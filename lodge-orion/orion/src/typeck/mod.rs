@@ -29,6 +29,9 @@ pub(crate) enum Ty {
     /// A user-declared `data` type — needed to dispatch method calls to the
     /// correct `impl Trait for Data` block (§14).
     Data(String),
+    /// Type variable from `fn name<T, U>(...)` — substituted at call sites
+    /// by `call_user_fn`. Acts as `Unknown` (wildcard) for assignability.
+    Var(String),
     /// Gradual seam — compatible with everything.
     Unknown,
 }
@@ -45,12 +48,17 @@ impl Ty {
             Ty::List(t) => format!("[{}]", t.show()),
             Ty::Enum(n) => n.clone(),
             Ty::Data(n) => n.clone(),
+            Ty::Var(n) => n.clone(),
             Ty::Unknown => "?".into(),
         }
     }
 }
 
 pub(crate) fn ty_of(t: &Type, enums: &HashSet<String>) -> Ty {
+    ty_of_with_generics(t, enums, &[])
+}
+
+pub(crate) fn ty_of_with_generics(t: &Type, enums: &HashSet<String>, generics: &[String]) -> Ty {
     match t {
         Type::Named(n) => match n.as_str() {
             "int" => Ty::Int,
@@ -58,12 +66,13 @@ pub(crate) fn ty_of(t: &Type, enums: &HashSet<String>) -> Ty {
             "bool" => Ty::Bool,
             "Text" => Ty::Text,
             "Entity" => Ty::Entity,
+            _ if generics.iter().any(|g| g == n) => Ty::Var(n.clone()),
             _ if enums.contains(n) => Ty::Enum(n.clone()),
             _ => Ty::Unknown,
         },
         Type::Range { .. } => Ty::Int,
-        Type::List(inner) => Ty::List(Box::new(ty_of(inner, enums))),
-        Type::Optional(inner) => ty_of(inner, enums),
+        Type::List(inner) => Ty::List(Box::new(ty_of_with_generics(inner, enums, generics))),
+        Type::Optional(inner) => ty_of_with_generics(inner, enums, generics),
     }
 }
 
@@ -76,6 +85,11 @@ pub(crate) fn numeric(t: &Ty) -> bool {
 /// assignable to `T` (so `[]: List<?>` flows into any `List<T>` parameter).
 pub(crate) fn assignable(target: &Ty, source: &Ty) -> bool {
     if target == source || *target == Ty::Unknown || *source == Ty::Unknown {
+        return true;
+    }
+    // Type variables match anything — they get pinned by substitution at the
+    // call site. Without this, generic params would reject all real values.
+    if matches!(target, Ty::Var(_)) || matches!(source, Ty::Var(_)) {
         return true;
     }
     if *target == Ty::Float && *source == Ty::Int {
@@ -164,8 +178,14 @@ fn build_cx(program: &Program, enums_set: &HashSet<String>) -> Cx {
                 }
             }
             Decl::Fn(f) => {
-                let ps = f.params.iter().map(|p| p.ty.as_ref().map(&resolve).unwrap_or(Ty::Unknown)).collect();
-                let ret = f.ret.as_ref().map(&resolve).unwrap_or(Ty::Unknown);
+                let ps: Vec<Ty> = f.params.iter()
+                    .map(|p| p.ty.as_ref()
+                        .map(|t| ty_of_with_generics(t, enums_set, &f.generics))
+                        .unwrap_or(Ty::Unknown))
+                    .collect();
+                let ret = f.ret.as_ref()
+                    .map(|t| ty_of_with_generics(t, enums_set, &f.generics))
+                    .unwrap_or(Ty::Unknown);
                 fns.insert(f.name.clone(), (ps, ret, f.generics.clone()));
             }
             Decl::Query(q) => {

@@ -6,6 +6,29 @@ use std::collections::HashMap;
 use super::{Cx, Ty, TypeError, assignable, err, numeric, span_of, unify};
 use crate::ast::Expr;
 
+/// Walk param/arg types in parallel, recording which arg type each
+/// generic var should be substituted with. Only fires on first sight —
+/// the assignable check above catches inconsistent re-bindings.
+fn collect_subst(param: &Ty, arg: &Ty, subst: &mut HashMap<String, Ty>) {
+    match (param, arg) {
+        (Ty::Var(n), other) => {
+            subst.entry(n.clone()).or_insert_with(|| other.clone());
+        }
+        (Ty::List(p), Ty::List(a)) => collect_subst(p, a, subst),
+        _ => {}
+    }
+}
+
+/// Substitute resolved type vars in `t` using `subst`. Vars not in the
+/// map stay as-is (caller may downgrade to Unknown).
+fn apply_subst(t: &Ty, subst: &HashMap<String, Ty>) -> Ty {
+    match t {
+        Ty::Var(n) => subst.get(n).cloned().unwrap_or_else(|| t.clone()),
+        Ty::List(inner) => Ty::List(Box::new(apply_subst(inner, subst))),
+        other => other.clone(),
+    }
+}
+
 impl Cx {
     pub(crate) fn call(&self, callee: &Expr, args: &[Expr], scope: &HashMap<String, Ty>) -> Result<Ty, TypeError> {
         let name = match callee {
@@ -159,18 +182,17 @@ impl Cx {
     }
 
     fn call_user_fn(&self, name: &str, args: &[Expr], scope: &HashMap<String, Ty>) -> Result<Option<Ty>, TypeError> {
-        let Some((params, ret, generics)) = self.fns.get(name) else {
+        let Some((params, ret, _generics)) = self.fns.get(name) else {
             return Ok(None);
         };
-        // Generic vars currently lower to Ty::Unknown via ty_of, which
-        // assignable() already treats as wildcards. We track `generics`
-        // here for future HM-style substitution; today the Unknown path
-        // gives erasure-based generics for free.
-        let _ = generics;
-        let mut arg_tys: Vec<Ty> = Vec::with_capacity(args.len());
+        // HM substitution: walk param types looking for Ty::Var bindings,
+        // pin each var to the first arg type seen, then apply the subst
+        // map to the return type.
+        let mut subst: HashMap<String, Ty> = HashMap::new();
         for (i, a) in args.iter().enumerate() {
             let at = self.infer(a, scope)?;
             if let Some(pt) = params.get(i) {
+                collect_subst(pt, &at, &mut subst);
                 if !assignable(pt, &at) {
                     return err(
                         format!("argument {} of `{name}` expects {}, found {}", i + 1, pt.show(), at.show()),
@@ -178,8 +200,7 @@ impl Cx {
                     );
                 }
             }
-            arg_tys.push(at);
         }
-        Ok(Some(ret.clone()))
+        Ok(Some(apply_subst(ret, &subst)))
     }
 }

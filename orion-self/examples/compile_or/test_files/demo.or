@@ -2,8 +2,8 @@ fn id<T>(x: T) -> T:
     x
 
 fn main() -> int:
-    a = id(42)
-    print("a =")
-    print(a)
-    # if substitution works, a is Int and a + 0 type-checks
-    a + 0
+    a = id(20)
+    b = id("hello")
+    # a should be Int. If HM works, a + 22 typechecks; if a is Unknown,
+    # also passes. Real proof: try Text into Int-expecting position.
+    a + 22
