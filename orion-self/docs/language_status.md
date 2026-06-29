@@ -24,6 +24,9 @@
 - `defer <expr>` — runs at block end + before any `return` (LIFO order; block-scope)
 - Pipe operator: `x |> f` → `f(x)`; `x |> f(a, b)` → `f(x, a, b)`
 - Exhaustiveness check on enum match (no wildcard → all variants required)
+- **First-class fn refs**: `f = some_fn` binds a fn-pointer; `f(args)` calls indirect
+- **Higher-order fns**: `fn apply(f: fn, x: int) -> int: f(x)` works end-to-end
+- Lambda parsing: `|x| x + 1` syntax parsed but lowering deferred (use named fn + ref instead)
 - Contracts: `require <cond>`, `ensure <cond>` (runtime checked)
 - `comptime` constant folding
 
@@ -53,8 +56,12 @@ bytes, text, fs, io, time, math, random, log, hash, json, csv, xml, regex, url, 
 
 ### Critical gaps (every modern language has these)
 1. **Generics** — `fn id<T>(x: T) -> T`, `List<int>` parameterized. 8-12h.
-2. **Closures** — `inc = fn(x) = x + 1`. Lambda AST is parsed but no codegen. 5-8h.
-3. **Type inference** — currently you annotate; full HM/bidirectional inference. 6-10h.
+2. **Lambda lift pass** — `|x| x + 1` inline syntax. Parser done; needs tree
+   walker that hoists Lambdas as `__lambda_N` top-level fns + rewrites
+   references. Workaround today: use named fns + first-class fn refs (works).
+3. **Closures with captures** — `fn outer(): adder = |y| x + y`. Needs env
+   struct + capture analysis on top of lambda lift. 5-8h.
+4. **Type inference** — currently you annotate; full HM/bidirectional inference. 6-10h.
 
 ### Important for next-gen game/AI
 4. **Async runtime** — effects are sync; need scheduler + libco for multi-shot. 15-25h.
