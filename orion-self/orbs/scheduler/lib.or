@@ -1,0 +1,55 @@
+# scheduler — cooperative task abstraction on top of the async orb.
+#
+# This is the user-space layer. A `Task` is a deadline + a fn_id the
+# dispatcher knows how to invoke. The run loop sleeps until the
+# earliest deadline, fires all due tasks, repeats until empty.
+#
+# Real preemptive scheduling with non-blocking I/O needs:
+#   - libco (or Windows fibers) for stack switching
+#   - IOCP (Windows) / epoll (Linux) for fd readiness
+#   - a worker pool for parallel execution
+# All future work. What this orb gives you today is a clean
+# event-loop pattern that composes with the existing setjmp/longjmp
+# continuations + the async timer queue.
+
+data Task: deadline_ms: int, fn_id: int, payload: int
+
+pub fn task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
+    Task{deadline_ms: monotonic_ms() + fire_in_ms, fn_id: fn_id, payload: payload}
+
+pub fn task_deadline(t: Task) -> int:
+    t.deadline_ms
+
+pub fn task_fn_id(t: Task) -> int:
+    t.fn_id
+
+pub fn task_payload(t: Task) -> int:
+    t.payload
+
+# Is this task ready to run (deadline ≤ now)?
+pub fn task_due(t: Task) -> int:
+    now = monotonic_ms()
+    if t.deadline_ms <= now then 1 else 0
+
+# Sleep until task fires. Returns immediately if already due.
+pub fn await_task(t: Task):
+    now = monotonic_ms()
+    remaining = t.deadline_ms - now
+    if remaining > 0:
+        sleep_ms(remaining)
+
+# Sleep until the earliest deadline in a list. Caller dispatches the
+# fired task(s) by inspecting `task_due` on each entry.
+pub fn await_next(tasks: [Task]):
+    n = len(tasks)
+    if n == 0:
+        return
+    mut earliest = at(tasks, 0).deadline_ms
+    for i in 1..<n:
+        d = at(tasks, i).deadline_ms
+        if d < earliest:
+            earliest = d
+    now = monotonic_ms()
+    remaining = earliest - now
+    if remaining > 0:
+        sleep_ms(remaining)
