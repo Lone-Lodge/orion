@@ -1250,6 +1250,21 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
     mut cursor = position + 1
     name = psr_peek_value(tokens, cursor)
     cursor += 1
+    # Optional generic type-param list: `fn name<T, U>(...)`. Erasure-based —
+    # parser accepts and skips, semantics treats T/U as ptr/i64 fallthrough.
+    # Real monomorphization is a future generation of the type system.
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
+        cursor = cursor + 1
+        loop:
+            tp_kind = psr_peek_kind(tokens, cursor)
+            tp_val = psr_peek_value(tokens, cursor)
+            if tp_kind == "symbol" and tp_val == ">":
+                cursor = cursor + 1
+                break
+            if tp_kind == "eof":
+                break
+            # ident param or comma separator
+            cursor = cursor + 1
     # Skip `(`.
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
         cursor += 1
