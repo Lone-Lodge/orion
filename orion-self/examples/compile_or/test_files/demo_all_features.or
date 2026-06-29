@@ -1,0 +1,37 @@
+# Demo: showcase the closure/generics/SIMD MVP features shipped today.
+# Run via lodge-orion's interpreter:
+#   orbit.exe run demo_all_features.or main
+
+fn id<T>(value: T) -> T:
+    value
+
+fn pair_first<A, B>(left: A, right: B) -> A:
+    left
+
+fn main() -> int:
+    # Generics — type vars erased to int/ptr.
+    a = id(20)
+    b = pair_first(22, 999)
+
+    # Closure with capture: `a` is captured.
+    add_a = |y| a + y
+    closured = add_a(0)
+
+    # SIMD-style list ops.
+    xs = [1, 2, 3, 4]
+    ys = [10, 20, 30, 40]
+    dot = vec_dot(xs, ys)
+    sum = vec_add(xs, ys)
+
+    print("generics:")
+    print(a)
+    print(b)
+    print("closure:")
+    print(closured)
+    print("simd dot:")
+    print(dot)
+    print("simd vec_add[0]:")
+    print(at(sum, 0))
+
+    # Combine: a (20) + b (22) = 42
+    a + b
