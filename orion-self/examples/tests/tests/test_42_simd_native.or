@@ -1,0 +1,6 @@
+fn main() -> int:
+    a = [1, 2, 3, 4]
+    b = [10, 20, 30, 40]
+    # vec_dot = 10+40+90+160 = 300; offset to 42
+    dot = vec_dot(a, b)
+    dot - 258

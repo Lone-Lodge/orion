@@ -1,0 +1,4 @@
+fn main() -> int:
+    mut x = 10
+    x = x + 32
+    x

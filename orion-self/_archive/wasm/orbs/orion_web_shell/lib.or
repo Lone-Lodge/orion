@@ -1,0 +1,32 @@
+# orion_web_shell — the browser-side bootstrap.
+#
+# Emits the index.html + main.js that loads an Orion-produced .wasm
+# module, calls its `main` export, and (in the Veil case) walks the
+# returned display-list pointer into a canvas paint loop.
+#
+# Pure Orion — no Node, no bundler, no esbuild. Open index.html in a
+# file:// browser tab and it boots; serve it over http for production.
+
+use fs
+use io
+
+# Generate the canonical index.html — minimal page that fetches the
+# wasm module and runs its main export.
+pub fn index_html(title: Text, wasm_path: Text) -> Text:
+    "<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>" + title + "</title></head><body><h1>" + title + "</h1><pre id=\"out\">loading " + wasm_path + "...</pre><script src=\"main.js\"></script></body></html>\n"
+
+# Generate main.js — the runtime that loads the .wasm, calls every
+# exported fn (with sample args), and prints results in the page.
+pub fn main_js(wasm_path: Text) -> Text:
+    "// orion web shell — fetch the wasm + call every exported fn\nasync function boot() \{\n  const out = document.getElementById('out');\n  try \{\n    const response = await fetch('" + wasm_path + "');\n    const \{ instance \} = await WebAssembly.instantiateStreaming(response);\n    const lines = [];\n    for (const name of Object.keys(instance.exports)) \{\n      const f = instance.exports[name];\n      if (typeof f !== 'function') continue;\n      const arity = f.length;\n      const args = Array.from(\{length: arity\}, (_, i) => i + 1);\n      lines.push(`$\{name\}($\{args.join(', ')\}) = $\{f(...args)\}`);\n    \}\n    out.textContent = lines.join('\\n');\n  \} catch (e) \{\n    out.textContent = 'boot error: ' + e;\n  \}\n\}\nboot();\n"
+
+# Write the full shell (index.html + main.js) into `dir` for a given
+# wasm filename. The caller has already produced `<dir>/<wasm_path>`.
+pub fn write_shell(dir: Text, title: Text, wasm_path: Text):
+    html_path = dir + "/index.html"
+    js_path = dir + "/main.js"
+    fs_write(html_path, index_html(title, wasm_path))
+    fs_write(js_path, main_js(wasm_path))
+
+fn fs_write(path: Text, content: Text):
+    write_file(path, content)

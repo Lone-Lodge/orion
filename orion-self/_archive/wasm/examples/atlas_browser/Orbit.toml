@@ -1,0 +1,10 @@
+[package]
+name = "atlas-browser"
+version = "0.0.1"
+description = "Atlas Session running in the browser — entities + motion + render"
+
+[orbs]
+orion_emit_wasm = "path:../../orbs/orion_emit_wasm"
+bytes = "*"
+io = "*"
+fs = "*"

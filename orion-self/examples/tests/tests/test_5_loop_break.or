@@ -1,0 +1,7 @@
+fn main() -> int:
+    mut n = 0
+    loop:
+        if n >= 5:
+            break
+        n = n + 1
+    n

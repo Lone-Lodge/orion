@@ -1,0 +1,87 @@
+# async — cooperative async helpers built on the new timing primitives.
+#
+# This orb is the user-space layer above the runtime builtins:
+#   - time_now_ms()     — wall clock (non-deterministic)
+#   - monotonic_ms()    — monotonic since process start
+#   - sleep_ms(n)       — blocking yield to OS
+#
+# A real preemptive scheduler with non-blocking I/O is future work
+# (libco + IOCP/epoll bindings). What this orb gives you today is the
+# cooperative subset: deadline tracking, periodic ticks, and a
+# `sleep_until` helper that's deadline-stable across loop iterations.
+
+# Sleep until the monotonic clock reaches `deadline_ms`. If we're already
+# past it, returns immediately. Otherwise sleeps the remaining time.
+pub fn sleep_until(deadline_ms: int):
+    now = monotonic_ms()
+    remaining = deadline_ms - now
+    if remaining > 0:
+        sleep_ms(remaining)
+
+# Sleep for at least `duration_ms`. Wrapper that documents intent —
+# `sleep_ms` directly works too, but `delay` reads better in async code.
+pub fn delay(duration_ms: int):
+    if duration_ms > 0:
+        sleep_ms(duration_ms)
+
+# Return the monotonic clock value `offset_ms` from now. Useful for
+# building deadlines: `deadline = deadline_from_now(100)` then later
+# `sleep_until(deadline)`.
+pub fn deadline_from_now(offset_ms: int) -> int:
+    monotonic_ms() + offset_ms
+
+# Did `deadline_ms` already pass? Plain comparison helper for readability
+# in event loops.
+pub fn past_deadline(deadline_ms: int) -> int:
+    now = monotonic_ms()
+    if now >= deadline_ms then 1 else 0
+
+# Number of ms remaining until `deadline_ms`, clamped to 0 if past.
+pub fn time_left(deadline_ms: int) -> int:
+    now = monotonic_ms()
+    delta = deadline_ms - now
+    if delta < 0 then 0 else delta
+
+# --- Deadline-driven timer queue ---
+# A poor-person's scheduler: keep deadlines in a list, advance the clock,
+# fire any whose deadline has passed. Pure data — no callbacks. The
+# caller drives the loop and dispatches based on the fired ids.
+#
+# Returns a list of timer-deadlines. Use add_timer / pop_due / next_due.
+
+# Build an empty timer queue.
+pub fn timers_new() -> [int]:
+    bytes_zeros(0)
+
+# Push a timer that fires `offset_ms` from now. Returns the new queue.
+pub fn add_timer(timers: [int], offset_ms: int) -> [int]:
+    push(timers, deadline_from_now(offset_ms))
+
+# Earliest deadline in the queue, or -1 if empty.
+pub fn next_due(timers: [int]) -> int:
+    n = len(timers)
+    if n == 0:
+        return 0 - 1
+    mut best = at(timers, 0)
+    for i in 1..<n:
+        d = at(timers, i)
+        if d < best:
+            best = d
+    best
+
+# How many timers have already fired (deadline <= now)?
+pub fn count_due(timers: [int]) -> int:
+    n = len(timers)
+    now = monotonic_ms()
+    mut count = 0
+    for i in 0..<n:
+        if at(timers, i) <= now:
+            count = count + 1
+    count
+
+# Sleep until the next deadline fires. Returns immediately if past or
+# the queue is empty. Caller is expected to dispatch after this returns.
+pub fn wait_next(timers: [int]):
+    nd = next_due(timers)
+    if nd > 0:
+        sleep_until(nd)

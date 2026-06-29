@@ -1,0 +1,10 @@
+data Point: x: int, y: int
+data Line: start: Point, end: Point
+
+fn main() -> int:
+    p1 = Point{x: 1, y: 2}
+    p2 = Point{x: 3, y: 4}
+    line = Line{start: p1, end: p2}
+    # line.start.x = 1, line.end.y = 4
+    # 1 + 4 + 5 + 32 = 42
+    line.start.x + line.end.y + 5 + 32

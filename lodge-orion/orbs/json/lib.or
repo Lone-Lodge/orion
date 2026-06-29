@@ -1,0 +1,353 @@
+# json — JSON parse / stringify, pure Orion.
+#
+# Recursive-descent parser. Position is threaded through every parse_*
+# function via a `{"v": value, "p": new_position}` map (Orion's gradual
+# typing treats Map as Unknown, which lets parse fns mix different
+# value types — int, float, text, list, map — in the same return slot
+# without tripping the typeck's branch-unification check).
+#
+# Coverage: null, true, false, ints, floats with decimals, basic-escape
+# strings, arrays, objects. NOT covered: \uXXXX escapes, scientific
+# notation. Good enough for save files, config, simple APIs.
+
+# ---- stringify (pure Orion since v0.0.12) ----
+
+fn escape_text(text: Text) -> Text:
+    bytes = bytes_from_text(text)
+    byte_count = bytes_length(bytes)
+    mut output = push(bytes_zeros(0), 34)
+    for byte_index in 0..<byte_count:
+        character = byte_at(bytes, byte_index)
+        if character == 34:
+            output = push(output, 92)
+            output = push(output, 34)
+        else:
+            if character == 92:
+                output = push(output, 92)
+                output = push(output, 92)
+            else:
+                if character == 10:
+                    output = push(output, 92)
+                    output = push(output, 110)
+                else:
+                    if character == 13:
+                        output = push(output, 92)
+                        output = push(output, 114)
+                    else:
+                        if character == 9:
+                            output = push(output, 92)
+                            output = push(output, 116)
+                        else:
+                            output = push(output, character)
+    output = push(output, 34)
+    bytes_to_text(output)
+
+fn stringify_list(items) -> Text:
+    count = len(items)
+    if count == 0:
+        "[]"
+    else:
+        mut output = "["
+        for index in 0..<count:
+            if index > 0:
+                output = output + ","
+            output = output + json_stringify(at(items, index))
+        output + "]"
+
+fn stringify_map(pairs) -> Text:
+    keys = map_keys(pairs)
+    count = len(keys)
+    if count == 0:
+        "\{\}"
+    else:
+        mut output = "\{"
+        for index in 0..<count:
+            if index > 0:
+                output = output + ","
+            key = at(keys, index)
+            output = output + escape_text(key) + ":" + json_stringify(get(pairs, key))
+        output + "\}"
+
+pub fn json_stringify(value) -> Text:
+    tag = type_of(value)
+    if tag == "none":
+        "null"
+    else:
+        if tag == "unit":
+            "null"
+        else:
+            if tag == "bool":
+                if value then "true" else "false"
+            else:
+                if tag == "int":
+                    fmt_int(value, 0)
+                else:
+                    if tag == "float":
+                        fmt_float(value, 6)
+                    else:
+                        if tag == "text":
+                            escape_text(value)
+                        else:
+                            if tag == "list":
+                                stringify_list(value)
+                            else:
+                                if tag == "map":
+                                    stringify_map(value)
+                                else:
+                                    "null"
+
+# ---- parser helpers ----
+
+fn is_digit(character: int) -> bool:
+    character >= 48 and character <= 57
+
+fn skip_whitespace(bytes: [int], total: int, start: int) -> int:
+    mut position = start
+    loop:
+        if position >= total:
+            break
+        character = byte_at(bytes, position)
+        if character == 32 or character == 9 or character == 10 or character == 13:
+            position += 1
+        else:
+            break
+    position
+
+# Convention: every parse_* fn returns { "v": value, "p": new_position }.
+# A `v` of `none` means the sub-parser failed — the caller propagates
+# by returning the same shape so the top-level `json_parse` can detect
+# the failure via type_of(value) == "none".
+
+fn parse_null(bytes: [int], total: int, start: int):
+    if start + 4 > total:
+        {"v": none, "p": start}
+    else:
+        if byte_at(bytes, start) == 110 and byte_at(bytes, start + 1) == 117 and byte_at(bytes, start + 2) == 108 and byte_at(bytes, start + 3) == 108:
+            # `null` parses to `none`, but successfully — use a sentinel position
+            # different from start so caller knows we matched.
+            {"v": none, "p": start + 4}
+        else:
+            {"v": none, "p": start}
+
+fn parse_true(bytes: [int], total: int, start: int):
+    if start + 4 > total:
+        {"v": none, "p": start}
+    else:
+        if byte_at(bytes, start) == 116 and byte_at(bytes, start + 1) == 114 and byte_at(bytes, start + 2) == 117 and byte_at(bytes, start + 3) == 101:
+            {"v": true, "p": start + 4}
+        else:
+            {"v": none, "p": start}
+
+fn parse_false(bytes: [int], total: int, start: int):
+    if start + 5 > total:
+        {"v": none, "p": start}
+    else:
+        if byte_at(bytes, start) == 102 and byte_at(bytes, start + 1) == 97 and byte_at(bytes, start + 2) == 108 and byte_at(bytes, start + 3) == 115 and byte_at(bytes, start + 4) == 101:
+            {"v": false, "p": start + 5}
+        else:
+            {"v": none, "p": start}
+
+fn parse_string(bytes: [int], total: int, start: int):
+    mut position = start + 1
+    mut buffer = bytes_zeros(0)
+    mut failed = false
+    mut done = false
+    loop:
+        if done or failed:
+            break
+        if position >= total:
+            failed = true
+            break
+        character = byte_at(bytes, position)
+        if character == 34:
+            position += 1
+            done = true
+        else:
+            if character == 92:
+                if position + 1 >= total:
+                    failed = true
+                else:
+                    next_character = byte_at(bytes, position + 1)
+                    if next_character == 34:
+                        buffer = push(buffer, 34)
+                    else:
+                        if next_character == 92:
+                            buffer = push(buffer, 92)
+                        else:
+                            if next_character == 47:
+                                buffer = push(buffer, 47)
+                            else:
+                                if next_character == 110:
+                                    buffer = push(buffer, 10)
+                                else:
+                                    if next_character == 114:
+                                        buffer = push(buffer, 13)
+                                    else:
+                                        if next_character == 116:
+                                            buffer = push(buffer, 9)
+                                        else:
+                                            buffer = push(buffer, next_character)
+                    position += 2
+            else:
+                buffer = push(buffer, character)
+                position += 1
+    if failed:
+        {"v": none, "p": position}
+    else:
+        {"v": bytes_to_text(buffer), "p": position}
+
+fn parse_number(bytes: [int], total: int, start: int):
+    mut position = start
+    mut is_negative = false
+    if position < total and byte_at(bytes, position) == 45:
+        is_negative = true
+        position += 1
+    if position >= total:
+        {"v": none, "p": start}
+    else:
+        if not is_digit(byte_at(bytes, position)):
+            {"v": none, "p": start}
+        else:
+            mut int_value = 0
+            loop:
+                if position >= total:
+                    break
+                character = byte_at(bytes, position)
+                if not is_digit(character):
+                    break
+                int_value = int_value * 10 + (character - 48)
+                position += 1
+            if position < total and byte_at(bytes, position) == 46:
+                position += 1
+                mut frac_value = 0.0
+                mut frac_divisor = 1.0
+                loop:
+                    if position >= total:
+                        break
+                    character = byte_at(bytes, position)
+                    if not is_digit(character):
+                        break
+                    frac_value = frac_value * 10.0 + to_float(character - 48)
+                    frac_divisor = frac_divisor * 10.0
+                    position += 1
+                combined = to_float(int_value) + frac_value / frac_divisor
+                signed_float = if is_negative then 0.0 - combined else combined
+                {"v": signed_float, "p": position}
+            else:
+                signed_int = if is_negative then 0 - int_value else int_value
+                {"v": signed_int, "p": position}
+
+fn parse_array(bytes: [int], total: int, start: int):
+    mut position = skip_whitespace(bytes, total, start + 1)
+    if position < total and byte_at(bytes, position) == 93:
+        {"v": [], "p": position + 1}
+    else:
+        mut items = []
+        mut failed = false
+        mut done = false
+        loop:
+            if done or failed:
+                break
+            element_result = parse_value(bytes, total, position)
+            element_value = get(element_result, "v")
+            position = get(element_result, "p")
+            items = push(items, element_value)
+            position = skip_whitespace(bytes, total, position)
+            if position >= total:
+                failed = true
+            else:
+                next_byte = byte_at(bytes, position)
+                if next_byte == 93:
+                    position += 1
+                    done = true
+                else:
+                    if next_byte == 44:
+                        position = skip_whitespace(bytes, total, position + 1)
+                    else:
+                        failed = true
+        if failed then {"v": none, "p": position}
+        else {"v": items, "p": position}
+
+fn parse_object(bytes: [int], total: int, start: int):
+    mut position = skip_whitespace(bytes, total, start + 1)
+    if position < total and byte_at(bytes, position) == 125:
+        {"v": {}, "p": position + 1}
+    else:
+        mut pairs = {}
+        mut failed = false
+        mut done = false
+        loop:
+            if done or failed:
+                break
+            position = skip_whitespace(bytes, total, position)
+            if position >= total:
+                failed = true
+            else:
+                if byte_at(bytes, position) != 34:
+                    failed = true
+                else:
+                    key_result = parse_string(bytes, total, position)
+                    key_text = get(key_result, "v")
+                    position = get(key_result, "p")
+                    position = skip_whitespace(bytes, total, position)
+                    if position >= total or byte_at(bytes, position) != 58:
+                        failed = true
+                    else:
+                        position = skip_whitespace(bytes, total, position + 1)
+                        value_result = parse_value(bytes, total, position)
+                        pairs = set(pairs, key_text, get(value_result, "v"))
+                        position = get(value_result, "p")
+                        position = skip_whitespace(bytes, total, position)
+                        if position >= total:
+                            failed = true
+                        else:
+                            next_byte = byte_at(bytes, position)
+                            if next_byte == 125:
+                                position += 1
+                                done = true
+                            else:
+                                if next_byte == 44:
+                                    position += 1
+                                else:
+                                    failed = true
+        if failed then {"v": none, "p": position}
+        else {"v": pairs, "p": position}
+
+fn parse_value(bytes: [int], total: int, start: int):
+    position = skip_whitespace(bytes, total, start)
+    if position >= total:
+        {"v": none, "p": position}
+    else:
+        character = byte_at(bytes, position)
+        if character == 123:
+            parse_object(bytes, total, position)
+        else:
+            if character == 91:
+                parse_array(bytes, total, position)
+            else:
+                if character == 34:
+                    parse_string(bytes, total, position)
+                else:
+                    if character == 110:
+                        parse_null(bytes, total, position)
+                    else:
+                        if character == 116:
+                            parse_true(bytes, total, position)
+                        else:
+                            if character == 102:
+                                parse_false(bytes, total, position)
+                            else:
+                                if character == 45 or is_digit(character):
+                                    parse_number(bytes, total, position)
+                                else:
+                                    {"v": none, "p": position}
+
+pub fn json_parse(text: Text):
+    bytes = bytes_from_text(text)
+    total = bytes_length(bytes)
+    result = parse_value(bytes, total, 0)
+    final_position = skip_whitespace(bytes, total, get(result, "p"))
+    # Top-level: if the parse didn't consume the entire input or the first
+    # character couldn't even start a value (final_position == 0), bail.
+    if final_position != total or final_position == 0 then none
+    else get(result, "v")

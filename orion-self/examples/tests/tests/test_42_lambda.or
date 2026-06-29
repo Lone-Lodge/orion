@@ -1,0 +1,9 @@
+fn main() -> int:
+    # Inline lambda — lifted to a synthesized __lambda_0 fn at compile time.
+    # No captures supported yet; the body must be closed.
+    double = |x| x * 2
+    inc = |x| x + 1
+    # 10 → double(10)=20 → inc(20)=21 → 21*2=42
+    a = double(10)
+    b = inc(a)
+    b * 2

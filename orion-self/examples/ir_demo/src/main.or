@@ -1,0 +1,98 @@
+use orion_ir
+use io
+
+# Stage 1 demo: build IR for some functions, validate, dump as text.
+#
+# Now using typed `data` structs throughout — no more Map.get hacks,
+# no more ir_to_int. Just clean field access: fn.name, inst.value.
+
+fn build_main_42() -> IRFn:
+    # fn main() -> i64:
+    #     return 42
+    f0 = ir_fn_new("main", "i64")
+
+    step1 = ir_fn_push(f0, ir_iconst(42))
+    f1 = step1.function
+    const_id = step1.id
+
+    step2 = ir_fn_push(f1, ir_return(const_id))
+    step2.function
+
+fn build_add_two() -> IRFn:
+    # fn add_two(a: i64, b: i64) -> i64:
+    #     return a + b
+    f0 = ir_fn_new("add_two", "i64")
+    f1 = ir_fn_add_param(f0, "a", "i64")
+    f2 = ir_fn_add_param(f1, "b", "i64")
+
+    # Params are values v0, v1 in the SSA value space; we model them as
+    # iconst placeholders for v1.0. Proper param-as-value support comes
+    # with basic blocks in v1.1.
+    step1 = ir_fn_push(f2, ir_iconst(0))
+    f3 = step1.function
+    v_a = step1.id
+
+    step2 = ir_fn_push(f3, ir_iconst(0))
+    f4 = step2.function
+    v_b = step2.id
+
+    step3 = ir_fn_push(f4, ir_iadd(v_a, v_b))
+    f5 = step3.function
+    v_sum = step3.id
+
+    step4 = ir_fn_push(f5, ir_return(v_sum))
+    step4.function
+
+fn build_complex() -> IRFn:
+    # fn compute() -> i64:
+    #     return (10 + 5) * (20 - 8)
+    f0 = ir_fn_new("compute", "i64")
+
+    mut s = ir_fn_push(f0, ir_iconst(10))
+    f1 = s.function
+    v10 = s.id
+
+    s = ir_fn_push(f1, ir_iconst(5))
+    f2 = s.function
+    v5 = s.id
+
+    s = ir_fn_push(f2, ir_iadd(v10, v5))
+    f3 = s.function
+    v_sum = s.id
+
+    s = ir_fn_push(f3, ir_iconst(20))
+    f4 = s.function
+    v20 = s.id
+
+    s = ir_fn_push(f4, ir_iconst(8))
+    f5 = s.function
+    v8 = s.id
+
+    s = ir_fn_push(f5, ir_isub(v20, v8))
+    f6 = s.function
+    v_diff = s.id
+
+    s = ir_fn_push(f6, ir_imul(v_sum, v_diff))
+    f7 = s.function
+    v_result = s.id
+
+    s = ir_fn_push(f7, ir_return(v_result))
+    s.function
+
+fn main() -> int:
+    print_line("=== Stage 1: IR builder demo ===")
+    print_line("")
+
+    main_fn = build_main_42()
+    add_fn = build_add_two()
+    complex_fn = build_complex()
+
+    m0 = ir_module_new()
+    m1 = ir_module_add_fn(m0, main_fn)
+    m2 = ir_module_add_fn(m1, add_fn)
+    m3 = ir_module_add_fn(m2, complex_fn)
+
+    print_line(ir_dump_module(m3))
+
+    print_line("IR layer working.")
+    0

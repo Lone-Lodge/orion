@@ -1,0 +1,8 @@
+fn main() -> int:
+    mut xs = []
+    n_empty = len(xs)
+    xs = push(xs, 21)
+    xs = push(xs, 21)
+    n_full = len(xs)
+    # 21 + 21 + 0 + 0 = 42
+    at(xs, 0) + at(xs, 1) + n_empty + (n_full - 2)

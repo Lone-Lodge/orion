@@ -1,0 +1,7 @@
+name = "orion_emit_llvm"
+version = "0.1.0"
+description = "Emit LLVM IR text from orion_ir for the LLVM backend pipeline"
+
+[orbs]
+orion_ir = "path:../orion_ir"
+bytes = "*"

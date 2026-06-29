@@ -1,0 +1,128 @@
+use orion_lex
+use orion_parse
+use orion_ir
+use orion_ast_to_ir
+use orion_emit_llvm
+use io
+use fs
+use time
+use bytes
+use process
+
+
+fn int_to_text(value: int) -> Text:
+    if value == 0:
+        "0"
+    else:
+        digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        mut n = if value < 0 then 0 - value else value
+        mut chars = ""
+        for _ in 0..<20:
+            if n > 0:
+                d = at(digits, n % 10)
+                chars = "{d}{chars}"
+                n = n / 10
+        if value < 0 then "-{chars}" else chars
+
+
+fn spaces(count: int) -> Text:
+    mut result = ""
+    for _ in 0..<count:
+        result = "{result} "
+    result
+
+
+fn padr(text: Text, width: int) -> Text:
+    cur = len(bytes_from_text(text))
+    if cur >= width then text else "{text}{spaces(width - cur)}"
+
+
+fn padl(text: Text, width: int) -> Text:
+    cur = len(bytes_from_text(text))
+    if cur >= width then text else "{spaces(width - cur)}{text}"
+
+
+fn ms_text(seconds: f64) -> Text:
+    ms_int = to_int(seconds * 1000.0)
+    "{padl(int_to_text(ms_int), 4)} ms"
+
+
+fn report_row(label: Text, info: Text, ms_seconds: f64):
+    l = padr(label, 12)
+    i = padr(info, 22)
+    t = ms_text(ms_seconds)
+    print_line("    {l}{i}{t}")
+
+
+pub fn compile_file(input: Text, output: Text):
+    print_line("")
+    print_line("   Compiling  {input} (LLVM backend)")
+    print_line("")
+
+    src = read_file(input)
+    src_bytes = bytes_from_text(src)
+    src_len = len(src_bytes)
+    label = padr("source", 12)
+    info = int_to_text(src_len) + " bytes"
+    print_line("    {label}{info}")
+
+    t_lex = now()
+    tokens = self_lex(src)
+    d_lex = elapsed(t_lex)
+    report_row("lex", int_to_text(len(tokens)) + " tokens", d_lex)
+
+    t_parse = now()
+    ast = self_parse(tokens)
+    d_parse = elapsed(t_parse)
+    decls = get(ast, "decls")
+    report_row("parse", int_to_text(len(decls)) + " fn", d_parse)
+
+    t_ir = now()
+    module = ast_program_to_ir(ast)
+    d_ir = elapsed(t_ir)
+    n_fns = len(module.functions)
+    mut total_insts = 0
+    for fi in 0..<n_fns:
+        f = at(module.functions, fi)
+        total_insts = total_insts + len(f.instructions)
+    report_row("ir", int_to_text(n_fns) + " fns, " + int_to_text(total_insts) + " insts", d_ir)
+
+    t_em = now()
+    llvm_text = emit_module(module)
+    d_em = elapsed(t_em)
+    report_row("emit ll", int_to_text(len(bytes_from_text(llvm_text))) + " bytes", d_em)
+
+    # Write .ll to disk.
+    mkdir_all("dist")
+    ll_path = "dist/demo.ll"
+    write_file(ll_path, llvm_text)
+
+    # Call clang to compile.
+    t_link = now()
+    clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
+    args = [ll_path, "-o", output]
+    exit_code = run_command(clang_path, args)
+    d_link = elapsed(t_link)
+    if exit_code == 0:
+        report_row("clang", output, d_link)
+    else:
+        print_line("    clang       FAILED exit={exit_code}")
+        print_line("")
+        print_line("   Compilation aborted (no .exe written)")
+        print_line("")
+
+    if exit_code == 0:
+        total = d_lex + d_parse + d_ir + d_em + d_link
+        pad = padr("", 34)
+        tot_label = padr("total", 34)
+        tot_time = ms_text(total)
+        print_line("    {pad}-------")
+        print_line("    {tot_label}{tot_time}")
+        print_line("")
+        print_line("   Done -> {output}")
+        print_line("")
+
+
+fn main() -> int:
+    compile_file("test_files/demo.or", "dist/demo.exe")
+    0

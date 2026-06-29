@@ -1,0 +1,5 @@
+# A module — imported by app.or via `use geometry`.
+
+fn area(w: int, h: int) -> int = w * h
+
+fn perimeter(w: int, h: int) -> int = 2 * (w + h)

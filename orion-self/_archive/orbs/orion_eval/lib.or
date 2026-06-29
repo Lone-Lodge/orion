@@ -1,0 +1,114 @@
+use bytes
+use io
+
+# orion_self_eval — Orion interpreter written in Orion. STEP 6 PROOF.
+#
+# Meta-circular eval: takes the AST produced by `self_parse`, walks it,
+# returns the result of calling `entry_name(args)`. The full interp
+# needs hundreds of cases (mut, loop, if/else, match, traits, ownership)
+# — this proof handles enough to run `add(2, 3) -> 5`, which is the
+# concrete demonstration that Orion can host Orion.
+#
+# Once this version is feature-complete, `orion run` could itself be a
+# pure-Orion program: it `read_file`s a `.or` file, lexes, parses,
+# typechecks, and evaluates — no Rust interpreter needed. Step 7
+# replaces the eval-loop with a code generator; step 8 deletes the
+# Rust kernel entirely.
+
+# --- scope: list of {"name": Text, "value": <runtime value>} ---
+
+fn ev_scope_empty():
+    []
+
+fn ev_scope_bind(scope, name: Text, value):
+    push(scope, {"name": name, "value": value})
+
+fn ev_scope_lookup(scope, name: Text) -> int:
+    # Returns the integer value bound to `name`. The proof only handles
+    # int values; a richer interp returns a tagged Map.
+    total = len(scope)
+    mut result = 0
+    for index in 0..<total:
+        entry = at(scope, index)
+        if bytes_to_text(bytes_from_text(get(entry, "name"))) == name:
+            result = get(entry, "value")
+    result
+
+# --- expression eval (int-typed proof) ---
+
+fn ev_expr(node, scope, decls) -> int:
+    kind = bytes_to_text(bytes_from_text(get(node, "kind")))
+    if kind == "Int":
+        text_value = bytes_to_text(bytes_from_text(get(node, "value")))
+        str_to_int(text_value)
+    else:
+        if kind == "Ident":
+            name = bytes_to_text(bytes_from_text(get(node, "name")))
+            ev_scope_lookup(scope, name)
+        else:
+            if kind == "Binary":
+                left_value = ev_expr(get(node, "left"), scope, decls)
+                right_value = ev_expr(get(node, "right"), scope, decls)
+                op_text = bytes_to_text(bytes_from_text(get(node, "op")))
+                if op_text == "+":
+                    left_value + right_value
+                else:
+                    if op_text == "-":
+                        left_value - right_value
+                    else:
+                        0
+            else:
+                if kind == "Call":
+                    # Look up the callee in the program's decl list, build a
+                    # scope from its params + the evaluated args, and recurse.
+                    callee_name = bytes_to_text(bytes_from_text(get(node, "callee")))
+                    args = get(node, "args")
+                    ev_call_named(callee_name, args, scope, decls)
+                else:
+                    0
+
+# Evaluate args in the *caller's* scope, then jump into the callee.
+fn ev_call_named(name: Text, args, caller_scope, decls) -> int:
+    decl_count = len(decls)
+    mut return_value = 0
+    mut found = false
+    for index in 0..<decl_count:
+        candidate = at(decls, index)
+        if not found:
+            candidate_name = bytes_to_text(bytes_from_text(get(candidate, "name")))
+            if candidate_name == name:
+                params = get(candidate, "params")
+                param_count = len(params)
+                mut call_scope = ev_scope_empty()
+                for arg_index in 0..<param_count:
+                    param = at(params, arg_index)
+                    param_name = bytes_to_text(bytes_from_text(get(param, "name")))
+                    arg_node = at(args, arg_index)
+                    arg_value = ev_expr(arg_node, caller_scope, decls)
+                    call_scope = ev_scope_bind(call_scope, param_name, arg_value)
+                return_value = ev_expr(get(candidate, "body"), call_scope, decls)
+                found = true
+    return_value
+
+# --- top-level: run a named fn with int args ---
+
+pub fn self_eval(ast, entry_name: Text, arg_values: [int]) -> int:
+    decls = get(ast, "decls")
+    decl_count = len(decls)
+    mut result = 0
+    mut found = false
+    for index in 0..<decl_count:
+        candidate = at(decls, index)
+        if not found:
+            candidate_name = bytes_to_text(bytes_from_text(get(candidate, "name")))
+            if candidate_name == entry_name:
+                params = get(candidate, "params")
+                param_count = len(params)
+                mut entry_scope = ev_scope_empty()
+                for binding_index in 0..<param_count:
+                    param_name = bytes_to_text(bytes_from_text(get(at(params, binding_index), "name")))
+                    arg_value = at(arg_values, binding_index)
+                    entry_scope = ev_scope_bind(entry_scope, param_name, arg_value)
+                result = ev_expr(get(candidate, "body"), entry_scope, decls)
+                found = true
+    result

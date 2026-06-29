@@ -1,0 +1,7 @@
+name = "path"
+version = "0.0.1"
+description = "orion stdlib orb: path"
+license = "MIT"
+
+[orbs]
+bytes = { built-in = true }

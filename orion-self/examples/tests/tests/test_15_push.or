@@ -1,0 +1,9 @@
+fn main() -> int:
+    mut xs = [10, 20]
+    xs = push(xs, 30)
+    xs = push(xs, 40)
+    xs = push(xs, 50)
+    mut sum = 0
+    for x in xs:
+        sum = sum + x
+    sum / 10

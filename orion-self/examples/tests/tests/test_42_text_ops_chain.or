@@ -1,0 +1,11 @@
+fn main() -> int:
+    base = "hello world!"
+    n = len(base)
+    # len("hello world!") = 12
+    sub = slice(base, 6, 11)  # "world"
+    # contains("world", "or") = true
+    if contains(sub, "or"):
+        # 12*3 = 36 + 6 = 42
+        n * 3 + 6
+    else:
+        0

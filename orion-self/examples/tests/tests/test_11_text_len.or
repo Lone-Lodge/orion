@@ -1,0 +1,3 @@
+fn main() -> int:
+    s = "hello world"
+    len(s)

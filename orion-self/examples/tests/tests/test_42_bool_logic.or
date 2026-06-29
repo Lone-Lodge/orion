@@ -1,0 +1,11 @@
+fn main() -> int:
+    a = true
+    b = false
+    # true and not false = true and true = true
+    c = a and not b
+    # 0 or true = true
+    d = b or a
+    if c and d:
+        42
+    else:
+        0

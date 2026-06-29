@@ -1,0 +1,8 @@
+fn main() -> int:
+    if argc() < 2:
+        print_line("usage: cat <file>")
+        0 - 1
+    else:
+        contents = file_read(argv(1))
+        print_line(contents)
+        0

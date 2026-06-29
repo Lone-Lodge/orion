@@ -1,0 +1,9 @@
+fn main() -> int:
+    s1 = {"kind": "Int", "value": "42"}
+    inner = {"items": [s1]}
+    items = get_list(inner, "items")
+    item = at(items, 0)
+    if get(item, "kind") == "Int":
+        42
+    else:
+        0

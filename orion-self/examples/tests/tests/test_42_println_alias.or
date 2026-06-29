@@ -1,0 +1,4 @@
+fn main() -> int:
+    println("Hello via println!")
+    print_line("Hello via print_line!")
+    42

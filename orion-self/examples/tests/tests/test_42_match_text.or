@@ -1,0 +1,12 @@
+fn main() -> int:
+    kind_val = 2
+    # Match with int patterns + text branches in expression position.
+    # Both bugs (match-as-expr + match-int-text) now fixed.
+    kind_text = match kind_val:
+        1 -> "one"
+        2 -> "two"
+        _ -> "other"
+    if kind_text == "two":
+        42
+    else:
+        0

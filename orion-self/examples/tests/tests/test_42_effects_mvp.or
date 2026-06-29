@@ -1,0 +1,15 @@
+effect AskUser:
+    ask: fn(prompt: Text) -> Text
+
+# Handler uses resume_text — control jumps back to caller with the
+# resumed Text value. The "" after is unreachable.
+fn __handler_AskUser_ask(prompt: Text) -> Text:
+    resume_text("default answer")
+    ""
+
+fn main() -> int:
+    answer = perform AskUser.ask("hello")
+    if answer == "default answer":
+        42
+    else:
+        0

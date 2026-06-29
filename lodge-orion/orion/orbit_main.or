@@ -1,0 +1,259 @@
+# orbit — Orion's project tool, written in Orion.
+#
+# `new` and `add` are pure Orion (filesystem + TOML manipulation).
+# `build`/`run`/`test` still need the Rust parser/typeck/interpreter,
+# so they call into a tiny set of `__os_orbit_*` primitives that
+# orbit.rs supplies. Once Orion has its own parser/interpreter
+# written in Orion (step 4–6 of the self-hosting plan) those
+# primitives go away and orbit becomes 100 % pure Orion.
+
+extern fn __os_orbit_stdlib_orbs() -> [Text]
+extern fn __os_orbit_build(path: Text) -> bool
+extern fn __os_orbit_run(path: Text, fname: Text, args: [Text]) -> bool
+extern fn __os_orbit_test(path: Text) -> int
+
+# ---------- args helpers ----------
+
+fn args_after(start_index: int) -> [Text]:
+    total = arg_count()
+    mut collected = []
+    for index in start_index..<total:
+        collected = push(collected, arg(index))
+    collected
+
+# arg(0) is the executable path, arg(1) is the verb, arg(2)+ are the rest.
+fn verb() -> Text:
+    if arg_count() < 2 then "" else arg(1)
+
+fn first_param() -> Text:
+    if arg_count() < 3 then "" else arg(2)
+
+# ---------- usage / die ----------
+
+fn usage():
+    eprint("orbit — Orion's project tool")
+    eprint("usage: orbit <new|add|build|run|test|fmt> ...")
+    exit_with(2)
+
+fn die(message: Text):
+    eprint(message)
+    exit_with(1)
+
+# ---------- list helpers (no `contains` in stdlib yet) ----------
+
+fn list_contains(haystack: [Text], needle: Text) -> bool:
+    total = len(haystack)
+    mut found = false
+    for index in 0..<total:
+        if at(haystack, index) == needle:
+            found = true
+    found
+
+# ---------- new ----------
+
+fn cmd_new():
+    name = first_param()
+    if name == "":
+        die("usage: orbit new <name>")
+    if is_dir(name) or is_file(name):
+        die("orbit: `" + name + "` already exists")
+    mkdir_all(name + "/src")
+    toml_body = "[package]\nname = \"" + name + "\"\nversion = \"0.0.1\"\n\n[orbs]\n"
+    write_file(name + "/Orbit.toml", toml_body)
+    main_body = "fn add(left: int, right: int) -> int = left + right\n\n# `orbit test` runs functions named test_*.\nfn test_add():\n    require add(2, 3) == 5\n"
+    write_file(name + "/src/main.or", main_body)
+    print("created `" + name + "`")
+    print("  " + name + "/Orbit.toml")
+    print("  " + name + "/src/main.or")
+    print("")
+    print("next:  cd " + name + " && orbit test")
+
+# ---------- add ----------
+
+# Insert `<orb_name> = "stdlib"` under the [orbs] section. If the section
+# doesn't exist we append one — matches what the old Rust impl did.
+fn insert_orb_line(existing: Text, orb_name: Text) -> Text:
+    new_line = orb_name + " = \"stdlib\"\n"
+    if str_contains(existing, "[orbs]"):
+        # Append after the [orbs] marker — simple text manipulation, no
+        # full TOML round-trip needed for this case.
+        existing + new_line
+    else:
+        existing + "\n[orbs]\n" + new_line
+
+fn cmd_add():
+    orb_name = first_param()
+    if orb_name == "":
+        die("usage: orbit add <orb>")
+    known = __os_orbit_stdlib_orbs()
+    if not list_contains(known, orb_name):
+        die("orbit: unknown orb `" + orb_name + "`")
+    if not file_exists("Orbit.toml"):
+        die("orbit: no Orbit.toml in this directory — run `orbit new` first")
+    existing = read_file("Orbit.toml")
+    # Crude "already there" check — looks for `<name> =` after a newline.
+    needle = "\n" + orb_name + " ="
+    if str_contains(existing, needle):
+        print(orb_name + ": already an orb")
+    else:
+        updated = insert_orb_line(existing, orb_name)
+        write_file("Orbit.toml", updated)
+        print("added `" + orb_name + "` to Orbit.toml")
+
+# ---------- build / run / test (delegate to the Rust runtime) ----------
+
+fn resolve_path() -> Text:
+    candidate = first_param()
+    if candidate == "" then "src/main.or" else candidate
+
+fn cmd_build():
+    path = resolve_path()
+    if __os_orbit_build(path):
+        print(path + ": ok — built with no errors")
+    else:
+        exit_with(1)
+
+fn cmd_run():
+    # `orbit run [file.or] <fn> [args...]` — if arg 2 ends with .or use it
+    # as the source file; otherwise default to src/main.or.
+    second = first_param()
+    has_path = str_ends_with(second, ".or")
+    path = if has_path then second else "src/main.or"
+    fname_index = if has_path then 3 else 2
+    if arg_count() <= fname_index:
+        die("usage: orbit run [file.or] <fn> [args...]")
+    fname = arg(fname_index)
+    rest = args_after(fname_index + 1)
+    if not __os_orbit_run(path, fname, rest):
+        exit_with(1)
+
+fn cmd_test():
+    path = resolve_path()
+    failures = __os_orbit_test(path)
+    if failures > 0:
+        exit_with(1)
+
+# ---------- fmt ----------
+#
+# Conservative whitespace formatter — doesn't need a real parser.
+# Operations: tabs → 4 spaces, trailing whitespace stripped, runs of
+# blank lines collapsed to one, file ends with exactly one newline.
+# A "real" formatter that rewrites expressions / re-indents blocks
+# needs the lexer + parser (step 3-4 of self-hosting).
+
+fn fmt_expand_tabs(line_text: Text) -> Text:
+    if str_contains(line_text, "\t"):
+        str_replace(line_text, "\t", "    ")
+    else:
+        line_text
+
+fn fmt_trim_trailing(line_text: Text) -> Text:
+    bytes = bytes_from_text(line_text)
+    byte_count = bytes_length(bytes)
+    mut end_index = byte_count
+    loop:
+        if end_index <= 0:
+            break
+        last_byte = byte_at(bytes, end_index - 1)
+        if last_byte == 32 or last_byte == 9:
+            end_index -= 1
+        else:
+            break
+    if end_index == byte_count:
+        line_text
+    else:
+        bytes_to_text(bytes_slice(bytes, 0, end_index))
+
+# Split on "\n" (without LF), normalize each line, then rejoin.
+fn fmt_normalize(text: Text) -> Text:
+    raw_lines = str_split(text, "\n")
+    line_count = len(raw_lines)
+    mut normalized_lines = []
+    for index in 0..<line_count:
+        raw_line = at(raw_lines, index)
+        without_tabs = fmt_expand_tabs(raw_line)
+        stripped = fmt_trim_trailing(without_tabs)
+        normalized_lines = push(normalized_lines, stripped)
+    # Collapse 2+ consecutive blank lines.
+    collapsed = []
+    mut output_lines = collapsed
+    mut last_was_blank = false
+    for index in 0..<line_count:
+        current_line = at(normalized_lines, index)
+        is_blank = current_line == ""
+        keep = not (is_blank and last_was_blank)
+        if keep:
+            output_lines = push(output_lines, current_line)
+        last_was_blank = is_blank
+    # Drop the trailing blank line so str_join + "\n" produces one final LF.
+    final_count = len(output_lines)
+    if final_count > 0 and at(output_lines, final_count - 1) == "":
+        mut trimmed = []
+        for index in 0..<(final_count - 1):
+            trimmed = push(trimmed, at(output_lines, index))
+        output_lines = trimmed
+    str_join(output_lines, "\n") + "\n"
+
+# Walk a directory recursively and format every .or file we find.
+# Flat structure dodges the nested-if-in-for parser bug (see
+# orion_nesting_bug memory).
+fn fmt_walk(directory: Text):
+    entries = list_dir(directory)
+    entry_count = len(entries)
+    for index in 0..<entry_count:
+        entry_name = at(entries, index)
+        full_path = path_join(directory, entry_name)
+        is_directory_entry = is_dir(full_path)
+        # Skip target/ — generated output we don't want to rewrite.
+        should_recurse = is_directory_entry and entry_name != "target"
+        should_format = (not is_directory_entry) and str_ends_with(entry_name, ".or")
+        if should_recurse:
+            fmt_walk(full_path)
+        if should_format:
+            fmt_one_file(full_path)
+
+fn fmt_one_file(file_path: Text):
+    original = read_file(file_path)
+    normalized = fmt_normalize(original)
+    if normalized == original:
+        # No-op file — don't even rewrite. Keeps mtimes stable.
+        print("  unchanged " + file_path)
+    else:
+        write_file(file_path, normalized)
+        print("  formatted " + file_path)
+
+fn cmd_fmt():
+    # Optional path argument; default is the current project.
+    target = first_param()
+    start_dir = if target == "" then "." else target
+    if is_file(start_dir):
+        fmt_one_file(start_dir)
+    else:
+        if is_dir(start_dir):
+            fmt_walk(start_dir)
+        else:
+            die("orbit fmt: `" + start_dir + "` not found")
+
+# ---------- entrypoint ----------
+
+pub fn main():
+    command = verb()
+    if command == "new":
+        cmd_new()
+    else:
+        if command == "add":
+            cmd_add()
+        else:
+            if command == "build" or command == "check":
+                cmd_build()
+            else:
+                if command == "run":
+                    cmd_run()
+                else:
+                    if command == "test":
+                        cmd_test()
+                    else:
+                        if command == "fmt":
+                            cmd_fmt()
+                        else:
+                            usage()

@@ -1,0 +1,12 @@
+effect Random:
+    int_range: fn(lo: int, hi: int) -> int
+
+# Mock handler — returns 88 deterministically.
+fn __handler_Random_int_range(lo: int, hi: int) -> int:
+    88
+
+fn roll_dice() -> int:
+    perform Random.int_range(1, 100)
+
+fn main() -> int:
+    roll_dice()

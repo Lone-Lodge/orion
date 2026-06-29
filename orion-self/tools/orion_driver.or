@@ -1,0 +1,25 @@
+# Self-hosted driver: orion_self foo.or [out.ll]
+#
+# Reads a .or file, runs it through lex → parse → AST → IR → LLVM-text,
+# writes the result to out.ll (or stdout if omitted). No timing, no orb
+# loading — everything is bundled above.
+
+fn main() -> int:
+    if argc() < 2:
+        print_line("usage: orion_self <input.or> [output.ll]")
+        0 - 1
+    else:
+        in_path = argv(1)
+        out_path = if argc() >= 3 then argv(2) else "out.ll"
+        src = file_read(in_path)
+        tokens = self_lex(src)
+        ast = self_parse(tokens)
+        module = ast_program_to_ir(ast)
+        llvm_text = emit_module(module)
+        ok = file_write(out_path, llvm_text)
+        if ok == 1:
+            print_line(out_path)
+            0
+        else:
+            print_line("write failed")
+            0 - 1

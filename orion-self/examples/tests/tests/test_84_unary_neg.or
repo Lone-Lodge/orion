@@ -1,0 +1,11 @@
+fn abs(x: int) -> int:
+    if x < 0:
+        -x
+    else:
+        x
+
+fn main() -> int:
+    a = -5
+    b = -10
+    c = abs(-42)
+    a + b + c + 15 + 42

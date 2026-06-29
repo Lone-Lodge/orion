@@ -1,0 +1,7 @@
+name = "hash"
+version = "0.0.1"
+description = "orion stdlib orb: hash"
+license = "MIT"
+
+[orbs]
+# add inter-orb deps here when introduced

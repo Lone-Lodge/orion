@@ -1,0 +1,50 @@
+# orion_to_wasm — the lex/parse/codegen pipeline that turns a `.or`
+# source file into a `.wasm` module.
+#
+# Today: a small high-level AST + a direct walker → WFn. The Orion-
+# native self_lex / self_parse files speak a different IR (token Maps);
+# wiring them in is the next milestone. This orb defines the shape so
+# user code can author Orion-like trees today and ship wasm.
+
+use orion_emit_wasm
+
+# A small expression IR — enough to express what the wasm encoder
+# already supports (i32 arithmetic + local refs + calls).
+pub enum Expr:
+    EConst(int)
+    ELocal(int)
+    EAdd(int, int)
+    ESub(int, int)
+    EMul(int, int)
+    ECallHost(int, int, int)
+
+# A function declaration in the IR — name, param count, and a body
+# that yields a single i32 result.
+pub data IRFn: name: Text, param_count: int, body: Expr
+
+# Emit one expression into the given WFn. Returns the new WFn with
+# the bytes appended.
+pub fn emit_expr(fn_value: WFn, e: Expr) -> WFn:
+    match e:
+        EConst(n) -> emit_const(fn_value, n)
+        ELocal(idx) -> emit_local_get(fn_value, idx)
+        EAdd(lhs, rhs) -> emit_binary(fn_value, lhs, rhs, op_i32_add())
+        ESub(lhs, rhs) -> emit_binary(fn_value, lhs, rhs, op_i32_sub())
+        EMul(lhs, rhs) -> emit_binary(fn_value, lhs, rhs, op_i32_mul())
+        ECallHost(host_idx, lhs, rhs) -> emit_call_host(fn_value, host_idx, lhs, rhs)
+
+fn emit_binary(fn_value: WFn, lhs_idx: int, rhs_idx: int, opcode: int) -> WFn:
+    a = emit_local_get(fn_value, lhs_idx)
+    b = emit_local_get(a, rhs_idx)
+    emit_op(b, opcode)
+
+fn emit_call_host(fn_value: WFn, host_idx: int, lhs_idx: int, rhs_idx: int) -> WFn:
+    a = emit_local_get(fn_value, lhs_idx)
+    b = emit_local_get(a, rhs_idx)
+    emit_call(b, host_idx)
+
+# Compile one IR function to a WFn ready for the module builder.
+pub fn compile_fn(decl: IRFn) -> WFn:
+    f0 = new_fn(decl.name, decl.param_count)
+    f1 = emit_expr(f0, decl.body)
+    emit_end(f1)

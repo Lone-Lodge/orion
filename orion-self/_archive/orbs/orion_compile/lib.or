@@ -1,0 +1,13 @@
+# orion_compile — top-level driver: source path → executable.
+#
+# The original self_compile.or expected file_exists / mkdir_all /
+# capture_stdout / exit_with builtins that landed in `fs`/`process`
+# stdlib orbs. The pure-Orion driver wires those orbs in. For now
+# this stub provides the entry point shape so dependents compile.
+
+# Compile a single source file to an executable. Returns the exit
+# code (0 = ok, non-zero = compile error). The full implementation
+# lives in the orion-cli orbit binary; this orb keeps the signature
+# stable for embedders.
+pub fn compile_file(_input_path: Text, _output_path: Text) -> int:
+    0

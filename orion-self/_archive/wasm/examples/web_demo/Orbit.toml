@@ -1,0 +1,11 @@
+[package]
+name = "web-demo"
+version = "0.0.1"
+description = "Build a minimal Orion-produced .wasm and serve it"
+
+[orbs]
+orion_emit_wasm = "path:../../orbs/orion_emit_wasm"
+orion_web_shell = "path:../../orbs/orion_web_shell"
+bytes = "*"
+io = "*"
+fs = "*"

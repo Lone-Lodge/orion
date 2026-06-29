@@ -1,0 +1,7 @@
+fn main() -> int:
+    t0 = monotonic_ms()
+    sleep_ms(40)
+    t1 = monotonic_ms()
+    delta = t1 - t0
+    # 42 if delta >= 30 (allow for clock jitter)
+    if delta >= 30 then 42 else 0

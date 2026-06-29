@@ -1,0 +1,5 @@
+name = "orion_ir"
+version = "0.1.0"
+description = "Typed IR for orion - SSA-form, platform-independent"
+
+[orbs]

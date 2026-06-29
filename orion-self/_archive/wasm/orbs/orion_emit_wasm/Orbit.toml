@@ -1,0 +1,8 @@
+name = "orion_emit_wasm"
+version = "0.0.1"
+description = "Orion self-host — emit wasm32 binary (.wasm) modules"
+
+[orbs]
+bytes = "*"
+io = "*"
+fs = "*"

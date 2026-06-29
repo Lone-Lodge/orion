@@ -1,0 +1,10 @@
+fn double(x: int) -> int:
+    x + x
+
+fn main() -> int:
+    # Interpolation with fn call
+    msg = "double of 21 is {double(21)}"
+    if contains(msg, "is 42"):
+        42
+    else:
+        0

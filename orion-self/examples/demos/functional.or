@@ -1,0 +1,51 @@
+# Functional-style programming in Orion 2026.
+#
+# `|x| body` lambdas ARE parsed but their lowering needs a tree-walker
+# lift pass (3-5h future work). Until then, use named fns + first-class
+# fn refs — same capabilities, slightly more verbose.
+
+# ---- Building blocks (named fns) ------------------------------------
+
+fn double(x: int) -> int:
+    x * 2
+
+fn inc(x: int) -> int:
+    x + 1
+
+fn add(a: int, b: int) -> int:
+    a + b
+
+# ---- Higher-order helpers ------------------------------------------
+
+fn apply(f: fn, x: int) -> int:
+    f(x)
+
+fn compose_call(g: fn, h: fn, x: int) -> int:
+    g(h(x))   # g(h(x))
+
+fn twice(f: fn, x: int) -> int:
+    f(f(x))
+
+# ---- Main — uses fns as first-class values --------------------------
+
+fn main() -> int:
+    # First-class fn binding
+    op = inc
+
+    # Indirect call
+    a = op(10)              # = 11
+
+    # Higher-order: pass fn as arg
+    b = apply(double, a)    # = 22
+
+    # Compose two fns
+    c = compose_call(inc, double, b)   # inc(double(22)) = 45
+
+    # Apply twice
+    d = twice(inc, 0)       # inc(inc(0)) = 2
+
+    # Pipe operator chains the same thing more readably:
+    e = 10 |> double |> inc # double(10)=20, inc(20)=21
+
+    # Total: 45 (c) - 3 = 42
+    c - 3

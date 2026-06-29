@@ -1,0 +1,37 @@
+use orion_lex
+use orion_parse
+use orion_emit_wasm
+use orion_ast_to_wasm
+use orion_build_wasm
+use io
+use fs
+
+# Authored Orion source — this is the input we want to compile.
+# A few i32 fns to prove the full pipeline.
+fn input_source() -> Text:
+    "fn add(a: int, b: int) -> int = a + b\nfn sub(a: int, b: int) -> int = a - b\nfn mul(a: int, b: int) -> int = a * b\nfn square(x: int) -> int = x * x\nfn forty_two() -> int = 42\n"
+
+fn main() -> int:
+    print_line("=== full pipeline: orion source → wasm ===")
+    source = input_source()
+    print_line("input: " + source)
+
+    # 1. lex
+    tokens = self_lex(source)
+    print_line("lex: ok")
+
+    # 2. parse
+    ast = self_parse(tokens)
+    decls = get(ast, "decls")
+    print_line("parse: ok")
+
+    # 3. codegen — walk each Fn decl, emit a WFn
+    mut module = new_module()
+    for decl in decls:
+        if get(decl, "kind") == "Fn":
+            wfn = compile_fn_ast(decl)
+            module = add_fn(module, wfn)
+
+    # 4. encode + write
+    build("orion_compiled", module, default_runtime("orion_compiled.wasm"))
+    0

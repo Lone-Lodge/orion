@@ -1,0 +1,7 @@
+name = "process"
+version = "0.0.1"
+description = "orion stdlib orb: process"
+license = "MIT"
+
+[orbs]
+# add inter-orb deps here when introduced

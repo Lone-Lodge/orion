@@ -1,0 +1,50 @@
+# easing — interpolation curves for animation. All take `t` in [0, 1] and
+# return a value in [0, 1]. Pure Orion on top of math builtins.
+#
+# `t` is kept as the universal animation-time parameter per CONVENTIONS §8
+# algorithm-letter exception; all helper locals use descriptive names.
+
+# linear identity (the no-easing baseline)
+pub fn ease_linear(t: f64) -> f64 = t
+
+# quadratic
+pub fn ease_in_quad(t: f64) -> f64 = t * t
+pub fn ease_out_quad(t: f64) -> f64 = 1.0 - (1.0 - t) * (1.0 - t)
+pub fn ease_in_out_quad(t: f64) -> f64:
+    if t < 0.5 then 2.0 * t * t else 1.0 - pow(-2.0 * t + 2.0, 2.0) / 2.0
+
+# cubic
+pub fn ease_in_cubic(t: f64) -> f64 = t * t * t
+pub fn ease_out_cubic(t: f64) -> f64:
+    inverse = 1.0 - t
+    1.0 - inverse * inverse * inverse
+pub fn ease_in_out_cubic(t: f64) -> f64:
+    if t < 0.5 then 4.0 * t * t * t else 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0
+
+# sinusoidal
+pub fn ease_in_sin(t: f64) -> f64 = 1.0 - cos(t * 1.5707963267948966)
+pub fn ease_out_sin(t: f64) -> f64 = sin(t * 1.5707963267948966)
+pub fn ease_in_out_sin(t: f64) -> f64 = -(cos(3.141592653589793 * t) - 1.0) / 2.0
+
+# exponential
+pub fn ease_in_expo(t: f64) -> f64:
+    if t == 0.0 then 0.0 else pow(2.0, 10.0 * t - 10.0)
+pub fn ease_out_expo(t: f64) -> f64:
+    if t == 1.0 then 1.0 else 1.0 - pow(2.0, -10.0 * t)
+
+# bounce (out only — the canonical one). Constants from Robert Penner's
+# original equation; `amplitude` and `quadrant` are renamed from `n`/`d`.
+pub fn ease_out_bounce(t: f64) -> f64:
+    amplitude = 7.5625
+    quadrant = 2.75
+    if t < 1.0 / quadrant then amplitude * t * t
+    else if t < 2.0 / quadrant then bounce_step(t - 1.5 / quadrant, amplitude, 0.75)
+    else if t < 2.5 / quadrant then bounce_step(t - 2.25 / quadrant, amplitude, 0.9375)
+    else bounce_step(t - 2.625 / quadrant, amplitude, 0.984375)
+
+fn bounce_step(time: f64, amplitude: f64, offset: f64) -> f64 = amplitude * time * time + offset
+pub fn ease_in_bounce(t: f64) -> f64 = 1.0 - ease_out_bounce(1.0 - t)
+
+# smoothstep — Hermite interpolation (Perlin's classic)
+pub fn smoothstep(t: f64) -> f64 = t * t * (3.0 - 2.0 * t)
+pub fn smootherstep(t: f64) -> f64 = t * t * t * (t * (t * 6.0 - 15.0) + 10.0)

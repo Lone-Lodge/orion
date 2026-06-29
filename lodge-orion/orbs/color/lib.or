@@ -1,0 +1,113 @@
+# color — RGBA colors with lerp, clamp, brightness, hex bridges, and HSV.
+#
+# `r`/`g`/`b`/`a`, `h`/`s`/`v`, and `t` (lerp param) are kept as universal
+# graphics-convention names per CONVENTIONS §8. All other locals use
+# descriptive names.
+
+pub data Color: r: f64, g: f64, b: f64, a: f64
+
+pub fn rgb(r: f64, g: f64, b: f64) -> Color = spawn Color{r: r, g: g, b: b, a: 1.0}
+pub fn rgba(r: f64, g: f64, b: f64, a: f64) -> Color = spawn Color{r: r, g: g, b: b, a: a}
+
+pub fn color_lerp(from: Color, to: Color, t: f64) -> Color:
+    inverse = 1.0 - t
+    rgba(from.Color.r * inverse + to.Color.r * t, from.Color.g * inverse + to.Color.g * t, from.Color.b * inverse + to.Color.b * t, from.Color.a * inverse + to.Color.a * t)
+
+pub fn color_clamp(color: Color) -> Color:
+    rgba(clamp(color.Color.r, 0.0, 1.0), clamp(color.Color.g, 0.0, 1.0), clamp(color.Color.b, 0.0, 1.0), clamp(color.Color.a, 0.0, 1.0))
+
+# ITU-R BT.709 luminance.
+pub fn color_brightness(color: Color) -> f64 = 0.2126 * color.Color.r + 0.7152 * color.Color.g + 0.0722 * color.Color.b
+
+# --- hex bridges ---
+# Both directions live in pure Orion. The Rust shim is empty.
+
+# Lowercase ASCII byte for a 0..=15 nibble. Color uses uppercase
+# (per the test's expected `#10204080` format), so this helper is
+# specifically the uppercase variant.
+fn upper_hex_byte(nibble: int) -> int:
+    if nibble < 10 then nibble + 48      # '0' = 48
+    else nibble + 55                     # 'A' = 65 → 65 - 10 = 55
+
+fn byte_to_upper_hex(value: int) -> Text:
+    high_nibble = (value >> 4) & 15
+    low_nibble = value & 15
+    bytes_to_text(push(push(bytes_zeros(0), upper_hex_byte(high_nibble)), upper_hex_byte(low_nibble)))
+
+fn decode_hex_digit(character: int) -> int:
+    if character >= 48 and character <= 57 then character - 48           # 0-9
+    else if character >= 65 and character <= 70 then character - 55      # A-F
+    else if character >= 97 and character <= 102 then character - 87     # a-f
+    else 0
+
+fn decode_hex_byte(bytes: [int], start_index: int) -> int:
+    high = decode_hex_digit(byte_at(bytes, start_index))
+    low = decode_hex_digit(byte_at(bytes, start_index + 1))
+    high * 16 + low
+
+fn _hex_to_rgba(hex: Text) -> [f64]:
+    trimmed = str_trim(hex)
+    raw_bytes = bytes_from_text(trimmed)
+    raw_length = bytes_length(raw_bytes)
+    # Skip a leading '#'.
+    body_start = if raw_length > 0 and byte_at(raw_bytes, 0) == 35 then 1 else 0
+    body_length = raw_length - body_start
+    if body_length == 6:
+        red = to_float(decode_hex_byte(raw_bytes, body_start)) / 255.0
+        green = to_float(decode_hex_byte(raw_bytes, body_start + 2)) / 255.0
+        blue = to_float(decode_hex_byte(raw_bytes, body_start + 4)) / 255.0
+        [red, green, blue, 1.0]
+    else:
+        if body_length == 8:
+            red = to_float(decode_hex_byte(raw_bytes, body_start)) / 255.0
+            green = to_float(decode_hex_byte(raw_bytes, body_start + 2)) / 255.0
+            blue = to_float(decode_hex_byte(raw_bytes, body_start + 4)) / 255.0
+            alpha = to_float(decode_hex_byte(raw_bytes, body_start + 6)) / 255.0
+            [red, green, blue, alpha]
+        else:
+            # `#RGB` shorthand — duplicate each nibble.
+            if body_length == 3:
+                red_nibble = decode_hex_digit(byte_at(raw_bytes, body_start))
+                green_nibble = decode_hex_digit(byte_at(raw_bytes, body_start + 1))
+                blue_nibble = decode_hex_digit(byte_at(raw_bytes, body_start + 2))
+                red = to_float(red_nibble * 16 + red_nibble) / 255.0
+                green = to_float(green_nibble * 16 + green_nibble) / 255.0
+                blue = to_float(blue_nibble * 16 + blue_nibble) / 255.0
+                [red, green, blue, 1.0]
+            else:
+                [0.0, 0.0, 0.0, 1.0]
+
+fn _rgba_to_hex(r: f64, g: f64, b: f64, a: f64) -> Text:
+    # Round, clamp, and emit. Drop the alpha byte when fully opaque, mirroring
+    # the original Rust impl's `#RRGGBB` vs `#RRGGBBAA` rule.
+    red_byte = to_int(round(clamp(r, 0.0, 1.0) * 255.0))
+    green_byte = to_int(round(clamp(g, 0.0, 1.0) * 255.0))
+    blue_byte = to_int(round(clamp(b, 0.0, 1.0) * 255.0))
+    head = "#" + byte_to_upper_hex(red_byte) + byte_to_upper_hex(green_byte) + byte_to_upper_hex(blue_byte)
+    if a == 1.0 then head
+    else head + byte_to_upper_hex(to_int(round(clamp(a, 0.0, 1.0) * 255.0)))
+
+pub fn color_from_hex(hex: Text) -> Color:
+    channels = _hex_to_rgba(hex)
+    rgba(at(channels, 0), at(channels, 1), at(channels, 2), at(channels, 3))
+
+pub fn color_to_hex(color: Color) -> Text = _rgba_to_hex(color.Color.r, color.Color.g, color.Color.b, color.Color.a)
+
+# --- HSV → RGB ---
+# `chroma`, `secondary`, `match_offset` are the standard HSV→RGB intermediates
+# (often written `C`, `X`, `m` in graphics literature). Spelled-out for clarity.
+pub fn hsv_to_rgb(h: f64, s: f64, v: f64) -> Color:
+    chroma = v * s
+    hue_sector = h * 6.0
+    secondary = chroma * (1.0 - abs(hue_sector - 2.0 * floor(hue_sector / 2.0) - 1.0))
+    match_offset = v - chroma
+    components = hsv_pick(hue_sector, chroma, secondary)
+    rgb(at(components, 0) + match_offset, at(components, 1) + match_offset, at(components, 2) + match_offset)
+
+fn hsv_pick(hue_sector: f64, chroma: f64, secondary: f64) -> [f64]:
+    if hue_sector < 1.0 then [chroma, secondary, 0.0]
+    else if hue_sector < 2.0 then [secondary, chroma, 0.0]
+    else if hue_sector < 3.0 then [0.0, chroma, secondary]
+    else if hue_sector < 4.0 then [0.0, secondary, chroma]
+    else if hue_sector < 5.0 then [secondary, 0.0, chroma]
+    else [chroma, 0.0, secondary]

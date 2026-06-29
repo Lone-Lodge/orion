@@ -1,0 +1,14 @@
+fn day_value(day: Text) -> int:
+    match day:
+        "mon" -> 10
+        "fri" -> 32
+        _ -> 0
+
+fn level_value(level: int) -> int:
+    match level:
+        0 -> 0
+        1 -> 100
+        _ -> 200
+
+fn main() -> int:
+    day_value("fri") + level_value(1) - level_value(1) + 10
