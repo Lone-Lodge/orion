@@ -2957,55 +2957,81 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
 pub fn ast_program_to_ir(program: Map) -> IRModule:
     raw_decls = get_list(program, "decls")
     raw_total = len(raw_decls)
-    init_decls = []
-    mut working_decls = init_decls
-    mut lambda_counter = 0
-    init_synth = []
-    mut synth_decls = init_synth
-    for d_idx in 0..<raw_total:
-        decl = at(raw_decls, d_idx)
-        if get(decl, "kind") == "Fn":
-            fn_body = get(decl, "body")
-            body_kind = get(fn_body, "kind")
-            if body_kind == "Block":
-                old_stmts = get_list(fn_body, "stmts")
-                n_stmts = len(old_stmts)
-                init_new_stmts = []
-                mut new_stmts = init_new_stmts
-                for s_idx in 0..<n_stmts:
-                    stmt = at(old_stmts, s_idx)
-                    stmt_kind = get(stmt, "kind")
-                    is_let_lambda = (stmt_kind == "LetOrAssign" or stmt_kind == "MutLet") and get(get(stmt, "value"), "kind") == "Lambda"
-                    if is_let_lambda:
-                        lam = get(stmt, "value")
-                        lam_params = get_list(lam, "params")
-                        n_lp = len(lam_params)
-                        init_typed = []
-                        mut typed_params = init_typed
-                        for pi in 0..<n_lp:
-                            p_name = at(lam_params, pi)
-                            typed_params = push(typed_params, {"name": p_name, "type": {"kind": "Named", "name": "int"}})
-                        synth_name = "__lambda_{lambda_counter}"
-                        lambda_counter = lambda_counter + 1
-                        lam_body = get(lam, "body")
-                        synth_body = {"kind": "Block", "stmts": [{"kind": "ExprStmt", "expr": lam_body}]}
-                        synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
-                        synth_decls = push(synth_decls, synth_decl)
-                        new_value = {"kind": "Ident", "name": synth_name}
-                        new_stmts = push(new_stmts, {"kind": stmt_kind, "name": get(stmt, "name"), "value": new_value})
-                    if not is_let_lambda:
-                        new_stmts = push(new_stmts, stmt)
-                new_body = {"kind": "Block", "stmts": new_stmts}
-                rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body}
-                working_decls = push(working_decls, rewritten_decl)
-            if body_kind != "Block":
+    mut has_any_lambda = false
+    for sc_idx in 0..<raw_total:
+        sc_decl = at(raw_decls, sc_idx)
+        if get(sc_decl, "kind") == "Fn":
+            sc_body = get(sc_decl, "body")
+            if get(sc_body, "kind") == "Block":
+                sc_stmts = get_list(sc_body, "stmts")
+                sc_n = len(sc_stmts)
+                for sc_s in 0..<sc_n:
+                    sc_stmt = at(sc_stmts, sc_s)
+                    sc_kind = get(sc_stmt, "kind")
+                    if sc_kind == "LetOrAssign" or sc_kind == "MutLet":
+                        if get(get(sc_stmt, "value"), "kind") == "Lambda":
+                            has_any_lambda = true
+    mut decls = raw_decls
+    if has_any_lambda:
+        seed = at(raw_decls, 0)
+        init_decls = [seed]
+        mut working_decls = init_decls
+        working_decls = bytes_slice(working_decls, 0, 0)
+        mut lambda_counter = 0
+        init_synth = [seed]
+        mut synth_decls = init_synth
+        synth_decls = bytes_slice(synth_decls, 0, 0)
+        for d_idx in 0..<raw_total:
+            decl = at(raw_decls, d_idx)
+            if get(decl, "kind") == "Fn":
+                fn_body = get(decl, "body")
+                body_kind = get(fn_body, "kind")
+                if body_kind == "Block":
+                    old_stmts = get_list(fn_body, "stmts")
+                    n_stmts = len(old_stmts)
+                    init_stmts = old_stmts
+                    mut new_stmts = init_stmts
+                    new_stmts = bytes_slice(new_stmts, 0, 0)
+                    for s_idx in 0..<n_stmts:
+                        stmt = at(old_stmts, s_idx)
+                        stmt_kind = get(stmt, "kind")
+                        mut is_let_lambda = false
+                        if stmt_kind == "LetOrAssign" or stmt_kind == "MutLet":
+                            if get(get(stmt, "value"), "kind") == "Lambda":
+                                is_let_lambda = true
+                        if is_let_lambda:
+                            lam = get(stmt, "value")
+                            lam_params = get_list(lam, "params")
+                            n_lp = len(lam_params)
+                            init_typed = get_list(decl, "params")
+                            mut typed_params = init_typed
+                            typed_params = bytes_slice(typed_params, 0, 0)
+                            for pi in 0..<n_lp:
+                                p_name = at(lam_params, pi)
+                                typed_params = push(typed_params, {"name": p_name, "type": {"kind": "Named", "name": "int"}})
+                            synth_name = "__lambda_{lambda_counter}"
+                            lambda_counter = lambda_counter + 1
+                            lam_body = get(lam, "body")
+                            synth_body_stmt = {"kind": "ExprStmt", "expr": lam_body}
+                            stmt_seed = [synth_body_stmt]
+                            synth_body = {"kind": "Block", "stmts": stmt_seed}
+                            synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
+                            synth_decls = push(synth_decls, synth_decl)
+                            new_value = {"kind": "Ident", "name": synth_name}
+                            new_stmts = push(new_stmts, {"kind": stmt_kind, "name": get(stmt, "name"), "value": new_value})
+                        if not is_let_lambda:
+                            new_stmts = push(new_stmts, stmt)
+                    new_body = {"kind": "Block", "stmts": new_stmts}
+                    rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body}
+                    working_decls = push(working_decls, rewritten_decl)
+                if body_kind != "Block":
+                    working_decls = push(working_decls, decl)
+            if get(decl, "kind") != "Fn":
                 working_decls = push(working_decls, decl)
-        if get(decl, "kind") != "Fn":
-            working_decls = push(working_decls, decl)
-    n_synth = len(synth_decls)
-    for sy_i in 0..<n_synth:
-        working_decls = push(working_decls, at(synth_decls, sy_i))
-    decls = working_decls
+        n_synth = len(synth_decls)
+        for sy_i in 0..<n_synth:
+            working_decls = push(working_decls, at(synth_decls, sy_i))
+        decls = working_decls
     total = len(decls)
     mut sig_scope = scope_empty()
     for index in 0..<total:
