@@ -577,6 +577,11 @@ fn emit_string_global(text_value: Text, idx: int) -> Text:
 # stay clang-only without a separate runtime .c file.
 fn emit_runtime() -> Text:
     mut text = ""
+    # Target Windows x64 MSVC explicitly — needed for setjmp/longjmp ABI
+    # to match the linker's MSVCRT. Without this the IR is target-agnostic
+    # and _setjmp expands incorrectly.
+    text = "{text}target datalayout = \"e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\n"
+    text = "{text}target triple = \"x86_64-pc-windows-msvc19.44.35209\"\n"
     text = "{text}declare i32 @printf(ptr, ...)\n"
     text = "{text}declare i32 @puts(ptr)\n"
     text = "{text}declare ptr @malloc(i64)\n"
@@ -585,42 +590,11 @@ fn emit_runtime() -> Text:
     text = "{text}declare ptr @strcat(ptr, ptr)\n"
     text = "{text}declare i32 @strcmp(ptr, ptr)\n"
     text = "{text}declare i32 @snprintf(ptr, i64, ptr, ...)\n"
-    # Effects runtime: one-shot continuations via setjmp/longjmp.
-    # On Windows MSVCRT setjmp expands to _setjmp(env, frame_addr). We emit
-    # the same sequence clang generates for plain C setjmp. The `#sjlj_rt`
-    # attribute group carries the returns_twice marker on the CALL site.
-    text = "{text}declare i32 @_setjmp(ptr, ptr)\n"
-    text = "{text}declare void @longjmp(ptr, i32)\n"
-    text = "{text}declare ptr @llvm.frameaddress.p0(i32 immarg)\n"
-    text = "{text}@__orion_current_k = global ptr null\n"
-    text = "{text}@__orion_resume_value = global i64 0\n"
-    text = "{text}define i64 @__orion_perform_int(ptr %handler_fn, i64 %arg) \{\n"
-    text = "{text}entry:\n"
-    text = "{text}  %jb = alloca [64 x i64], align 16\n"
-    text = "{text}  %old_k = load ptr, ptr @__orion_current_k\n"
-    text = "{text}  store ptr %jb, ptr @__orion_current_k\n"
-    text = "{text}  %fp = call ptr @llvm.frameaddress.p0(i32 0)\n"
-    text = "{text}  %sj = call i32 @_setjmp(ptr %jb, ptr %fp) #99\n"
-    text = "{text}  %is_first = icmp eq i32 %sj, 0\n"
-    text = "{text}  br i1 %is_first, label %first_call, label %resumed\n"
-    text = "{text}first_call:\n"
-    text = "{text}  %ret = call i64 %handler_fn(i64 %arg)\n"
-    text = "{text}  store ptr %old_k, ptr @__orion_current_k\n"
-    text = "{text}  ret i64 %ret\n"
-    text = "{text}resumed:\n"
-    text = "{text}  %v = load i64, ptr @__orion_resume_value\n"
-    text = "{text}  store ptr %old_k, ptr @__orion_current_k\n"
-    text = "{text}  ret i64 %v\n"
-    text = "{text}\}\n"
-    text = "{text}define void @__orion_resume_int(i64 %value) \{\n"
-    text = "{text}entry:\n"
-    text = "{text}  store i64 %value, ptr @__orion_resume_value\n"
-    text = "{text}  %k = load ptr, ptr @__orion_current_k\n"
-    text = "{text}  call void @longjmp(ptr %k, i32 1) #98\n"
-    text = "{text}  unreachable\n"
-    text = "{text}\}\n"
-    text = "{text}attributes #99 = \{ returns_twice \}\n"
-    text = "{text}attributes #98 = \{ noreturn \}\n"
+    # Effects runtime: continuations via setjmp/longjmp. Declared as
+    # externs — the actual implementations come from orion_rt.c which
+    # the test runner / driver compiles alongside our .ll.
+    text = "{text}declare i64 @__orion_perform_int(ptr, i64)\n"
+    text = "{text}declare void @__orion_resume_int(i64)\n"
     text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
     text = "{text}\n"
