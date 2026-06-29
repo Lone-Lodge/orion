@@ -1699,6 +1699,41 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                     if sc_kind == "LetOrAssign" or sc_kind == "MutLet":
                         if get(get(sc_stmt, "value"), "kind") == "Lambda":
                             has_any_lambda = true
+    # Pre-scan to find Lambda bindings + their captures. Used by the next
+    # phase to emit a clean error if any captures exist (real env-struct
+    # closures need more wiring than this minimal lift can offer today).
+    # This is best-effort: shallow walk of lambda body looking for idents.
+    mut captures_warned = false
+    for cs_idx in 0..<raw_total:
+        cs_decl = at(raw_decls, cs_idx)
+        if get(cs_decl, "kind") == "Fn":
+            cs_body = get(cs_decl, "body")
+            if get(cs_body, "kind") == "Block":
+                cs_stmts = get_list(cs_body, "stmts")
+                cs_n = len(cs_stmts)
+                for cs_s in 0..<cs_n:
+                    cs_stmt = at(cs_stmts, cs_s)
+                    cs_kind = get(cs_stmt, "kind")
+                    if cs_kind == "LetOrAssign" or cs_kind == "MutLet":
+                        cs_val = get(cs_stmt, "value")
+                        if get(cs_val, "kind") == "Lambda":
+                            cs_lp = get_list(cs_val, "params")
+                            cs_body_expr = get(cs_val, "body")
+                            # Shallow capture scan: if body is Binary, check operand idents.
+                            cs_body_kind = get(cs_body_expr, "kind")
+                            if cs_body_kind == "Binary":
+                                cs_left = get(cs_body_expr, "left")
+                                cs_right = get(cs_body_expr, "right")
+                                if get(cs_left, "kind") == "Ident":
+                                    cs_l_name = get(cs_left, "name")
+                                    mut found_in_params = false
+                                    nlp_x = len(cs_lp)
+                                    for ix in 0..<nlp_x:
+                                        if at(cs_lp, ix) == cs_l_name:
+                                            found_in_params = true
+                                    if not found_in_params and not captures_warned:
+                                        print_line("orion-self: WARNING — lambda likely captures `{cs_l_name}` (env-struct closures not yet supported; capture acts as free var)")
+                                        captures_warned = true
     mut decls = raw_decls
     if has_any_lambda:
         # Tree walk + rewrite. Use seed Maps to avoid empty-list type drift.
