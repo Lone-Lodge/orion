@@ -166,10 +166,12 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
             sep = if ai == 0 then "" else ", "
             arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
-        # __orion_resume_int returns void — emit `call void` + dummy SSA.
-        # Other fns go through the normal path; their return-type lookup
-        # is in find_fn_return_type which defaults non-matches to i64.
-        if inst.name == "__orion_resume_int":
+        # __orion_resume_int / __orion_resume_text return void — emit
+        # `call void` + dummy SSA. Other fns go through the normal path;
+        # their return-type lookup is in find_fn_return_type which
+        # defaults non-matches to i64.
+        is_void_resume = inst.name == "__orion_resume_int" or inst.name == "__orion_resume_text"
+        if is_void_resume:
             result = "    call void @{inst.name}({arg_text})\n    {value_ref(my_id)} = add i64 0, 0"
         else:
             ret_ty = llvm_type_of(find_fn_return_type(module, inst.name))
@@ -183,6 +185,10 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         # handler resumed, the resumed value).
         arg_ref = value_ref(inst.lhs)
         result = "    {value_ref(my_id)} = call i64 @__orion_perform_int(ptr @{inst.name}, i64 {arg_ref})"
+
+    if op == "perform_text":
+        arg_ref = value_ref(inst.lhs)
+        result = "    {value_ref(my_id)} = call ptr @__orion_perform_text(ptr @{inst.name}, ptr {arg_ref})"
 
     if op == "label":
         # Emit basic-block label (no leading 4-space indent).
@@ -595,6 +601,8 @@ fn emit_runtime() -> Text:
     # the test runner / driver compiles alongside our .ll.
     text = "{text}declare i64 @__orion_perform_int(ptr, i64)\n"
     text = "{text}declare void @__orion_resume_int(i64)\n"
+    text = "{text}declare ptr @__orion_perform_text(ptr, ptr)\n"
+    text = "{text}declare void @__orion_resume_text(ptr)\n"
     text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
     text = "{text}\n"

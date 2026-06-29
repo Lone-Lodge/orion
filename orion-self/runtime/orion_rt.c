@@ -38,3 +38,27 @@ void __orion_resume_int(long long value) {
     resume_value = value;
     longjmp(*current_k, 1);
 }
+
+/* Text variants — same setjmp dance, but the value is a char*. We use a
+ * separate global to avoid type confusion when both kinds of perform
+ * are nested (rare but possible). */
+static char *resume_text_value = NULL;
+
+char *__orion_perform_text(char *(*handler)(char *), char *arg) {
+    jmp_buf jb;
+    jmp_buf *old_k = current_k;
+    current_k = &jb;
+    char *ret;
+    if (setjmp(jb) == 0) {
+        ret = handler(arg);
+    } else {
+        ret = resume_text_value;
+    }
+    current_k = old_k;
+    return ret;
+}
+
+void __orion_resume_text(char *value) {
+    resume_text_value = value;
+    longjmp(*current_k, 1);
+}

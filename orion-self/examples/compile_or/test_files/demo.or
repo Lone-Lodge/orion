@@ -158,6 +158,8 @@ pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
             "{prefix}{op}.{inst.type_text} {lhs_ref}, {rhs_ref}"
 pub fn ir_perform_int(handler_name: Text, arg_id: int) -> Inst:
     Inst{op: "perform_int", type_text: "i64", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
+pub fn ir_perform_text(handler_name: Text, arg_id: int) -> Inst:
+    Inst{op: "perform_text", type_text: "text", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:
     mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
@@ -2140,6 +2142,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_print_line = callee == "print_line" or callee == "println"
     is_to_text = callee == "to_text"
     is_resume_int = callee == "resume_int"
+    is_resume_text = callee == "resume_text"
     mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
     if is_print_line:
         arg0 = at(args, 0)
@@ -2353,10 +2356,14 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_resume_int == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false)
     if is_resume_int:
         arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_int", [arg_r.id], "void"))
+        result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_resume_text:
+        arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_text", [arg_r.id], "void"))
         result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_user_fn:
         total_args = len(args)
@@ -2745,8 +2752,14 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             extra_r = ast_expr_to_ir(cur_fn, cur_scope, extra_node)
             cur_fn = extra_r.function
             cur_scope = extra_r.scope
-        pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_name, arg_id))
-        result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
+        handler_ret = scope_lookup_fn_ret_loc(cur_scope, handler_name, node)
+        use_text = handler_ret == "text"
+        if use_text:
+            pr_perf = ir_fn_push(cur_fn, ir_perform_text(handler_name, arg_id))
+            result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
+        else:
+            pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_name, arg_id))
+            result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
     any_match = is_block or is_int or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
@@ -3000,7 +3013,8 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
             sep = if ai == 0 then "" else ", "
             arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
-        if inst.name == "__orion_resume_int":
+        is_void_resume = inst.name == "__orion_resume_int" or inst.name == "__orion_resume_text"
+        if is_void_resume:
             result = "    call void @{inst.name}({arg_text})\n    {value_ref(my_id)} = add i64 0, 0"
         else:
             ret_ty = llvm_type_of(find_fn_return_type(module, inst.name))
@@ -3008,6 +3022,9 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "perform_int":
         arg_ref = value_ref(inst.lhs)
         result = "    {value_ref(my_id)} = call i64 @__orion_perform_int(ptr @{inst.name}, i64 {arg_ref})"
+    if op == "perform_text":
+        arg_ref = value_ref(inst.lhs)
+        result = "    {value_ref(my_id)} = call ptr @__orion_perform_text(ptr @{inst.name}, ptr {arg_ref})"
     if op == "label":
         result = "{inst.name}:"
     if op == "br":
@@ -3329,6 +3346,8 @@ fn emit_runtime() -> Text:
     text = "{text}declare i32 @snprintf(ptr, i64, ptr, ...)\n"
     text = "{text}declare i64 @__orion_perform_int(ptr, i64)\n"
     text = "{text}declare void @__orion_resume_int(i64)\n"
+    text = "{text}declare ptr @__orion_perform_text(ptr, ptr)\n"
+    text = "{text}declare void @__orion_resume_text(ptr)\n"
     text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
     text = "{text}\n"

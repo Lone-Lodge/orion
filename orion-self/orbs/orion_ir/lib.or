@@ -357,6 +357,10 @@ pub fn ir_perform_int(handler_name: Text, arg_id: int) -> Inst:
     Inst{op: "perform_int", type_text: "i64", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
 
 
+pub fn ir_perform_text(handler_name: Text, arg_id: int) -> Inst:
+    Inst{op: "perform_text", type_text: "text", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
+
+
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:
     mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
