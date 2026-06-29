@@ -646,6 +646,9 @@ fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
         is_cmp = op_value == "==" or op_value == "!=" or op_value == "<" or op_value == ">" or op_value == "<=" or op_value == ">="
         is_add = op_value == "+" or op_value == "-"
         is_mul = op_value == "*" or op_value == "/" or op_value == "%"
+        is_pipe = op_value == "|>"
+        if is_pipe:
+            precedence = 3
         if is_cmp:
             precedence = 10
         if is_add:
@@ -803,6 +806,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # `break` — single-token statement, only meaningful inside a loop.
         is_break = kind_here == "ident" and value_here == "break"
         is_continue = kind_here == "ident" and value_here == "continue"
+        is_defer = kind_here == "ident" and value_here == "defer"
         is_handle = kind_here == "ident" and value_here == "handle"
         is_require = kind_here == "ident" and value_here == "require"
         is_ensure = kind_here == "ident" and value_here == "ensure"
@@ -856,6 +860,13 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         if is_continue:
             statements = push(statements, {"kind": "Continue"})
             cursor = cursor + 1
+        if is_defer:
+            # `defer <expr>` — register the expression to run when the
+            # enclosing fn returns. LIFO order. Lowered by collecting
+            # all Defer stmts in fn body, then injecting before each ret.
+            def_result = psr_parse_expr(tokens, cursor + 1)
+            statements = push(statements, {"kind": "Defer", "expr": get_map(def_result, "node")})
+            cursor = get_int(def_result, "next")
         if is_require:
             req_result = psr_parse_expr(tokens, cursor + 1)
             statements = push(statements, {"kind": "Require", "expr": get_map(req_result, "node")})

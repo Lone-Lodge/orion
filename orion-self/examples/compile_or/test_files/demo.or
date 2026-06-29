@@ -310,6 +310,8 @@ fn slx_scan_op_short(first: int, second: int) -> Text:
         result = "/="
     if first == 46 and second == 46:
         result = ".."
+    if first == 124 and second == 62:
+        result = "|>"
     if result == "":
         result = slx_scan_op_single(first)
     result
@@ -960,6 +962,9 @@ fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
         is_cmp = op_value == "==" or op_value == "!=" or op_value == "<" or op_value == ">" or op_value == "<=" or op_value == ">="
         is_add = op_value == "+" or op_value == "-"
         is_mul = op_value == "*" or op_value == "/" or op_value == "%"
+        is_pipe = op_value == "|>"
+        if is_pipe:
+            precedence = 3
         if is_cmp:
             precedence = 10
         if is_add:
@@ -1076,6 +1081,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         is_compound_assign = (not is_mut_decl) and (not is_let_or_assign) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and (compound_op_value == "+=" or compound_op_value == "-=" or compound_op_value == "*=" or compound_op_value == "/=")
         is_break = kind_here == "ident" and value_here == "break"
         is_continue = kind_here == "ident" and value_here == "continue"
+        is_defer = kind_here == "ident" and value_here == "defer"
         is_handle = kind_here == "ident" and value_here == "handle"
         is_require = kind_here == "ident" and value_here == "require"
         is_ensure = kind_here == "ident" and value_here == "ensure"
@@ -1121,6 +1127,10 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         if is_continue:
             statements = push(statements, {"kind": "Continue"})
             cursor = cursor + 1
+        if is_defer:
+            def_result = psr_parse_expr(tokens, cursor + 1)
+            statements = push(statements, {"kind": "Defer", "expr": get_map(def_result, "node")})
+            cursor = get_int(def_result, "next")
         if is_require:
             req_result = psr_parse_expr(tokens, cursor + 1)
             statements = push(statements, {"kind": "Require", "expr": get_map(req_result, "node")})
@@ -2661,7 +2671,27 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if is_field:
         result = ast_field_to_ir(fn_value, scope, node)
     if is_binary:
-        result = ast_binop_to_ir(fn_value, scope, node)
+        bin_op = get(node, "op")
+        if bin_op == "|>":
+            pipe_lhs = get(node, "left")
+            pipe_rhs = get(node, "right")
+            rhs_kind = get(pipe_rhs, "kind")
+            mut desugared_call = pipe_rhs
+            if rhs_kind == "Ident":
+                callee_name = get(pipe_rhs, "name")
+                desugared_call = {"kind": "Call", "callee": callee_name, "args": [pipe_lhs]}
+            if rhs_kind == "Call":
+                callee_name = get(pipe_rhs, "callee")
+                orig_args = get_list(pipe_rhs, "args")
+                new_args = [pipe_lhs]
+                mut combined_args = new_args
+                n_orig = len(orig_args)
+                for ai in 0..<n_orig:
+                    combined_args = push(combined_args, at(orig_args, ai))
+                desugared_call = {"kind": "Call", "callee": callee_name, "args": combined_args}
+            result = ast_call_to_ir(fn_value, scope, desugared_call)
+        else:
+            result = ast_binop_to_ir(fn_value, scope, node)
     if is_ident:
         result = ast_ident_to_ir(fn_value, scope, node)
     if is_call:
