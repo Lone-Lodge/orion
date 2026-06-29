@@ -1,9 +1,18 @@
+fn deadline_from_now(offset_ms: int) -> int:
+    monotonic_ms() + offset_ms
+
+fn time_left(deadline_ms: int) -> int:
+    now = monotonic_ms()
+    delta = deadline_ms - now
+    if delta < 0 then 0 else delta
+
 fn main() -> int:
-    t0 = monotonic_ms()
-    sleep_ms(50)
-    t1 = monotonic_ms()
-    delta = t1 - t0
-    print("elapsed_ms:")
-    print(delta)
-    # 42 if elapsed > 30ms
-    if delta > 30 then 42 else 0
+    deadline = deadline_from_now(100)
+    initial = time_left(deadline)
+    sleep_ms(30)
+    after = time_left(deadline)
+    diff = initial - after
+    print("burnt_ms:")
+    print(diff)
+    # exit 42 if we burnt 25-50ms
+    if diff >= 25 and diff <= 55 then 42 else 0
