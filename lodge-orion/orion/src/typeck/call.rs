@@ -49,6 +49,18 @@ impl Cx {
                 }
                 Ty::Unknown
             }
+            "vec_add" | "vec_sub" | "vec_mul" => {
+                for a in args {
+                    self.infer(a, scope)?;
+                }
+                Ty::List(Box::new(Ty::Int))
+            }
+            "vec_dot" => {
+                for a in args {
+                    self.infer(a, scope)?;
+                }
+                Ty::Int
+            }
             "sqrt" | "abs" | "max" | "min" | "floor" | "ceil" | "round" | "pow" | "clamp" | "sign"
             | "sin" | "cos" | "tan" | "atan2" | "exp" | "ln" | "log2"
             | "to_int" | "to_float" => {

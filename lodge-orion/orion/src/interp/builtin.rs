@@ -43,6 +43,10 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     // pool size; `thread_id` returns the current worker id (useful for
     // sharding writes when no shared output is allowed).
     ("cpu_count", 0), ("thread_id", 0),
+    // SIMD-style element-wise list ops. Interpreter does plain serial maths;
+    // the LLVM emit pass can lower the same calls to `<N x i64>` vector
+    // ops once the IR backend gains vector type support.
+    ("vec_add", 2), ("vec_sub", 2), ("vec_mul", 2), ("vec_dot", 2),
 ];
 
 pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
@@ -100,8 +104,42 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         "bytes_to_ptr" => bytes_to_ptr(&args),
         "cpu_count" => Ok(Value::Int(num_cpus() as i64)),
         "thread_id" => Ok(Value::Int(rayon::current_thread_index().map(|i| i as i64).unwrap_or(0))),
+        "vec_add" => vec_op(&args, "vec_add", |x, y| x.wrapping_add(y)),
+        "vec_sub" => vec_op(&args, "vec_sub", |x, y| x.wrapping_sub(y)),
+        "vec_mul" => vec_op(&args, "vec_mul", |x, y| x.wrapping_mul(y)),
+        "vec_dot" => vec_dot(&args),
         _ => unreachable!("BUILTINS guarded above"),
     }
+}
+
+fn vec_op(args: &[Value], who: &str, f: fn(i64, i64) -> i64) -> Result<Value, RunError> {
+    let (Value::List(a), Value::List(b)) = (&args[0], &args[1]) else {
+        return Err(run_err(format!("{who} expects (list, list), got {args:?}")));
+    };
+    if a.len() != b.len() {
+        return Err(run_err(format!("{who}: length mismatch ({} vs {})", a.len(), b.len())));
+    }
+    let out: Vec<Value> = a.iter().zip(b.iter()).map(|(x, y)| match (x, y) {
+        (Value::Int(xi), Value::Int(yi)) => Value::Int(f(*xi, *yi)),
+        _ => Value::Int(0),
+    }).collect();
+    Ok(Value::List(std::sync::Arc::new(out)))
+}
+
+fn vec_dot(args: &[Value]) -> Result<Value, RunError> {
+    let (Value::List(a), Value::List(b)) = (&args[0], &args[1]) else {
+        return Err(run_err(format!("vec_dot expects (list, list), got {args:?}")));
+    };
+    if a.len() != b.len() {
+        return Err(run_err(format!("vec_dot: length mismatch ({} vs {})", a.len(), b.len())));
+    }
+    let mut acc: i64 = 0;
+    for (x, y) in a.iter().zip(b.iter()) {
+        if let (Value::Int(xi), Value::Int(yi)) = (x, y) {
+            acc = acc.wrapping_add(xi.wrapping_mul(*yi));
+        }
+    }
+    Ok(Value::Int(acc))
 }
 
 fn num_cpus() -> usize {
