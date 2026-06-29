@@ -190,6 +190,20 @@ impl Parser<'_> {
     fn fn_decl(&mut self, public: bool, base: u32) -> Result<FnDecl, ParseError> {
         self.eat(&Tok::Fn)?;
         let name = self.ident()?;
+        // Optional generic type-param list `<T, U>`. Erasure-based:
+        // parser accepts and discards. Type vars fall through as `Unknown`
+        // which the type system already treats as i64/ptr.
+        if self.check(&Tok::Lt) {
+            self.bump();
+            loop {
+                if self.check(&Tok::Gt) {
+                    self.bump();
+                    break;
+                }
+                // Token-skip: an ident, comma, or anything other than `>`.
+                self.bump();
+            }
+        }
         let params = self.params()?;
         let ret = self.return_type()?;
         let body = self.fn_body(base)?;

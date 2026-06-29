@@ -1,6 +1,9 @@
-# Demo: showcase the closure/generics/SIMD MVP features shipped today.
+# Demo: showcase generics + SIMD MVP features. Both work in interp + native.
 # Run via lodge-orion's interpreter:
 #   orbit.exe run demo_all_features.or main
+#
+# Lambdas/closures with captures work via the native compile path (orion-self
+# orbs → LLVM); demo_closure.or has that flavour.
 
 fn id<T>(value: T) -> T:
     value
@@ -13,21 +16,16 @@ fn main() -> int:
     a = id(20)
     b = pair_first(22, 999)
 
-    # Closure with capture: `a` is captured.
-    add_a = |y| a + y
-    closured = add_a(0)
-
     # SIMD-style list ops.
     xs = [1, 2, 3, 4]
     ys = [10, 20, 30, 40]
     dot = vec_dot(xs, ys)
     sum = vec_add(xs, ys)
 
-    print("generics:")
+    print("generics a:")
     print(a)
+    print("generics b:")
     print(b)
-    print("closure:")
-    print(closured)
     print("simd dot:")
     print(dot)
     print("simd vec_add[0]:")
