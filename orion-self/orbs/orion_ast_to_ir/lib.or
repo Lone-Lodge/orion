@@ -1402,22 +1402,27 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         pr_val = ir_fn_push(cur_fn, ir_field_load(tmp_id, 1, "i64"))
         result = ConvResult{function: pr_val.function, scope: inner_r.scope, id: pr_val.id}
     if is_perform:
-        # MVP: dispatch through thread-local handler table. For now, no
-        # handler is installed, so call the runtime stub which returns 0.
-        # Future: real continuations via Windows Fibers + handler stack.
-        # Args are evaluated and dropped (default handler ignores them).
+        # `perform Effect.op(args)` → call `__handler_Effect_op(args)`.
+        # User defines the handler as a regular fn with the mangled name.
+        # Static dispatch — handler is fixed per-program, no runtime switching.
+        # Future upgrade: thread-local handler stack + continuations via libco.
+        effect_name = get(node, "effect")
+        op_name = get(node, "op")
+        handler_name = "__handler_{effect_name}_{op_name}"
         perf_args = get_list(node, "args")
         n_pa = len(perf_args)
         mut cur_fn = fn_value
         mut cur_scope = scope
+        mut arg_ids = []
         for pi in 0..<n_pa:
             arg_node = at(perf_args, pi)
             arg_r = ast_expr_to_ir(cur_fn, cur_scope, arg_node)
             cur_fn = arg_r.function
             cur_scope = arg_r.scope
-        # Stub: emit iconst(0). Real impl will lookup handler and call.
-        pr_zero = ir_fn_push(cur_fn, ir_iconst(0))
-        result = ConvResult{function: pr_zero.function, scope: cur_scope, id: pr_zero.id}
+            arg_ids = push(arg_ids, arg_r.id)
+        ret_type = scope_lookup_fn_ret_loc(cur_scope, handler_name, node)
+        pr_call = ir_fn_push(cur_fn, ir_call(handler_name, arg_ids, ret_type))
+        result = ConvResult{function: pr_call.function, scope: cur_scope, id: pr_call.id}
     any_match = is_block or is_int or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0

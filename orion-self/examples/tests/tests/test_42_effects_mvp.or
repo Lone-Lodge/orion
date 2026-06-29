@@ -1,8 +1,13 @@
 effect AskUser:
     ask: fn(prompt: Text) -> Text
 
+# Handler — perform AskUser.ask(prompt) dispatches to this by mangled name.
+fn __handler_AskUser_ask(prompt: Text) -> Text:
+    "default answer"
+
 fn main() -> int:
-    # MVP: perform compiles, returns 0 (default stub).
-    # Real handlers + continuations: future work via Windows Fibers.
-    _ = perform AskUser.ask("hello")
-    42
+    answer = perform AskUser.ask("hello")
+    if answer == "default answer":
+        42
+    else:
+        0
