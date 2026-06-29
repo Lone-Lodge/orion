@@ -426,6 +426,17 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         else:
             result = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
+    # SIMD-style vector ops over int lists. Lowered to elementwise runtime
+    # fns (orion_vec_add/sub/mul return ptr; orion_vec_dot returns i64).
+    if op == "vec_add":
+        result = "    {value_ref(my_id)} = call ptr @orion_vec_add(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "vec_sub":
+        result = "    {value_ref(my_id)} = call ptr @orion_vec_sub(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "vec_mul":
+        result = "    {value_ref(my_id)} = call ptr @orion_vec_mul(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "vec_dot":
+        result = "    {value_ref(my_id)} = call i64 @orion_vec_dot(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+
     if op == "map_lit":
         # args alternates key/val: [k0, v0, k1, v1, ...]
         n_total = len(inst.args)
@@ -1015,6 +1026,28 @@ fn emit_runtime() -> Text:
     text = "{text}miss:\n"
     text = "{text}  ret i64 0\n"
     text = "{text}\}\n\n"
+    # SIMD-style elementwise vector ops over int lists. Scalar fallback;
+    # autovectorizer may lift to <N x i64> via -Os.
+    text = "{text}define ptr @orion_vec_add(ptr %a, ptr %b) \{\n"
+    text = "{text}entry:\n  %la = call i64 @orion_list_len(ptr %a)\n  %out = call ptr @orion_list_new(i64 %la)\n  br label %hdr\n"
+    text = "{text}hdr:\n  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n  %done = icmp sge i64 %i, %la\n  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\n  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\n  %s = add i64 %xa, %xb\n  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\n  %i_next = add i64 %i, 1\n  br label %hdr\n"
+    text = "{text}after:\n  ret ptr %out\n\}\n\n"
+    text = "{text}define ptr @orion_vec_sub(ptr %a, ptr %b) \{\n"
+    text = "{text}entry:\n  %la = call i64 @orion_list_len(ptr %a)\n  %out = call ptr @orion_list_new(i64 %la)\n  br label %hdr\n"
+    text = "{text}hdr:\n  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n  %done = icmp sge i64 %i, %la\n  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\n  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\n  %s = sub i64 %xa, %xb\n  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\n  %i_next = add i64 %i, 1\n  br label %hdr\n"
+    text = "{text}after:\n  ret ptr %out\n\}\n\n"
+    text = "{text}define ptr @orion_vec_mul(ptr %a, ptr %b) \{\n"
+    text = "{text}entry:\n  %la = call i64 @orion_list_len(ptr %a)\n  %out = call ptr @orion_list_new(i64 %la)\n  br label %hdr\n"
+    text = "{text}hdr:\n  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n  %done = icmp sge i64 %i, %la\n  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\n  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\n  %s = mul i64 %xa, %xb\n  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\n  %i_next = add i64 %i, 1\n  br label %hdr\n"
+    text = "{text}after:\n  ret ptr %out\n\}\n\n"
+    text = "{text}define i64 @orion_vec_dot(ptr %a, ptr %b) \{\n"
+    text = "{text}entry:\n  %la = call i64 @orion_list_len(ptr %a)\n  br label %hdr\n"
+    text = "{text}hdr:\n  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n  %acc = phi i64 [ 0, %entry ], [ %acc_next, %bdy ]\n  %done = icmp sge i64 %i, %la\n  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\n  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\n  %m = mul i64 %xa, %xb\n  %acc_next = add i64 %acc, %m\n  %i_next = add i64 %i, 1\n  br label %hdr\n"
+    text = "{text}after:\n  ret i64 %acc\n\}\n\n"
     text
 
 

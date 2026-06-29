@@ -223,6 +223,17 @@ pub fn ir_list_len(list_id: int) -> Inst:
 pub fn ir_list_push(list_id: int, val_id: int) -> Inst:
     Inst{op: "list_push", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
 
+# SIMD-style elementwise vector ops. Returns a new int list (vec_add/sub/mul)
+# or i64 (vec_dot).
+pub fn ir_vec_add(a_id: int, b_id: int) -> Inst:
+    Inst{op: "vec_add", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
+pub fn ir_vec_sub(a_id: int, b_id: int) -> Inst:
+    Inst{op: "vec_sub", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
+pub fn ir_vec_mul(a_id: int, b_id: int) -> Inst:
+    Inst{op: "vec_mul", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
+pub fn ir_vec_dot(a_id: int, b_id: int) -> Inst:
+    Inst{op: "vec_dot", type_text: "i64", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
+
 
 # --- Maps (text key → i64 value) ---
 # A map is a ptr to a heap buffer laid out as
