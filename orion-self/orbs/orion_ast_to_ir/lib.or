@@ -1758,7 +1758,9 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                     n_stmts = len(old_stmts)
                     init_stmts = old_stmts
                     mut new_stmts = init_stmts
-                    new_stmts = bytes_slice(new_stmts, 0, 0)
+                    new_stmts = slice(new_stmts, 0, 0)
+                    mut binding_names = slice([""], 0, 0)
+                    mut binding_caps = slice([""], 0, 0)
                     for s_idx in 0..<n_stmts:
                         stmt = at(old_stmts, s_idx)
                         stmt_kind = get(stmt, "kind")
@@ -1770,24 +1772,91 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             lam = get(stmt, "value")
                             lam_params = get_list(lam, "params")
                             n_lp = len(lam_params)
+                            lam_body = get(lam, "body")
+                            mut caps = slice([""], 0, 0)
+                            if get(lam_body, "kind") == "Binary":
+                                bl = get(lam_body, "left")
+                                br = get(lam_body, "right")
+                                if get(bl, "kind") == "Ident":
+                                    bl_name = get(bl, "name")
+                                    mut bl_is_param = false
+                                    for lp_i in 0..<n_lp:
+                                        if at(lam_params, lp_i) == bl_name:
+                                            bl_is_param = true
+                                    if not bl_is_param:
+                                        caps = push(caps, bl_name)
+                                if get(br, "kind") == "Ident":
+                                    br_name = get(br, "name")
+                                    mut br_is_param = false
+                                    for lp_j in 0..<n_lp:
+                                        if at(lam_params, lp_j) == br_name:
+                                            br_is_param = true
+                                    if not br_is_param:
+                                        caps = push(caps, br_name)
+                            n_caps = len(caps)
                             init_typed = get_list(decl, "params")
                             mut typed_params = init_typed
-                            typed_params = bytes_slice(typed_params, 0, 0)
+                            typed_params = slice(typed_params, 0, 0)
+                            for ci in 0..<n_caps:
+                                cap_name = at(caps, ci)
+                                typed_params = push(typed_params, {"name": cap_name, "type": {"kind": "Named", "name": "int"}})
                             for pi in 0..<n_lp:
                                 p_name = at(lam_params, pi)
                                 typed_params = push(typed_params, {"name": p_name, "type": {"kind": "Named", "name": "int"}})
                             synth_name = "__lambda_{lambda_counter}"
                             lambda_counter = lambda_counter + 1
-                            lam_body = get(lam, "body")
                             synth_body_stmt = {"kind": "ExprStmt", "expr": lam_body}
                             stmt_seed = [synth_body_stmt]
                             synth_body = {"kind": "Block", "stmts": stmt_seed}
                             synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
                             synth_decls = push(synth_decls, synth_decl)
+                            bind_name = get(stmt, "name")
+                            binding_names = push(binding_names, bind_name)
+                            mut caps_csv = ""
+                            for cj in 0..<n_caps:
+                                csep = if cj == 0 then "" else ","
+                                caps_csv = "{caps_csv}{csep}{at(caps, cj)}"
+                            binding_caps = push(binding_caps, caps_csv)
                             new_value = {"kind": "Ident", "name": synth_name}
-                            new_stmts = push(new_stmts, {"kind": stmt_kind, "name": get(stmt, "name"), "value": new_value})
+                            new_stmts = push(new_stmts, {"kind": stmt_kind, "name": bind_name, "value": new_value})
                         if not is_let_lambda:
-                            new_stmts = push(new_stmts, stmt)
+                            mut rewritten_stmt = stmt
+                            if stmt_kind == "ExprStmt":
+                                expr = get(stmt, "expr")
+                                if get(expr, "kind") == "Call":
+                                    callee = get(expr, "callee")
+                                    n_bn = len(binding_names)
+                                    mut match_idx = 0 - 1
+                                    for bi in 0..<n_bn:
+                                        if at(binding_names, bi) == callee:
+                                            match_idx = bi
+                                    if match_idx >= 0:
+                                        caps_csv2 = at(binding_caps, match_idx)
+                                        if caps_csv2 != "":
+                                            cap_bs = bytes_from_text(caps_csv2)
+                                            cap_n = len(cap_bs)
+                                            mut cap_names = slice([""], 0, 0)
+                                            mut cur_cap = ""
+                                            for cbi in 0..<cap_n:
+                                                cb = at(cap_bs, cbi)
+                                                if cb == 44:
+                                                    cap_names = push(cap_names, cur_cap)
+                                                    cur_cap = ""
+                                                if cb != 44:
+                                                    cur_cap = "{cur_cap}{bytes_to_text(bytes_slice(cap_bs, cbi, cbi + 1))}"
+                                            if cur_cap != "":
+                                                cap_names = push(cap_names, cur_cap)
+                                            old_args = get_list(expr, "args")
+                                            old_n_args = len(old_args)
+                                            mut new_args = slice(old_args, 0, 0)
+                                            n_cap_names = len(cap_names)
+                                            for cni in 0..<n_cap_names:
+                                                new_args = push(new_args, {"kind": "Ident", "name": at(cap_names, cni)})
+                                            for oai in 0..<old_n_args:
+                                                new_args = push(new_args, at(old_args, oai))
+                                            new_call = {"kind": "Call", "callee": callee, "args": new_args}
+                                            rewritten_stmt = {"kind": "ExprStmt", "expr": new_call}
+                            new_stmts = push(new_stmts, rewritten_stmt)
                     new_body = {"kind": "Block", "stmts": new_stmts}
                     rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body}
                     working_decls = push(working_decls, rewritten_decl)

@@ -43,7 +43,7 @@ impl Cx {
                 }
                 Ty::Bool
             }
-            "get_or" | "get" | "set" | "at" | "push" => {
+            "get_or" | "get" | "set" | "at" | "push" | "slice" => {
                 for a in args {
                     self.infer(a, scope)?;
                 }

@@ -8,7 +8,7 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     ("max", 2), ("min", 2), ("abs", 1), ("sqrt", 1), ("print", 1),
     ("floor", 1), ("ceil", 1), ("round", 1), ("pow", 2), ("clamp", 3),
     ("sign", 1), ("len", 1), ("get_or", 3), ("get", 2), ("has", 2),
-    ("set", 3), ("at", 2), ("push", 2),
+    ("set", 3), ("at", 2), ("push", 2), ("slice", 3),
     // numeric conversion
     ("to_int", 1), ("to_float", 1),
     // runtime type introspection
@@ -80,6 +80,7 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         "set" => set(args),
         "at" => at(&args),
         "push" => push(args),
+        "slice" => slice(&args),
         "sin" => float1(&args, f64::sin, "sin"),
         "cos" => float1(&args, f64::cos, "cos"),
         "tan" => float1(&args, f64::tan, "tan"),
@@ -497,6 +498,19 @@ fn at(args: &[Value]) -> Result<Value, RunError> {
     };
     items.get(*i as usize).cloned()
         .ok_or_else(|| run_err(format!("index {i} out of bounds (len {})", items.len())))
+}
+
+fn slice(args: &[Value]) -> Result<Value, RunError> {
+    // Generic slice — works on any list type (vs bytes_slice which is [int]-only).
+    // `slice(list, lo, hi)` returns the half-open range [lo, hi). Bounds are clamped.
+    let (Value::List(items), Value::Int(lo), Value::Int(hi)) = (&args[0], &args[1], &args[2]) else {
+        return Err(run_err(format!("slice expects (list, lo, hi), got {:?}", args)));
+    };
+    let total = items.len() as i64;
+    let capped_hi = (*hi).clamp(0, total);
+    let capped_lo = (*lo).clamp(0, capped_hi);
+    let out: Vec<Value> = items[capped_lo as usize..capped_hi as usize].to_vec();
+    Ok(Value::List(std::sync::Arc::new(out)))
 }
 
 fn push(mut args: Vec<Value>) -> Result<Value, RunError> {

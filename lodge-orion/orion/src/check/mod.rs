@@ -30,7 +30,7 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     ("max", 2), ("min", 2), ("abs", 1), ("sqrt", 1), ("print", 1),
     ("floor", 1), ("ceil", 1), ("round", 1), ("pow", 2), ("clamp", 3),
     ("sign", 1), ("len", 1), ("get_or", 3), ("get", 2), ("has", 2),
-    ("set", 3), ("at", 2), ("push", 2),
+    ("set", 3), ("at", 2), ("push", 2), ("slice", 3),
     ("to_int", 1), ("to_float", 1),
     ("type_of", 1),
     ("map_keys", 1), ("map_values", 1),
