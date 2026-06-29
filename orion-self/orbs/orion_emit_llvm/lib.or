@@ -190,6 +190,24 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         arg_ref = value_ref(inst.lhs)
         result = "    {value_ref(my_id)} = call ptr @__orion_perform_text(ptr @{inst.name}, ptr {arg_ref})"
 
+    if op == "fn_ref":
+        # Function pointer constant — `@<name>` evaluates to a ptr in LLVM.
+        # Use getelementptr with 0 offset to force it into an SSA slot.
+        result = "    {value_ref(my_id)} = getelementptr i8, ptr @{inst.name}, i64 0"
+
+    if op == "indirect_call":
+        # Indirect call: callee SSA value is in inst.value; args same as call.
+        n_args = len(inst.args)
+        mut arg_text = ""
+        for ai in 0..<n_args:
+            arg_id = at(inst.args, ai)
+            arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
+            sep = if ai == 0 then "" else ", "
+            arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
+        ret_ty = llvm_type_of(inst.type_text)
+        callee_ref = value_ref(inst.value)
+        result = "    {value_ref(my_id)} = call {ret_ty} {callee_ref}({arg_text})"
+
     if op == "label":
         # Emit basic-block label (no leading 4-space indent).
         result = "{inst.name}:"

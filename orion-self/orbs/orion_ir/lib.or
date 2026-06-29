@@ -361,6 +361,19 @@ pub fn ir_perform_text(handler_name: Text, arg_id: int) -> Inst:
     Inst{op: "perform_text", type_text: "text", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
 
 
+# First-class fn reference — produces a ptr-typed SSA value holding
+# the address of the named global fn. Used for higher-order fns.
+pub fn ir_fn_ref(fn_name: Text) -> Inst:
+    Inst{op: "fn_ref", type_text: "ptr", value: 0, lhs: 0, rhs: 0, name: fn_name, args: []}
+
+
+# Indirect call through a fn-ptr value (not a global fn name).
+# callee_id is the SSA value holding the ptr; ret_type is what the
+# fn returns. For now we restrict to all-i64 args / i64 or text ret.
+pub fn ir_indirect_call(callee_id: int, arg_ids: [int], ret_type: Text) -> Inst:
+    Inst{op: "indirect_call", type_text: ret_type, value: callee_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
+
+
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:
     mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)

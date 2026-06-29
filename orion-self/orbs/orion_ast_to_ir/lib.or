@@ -615,14 +615,20 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_mut = scope_is_mut(scope, name)
     mut result = ConvResult{function: fn_value, scope: scope, id: found_id}
     if found_id < 0:
-        # Unknown ident — likely a `{expr}` interpolation the parser
-        # captured as a single ident. Emit a sentinel iconst(0) so
-        # downstream code doesn't panic on at(insts, -1).
-        line = if has(node, "line") then get_int(node, "line") else 0
-        col = if has(node, "col") then get_int(node, "col") else 0
-        print_line("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
-        pr = ir_fn_push(fn_value, ir_iconst(0))
-        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+        # Not a local — check if it's a known global fn. If so, produce
+        # a fn-ref value (first-class function reference).
+        fn_ret = scope_lookup_fn_ret(scope, name)
+        if fn_ret != "":
+            pr_fnref = ir_fn_push(fn_value, ir_fn_ref(name))
+            result = ConvResult{function: pr_fnref.function, scope: scope, id: pr_fnref.id}
+        if fn_ret == "":
+            # Unknown ident — likely a `{expr}` interpolation the parser
+            # captured as a single ident. Emit a sentinel iconst(0).
+            line = if has(node, "line") then get_int(node, "line") else 0
+            col = if has(node, "col") then get_int(node, "col") else 0
+            print_line("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
+            pr = ir_fn_push(fn_value, ir_iconst(0))
+            result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     is_real_mut = found_id >= 0 and is_mut == 1
     if is_real_mut:
         # Mut bindings store a ptr (alloca) — read via load with the
@@ -1004,7 +1010,10 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_text", [arg_r.id], "void"))
         result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_user_fn:
-        # User-defined fn call. Evaluate each arg and collect SSA ids.
+        # If `callee` is a LOCAL variable bound to a fn-ref value, emit an
+        # indirect call. Otherwise treat it as a global fn name (direct call).
+        bound_id = scope_lookup(scope, callee)
+        is_local_callee = bound_id >= 0
         total_args = len(args)
         mut current_fn = fn_value
         mut current_scope = scope
@@ -1015,9 +1024,15 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_fn = arg_r.function
             current_scope = arg_r.scope
             arg_ids = push(arg_ids, arg_r.id)
-        call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
-        pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
-        result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+        if is_local_callee:
+            # Indirect call. Return type defaults to i64 — proper type
+            # tracking on fn-ref values is future work.
+            pr = ir_fn_push(current_fn, ir_indirect_call(bound_id, arg_ids, "i64"))
+            result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+        else:
+            call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
+            pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
+            result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
     result
 
 fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:

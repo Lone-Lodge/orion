@@ -160,6 +160,10 @@ pub fn ir_perform_int(handler_name: Text, arg_id: int) -> Inst:
     Inst{op: "perform_int", type_text: "i64", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
 pub fn ir_perform_text(handler_name: Text, arg_id: int) -> Inst:
     Inst{op: "perform_text", type_text: "text", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
+pub fn ir_fn_ref(fn_name: Text) -> Inst:
+    Inst{op: "fn_ref", type_text: "ptr", value: 0, lhs: 0, rhs: 0, name: fn_name, args: []}
+pub fn ir_indirect_call(callee_id: int, arg_ids: [int], ret_type: Text) -> Inst:
+    Inst{op: "indirect_call", type_text: ret_type, value: callee_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:
     mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
@@ -2045,11 +2049,16 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_mut = scope_is_mut(scope, name)
     mut result = ConvResult{function: fn_value, scope: scope, id: found_id}
     if found_id < 0:
-        line = if has(node, "line") then get_int(node, "line") else 0
-        col = if has(node, "col") then get_int(node, "col") else 0
-        print_line("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
-        pr = ir_fn_push(fn_value, ir_iconst(0))
-        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+        fn_ret = scope_lookup_fn_ret(scope, name)
+        if fn_ret != "":
+            pr_fnref = ir_fn_push(fn_value, ir_fn_ref(name))
+            result = ConvResult{function: pr_fnref.function, scope: scope, id: pr_fnref.id}
+        if fn_ret == "":
+            line = if has(node, "line") then get_int(node, "line") else 0
+            col = if has(node, "col") then get_int(node, "col") else 0
+            print_line("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
+            pr = ir_fn_push(fn_value, ir_iconst(0))
+            result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     is_real_mut = found_id >= 0 and is_mut == 1
     if is_real_mut:
         alloca_inst = at(fn_value.instructions, found_id)
@@ -2396,6 +2405,8 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_text", [arg_r.id], "void"))
         result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_user_fn:
+        bound_id = scope_lookup(scope, callee)
+        is_local_callee = bound_id >= 0
         total_args = len(args)
         mut current_fn = fn_value
         mut current_scope = scope
@@ -2406,9 +2417,13 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_fn = arg_r.function
             current_scope = arg_r.scope
             arg_ids = push(arg_ids, arg_r.id)
-        call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
-        pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
-        result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+        if is_local_callee:
+            pr = ir_fn_push(current_fn, ir_indirect_call(bound_id, arg_ids, "i64"))
+            result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+        else:
+            call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
+            pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
+            result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
     result
 fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     op = get(node, "op")
@@ -3109,6 +3124,19 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "perform_text":
         arg_ref = value_ref(inst.lhs)
         result = "    {value_ref(my_id)} = call ptr @__orion_perform_text(ptr @{inst.name}, ptr {arg_ref})"
+    if op == "fn_ref":
+        result = "    {value_ref(my_id)} = getelementptr i8, ptr @{inst.name}, i64 0"
+    if op == "indirect_call":
+        n_args = len(inst.args)
+        mut arg_text = ""
+        for ai in 0..<n_args:
+            arg_id = at(inst.args, ai)
+            arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
+            sep = if ai == 0 then "" else ", "
+            arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
+        ret_ty = llvm_type_of(inst.type_text)
+        callee_ref = value_ref(inst.value)
+        result = "    {value_ref(my_id)} = call {ret_ty} {callee_ref}({arg_text})"
     if op == "label":
         result = "{inst.name}:"
     if op == "br":
