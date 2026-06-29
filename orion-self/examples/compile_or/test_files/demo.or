@@ -1,0 +1,3719 @@
+use bytes
+use io
+data Inst: op: Text, type_text: Text, value: int, lhs: int, rhs: int, name: Text, args: [int]
+data Param: name: Text, type_text: Text
+data IRFn: name: Text, return_type: Text, params: [Param], instructions: [Inst]
+data IRModule: functions: [IRFn]
+data PushResult: function: IRFn, id: int
+pub fn ir_type_i64() -> Text: "i64"
+pub fn ir_type_ptr() -> Text: "ptr"
+pub fn ir_type_bool() -> Text: "bool"
+pub fn ir_type_void() -> Text: "void"
+pub fn ir_iconst(value: int) -> Inst:
+    Inst{op: "iconst", type_text: "i64", value: value, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_iadd(lhs: int, rhs: int) -> Inst:
+    Inst{op: "iadd", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_isub(lhs: int, rhs: int) -> Inst:
+    Inst{op: "isub", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_imul(lhs: int, rhs: int) -> Inst:
+    Inst{op: "imul", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_idiv(lhs: int, rhs: int) -> Inst:
+    Inst{op: "idiv", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_imod(lhs: int, rhs: int) -> Inst:
+    Inst{op: "imod", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_iand(lhs: int, rhs: int) -> Inst:
+    Inst{op: "iand", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_ior(lhs: int, rhs: int) -> Inst:
+    Inst{op: "ior", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_inot(value_id: int) -> Inst:
+    Inst{op: "inot", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_icmp_eq(lhs: int, rhs: int) -> Inst:
+    Inst{op: "icmp_eq", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_icmp_ne(lhs: int, rhs: int) -> Inst:
+    Inst{op: "icmp_ne", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_icmp_lt(lhs: int, rhs: int) -> Inst:
+    Inst{op: "icmp_lt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_icmp_le(lhs: int, rhs: int) -> Inst:
+    Inst{op: "icmp_le", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_icmp_gt(lhs: int, rhs: int) -> Inst:
+    Inst{op: "icmp_gt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_icmp_ge(lhs: int, rhs: int) -> Inst:
+    Inst{op: "icmp_ge", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+pub fn ir_return(value_id: int) -> Inst:
+    Inst{op: "return", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_return_void() -> Inst:
+    Inst{op: "return", type_text: "void", value: 0 - 1, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_print_int(value_id: int) -> Inst:
+    Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
+    Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
+pub fn ir_call(fn_name: Text, arg_ids: [int], ret_type: Text) -> Inst:
+    Inst{op: "call", type_text: ret_type, value: 0, lhs: 0, rhs: 0, name: fn_name, args: arg_ids}
+pub fn ir_print_str(text: Text) -> Inst:
+    Inst{op: "print_str", type_text: "void", value: 0, lhs: 0, rhs: 0, name: text, args: []}
+pub fn ir_const_str(text: Text) -> Inst:
+    Inst{op: "const_str", type_text: "text", value: 0, lhs: 0, rhs: 0, name: text, args: []}
+pub fn ir_text_concat(left_id: int, right_id: int) -> Inst:
+    Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
+pub fn ir_int_to_text(value_id: int) -> Inst:
+    Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_text_cmp(op_name: Text, left_id: int, right_id: int) -> Inst:
+    Inst{op: op_name, type_text: "i64", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
+pub fn ir_text_len(value_id: int) -> Inst:
+    Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
+    Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
+pub fn ir_text_contains(text_id: int, sub_id: int) -> Inst:
+    Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
+pub fn ir_file_read(path_id: int) -> Inst:
+    Inst{op: "file_read", type_text: "text", value: path_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_file_write(path_id: int, content_id: int) -> Inst:
+    Inst{op: "file_write", type_text: "i64", value: path_id, lhs: content_id, rhs: 0, name: "", args: []}
+pub fn ir_argc() -> Inst:
+    Inst{op: "argc", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_argv(idx_id: int) -> Inst:
+    Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_bytes_from_text(text_id: int) -> Inst:
+    Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_bytes_to_text(list_id: int) -> Inst:
+    Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
+    Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
+pub fn ir_bytes_concat(a_id: int, b_id: int) -> Inst:
+    Inst{op: "bytes_concat", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
+pub fn ir_bytes_zeros(n_id: int) -> Inst:
+    Inst{op: "bytes_zeros", type_text: "list", value: n_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_slot_get(key_id: int) -> Inst:
+    Inst{op: "slot_get", type_text: "text", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_slot_set(key_id: int, val_id: int) -> Inst:
+    Inst{op: "slot_set", type_text: "i64", value: key_id, lhs: val_id, rhs: 0, name: "", args: []}
+pub fn ir_list_lit(item_ids: [int], elem_type: Text) -> Inst:
+    Inst{op: "list_lit", type_text: "list:{elem_type}", value: 0, lhs: 0, rhs: 0, name: "", args: item_ids}
+pub fn ir_list_at(list_id: int, index_id: int) -> Inst:
+    Inst{op: "list_at", type_text: "i64", value: list_id, lhs: index_id, rhs: 0, name: "", args: []}
+pub fn ir_list_len(list_id: int) -> Inst:
+    Inst{op: "list_len", type_text: "i64", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_list_push(list_id: int, val_id: int) -> Inst:
+    Inst{op: "list_push", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
+pub fn ir_map_lit(pair_ids: [int]) -> Inst:
+    Inst{op: "map_lit", type_text: "map", value: 0, lhs: 0, rhs: 0, name: "", args: pair_ids}
+pub fn ir_map_get(map_id: int, key_id: int, value_type: Text) -> Inst:
+    Inst{op: "map_get", type_text: value_type, value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
+pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
+    Inst{op: "map_has", type_text: "i64", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
+pub fn ir_struct_cons(struct_name: Text, n_fields: int, value_ids: [int]) -> Inst:
+    Inst{op: "struct_cons", type_text: "struct:{struct_name}", value: n_fields, lhs: 0, rhs: 0, name: struct_name, args: value_ids}
+pub fn ir_field_load(struct_id: int, field_index: int, field_type: Text) -> Inst:
+    Inst{op: "field_load", type_text: field_type, value: struct_id, lhs: field_index, rhs: 0, name: "", args: []}
+pub fn ir_print_text(value_id: int) -> Inst:
+    Inst{op: "print_text", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_alloca(stored_type: Text) -> Inst:
+    Inst{op: "alloca", type_text: stored_type, value: 0, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_load(ptr_id: int, loaded_type: Text) -> Inst:
+    Inst{op: "load", type_text: loaded_type, value: ptr_id, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_store(ptr_id: int, value_id: int) -> Inst:
+    Inst{op: "store", type_text: "void", value: ptr_id, lhs: value_id, rhs: 0, name: "", args: []}
+pub fn ir_label(label_name: Text) -> Inst:
+    Inst{op: "label", type_text: "void", value: 0, lhs: 0, rhs: 0, name: label_name, args: []}
+pub fn ir_br(target_label: Text) -> Inst:
+    Inst{op: "br", type_text: "void", value: 0, lhs: 0, rhs: 0, name: target_label, args: []}
+pub fn ir_br_if(cond_id: int, then_label: Text, else_label: Text) -> Inst:
+    Inst{op: "br_if", type_text: "void", value: cond_id, lhs: 0, rhs: 0, name: "{then_label}|{else_label}", args: []}
+pub fn ir_phi(then_val_id: int, then_label: Text, else_val_id: int, else_label: Text, phi_type: Text) -> Inst:
+    Inst{op: "phi", type_text: phi_type, value: 0, lhs: then_val_id, rhs: else_val_id, name: "{then_label}|{else_label}", args: []}
+pub fn ir_param(param_index: int, param_type: Text) -> Inst:
+    Inst{op: "param", type_text: param_type, value: param_index, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_fn_new(name: Text, return_type: Text) -> IRFn:
+    IRFn{name: name, return_type: return_type, params: [], instructions: []}
+pub fn ir_fn_add_param(fn_value: IRFn, param_name: Text, param_type: Text) -> IRFn:
+    new_param = Param{name: param_name, type_text: param_type}
+    new_params = push(fn_value.params, new_param)
+    IRFn{name: fn_value.name, return_type: fn_value.return_type, params: new_params, instructions: fn_value.instructions}
+pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
+    new_id = len(fn_value.instructions)
+    new_instructions = push(fn_value.instructions, inst)
+    new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: new_instructions}
+    PushResult{function: new_fn, id: new_id}
+pub fn ir_module_new() -> IRModule:
+    IRModule{functions: []}
+pub fn ir_module_add_fn(module: IRModule, fn_value: IRFn) -> IRModule:
+    new_functions = push(module.functions, fn_value)
+    IRModule{functions: new_functions}
+pub fn ir_dump_value_ref(value_id: int) -> Text:
+    if value_id < 0:
+        "void"
+    else:
+        "v{value_id}"
+pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
+    prefix = "{ir_dump_value_ref(my_id)} = "
+    op = inst.op
+    if op == "iconst":
+        "{prefix}iconst.{inst.type_text} {inst.value}"
+    else:
+        if op == "return":
+            "return {ir_dump_value_ref(inst.value)}"
+        else:
+            lhs_ref = ir_dump_value_ref(inst.lhs)
+            rhs_ref = ir_dump_value_ref(inst.rhs)
+            "{prefix}{op}.{inst.type_text} {lhs_ref}, {rhs_ref}"
+pub fn ir_dump_fn(fn_value: IRFn) -> Text:
+    mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
+    total = len(fn_value.instructions)
+    for idx in 0..<total:
+        inst = at(fn_value.instructions, idx)
+        line = ir_dump_instruction(inst, idx)
+        text = "{text}    {line}\n"
+    text
+pub fn ir_dump_module(module: IRModule) -> Text:
+    mut text = "; orion_ir module dump\n"
+    total = len(module.functions)
+    for idx in 0..<total:
+        fn_value = at(module.functions, idx)
+        text = "{text}{ir_dump_fn(fn_value)}\n"
+    text
+fn slx_is_space(byte: int) -> bool:
+    byte == 32 or byte == 9 or byte == 13
+fn slx_is_newline(byte: int) -> bool:
+    byte == 10
+fn slx_is_digit(byte: int) -> bool:
+    byte >= 48 and byte <= 57
+fn slx_is_lower(byte: int) -> bool:
+    byte >= 97 and byte <= 122
+fn slx_is_upper(byte: int) -> bool:
+    byte >= 65 and byte <= 90
+fn slx_is_ident_start(byte: int) -> bool:
+    slx_is_lower(byte) or slx_is_upper(byte) or byte == 95
+fn slx_is_ident_continue(byte: int) -> bool:
+    slx_is_ident_start(byte) or slx_is_digit(byte)
+fn slx_make_token(kind: Text, value: Text, line: int, col: int) -> Map:
+    {"kind": kind, "value": value, "line": line, "col": col}
+fn slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
+    mut cursor = start
+    loop:
+        if cursor >= byte_count:
+            break
+        if not slx_is_ident_continue(byte_at(bytes, cursor)):
+            break
+        cursor += 1
+    text_value = bytes_to_text(bytes_slice(bytes, start, cursor))
+    {"token": slx_make_token("ident", text_value, line, col), "next": cursor}
+fn slx_keyword_table() -> [Text]:
+    ["fn", "kw_fn", "data", "kw_data", "enum", "kw_enum", "trait", "kw_trait", "impl", "kw_impl", "system", "kw_system", "use", "kw_use", "pub", "kw_pub", "mut", "kw_mut", "if", "kw_if", "else", "kw_else", "for", "kw_for", "in", "kw_in", "with", "kw_with", "where", "kw_where", "loop", "kw_loop", "break", "kw_break", "continue", "kw_continue", "match", "kw_match", "true", "kw_true", "false", "kw_false", "and", "kw_and", "or", "kw_or", "not", "kw_not", "extern", "kw_extern", "comptime", "kw_comptime", "deterministic", "kw_deterministic", "parallel", "kw_parallel", "spawn", "kw_spawn", "destroy", "kw_destroy", "require", "kw_require", "ensure", "kw_ensure", "scope", "kw_scope", "job", "kw_job", "raw", "kw_raw", "frame", "kw_frame", "before", "kw_before", "after", "kw_after", "as", "kw_as", "return", "kw_return", "none", "kw_none", "self", "kw_self"]
+fn slx_keyword_kind(word: Text) -> Text:
+    table = slx_keyword_table()
+    table_length = len(table)
+    mut found = "ident"
+    mut index = 0
+    loop:
+        if index >= table_length:
+            break
+        if at(table, index) == word:
+            found = at(table, index + 1)
+        index += 2
+    found
+fn slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
+    mut cursor = start
+    mut saw_dot = false
+    loop:
+        if cursor >= byte_count:
+            break
+        current = byte_at(bytes, cursor)
+        if slx_is_digit(current):
+            cursor += 1
+        else:
+            is_dot_then_digit = current == 46 and (not saw_dot) and cursor + 1 < byte_count and slx_is_digit(byte_at(bytes, cursor + 1))
+            if is_dot_then_digit:
+                saw_dot = true
+                cursor += 1
+            else:
+                break
+    text_value = bytes_to_text(bytes_slice(bytes, start, cursor))
+    kind = if saw_dot then "float" else "int"
+    {"token": slx_make_token(kind, text_value, line, col), "next": cursor}
+fn slx_resolve_escape(escape_char: int) -> int:
+    mut result = 0 - 1
+    if escape_char == 34: result = 34
+    if escape_char == 92: result = 92
+    if escape_char == 110: result = 10
+    if escape_char == 114: result = 13
+    if escape_char == 116: result = 9
+    if escape_char == 48: result = 0
+    result
+fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
+    mut cursor = start + 1
+    mut buffer = bytes_zeros(0)
+    mut closed = false
+    loop:
+        if cursor >= byte_count:
+            break
+        current = byte_at(bytes, cursor)
+        if current == 34:
+            closed = true
+            cursor += 1
+            break
+        if current == 10:
+            break
+        if current == 92 and cursor + 1 < byte_count:
+            next_byte = byte_at(bytes, cursor + 1)
+            resolved = slx_resolve_escape(next_byte)
+            if resolved >= 0:
+                buffer = push(buffer, resolved)
+                cursor += 2
+            else:
+                buffer = push(buffer, 92)
+                buffer = push(buffer, next_byte)
+                cursor += 2
+        else:
+            buffer = push(buffer, current)
+            cursor += 1
+    text_value = bytes_to_text(buffer)
+    {"token": slx_make_token("str", text_value, line, col), "next": cursor, "closed": closed}
+fn slx_scan_op(bytes: [int], start: int, byte_count: int) -> Text:
+    first = byte_at(bytes, start)
+    mut second = 0
+    if start + 1 < byte_count:
+        second = byte_at(bytes, start + 1)
+    mut third = 0
+    if start + 2 < byte_count:
+        third = byte_at(bytes, start + 2)
+    mut op = ""
+    if first == 46 and second == 46 and third == 60:
+        op = "..<"
+    if first == 46 and second == 46 and third == 61:
+        op = "..="
+    if op == "":
+        op = slx_scan_op_short(first, second)
+    op
+fn slx_scan_op_short(first: int, second: int) -> Text:
+    mut result = ""
+    if first == 61 and second == 61:
+        result = "=="
+    if first == 33 and second == 61:
+        result = "!="
+    if first == 60 and second == 61:
+        result = "<="
+    if first == 62 and second == 61:
+        result = ">="
+    if first == 45 and second == 62:
+        result = "->"
+    if first == 43 and second == 61:
+        result = "+="
+    if first == 45 and second == 61:
+        result = "-="
+    if first == 42 and second == 61:
+        result = "*="
+    if first == 47 and second == 61:
+        result = "/="
+    if first == 46 and second == 46:
+        result = ".."
+    if result == "":
+        result = slx_scan_op_single(first)
+    result
+fn slx_scan_op_single(first: int) -> Text:
+    mut result_text = ""
+    if first == 43:
+        result_text = "+"
+    if first == 45:
+        result_text = "-"
+    if first == 42:
+        result_text = "*"
+    if first == 47:
+        result_text = "/"
+    if first == 61:
+        result_text = "="
+    if first == 60:
+        result_text = "<"
+    if first == 62:
+        result_text = ">"
+    if first == 33:
+        result_text = "!"
+    if first == 40:
+        result_text = "("
+    if first == 41:
+        result_text = ")"
+    if first == 44:
+        result_text = ","
+    if first == 58:
+        result_text = ":"
+    if first == 59:
+        result_text = ";"
+    if first == 46:
+        result_text = "."
+    if first == 91:
+        result_text = "["
+    if first == 93:
+        result_text = "]"
+    if first == 123:
+        result_text = "\{"
+    if first == 125:
+        result_text = "\}"
+    if first == 63:
+        result_text = "?"
+    if first == 64:
+        result_text = "@"
+    if first == 38:
+        result_text = "&"
+    if first == 124:
+        result_text = "|"
+    if first == 94:
+        result_text = "^"
+    if first == 37:
+        result_text = "%"
+    result_text
+fn slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
+    mut cursor = start
+    loop:
+        if cursor >= byte_count:
+            break
+        if slx_is_newline(byte_at(bytes, cursor)):
+            break
+        cursor += 1
+    cursor
+fn slx_push_token(tokens: [Map], token: Map) -> [Map]:
+    last_kind = slot_get("slx:last_kind")
+    is_newline = get(token, "kind") == "newline"
+    last_was_newline = last_kind == "newline" or last_kind == ""
+    suppress = is_newline and last_was_newline
+    mut result = tokens
+    if not suppress:
+        result = push(tokens, token)
+        slot_set("slx:last_kind", get(token, "kind"))
+    result
+pub fn self_lex(source: Text) -> [Map]:
+    bytes = bytes_from_text(source)
+    byte_count = bytes_length(bytes)
+    slot_set("slx:last_kind", "")
+    mut tokens = []
+    mut cursor = 0
+    mut line = 1
+    mut line_start = 0
+    loop:
+        if cursor >= byte_count:
+            break
+        current = byte_at(bytes, cursor)
+        col = cursor - line_start
+        is_nl = slx_is_newline(current)
+        is_ws = slx_is_space(current)
+        is_comment = current == 35
+        is_string = current == 34
+        is_digit = slx_is_digit(current)
+        is_ident = slx_is_ident_start(current)
+        if is_nl:
+            tokens = slx_push_token(tokens, slx_make_token("newline", "\n", line, col))
+            line += 1
+            cursor += 1
+            line_start = cursor
+        if is_ws and not is_nl:
+            cursor += 1
+        if is_comment:
+            cursor = slx_skip_comment(bytes, cursor, byte_count)
+        if is_string:
+            scanned = slx_scan_string(bytes, cursor, byte_count, line, col)
+            tokens = slx_push_token(tokens, get(scanned, "token"))
+            cursor = get(scanned, "next")
+        if is_digit:
+            scanned = slx_scan_number(bytes, cursor, byte_count, line, col)
+            tokens = slx_push_token(tokens, get(scanned, "token"))
+            cursor = get(scanned, "next")
+        if is_ident:
+            scanned = slx_scan_ident(bytes, cursor, byte_count, line, col)
+            tokens = slx_push_token(tokens, get(scanned, "token"))
+            cursor = get(scanned, "next")
+        is_unknown = not (is_nl or is_ws or is_comment or is_string or is_digit or is_ident)
+        if is_unknown:
+            op_text = slx_scan_op(bytes, cursor, byte_count)
+            if op_text == "":
+                cursor += 1
+            else:
+                op_length = bytes_length(bytes_from_text(op_text))
+                tokens = slx_push_token(tokens, slx_make_token("symbol", op_text, line, col))
+                cursor += op_length
+    tokens = slx_push_token(tokens, slx_make_token("newline", "\n", line, byte_count - line_start))
+    eof_token = slx_make_token("eof", "", line, byte_count - line_start)
+    tokens = push(tokens, eof_token)
+    tokens
+pub fn get_int(m: Map, k: Text) -> int: get(m, k)
+pub fn get_map(m: Map, k: Text) -> Map: get(m, k)
+pub fn get_list(m: Map, k: Text) -> [Map]: get(m, k)
+fn psr_arg_to_node(text: Text) -> Map:
+    bs = bytes_from_text(text)
+    n = bytes_length(bs)
+    mut all_digits = n > 0
+    mut dot_at = 0 - 1
+    mut paren_at = 0 - 1
+    for ci in 0..<n:
+        b = byte_at(bs, ci)
+        if b < 48 or b > 57:
+            all_digits = false
+        if b == 46 and dot_at == (0 - 1):
+            dot_at = ci
+        if b == 40 and paren_at == (0 - 1):
+            paren_at = ci
+    has_call = paren_at > 0
+    has_field = dot_at > 0 and not all_digits and not has_call
+    if all_digits:
+        {"kind": "Int", "value": text}
+    else:
+        if has_call:
+            callee = psr_trim_ws(bytes_to_text(bytes_slice(bs, 0, paren_at)))
+            inner = bytes_to_text(bytes_slice(bs, paren_at + 1, n - 1))
+            inner_bs = bytes_from_text(inner)
+            inner_len = bytes_length(inner_bs)
+            mut inner_args = []
+            mut a_start = 0
+            mut depth = 0
+            for ai in 0..<inner_len:
+                bi = byte_at(inner_bs, ai)
+                if bi == 40:
+                    depth = depth + 1
+                if bi == 41:
+                    depth = depth - 1
+                if bi == 44 and depth == 0:
+                    chunk = psr_trim_ws(bytes_to_text(bytes_slice(inner_bs, a_start, ai)))
+                    inner_args = push(inner_args, psr_arg_to_node(chunk))
+                    a_start = ai + 1
+            if inner_len > 0:
+                tail = psr_trim_ws(bytes_to_text(bytes_slice(inner_bs, a_start, inner_len)))
+                inner_args = push(inner_args, psr_arg_to_node(tail))
+            {"kind": "Call", "callee": callee, "args": inner_args}
+        else:
+            if has_field:
+                obj_name = psr_trim_ws(bytes_to_text(bytes_slice(bs, 0, dot_at)))
+                field_name = psr_trim_ws(bytes_to_text(bytes_slice(bs, dot_at + 1, n)))
+                {"kind": "Field", "object": {"kind": "Ident", "name": obj_name}, "field": field_name}
+            else:
+                {"kind": "Ident", "name": text}
+fn psr_trim_ws(text: Text) -> Text:
+    bs = bytes_from_text(text)
+    n = bytes_length(bs)
+    mut start = 0
+    loop:
+        if start >= n:
+            break
+        b = byte_at(bs, start)
+        is_ws = b == 32 or b == 9 or b == 10 or b == 13
+        if not is_ws:
+            break
+        start = start + 1
+    mut stop = n
+    loop:
+        if stop <= start:
+            break
+        b = byte_at(bs, stop - 1)
+        is_ws = b == 32 or b == 9 or b == 10 or b == 13
+        if not is_ws:
+            break
+        stop = stop - 1
+    bytes_to_text(bytes_slice(bs, start, stop))
+fn psr_peek_kind(tokens: [Map], position: int) -> Text:
+    if position >= len(tokens):
+        "eof"
+    else:
+        get(at(tokens, position), "kind")
+fn psr_peek_value(tokens: [Map], position: int) -> Text:
+    if position >= len(tokens):
+        ""
+    else:
+        get(at(tokens, position), "value")
+fn psr_skip_newlines(tokens: [Map], position: int) -> int:
+    mut cursor = position
+    loop:
+        if psr_peek_kind(tokens, cursor) != "newline":
+            break
+        cursor += 1
+    cursor
+fn psr_parse_type(tokens: [Map], position: int) -> Map:
+    if psr_peek_kind(tokens, position) == "symbol" and psr_peek_value(tokens, position) == "[":
+        inner_result = psr_parse_type(tokens, position + 1)
+        next_position = get_int(inner_result, "next")
+        if psr_peek_kind(tokens, next_position) == "symbol" and psr_peek_value(tokens, next_position) == "]":
+            {"node": {"kind": "List", "elem": get_map(inner_result, "node")}, "next": next_position + 1}
+        else:
+            {"node": {"kind": "Error", "msg": "expected `]` to close list type"}, "next": next_position}
+    else:
+        if psr_peek_kind(tokens, position) == "int":
+            low_text = psr_peek_value(tokens, position)
+            mut cursor = position + 1
+            op_kind = psr_peek_kind(tokens, cursor)
+            op_val = psr_peek_value(tokens, cursor)
+            is_range_op = op_kind == "symbol" and (op_val == "..." or op_val == "..=" or op_val == "..<" or op_val == "..")
+            if is_range_op:
+                cursor = cursor + 1
+                if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ".":
+                    cursor = cursor + 1
+                high_text = psr_peek_value(tokens, cursor)
+                cursor = cursor + 1
+                inclusive = op_val == "..." or op_val == "..="
+                {"node": {"kind": "Range", "low": low_text, "high": high_text, "inclusive": inclusive}, "next": cursor}
+            else:
+                {"node": {"kind": "Named", "name": low_text}, "next": position + 1}
+        else:
+            name_text = psr_peek_value(tokens, position)
+            {"node": {"kind": "Named", "name": name_text}, "next": position + 1}
+fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
+    mut match_cursor = position + 1
+    scrutinee_result = psr_parse_expr(tokens, match_cursor)
+    match_cursor = get_int(scrutinee_result, "next")
+    if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == ":":
+        match_cursor = match_cursor + 1
+    match_cursor = psr_skip_newlines(tokens, match_cursor)
+    arm_col = psr_peek_col(tokens, match_cursor)
+    arms = []
+    mut arms_list = arms
+    loop:
+        arm_kind = psr_peek_kind(tokens, match_cursor)
+        arm_col_now = psr_peek_col(tokens, match_cursor)
+        if arm_kind == "eof":
+            break
+        if arm_col_now < arm_col:
+            break
+        pat_value = psr_peek_value(tokens, match_cursor)
+        pat_kind = psr_peek_kind(tokens, match_cursor)
+        match_cursor = match_cursor + 1
+        pat_bindings = []
+        mut pat_binding_list = pat_bindings
+        if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "(":
+            match_cursor = match_cursor + 1
+            loop:
+                bk = psr_peek_kind(tokens, match_cursor)
+                bv = psr_peek_value(tokens, match_cursor)
+                if bk == "symbol" and bv == ")":
+                    match_cursor = match_cursor + 1
+                    break
+                if bk == "eof":
+                    break
+                if bk == "ident":
+                    pat_binding_list = push(pat_binding_list, bv)
+                    match_cursor = match_cursor + 1
+                if bk == "symbol" and bv == ",":
+                    match_cursor = match_cursor + 1
+                if bk != "ident" and bk != "symbol":
+                    match_cursor = match_cursor + 1
+        if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "->":
+            match_cursor = match_cursor + 1
+        body_result = psr_parse_expr(tokens, match_cursor)
+        arms_list = push(arms_list, {"pattern": pat_value, "pat_kind": pat_kind, "bindings": pat_binding_list, "body": get_map(body_result, "node")})
+        match_cursor = get_int(body_result, "next")
+        match_cursor = psr_skip_newlines(tokens, match_cursor)
+    {"node": {"kind": "Match", "scrutinee": get_map(scrutinee_result, "node"), "arms": arms_list}, "next": match_cursor}
+fn psr_parse_primary(tokens: [Map], position: int) -> Map:
+    kind = psr_peek_kind(tokens, position)
+    value = psr_peek_value(tokens, position)
+    is_not = kind == "ident" and value == "not"
+    is_neg = kind == "symbol" and value == "-"
+    mut not_node = {"node": {"kind": "Error", "msg": ""}, "next": position}
+    if is_not:
+        operand_result = psr_parse_primary(tokens, position + 1)
+        not_node = {"node": {"kind": "Unary", "op": "not", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
+    if is_neg:
+        operand_result = psr_parse_primary(tokens, position + 1)
+        not_node = {"node": {"kind": "Unary", "op": "neg", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
+    is_ident = kind == "ident"
+    is_int = kind == "int"
+    is_str = kind == "str"
+    is_lbracket = kind == "symbol" and value == "["
+    is_lbrace = kind == "symbol" and value == "\{"
+    is_pipe = kind == "symbol" and value == "|"
+    is_lparen = kind == "symbol" and value == "("
+    is_if = is_ident and value == "if"
+    is_match_expr = is_ident and value == "match"
+    is_perform = is_ident and value == "perform"
+    is_call = is_ident and not is_if and not is_not and not is_match_expr and not is_perform and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
+    mut result = {"node": {"kind": "Error", "msg": "expected an expression"}, "next": position}
+    if is_if:
+        result = psr_parse_if(tokens, position)
+    if is_match_expr:
+        result = psr_parse_match_node(tokens, position)
+    if is_perform:
+        mut pc = position + 1
+        eff_name = psr_peek_value(tokens, pc)
+        pc = pc + 1
+        if psr_peek_kind(tokens, pc) == "symbol" and psr_peek_value(tokens, pc) == ".":
+            pc = pc + 1
+        op_name = psr_peek_value(tokens, pc)
+        pc = pc + 1
+        perf_args = []
+        mut perf_args_list = perf_args
+        if psr_peek_kind(tokens, pc) == "symbol" and psr_peek_value(tokens, pc) == "(":
+            pc = pc + 1
+            loop:
+                ak = psr_peek_kind(tokens, pc)
+                av = psr_peek_value(tokens, pc)
+                if ak == "symbol" and av == ")":
+                    pc = pc + 1
+                    break
+                if ak == "eof":
+                    break
+                a_r = psr_parse_expr(tokens, pc)
+                perf_args_list = push(perf_args_list, get_map(a_r, "node"))
+                pc = get_int(a_r, "next")
+                if psr_peek_kind(tokens, pc) == "symbol" and psr_peek_value(tokens, pc) == ",":
+                    pc = pc + 1
+        result = {"node": {"kind": "Perform", "effect": eff_name, "op": op_name, "args": perf_args_list}, "next": pc}
+    if is_call:
+        result = psr_parse_call(tokens, position, value)
+    is_true = is_ident and value == "true"
+    is_false = is_ident and value == "false"
+    if is_ident and not is_call and not is_if and not is_match_expr and not is_perform and not is_true and not is_false:
+        next_kind = psr_peek_kind(tokens, position + 1)
+        next_value = psr_peek_value(tokens, position + 1)
+        value_bytes = bytes_from_text(value)
+        mut starts_capital = false
+        if len(value_bytes) > 0:
+            first_byte = at(value_bytes, 0)
+            if first_byte >= 65 and first_byte <= 90:
+                starts_capital = true
+        is_struct_cons = next_kind == "symbol" and next_value == "\{" and starts_capital
+        ident_tok = at(tokens, position)
+        ident_line = get_int(ident_tok, "line")
+        ident_col = get_int(ident_tok, "col")
+        if is_struct_cons:
+            result = psr_parse_struct_cons(tokens, position + 2, value)
+        else:
+            result = {"node": {"kind": "Ident", "name": value, "line": ident_line, "col": ident_col}, "next": position + 1}
+    if is_true:
+        result = {"node": {"kind": "Int", "value": "1"}, "next": position + 1}
+    if is_false:
+        result = {"node": {"kind": "Int", "value": "0"}, "next": position + 1}
+    if is_int:
+        result = {"node": {"kind": "Int", "value": value}, "next": position + 1}
+    if is_str:
+        result = {"node": psr_interpolate_str(value), "next": position + 1}
+    if is_lbracket:
+        result = psr_parse_list_literal(tokens, position)
+    if is_lbrace:
+        result = psr_parse_map_literal(tokens, position)
+    if is_not:
+        result = not_node
+    if is_neg:
+        result = not_node
+    if is_lparen:
+        inner = psr_parse_expr(tokens, position + 1)
+        mut inner_next = get_int(inner, "next")
+        if psr_peek_kind(tokens, inner_next) == "symbol" and psr_peek_value(tokens, inner_next) == ")":
+            inner_next = inner_next + 1
+        result = {"node": get_map(inner, "node"), "next": inner_next}
+    if is_pipe:
+        mut lam_cursor = position + 1
+        params = []
+        mut params_list = params
+        loop:
+            lam_kind = psr_peek_kind(tokens, lam_cursor)
+            lam_val = psr_peek_value(tokens, lam_cursor)
+            if lam_kind == "symbol" and lam_val == "|":
+                lam_cursor = lam_cursor + 1
+                break
+            if lam_kind == "eof":
+                break
+            if lam_kind == "ident":
+                params_list = push(params_list, lam_val)
+                lam_cursor = lam_cursor + 1
+            if lam_kind == "symbol" and lam_val == ",":
+                lam_cursor = lam_cursor + 1
+        body_result = psr_parse_expr(tokens, lam_cursor)
+        result = {"node": {"kind": "Lambda", "params": params_list, "body": get_map(body_result, "node")}, "next": get_int(body_result, "next")}
+    result
+fn psr_parse_struct_cons(tokens: [Map], position: int, type_name: Text) -> Map:
+    mut cursor = position
+    fields = []
+    mut field_list = fields
+    loop:
+        kind_here = psr_peek_kind(tokens, cursor)
+        value_here = psr_peek_value(tokens, cursor)
+        is_close = kind_here == "symbol" and value_here == "\}"
+        is_eof = kind_here == "eof"
+        is_nl = kind_here == "newline"
+        is_id = kind_here == "ident"
+        if is_close:
+            cursor = cursor + 1
+            break
+        if is_eof:
+            break
+        if is_nl:
+            cursor = cursor + 1
+        if is_id:
+            field_name = value_here
+            cursor = cursor + 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+                cursor = cursor + 1
+            value_result = psr_parse_expr(tokens, cursor)
+            field_list = push(field_list, {"name": field_name, "value": get_map(value_result, "node")})
+            cursor = get_int(value_result, "next")
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+                cursor = cursor + 1
+        is_advanced = is_close or is_nl or is_id
+        if not is_advanced:
+            cursor = cursor + 1
+    {"node": {"kind": "StructCons", "name": type_name, "fields": field_list}, "next": cursor}
+fn psr_interpolate_str(raw_text: Text) -> Map:
+    raw_bytes = bytes_from_text(raw_text)
+    total_len = bytes_length(raw_bytes)
+    mut has_brace = 0
+    for scan_index in 0..<total_len:
+        b = byte_at(raw_bytes, scan_index)
+        prev_b = if scan_index > 0 then byte_at(raw_bytes, scan_index - 1) else 0
+        if b == 123 and prev_b != 92:
+            has_brace = 1
+    mut plain_value = raw_text
+    if has_brace == 0:
+        mut plain_buf = bytes_zeros(0)
+        mut pi = 0
+        loop:
+            if pi >= total_len:
+                break
+            bp = byte_at(raw_bytes, pi)
+            if bp == 92 and pi + 1 < total_len:
+                nxt = byte_at(raw_bytes, pi + 1)
+                if nxt == 123 or nxt == 125:
+                    plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi + 1, pi + 2))
+                    pi = pi + 2
+                else:
+                    plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi, pi + 1))
+                    pi = pi + 1
+            else:
+                plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi, pi + 1))
+                pi = pi + 1
+        plain_value = bytes_to_text(plain_buf)
+    mut result_node = {"kind": "Str", "value": plain_value}
+    if has_brace == 1:
+        mut current_node = {"kind": "Str", "value": ""}
+        mut node_started = 0
+        mut literal_buf = bytes_zeros(0)
+        mut scan_index2 = 0
+        loop:
+            if scan_index2 >= total_len:
+                break
+            current_byte = byte_at(raw_bytes, scan_index2)
+            nx_b = if current_byte == 92 and scan_index2 + 1 < total_len then byte_at(raw_bytes, scan_index2 + 1) else 0
+            is_escaped_brace = current_byte == 92 and (nx_b == 123 or nx_b == 125)
+            if is_escaped_brace:
+                literal_buf = bytes_concat(literal_buf, bytes_slice(raw_bytes, scan_index2 + 1, scan_index2 + 2))
+                scan_index2 = scan_index2 + 2
+            is_open = current_byte == 123 and not is_escaped_brace
+            if not is_open and not is_escaped_brace:
+                literal_buf = bytes_concat(literal_buf, bytes_slice(raw_bytes, scan_index2, scan_index2 + 1))
+                scan_index2 = scan_index2 + 1
+            if is_open:
+                if bytes_length(literal_buf) > 0:
+                    literal_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
+                    started_before_flush = node_started
+                    if started_before_flush == 0:
+                        current_node = literal_part
+                        node_started = 1
+                    if started_before_flush == 1:
+                        current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": literal_part}
+                literal_buf = bytes_zeros(0)
+                scan_index2 = scan_index2 + 1
+                ident_start = scan_index2
+                loop:
+                    if scan_index2 >= total_len:
+                        break
+                    if byte_at(raw_bytes, scan_index2) == 125:
+                        break
+                    scan_index2 = scan_index2 + 1
+                ident_text = bytes_to_text(bytes_slice(raw_bytes, ident_start, scan_index2))
+                expr_bytes = bytes_from_text(ident_text)
+                expr_len = bytes_length(expr_bytes)
+                mut paren_at = 0 - 1
+                mut dot_at = 0 - 1
+                for ei in 0..<expr_len:
+                    if byte_at(expr_bytes, ei) == 40 and paren_at == (0 - 1):
+                        paren_at = ei
+                    if byte_at(expr_bytes, ei) == 46 and dot_at == (0 - 1):
+                        dot_at = ei
+                mut raw_ident = {"kind": "Ident", "name": ident_text}
+                has_dot_only = dot_at > 0 and paren_at == (0 - 1)
+                if has_dot_only:
+                    obj_name = psr_trim_ws(bytes_to_text(bytes_slice(expr_bytes, 0, dot_at)))
+                    field_name = psr_trim_ws(bytes_to_text(bytes_slice(expr_bytes, dot_at + 1, expr_len)))
+                    raw_ident = {"kind": "Field", "object": {"kind": "Ident", "name": obj_name}, "field": field_name}
+                if paren_at > 0:
+                    callee_name = psr_trim_ws(bytes_to_text(bytes_slice(expr_bytes, 0, paren_at)))
+                    args_text = bytes_to_text(bytes_slice(expr_bytes, paren_at + 1, expr_len - 1))
+                    args_bytes = bytes_from_text(args_text)
+                    args_len = bytes_length(args_bytes)
+                    mut call_args = []
+                    mut arg_start = 0
+                    mut paren_depth = 0
+                    for ai in 0..<args_len:
+                        bi = byte_at(args_bytes, ai)
+                        if bi == 40:
+                            paren_depth = paren_depth + 1
+                        if bi == 41:
+                            paren_depth = paren_depth - 1
+                        if bi == 44 and paren_depth == 0:
+                            arg_chunk = psr_trim_ws(bytes_to_text(bytes_slice(args_bytes, arg_start, ai)))
+                            call_args = push(call_args, psr_arg_to_node(arg_chunk))
+                            arg_start = ai + 1
+                    if args_len > 0:
+                        tail_chunk = psr_trim_ws(bytes_to_text(bytes_slice(args_bytes, arg_start, args_len)))
+                        call_args = push(call_args, psr_arg_to_node(tail_chunk))
+                    raw_ident = {"kind": "Call", "callee": callee_name, "args": call_args}
+                ident_node = {"kind": "Call", "callee": "to_text", "args": [raw_ident]}
+                started_before_ident = node_started
+                if started_before_ident == 0:
+                    current_node = ident_node
+                    node_started = 1
+                if started_before_ident == 1:
+                    current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": ident_node}
+                if scan_index2 < total_len:
+                    scan_index2 = scan_index2 + 1
+        if bytes_length(literal_buf) > 0:
+            tail_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
+            started_before_tail = node_started
+            if started_before_tail == 0:
+                current_node = tail_part
+            if started_before_tail == 1:
+                current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": tail_part}
+        result_node = current_node
+    result_node
+fn psr_parse_map_literal(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    mut pairs = []
+    loop:
+        kind_here = psr_peek_kind(tokens, cursor)
+        value_here = psr_peek_value(tokens, cursor)
+        is_close = kind_here == "symbol" and value_here == "\}"
+        is_eof = kind_here == "eof"
+        if is_close:
+            cursor += 1
+            break
+        if is_eof:
+            break
+        if kind_here == "str":
+            key_text = value_here
+            cursor += 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+                cursor += 1
+            value_result = psr_parse_expr(tokens, cursor)
+            pairs = push(pairs, {"key": key_text, "value": get_map(value_result, "node")})
+            cursor = get_int(value_result, "next")
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+                cursor += 1
+    {"node": {"kind": "MapLit", "pairs": pairs}, "next": cursor}
+fn psr_parse_list_literal(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    mut items = []
+    loop:
+        kind_here = psr_peek_kind(tokens, cursor)
+        value_here = psr_peek_value(tokens, cursor)
+        is_close = kind_here == "symbol" and value_here == "]"
+        is_eof = kind_here == "eof"
+        if is_close:
+            cursor += 1
+            break
+        if is_eof:
+            break
+        item_result = psr_parse_expr(tokens, cursor)
+        items = push(items, get_map(item_result, "node"))
+        cursor = get_int(item_result, "next")
+        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+            cursor += 1
+    {"node": {"kind": "ListLit", "items": items}, "next": cursor}
+fn psr_parse_if(tokens: [Map], position: int) -> Map:
+    cond_result = psr_parse_expr(tokens, position + 1)
+    cursor_after_cond = get_int(cond_result, "next")
+    has_then = psr_peek_kind(tokens, cursor_after_cond) == "ident" and psr_peek_value(tokens, cursor_after_cond) == "then"
+    mut cursor = cursor_after_cond
+    if has_then:
+        cursor = cursor_after_cond + 1
+    then_result = psr_parse_expr(tokens, cursor)
+    cursor = get_int(then_result, "next")
+    has_else = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "else"
+    mut else_node = {"kind": "Int", "value": "0"}
+    if has_else:
+        else_result = psr_parse_expr(tokens, cursor + 1)
+        else_node = get_map(else_result, "node")
+        cursor = get_int(else_result, "next")
+    {"node": {"kind": "If", "cond": get_map(cond_result, "node"), "then": get_map(then_result, "node"), "else": else_node}, "next": cursor}
+fn psr_parse_call(tokens: [Map], position: int, callee_name: Text) -> Map:
+    callee_tok = at(tokens, position)
+    callee_line = get_int(callee_tok, "line")
+    callee_col = get_int(callee_tok, "col")
+    mut cursor = position + 2
+    mut args = []
+    loop:
+        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ")":
+            cursor += 1
+            break
+        if psr_peek_kind(tokens, cursor) == "eof":
+            break
+        arg_result = psr_parse_expr(tokens, cursor)
+        args = push(args, get_map(arg_result, "node"))
+        cursor = get_int(arg_result, "next")
+        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+            cursor += 1
+    {"node": {"kind": "Call", "callee": callee_name, "args": args, "line": callee_line, "col": callee_col}, "next": cursor}
+fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
+    mut precedence = 0
+    is_ident = op_kind == "ident"
+    is_symbol = op_kind == "symbol"
+    if is_ident and op_value == "or":
+        precedence = 5
+    if is_ident and op_value == "and":
+        precedence = 7
+    if is_symbol:
+        is_cmp = op_value == "==" or op_value == "!=" or op_value == "<" or op_value == ">" or op_value == "<=" or op_value == ">="
+        is_add = op_value == "+" or op_value == "-"
+        is_mul = op_value == "*" or op_value == "/" or op_value == "%"
+        if is_cmp:
+            precedence = 10
+        if is_add:
+            precedence = 20
+        if is_mul:
+            precedence = 30
+    precedence
+fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
+    mut node = current_node
+    mut cursor = position
+    loop:
+        kind_here = psr_peek_kind(tokens, cursor)
+        value_here = psr_peek_value(tokens, cursor)
+        is_dot = kind_here == "symbol" and value_here == "."
+        dot_tok = at(tokens, cursor)
+        dot_line = if is_dot then get_int(dot_tok, "line") else 0
+        dot_col = if is_dot then get_int(dot_tok, "col") else 0
+        if is_dot:
+            field_name = psr_peek_value(tokens, cursor + 1)
+            cursor = cursor + 2
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
+                cursor = cursor + 1
+                args = []
+                mut args_list = args
+                loop:
+                    arg_kind = psr_peek_kind(tokens, cursor)
+                    arg_val = psr_peek_value(tokens, cursor)
+                    if arg_kind == "symbol" and arg_val == ")":
+                        cursor = cursor + 1
+                        break
+                    if arg_kind == "eof":
+                        break
+                    arg_result = psr_parse_expr(tokens, cursor)
+                    args_list = push(args_list, get_map(arg_result, "node"))
+                    cursor = get_int(arg_result, "next")
+                    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+                        cursor = cursor + 1
+                node = {"kind": "MethodCall", "receiver": node, "method": field_name, "args": args_list, "line": dot_line, "col": dot_col}
+            else:
+                node = {"kind": "Field", "object": node, "field": field_name, "line": dot_line, "col": dot_col}
+        is_lbracket = kind_here == "symbol" and value_here == "["
+        if is_lbracket:
+            idx_result = psr_parse_expr(tokens, cursor + 1)
+            cursor = get_int(idx_result, "next")
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "]":
+                cursor = cursor + 1
+            node = {"kind": "Index", "object": node, "index": get_map(idx_result, "node")}
+        is_question = kind_here == "symbol" and value_here == "?"
+        if is_question:
+            node = {"kind": "Question", "inner": node}
+            cursor = cursor + 1
+        if not is_dot and not is_lbracket and not is_question:
+            break
+    {"node": node, "next": cursor}
+fn psr_parse_expr_at(tokens: [Map], position: int, min_prec: int) -> Map:
+    primary_result = psr_parse_primary(tokens, position)
+    postfix_result = psr_parse_postfix(tokens, get_int(primary_result, "next"), get_map(primary_result, "node"))
+    mut current_node = get_map(postfix_result, "node")
+    mut cursor = get_int(postfix_result, "next")
+    loop:
+        op_kind = psr_peek_kind(tokens, cursor)
+        op_value = psr_peek_value(tokens, cursor)
+        prec = psr_op_prec(op_kind, op_value)
+        if prec == 0 or prec < min_prec:
+            break
+        rhs_result = psr_parse_expr_at(tokens, cursor + 1, prec + 1)
+        current_node = {"kind": "Binary", "op": op_value, "left": current_node, "right": get_map(rhs_result, "node")}
+        cursor = get_int(rhs_result, "next")
+    {"node": current_node, "next": cursor}
+fn psr_parse_expr(tokens: [Map], position: int) -> Map:
+    psr_parse_expr_at(tokens, position, 1)
+fn psr_parse_params(tokens: [Map], position: int) -> Map:
+    mut cursor = position
+    mut params = []
+    loop:
+        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ")":
+            cursor += 1
+            break
+        param_name = psr_peek_value(tokens, cursor)
+        cursor += 1
+        has_type = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":"
+        if has_type:
+            cursor += 1
+            type_result = psr_parse_type(tokens, cursor)
+            params = push(params, {"name": param_name, "type": get_map(type_result, "node")})
+            cursor = get_int(type_result, "next")
+        if not has_type:
+            params = push(params, {"name": param_name, "type": {"kind": "Unknown"}})
+        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+            cursor += 1
+    {"node": params, "next": cursor}
+fn psr_peek_col(tokens: [Map], position: int) -> int:
+    cursor = psr_skip_newlines(tokens, position)
+    if cursor >= len(tokens):
+        0
+    else:
+        get_int(at(tokens, cursor), "col")
+fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
+    mut cursor = psr_skip_newlines(tokens, position)
+    mut statements = []
+    loop:
+        cursor = psr_skip_newlines(tokens, cursor)
+        kind_here = psr_peek_kind(tokens, cursor)
+        value_here = psr_peek_value(tokens, cursor)
+        col_here = if cursor >= len(tokens) then 0 else get_int(at(tokens, cursor), "col")
+        is_eof = kind_here == "eof"
+        starts_new_decl = kind_here == "ident" and (value_here == "fn" or value_here == "pub" or value_here == "data" or value_here == "enum" or value_here == "use" or value_here == "system" or value_here == "impl" or value_here == "trait" or value_here == "extern")
+        dedented = col_here < min_col
+        if is_eof or starts_new_decl or dedented:
+            break
+        is_mut_decl = kind_here == "ident" and value_here == "mut" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
+        is_let_or_assign = (not is_mut_decl) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
+        compound_op_value = psr_peek_value(tokens, cursor + 1)
+        is_compound_assign = (not is_mut_decl) and (not is_let_or_assign) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and (compound_op_value == "+=" or compound_op_value == "-=" or compound_op_value == "*=" or compound_op_value == "/=")
+        is_break = kind_here == "ident" and value_here == "break"
+        is_continue = kind_here == "ident" and value_here == "continue"
+        is_handle = kind_here == "ident" and value_here == "handle"
+        is_require = kind_here == "ident" and value_here == "require"
+        is_ensure = kind_here == "ident" and value_here == "ensure"
+        is_return = kind_here == "ident" and value_here == "return"
+        is_spawn = kind_here == "ident" and value_here == "spawn"
+        is_destroy = kind_here == "ident" and value_here == "destroy"
+        is_loop = kind_here == "ident" and value_here == "loop" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ":"
+        is_if_block = kind_here == "ident" and value_here == "if"
+        is_for = kind_here == "ident" and value_here == "for" and psr_peek_kind(tokens, cursor + 1) == "ident"
+        is_match = kind_here == "ident" and value_here == "match"
+        if is_mut_decl:
+            mut_name = psr_peek_value(tokens, cursor + 1)
+            mut_expr_result = psr_parse_expr(tokens, cursor + 3)
+            statements = push(statements, {"kind": "MutLet", "name": mut_name, "value": get_map(mut_expr_result, "node")})
+            cursor = get_int(mut_expr_result, "next")
+        if is_let_or_assign:
+            assign_name = value_here
+            assign_tok = at(tokens, cursor)
+            assign_line = get_int(assign_tok, "line")
+            assign_col = get_int(assign_tok, "col")
+            assign_expr_result = psr_parse_expr(tokens, cursor + 2)
+            statements = push(statements, {"kind": "LetOrAssign", "name": assign_name, "value": get_map(assign_expr_result, "node"), "line": assign_line, "col": assign_col})
+            cursor = get_int(assign_expr_result, "next")
+        if is_compound_assign:
+            compound_name = value_here
+            compound_op_text = psr_peek_value(tokens, cursor + 1)
+            compound_rhs_result = psr_parse_expr(tokens, cursor + 2)
+            compound_rhs_node = get_map(compound_rhs_result, "node")
+            mut actual_op = "+"
+            if compound_op_text == "-=":
+                actual_op = "-"
+            if compound_op_text == "*=":
+                actual_op = "*"
+            if compound_op_text == "/=":
+                actual_op = "/"
+            ident_ref = {"kind": "Ident", "name": compound_name}
+            binop_node = {"kind": "Binary", "op": actual_op, "left": ident_ref, "right": compound_rhs_node}
+            statements = push(statements, {"kind": "LetOrAssign", "name": compound_name, "value": binop_node})
+            cursor = get_int(compound_rhs_result, "next")
+        if is_break:
+            statements = push(statements, {"kind": "Break"})
+            cursor = cursor + 1
+        if is_continue:
+            statements = push(statements, {"kind": "Continue"})
+            cursor = cursor + 1
+        if is_require:
+            req_result = psr_parse_expr(tokens, cursor + 1)
+            statements = push(statements, {"kind": "Require", "expr": get_map(req_result, "node")})
+            cursor = get_int(req_result, "next")
+        if is_ensure:
+            ens_result = psr_parse_expr(tokens, cursor + 1)
+            statements = push(statements, {"kind": "Ensure", "expr": get_map(ens_result, "node")})
+            cursor = get_int(ens_result, "next")
+        if is_return:
+            ret_result = psr_parse_expr(tokens, cursor + 1)
+            statements = push(statements, {"kind": "Return", "expr": get_map(ret_result, "node")})
+            cursor = get_int(ret_result, "next")
+        if is_destroy:
+            destroy_result = psr_parse_expr(tokens, cursor + 1)
+            statements = push(statements, {"kind": "Destroy", "expr": get_map(destroy_result, "node")})
+            cursor = get_int(destroy_result, "next")
+        if is_loop:
+            inner_col = psr_peek_col(tokens, cursor + 2)
+            inner_result = psr_parse_body_at(tokens, cursor + 2, inner_col)
+            statements = push(statements, {"kind": "Loop", "body": get_map(inner_result, "node")})
+            cursor = get_int(inner_result, "next")
+        if is_for:
+            mut for_var_name = psr_peek_value(tokens, cursor + 1)
+            mut for_cursor = cursor + 2
+            mut for_index_name = ""
+            after_first_kind = psr_peek_kind(tokens, for_cursor)
+            after_first_val = psr_peek_value(tokens, for_cursor)
+            is_indexed_for = after_first_kind == "symbol" and after_first_val == ","
+            if is_indexed_for:
+                for_index_name = for_var_name
+                for_var_name = psr_peek_value(tokens, for_cursor + 1)
+                for_cursor = for_cursor + 2
+            next_kind = psr_peek_kind(tokens, for_cursor)
+            next_val = psr_peek_value(tokens, for_cursor)
+            is_for_with = next_kind == "ident" and next_val == "with"
+            if is_for_with:
+                for_cursor = for_cursor + 1
+                comps = []
+                mut comps_list = comps
+                loop:
+                    comp_kind = psr_peek_kind(tokens, for_cursor)
+                    comp_val = psr_peek_value(tokens, for_cursor)
+                    if comp_kind == "symbol" and comp_val == ":":
+                        for_cursor = for_cursor + 1
+                        break
+                    if comp_kind == "newline" or comp_kind == "eof":
+                        break
+                    if comp_kind == "ident":
+                        comps_list = push(comps_list, comp_val)
+                        for_cursor = for_cursor + 1
+                    if comp_kind == "symbol" and comp_val == ",":
+                        for_cursor = for_cursor + 1
+                    if comp_kind != "ident" and comp_kind != "symbol":
+                        for_cursor = for_cursor + 1
+                for_body_col = psr_peek_col(tokens, for_cursor)
+                for_body_result = psr_parse_body_at(tokens, for_cursor, for_body_col)
+                statements = push(statements, {"kind": "ForWith", "var": for_var_name, "components": comps_list, "body": get_map(for_body_result, "node")})
+                cursor = get_int(for_body_result, "next")
+            if not is_for_with:
+                if next_kind == "ident" and next_val == "in":
+                    for_cursor = for_cursor + 1
+                low_result = psr_parse_expr(tokens, for_cursor)
+                for_cursor = get_int(low_result, "next")
+                range_op_kind = psr_peek_kind(tokens, for_cursor)
+                range_op_val = psr_peek_value(tokens, for_cursor)
+                is_range = range_op_kind == "symbol" and (range_op_val == "..<" or range_op_val == "..=" or range_op_val == "..")
+                if is_range:
+                    for_cursor = for_cursor + 1
+                    high_result = psr_parse_expr(tokens, for_cursor)
+                    for_cursor = get_int(high_result, "next")
+                    if psr_peek_kind(tokens, for_cursor) == "symbol" and psr_peek_value(tokens, for_cursor) == ":":
+                        for_cursor = for_cursor + 1
+                    for_body_col = psr_peek_col(tokens, for_cursor)
+                    for_body_result = psr_parse_body_at(tokens, for_cursor, for_body_col)
+                    statements = push(statements, {"kind": "ForRange", "var": for_var_name, "low": get_map(low_result, "node"), "high": get_map(high_result, "node"), "body": get_map(for_body_result, "node")})
+                    cursor = get_int(for_body_result, "next")
+                if not is_range:
+                    if psr_peek_kind(tokens, for_cursor) == "symbol" and psr_peek_value(tokens, for_cursor) == ":":
+                        for_cursor = for_cursor + 1
+                    for_body_col = psr_peek_col(tokens, for_cursor)
+                    for_body_result = psr_parse_body_at(tokens, for_cursor, for_body_col)
+                    statements = push(statements, {"kind": "ForIn", "var": for_var_name, "index_var": for_index_name, "iter": get_map(low_result, "node"), "body": get_map(for_body_result, "node")})
+                    cursor = get_int(for_body_result, "next")
+        if is_match:
+            match_result = psr_parse_match_node(tokens, cursor)
+            statements = push(statements, get_map(match_result, "node"))
+            cursor = get_int(match_result, "next")
+        mut actually_if_block = false
+        if is_if_block:
+            cond_probe = psr_parse_expr(tokens, cursor + 1)
+            probe_next = get_int(cond_probe, "next")
+            looks_like_block = psr_peek_kind(tokens, probe_next) == "symbol" and psr_peek_value(tokens, probe_next) == ":"
+            if looks_like_block:
+                actually_if_block = true
+                mut if_cursor = probe_next + 1   # skip `:`
+                then_body_col = psr_peek_col(tokens, if_cursor)
+                then_body_result = psr_parse_body_at(tokens, if_cursor, then_body_col)
+                if_cursor = get_int(then_body_result, "next")
+                if_cursor = psr_skip_newlines(tokens, if_cursor)
+                mut else_node = {"kind": "Block", "stmts": []}
+                if psr_peek_kind(tokens, if_cursor) == "ident" and psr_peek_value(tokens, if_cursor) == "else":
+                    if_cursor = if_cursor + 1
+                    if psr_peek_kind(tokens, if_cursor) == "symbol" and psr_peek_value(tokens, if_cursor) == ":":
+                        if_cursor = if_cursor + 1
+                    else_body_col = psr_peek_col(tokens, if_cursor)
+                    else_body_result = psr_parse_body_at(tokens, if_cursor, else_body_col)
+                    else_node = get_map(else_body_result, "node")
+                    if_cursor = get_int(else_body_result, "next")
+                statements = push(statements, {"kind": "IfBlock", "cond": get_map(cond_probe, "node"), "then": get_map(then_body_result, "node"), "else": else_node})
+                cursor = if_cursor
+        is_plain_expr = not (is_mut_decl or is_let_or_assign or is_break or is_continue or is_require or is_ensure or is_return or is_destroy or is_loop or is_for or is_match or actually_if_block)
+        if is_plain_expr:
+            expr_result = psr_parse_expr(tokens, cursor)
+            expr_next = get_int(expr_result, "next")
+            if expr_next == cursor:
+                cursor = cursor + 1
+            else:
+                statements = push(statements, {"kind": "ExprStmt", "expr": get_map(expr_result, "node")})
+                cursor = expr_next
+        cursor = psr_skip_newlines(tokens, cursor)
+    {"node": {"kind": "Block", "stmts": statements}, "next": cursor}
+fn psr_parse_body(tokens: [Map], position: int) -> Map:
+    body_col = psr_peek_col(tokens, position)
+    psr_parse_body_at(tokens, position, body_col)
+fn psr_parse_system(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
+        cursor += 1
+    params_result = psr_parse_params(tokens, cursor)
+    cursor = get_int(params_result, "next")
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+        cursor += 1
+    cursor = psr_skip_newlines(tokens, cursor)
+    body_result = psr_parse_body(tokens, cursor)
+    cursor = get_int(body_result, "next")
+    {"node": {"kind": "System", "name": name, "params": get_map(params_result, "node"), "body": get_map(body_result, "node")}, "next": cursor}
+fn psr_parse_impl(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    trait_name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "for":
+        cursor += 1
+    for_type = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+        cursor += 1
+    cursor = psr_skip_newlines(tokens, cursor)
+    methods = []
+    mut method_list = methods
+    base_col = psr_peek_col(tokens, cursor)
+    loop:
+        k = psr_peek_kind(tokens, cursor)
+        col_now = psr_peek_col(tokens, cursor)
+        if k == "eof" or col_now < base_col:
+            break
+        v = psr_peek_value(tokens, cursor)
+        if k == "ident" and (v == "fn" or v == "pub"):
+            if v == "pub":
+                cursor += 1
+            fn_result = psr_parse_fn(tokens, cursor)
+            method_list = push(method_list, get_map(fn_result, "node"))
+            cursor = get_int(fn_result, "next")
+        else:
+            cursor += 1
+        cursor = psr_skip_newlines(tokens, cursor)
+    {"node": {"kind": "Impl", "trait": trait_name, "for_type": for_type, "methods": method_list}, "next": cursor}
+fn psr_parse_trait(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+        cursor += 1
+    cursor = psr_skip_newlines(tokens, cursor)
+    methods = []
+    mut method_list = methods
+    base_col = psr_peek_col(tokens, cursor)
+    loop:
+        k = psr_peek_kind(tokens, cursor)
+        col_now = psr_peek_col(tokens, cursor)
+        if k == "eof" or col_now < base_col:
+            break
+        v = psr_peek_value(tokens, cursor)
+        if k == "ident" and v == "fn":
+            cursor += 1
+            method_name = psr_peek_value(tokens, cursor)
+            cursor += 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
+                cursor += 1
+            params_r = psr_parse_params(tokens, cursor)
+            cursor = get_int(params_r, "next")
+            mut ret_node = {"kind": "Named", "name": "Unit"}
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
+                cursor += 1
+                ret_r = psr_parse_type(tokens, cursor)
+                ret_node = get_map(ret_r, "node")
+                cursor = get_int(ret_r, "next")
+            method_list = push(method_list, {"name": method_name, "params": get_map(params_r, "node"), "ret": ret_node})
+        else:
+            cursor += 1
+        cursor = psr_skip_newlines(tokens, cursor)
+    {"node": {"kind": "Trait", "name": name, "methods": method_list}, "next": cursor}
+fn psr_parse_data(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+        cursor += 1
+    fields = []
+    mut field_list = fields
+    loop:
+        kind_here = psr_peek_kind(tokens, cursor)
+        value_here = psr_peek_value(tokens, cursor)
+        is_break = kind_here == "newline" or kind_here == "eof"
+        is_ident_case = kind_here == "ident"
+        if is_break:
+            break
+        if is_ident_case:
+            field_name = value_here
+            cursor = cursor + 1
+            colon_kind = psr_peek_kind(tokens, cursor)
+            colon_val = psr_peek_value(tokens, cursor)
+            if colon_kind == "symbol" and colon_val == ":":
+                cursor = cursor + 1
+            type_result = psr_parse_type(tokens, cursor)
+            field_list = push(field_list, {"name": field_name, "type": get_map(type_result, "node")})
+            cursor = get_int(type_result, "next")
+            comma_kind = psr_peek_kind(tokens, cursor)
+            comma_val = psr_peek_value(tokens, cursor)
+            if comma_kind == "symbol" and comma_val == ",":
+                cursor = cursor + 1
+        if not is_break and not is_ident_case:
+            cursor = cursor + 1
+    {"node": {"kind": "Data", "name": name, "fields": field_list}, "next": cursor}
+fn psr_parse_effect(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+        cursor += 1
+    cursor = psr_skip_newlines(tokens, cursor)
+    ops = []
+    mut ops_list = ops
+    first_col = psr_peek_col(tokens, cursor)
+    loop:
+        kind_here = psr_peek_kind(tokens, cursor)
+        col_here = psr_peek_col(tokens, cursor)
+        if kind_here == "eof":
+            break
+        if col_here < first_col:
+            break
+        if kind_here != "ident":
+            cursor = cursor + 1
+            cursor = psr_skip_newlines(tokens, cursor)
+        if kind_here == "ident":
+            op_name = psr_peek_value(tokens, cursor)
+            cursor = cursor + 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+                cursor = cursor + 1
+            if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "fn":
+                cursor = cursor + 1
+            params_list = []
+            mut p_list = params_list
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
+                cursor = cursor + 1
+                loop:
+                    pk = psr_peek_kind(tokens, cursor)
+                    pv = psr_peek_value(tokens, cursor)
+                    if pk == "symbol" and pv == ")":
+                        cursor = cursor + 1
+                        break
+                    if pk == "eof":
+                        break
+                    if pk == "ident":
+                        p_name = pv
+                        cursor = cursor + 1
+                        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+                            cursor = cursor + 1
+                        p_type_r = psr_parse_type(tokens, cursor)
+                        p_list = push(p_list, {"name": p_name, "type": get_map(p_type_r, "node")})
+                        cursor = get_int(p_type_r, "next")
+                    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+                        cursor = cursor + 1
+            mut ret_node = {"kind": "Named", "name": "Unit"}
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
+                cursor = cursor + 1
+                ret_r = psr_parse_type(tokens, cursor)
+                ret_node = get_map(ret_r, "node")
+                cursor = get_int(ret_r, "next")
+            ops_list = push(ops_list, {"name": op_name, "params": p_list, "ret": ret_node})
+            cursor = psr_skip_newlines(tokens, cursor)
+    {"node": {"kind": "Effect", "name": name, "ops": ops_list}, "next": cursor}
+fn psr_parse_enum(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+        cursor += 1
+    cursor = psr_skip_newlines(tokens, cursor)
+    variants = []
+    mut variant_list = variants
+    first_col = psr_peek_col(tokens, cursor)
+    loop:
+        kind_here = psr_peek_kind(tokens, cursor)
+        col_here = psr_peek_col(tokens, cursor)
+        if kind_here == "eof":
+            break
+        if col_here < first_col:
+            break
+        if kind_here != "ident":
+            cursor = cursor + 1
+            cursor = psr_skip_newlines(tokens, cursor)
+        if kind_here == "ident":
+            variant_name = psr_peek_value(tokens, cursor)
+            cursor += 1
+            payload = []
+            mut payload_list = payload
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
+                cursor += 1
+                loop:
+                    payload_kind = psr_peek_kind(tokens, cursor)
+                    payload_value = psr_peek_value(tokens, cursor)
+                    if payload_kind == "symbol" and payload_value == ")":
+                        cursor += 1
+                        break
+                    if payload_kind == "eof":
+                        break
+                    type_result = psr_parse_type(tokens, cursor)
+                    payload_list = push(payload_list, get_map(type_result, "node"))
+                    cursor = get_int(type_result, "next")
+                    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+                        cursor += 1
+            variant_list = push(variant_list, {"name": variant_name, "payload": payload_list})
+            cursor = psr_skip_newlines(tokens, cursor)
+    {"node": {"kind": "Enum", "name": name, "variants": variant_list}, "next": cursor}
+fn psr_parse_fn(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1
+    name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
+        cursor += 1
+    params_result = psr_parse_params(tokens, cursor)
+    cursor = get_int(params_result, "next")
+    mut return_node = {"kind": "Named", "name": "Unit"}
+    has_arrow = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->"
+    if has_arrow:
+        cursor += 1
+        ret_result = psr_parse_type(tokens, cursor)
+        return_node = get_map(ret_result, "node")
+        cursor = get_int(ret_result, "next")
+    has_equals = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "="
+    if has_equals:
+        cursor += 1
+        expr_result = psr_parse_expr(tokens, cursor)
+        body_node = {"kind": "Block", "stmts": push([], {"kind": "ExprStmt", "expr": get_map(expr_result, "node")})}
+        cursor = get_int(expr_result, "next")
+        cursor = psr_skip_newlines(tokens, cursor)
+        {"node": {"kind": "Fn", "name": name, "params": get_map(params_result, "node"), "ret": return_node, "body": body_node}, "next": cursor}
+    else:
+        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+            cursor += 1
+        cursor = psr_skip_newlines(tokens, cursor)
+        body_result = psr_parse_body(tokens, cursor)
+        cursor = get_int(body_result, "next")
+        {"node": {"kind": "Fn", "name": name, "params": get_map(params_result, "node"), "ret": return_node, "body": get_map(body_result, "node")}, "next": cursor}
+fn psr_skip_extern_fn(tokens: [Map], position: int) -> int:
+    mut cursor = position
+    if psr_peek_kind(tokens, cursor) == "ident":
+        cursor = cursor + 1
+    loop:
+        if psr_peek_kind(tokens, cursor) == "newline" or psr_peek_kind(tokens, cursor) == "eof":
+            break
+        cursor = cursor + 1
+    cursor
+fn psr_skip_use(tokens: [Map], position: int) -> int:
+    mut cursor = position + 1
+    loop:
+        if psr_peek_kind(tokens, cursor) == "newline" or psr_peek_kind(tokens, cursor) == "eof":
+            break
+        cursor = cursor + 1
+    cursor
+pub fn self_parse(tokens: [Map]) -> Map:
+    mut cursor = psr_skip_newlines(tokens, 0)
+    mut decls = []
+    loop:
+        mut kind_here = psr_peek_kind(tokens, cursor)
+        mut value_here = psr_peek_value(tokens, cursor)
+        if kind_here == "eof":
+            break
+        is_pub = kind_here == "ident" and value_here == "pub"
+        if is_pub:
+            cursor = cursor + 1
+            kind_here = psr_peek_kind(tokens, cursor)
+            value_here = psr_peek_value(tokens, cursor)
+        mut is_fn = kind_here == "ident" and value_here == "fn"
+        is_data = kind_here == "ident" and value_here == "data"
+        is_enum = kind_here == "ident" and value_here == "enum"
+        mut is_system = kind_here == "ident" and value_here == "system"
+        is_impl = kind_here == "ident" and value_here == "impl"
+        is_trait = kind_here == "ident" and value_here == "trait"
+        is_extern = kind_here == "ident" and value_here == "extern"
+        is_use = kind_here == "ident" and value_here == "use"
+        is_effect = kind_here == "ident" and value_here == "effect"
+        is_comptime = kind_here == "ident" and value_here == "comptime"
+        is_deterministic = kind_here == "ident" and value_here == "deterministic"
+        if is_comptime or is_deterministic:
+            cursor = cursor + 1
+            kind_here = psr_peek_kind(tokens, cursor)
+            value_here = psr_peek_value(tokens, cursor)
+            is_fn = kind_here == "ident" and value_here == "fn"
+            is_system = kind_here == "ident" and value_here == "system"
+        if is_fn:
+            decl_result = psr_parse_fn(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
+        if is_data:
+            decl_result = psr_parse_data(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
+        if is_enum:
+            decl_result = psr_parse_enum(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
+        if is_effect:
+            decl_result = psr_parse_effect(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
+        if is_system:
+            decl_result = psr_parse_system(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
+        if is_impl:
+            decl_result = psr_parse_impl(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
+        if is_trait:
+            decl_result = psr_parse_trait(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
+        if is_extern:
+            cursor = cursor + 1
+            if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "fn":
+                cursor = cursor + 1
+            cursor = psr_skip_extern_fn(tokens, cursor)
+        if is_use:
+            cursor = psr_skip_use(tokens, cursor)
+        not_recognized = not (is_fn or is_data or is_enum or is_effect or is_system or is_impl or is_trait or is_extern or is_use)
+        if not_recognized:
+            cursor = cursor + 1
+        cursor = psr_skip_newlines(tokens, cursor)
+    {"kind": "Program", "decls": decls}
+data Scope: names: [Text], ids: [int], mut_flags: [int], loop_headers: [Text], loop_ends: [Text], fn_sig_names: [Text], fn_sig_rets: [Text], ds_names: [Text], ds_specs: [Text], en_names: [Text], en_variants: [Text]
+pub fn get_int(m: Map, k: Text) -> int: get(m, k)
+pub fn get_map(m: Map, k: Text) -> Map: get(m, k)
+pub fn get_list(m: Map, k: Text) -> [Map]: get(m, k)
+fn scope_empty() -> Scope:
+    Scope{names: [], ids: [], mut_flags: [], loop_headers: [], loop_ends: [], fn_sig_names: [], fn_sig_rets: [], ds_names: [], ds_specs: [], en_names: [], en_variants: []}
+fn scope_add_enum_decl(scope: Scope, enum_name: Text, variant_csv: Text) -> Scope:
+    new_names = push(scope.en_names, enum_name)
+    new_vars = push(scope.en_variants, variant_csv)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: new_names, en_variants: new_vars}
+fn scope_lookup_enum_variant(scope: Scope, enum_name: Text, variant: Text) -> int:
+    total = len(scope.en_names)
+    mut result = 0 - 1
+    for index in 0..<total:
+        if at(scope.en_names, index) == enum_name:
+            csv = at(scope.en_variants, index)
+            csv_bytes = bytes_from_text(csv)
+            n = len(csv_bytes)
+            mut current = ""
+            mut found_at = 0 - 1
+            mut idx_count = 0
+            for ci in 0..<n:
+                b = at(csv_bytes, ci)
+                if b == 44:
+                    if current == variant and found_at == (0 - 1):
+                        found_at = idx_count
+                    current = ""
+                    idx_count = idx_count + 1
+                else:
+                    single = bytes_to_text([b])
+                    current = "{current}{single}"
+            if current == variant and found_at == (0 - 1):
+                found_at = idx_count
+            if found_at >= 0:
+                result = found_at
+    result
+fn scope_add_data_decl(scope: Scope, struct_name: Text, spec: Text) -> Scope:
+    new_names = push(scope.ds_names, struct_name)
+    new_specs = push(scope.ds_specs, spec)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: new_names, ds_specs: new_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+fn scope_lookup_data_spec(scope: Scope, struct_name: Text) -> Text:
+    total = len(scope.ds_names)
+    mut result = ""
+    for index in 0..<total:
+        if at(scope.ds_names, index) == struct_name:
+            result = at(scope.ds_specs, index)
+    result
+fn int_to_text_helper(value: int) -> Text:
+    if value == 0:
+        "0"
+    else:
+        digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        mut n = if value < 0 then 0 - value else value
+        mut chars = ""
+        for _ in 0..<20:
+            if n > 0:
+                d = at(digits, n % 10)
+                chars = "{d}{chars}"
+                n = n / 10
+        if value < 0 then "-{chars}" else chars
+fn parse_data_spec(spec: Text) -> [Text]:
+    bs = bytes_from_text(spec)
+    total = len(bs)
+    mut parts = []
+    mut current = ""
+    for index in 0..<total:
+        b = at(bs, index)
+        if b == 124:  # '|'
+            parts = push(parts, current)
+            current = ""
+        else:
+            single = bytes_to_text([b])
+            current = "{current}{single}"
+    if len(bytes_from_text(current)) > 0:
+        parts = push(parts, current)
+    parts
+fn find_field_index(parts: [Text], field_name: Text) -> int:
+    n = len(parts)
+    mut result = 0 - 1
+    for index in 0..<n:
+        part = at(parts, index)
+        bs = bytes_from_text(part)
+        bs_n = len(bs)
+        mut name_buf = ""
+        mut found_colon = 0
+        for ci in 0..<bs_n:
+            b = at(bs, ci)
+            if found_colon == 0:
+                if b == 58:  # ':'
+                    found_colon = 1
+                else:
+                    single = bytes_to_text([b])
+                    name_buf = "{name_buf}{single}"
+        if name_buf == field_name and result == (0 - 1):
+            result = index
+    result
+fn field_type_at(parts: [Text], idx: int) -> Text:
+    n = len(parts)
+    if idx < 0 or idx >= n:
+        "i64"
+    else:
+        part = at(parts, idx)
+        bs = bytes_from_text(part)
+        bs_n = len(bs)
+        mut type_buf = ""
+        mut found_colon = 0
+        for ci in 0..<bs_n:
+            b = at(bs, ci)
+            if found_colon == 1:
+                single = bytes_to_text([b])
+                type_buf = "{type_buf}{single}"
+            else:
+                if b == 58:
+                    found_colon = 1
+        type_buf
+fn scope_add_fn_sig(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
+    new_names = push(scope.fn_sig_names, fn_name)
+    new_rets = push(scope.fn_sig_rets, ret_type)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+fn scope_lookup_fn_ret(scope: Scope, fn_name: Text) -> Text:
+    total = len(scope.fn_sig_names)
+    mut result = ""
+    for index in 0..<total:
+        if at(scope.fn_sig_names, index) == fn_name:
+            result = at(scope.fn_sig_rets, index)
+    result
+fn scope_lookup_fn_ret_loc(scope: Scope, fn_name: Text, node: Map) -> Text:
+    found = scope_lookup_fn_ret(scope, fn_name)
+    mut result = found
+    if found == "":
+        line = if has(node, "line") then get_int(node, "line") else 0
+        col = if has(node, "col") then get_int(node, "col") else 0
+        print_line("orion-self: ERROR at line {line}:{col} — call to unknown function `{fn_name}` (returning i64 as guess)")
+        result = "i64"
+    result
+fn scope_bind(scope: Scope, name: Text, id: int) -> Scope:
+    new_names = push(scope.names, name)
+    new_ids = push(scope.ids, id)
+    new_flags = push(scope.mut_flags, 0)
+    Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+fn scope_bind_mut(scope: Scope, name: Text, ptr_id: int) -> Scope:
+    new_names = push(scope.names, name)
+    new_ids = push(scope.ids, ptr_id)
+    new_flags = push(scope.mut_flags, 1)
+    Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+fn scope_add_fn_sig_keep_data(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
+    new_names = push(scope.fn_sig_names, fn_name)
+    new_rets = push(scope.fn_sig_rets, ret_type)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+fn scope_push_loop(scope: Scope, header_lbl: Text, end_lbl: Text) -> Scope:
+    new_headers = push(scope.loop_headers, header_lbl)
+    new_ends = push(scope.loop_ends, end_lbl)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: new_headers, loop_ends: new_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+fn scope_top_loop_header(scope: Scope) -> Text:
+    n = len(scope.loop_headers)
+    if n == 0 then "" else at(scope.loop_headers, n - 1)
+fn scope_top_loop_end(scope: Scope) -> Text:
+    n = len(scope.loop_ends)
+    if n == 0 then "" else at(scope.loop_ends, n - 1)
+fn scope_lookup(scope: Scope, name: Text) -> int:
+    total = len(scope.names)
+    mut result = 0 - 1
+    for index in 0..<total:
+        from_end = total - 1 - index
+        candidate = at(scope.names, from_end)
+        if candidate == name and result == (0 - 1):
+            result = at(scope.ids, from_end)
+    result
+fn scope_is_mut(scope: Scope, name: Text) -> int:
+    total = len(scope.names)
+    mut result = 0
+    mut found = 0
+    for index in 0..<total:
+        from_end = total - 1 - index
+        candidate = at(scope.names, from_end)
+        if candidate == name and found == 0:
+            result = at(scope.mut_flags, from_end)
+            found = 1
+    result
+fn last_op(fn_value: IRFn) -> Text:
+    insts = fn_value.instructions
+    n = len(insts)
+    if n == 0 then "" else at(insts, n - 1).op
+fn is_block_terminated(fn_value: IRFn) -> int:
+    op = last_op(fn_value)
+    if op == "br" or op == "return" then 1 else 0
+data ConvResult: function: IRFn, scope: Scope, id: int
+fn parse_int(text: Text) -> int:
+    byte_list = bytes_from_text(text)
+    total = len(byte_list)
+    mut value = 0
+    mut start = 0
+    mut is_neg = false
+    if total > 0:
+        first = at(byte_list, 0)
+        if first == 45:
+            is_neg = true
+            start = 1
+    for index in start..<total:
+        b = at(byte_list, index)
+        if b >= 48 and b <= 57:
+            value = value * 10 + (b - 48)
+    if is_neg then 0 - value else value
+fn ast_binary_to_ir(fn2: IRFn, scope: Scope, op: Text, left_id: int, right_id: int) -> ConvResult:
+    mut pr = PushResult{function: fn2, id: 0 - 1}
+    if op == "+":
+        pr = ir_fn_push(fn2, ir_iadd(left_id, right_id))
+    if op == "-":
+        pr = ir_fn_push(fn2, ir_isub(left_id, right_id))
+    if op == "*":
+        pr = ir_fn_push(fn2, ir_imul(left_id, right_id))
+    if op == "/":
+        pr = ir_fn_push(fn2, ir_idiv(left_id, right_id))
+    if op == "%":
+        pr = ir_fn_push(fn2, ir_imod(left_id, right_id))
+    if op == "and":
+        pr = ir_fn_push(fn2, ir_iand(left_id, right_id))
+    if op == "or":
+        pr = ir_fn_push(fn2, ir_ior(left_id, right_id))
+    if op == "==":
+        pr = ir_fn_push(fn2, ir_icmp_eq(left_id, right_id))
+    if op == "!=":
+        pr = ir_fn_push(fn2, ir_icmp_ne(left_id, right_id))
+    if op == "<":
+        pr = ir_fn_push(fn2, ir_icmp_lt(left_id, right_id))
+    if op == "<=":
+        pr = ir_fn_push(fn2, ir_icmp_le(left_id, right_id))
+    if op == ">":
+        pr = ir_fn_push(fn2, ir_icmp_gt(left_id, right_id))
+    if op == ">=":
+        pr = ir_fn_push(fn2, ir_icmp_ge(left_id, right_id))
+    ConvResult{function: pr.function, scope: scope, id: pr.id}
+fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    stmts = get_list(node, "stmts")
+    total_stmts = len(stmts)
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut last_id = 0 - 1
+    for index in 0..<total_stmts:
+        stmt = at(stmts, index)
+        stmt_kind = get(stmt, "kind")
+        is_expr = stmt_kind == "ExprStmt"
+        is_let = stmt_kind == "LetOrAssign" or stmt_kind == "MutLet"
+        is_if_block = stmt_kind == "IfBlock"
+        is_for_range = stmt_kind == "ForRange"
+        is_for_in = stmt_kind == "ForIn"
+        is_loop = stmt_kind == "Loop"
+        is_break = stmt_kind == "Break"
+        is_continue = stmt_kind == "Continue"
+        is_return = stmt_kind == "Return"
+        is_match_stmt = stmt_kind == "Match"
+        already_done = is_block_terminated(current_fn)
+        if already_done == 0 and is_expr:
+            er = ast_expr_to_ir(current_fn, current_scope, get(stmt, "expr"))
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_let:
+            name = get(stmt, "name")
+            er = ast_expr_to_ir(current_fn, current_scope, get(stmt, "value"))
+            current_fn = er.function
+            current_scope = er.scope
+            if stmt_kind == "MutLet":
+                value_type = get_value_type(current_fn, er.id)
+                pr_alloca = ir_fn_push(current_fn, ir_alloca(value_type))
+                ptr_id = pr_alloca.id
+                pr_store = ir_fn_push(pr_alloca.function, ir_store(ptr_id, er.id))
+                current_fn = pr_store.function
+                current_scope = scope_bind_mut(current_scope, name, ptr_id)
+                last_id = pr_store.id
+            else:
+                existing_mut = scope_is_mut(current_scope, name)
+                if existing_mut == 1:
+                    ptr_id = scope_lookup(current_scope, name)
+                    alloca_inst = at(current_fn.instructions, ptr_id)
+                    slot_type = alloca_inst.type_text
+                    new_type = get_value_type(current_fn, er.id)
+                    slot_ll = if slot_type == "i64" then "i64" else "ptr"
+                    new_ll = if new_type == "i64" then "i64" else "ptr"
+                    if slot_ll != new_ll:
+                        line = if has(stmt, "line") then get_int(stmt, "line") else 0
+                        col = if has(stmt, "col") then get_int(stmt, "col") else 0
+                        print_line("orion-self: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                    pr_store = ir_fn_push(current_fn, ir_store(ptr_id, er.id))
+                    current_fn = pr_store.function
+                    last_id = pr_store.id
+                else:
+                    current_scope = scope_bind(current_scope, name, er.id)
+                    last_id = er.id
+        if already_done == 0 and is_if_block:
+            er = ast_if_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_for_range:
+            er = ast_for_range_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_for_in:
+            er = ast_for_in_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_loop:
+            er = ast_loop_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_break:
+            target = scope_top_loop_end(current_scope)
+            pr_br = ir_fn_push(current_fn, ir_br(target))
+            current_fn = pr_br.function
+            last_id = 0 - 1
+        if already_done == 0 and is_continue:
+            target = scope_top_loop_header(current_scope)
+            pr_br = ir_fn_push(current_fn, ir_br(target))
+            current_fn = pr_br.function
+            last_id = 0 - 1
+        if already_done == 0 and is_return:
+            ret_expr = get(stmt, "expr")
+            er = ast_expr_to_ir(current_fn, current_scope, ret_expr)
+            current_fn = er.function
+            current_scope = er.scope
+            pr_ret = ir_fn_push(current_fn, ir_return(er.id))
+            current_fn = pr_ret.function
+            last_id = er.id
+        if already_done == 0 and is_match_stmt:
+            er = ast_match_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_match_stmt
+        if already_done == 0 and not handled:
+            line = if has(stmt, "line") then get_int(stmt, "line") else 0
+            col = if has(stmt, "col") then get_int(stmt, "col") else 0
+            print_line("orion-self: ERROR at line {line}:{col} — unhandled statement kind `{stmt_kind}` (skipping)")
+    ConvResult{function: current_fn, scope: current_scope, id: last_id}
+fn ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    body_node = get(node, "body")
+    n = len(fn_value.instructions)
+    header_lbl = "loop_{n}_header"
+    end_lbl = "loop_{n}_end"
+    body_scope = scope_push_loop(scope, header_lbl, end_lbl)
+    pr_br_in = ir_fn_push(fn_value, ir_br(header_lbl))
+    pr_header = ir_fn_push(pr_br_in.function, ir_label(header_lbl))
+    body_r = ast_expr_to_ir(pr_header.function, body_scope, body_node)
+    mut fn_after_body = body_r.function
+    if is_block_terminated(fn_after_body) == 0:
+        pr_br_back = ir_fn_push(fn_after_body, ir_br(header_lbl))
+        fn_after_body = pr_br_back.function
+    pr_end = ir_fn_push(fn_after_body, ir_label(end_lbl))
+    ConvResult{function: pr_end.function, scope: scope, id: 0 - 1}
+fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    var_name = get(node, "var")
+    index_var_name = get(node, "index_var")
+    iter_node = get(node, "iter")
+    body_node = get(node, "body")
+    n = len(fn_value.instructions)
+    header_lbl = "fin_{n}_header"
+    body_lbl = "fin_{n}_body"
+    step_lbl = "fin_{n}_step"
+    end_lbl = "fin_{n}_end"
+    iter_r = ast_expr_to_ir(fn_value, scope, iter_node)
+    list_id = iter_r.id
+    pr_len = ir_fn_push(iter_r.function, ir_list_len(list_id))
+    len_id = pr_len.id
+    pr_alloca = ir_fn_push(pr_len.function, ir_alloca("i64"))
+    counter_ptr_id = pr_alloca.id
+    pr_zero = ir_fn_push(pr_alloca.function, ir_iconst(0))
+    pr_init_store = ir_fn_push(pr_zero.function, ir_store(counter_ptr_id, pr_zero.id))
+    pr_br_to_header = ir_fn_push(pr_init_store.function, ir_br(header_lbl))
+    pr_header_lbl = ir_fn_push(pr_br_to_header.function, ir_label(header_lbl))
+    pr_load_cur = ir_fn_push(pr_header_lbl.function, ir_load(counter_ptr_id, "i64"))
+    cur_id = pr_load_cur.id
+    pr_cmp = ir_fn_push(pr_load_cur.function, ir_icmp_lt(cur_id, len_id))
+    pr_br_loop = ir_fn_push(pr_cmp.function, ir_br_if(pr_cmp.id, body_lbl, end_lbl))
+    pr_body_lbl = ir_fn_push(pr_br_loop.function, ir_label(body_lbl))
+    pr_at = ir_fn_push(pr_body_lbl.function, ir_list_at(list_id, cur_id))
+    elem_id = pr_at.id
+    mut body_scope = scope_bind(iter_r.scope, var_name, elem_id)
+    if index_var_name != "":
+        body_scope = scope_bind(body_scope, index_var_name, cur_id)
+    body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
+    body_r = ast_expr_to_ir(pr_at.function, body_scope, body_node)
+    mut fn_after_body = body_r.function
+    if is_block_terminated(fn_after_body) == 0:
+        pr_br_to_step = ir_fn_push(fn_after_body, ir_br(step_lbl))
+        fn_after_body = pr_br_to_step.function
+    pr_step_lbl = ir_fn_push(fn_after_body, ir_label(step_lbl))
+    pr_one = ir_fn_push(pr_step_lbl.function, ir_iconst(1))
+    pr_next = ir_fn_push(pr_one.function, ir_iadd(cur_id, pr_one.id))
+    pr_store_next = ir_fn_push(pr_next.function, ir_store(counter_ptr_id, pr_next.id))
+    pr_br_back = ir_fn_push(pr_store_next.function, ir_br(header_lbl))
+    pr_end_lbl = ir_fn_push(pr_br_back.function, ir_label(end_lbl))
+    ConvResult{function: pr_end_lbl.function, scope: scope, id: 0 - 1}
+fn ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    var_name = get(node, "var")
+    low_node = get(node, "low")
+    high_node = get(node, "high")
+    body_node = get(node, "body")
+    n = len(fn_value.instructions)
+    header_lbl = "for_{n}_header"
+    body_lbl = "for_{n}_body"
+    step_lbl = "for_{n}_step"
+    end_lbl = "for_{n}_end"
+    low_r = ast_expr_to_ir(fn_value, scope, low_node)
+    high_r = ast_expr_to_ir(low_r.function, low_r.scope, high_node)
+    pr_alloca = ir_fn_push(high_r.function, ir_alloca("i64"))
+    counter_ptr_id = pr_alloca.id
+    pr_init_store = ir_fn_push(pr_alloca.function, ir_store(counter_ptr_id, low_r.id))
+    pr_br_to_header = ir_fn_push(pr_init_store.function, ir_br(header_lbl))
+    pr_header_lbl = ir_fn_push(pr_br_to_header.function, ir_label(header_lbl))
+    pr_load_cur = ir_fn_push(pr_header_lbl.function, ir_load(counter_ptr_id, "i64"))
+    cur_id = pr_load_cur.id
+    pr_cmp = ir_fn_push(pr_load_cur.function, ir_icmp_lt(cur_id, high_r.id))
+    pr_br_loop = ir_fn_push(pr_cmp.function, ir_br_if(pr_cmp.id, body_lbl, end_lbl))
+    pr_body_lbl = ir_fn_push(pr_br_loop.function, ir_label(body_lbl))
+    mut body_scope = scope_bind(high_r.scope, var_name, cur_id)
+    body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
+    body_r = ast_expr_to_ir(pr_body_lbl.function, body_scope, body_node)
+    mut fn_after_body = body_r.function
+    if is_block_terminated(fn_after_body) == 0:
+        pr_br_to_step = ir_fn_push(fn_after_body, ir_br(step_lbl))
+        fn_after_body = pr_br_to_step.function
+    pr_step_lbl = ir_fn_push(fn_after_body, ir_label(step_lbl))
+    pr_one = ir_fn_push(pr_step_lbl.function, ir_iconst(1))
+    pr_next = ir_fn_push(pr_one.function, ir_iadd(cur_id, pr_one.id))
+    pr_store_next = ir_fn_push(pr_next.function, ir_store(counter_ptr_id, pr_next.id))
+    pr_br_back = ir_fn_push(pr_store_next.function, ir_br(header_lbl))
+    pr_end_lbl = ir_fn_push(pr_br_back.function, ir_label(end_lbl))
+    ConvResult{function: pr_end_lbl.function, scope: high_r.scope, id: 0 - 1}
+fn ast_int_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    value_text = get(node, "value")
+    pr = ir_fn_push(fn_value, ir_iconst(parse_int(value_text)))
+    ConvResult{function: pr.function, scope: scope, id: pr.id}
+fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    name = get(node, "name")
+    found_id = scope_lookup(scope, name)
+    is_mut = scope_is_mut(scope, name)
+    mut result = ConvResult{function: fn_value, scope: scope, id: found_id}
+    if found_id < 0:
+        line = if has(node, "line") then get_int(node, "line") else 0
+        col = if has(node, "col") then get_int(node, "col") else 0
+        print_line("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
+        pr = ir_fn_push(fn_value, ir_iconst(0))
+        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    is_real_mut = found_id >= 0 and is_mut == 1
+    if is_real_mut:
+        alloca_inst = at(fn_value.instructions, found_id)
+        loaded_type = alloca_inst.type_text
+        pr = ir_fn_push(fn_value, ir_load(found_id, loaded_type))
+        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    result
+fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    op = get(node, "op")
+    left_result = ast_expr_to_ir(fn_value, scope, get(node, "left"))
+    right_result = ast_expr_to_ir(left_result.function, left_result.scope, get(node, "right"))
+    left_type = get_value_type(right_result.function, left_result.id)
+    right_type = get_value_type(right_result.function, right_result.id)
+    either_text = left_type == "text" or right_type == "text"
+    both_text = left_type == "text" and right_type == "text"
+    is_eq_op = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
+    is_text_cmp = is_eq_op and both_text
+    is_text_concat = op == "+" and either_text
+    mut result = ConvResult{function: right_result.function, scope: right_result.scope, id: 0 - 1}
+    if is_text_cmp:
+        mut ir_op = "text_eq"
+        if op == "!=":
+            ir_op = "text_ne"
+        if op == "<":
+            ir_op = "text_lt"
+        if op == "<=":
+            ir_op = "text_le"
+        if op == ">":
+            ir_op = "text_gt"
+        if op == ">=":
+            ir_op = "text_ge"
+        pr = ir_fn_push(right_result.function, ir_text_cmp(ir_op, left_result.id, right_result.id))
+        result = ConvResult{function: pr.function, scope: right_result.scope, id: pr.id}
+    if is_text_concat:
+        mut current_fn = right_result.function
+        mut left_id = left_result.id
+        mut right_id = right_result.id
+        if left_type != "text":
+            pr_l = ir_fn_push(current_fn, ir_int_to_text(left_id))
+            current_fn = pr_l.function
+            left_id = pr_l.id
+        if right_type != "text":
+            pr_r = ir_fn_push(current_fn, ir_int_to_text(right_id))
+            current_fn = pr_r.function
+            right_id = pr_r.id
+        pr_cat = ir_fn_push(current_fn, ir_text_concat(left_id, right_id))
+        result = ConvResult{function: pr_cat.function, scope: right_result.scope, id: pr_cat.id}
+    is_plain_binary = (is_text_cmp == false) and (is_text_concat == false)
+    if is_plain_binary:
+        result = ast_binary_to_ir(right_result.function, right_result.scope, op, left_result.id, right_result.id)
+    result
+fn current_block(fn_value: IRFn) -> Text:
+    insts = fn_value.instructions
+    total = len(insts)
+    mut found = "entry"
+    mut done = 0
+    for index in 0..<total:
+        if done == 0:
+            from_end = total - 1 - index
+            inst = at(insts, from_end)
+            if inst.op == "label":
+                found = inst.name
+                done = 1
+    found
+fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    cond_node = get(node, "cond")
+    then_node = get(node, "then")
+    else_node = get(node, "else")
+    n = len(fn_value.instructions)
+    then_lbl = "if_{n}_then"
+    else_lbl = "if_{n}_else"
+    merge_lbl = "if_{n}_merge"
+    cond_r = ast_expr_to_ir(fn_value, scope, cond_node)
+    pr_br = ir_fn_push(cond_r.function, ir_br_if(cond_r.id, then_lbl, else_lbl))
+    fn_after_br = pr_br.function
+    pr_then_lbl = ir_fn_push(fn_after_br, ir_label(then_lbl))
+    then_r = ast_expr_to_ir(pr_then_lbl.function, cond_r.scope, then_node)
+    then_terminated = is_block_terminated(then_r.function)
+    mut then_end_block = ""
+    mut fn_after_then = then_r.function
+    if then_terminated == 0:
+        then_end_block = current_block(then_r.function)
+        pr_then_br = ir_fn_push(then_r.function, ir_br(merge_lbl))
+        fn_after_then = pr_then_br.function
+    pr_else_lbl = ir_fn_push(fn_after_then, ir_label(else_lbl))
+    else_r = ast_expr_to_ir(pr_else_lbl.function, then_r.scope, else_node)
+    else_terminated = is_block_terminated(else_r.function)
+    mut else_end_block = ""
+    mut fn_after_else = else_r.function
+    if else_terminated == 0:
+        else_end_block = current_block(else_r.function)
+        pr_else_br = ir_fn_push(else_r.function, ir_br(merge_lbl))
+        fn_after_else = pr_else_br.function
+    pr_merge_lbl = ir_fn_push(fn_after_else, ir_label(merge_lbl))
+    mut result_id = 0 - 1
+    mut result_fn = pr_merge_lbl.function
+    if then_terminated == 0 and else_terminated == 0:
+        both_have_value = then_r.id >= 0 and else_r.id >= 0
+        if both_have_value:
+            then_type = get_value_type(result_fn, then_r.id)
+            else_type = get_value_type(result_fn, else_r.id)
+            type_mismatch = then_type != else_type and then_type != "void" and else_type != "void"
+            if type_mismatch:
+                line = if has(node, "line") then get_int(node, "line") else 0
+                col = if has(node, "col") then get_int(node, "col") else 0
+                print_line("orion-self: ERROR at line {line}:{col} — if/else branches have different types ({then_type} vs {else_type})")
+            pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
+            result_id = pr_phi.id
+            result_fn = pr_phi.function
+        else:
+            result_id = 0 - 1
+    if then_terminated == 0 and else_terminated == 1:
+        result_id = then_r.id
+    if then_terminated == 1 and else_terminated == 0:
+        result_id = else_r.id
+    ConvResult{function: result_fn, scope: else_r.scope, id: result_id}
+fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    callee = get(node, "callee")
+    args = get_list(node, "args")
+    is_print_line = callee == "print_line" or callee == "println"
+    is_to_text = callee == "to_text"
+    mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    if is_print_line:
+        arg0 = at(args, 0)
+        arg_kind = get(arg0, "kind")
+        if arg_kind == "Str":
+            text = get(arg0, "value")
+            pr = ir_fn_push(fn_value, ir_print_str(text))
+            result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+        else:
+            arg_r = ast_expr_to_ir(fn_value, scope, arg0)
+            arg_type = get_value_type(arg_r.function, arg_r.id)
+            if arg_type == "text":
+                pr = ir_fn_push(arg_r.function, ir_print_text(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+            else:
+                pr = ir_fn_push(arg_r.function, ir_print_int(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_to_text:
+        arg0 = at(args, 0)
+        arg_r = ast_expr_to_ir(fn_value, scope, arg0)
+        arg_type = get_value_type(arg_r.function, arg_r.id)
+        if arg_type == "text":
+            result = arg_r
+        else:
+            pr = ir_fn_push(arg_r.function, ir_int_to_text(arg_r.id))
+            result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    is_at = callee == "at"
+    is_len = callee == "len"
+    is_get = callee == "get"
+    is_has = callee == "has"
+    is_push = callee == "push"
+    is_slice = callee == "slice"
+    is_contains = callee == "contains"
+    is_file_read = callee == "file_read"
+    is_file_write = callee == "file_write"
+    is_argc = callee == "argc"
+    is_argv = callee == "argv"
+    is_b_from_t = callee == "bytes_from_text"
+    is_b_to_t = callee == "bytes_to_text"
+    is_b_slice = callee == "bytes_slice"
+    is_b_concat = callee == "bytes_concat"
+    is_b_zeros = callee == "bytes_zeros"
+    is_byte_at = callee == "byte_at"
+    is_b_length = callee == "bytes_length"
+    is_slot_get = callee == "slot_get"
+    is_slot_set = callee == "slot_set"
+    is_get_int = callee == "get_int"
+    is_get_map = callee == "get_map"
+    is_get_list = callee == "get_list"
+    if is_at:
+        list_node = at(args, 0)
+        idx_node = at(args, 1)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
+        list_type = get_value_type(idx_r.function, list_r.id)
+        elem_type = extract_list_elem(list_type)
+        at_inst = ir_list_at(list_r.id, idx_r.id)
+        at_inst_typed = Inst{op: at_inst.op, type_text: elem_type, value: at_inst.value, lhs: at_inst.lhs, rhs: at_inst.rhs, name: at_inst.name, args: at_inst.args}
+        pr = ir_fn_push(idx_r.function, at_inst_typed)
+        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+    if is_len:
+        arg_node = at(args, 0)
+        arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
+        arg_type = get_value_type(arg_r.function, arg_r.id)
+        if arg_type == "text":
+            pr = ir_fn_push(arg_r.function, ir_text_len(arg_r.id))
+            result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+        else:
+            pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
+            result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_get:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        mut get_type = "text"
+        map_fn = map_r.function
+        map_insts = map_fn.instructions
+        map_inst = at(map_insts, map_r.id)
+        map_args = map_inst.args
+        if map_inst.op == "map_lit" and len(map_args) >= 2:
+            first_val_id = at(map_args, 1)
+            first_val_type = get_value_type(map_fn, first_val_id)
+            if first_val_type == "i64":
+                get_type = "i64"
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, get_type))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_has:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_map_has(map_r.id, key_r.id))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_push:
+        list_node = at(args, 0)
+        val_node = at(args, 1)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
+        pr = ir_fn_push(val_r.function, ir_list_push(list_r.id, val_r.id))
+        result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
+    if is_slice:
+        text_node = at(args, 0)
+        lo_node = at(args, 1)
+        hi_node = at(args, 2)
+        text_r = ast_expr_to_ir(fn_value, scope, text_node)
+        lo_r = ast_expr_to_ir(text_r.function, text_r.scope, lo_node)
+        hi_r = ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node)
+        pr = ir_fn_push(hi_r.function, ir_text_slice(text_r.id, lo_r.id, hi_r.id))
+        result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
+    if is_contains:
+        text_node = at(args, 0)
+        sub_node = at(args, 1)
+        text_r = ast_expr_to_ir(fn_value, scope, text_node)
+        sub_r = ast_expr_to_ir(text_r.function, text_r.scope, sub_node)
+        pr = ir_fn_push(sub_r.function, ir_text_contains(text_r.id, sub_r.id))
+        result = ConvResult{function: pr.function, scope: sub_r.scope, id: pr.id}
+    if is_file_read:
+        path_node = at(args, 0)
+        path_r = ast_expr_to_ir(fn_value, scope, path_node)
+        pr = ir_fn_push(path_r.function, ir_file_read(path_r.id))
+        result = ConvResult{function: pr.function, scope: path_r.scope, id: pr.id}
+    if is_file_write:
+        path_node = at(args, 0)
+        content_node = at(args, 1)
+        path_r = ast_expr_to_ir(fn_value, scope, path_node)
+        content_r = ast_expr_to_ir(path_r.function, path_r.scope, content_node)
+        pr = ir_fn_push(content_r.function, ir_file_write(path_r.id, content_r.id))
+        result = ConvResult{function: pr.function, scope: content_r.scope, id: pr.id}
+    if is_argc:
+        pr = ir_fn_push(fn_value, ir_argc())
+        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    if is_argv:
+        idx_node = at(args, 0)
+        idx_r = ast_expr_to_ir(fn_value, scope, idx_node)
+        pr = ir_fn_push(idx_r.function, ir_argv(idx_r.id))
+        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+    if is_b_from_t:
+        arg_node = at(args, 0)
+        arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
+        pr = ir_fn_push(arg_r.function, ir_bytes_from_text(arg_r.id))
+        result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_b_to_t:
+        arg_node = at(args, 0)
+        arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
+        pr = ir_fn_push(arg_r.function, ir_bytes_to_text(arg_r.id))
+        result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_b_slice:
+        list_node = at(args, 0)
+        lo_node = at(args, 1)
+        hi_node = at(args, 2)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        lo_r = ast_expr_to_ir(list_r.function, list_r.scope, lo_node)
+        hi_r = ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node)
+        pr = ir_fn_push(hi_r.function, ir_bytes_slice(list_r.id, lo_r.id, hi_r.id))
+        result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
+    if is_b_concat:
+        a_node = at(args, 0)
+        b_node = at(args, 1)
+        a_r = ast_expr_to_ir(fn_value, scope, a_node)
+        b_r = ast_expr_to_ir(a_r.function, a_r.scope, b_node)
+        pr = ir_fn_push(b_r.function, ir_bytes_concat(a_r.id, b_r.id))
+        result = ConvResult{function: pr.function, scope: b_r.scope, id: pr.id}
+    if is_b_zeros:
+        n_node = at(args, 0)
+        n_r = ast_expr_to_ir(fn_value, scope, n_node)
+        pr = ir_fn_push(n_r.function, ir_bytes_zeros(n_r.id))
+        result = ConvResult{function: pr.function, scope: n_r.scope, id: pr.id}
+    if is_byte_at:
+        list_node = at(args, 0)
+        idx_node = at(args, 1)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
+        pr = ir_fn_push(idx_r.function, ir_list_at(list_r.id, idx_r.id))
+        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+    if is_b_length:
+        list_node = at(args, 0)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        pr = ir_fn_push(list_r.function, ir_list_len(list_r.id))
+        result = ConvResult{function: pr.function, scope: list_r.scope, id: pr.id}
+    if is_slot_get:
+        key_node = at(args, 0)
+        key_r = ast_expr_to_ir(fn_value, scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_slot_get(key_r.id))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_slot_set:
+        key_node = at(args, 0)
+        val_node = at(args, 1)
+        key_r = ast_expr_to_ir(fn_value, scope, key_node)
+        val_r = ast_expr_to_ir(key_r.function, key_r.scope, val_node)
+        pr = ir_fn_push(val_r.function, ir_slot_set(key_r.id, val_r.id))
+        result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
+    if is_get_int:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "i64"))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_get_map:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "map"))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_get_list:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false)
+    if is_user_fn:
+        total_args = len(args)
+        mut current_fn = fn_value
+        mut current_scope = scope
+        mut arg_ids = []
+        for arg_index in 0..<total_args:
+            arg_node = at(args, arg_index)
+            arg_r = ast_expr_to_ir(current_fn, current_scope, arg_node)
+            current_fn = arg_r.function
+            current_scope = arg_r.scope
+            arg_ids = push(arg_ids, arg_r.id)
+        call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
+        pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
+        result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+    result
+fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    op = get(node, "op")
+    operand_r = ast_expr_to_ir(fn_value, scope, get(node, "operand"))
+    if op == "not":
+        pr = ir_fn_push(operand_r.function, ir_inot(operand_r.id))
+        ConvResult{function: pr.function, scope: operand_r.scope, id: pr.id}
+    else:
+        if op == "neg":
+            pr_z = ir_fn_push(operand_r.function, ir_iconst(0))
+            pr_s = ir_fn_push(pr_z.function, ir_isub(pr_z.id, operand_r.id))
+            ConvResult{function: pr_s.function, scope: operand_r.scope, id: pr_s.id}
+        else:
+            operand_r
+fn get_value_type(fn_value: IRFn, value_id: int) -> Text:
+    if value_id < 0:
+        "void"
+    else:
+        inst = at(fn_value.instructions, value_id)
+        inst.type_text
+fn ast_str_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    text = get(node, "value")
+    pr = ir_fn_push(fn_value, ir_const_str(text))
+    ConvResult{function: pr.function, scope: scope, id: pr.id}
+fn ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    items = get_list(node, "items")
+    n_items = len(items)
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut item_ids = []
+    for index in 0..<n_items:
+        item_node = at(items, index)
+        item_r = ast_expr_to_ir(current_fn, current_scope, item_node)
+        current_fn = item_r.function
+        current_scope = item_r.scope
+        item_ids = push(item_ids, item_r.id)
+    mut elem_type = "i64"
+    if n_items > 0:
+        first_id = at(item_ids, 0)
+        elem_type = get_value_type(current_fn, first_id)
+    pr = ir_fn_push(current_fn, ir_list_lit(item_ids, elem_type))
+    ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    scrutinee_node = get(node, "scrutinee")
+    arms = get_list(node, "arms")
+    n_arms = len(arms)
+    n = len(fn_value.instructions)
+    end_lbl = "match_{n}_end"
+    scrut_r = ast_expr_to_ir(fn_value, scope, scrutinee_node)
+    scrut_id = scrut_r.id
+    scrut_type = get_value_type(scrut_r.function, scrut_id)
+    mut result_type = "i64"
+    if n_arms > 0:
+        first_body = get(at(arms, 0), "body")
+        first_kind = get(first_body, "kind")
+        if first_kind == "Str":
+            result_type = "text"
+    pr_alloca = ir_fn_push(scrut_r.function, ir_alloca(result_type))
+    result_ptr_id = pr_alloca.id
+    mut current_fn = pr_alloca.function
+    mut current_scope = scrut_r.scope
+    mut arm_index = 0
+    for arm_idx in 0..<n_arms:
+        arm = at(arms, arm_idx)
+        pat_kind = get(arm, "pat_kind")
+        pat_value = get(arm, "pattern")
+        body_node = get(arm, "body")
+        is_wildcard = pat_kind == "ident" and pat_value == "_"
+        body_lbl = "match_{n}_arm_{arm_index}_body"
+        next_lbl = "match_{n}_arm_{arm_index}_next"
+        arm_index = arm_index + 1
+        bindings = if has(arm, "bindings") then get_list(arm, "bindings") else []
+        mut variant_idx = 0 - 1
+        if (not is_wildcard) and pat_kind == "ident":
+            n_enums = len(scope.en_names)
+            for ei in 0..<n_enums:
+                en_name = at(scope.en_names, ei)
+                v_idx = scope_lookup_enum_variant(scope, en_name, pat_value)
+                if v_idx >= 0 and variant_idx < 0:
+                    variant_idx = v_idx
+        is_variant = variant_idx >= 0
+        do_int_pat = (not is_wildcard) and pat_kind == "int"
+        do_str_pat = (not is_wildcard) and pat_kind == "str"
+        do_variant_pat = is_variant
+        mut pat_id = 0 - 1
+        if do_int_pat:
+            pr_pat = ir_fn_push(current_fn, ir_iconst(parse_int(pat_value)))
+            current_fn = pr_pat.function
+            pat_id = pr_pat.id
+        if do_str_pat:
+            pr_pat = ir_fn_push(current_fn, ir_const_str(pat_value))
+            current_fn = pr_pat.function
+            pat_id = pr_pat.id
+        if do_variant_pat:
+            pr_pat = ir_fn_push(current_fn, ir_iconst(variant_idx))
+            current_fn = pr_pat.function
+            pat_id = pr_pat.id
+        do_cmp = not is_wildcard
+        do_text_cmp = do_cmp and scrut_type == "text" and not do_variant_pat
+        do_int_cmp = do_cmp and scrut_type != "text" and not do_variant_pat
+        mut eq_id = 0 - 1
+        if do_variant_pat:
+            pr_load_tag = ir_fn_push(current_fn, ir_field_load(scrut_id, 0, "i64"))
+            current_fn = pr_load_tag.function
+            pr_eq = ir_fn_push(current_fn, ir_icmp_eq(pr_load_tag.id, pat_id))
+            current_fn = pr_eq.function
+            eq_id = pr_eq.id
+        if do_text_cmp:
+            pr_eq = ir_fn_push(current_fn, ir_text_cmp("text_eq", scrut_id, pat_id))
+            current_fn = pr_eq.function
+            eq_id = pr_eq.id
+        if do_int_cmp:
+            pr_eq = ir_fn_push(current_fn, ir_icmp_eq(scrut_id, pat_id))
+            current_fn = pr_eq.function
+            eq_id = pr_eq.id
+        if do_cmp:
+            pr_br_if = ir_fn_push(current_fn, ir_br_if(eq_id, body_lbl, next_lbl))
+            current_fn = pr_br_if.function
+            pr_body_lbl = ir_fn_push(current_fn, ir_label(body_lbl))
+            current_fn = pr_body_lbl.function
+        mut body_scope = current_scope
+        if do_variant_pat and len(bindings) > 0:
+            bind_name = at(bindings, 0)
+            pr_load_val = ir_fn_push(current_fn, ir_field_load(scrut_id, 1, "i64"))
+            current_fn = pr_load_val.function
+            body_scope = scope_bind(body_scope, bind_name, pr_load_val.id)
+        body_r = ast_expr_to_ir(current_fn, body_scope, body_node)
+        current_fn = body_r.function
+        current_scope = body_r.scope
+        pr_store = ir_fn_push(current_fn, ir_store(result_ptr_id, body_r.id))
+        current_fn = pr_store.function
+        pr_br_end = ir_fn_push(current_fn, ir_br(end_lbl))
+        current_fn = pr_br_end.function
+        if do_cmp:
+            pr_next_lbl = ir_fn_push(current_fn, ir_label(next_lbl))
+            current_fn = pr_next_lbl.function
+    if is_block_terminated(current_fn) == 0:
+        pr_zero = ir_fn_push(current_fn, ir_iconst(0))
+        pr_store0 = ir_fn_push(pr_zero.function, ir_store(result_ptr_id, pr_zero.id))
+        pr_br_end = ir_fn_push(pr_store0.function, ir_br(end_lbl))
+        current_fn = pr_br_end.function
+    pr_end_lbl = ir_fn_push(current_fn, ir_label(end_lbl))
+    pr_load = ir_fn_push(pr_end_lbl.function, ir_load(result_ptr_id, result_type))
+    ConvResult{function: pr_load.function, scope: scrut_r.scope, id: pr_load.id}
+fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    struct_name = get(node, "name")
+    fields = get_list(node, "fields")
+    spec = scope_lookup_data_spec(scope, struct_name)
+    if spec == "":
+        line = if has(node, "line") then get_int(node, "line") else 0
+        col = if has(node, "col") then get_int(node, "col") else 0
+        print_line("orion-self: ERROR at line {line}:{col} — unknown data type `{struct_name}`")
+    parts = parse_data_spec(spec)
+    n_fields_decl = len(parts)
+    n_provided = len(fields)
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut value_ids = []
+    for di in 0..<n_fields_decl:
+        decl_part = at(parts, di)
+        decl_bs = bytes_from_text(decl_part)
+        mut decl_name = ""
+        mut found_colon = 0
+        decl_bs_n = len(decl_bs)
+        for ci in 0..<decl_bs_n:
+            b = at(decl_bs, ci)
+            if found_colon == 0:
+                if b == 58:
+                    found_colon = 1
+                else:
+                    single = bytes_to_text([b])
+                    decl_name = "{decl_name}{single}"
+        mut matched_id = 0 - 1
+        for pi in 0..<n_provided:
+            prov = at(fields, pi)
+            if get(prov, "name") == decl_name and matched_id == (0 - 1):
+                val_r = ast_expr_to_ir(current_fn, current_scope, get(prov, "value"))
+                current_fn = val_r.function
+                current_scope = val_r.scope
+                matched_id = val_r.id
+        if matched_id == (0 - 1):
+            pr_default = ir_fn_push(current_fn, ir_iconst(0))
+            current_fn = pr_default.function
+            matched_id = pr_default.id
+        value_ids = push(value_ids, matched_id)
+    pr = ir_fn_push(current_fn, ir_struct_cons(struct_name, n_fields_decl, value_ids))
+    ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    obj_node = get(node, "object")
+    field_name = get(node, "field")
+    mut handled_enum = false
+    mut enum_result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    obj_kind = get(obj_node, "kind")
+    if obj_kind == "Ident":
+        obj_name = get(obj_node, "name")
+        var_idx = scope_lookup_enum_variant(scope, obj_name, field_name)
+        if var_idx >= 0:
+            pr = ir_fn_push(fn_value, ir_iconst(var_idx))
+            handled_enum = true
+            enum_result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    mut result = enum_result
+    if not handled_enum:
+        obj_r = ast_expr_to_ir(fn_value, scope, obj_node)
+        obj_type = get_value_type(obj_r.function, obj_r.id)
+        mut struct_name = ""
+        obj_bytes = bytes_from_text(obj_type)
+        n = len(obj_bytes)
+        mut past_colon = 0
+        for ci in 0..<n:
+            b = at(obj_bytes, ci)
+            if past_colon == 1:
+                single = bytes_to_text([b])
+                struct_name = "{struct_name}{single}"
+            else:
+                if b == 58:
+                    past_colon = 1
+        spec = scope_lookup_data_spec(scope, struct_name)
+        parts = parse_data_spec(spec)
+        field_idx = find_field_index(parts, field_name)
+        field_type = field_type_at(parts, field_idx)
+        if field_idx < 0:
+            line = if has(node, "line") then get_int(node, "line") else 0
+            col = if has(node, "col") then get_int(node, "col") else 0
+            print_line("orion-self: ERROR at line {line}:{col} — `{struct_name}` has no field `{field_name}`")
+        pr_load = ir_fn_push(obj_r.function, ir_field_load(obj_r.id, field_idx, field_type))
+        result = ConvResult{function: pr_load.function, scope: obj_r.scope, id: pr_load.id}
+    result
+fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    pairs = get_list(node, "pairs")
+    n_pairs = len(pairs)
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut pair_ids = []
+    for index in 0..<n_pairs:
+        pair = at(pairs, index)
+        key_text = get(pair, "key")
+        val_node = get(pair, "value")
+        pr_key = ir_fn_push(current_fn, ir_const_str(key_text))
+        current_fn = pr_key.function
+        val_r = ast_expr_to_ir(current_fn, current_scope, val_node)
+        current_fn = val_r.function
+        current_scope = val_r.scope
+        pair_ids = push(pair_ids, pr_key.id)
+        pair_ids = push(pair_ids, val_r.id)
+    pr = ir_fn_push(current_fn, ir_map_lit(pair_ids))
+    ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    kind = get(node, "kind")
+    is_block = kind == "Block"
+    is_int = kind == "Int"
+    is_str = kind == "Str"
+    is_binary = kind == "Binary"
+    is_ident = kind == "Ident"
+    is_call = kind == "Call"
+    is_if = kind == "If"
+    is_unary = kind == "Unary"
+    is_list_lit = kind == "ListLit"
+    is_map_lit = kind == "MapLit"
+    is_match = kind == "Match"
+    is_struct_cons = kind == "StructCons"
+    is_field = kind == "Field"
+    is_method_call = kind == "MethodCall"
+    is_question = kind == "Question"
+    is_perform = kind == "Perform"
+    mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    if is_block:
+        result = ast_block_to_ir(fn_value, scope, node)
+    if is_int:
+        result = ast_int_to_ir(fn_value, scope, node)
+    if is_str:
+        result = ast_str_to_ir(fn_value, scope, node)
+    if is_list_lit:
+        result = ast_list_lit_to_ir(fn_value, scope, node)
+    if is_map_lit:
+        result = ast_map_lit_to_ir(fn_value, scope, node)
+    if is_match:
+        result = ast_match_to_ir(fn_value, scope, node)
+    if is_struct_cons:
+        result = ast_struct_cons_to_ir(fn_value, scope, node)
+    if is_field:
+        result = ast_field_to_ir(fn_value, scope, node)
+    if is_binary:
+        result = ast_binop_to_ir(fn_value, scope, node)
+    if is_ident:
+        result = ast_ident_to_ir(fn_value, scope, node)
+    if is_call:
+        result = ast_call_to_ir(fn_value, scope, node)
+    if is_if:
+        result = ast_if_to_ir(fn_value, scope, node)
+    if is_unary:
+        result = ast_unary_to_ir(fn_value, scope, node)
+    if is_method_call:
+        method = get(node, "method")
+        receiver = get(node, "receiver")
+        m_args = get_list(node, "args")
+        mut is_enum_cons = false
+        mut enum_name = ""
+        mut variant_idx = 0 - 1
+        if get(receiver, "kind") == "Ident":
+            rcv_name = get(receiver, "name")
+            v_idx = scope_lookup_enum_variant(scope, rcv_name, method)
+            if v_idx >= 0:
+                is_enum_cons = true
+                enum_name = rcv_name
+                variant_idx = v_idx
+        if is_enum_cons:
+            payload_arg = if len(m_args) > 0 then at(m_args, 0) else {"kind": "Int", "value": "0"}
+            arg_kind = get(payload_arg, "kind")
+            is_text_payload = arg_kind == "Str"
+            zero_int = {"kind": "Int", "value": "0"}
+            zero_text = {"kind": "Str", "value": ""}
+            tag_field = {"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(variant_idx)}}
+            int_field = if is_text_payload then {"name": "val_int", "value": zero_int} else {"name": "val_int", "value": payload_arg}
+            text_field = if is_text_payload then {"name": "val_text", "value": payload_arg} else {"name": "val_text", "value": zero_text}
+            cons_node = {"kind": "StructCons", "name": enum_name, "fields": [tag_field, int_field, text_field]}
+            result = ast_struct_cons_to_ir(fn_value, scope, cons_node)
+        else:
+            mut new_args_list = [receiver]
+            n_m_args = len(m_args)
+            for ami in 0..<n_m_args:
+                new_args_list = push(new_args_list, at(m_args, ami))
+            line = if has(node, "line") then get_int(node, "line") else 0
+            col = if has(node, "col") then get_int(node, "col") else 0
+            call_node = {"kind": "Call", "callee": method, "args": new_args_list, "line": line, "col": col}
+            result = ast_call_to_ir(fn_value, scope, call_node)
+    if is_question:
+        inner = get(node, "inner")
+        inner_r = ast_expr_to_ir(fn_value, scope, inner)
+        tmp_id = inner_r.id
+        mut cur_fn = inner_r.function
+        pr_tag = ir_fn_push(cur_fn, ir_field_load(tmp_id, 0, "i64"))
+        cur_fn = pr_tag.function
+        pr_zero = ir_fn_push(cur_fn, ir_iconst(0))
+        cur_fn = pr_zero.function
+        pr_ne = ir_fn_push(cur_fn, ir_icmp_ne(pr_tag.id, pr_zero.id))
+        cur_fn = pr_ne.function
+        n_q = len(cur_fn.instructions)
+        ret_lbl = "q_{n_q}_ret"
+        cont_lbl = "q_{n_q}_cont"
+        pr_br = ir_fn_push(cur_fn, ir_br_if(pr_ne.id, ret_lbl, cont_lbl))
+        cur_fn = pr_br.function
+        pr_ret_lbl = ir_fn_push(cur_fn, ir_label(ret_lbl))
+        cur_fn = pr_ret_lbl.function
+        pr_ret = ir_fn_push(cur_fn, ir_return(tmp_id))
+        cur_fn = pr_ret.function
+        pr_cont_lbl = ir_fn_push(cur_fn, ir_label(cont_lbl))
+        cur_fn = pr_cont_lbl.function
+        pr_val = ir_fn_push(cur_fn, ir_field_load(tmp_id, 1, "i64"))
+        result = ConvResult{function: pr_val.function, scope: inner_r.scope, id: pr_val.id}
+    if is_perform:
+        perf_args = get_list(node, "args")
+        n_pa = len(perf_args)
+        mut cur_fn = fn_value
+        mut cur_scope = scope
+        for pi in 0..<n_pa:
+            arg_node = at(perf_args, pi)
+            arg_r = ast_expr_to_ir(cur_fn, cur_scope, arg_node)
+            cur_fn = arg_r.function
+            cur_scope = arg_r.scope
+        pr_zero = ir_fn_push(cur_fn, ir_iconst(0))
+        result = ConvResult{function: pr_zero.function, scope: cur_scope, id: pr_zero.id}
+    any_match = is_block or is_int or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform
+    if not any_match:
+        line = if has(node, "line") then get_int(node, "line") else 0
+        col = if has(node, "col") then get_int(node, "col") else 0
+        print_line("orion-self: ERROR at line {line}:{col} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
+        pr_fallback = ir_fn_push(fn_value, ir_iconst(0))
+        result = ConvResult{function: pr_fallback.function, scope: scope, id: pr_fallback.id}
+    result
+fn extract_list_elem(type_text: Text) -> Text:
+    bs = bytes_from_text(type_text)
+    n = len(bs)
+    mut is_param = false
+    if n >= 5:
+        if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
+            is_param = true
+    if not is_param:
+        "i64"
+    else:
+        mut result = ""
+        for ci in 5..<n:
+            single = bytes_to_text([at(bs, ci)])
+            result = "{result}{single}"
+        result
+fn ast_type_to_ir(type_node: Map) -> Text:
+    kind = get(type_node, "kind")
+    if kind == "List":
+        elem_node = get(type_node, "elem")
+        elem = ast_type_to_ir(elem_node)
+        "list:{elem}"
+    else:
+        name = get(type_node, "name")
+        if name == "Text":
+            "text"
+        else:
+            if name == "Map":
+                "map"
+            else:
+                name_bs = bytes_from_text(name)
+                mut starts_cap = false
+                if len(name_bs) > 0:
+                    first = at(name_bs, 0)
+                    if first >= 65 and first <= 90:
+                        starts_cap = true
+                if starts_cap then "struct:{name}" else "i64"
+fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
+    kind = get(type_node, "kind")
+    if kind == "List":
+        elem_node = get(type_node, "elem")
+        elem_type = ast_type_to_ir_with_scope(elem_node, scope)
+        "list:{elem_type}"
+    else:
+        name = get(type_node, "name")
+        if name == "Text":
+            "text"
+        else:
+            if name == "Map":
+                "map"
+            else:
+                ds_names = scope.ds_names
+                n_structs = len(ds_names)
+                mut is_struct = false
+                for si in 0..<n_structs:
+                    if at(ds_names, si) == name:
+                        is_struct = true
+                if is_struct then "struct:{name}" else "i64"
+pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
+    name = get(ast_fn, "name")
+    ret_type_node = get(ast_fn, "ret")
+    ret_type = ast_type_to_ir_with_scope(ret_type_node, initial_scope)
+    mut fn_value = ir_fn_new(name, ret_type)
+    params = get_list(ast_fn, "params")
+    n_params = len(params)
+    mut scope = initial_scope
+    for index in 0..<n_params:
+        param = at(params, index)
+        param_name = get(param, "name")
+        param_type_node = get(param, "type")
+        param_type = ast_type_to_ir_with_scope(param_type_node, initial_scope)
+        fn_value = ir_fn_add_param(fn_value, param_name, param_type)
+        pr = ir_fn_push(fn_value, ir_param(index, param_type))
+        fn_value = pr.function
+        scope = scope_bind(scope, param_name, pr.id)
+    body = get(ast_fn, "body")
+    body_result = ast_expr_to_ir(fn_value, scope, body)
+    if is_block_terminated(body_result.function) == 0:
+        ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
+        ret_result.function
+    else:
+        body_result.function
+pub fn ast_program_to_ir(program: Map) -> IRModule:
+    decls = get_list(program, "decls")
+    total = len(decls)
+    mut sig_scope = scope_empty()
+    for index in 0..<total:
+        decl = at(decls, index)
+        if get(decl, "kind") == "Data":
+            struct_name = get(decl, "name")
+            data_fields = get_list(decl, "fields")
+            n_df = len(data_fields)
+            mut spec = ""
+            for fi in 0..<n_df:
+                fld = at(data_fields, fi)
+                fld_name = get(fld, "name")
+                fld_type = ast_type_to_ir(get(fld, "type"))
+                sep = if fi == 0 then "" else "|"
+                spec = "{spec}{sep}{fld_name}:{fld_type}"
+            sig_scope = scope_add_data_decl(sig_scope, struct_name, spec)
+        if get(decl, "kind") == "Enum":
+            enum_name = get(decl, "name")
+            variants = get_list(decl, "variants")
+            n_vars = len(variants)
+            mut csv = ""
+            for vi in 0..<n_vars:
+                v = at(variants, vi)
+                v_name = get(v, "name")
+                sep = if vi == 0 then "" else ","
+                csv = "{csv}{sep}{v_name}"
+            sig_scope = scope_add_enum_decl(sig_scope, enum_name, csv)
+            sig_scope = scope_add_data_decl(sig_scope, enum_name, "tag:int|val_int:int|val_text:text")
+    for index in 0..<total:
+        decl = at(decls, index)
+        if get(decl, "kind") == "Fn":
+            fn_name = get(decl, "name")
+            ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
+            sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
+    mut module = ir_module_new()
+    mut has_main = 0
+    for index in 0..<total:
+        decl = at(decls, index)
+        kind = get(decl, "kind")
+        if kind == "Fn":
+            fn_ir = ast_fn_to_ir(decl, sig_scope)
+            module = ir_module_add_fn(module, fn_ir)
+            if fn_ir.name == "main":
+                has_main = 1
+    if has_main == 0:
+        mut stub = ir_fn_new("main", "i64")
+        zero = ir_fn_push(stub, ir_iconst(0))
+        ret = ir_fn_push(zero.function, ir_return(zero.id))
+        module = ir_module_add_fn(module, ret.function)
+    module
+fn value_ref(value_id: int) -> Text:
+    "%v{value_id}"
+fn hex_digit(value: int) -> Text:
+    digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]
+    at(digits, value)
+fn llvm_escape(text: Text) -> Text:
+    bs = bytes_from_text(text)
+    total = len(bs)
+    mut result = ""
+    for index in 0..<total:
+        b = at(bs, index)
+        needs_escape = b == 34 or b == 92 or b < 32 or b > 126
+        if needs_escape:
+            hi = hex_digit(b / 16)
+            lo = hex_digit(b % 16)
+            backslash = bytes_to_text([92])
+            result = "{result}{backslash}{hi}{lo}"
+        else:
+            single = bytes_to_text([b])
+            result = "{result}{single}"
+    result
+fn string_list_index(strings: [Text], target: Text) -> int:
+    total = len(strings)
+    mut found = 0 - 1
+    for index in 0..<total:
+        if at(strings, index) == target and found == (0 - 1):
+            found = index
+    found
+fn collect_strings(module: IRModule) -> [Text]:
+    n_fns = len(module.functions)
+    mut result = []
+    for fi in 0..<n_fns:
+        fn_value = at(module.functions, fi)
+        n_insts = len(fn_value.instructions)
+        for ii in 0..<n_insts:
+            inst = at(fn_value.instructions, ii)
+            is_str_op = inst.op == "print_str" or inst.op == "const_str"
+            if is_str_op:
+                existing = string_list_index(result, inst.name)
+                if existing < 0:
+                    result = push(result, inst.name)
+    result
+fn split_pipe(text: Text) -> [Text]:
+    bs = bytes_from_text(text)
+    total = len(bs)
+    mut parts = []
+    mut current = ""
+    for index in 0..<total:
+        ch = at(bs, index)
+        if ch == 124:  # '|'
+            parts = push(parts, current)
+            current = ""
+        else:
+            single = bytes_to_text([ch])
+            current = "{current}{single}"
+    parts = push(parts, current)
+    parts
+fn icmp_cc(op: Text) -> Text:
+    mut cc = "eq"
+    if op == "icmp_ne":
+        cc = "ne"
+    if op == "icmp_lt":
+        cc = "slt"
+    if op == "icmp_le":
+        cc = "sle"
+    if op == "icmp_gt":
+        cc = "sgt"
+    if op == "icmp_ge":
+        cc = "sge"
+    cc
+fn find_fn_return_type(module: IRModule, fn_name: Text) -> Text:
+    n = len(module.functions)
+    mut result = "i64"
+    for index in 0..<n:
+        f = at(module.functions, index)
+        if f.name == fn_name:
+            result = f.return_type
+    result
+fn ssa_value_type(value_id: int, fn_value: IRFn, module: IRModule) -> Text:
+    if value_id < 0:
+        "i64"
+    else:
+        inst = at(fn_value.instructions, value_id)
+        if inst.op == "call":
+            find_fn_return_type(module, inst.name)
+        else:
+            inst.type_text
+pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn, module: IRModule) -> Text:
+    op = inst.op
+    is_icmp = op == "icmp_eq" or op == "icmp_ne" or op == "icmp_lt" or op == "icmp_le" or op == "icmp_gt" or op == "icmp_ge"
+    is_logical = op == "iand" or op == "ior"
+    mut result = "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}"
+    if op == "iconst":
+        result = "    {value_ref(my_id)} = add i64 0, {inst.value}"
+    if op == "param":
+        ty = llvm_type_of(inst.type_text)
+        if ty == "ptr":
+            result = "    {value_ref(my_id)} = getelementptr i8, ptr %p{inst.value}, i64 0"
+        else:
+            result = "    {value_ref(my_id)} = add i64 0, %p{inst.value}"
+    if op == "call":
+        n_args = len(inst.args)
+        mut arg_text = ""
+        for ai in 0..<n_args:
+            arg_id = at(inst.args, ai)
+            arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
+            sep = if ai == 0 then "" else ", "
+            arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
+        ret_ty = llvm_type_of(find_fn_return_type(module, inst.name))
+        result = "    {value_ref(my_id)} = call {ret_ty} @{inst.name}({arg_text})"
+    if op == "label":
+        result = "{inst.name}:"
+    if op == "br":
+        result = "    br label %{inst.name}"
+    if op == "br_if":
+        labels = split_pipe(inst.name)
+        then_lbl = at(labels, 0)
+        else_lbl = at(labels, 1)
+        cond_bool = "%v{my_id}.cb"
+        l1 = "    {cond_bool} = icmp ne i64 {value_ref(inst.value)}, 0"
+        l2 = "    br i1 {cond_bool}, label %{then_lbl}, label %{else_lbl}"
+        result = "{l1}\n{l2}"
+    if op == "phi":
+        labels = split_pipe(inst.name)
+        then_lbl = at(labels, 0)
+        else_lbl = at(labels, 1)
+        then_inst = at(fn_value.instructions, inst.lhs)
+        phi_ty = llvm_type_of(then_inst.type_text)
+        result = "    {value_ref(my_id)} = phi {phi_ty} [ {value_ref(inst.lhs)}, %{then_lbl} ], [ {value_ref(inst.rhs)}, %{else_lbl} ]"
+    if op == "iadd":
+        result = "    {value_ref(my_id)} = add i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+    if op == "isub":
+        result = "    {value_ref(my_id)} = sub i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+    if op == "imul":
+        result = "    {value_ref(my_id)} = mul i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+    if op == "idiv":
+        result = "    {value_ref(my_id)} = sdiv i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+    if op == "imod":
+        result = "    {value_ref(my_id)} = srem i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+    if is_icmp:
+        cc = icmp_cc(op)
+        bool_name = "%v{my_id}.b"
+        l1 = "    {bool_name} = icmp {cc} i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+        l2 = "    {value_ref(my_id)} = zext i1 {bool_name} to i64"
+        result = "{l1}\n{l2}"
+    if op == "select":
+        cond_name = "%v{my_id}.c"
+        l1 = "    {cond_name} = icmp ne i64 {value_ref(inst.value)}, 0"
+        l2 = "    {value_ref(my_id)} = select i1 {cond_name}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)}"
+        result = "{l1}\n{l2}"
+    if is_logical:
+        bool_op = if op == "iand" then "and" else "or"
+        ab = "%v{my_id}.la"
+        bb = "%v{my_id}.lb"
+        rb = "%v{my_id}.lr"
+        l1 = "    {ab} = icmp ne i64 {value_ref(inst.lhs)}, 0"
+        l2 = "    {bb} = icmp ne i64 {value_ref(inst.rhs)}, 0"
+        l3 = "    {rb} = {bool_op} i1 {ab}, {bb}"
+        l4 = "    {value_ref(my_id)} = zext i1 {rb} to i64"
+        result = "{l1}\n{l2}\n{l3}\n{l4}"
+    if op == "inot":
+        eq0 = "%v{my_id}.n"
+        l1 = "    {eq0} = icmp eq i64 {value_ref(inst.value)}, 0"
+        l2 = "    {value_ref(my_id)} = zext i1 {eq0} to i64"
+        result = "{l1}\n{l2}"
+    if op == "print_int":
+        l1 = "    call i32 (ptr, ...) @printf(ptr @.fmt_int, i64 {value_ref(inst.value)})"
+        l2 = "    {value_ref(my_id)} = add i64 0, 0"
+        result = "{l1}\n{l2}"
+    if op == "print_str":
+        idx = string_list_index(strings, inst.name)
+        l1 = "    call i32 @puts(ptr @.str_{idx})"
+        l2 = "    {value_ref(my_id)} = add i64 0, 0"
+        result = "{l1}\n{l2}"
+    if op == "const_str":
+        idx = string_list_index(strings, inst.name)
+        result = "    {value_ref(my_id)} = getelementptr i8, ptr @.str_{idx}, i64 0"
+    if op == "text_concat":
+        result = "    {value_ref(my_id)} = call ptr @orion_text_concat(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.rhs)})"
+    if op == "int_to_text":
+        result = "    {value_ref(my_id)} = call ptr @orion_int_to_text(i64 {value_ref(inst.value)})"
+    if op == "text_len":
+        result = "    {value_ref(my_id)} = call i64 @strlen(ptr {value_ref(inst.value)})"
+    if op == "text_slice":
+        result = "    {value_ref(my_id)} = call ptr @orion_text_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+    if op == "text_contains":
+        result = "    {value_ref(my_id)} = call i64 @orion_text_contains(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "file_read":
+        result = "    {value_ref(my_id)} = call ptr @orion_file_read(ptr {value_ref(inst.value)})"
+    if op == "file_write":
+        result = "    {value_ref(my_id)} = call i64 @orion_file_write(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "argc":
+        result = "    {value_ref(my_id)} = load i64, ptr @orion_argc"
+    if op == "argv":
+        slot_name = "%v{my_id}.slot"
+        arr_name = "%v{my_id}.arr"
+        l1 = "    {arr_name} = load ptr, ptr @orion_argv"
+        l2 = "    {slot_name} = getelementptr ptr, ptr {arr_name}, i64 {value_ref(inst.value)}"
+        l3 = "    {value_ref(my_id)} = load ptr, ptr {slot_name}"
+        result = "{l1}\n{l2}\n{l3}"
+    if op == "bytes_from_text":
+        result = "    {value_ref(my_id)} = call ptr @orion_bytes_from_text(ptr {value_ref(inst.value)})"
+    if op == "bytes_to_text":
+        result = "    {value_ref(my_id)} = call ptr @orion_bytes_to_text(ptr {value_ref(inst.value)})"
+    if op == "bytes_slice":
+        result = "    {value_ref(my_id)} = call ptr @orion_bytes_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+    if op == "bytes_concat":
+        result = "    {value_ref(my_id)} = call ptr @orion_bytes_concat(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "bytes_zeros":
+        result = "    {value_ref(my_id)} = call ptr @orion_bytes_zeros(i64 {value_ref(inst.value)})"
+    if op == "slot_get":
+        result = "    {value_ref(my_id)} = call ptr @orion_slot_get(ptr {value_ref(inst.value)})"
+    if op == "slot_set":
+        val_inst = at(fn_value.instructions, inst.lhs)
+        val_ty = llvm_type_of(val_inst.type_text)
+        if val_ty == "ptr":
+            tmp = "%v{my_id}.sp"
+            l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
+            l2 = "    {value_ref(my_id)} = call i64 @orion_slot_set(ptr {value_ref(inst.value)}, i64 {tmp})"
+            result = "{l1}\n{l2}"
+        else:
+            result = "    {value_ref(my_id)} = call i64 @orion_slot_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+    is_text_cmp = op == "text_eq" or op == "text_ne" or op == "text_lt" or op == "text_le" or op == "text_gt" or op == "text_ge"
+    if is_text_cmp:
+        mut cc = "eq"
+        if op == "text_ne":
+            cc = "ne"
+        if op == "text_lt":
+            cc = "slt"
+        if op == "text_le":
+            cc = "sle"
+        if op == "text_gt":
+            cc = "sgt"
+        if op == "text_ge":
+            cc = "sge"
+        cmp_id = "%v{my_id}.s"
+        bool_id = "%v{my_id}.b"
+        l1 = "    {cmp_id} = call i32 @strcmp(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.rhs)})"
+        l2 = "    {bool_id} = icmp {cc} i32 {cmp_id}, 0"
+        l3 = "    {value_ref(my_id)} = zext i1 {bool_id} to i64"
+        result = "{l1}\n{l2}\n{l3}"
+    if op == "print_text":
+        l1 = "    call i32 @puts(ptr {value_ref(inst.value)})"
+        l2 = "    {value_ref(my_id)} = add i64 0, 0"
+        result = "{l1}\n{l2}"
+    if op == "list_lit":
+        n = len(inst.args)
+        mut text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
+        for ai in 0..<n:
+            item_id = at(inst.args, ai)
+            item_inst = at(fn_value.instructions, item_id)
+            item_ty = llvm_type_of(item_inst.type_text)
+            if item_ty == "ptr":
+                tmp = "%v{my_id}.lp{ai}"
+                text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(item_id)} to i64"
+                text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {tmp})"
+            else:
+                text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {value_ref(item_id)})"
+        result = text
+    if op == "list_at":
+        src_inst = at(fn_value.instructions, inst.value)
+        elem = list_elem_type(src_inst.type_text)
+        elem_ll = llvm_type_of(elem)
+        if elem_ll == "ptr":
+            int_name = "%v{my_id}.i"
+            l1 = "    {int_name} = call i64 @orion_list_at(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+            l2 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
+            result = "{l1}\n{l2}"
+        else:
+            result = "    {value_ref(my_id)} = call i64 @orion_list_at(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+    if op == "list_len":
+        result = "    {value_ref(my_id)} = call i64 @orion_list_len(ptr {value_ref(inst.value)})"
+    if op == "list_push":
+        val_inst = at(fn_value.instructions, inst.lhs)
+        val_ty = llvm_type_of(val_inst.type_text)
+        if val_ty == "ptr":
+            tmp = "%v{my_id}.p"
+            l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
+            l2 = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {tmp})"
+            result = "{l1}\n{l2}"
+        else:
+            result = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+    if op == "map_lit":
+        n_total = len(inst.args)
+        n_pairs = n_total / 2
+        mut text = "    {value_ref(my_id)} = call ptr @orion_map_new(i64 {n_pairs})"
+        for pi in 0..<n_pairs:
+            key_id = at(inst.args, pi * 2)
+            val_id = at(inst.args, pi * 2 + 1)
+            val_inst = at(fn_value.instructions, val_id)
+            val_ty = llvm_type_of(val_inst.type_text)
+            if val_ty == "ptr":
+                tmp = "%v{my_id}.p{pi}"
+                text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(val_id)} to i64"
+                text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {tmp})"
+            else:
+                text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {value_ref(val_id)})"
+        result = text
+    if op == "map_get":
+        ty = llvm_type_of(inst.type_text)
+        if ty == "ptr":
+            int_name = "%v{my_id}.i"
+            l1 = "    {int_name} = call i64 @orion_map_get(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+            l2 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
+            result = "{l1}\n{l2}"
+        else:
+            result = "    {value_ref(my_id)} = call i64 @orion_map_get(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "map_has":
+        result = "    {value_ref(my_id)} = call i64 @orion_map_has(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "struct_cons":
+        n_fields = inst.value
+        bytes_needed = n_fields * 8
+        mut text2 = "    {value_ref(my_id)} = call ptr @malloc(i64 {bytes_needed})"
+        for fi in 0..<n_fields:
+            val_id = at(inst.args, fi)
+            val_inst = at(fn_value.instructions, val_id)
+            val_ty = llvm_type_of(val_inst.type_text)
+            slot_name = "%v{my_id}.f{fi}"
+            text2 = "{text2}\n    {slot_name} = getelementptr i64, ptr {value_ref(my_id)}, i64 {fi}"
+            if val_ty == "ptr":
+                int_name = "%v{my_id}.f{fi}.i"
+                text2 = "{text2}\n    {int_name} = ptrtoint ptr {value_ref(val_id)} to i64"
+                text2 = "{text2}\n    store i64 {int_name}, ptr {slot_name}"
+            else:
+                text2 = "{text2}\n    store i64 {value_ref(val_id)}, ptr {slot_name}"
+        result = text2
+    if op == "field_load":
+        ty = llvm_type_of(inst.type_text)
+        slot_name = "%v{my_id}.slot"
+        l1 = "    {slot_name} = getelementptr i64, ptr {value_ref(inst.value)}, i64 {inst.lhs}"
+        if ty == "ptr":
+            int_name = "%v{my_id}.i"
+            l2 = "    {int_name} = load i64, ptr {slot_name}"
+            l3 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
+            result = "{l1}\n{l2}\n{l3}"
+        else:
+            l2 = "    {value_ref(my_id)} = load i64, ptr {slot_name}"
+            result = "{l1}\n{l2}"
+    if op == "alloca":
+        ty = llvm_type_of(inst.type_text)
+        result = "    {value_ref(my_id)} = alloca {ty}, align 8"
+    if op == "load":
+        ty = llvm_type_of(inst.type_text)
+        result = "    {value_ref(my_id)} = load {ty}, ptr {value_ref(inst.value)}"
+    if op == "store":
+        val_inst = at(fn_value.instructions, inst.lhs)
+        ty = llvm_type_of(val_inst.type_text)
+        l1 = "    store {ty} {value_ref(inst.lhs)}, ptr {value_ref(inst.value)}"
+        l2 = "    {value_ref(my_id)} = add i64 0, 0"
+        result = "{l1}\n{l2}"
+    if op == "return":
+        ret_ty = llvm_type_of(fn_value.return_type)
+        if inst.value < 0:
+            if ret_ty == "ptr":
+                result = "    ret ptr null"
+            else:
+                result = "    ret i64 0"
+        else:
+            result = "    ret {ret_ty} {value_ref(inst.value)}"
+    result
+fn llvm_type_of(orion_type: Text) -> Text:
+    mut is_struct = false
+    mut is_list_elem = false
+    bs = bytes_from_text(orion_type)
+    if len(bs) >= 7:
+        if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
+            is_struct = true
+    if len(bs) >= 5:
+        if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
+            is_list_elem = true
+    if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or is_struct or is_list_elem then "ptr" else "i64"
+fn list_elem_type(list_type: Text) -> Text:
+    bs = bytes_from_text(list_type)
+    n = len(bs)
+    mut is_listed = false
+    if n >= 5:
+        if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
+            is_listed = true
+    if not is_listed:
+        "i64"
+    else:
+        mut result = ""
+        for index in 5..<n:
+            single = bytes_to_text([at(bs, index)])
+            result = "{result}{single}"
+        result
+fn emit_param_list(params: [Param]) -> Text:
+    n = len(params)
+    mut result = ""
+    for index in 0..<n:
+        sep = if index == 0 then "" else ", "
+        ty = llvm_type_of(at(params, index).type_text)
+        result = "{result}{sep}{ty} %p{index}"
+    result
+pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
+    name = fn_value.name
+    is_alias = name == "get_int" or name == "get_map" or name == "get_list"
+    if is_alias:
+        ""
+    else:
+        ret_type = llvm_type_of(fn_value.return_type)
+        param_list = emit_param_list(fn_value.params)
+        is_user_main = name == "main"
+        emit_name = if is_user_main then "orion_main" else name
+        mut text = "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n"
+        total = len(fn_value.instructions)
+        for index in 0..<total:
+            inst = at(fn_value.instructions, index)
+            line = emit_instruction(inst, index, strings, fn_value, module)
+            text = "{text}{line}\n"
+        text = "{text}\}\n"
+        text
+fn emit_string_global(text_value: Text, idx: int) -> Text:
+    bs = bytes_from_text(text_value)
+    n = len(bs) + 1                          # +1 for null terminator
+    escaped = llvm_escape(text_value)
+    "@.str_{idx} = private unnamed_addr constant [{n} x i8] c\"{escaped}\\00\""
+fn emit_runtime() -> Text:
+    mut text = ""
+    text = "{text}declare i32 @printf(ptr, ...)\n"
+    text = "{text}declare i32 @puts(ptr)\n"
+    text = "{text}declare ptr @malloc(i64)\n"
+    text = "{text}declare i64 @strlen(ptr)\n"
+    text = "{text}declare ptr @strcpy(ptr, ptr)\n"
+    text = "{text}declare ptr @strcat(ptr, ptr)\n"
+    text = "{text}declare i32 @strcmp(ptr, ptr)\n"
+    text = "{text}declare i32 @snprintf(ptr, i64, ptr, ...)\n"
+    text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
+    text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
+    text = "{text}\n"
+    text = "{text}define ptr @orion_text_concat(ptr %a, ptr %b) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %la = call i64 @strlen(ptr %a)\n"
+    text = "{text}  %lb = call i64 @strlen(ptr %b)\n"
+    text = "{text}  %sum = add i64 %la, %lb\n"
+    text = "{text}  %total = add i64 %sum, 1\n"
+    text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
+    text = "{text}  %_1 = call ptr @strcpy(ptr %buf, ptr %a)\n"
+    text = "{text}  %_2 = call ptr @strcat(ptr %buf, ptr %b)\n"
+    text = "{text}  ret ptr %buf\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_int_to_text(i64 %n) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %buf = call ptr @malloc(i64 32)\n"
+    text = "{text}  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)\n"
+    text = "{text}  ret ptr %buf\n"
+    text = "{text}\}\n\n"
+    text = "{text}declare ptr @memcpy(ptr, ptr, i64)\n\n"
+    text = "{text}define ptr @orion_text_slice(ptr %src, i64 %lo, i64 %hi) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %src_len = call i64 @strlen(ptr %src)\n"
+    text = "{text}  %lo_neg = icmp slt i64 %lo, 0\n"
+    text = "{text}  %lo_safe = select i1 %lo_neg, i64 0, i64 %lo\n"
+    text = "{text}  %hi_big = icmp sgt i64 %hi, %src_len\n"
+    text = "{text}  %hi_safe = select i1 %hi_big, i64 %src_len, i64 %hi\n"
+    text = "{text}  %hi_lt_lo = icmp slt i64 %hi_safe, %lo_safe\n"
+    text = "{text}  %hi_final = select i1 %hi_lt_lo, i64 %lo_safe, i64 %hi_safe\n"
+    text = "{text}  %slice_len = sub i64 %hi_final, %lo_safe\n"
+    text = "{text}  %total = add i64 %slice_len, 1\n"
+    text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
+    text = "{text}  %src_off = getelementptr i8, ptr %src, i64 %lo_safe\n"
+    text = "{text}  %_ = call ptr @memcpy(ptr %buf, ptr %src_off, i64 %slice_len)\n"
+    text = "{text}  %term = getelementptr i8, ptr %buf, i64 %slice_len\n"
+    text = "{text}  store i8 0, ptr %term\n"
+    text = "{text}  ret ptr %buf\n"
+    text = "{text}\}\n\n"
+    text = "{text}declare ptr @strstr(ptr, ptr)\n\n"
+    text = "{text}define i64 @orion_text_contains(ptr %hay, ptr %needle) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %hit = call ptr @strstr(ptr %hay, ptr %needle)\n"
+    text = "{text}  %is_null = icmp eq ptr %hit, null\n"
+    text = "{text}  %result = select i1 %is_null, i64 0, i64 1\n"
+    text = "{text}  ret i64 %result\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_bytes_from_text(ptr %src) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %src_len = call i64 @strlen(ptr %src)\n"
+    text = "{text}  %list = call ptr @orion_list_new(i64 %src_len)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %src_len\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  %byte_ptr = getelementptr i8, ptr %src, i64 %i\n"
+    text = "{text}  %byte = load i8, ptr %byte_ptr\n"
+    text = "{text}  %byte64 = zext i8 %byte to i64\n"
+    text = "{text}  call void @orion_list_set(ptr %list, i64 %i, i64 %byte64)\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  ret ptr %list\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_bytes_to_text(ptr %list) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %list_len = call i64 @orion_list_len(ptr %list)\n"
+    text = "{text}  %buf_sz = add i64 %list_len, 1\n"
+    text = "{text}  %buf = call ptr @malloc(i64 %buf_sz)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %list_len\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  %v64 = call i64 @orion_list_at(ptr %list, i64 %i)\n"
+    text = "{text}  %v8 = trunc i64 %v64 to i8\n"
+    text = "{text}  %dst = getelementptr i8, ptr %buf, i64 %i\n"
+    text = "{text}  store i8 %v8, ptr %dst\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  %term = getelementptr i8, ptr %buf, i64 %list_len\n"
+    text = "{text}  store i8 0, ptr %term\n"
+    text = "{text}  ret ptr %buf\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_bytes_zeros(i64 %n) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %list = call ptr @orion_list_new(i64 %n)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %n\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  call void @orion_list_set(ptr %list, i64 %i, i64 0)\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  ret ptr %list\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_bytes_slice(ptr %src, i64 %lo, i64 %hi) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %src_len = call i64 @orion_list_len(ptr %src)\n"
+    text = "{text}  %lo_neg = icmp slt i64 %lo, 0\n"
+    text = "{text}  %lo_safe = select i1 %lo_neg, i64 0, i64 %lo\n"
+    text = "{text}  %hi_big = icmp sgt i64 %hi, %src_len\n"
+    text = "{text}  %hi_safe = select i1 %hi_big, i64 %src_len, i64 %hi\n"
+    text = "{text}  %hi_lt = icmp slt i64 %hi_safe, %lo_safe\n"
+    text = "{text}  %hi_final = select i1 %hi_lt, i64 %lo_safe, i64 %hi_safe\n"
+    text = "{text}  %new_len = sub i64 %hi_final, %lo_safe\n"
+    text = "{text}  %dst = call ptr @orion_list_new(i64 %new_len)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %new_len\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  %src_idx = add i64 %lo_safe, %i\n"
+    text = "{text}  %item = call i64 @orion_list_at(ptr %src, i64 %src_idx)\n"
+    text = "{text}  call void @orion_list_set(ptr %dst, i64 %i, i64 %item)\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  ret ptr %dst\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_bytes_concat(ptr %a, ptr %b) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %a_len = call i64 @orion_list_len(ptr %a)\n"
+    text = "{text}  %b_len = call i64 @orion_list_len(ptr %b)\n"
+    text = "{text}  %total = add i64 %a_len, %b_len\n"
+    text = "{text}  %dst = call ptr @orion_list_new(i64 %total)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %store ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %total\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  %from_a = icmp slt i64 %i, %a_len\n"
+    text = "{text}  br i1 %from_a, label %ba, label %bb\n"
+    text = "{text}ba:\n"
+    text = "{text}  %item_a = call i64 @orion_list_at(ptr %a, i64 %i)\n"
+    text = "{text}  br label %store\n"
+    text = "{text}bb:\n"
+    text = "{text}  %b_idx = sub i64 %i, %a_len\n"
+    text = "{text}  %item_b = call i64 @orion_list_at(ptr %b, i64 %b_idx)\n"
+    text = "{text}  br label %store\n"
+    text = "{text}store:\n"
+    text = "{text}  %item = phi i64 [ %item_a, %ba ], [ %item_b, %bb ]\n"
+    text = "{text}  call void @orion_list_set(ptr %dst, i64 %i, i64 %item)\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  ret ptr %dst\n"
+    text = "{text}\}\n\n"
+    text = "{text}@orion_slots = global ptr null\n\n"
+    text = "{text}define ptr @orion_slot_get(ptr %key) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %m = load ptr, ptr @orion_slots\n"
+    text = "{text}  %is_null = icmp eq ptr %m, null\n"
+    text = "{text}  br i1 %is_null, label %init, label %get\n"
+    text = "{text}init:\n"
+    text = "{text}  %new = call ptr @orion_map_new(i64 16)\n"
+    text = "{text}  store ptr %new, ptr @orion_slots\n"
+    text = "{text}  br label %get\n"
+    text = "{text}get:\n"
+    text = "{text}  %m2 = load ptr, ptr @orion_slots\n"
+    text = "{text}  %has = call i64 @orion_map_has(ptr %m2, ptr %key)\n"
+    text = "{text}  %miss = icmp eq i64 %has, 0\n"
+    text = "{text}  br i1 %miss, label %empty, label %fetch\n"
+    text = "{text}empty:\n"
+    text = "{text}  ret ptr @.empty_str\n"
+    text = "{text}fetch:\n"
+    text = "{text}  %raw = call i64 @orion_map_get(ptr %m2, ptr %key)\n"
+    text = "{text}  %p = inttoptr i64 %raw to ptr\n"
+    text = "{text}  ret ptr %p\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_slot_set(ptr %key, i64 %val) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %m = load ptr, ptr @orion_slots\n"
+    text = "{text}  %is_null = icmp eq ptr %m, null\n"
+    text = "{text}  br i1 %is_null, label %init, label %store\n"
+    text = "{text}init:\n"
+    text = "{text}  %new = call ptr @orion_map_new(i64 16)\n"
+    text = "{text}  store ptr %new, ptr @orion_slots\n"
+    text = "{text}  br label %store\n"
+    text = "{text}store:\n"
+    text = "{text}  %m2 = load ptr, ptr @orion_slots\n"
+    text = "{text}  call void @orion_map_set(ptr %m2, ptr %key, i64 %val)\n"
+    text = "{text}  ret i64 0\n"
+    text = "{text}\}\n\n"
+    text = "{text}declare ptr @fopen(ptr, ptr)\n"
+    text = "{text}declare i32 @fclose(ptr)\n"
+    text = "{text}declare i64 @fread(ptr, i64, i64, ptr)\n"
+    text = "{text}declare i64 @fwrite(ptr, i64, i64, ptr)\n"
+    text = "{text}declare i32 @fseek(ptr, i64, i32)\n"
+    text = "{text}declare i64 @ftell(ptr)\n"
+    text = "{text}@.fmode_r = private unnamed_addr constant [3 x i8] c\"rb\\00\"\n"
+    text = "{text}@.fmode_w = private unnamed_addr constant [3 x i8] c\"wb\\00\"\n"
+    text = "{text}@.empty_str = private unnamed_addr constant [1 x i8] c\"\\00\"\n\n"
+    text = "{text}define ptr @orion_file_read(ptr %path) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %fp = call ptr @fopen(ptr %path, ptr @.fmode_r)\n"
+    text = "{text}  %is_null = icmp eq ptr %fp, null\n"
+    text = "{text}  br i1 %is_null, label %err, label %ok\n"
+    text = "{text}err:\n"
+    text = "{text}  ret ptr @.empty_str\n"
+    text = "{text}ok:\n"
+    text = "{text}  %_seek = call i32 @fseek(ptr %fp, i64 0, i32 2)\n"
+    text = "{text}  %size = call i64 @ftell(ptr %fp)\n"
+    text = "{text}  %_rew = call i32 @fseek(ptr %fp, i64 0, i32 0)\n"
+    text = "{text}  %buf_sz = add i64 %size, 1\n"
+    text = "{text}  %buf = call ptr @malloc(i64 %buf_sz)\n"
+    text = "{text}  %_read = call i64 @fread(ptr %buf, i64 1, i64 %size, ptr %fp)\n"
+    text = "{text}  %term = getelementptr i8, ptr %buf, i64 %size\n"
+    text = "{text}  store i8 0, ptr %term\n"
+    text = "{text}  %_close = call i32 @fclose(ptr %fp)\n"
+    text = "{text}  ret ptr %buf\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_file_write(ptr %path, ptr %content) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %fp = call ptr @fopen(ptr %path, ptr @.fmode_w)\n"
+    text = "{text}  %is_null = icmp eq ptr %fp, null\n"
+    text = "{text}  br i1 %is_null, label %err, label %ok\n"
+    text = "{text}err:\n"
+    text = "{text}  ret i64 0\n"
+    text = "{text}ok:\n"
+    text = "{text}  %len = call i64 @strlen(ptr %content)\n"
+    text = "{text}  %_wrote = call i64 @fwrite(ptr %content, i64 1, i64 %len, ptr %fp)\n"
+    text = "{text}  %_close = call i32 @fclose(ptr %fp)\n"
+    text = "{text}  ret i64 1\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_list_new(i64 %cap) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %bytes = mul i64 %cap, 8\n"
+    text = "{text}  %total = add i64 %bytes, 8\n"
+    text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
+    text = "{text}  store i64 %cap, ptr %buf\n"
+    text = "{text}  ret ptr %buf\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_list_len(ptr %list) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %len = load i64, ptr %list\n"
+    text = "{text}  ret i64 %len\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_list_at(ptr %list, i64 %idx) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %offset = add i64 %idx, 1\n"
+    text = "{text}  %slot = getelementptr i64, ptr %list, i64 %offset\n"
+    text = "{text}  %val = load i64, ptr %slot\n"
+    text = "{text}  ret i64 %val\n"
+    text = "{text}\}\n\n"
+    text = "{text}define void @orion_list_set(ptr %list, i64 %idx, i64 %val) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %offset = add i64 %idx, 1\n"
+    text = "{text}  %slot = getelementptr i64, ptr %list, i64 %offset\n"
+    text = "{text}  store i64 %val, ptr %slot\n"
+    text = "{text}  ret void\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_list_push(ptr %list, i64 %val) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %old_len = load i64, ptr %list\n"
+    text = "{text}  %new_len = add i64 %old_len, 1\n"
+    text = "{text}  %new_list = call ptr @orion_list_new(i64 %new_len)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %old_len\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  %item = call i64 @orion_list_at(ptr %list, i64 %i)\n"
+    text = "{text}  call void @orion_list_set(ptr %new_list, i64 %i, i64 %item)\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  call void @orion_list_set(ptr %new_list, i64 %old_len, i64 %val)\n"
+    text = "{text}  ret ptr %new_list\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_map_new(i64 %cap) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %entry_bytes = mul i64 %cap, 16\n"
+    text = "{text}  %total = add i64 %entry_bytes, 8\n"
+    text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
+    text = "{text}  store i64 0, ptr %buf\n"
+    text = "{text}  ret ptr %buf\n"
+    text = "{text}\}\n\n"
+    text = "{text}define void @orion_map_set(ptr %map, ptr %key, i64 %val) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %len = load i64, ptr %map\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %len\n"
+    text = "{text}  br i1 %done, label %append, label %check\n"
+    text = "{text}check:\n"
+    text = "{text}  %idx2 = mul i64 %i, 2\n"
+    text = "{text}  %ki = add i64 %idx2, 1\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %map, i64 %ki\n"
+    text = "{text}  %k_int = load i64, ptr %k_slot\n"
+    text = "{text}  %k_ptr = inttoptr i64 %k_int to ptr\n"
+    text = "{text}  %cmp = call i32 @strcmp(ptr %k_ptr, ptr %key)\n"
+    text = "{text}  %eq = icmp eq i32 %cmp, 0\n"
+    text = "{text}  br i1 %eq, label %update, label %step\n"
+    text = "{text}step:\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}update:\n"
+    text = "{text}  %vi = add i64 %idx2, 2\n"
+    text = "{text}  %v_slot = getelementptr i64, ptr %map, i64 %vi\n"
+    text = "{text}  store i64 %val, ptr %v_slot\n"
+    text = "{text}  ret void\n"
+    text = "{text}append:\n"
+    text = "{text}  %new_idx2 = mul i64 %len, 2\n"
+    text = "{text}  %new_ki = add i64 %new_idx2, 1\n"
+    text = "{text}  %new_vi = add i64 %new_idx2, 2\n"
+    text = "{text}  %new_k_slot = getelementptr i64, ptr %map, i64 %new_ki\n"
+    text = "{text}  %new_v_slot = getelementptr i64, ptr %map, i64 %new_vi\n"
+    text = "{text}  %key_int = ptrtoint ptr %key to i64\n"
+    text = "{text}  store i64 %key_int, ptr %new_k_slot\n"
+    text = "{text}  store i64 %val, ptr %new_v_slot\n"
+    text = "{text}  %new_len = add i64 %len, 1\n"
+    text = "{text}  store i64 %new_len, ptr %map\n"
+    text = "{text}  ret void\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_map_get(ptr %map, ptr %key) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %len = load i64, ptr %map\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %len\n"
+    text = "{text}  br i1 %done, label %miss, label %body\n"
+    text = "{text}body:\n"
+    text = "{text}  %ki = mul i64 %i, 2\n"
+    text = "{text}  %ki1 = add i64 %ki, 1\n"
+    text = "{text}  %vi = add i64 %ki, 2\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %map, i64 %ki1\n"
+    text = "{text}  %k_int = load i64, ptr %k_slot\n"
+    text = "{text}  %k_ptr = inttoptr i64 %k_int to ptr\n"
+    text = "{text}  %cmp = call i32 @strcmp(ptr %k_ptr, ptr %key)\n"
+    text = "{text}  %eq = icmp eq i32 %cmp, 0\n"
+    text = "{text}  br i1 %eq, label %hit, label %step\n"
+    text = "{text}hit:\n"
+    text = "{text}  %v_slot = getelementptr i64, ptr %map, i64 %vi\n"
+    text = "{text}  %v = load i64, ptr %v_slot\n"
+    text = "{text}  ret i64 %v\n"
+    text = "{text}step:\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}miss:\n"
+    text = "{text}  ret i64 0\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_map_has(ptr %map, ptr %key) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %len = load i64, ptr %map\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %len\n"
+    text = "{text}  br i1 %done, label %miss, label %body\n"
+    text = "{text}body:\n"
+    text = "{text}  %ki = mul i64 %i, 2\n"
+    text = "{text}  %ki1 = add i64 %ki, 1\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %map, i64 %ki1\n"
+    text = "{text}  %k_int = load i64, ptr %k_slot\n"
+    text = "{text}  %k_ptr = inttoptr i64 %k_int to ptr\n"
+    text = "{text}  %cmp = call i32 @strcmp(ptr %k_ptr, ptr %key)\n"
+    text = "{text}  %eq = icmp eq i32 %cmp, 0\n"
+    text = "{text}  br i1 %eq, label %hit, label %step\n"
+    text = "{text}hit:\n"
+    text = "{text}  ret i64 1\n"
+    text = "{text}step:\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}miss:\n"
+    text = "{text}  ret i64 0\n"
+    text = "{text}\}\n\n"
+    text
+pub fn emit_module(module: IRModule) -> Text:
+    mut text = "; orion_emit_llvm output\n"
+    text = "{text}{emit_runtime()}"
+    strings = collect_strings(module)
+    n_strings = len(strings)
+    for index in 0..<n_strings:
+        text = "{text}{emit_string_global(at(strings, index), index)}\n"
+    text = "{text}\n"
+    total = len(module.functions)
+    for index in 0..<total:
+        fn_value = at(module.functions, index)
+        text = "{text}{emit_fn(fn_value, strings, module)}\n"
+    text = "{text}@orion_argc = global i64 0\n"
+    text = "{text}@orion_argv = global ptr null\n\n"
+    text = "{text}define i32 @main(i32 %argc, ptr %argv) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %argc64 = sext i32 %argc to i64\n"
+    text = "{text}  store i64 %argc64, ptr @orion_argc\n"
+    text = "{text}  store ptr %argv, ptr @orion_argv\n"
+    text = "{text}  %ret = call i64 @orion_main()\n"
+    text = "{text}  %ret32 = trunc i64 %ret to i32\n"
+    text = "{text}  ret i32 %ret32\n"
+    text = "{text}\}\n"
+    text
+fn main() -> int:
+    if argc() < 2:
+        print_line("usage: orion_self <input.or> [output.ll]")
+        0 - 1
+    else:
+        in_path = argv(1)
+        out_path = if argc() >= 3 then argv(2) else "out.ll"
+        src = file_read(in_path)
+        tokens = self_lex(src)
+        ast = self_parse(tokens)
+        module = ast_program_to_ir(ast)
+        llvm_text = emit_module(module)
+        ok = file_write(out_path, llvm_text)
+        if ok == 1:
+            print_line(out_path)
+            0
+        else:
+            print_line("write failed")
+            0 - 1

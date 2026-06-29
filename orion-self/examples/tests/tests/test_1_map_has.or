@@ -1,0 +1,3 @@
+fn main() -> int:
+    m = {"x": 100}
+    has(m, "x")

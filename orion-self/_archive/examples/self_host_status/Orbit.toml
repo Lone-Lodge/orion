@@ -1,0 +1,10 @@
+[package]
+name = "self-host-status"
+version = "0.0.1"
+description = "Verify orion-self lex+parse against actual orion-self source files"
+
+[orbs]
+orion_lex = "path:../../orbs/orion_lex"
+bytes = "*"
+io = "*"
+fs = "*"

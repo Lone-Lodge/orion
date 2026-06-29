@@ -1,0 +1,16 @@
+fn main() -> int:
+    # Mirror what orion_driver.or does, except hardcoded paths.
+    if argc() < 1:
+        99
+    else:
+        # Write a small file, read it back, verify roundtrip
+        out_path = "/tmp/orion_smoke_driver.txt"
+        ok = file_write(out_path, "marker-42")
+        if ok == 1:
+            content = file_read(out_path)
+            if content == "marker-42":
+                42
+            else:
+                88
+        else:
+            77

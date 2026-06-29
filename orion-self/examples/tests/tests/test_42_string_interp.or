@@ -1,0 +1,4 @@
+fn main() -> int:
+    n = 42
+    print_line("Answer = {n}")
+    n

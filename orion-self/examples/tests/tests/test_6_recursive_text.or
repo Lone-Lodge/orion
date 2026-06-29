@@ -1,0 +1,6 @@
+fn repeat(s: Text, n: int) -> Text:
+    if n <= 0 then "" else s + repeat(s, n - 1)
+
+fn main() -> int:
+    out = repeat("a", 6)
+    if out == "aaaaaa" then 6 else 0

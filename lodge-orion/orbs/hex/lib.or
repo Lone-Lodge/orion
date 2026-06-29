@@ -1,0 +1,41 @@
+# hex — lowercase hex encode/decode for byte arrays.
+
+fn hex_digit(value: int) -> int:
+    if value < 10 then value + 48
+    else value + 87
+
+fn hex_value(character: int) -> int:
+    if character >= 48 and character <= 57 then character - 48
+    else if character >= 97 and character <= 102 then character - 87
+    else if character >= 65 and character <= 70 then character - 55
+    else -1
+
+pub fn hex_encode(bytes: [int]) -> Text:
+    mut output = bytes_zeros(0)
+
+    for index in 0..<bytes_length(bytes):
+        value = byte_at(bytes, index)
+
+        output = push(output, hex_digit(value / 16))
+        output = push(output, hex_digit(value % 16))
+
+    bytes_to_text(output)
+
+pub fn hex_decode(text: Text) -> [int]:
+    input = bytes_from_text(text)
+    length = bytes_length(input)
+
+    if length % 2 != 0:
+        bytes_zeros(0)
+    else:
+        mut output = bytes_zeros(0)
+
+        for pair_index in 0..<(length / 2):
+            index = pair_index * 2
+
+            high = hex_value(byte_at(input, index))
+            low = hex_value(byte_at(input, index + 1))
+
+            output = push(output, high * 16 + low)
+
+        output

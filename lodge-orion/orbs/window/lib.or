@@ -1,0 +1,32 @@
+# window — winit-backed window (not yet implemented). Pure Orion API on
+# top of OS primitives — calls error with a friendly message until the
+# native side lands.
+
+pub data Event: kind: Text, key: int, x: f64, y: f64
+
+extern fn __os_window_open(width: int, height: int, title: Text) -> int
+extern fn __os_window_should_close() -> bool
+extern fn __os_window_pump() -> [Event]
+extern fn __os_window_swap(window_id: int)
+extern fn __os_window_close(window_id: int)
+extern fn __os_window_ready() -> bool
+
+pub fn window_open(width: int, height: int, title: Text) -> int:
+    __os_window_open(width, height, title)
+
+pub fn window_should_close() -> bool:
+    __os_window_should_close()
+
+pub fn window_pump() -> [Event]:
+    __os_window_pump()
+
+pub fn window_swap(window_id: int):
+    __os_window_swap(window_id)
+
+pub fn window_close(window_id: int):
+    __os_window_close(window_id)
+
+# Reports whether the native backend is wired up. Use this to gracefully
+# degrade in Orion code when running on a platform without a window.
+pub fn window_ready() -> bool:
+    __os_window_ready()

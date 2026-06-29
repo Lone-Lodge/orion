@@ -1,0 +1,18 @@
+# orion_self — the Orion compiler, written in Orion.
+#
+# Reuses the self-host files already proven to round-trip:
+# lex → parse → typeck → eval → codegen → emit_pe.
+#
+# Status: lex / parse / typeck / eval / codegen / emit_pe boot. The
+# emit_x64 module is kept separate (orbit-only loads what's used).
+# Full coverage tracking in TASKS / memory.
+
+use orion_lex
+use orion_parse
+use orion_typeck
+use orion_eval
+use orion_codegen
+use orion_emit_pe
+use orion_compile
+
+pub fn version() -> Text = comptime "0.0.1-self"

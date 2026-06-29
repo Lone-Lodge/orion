@@ -1,0 +1,8 @@
+name = "orion_ast_to_wasm"
+version = "0.0.1"
+description = "AST → wasm codegen: walks the parser output and emits WFn bodies"
+
+[orbs]
+orion_emit_wasm = "path:../orion_emit_wasm"
+string = "*"
+bytes = "*"

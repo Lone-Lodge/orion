@@ -1,0 +1,141 @@
+use orion_lex
+use orion_parse
+use orion_ir
+use orion_ast_to_ir
+use orion_emit_llvm
+use io
+use fs
+use time
+use process
+use bytes
+
+# Orion test runner — LLVM backend.
+#
+# Each tests/test_<EXPECTED>.or contains an Orion source program that
+# should compile and run with exit code EXPECTED. The runner:
+#   1. compiles every test via LLVM IR → clang → native .exe
+#   2. runs the .exe
+#   3. checks exit == expected
+#   4. measures compile time + binary size
+#   5. prints summary table + totals
+
+
+fn parse_expected(filename: Text) -> int:
+    b = bytes_from_text(filename)
+    total = len(b)
+    mut start = 0
+    if total >= 5:
+        start = 5
+    mut value = 0
+    mut done = 0
+    for index in start..<total:
+        if done == 0:
+            ch = at(b, index)
+            if ch >= 48 and ch <= 57:
+                value = value * 10 + (ch - 48)
+            else:
+                done = 1
+    value
+
+
+# Compile one source file. Returns 1 if ok, 0 if compilation failed.
+fn compile_one(src_path: Text, ll_path: Text, exe_path: Text) -> int:
+    src = read_file(src_path)
+    tokens = self_lex(src)
+    ast = self_parse(tokens)
+    # Reject empty/garbage AST. A Program with 0 decls means the input
+    # wasn't valid Orion source — clang would happily compile an empty
+    # LLVM module, the resulting exe exits 0, and any test expecting 0
+    # would falsely pass. Fail fast here.
+    decls = get_list(ast, "decls")
+    if len(decls) == 0:
+        return 0
+    module = ast_program_to_ir(ast)
+    llvm_text = emit_module(module)
+    write_file(ll_path, llvm_text)
+    clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
+    args = [ll_path, "-Os", "-o", exe_path]
+    exit_code = run_command(clang_path, args)
+    if exit_code == 0 then 1 else 0
+
+
+fn fmt_ms(seconds: f64) -> Text:
+    ms = seconds * 1000.0
+    ms_int = to_int(ms)
+    "{ms_int}ms"
+
+
+fn main() -> int:
+    mkdir_all("dist")
+    raw_files = list_dir("tests")
+    raw_total = len(raw_files)
+    # Only run .or files. Without this filter, non-source files like
+    # KNOWN_BUGS.md get fed to the compiler, produce broken-but-not-crashing
+    # .exe's, exit=0 happens to match parse_expected()=0, and we get a
+    # silent false pass. Filter at the source.
+    init_files = []
+    mut files = init_files
+    for raw_index in 0..<raw_total:
+        raw_name = at(raw_files, raw_index)
+        name_bytes = bytes_from_text(raw_name)
+        name_len = len(name_bytes)
+        mut is_or_file = false
+        if name_len >= 3:
+            tail_dot = at(name_bytes, name_len - 3)
+            tail_o = at(name_bytes, name_len - 2)
+            tail_r = at(name_bytes, name_len - 1)
+            if tail_dot == 46 and tail_o == 111 and tail_r == 114:
+                is_or_file = true
+        if is_or_file:
+            files = push(files, raw_name)
+    total_tests = len(files)
+
+    print_line("=== Orion test runner (LLVM backend) ===")
+    print_line("")
+    print_line("--------------------------------------------------------------------")
+
+    mut pass_count = 0
+    mut fail_count = 0
+    mut total_compile_seconds = 0.0
+    mut total_bytes = 0
+
+    for file_index in 0..<total_tests:
+        filename = at(files, file_index)
+        src_path = "tests/{filename}"
+        ll_path = "dist/{filename}.ll"
+        exe_path = "dist/{filename}.exe"
+        expected = parse_expected(filename)
+
+        compile_start = now()
+        ok = compile_one(src_path, ll_path, exe_path)
+        compile_seconds = elapsed(compile_start)
+        total_compile_seconds = total_compile_seconds + compile_seconds
+
+        size_bytes = file_size(exe_path)
+        total_bytes = total_bytes + size_bytes
+
+        actual = run_command(exe_path, [])
+
+        passed = ok == 1 and actual == expected
+        status_txt = if passed then "PASS" else "FAIL"
+        if passed:
+            pass_count = pass_count + 1
+        else:
+            fail_count = fail_count + 1
+
+        time_txt = fmt_ms(compile_seconds)
+        line_a = "  {filename} :  expected={expected} actual={actual}"
+        line_b = "  {status_txt}  compile={time_txt}  size={size_bytes}b"
+        print_line("{line_a}  {line_b}")
+
+    print_line("--------------------------------------------------------------------")
+    print_line("")
+    print_line("Pass: {pass_count} / {total_tests}")
+    if fail_count > 0:
+        print_line("Fail: {fail_count}")
+    avg_seconds = total_compile_seconds / to_float(total_tests)
+    print_line("Total compile time: {fmt_ms(total_compile_seconds)}")
+    print_line("Average per test:   {fmt_ms(avg_seconds)}")
+    print_line("Total binary size:  {total_bytes} bytes")
+
+    fail_count

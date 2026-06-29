@@ -1,0 +1,6 @@
+name = "ir_demo"
+version = "0.1.0"
+
+[orbs]
+orion_ir = "path:../../orbs/orion_ir"
+io = "*"

@@ -1,0 +1,219 @@
+
+pub data Vec2: x: f64, y: f64
+pub data Vec3: x: f64, y: f64, z: f64
+
+# --- Vec2 ---
+
+pub fn v2(x: f64, y: f64) -> Vec2 = spawn Vec2{x: x, y: y}
+pub fn v2_add(a: Vec2, b: Vec2) -> Vec2 = v2(a.Vec2.x + b.Vec2.x, a.Vec2.y + b.Vec2.y)
+pub fn v2_sub(a: Vec2, b: Vec2) -> Vec2 = v2(a.Vec2.x - b.Vec2.x, a.Vec2.y - b.Vec2.y)
+pub fn v2_scale(a: Vec2, s: f64) -> Vec2 = v2(a.Vec2.x * s, a.Vec2.y * s)
+pub fn v2_dot(a: Vec2, b: Vec2) -> f64 = a.Vec2.x * b.Vec2.x + a.Vec2.y * b.Vec2.y
+pub fn v2_length(a: Vec2) -> f64 = sqrt(v2_dot(a, a))
+pub fn v2_distance(a: Vec2, b: Vec2) -> f64 = v2_length(v2_sub(a, b))
+pub fn v2_angle(a: Vec2) -> f64 = atan2(a.Vec2.y, a.Vec2.x)
+pub fn v2_lerp(a: Vec2, b: Vec2, t: f64) -> Vec2 = v2_add(v2_scale(a, 1.0 - t), v2_scale(b, t))
+
+pub fn v2_normalize(a: Vec2) -> Vec2:
+    l = v2_length(a)
+    if l == 0.0 then v2(0.0, 0.0) else v2_scale(a, 1.0 / l)
+
+pub fn v2_rotate(a: Vec2, angle: f64) -> Vec2:
+    c = cos(angle)
+    s = sin(angle)
+    v2(a.Vec2.x * c - a.Vec2.y * s, a.Vec2.x * s + a.Vec2.y * c)
+
+# --- Vec3 ---
+
+pub fn v3(x: f64, y: f64, z: f64) -> Vec3 = spawn Vec3{x: x, y: y, z: z}
+pub fn v3_add(a: Vec3, b: Vec3) -> Vec3 = v3(a.Vec3.x + b.Vec3.x, a.Vec3.y + b.Vec3.y, a.Vec3.z + b.Vec3.z)
+pub fn v3_sub(a: Vec3, b: Vec3) -> Vec3 = v3(a.Vec3.x - b.Vec3.x, a.Vec3.y - b.Vec3.y, a.Vec3.z - b.Vec3.z)
+pub fn v3_scale(a: Vec3, s: f64) -> Vec3 = v3(a.Vec3.x * s, a.Vec3.y * s, a.Vec3.z * s)
+pub fn v3_dot(a: Vec3, b: Vec3) -> f64 = a.Vec3.x * b.Vec3.x + a.Vec3.y * b.Vec3.y + a.Vec3.z * b.Vec3.z
+pub fn v3_length(a: Vec3) -> f64 = sqrt(v3_dot(a, a))
+pub fn v3_distance(a: Vec3, b: Vec3) -> f64 = v3_length(v3_sub(a, b))
+pub fn v3_lerp(a: Vec3, b: Vec3, t: f64) -> Vec3 = v3_add(v3_scale(a, 1.0 - t), v3_scale(b, t))
+
+pub fn v3_normalize(a: Vec3) -> Vec3:
+    l = v3_length(a)
+    if l == 0.0 then v3(0.0, 0.0, 0.0) else v3_scale(a, 1.0 / l)
+
+pub fn v3_cross(a: Vec3, b: Vec3) -> Vec3:
+    cx = a.Vec3.y * b.Vec3.z - a.Vec3.z * b.Vec3.y
+    cy = a.Vec3.z * b.Vec3.x - a.Vec3.x * b.Vec3.z
+    cz = a.Vec3.x * b.Vec3.y - a.Vec3.y * b.Vec3.x
+    v3(cx, cy, cz)
+
+# --- scalar helpers ---
+
+pub fn deg_to_rad(d: f64) -> f64 = d * 0.017453292519943295
+pub fn rad_to_deg(r: f64) -> f64 = r * 57.29577951308232
+pub fn lerp(a: f64, b: f64, t: f64) -> f64 = a * (1.0 - t) + b * t
+
+# --- Mat4 (column-major, 16 f64 in a list) ---
+# Simple constructors are pure Orion; multiplication and projection
+# matrices that have larger formulas stay native for now (~150 lines of
+# Orion would be needed otherwise).
+
+pub fn mat4_identity() -> [f64]:
+    [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+pub fn mat4_translate(x: f64, y: f64, z: f64) -> [f64]:
+    [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, x, y, z, 1.0]
+
+pub fn mat4_scale(x: f64, y: f64, z: f64) -> [f64]:
+    [x, 0.0, 0.0, 0.0, 0.0, y, 0.0, 0.0, 0.0, 0.0, z, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+pub fn mat4_rotate_x(angle: f64) -> [f64]:
+    angle_cos = cos(angle)
+    angle_sin = sin(angle)
+    [1.0, 0.0, 0.0, 0.0, 0.0, angle_cos, angle_sin, 0.0, 0.0, 0.0 - angle_sin, angle_cos, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+pub fn mat4_rotate_y(angle: f64) -> [f64]:
+    angle_cos = cos(angle)
+    angle_sin = sin(angle)
+    [angle_cos, 0.0, 0.0 - angle_sin, 0.0, 0.0, 1.0, 0.0, 0.0, angle_sin, 0.0, angle_cos, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+pub fn mat4_rotate_z(angle: f64) -> [f64]:
+    angle_cos = cos(angle)
+    angle_sin = sin(angle)
+    [angle_cos, angle_sin, 0.0, 0.0, 0.0 - angle_sin, angle_cos, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+# Single dot of column k of `a` with column j of `b`, picking row i. Used
+# internally by mat4_mul (`a` is column-major: index = column * 4 + row).
+fn mat4_dot(a: [f64], b: [f64], column: int, row: int) -> f64:
+    at(a, 0 * 4 + row) * at(b, column * 4 + 0) + at(a, 1 * 4 + row) * at(b, column * 4 + 1) + at(a, 2 * 4 + row) * at(b, column * 4 + 2) + at(a, 3 * 4 + row) * at(b, column * 4 + 3)
+
+pub fn mat4_mul(a: [f64], b: [f64]) -> [f64]:
+    [mat4_dot(a, b, 0, 0), mat4_dot(a, b, 0, 1), mat4_dot(a, b, 0, 2), mat4_dot(a, b, 0, 3), mat4_dot(a, b, 1, 0), mat4_dot(a, b, 1, 1), mat4_dot(a, b, 1, 2), mat4_dot(a, b, 1, 3), mat4_dot(a, b, 2, 0), mat4_dot(a, b, 2, 1), mat4_dot(a, b, 2, 2), mat4_dot(a, b, 2, 3), mat4_dot(a, b, 3, 0), mat4_dot(a, b, 3, 1), mat4_dot(a, b, 3, 2), mat4_dot(a, b, 3, 3)]
+
+# fov in radians; right-handed, zero-to-one depth (Vulkan convention).
+pub fn mat4_perspective(fov: f64, aspect: f64, near: f64, far: f64) -> [f64]:
+    focal = 1.0 / tan(fov * 0.5)
+    depth_scale = far / (near - far)
+    depth_offset = (near * far) / (near - far)
+    [focal / aspect, 0.0, 0.0, 0.0, 0.0, focal, 0.0, 0.0, 0.0, 0.0, depth_scale, 0.0 - 1.0, 0.0, 0.0, depth_offset, 0.0]
+
+pub fn mat4_orthographic(left: f64, right: f64, bottom: f64, top: f64, near: f64, far: f64) -> [f64]:
+    width = right - left
+    height = top - bottom
+    depth = far - near
+    [2.0 / width, 0.0, 0.0, 0.0, 0.0, 2.0 / height, 0.0, 0.0, 0.0, 0.0, 0.0 - 2.0 / depth, 0.0, 0.0 - (right + left) / width, 0.0 - (top + bottom) / height, 0.0 - (far + near) / depth, 1.0]
+
+pub fn mat4_transform_point(m: [f64], x: f64, y: f64, z: f64) -> [f64]:
+    transformed_x = at(m, 0) * x + at(m, 4) * y + at(m, 8) * z + at(m, 12)
+    transformed_y = at(m, 1) * x + at(m, 5) * y + at(m, 9) * z + at(m, 13)
+    transformed_z = at(m, 2) * x + at(m, 6) * y + at(m, 10) * z + at(m, 14)
+    w = at(m, 3) * x + at(m, 7) * y + at(m, 11) * z + at(m, 15)
+    if abs(w) < 0.000000000000001 then [transformed_x, transformed_y, transformed_z]
+    else [transformed_x / w, transformed_y / w, transformed_z / w]
+
+# mat4_look_at: builds a view matrix. Uses cross/dot via 3-element lists.
+pub fn mat4_look_at(eye_x: f64, eye_y: f64, eye_z: f64, target_x: f64, target_y: f64, target_z: f64, up_x: f64, up_y: f64, up_z: f64) -> [f64]:
+    # forward = normalize(target - eye)
+    raw_forward_x = target_x - eye_x
+    raw_forward_y = target_y - eye_y
+    raw_forward_z = target_z - eye_z
+    forward_length = sqrt(raw_forward_x * raw_forward_x + raw_forward_y * raw_forward_y + raw_forward_z * raw_forward_z)
+    forward_x = if forward_length == 0.0 then 0.0 else raw_forward_x / forward_length
+    forward_y = if forward_length == 0.0 then 0.0 else raw_forward_y / forward_length
+    forward_z = if forward_length == 0.0 then 0.0 else raw_forward_z / forward_length
+    # side = normalize(cross(forward, up))
+    raw_side_x = forward_y * up_z - forward_z * up_y
+    raw_side_y = forward_z * up_x - forward_x * up_z
+    raw_side_z = forward_x * up_y - forward_y * up_x
+    side_length = sqrt(raw_side_x * raw_side_x + raw_side_y * raw_side_y + raw_side_z * raw_side_z)
+    side_x = if side_length == 0.0 then 0.0 else raw_side_x / side_length
+    side_y = if side_length == 0.0 then 0.0 else raw_side_y / side_length
+    side_z = if side_length == 0.0 then 0.0 else raw_side_z / side_length
+    # up_recomputed = cross(side, forward)
+    up_x_recomputed = side_y * forward_z - side_z * forward_y
+    up_y_recomputed = side_z * forward_x - side_x * forward_z
+    up_z_recomputed = side_x * forward_y - side_y * forward_x
+    # Translation: -dot(s,eye), -dot(u,eye), dot(f,eye)
+    side_dot_eye = side_x * eye_x + side_y * eye_y + side_z * eye_z
+    up_dot_eye = up_x_recomputed * eye_x + up_y_recomputed * eye_y + up_z_recomputed * eye_z
+    forward_dot_eye = forward_x * eye_x + forward_y * eye_y + forward_z * eye_z
+    [side_x, up_x_recomputed, 0.0 - forward_x, 0.0, side_y, up_y_recomputed, 0.0 - forward_y, 0.0, side_z, up_z_recomputed, 0.0 - forward_z, 0.0, 0.0 - side_dot_eye, 0.0 - up_dot_eye, forward_dot_eye, 1.0]
+
+# --- Quaternion (column [x, y, z, w]) ---
+
+pub fn quat_identity() -> [f64]:
+    [0.0, 0.0, 0.0, 1.0]
+
+pub fn quat_from_axis_angle(axis_x: f64, axis_y: f64, axis_z: f64, angle: f64) -> [f64]:
+    half_angle = angle * 0.5
+    half_sin = sin(half_angle)
+    half_cos = cos(half_angle)
+    [axis_x * half_sin, axis_y * half_sin, axis_z * half_sin, half_cos]
+
+pub fn quat_mul(a: [f64], b: [f64]) -> [f64]:
+    ax = at(a, 0)
+    ay = at(a, 1)
+    az = at(a, 2)
+    aw = at(a, 3)
+    bx = at(b, 0)
+    by = at(b, 1)
+    bz = at(b, 2)
+    bw = at(b, 3)
+    [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz]
+
+pub fn quat_normalize(q: [f64]) -> [f64]:
+    qx = at(q, 0)
+    qy = at(q, 1)
+    qz = at(q, 2)
+    qw = at(q, 3)
+    length = sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
+    if length < 0.000000000000001:
+        [0.0, 0.0, 0.0, 1.0]
+    else:
+        [qx / length, qy / length, qz / length, qw / length]
+
+# Column-major Mat4 from a unit quaternion (caller normalises).
+pub fn quat_to_mat4(q: [f64]) -> [f64]:
+    qx = at(q, 0)
+    qy = at(q, 1)
+    qz = at(q, 2)
+    qw = at(q, 3)
+    xx = qx * qx
+    yy = qy * qy
+    zz = qz * qz
+    xy = qx * qy
+    xz = qx * qz
+    yz = qy * qz
+    wx = qw * qx
+    wy = qw * qy
+    wz = qw * qz
+    [1.0 - 2.0 * (yy + zz), 2.0 * (xy + wz), 2.0 * (xz - wy), 0.0, 2.0 * (xy - wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz + wx), 0.0, 2.0 * (xz + wy), 2.0 * (yz - wx), 1.0 - 2.0 * (xx + yy), 0.0, 0.0, 0.0, 0.0, 1.0]
+
+# Spherical linear interpolation between two unit quaternions.
+pub fn quat_slerp(a: [f64], b: [f64], t: f64) -> [f64]:
+    ax = at(a, 0)
+    ay = at(a, 1)
+    az = at(a, 2)
+    aw = at(a, 3)
+    raw_bx = at(b, 0)
+    raw_by = at(b, 1)
+    raw_bz = at(b, 2)
+    raw_bw = at(b, 3)
+    raw_dot = ax * raw_bx + ay * raw_by + az * raw_bz + aw * raw_bw
+    # Pick the short-arc neighbour.
+    dot_product = if raw_dot < 0.0 then 0.0 - raw_dot else raw_dot
+    bx = if raw_dot < 0.0 then 0.0 - raw_bx else raw_bx
+    by = if raw_dot < 0.0 then 0.0 - raw_by else raw_by
+    bz = if raw_dot < 0.0 then 0.0 - raw_bz else raw_bz
+    bw = if raw_dot < 0.0 then 0.0 - raw_bw else raw_bw
+    if dot_product > 0.9995:
+        # Near-aligned — lerp + renormalise avoids a tiny-sin divide.
+        rx = ax + t * (bx - ax)
+        ry = ay + t * (by - ay)
+        rz = az + t * (bz - az)
+        rw = aw + t * (bw - aw)
+        normalising_length = sqrt(rx * rx + ry * ry + rz * rz + rw * rw)
+        [rx / normalising_length, ry / normalising_length, rz / normalising_length, rw / normalising_length]
+    else:
+        theta = atan2(sqrt(1.0 - dot_product * dot_product), dot_product)
+        sin_theta = sin(theta)
+        scale_a = sin((1.0 - t) * theta) / sin_theta
+        scale_b = sin(t * theta) / sin_theta
+        [scale_a * ax + scale_b * bx, scale_a * ay + scale_b * by, scale_a * az + scale_b * bz, scale_a * aw + scale_b * bw]

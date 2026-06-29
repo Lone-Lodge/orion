@@ -1,0 +1,174 @@
+# path — filesystem path manipulation.
+# Pure string ops are pure Orion. Only current_dir is a syscall.
+
+extern fn __os_current_dir() -> Text
+
+pub fn current_dir() -> Text:
+    __os_current_dir()
+
+fn is_separator_byte(byte: int) -> bool:
+    byte == 47 or byte == 92
+
+fn last_separator_index(bytes: [int], byte_count: int) -> int:
+    mut found = 0 - 1
+    for index in 0..<byte_count:
+        if is_separator_byte(byte_at(bytes, index)):
+            found = index
+    found
+
+fn last_dot_in_name(bytes: [int], name_start: int, byte_count: int) -> int:
+    if name_start >= byte_count:
+        0 - 1
+    else:
+        scan_start = if byte_at(bytes, name_start) == 46 then name_start + 1 else name_start
+        mut found = 0 - 1
+        mut walk = scan_start
+        loop:
+            if walk >= byte_count:
+                break
+            if byte_at(bytes, walk) == 46:
+                found = walk
+            walk += 1
+        found
+
+fn slice_to_text(bytes: [int], start_index: int, end_index: int) -> Text:
+    bytes_to_text(bytes_slice(bytes, start_index, end_index))
+
+pub fn path_join(base: Text, child: Text) -> Text:
+    base_bytes = bytes_from_text(base)
+    base_length = bytes_length(base_bytes)
+    child_bytes = bytes_from_text(child)
+    child_length = bytes_length(child_bytes)
+    if child_length > 0 and is_separator_byte(byte_at(child_bytes, 0)):
+        child
+    else:
+        if base_length == 0:
+            child
+        else:
+            if is_separator_byte(byte_at(base_bytes, base_length - 1)):
+                base + child
+            else:
+                base + "/" + child
+
+pub fn path_parent(path: Text) -> Text:
+    bytes = bytes_from_text(path)
+    byte_count = bytes_length(bytes)
+    separator_index = last_separator_index(bytes, byte_count)
+    if separator_index < 0:
+        ""
+    else:
+        if separator_index == 0:
+            "/"
+        else:
+            slice_to_text(bytes, 0, separator_index)
+
+pub fn path_filename(path: Text) -> Text:
+    bytes = bytes_from_text(path)
+    byte_count = bytes_length(bytes)
+    separator_index = last_separator_index(bytes, byte_count)
+    name_start = if separator_index < 0 then 0 else separator_index + 1
+    slice_to_text(bytes, name_start, byte_count)
+
+pub fn path_stem(path: Text) -> Text:
+    bytes = bytes_from_text(path)
+    byte_count = bytes_length(bytes)
+    separator_index = last_separator_index(bytes, byte_count)
+    name_start = if separator_index < 0 then 0 else separator_index + 1
+    dot_index = last_dot_in_name(bytes, name_start, byte_count)
+    end_index = if dot_index < 0 then byte_count else dot_index
+    slice_to_text(bytes, name_start, end_index)
+
+pub fn path_extension(path: Text) -> Text:
+    bytes = bytes_from_text(path)
+    byte_count = bytes_length(bytes)
+    separator_index = last_separator_index(bytes, byte_count)
+    name_start = if separator_index < 0 then 0 else separator_index + 1
+    dot_index = last_dot_in_name(bytes, name_start, byte_count)
+    if dot_index < 0:
+        ""
+    else:
+        slice_to_text(bytes, dot_index + 1, byte_count)
+
+pub fn path_is_absolute(path: Text) -> bool:
+    bytes = bytes_from_text(path)
+    byte_count = bytes_length(bytes)
+    if byte_count == 0:
+        false
+    else:
+        first_byte = byte_at(bytes, 0)
+        if is_separator_byte(first_byte):
+            true
+        else:
+            if byte_count >= 2 and byte_at(bytes, 1) == 58:
+                drive = first_byte
+                (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122)
+            else:
+                false
+
+fn _path_split(raw_bytes: [int], raw_length: int, has_root: bool) -> [Text]:
+    mut segments = []
+    mut segment_start = if has_root then 1 else 0
+    mut cursor = segment_start
+    loop:
+        if cursor >= raw_length:
+            break
+        if is_separator_byte(byte_at(raw_bytes, cursor)):
+            if cursor > segment_start:
+                segments = push(segments, slice_to_text(raw_bytes, segment_start, cursor))
+            segment_start = cursor + 1
+        cursor += 1
+    if raw_length > segment_start:
+        segments = push(segments, slice_to_text(raw_bytes, segment_start, raw_length))
+    segments
+
+fn _can_pop_for_dotdot(kept: [Text]) -> bool:
+    depth = len(kept)
+    if depth == 0:
+        false
+    else:
+        at(kept, depth - 1) != ".."
+
+fn _pop_last(kept: [Text]) -> [Text]:
+    depth = len(kept)
+    mut shrunk = []
+    for keep_index in 0..<(depth - 1):
+        shrunk = push(shrunk, at(kept, keep_index))
+    shrunk
+
+fn _path_resolve(segments: [Text], has_root: bool) -> [Text]:
+    mut kept = []
+    total = len(segments)
+    for index in 0..<total:
+        segment_text = at(segments, index)
+        is_cur = segment_text == "."
+        is_dotdot = segment_text == ".."
+        can_pop = is_dotdot and _can_pop_for_dotdot(kept)
+        keep_dotdot = is_dotdot and not can_pop and not has_root
+        keep_normal = not is_cur and not is_dotdot
+        if can_pop:
+            kept = _pop_last(kept)
+        if keep_dotdot:
+            kept = push(kept, "..")
+        if keep_normal:
+            kept = push(kept, segment_text)
+    kept
+
+pub fn path_normalize(path: Text) -> Text:
+    raw_bytes = bytes_from_text(path)
+    raw_length = bytes_length(raw_bytes)
+    has_root = raw_length > 0 and is_separator_byte(byte_at(raw_bytes, 0))
+    segments = _path_split(raw_bytes, raw_length, has_root)
+    kept = _path_resolve(segments, has_root)
+    final_count = len(kept)
+    if final_count == 0:
+        if has_root then "/" else ""
+    else:
+        mut output = bytes_zeros(0)
+        if has_root:
+            output = push(output, 47)
+        for index in 0..<final_count:
+            if index > 0:
+                output = push(output, 47)
+            piece_bytes = bytes_from_text(at(kept, index))
+            output = bytes_concat(output, piece_bytes)
+        bytes_to_text(output)

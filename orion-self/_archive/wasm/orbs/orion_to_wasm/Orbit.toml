@@ -1,0 +1,6 @@
+name = "orion_to_wasm"
+version = "0.0.1"
+description = "Orion AST → wasm: lex + parse + codegen pipeline"
+
+[orbs]
+orion_emit_wasm = "path:../orion_emit_wasm"

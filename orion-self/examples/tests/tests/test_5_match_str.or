@@ -1,0 +1,8 @@
+fn day_score(day: Text) -> int:
+    match day:
+        "mon" -> 1
+        "fri" -> 5
+        _ -> 0
+
+fn main() -> int:
+    day_score("fri")

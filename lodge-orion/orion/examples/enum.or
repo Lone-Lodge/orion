@@ -1,0 +1,20 @@
+# enum + match — sum types with exhaustive pattern matching.
+#   orion run examples/enum.or demo
+
+enum Shape:
+    Circle(f32)
+    Rect(f32, f32)
+    Empty
+
+# match must cover every variant (or use `_`) — the compiler checks it
+fn area(s: Shape) -> f32:
+    match s:
+        Circle(r) -> 3.14159 * r * r
+        Rect(w, h) -> w * h
+        Empty -> 0.0
+
+fn demo() -> int:
+    print(area(Circle(2.0)))
+    print(area(Rect(3.0, 4.0)))
+    print(area(Empty))
+    0

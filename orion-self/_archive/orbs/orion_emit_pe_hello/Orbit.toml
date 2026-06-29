@@ -1,0 +1,8 @@
+name = "orion_emit_pe_hello"
+version = "0.0.1"
+description = "Orion self-host — PE with kernel32 imports including WriteFile + GetStdHandle"
+
+[orbs]
+bytes = "*"
+io = "*"
+fs = "*"

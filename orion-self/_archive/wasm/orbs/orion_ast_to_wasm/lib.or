@@ -1,0 +1,196 @@
+# orion_ast_to_wasm — AST → wasm codegen.
+#
+# Walks the AST produced by `orion_parse::self_parse` and emits wasm
+# bytes via the `orion_emit_wasm` builder API. Each Fn decl in the
+# AST becomes a WFn; the body's statements/expressions are linearised
+# into a stack-machine instruction sequence.
+#
+# Scope today: i32 arithmetic, local vars (params + bindings), if/else
+# blocks, loops, function calls. No strings (those need linear memory
+# allocation), no closures, no traits — these layers come once the
+# core arithmetic pipeline runs orion-self's own files.
+
+use orion_emit_wasm
+use string
+
+# Compile one fn AST node to a WFn. Param-name → local-index mapping
+# is built up as we walk the body so `Ident` references resolve.
+pub fn compile_fn_ast(fn_node) -> WFn:
+    fn_name = get(fn_node, "name")
+    params = get(fn_node, "params")
+    body = get(fn_node, "body")
+    param_count = list_count(params)
+    # Build the locals map: param name → index.
+    locals = build_locals(params)
+    f0 = new_fn(fn_name, param_count)
+    f1 = compile_block(f0, body, locals)
+    emit_end(f1)
+
+fn list_count(items) -> int:
+    mut count = 0
+    for _item in items:
+        count = count + 1
+    count
+
+# Locals table is a flat list of names — index into the list IS the
+# local index in wasm. push a name and you get its index for free.
+fn build_locals(params) -> [Text]:
+    mut locals = []
+    for param in params:
+        locals = push(locals, get(param, "name"))
+    locals
+
+# Find a local's wasm index. Returns -1 if not found — caller emits
+# an error-shaped placeholder so the rest of the body compiles.
+fn lookup_local(locals: [Text], name: Text) -> int:
+    mut found = 0 - 1
+    mut index = 0
+    for entry in locals:
+        if entry == name:
+            found = index
+        index = index + 1
+    found
+
+# Compile a Block (statement list) into the wasm fn body. Each
+# statement walks through with the locals table threaded so bindings
+# stay in scope. Returns the WFn with the body extended.
+fn compile_block(fn_value: WFn, block, locals: [Text]) -> WFn:
+    statements = get(block, "stmts")
+    mut current_fn = fn_value
+    mut current_locals = locals
+    for stmt in statements:
+        result = compile_stmt(current_fn, stmt, current_locals)
+        current_fn = get(result, "fn")
+        current_locals = get(result, "locals")
+    current_fn
+
+fn compile_stmt(fn_value: WFn, stmt, locals: [Text]):
+    kind = get(stmt, "kind")
+    if kind == "ExprStmt":
+        expr_node = get(stmt, "expr")
+        new_fn = compile_expr(fn_value, expr_node, locals)
+        {"fn": new_fn, "locals": locals}
+    else:
+        if kind == "MutLet" or kind == "LetOrAssign":
+            value_node = get(stmt, "value")
+            after_value = compile_expr(fn_value, value_node, locals)
+            name = get(stmt, "name")
+            # Add new local if name isn't bound yet.
+            existing = lookup_local(locals, name)
+            new_locals = locals
+            mut current_locals = new_locals
+            if existing < 0:
+                current_locals = push(locals, name)
+            new_index = lookup_local(current_locals, name)
+            with_set = emit_local_set(after_value, new_index)
+            {"fn": with_set, "locals": current_locals}
+        else:
+            if kind == "Return":
+                expr_node = get(stmt, "expr")
+                with_value = compile_expr(fn_value, expr_node, locals)
+                # wasm `return` opcode is 0x0F
+                {"fn": emit_op(with_value, 15), "locals": locals}
+            else:
+                if kind == "Break":
+                    # `br 1` — break out of the enclosing loop (depth 1)
+                    with_br = emit_op(fn_value, op_br())
+                    {"fn": emit_bytes(with_br, [1]), "locals": locals}
+                else:
+                    if kind == "Loop":
+                        loop_body = get(stmt, "body")
+                        # `loop` block — wasm structured loop with branch back.
+                        with_loop = emit_op(fn_value, op_loop())
+                        with_bt = emit_bytes(with_loop, [blocktype_void()])
+                        body_fn = compile_block(with_bt, loop_body, locals)
+                        # `br 0` — branch back to loop start
+                        with_br0 = emit_op(body_fn, op_br())
+                        with_zero = emit_bytes(with_br0, [0])
+                        with_end_loop = emit_op(with_zero, op_end())
+                        {"fn": with_end_loop, "locals": locals}
+                    else:
+                        if kind == "IfBlock":
+                            with_cond = compile_expr(fn_value, get(stmt, "cond"), locals)
+                            with_if = emit_op(with_cond, op_if())
+                            with_bt = emit_bytes(with_if, [blocktype_void()])
+                            then_fn = compile_block(with_bt, get(stmt, "then"), locals)
+                            with_else = emit_op(then_fn, op_else())
+                            else_fn = compile_block(with_else, get(stmt, "else"), locals)
+                            with_end_if = emit_op(else_fn, op_end())
+                            {"fn": with_end_if, "locals": locals}
+                        else:
+                            # Unsupported — pass through unchanged.
+                            {"fn": fn_value, "locals": locals}
+
+# Compile an expression — pushes its result on the wasm stack.
+fn compile_expr(fn_value: WFn, expr_node, locals: [Text]) -> WFn:
+    kind = get(expr_node, "kind")
+    if kind == "Int":
+        value_text = get(expr_node, "value")
+        # Parse decimal int
+        emit_const(fn_value, parse_decimal(value_text))
+    else:
+        if kind == "Ident":
+            name = get(expr_node, "name")
+            index = lookup_local(locals, name)
+            if index >= 0:
+                emit_local_get(fn_value, index)
+            else:
+                # Unknown identifier — push 0 as placeholder
+                emit_const(fn_value, 0)
+        else:
+            if kind == "Binary":
+                left = get(expr_node, "left")
+                right = get(expr_node, "right")
+                op = get(expr_node, "op")
+                with_left = compile_expr(fn_value, left, locals)
+                with_right = compile_expr(with_left, right, locals)
+                emit_binop(with_right, op)
+            else:
+                if kind == "Call":
+                    # Calling a host fn or another local fn — for now assume host index 0.
+                    args = get(expr_node, "args")
+                    callee = get(expr_node, "callee")
+                    mut current_fn = fn_value
+                    for arg in args:
+                        current_fn = compile_expr(current_fn, arg, locals)
+                    # Resolve callee by name — for now use host index by hash
+                    emit_call(current_fn, 0)
+                else:
+                    if kind == "If":
+                        # if-as-expression: cond, then push result, else push result
+                        with_cond = compile_expr(fn_value, get(expr_node, "cond"), locals)
+                        with_if = emit_op(with_cond, op_if())
+                        # blocktype = i32 (return one i32)
+                        with_bt = emit_bytes(with_if, [ty_i32()])
+                        with_then = compile_expr(with_bt, get(expr_node, "then"), locals)
+                        with_else = emit_op(with_then, op_else())
+                        with_otherwise = compile_expr(with_else, get(expr_node, "otherwise"), locals)
+                        emit_op(with_otherwise, op_end())
+                    else:
+                        # Unsupported expression — push 0 as a no-op.
+                        emit_const(fn_value, 0)
+
+# Map an Orion binary op string to the corresponding wasm i32 opcode.
+fn emit_binop(fn_value: WFn, op: Text) -> WFn:
+    if op == "+":
+        emit_op(fn_value, op_i32_add())
+    else:
+        if op == "-":
+            emit_op(fn_value, op_i32_sub())
+        else:
+            if op == "*":
+                emit_op(fn_value, op_i32_mul())
+            else:
+                if op == "/":
+                    emit_op(fn_value, op_i32_div_s())
+                else:
+                    if op == "==":
+                        emit_op(fn_value, op_i32_eq())
+                    else:
+                        # Default to add as fallback so unknown ops don't break the stack.
+                        emit_op(fn_value, op_i32_add())
+
+# Parse a decimal integer string (no error handling — invalid input
+# returns 0). The Orion `str_to_int` builtin handles edge cases.
+fn parse_decimal(text: Text) -> int:
+    str_to_int(text)

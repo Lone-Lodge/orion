@@ -1,0 +1,3 @@
+name = "net"
+version = "0.1.0"
+description = "HTTP + TCP networking — game-friendly minimal API"

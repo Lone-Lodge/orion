@@ -1,0 +1,11 @@
+fn main() -> int:
+    s = "hello world"
+    mut score = 0
+    if contains(s, "world"):
+        score = score + 1
+    if not contains(s, "xyz"):
+        score = score + 1
+    sub = slice(s, 6, 11)
+    if sub == "world":
+        score = score + 1
+    score

@@ -1,0 +1,21 @@
+fn assert_true(cond: int, label: Text) -> int:
+    if cond == 0:
+        print_line("ASSERT FAILED: {label}")
+        0
+    else:
+        1
+
+fn assert_eq(actual: int, expected: int, label: Text) -> int:
+    if actual == expected:
+        1
+    else:
+        print_line("ASSERT FAILED: {label} — expected {expected}, got {actual}")
+        0
+
+fn main() -> int:
+    mut passes = 0
+    passes = passes + assert_true(1, "trivially true")
+    passes = passes + assert_eq(42, 42, "equal ints")
+    passes = passes + assert_eq(2 + 2, 4, "math")
+    # 3 asserts × 14 = 42
+    passes * 14

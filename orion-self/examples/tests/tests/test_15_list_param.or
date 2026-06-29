@@ -1,0 +1,8 @@
+fn sum_list(xs: [int]) -> int:
+    mut total = 0
+    for x in xs:
+        total = total + x
+    total
+
+fn main() -> int:
+    sum_list([1, 2, 3, 4, 5])

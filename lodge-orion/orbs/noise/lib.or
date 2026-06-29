@@ -1,0 +1,63 @@
+# noise — value noise + FBM. `x`/`y` are universal coordinate names;
+# integer-cell corners follow the standard `x0/x1/y0/y1` notation. All
+# other locals use descriptive names.
+
+# SplitMix-style integer hash of `(x, y, seed)`. Deterministic — same
+# arguments always produce the same value in [-1, 1]. Coordinates are
+# truncated to int before mixing (the bit pattern is what matters).
+#
+# Wrapping i64 multiplication mirrors Rust's u64.wrapping_mul on the
+# same constants. The final `& 0x001F_FFFF_FFFF_FFFF` clears any sign
+# extension from the arithmetic `>>` so the float division stays in
+# the canonical [0, 1) range.
+pub fn noise_hash(x: f64, y: f64, seed: int) -> f64:
+    x_int = to_int(x)
+    y_int = to_int(y)
+    mut hash_value = x_int * 0x9E37_79B9_7F4A_7C15 + y_int * 0xBF58_476D_1CE4_E5B9 + seed * 0x94D0_49BB_1331_11EB
+    hash_value = (hash_value ^ (hash_value >> 30)) * 0xBF58_476D_1CE4_E5B9
+    hash_value = (hash_value ^ (hash_value >> 27)) * 0x94D0_49BB_1331_11EB
+    hash_value = hash_value ^ (hash_value >> 31)
+    high_bits = (hash_value >> 11) & 0x001F_FFFF_FFFF_FFFF
+    unit_interval = to_float(high_bits) / 9007199254740992.0
+    unit_interval * 2.0 - 1.0
+
+# 1D value noise — lerp between hashes of integer cells.
+pub fn value_noise_1d(x: f64, seed: int) -> f64:
+    x0 = floor(x)
+    x1 = x0 + 1.0
+    frac_x = x - x0
+    hash_lo = noise_hash(x0, 0.0, seed)
+    hash_hi = noise_hash(x1, 0.0, seed)
+    weight = frac_x * frac_x * (3.0 - 2.0 * frac_x)
+    hash_lo * (1.0 - weight) + hash_hi * weight
+
+# 2D value noise — bilinear lerp of 4 corner hashes with smoothstep weighting.
+pub fn value_noise_2d(x: f64, y: f64, seed: int) -> f64:
+    x0 = floor(x)
+    y0 = floor(y)
+    x1 = x0 + 1.0
+    y1 = y0 + 1.0
+    frac_x = x - x0
+    frac_y = y - y0
+    corner_bl = noise_hash(x0, y0, seed)
+    corner_br = noise_hash(x1, y0, seed)
+    corner_tl = noise_hash(x0, y1, seed)
+    corner_tr = noise_hash(x1, y1, seed)
+    weight_x = frac_x * frac_x * (3.0 - 2.0 * frac_x)
+    weight_y = frac_y * frac_y * (3.0 - 2.0 * frac_y)
+    lerp_bottom = corner_bl * (1.0 - weight_x) + corner_br * weight_x
+    lerp_top = corner_tl * (1.0 - weight_x) + corner_tr * weight_x
+    lerp_bottom * (1.0 - weight_y) + lerp_top * weight_y
+
+# Fractional Brownian Motion — stack octaves with halving amplitude.
+pub fn fbm_2d(x: f64, y: f64, octaves: int, seed: int) -> f64:
+    mut accumulated = 0.0
+    mut amplitude = 1.0
+    mut frequency = 1.0
+    mut normaliser = 0.0
+    for octave_index in 0..<octaves:
+        accumulated = accumulated + value_noise_2d(x * frequency, y * frequency, seed + octave_index) * amplitude
+        normaliser = normaliser + amplitude
+        amplitude = amplitude * 0.5
+        frequency = frequency * 2.0
+    accumulated / normaliser

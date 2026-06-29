@@ -1,0 +1,3 @@
+name = "option"
+version = "0.1.0"
+description = "Option<T>-style nullable values as a library orb"

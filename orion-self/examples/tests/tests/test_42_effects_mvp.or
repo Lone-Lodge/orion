@@ -1,0 +1,8 @@
+effect AskUser:
+    ask: fn(prompt: Text) -> Text
+
+fn main() -> int:
+    # MVP: perform compiles, returns 0 (default stub).
+    # Real handlers + continuations: future work via Windows Fibers.
+    _ = perform AskUser.ask("hello")
+    42

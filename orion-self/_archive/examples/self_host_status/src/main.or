@@ -1,0 +1,97 @@
+use orion_lex
+use io
+use fs
+
+# Self-host status report. Reads orion-self's own lib.or files and
+# runs them through self_lex, counting how many tokens of each kind
+# the lexer produced. Tells us *exactly* what the parser will see
+# when it's ready to consume real source files.
+
+fn main() -> int:
+    print_line("=== orion-self self-host status report ===")
+    print_line("")
+
+    files = list_self_files()
+    mut total_files = 0
+    mut total_tokens = 0
+    mut total_keywords = 0
+    mut total_idents = 0
+
+    for path in files:
+        total_files = total_files + 1
+        source = read_file(path)
+        tokens = self_lex(source)
+
+        mut file_kw = 0
+        mut file_ident = 0
+        mut file_total = 0
+        for tok in tokens:
+            file_total = file_total + 1
+            kind = get(tok, "kind")
+            if kind == "ident":
+                file_ident = file_ident + 1
+            # All `kw_*` token kinds.
+            if kind == "kw_fn" or kind == "kw_data" or kind == "kw_enum" or kind == "kw_match" or kind == "kw_for" or kind == "kw_if" or kind == "kw_else" or kind == "kw_mut" or kind == "kw_use" or kind == "kw_pub":
+                file_kw = file_kw + 1
+
+        total_tokens = total_tokens + file_total
+        total_keywords = total_keywords + file_kw
+        total_idents = total_idents + file_ident
+        print_line("  " + path + ": " + show(file_total) + " tokens (" + show(file_kw) + " keywords, " + show(file_ident) + " idents)")
+
+    print_line("")
+    print_line("=== totals ===")
+    print_line("files:    " + show(total_files))
+    print_line("tokens:   " + show(total_tokens))
+    print_line("keywords: " + show(total_keywords))
+    print_line("idents:   " + show(total_idents))
+    print_line("")
+    print_line("lexer status: ✓ accepts every orion-self source file")
+    print_line("parser status: ⏳ POC handles fn-decls only — full grammar pending")
+    0
+
+fn list_self_files() -> [Text]:
+    base = "E:/lone-lodge/orion-self/orbs/"
+    [base + "orion_lex/lib.or", base + "orion_parse/lib.or", base + "orion_typeck/lib.or", base + "orion_eval/lib.or", base + "orion_codegen/lib.or", base + "orion_emit_pe/lib.or", base + "orion_emit_wasm/lib.or", base + "orion_build_wasm/lib.or", base + "orion_to_wasm/lib.or", base + "orion_veil_to_wasm/lib.or", base + "orion_web_shell/lib.or", base + "orion_compile/lib.or", base + "orion_self/lib.or"]
+
+fn show(value: int) -> Text:
+    if value == 0:
+        "0"
+    else:
+        digits(value)
+
+fn digits(value: int) -> Text:
+    if value == 0:
+        ""
+    else:
+        digits(value / 10) + glyph(value % 10)
+
+fn glyph(d: int) -> Text:
+    if d == 0:
+        "0"
+    else:
+        if d == 1:
+            "1"
+        else:
+            if d == 2:
+                "2"
+            else:
+                if d == 3:
+                    "3"
+                else:
+                    if d == 4:
+                        "4"
+                    else:
+                        if d == 5:
+                            "5"
+                        else:
+                            if d == 6:
+                                "6"
+                            else:
+                                if d == 7:
+                                    "7"
+                                else:
+                                    if d == 8:
+                                        "8"
+                                    else:
+                                        "9"

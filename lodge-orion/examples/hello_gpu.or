@@ -1,0 +1,40 @@
+use window
+use gpu
+use io
+
+# Demonstrates the gpu orb API surface. With the stub backend this just
+# exercises the handle-passing path; once the OpenGL backend lands you'll
+# see an actual triangle.
+
+fn main() -> int:
+    print_line("gpu backend: " + gpu_backend())
+
+    if not window_ready():
+        print_line("no window — skipping gpu init")
+        0
+    else:
+        win_id = window_open(800, 600, "Orion GPU")
+        device = gpu_init(win_id)
+        print_line("device created")
+
+        verts = create_buffer(device, 64, "vertex")
+        write_buffer(device, verts, [-0.5, -0.5, 0.0,  0.5, -0.5, 0.0,  0.0, 0.5, 0.0])
+        print_line("vertex buffer uploaded")
+
+        # WGSL shader source — kept short to avoid Orion's string-interp
+        # eating the WGSL braces. Real apps load it from a .wgsl file.
+        shader = create_shader(device, "triangle.wgsl")
+        pipeline = create_pipeline(device, shader, "f32x3")
+        print_line("pipeline built")
+
+        cmd = begin_frame(device)
+        set_pipeline(cmd, pipeline)
+        set_vertex_buffer(cmd, verts)
+        draw(cmd, 3)
+        submit(device, cmd)
+        present(device)
+        print_line("frame submitted")
+
+        gpu_destroy(device)
+        window_close(win_id)
+        0

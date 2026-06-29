@@ -1,0 +1,22 @@
+fn double_it(x: int) -> int:
+    x + x
+
+fn main() -> int:
+    # User fn via method-call syntax
+    a = 21
+    a_doubled = a.double_it()
+
+    # Builtin via method-call syntax: text.len()
+    msg = "hello"
+    msg_len = msg.len()
+
+    # Builtin with arg: text.contains("world")
+    has_lo = msg.contains("lo")
+
+    # List push via method-call
+    items = [1, 2]
+    items = items.push(3)
+    sum_items = at(items, 0) + at(items, 1) + at(items, 2)
+
+    # 42 + 5 + 1 + 6 - 12 = 42
+    a_doubled + msg_len + has_lo + sum_items - 12

@@ -1,0 +1,71 @@
+//! `io` — file I/O and line-based stdio. Public API is pure Orion
+//! (`orbs/io/lib.or`); only the OS bridges stay native.
+
+use std::fs;
+use std::io::{BufRead, Write};
+
+use crate::interp::Interp;
+use crate::value::Value;
+
+pub const SOURCE: &str = include_str!("../../../orbs/io/lib.or");
+
+pub fn register(interp: &Interp) {
+    interp.register_extern("__os_read_file", |args| {
+        let path = as_text(&args[0]);
+        Ok(Value::Text(fs::read_to_string(&path).unwrap_or_default()))
+    });
+    interp.register_extern("__os_write_file", |args| {
+        let path = as_text(&args[0]);
+        let contents = as_text(&args[1]);
+        Ok(Value::Bool(fs::write(&path, contents).is_ok()))
+    });
+    interp.register_extern("__os_write_bytes", |args| {
+        // Write a `[int]` to disk as raw bytes — preserves values ≥ 0x80
+        // that `__os_write_file` (which goes through `bytes_to_text` →
+        // `from_utf8_lossy`) would corrupt. Required for emitting PE/ELF
+        // binaries, image files, audio, anything non-text.
+        let path = as_text(&args[0]);
+        let bytes: Vec<u8> = match &args[1] {
+            Value::List(items) => items
+                .iter()
+                .map(|v| match v {
+                    Value::Int(n) => (*n).max(0).min(255) as u8,
+                    Value::Float(f) => (*f as i64).max(0).min(255) as u8,
+                    _ => 0,
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        Ok(Value::Bool(fs::write(&path, bytes).is_ok()))
+    });
+    interp.register_extern("__os_print_line", |args| {
+        let line = as_text(&args[0]);
+        let stdout = std::io::stdout();
+        let mut h = stdout.lock();
+        let _ = writeln!(h, "{line}");
+        Ok(Value::Unit)
+    });
+    interp.register_extern("__os_read_line", |_args| {
+        let stdin = std::io::stdin();
+        let mut buf = String::new();
+        let _ = stdin.lock().read_line(&mut buf);
+        if buf.ends_with('\n') {
+            buf.pop();
+        }
+        if buf.ends_with('\r') {
+            buf.pop();
+        }
+        Ok(Value::Text(buf))
+    });
+    interp.register_extern("__os_file_exists", |args| {
+        let path = as_text(&args[0]);
+        Ok(Value::Bool(std::path::Path::new(&path).exists()))
+    });
+}
+
+fn as_text(v: &Value) -> String {
+    match v {
+        Value::Text(s) => s.clone(),
+        other => other.to_string(),
+    }
+}

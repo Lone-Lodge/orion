@@ -1,0 +1,1595 @@
+use orion_ir
+use bytes
+
+# orion_ast_to_ir — walk Orion AST and emit typed IR.
+#
+# Today: ints, arith (+ - * / %), comparisons, and/or/not,
+# if/else (expr + stmt), locals (let/mut), text (literals,
+# interpolation, concat, cmp via strcmp), int lists with
+# at/len/iteration, for-range, for-in, loop + break/continue,
+# typed fn params (int + Text + [int]), recursion, mutual recursion.
+#
+# Roadmap: maps, text lists, struct types.
+
+
+# --- Symbol table ---
+# Each binding tracks name, ssa-id, and a mut flag.
+#   is_mut == 0 → id is a value (use directly)
+#   is_mut == 1 → id is a ptr (alloca) — emit load to read, store to write
+# loop_headers / loop_ends — parallel stack of enclosing loops for
+# break/continue targets. Push when entering a loop, do not pop (immutable scope).
+data Scope: names: [Text], ids: [int], mut_flags: [int], loop_headers: [Text], loop_ends: [Text], fn_sig_names: [Text], fn_sig_rets: [Text], ds_names: [Text], ds_specs: [Text], en_names: [Text], en_variants: [Text]
+
+# Typed map-get aliases — orion-self dispatches their callers to typed
+# runtime helpers, but lodge-orion needs an actual definition to interpret.
+pub fn get_int(m: Map, k: Text) -> int: get(m, k)
+pub fn get_map(m: Map, k: Text) -> Map: get(m, k)
+pub fn get_list(m: Map, k: Text) -> [Map]: get(m, k)
+
+fn scope_empty() -> Scope:
+    Scope{names: [], ids: [], mut_flags: [], loop_headers: [], loop_ends: [], fn_sig_names: [], fn_sig_rets: [], ds_names: [], ds_specs: [], en_names: [], en_variants: []}
+
+# Register an enum: variant_csv = "Active,Idle,Done" (comma-joined names).
+fn scope_add_enum_decl(scope: Scope, enum_name: Text, variant_csv: Text) -> Scope:
+    new_names = push(scope.en_names, enum_name)
+    new_vars = push(scope.en_variants, variant_csv)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: new_names, en_variants: new_vars}
+
+# Find the index of a variant in an enum. -1 if not enum or no match.
+fn scope_lookup_enum_variant(scope: Scope, enum_name: Text, variant: Text) -> int:
+    total = len(scope.en_names)
+    mut result = 0 - 1
+    for index in 0..<total:
+        if at(scope.en_names, index) == enum_name:
+            csv = at(scope.en_variants, index)
+            csv_bytes = bytes_from_text(csv)
+            n = len(csv_bytes)
+            mut current = ""
+            mut found_at = 0 - 1
+            mut idx_count = 0
+            for ci in 0..<n:
+                b = at(csv_bytes, ci)
+                if b == 44:
+                    if current == variant and found_at == (0 - 1):
+                        found_at = idx_count
+                    current = ""
+                    idx_count = idx_count + 1
+                else:
+                    single = bytes_to_text([b])
+                    current = "{current}{single}"
+            if current == variant and found_at == (0 - 1):
+                found_at = idx_count
+            if found_at >= 0:
+                result = found_at
+    result
+
+# Encode a data decl's fields as "name1:type1|name2:type2|..." text for
+# easy parallel storage in Scope.
+fn scope_add_data_decl(scope: Scope, struct_name: Text, spec: Text) -> Scope:
+    new_names = push(scope.ds_names, struct_name)
+    new_specs = push(scope.ds_specs, spec)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: new_names, ds_specs: new_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
+fn scope_lookup_data_spec(scope: Scope, struct_name: Text) -> Text:
+    total = len(scope.ds_names)
+    mut result = ""
+    for index in 0..<total:
+        if at(scope.ds_names, index) == struct_name:
+            result = at(scope.ds_specs, index)
+    result
+
+
+# Parse "name:type|name:type|..." into parallel lists.
+fn int_to_text_helper(value: int) -> Text:
+    if value == 0:
+        "0"
+    else:
+        digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        mut n = if value < 0 then 0 - value else value
+        mut chars = ""
+        for _ in 0..<20:
+            if n > 0:
+                d = at(digits, n % 10)
+                chars = "{d}{chars}"
+                n = n / 10
+        if value < 0 then "-{chars}" else chars
+
+fn parse_data_spec(spec: Text) -> [Text]:
+    bs = bytes_from_text(spec)
+    total = len(bs)
+    mut parts = []
+    mut current = ""
+    for index in 0..<total:
+        b = at(bs, index)
+        if b == 124:  # '|'
+            parts = push(parts, current)
+            current = ""
+        else:
+            single = bytes_to_text([b])
+            current = "{current}{single}"
+    if len(bytes_from_text(current)) > 0:
+        parts = push(parts, current)
+    parts
+
+
+# Given parsed parts ["name:type", ...] find the index of field_name.
+# Returns -1 if not found.
+fn find_field_index(parts: [Text], field_name: Text) -> int:
+    n = len(parts)
+    mut result = 0 - 1
+    for index in 0..<n:
+        part = at(parts, index)
+        # Split on ':' to get name
+        bs = bytes_from_text(part)
+        bs_n = len(bs)
+        mut name_buf = ""
+        mut found_colon = 0
+        for ci in 0..<bs_n:
+            b = at(bs, ci)
+            if found_colon == 0:
+                if b == 58:  # ':'
+                    found_colon = 1
+                else:
+                    single = bytes_to_text([b])
+                    name_buf = "{name_buf}{single}"
+        if name_buf == field_name and result == (0 - 1):
+            result = index
+    result
+
+
+# Given parsed parts and an index, return the type after ':'.
+fn field_type_at(parts: [Text], idx: int) -> Text:
+    n = len(parts)
+    if idx < 0 or idx >= n:
+        "i64"
+    else:
+        part = at(parts, idx)
+        bs = bytes_from_text(part)
+        bs_n = len(bs)
+        mut type_buf = ""
+        mut found_colon = 0
+        for ci in 0..<bs_n:
+            b = at(bs, ci)
+            if found_colon == 1:
+                single = bytes_to_text([b])
+                type_buf = "{type_buf}{single}"
+            else:
+                if b == 58:
+                    found_colon = 1
+        type_buf
+
+fn scope_add_fn_sig(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
+    new_names = push(scope.fn_sig_names, fn_name)
+    new_rets = push(scope.fn_sig_rets, ret_type)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
+fn scope_lookup_fn_ret(scope: Scope, fn_name: Text) -> Text:
+    total = len(scope.fn_sig_names)
+    mut result = ""
+    for index in 0..<total:
+        if at(scope.fn_sig_names, index) == fn_name:
+            result = at(scope.fn_sig_rets, index)
+    result
+
+# Same as scope_lookup_fn_ret but emits a source-located error if the function
+# isn't registered. The `node` arg is the Call AST node with optional line/col.
+fn scope_lookup_fn_ret_loc(scope: Scope, fn_name: Text, node: Map) -> Text:
+    found = scope_lookup_fn_ret(scope, fn_name)
+    mut result = found
+    if found == "":
+        line = if has(node, "line") then get_int(node, "line") else 0
+        col = if has(node, "col") then get_int(node, "col") else 0
+        print_line("orion-self: ERROR at line {line}:{col} — call to unknown function `{fn_name}` (returning i64 as guess)")
+        result = "i64"
+    result
+
+fn scope_bind(scope: Scope, name: Text, id: int) -> Scope:
+    new_names = push(scope.names, name)
+    new_ids = push(scope.ids, id)
+    new_flags = push(scope.mut_flags, 0)
+    Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
+fn scope_bind_mut(scope: Scope, name: Text, ptr_id: int) -> Scope:
+    new_names = push(scope.names, name)
+    new_ids = push(scope.ids, ptr_id)
+    new_flags = push(scope.mut_flags, 1)
+    Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
+
+fn scope_add_fn_sig_keep_data(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
+    new_names = push(scope.fn_sig_names, fn_name)
+    new_rets = push(scope.fn_sig_rets, ret_type)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
+fn scope_push_loop(scope: Scope, header_lbl: Text, end_lbl: Text) -> Scope:
+    new_headers = push(scope.loop_headers, header_lbl)
+    new_ends = push(scope.loop_ends, end_lbl)
+    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: new_headers, loop_ends: new_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
+fn scope_top_loop_header(scope: Scope) -> Text:
+    n = len(scope.loop_headers)
+    if n == 0 then "" else at(scope.loop_headers, n - 1)
+
+fn scope_top_loop_end(scope: Scope) -> Text:
+    n = len(scope.loop_ends)
+    if n == 0 then "" else at(scope.loop_ends, n - 1)
+
+fn scope_lookup(scope: Scope, name: Text) -> int:
+    total = len(scope.names)
+    mut result = 0 - 1
+    for index in 0..<total:
+        from_end = total - 1 - index
+        candidate = at(scope.names, from_end)
+        if candidate == name and result == (0 - 1):
+            result = at(scope.ids, from_end)
+    result
+
+fn scope_is_mut(scope: Scope, name: Text) -> int:
+    total = len(scope.names)
+    mut result = 0
+    mut found = 0
+    for index in 0..<total:
+        from_end = total - 1 - index
+        candidate = at(scope.names, from_end)
+        if candidate == name and found == 0:
+            result = at(scope.mut_flags, from_end)
+            found = 1
+    result
+
+
+# --- Block terminator detection ---
+# A block is terminated if its last instruction is a `br` or `return`.
+# We use this to avoid emitting redundant branches (which LLVM rejects).
+fn last_op(fn_value: IRFn) -> Text:
+    insts = fn_value.instructions
+    n = len(insts)
+    if n == 0 then "" else at(insts, n - 1).op
+
+fn is_block_terminated(fn_value: IRFn) -> int:
+    op = last_op(fn_value)
+    if op == "br" or op == "return" then 1 else 0
+
+
+# --- Conversion result threading function, scope, and value id ---
+data ConvResult: function: IRFn, scope: Scope, id: int
+#
+# AST is Maps with "kind" field:
+#   Program: {"kind": "Program", "decls": [Fn]}
+#   Fn:      {"kind": "Fn", "name", "params", "ret", "body"}
+#   Int:     {"kind": "Int", "value": Text}
+#   Binary:  {"kind": "Binary", "op": Text, "left": Expr, "right": Expr}
+#   Ident:   {"kind": "Ident", "name": Text}
+#
+# We return PushResult{function, id} so caller can chain.
+
+
+# Convert a text-encoded int literal to int.
+# Use bytes (text[i] returns whole string — Orion bug as of 2026-06).
+fn parse_int(text: Text) -> int:
+    byte_list = bytes_from_text(text)
+    total = len(byte_list)
+    mut value = 0
+    mut start = 0
+    mut is_neg = false
+    if total > 0:
+        first = at(byte_list, 0)
+        # '-' = 45
+        if first == 45:
+            is_neg = true
+            start = 1
+    for index in start..<total:
+        b = at(byte_list, index)
+        # '0' = 48, '9' = 57
+        if b >= 48 and b <= 57:
+            value = value * 10 + (b - 48)
+    if is_neg then 0 - value else value
+
+
+# Walk an expression node, append IR instructions to the function,
+# return the SSA id of the result.
+fn ast_binary_to_ir(fn2: IRFn, scope: Scope, op: Text, left_id: int, right_id: int) -> ConvResult:
+    mut pr = PushResult{function: fn2, id: 0 - 1}
+    if op == "+":
+        pr = ir_fn_push(fn2, ir_iadd(left_id, right_id))
+    if op == "-":
+        pr = ir_fn_push(fn2, ir_isub(left_id, right_id))
+    if op == "*":
+        pr = ir_fn_push(fn2, ir_imul(left_id, right_id))
+    if op == "/":
+        pr = ir_fn_push(fn2, ir_idiv(left_id, right_id))
+    if op == "%":
+        pr = ir_fn_push(fn2, ir_imod(left_id, right_id))
+    if op == "and":
+        pr = ir_fn_push(fn2, ir_iand(left_id, right_id))
+    if op == "or":
+        pr = ir_fn_push(fn2, ir_ior(left_id, right_id))
+    if op == "==":
+        pr = ir_fn_push(fn2, ir_icmp_eq(left_id, right_id))
+    if op == "!=":
+        pr = ir_fn_push(fn2, ir_icmp_ne(left_id, right_id))
+    if op == "<":
+        pr = ir_fn_push(fn2, ir_icmp_lt(left_id, right_id))
+    if op == "<=":
+        pr = ir_fn_push(fn2, ir_icmp_le(left_id, right_id))
+    if op == ">":
+        pr = ir_fn_push(fn2, ir_icmp_gt(left_id, right_id))
+    if op == ">=":
+        pr = ir_fn_push(fn2, ir_icmp_ge(left_id, right_id))
+    ConvResult{function: pr.function, scope: scope, id: pr.id}
+
+fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    stmts = get_list(node, "stmts")
+    total_stmts = len(stmts)
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut last_id = 0 - 1
+    for index in 0..<total_stmts:
+        stmt = at(stmts, index)
+        stmt_kind = get(stmt, "kind")
+        is_expr = stmt_kind == "ExprStmt"
+        is_let = stmt_kind == "LetOrAssign" or stmt_kind == "MutLet"
+        is_if_block = stmt_kind == "IfBlock"
+        is_for_range = stmt_kind == "ForRange"
+        is_for_in = stmt_kind == "ForIn"
+        is_loop = stmt_kind == "Loop"
+        is_break = stmt_kind == "Break"
+        is_continue = stmt_kind == "Continue"
+        is_return = stmt_kind == "Return"
+        is_match_stmt = stmt_kind == "Match"
+        # Stop processing further stmts in this block if a prior one
+        # already terminated the current basic block (e.g. via break).
+        already_done = is_block_terminated(current_fn)
+        if already_done == 0 and is_expr:
+            er = ast_expr_to_ir(current_fn, current_scope, get(stmt, "expr"))
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_let:
+            name = get(stmt, "name")
+            er = ast_expr_to_ir(current_fn, current_scope, get(stmt, "value"))
+            current_fn = er.function
+            current_scope = er.scope
+            # If this is MutLet (fresh mut binding): alloca + store + bind as mut.
+            # Else if it's LetOrAssign on an existing mut var: just store.
+            # Else: regular SSA-style bind (immutable shadowing).
+            if stmt_kind == "MutLet":
+                value_type = get_value_type(current_fn, er.id)
+                pr_alloca = ir_fn_push(current_fn, ir_alloca(value_type))
+                ptr_id = pr_alloca.id
+                pr_store = ir_fn_push(pr_alloca.function, ir_store(ptr_id, er.id))
+                current_fn = pr_store.function
+                current_scope = scope_bind_mut(current_scope, name, ptr_id)
+                last_id = pr_store.id
+            else:
+                existing_mut = scope_is_mut(current_scope, name)
+                if existing_mut == 1:
+                    ptr_id = scope_lookup(current_scope, name)
+                    # Type-check the rebind: the new value's type must match
+                    # the slot's stored type. Mismatch → user gets a clean
+                    # error instead of cryptic LLVM IR rejection.
+                    alloca_inst = at(current_fn.instructions, ptr_id)
+                    slot_type = alloca_inst.type_text
+                    new_type = get_value_type(current_fn, er.id)
+                    # All ptr-typed values (text/list/map/struct:T/list:T) share
+                    # the same LLVM storage. Only flag a mismatch when one side
+                    # is i64 and the other is ptr-shaped.
+                    slot_ll = if slot_type == "i64" then "i64" else "ptr"
+                    new_ll = if new_type == "i64" then "i64" else "ptr"
+                    if slot_ll != new_ll:
+                        line = if has(stmt, "line") then get_int(stmt, "line") else 0
+                        col = if has(stmt, "col") then get_int(stmt, "col") else 0
+                        print_line("orion-self: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                    pr_store = ir_fn_push(current_fn, ir_store(ptr_id, er.id))
+                    current_fn = pr_store.function
+                    last_id = pr_store.id
+                else:
+                    current_scope = scope_bind(current_scope, name, er.id)
+                    last_id = er.id
+        if already_done == 0 and is_if_block:
+            er = ast_if_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_for_range:
+            er = ast_for_range_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_for_in:
+            er = ast_for_in_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_loop:
+            er = ast_loop_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        if already_done == 0 and is_break:
+            target = scope_top_loop_end(current_scope)
+            pr_br = ir_fn_push(current_fn, ir_br(target))
+            current_fn = pr_br.function
+            last_id = 0 - 1
+        if already_done == 0 and is_continue:
+            target = scope_top_loop_header(current_scope)
+            pr_br = ir_fn_push(current_fn, ir_br(target))
+            current_fn = pr_br.function
+            last_id = 0 - 1
+        if already_done == 0 and is_return:
+            ret_expr = get(stmt, "expr")
+            er = ast_expr_to_ir(current_fn, current_scope, ret_expr)
+            current_fn = er.function
+            current_scope = er.scope
+            pr_ret = ir_fn_push(current_fn, ir_return(er.id))
+            current_fn = pr_ret.function
+            last_id = er.id
+        if already_done == 0 and is_match_stmt:
+            er = ast_match_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
+        # Silent-failure guard: if none of the dispatch flags fired for this
+        # statement and the block wasn't already terminated, the parser produced
+        # a kind we don't lower. Print an error so it's not invisible.
+        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_match_stmt
+        if already_done == 0 and not handled:
+            line = if has(stmt, "line") then get_int(stmt, "line") else 0
+            col = if has(stmt, "col") then get_int(stmt, "col") else 0
+            print_line("orion-self: ERROR at line {line}:{col} — unhandled statement kind `{stmt_kind}` (skipping)")
+    ConvResult{function: current_fn, scope: current_scope, id: last_id}
+
+
+# `loop:` — infinite loop with `break`/`continue` for exit.
+fn ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    body_node = get(node, "body")
+    n = len(fn_value.instructions)
+    header_lbl = "loop_{n}_header"
+    end_lbl = "loop_{n}_end"
+
+    # Enter the loop: push its labels onto the scope so break/continue
+    # inside the body can find them.
+    body_scope = scope_push_loop(scope, header_lbl, end_lbl)
+
+    # 1) Jump to header.
+    pr_br_in = ir_fn_push(fn_value, ir_br(header_lbl))
+    # 2) Header label.
+    pr_header = ir_fn_push(pr_br_in.function, ir_label(header_lbl))
+    # 3) Walk body inside loop scope.
+    body_r = ast_expr_to_ir(pr_header.function, body_scope, body_node)
+    # 4) If body didn't terminate (no break/continue at end), loop back.
+    mut fn_after_body = body_r.function
+    if is_block_terminated(fn_after_body) == 0:
+        pr_br_back = ir_fn_push(fn_after_body, ir_br(header_lbl))
+        fn_after_body = pr_br_back.function
+    # 5) End label (target of break).
+    pr_end = ir_fn_push(fn_after_body, ir_label(end_lbl))
+    ConvResult{function: pr_end.function, scope: scope, id: 0 - 1}
+
+
+# `for var in iter_list:` — iterate over a list value.
+fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    var_name = get(node, "var")
+    index_var_name = get(node, "index_var")
+    iter_node = get(node, "iter")
+    body_node = get(node, "body")
+
+    n = len(fn_value.instructions)
+    header_lbl = "fin_{n}_header"
+    body_lbl = "fin_{n}_body"
+    step_lbl = "fin_{n}_step"
+    end_lbl = "fin_{n}_end"
+
+    iter_r = ast_expr_to_ir(fn_value, scope, iter_node)
+    list_id = iter_r.id
+    pr_len = ir_fn_push(iter_r.function, ir_list_len(list_id))
+    len_id = pr_len.id
+
+    pr_alloca = ir_fn_push(pr_len.function, ir_alloca("i64"))
+    counter_ptr_id = pr_alloca.id
+    pr_zero = ir_fn_push(pr_alloca.function, ir_iconst(0))
+    pr_init_store = ir_fn_push(pr_zero.function, ir_store(counter_ptr_id, pr_zero.id))
+    pr_br_to_header = ir_fn_push(pr_init_store.function, ir_br(header_lbl))
+
+    pr_header_lbl = ir_fn_push(pr_br_to_header.function, ir_label(header_lbl))
+    pr_load_cur = ir_fn_push(pr_header_lbl.function, ir_load(counter_ptr_id, "i64"))
+    cur_id = pr_load_cur.id
+    pr_cmp = ir_fn_push(pr_load_cur.function, ir_icmp_lt(cur_id, len_id))
+    pr_br_loop = ir_fn_push(pr_cmp.function, ir_br_if(pr_cmp.id, body_lbl, end_lbl))
+
+    # Body: load element, bind var(s), walk body.
+    # continue targets step_lbl so the counter still increments.
+    pr_body_lbl = ir_fn_push(pr_br_loop.function, ir_label(body_lbl))
+    pr_at = ir_fn_push(pr_body_lbl.function, ir_list_at(list_id, cur_id))
+    elem_id = pr_at.id
+    mut body_scope = scope_bind(iter_r.scope, var_name, elem_id)
+    if index_var_name != "":
+        body_scope = scope_bind(body_scope, index_var_name, cur_id)
+    body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
+    body_r = ast_expr_to_ir(pr_at.function, body_scope, body_node)
+
+    # Fall through from body into step block.
+    mut fn_after_body = body_r.function
+    if is_block_terminated(fn_after_body) == 0:
+        pr_br_to_step = ir_fn_push(fn_after_body, ir_br(step_lbl))
+        fn_after_body = pr_br_to_step.function
+
+    # Step block: increment counter, jump back to header.
+    pr_step_lbl = ir_fn_push(fn_after_body, ir_label(step_lbl))
+    pr_one = ir_fn_push(pr_step_lbl.function, ir_iconst(1))
+    pr_next = ir_fn_push(pr_one.function, ir_iadd(cur_id, pr_one.id))
+    pr_store_next = ir_fn_push(pr_next.function, ir_store(counter_ptr_id, pr_next.id))
+    pr_br_back = ir_fn_push(pr_store_next.function, ir_br(header_lbl))
+
+    pr_end_lbl = ir_fn_push(pr_br_back.function, ir_label(end_lbl))
+    ConvResult{function: pr_end_lbl.function, scope: scope, id: 0 - 1}
+
+
+# `for var in low..<high:` — emit alloca + classic header/body/end blocks.
+fn ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    var_name = get(node, "var")
+    low_node = get(node, "low")
+    high_node = get(node, "high")
+    body_node = get(node, "body")
+
+    n = len(fn_value.instructions)
+    header_lbl = "for_{n}_header"
+    body_lbl = "for_{n}_body"
+    step_lbl = "for_{n}_step"
+    end_lbl = "for_{n}_end"
+
+    low_r = ast_expr_to_ir(fn_value, scope, low_node)
+    high_r = ast_expr_to_ir(low_r.function, low_r.scope, high_node)
+    pr_alloca = ir_fn_push(high_r.function, ir_alloca("i64"))
+    counter_ptr_id = pr_alloca.id
+    pr_init_store = ir_fn_push(pr_alloca.function, ir_store(counter_ptr_id, low_r.id))
+    pr_br_to_header = ir_fn_push(pr_init_store.function, ir_br(header_lbl))
+
+    pr_header_lbl = ir_fn_push(pr_br_to_header.function, ir_label(header_lbl))
+    pr_load_cur = ir_fn_push(pr_header_lbl.function, ir_load(counter_ptr_id, "i64"))
+    cur_id = pr_load_cur.id
+    pr_cmp = ir_fn_push(pr_load_cur.function, ir_icmp_lt(cur_id, high_r.id))
+    pr_br_loop = ir_fn_push(pr_cmp.function, ir_br_if(pr_cmp.id, body_lbl, end_lbl))
+
+    # Body block. continue → step (so counter increments).
+    pr_body_lbl = ir_fn_push(pr_br_loop.function, ir_label(body_lbl))
+    mut body_scope = scope_bind(high_r.scope, var_name, cur_id)
+    body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
+    body_r = ast_expr_to_ir(pr_body_lbl.function, body_scope, body_node)
+
+    # Fall through from body into step block.
+    mut fn_after_body = body_r.function
+    if is_block_terminated(fn_after_body) == 0:
+        pr_br_to_step = ir_fn_push(fn_after_body, ir_br(step_lbl))
+        fn_after_body = pr_br_to_step.function
+
+    # Step block: increment + jump back to header.
+    pr_step_lbl = ir_fn_push(fn_after_body, ir_label(step_lbl))
+    pr_one = ir_fn_push(pr_step_lbl.function, ir_iconst(1))
+    pr_next = ir_fn_push(pr_one.function, ir_iadd(cur_id, pr_one.id))
+    pr_store_next = ir_fn_push(pr_next.function, ir_store(counter_ptr_id, pr_next.id))
+    pr_br_back = ir_fn_push(pr_store_next.function, ir_br(header_lbl))
+
+    pr_end_lbl = ir_fn_push(pr_br_back.function, ir_label(end_lbl))
+
+    # For-loop is a statement — return scope as it was BEFORE body
+    # (loop var doesn't leak out).
+    ConvResult{function: pr_end_lbl.function, scope: high_r.scope, id: 0 - 1}
+
+fn ast_int_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    value_text = get(node, "value")
+    pr = ir_fn_push(fn_value, ir_iconst(parse_int(value_text)))
+    ConvResult{function: pr.function, scope: scope, id: pr.id}
+
+fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    name = get(node, "name")
+    found_id = scope_lookup(scope, name)
+    is_mut = scope_is_mut(scope, name)
+    mut result = ConvResult{function: fn_value, scope: scope, id: found_id}
+    if found_id < 0:
+        # Unknown ident — likely a `{expr}` interpolation the parser
+        # captured as a single ident. Emit a sentinel iconst(0) so
+        # downstream code doesn't panic on at(insts, -1).
+        line = if has(node, "line") then get_int(node, "line") else 0
+        col = if has(node, "col") then get_int(node, "col") else 0
+        print_line("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
+        pr = ir_fn_push(fn_value, ir_iconst(0))
+        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    is_real_mut = found_id >= 0 and is_mut == 1
+    if is_real_mut:
+        # Mut bindings store a ptr (alloca) — read via load with the
+        # alloca's stored type.
+        alloca_inst = at(fn_value.instructions, found_id)
+        loaded_type = alloca_inst.type_text
+        pr = ir_fn_push(fn_value, ir_load(found_id, loaded_type))
+        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    result
+
+fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    op = get(node, "op")
+    left_result = ast_expr_to_ir(fn_value, scope, get(node, "left"))
+    right_result = ast_expr_to_ir(left_result.function, left_result.scope, get(node, "right"))
+    left_type = get_value_type(right_result.function, left_result.id)
+    right_type = get_value_type(right_result.function, right_result.id)
+    either_text = left_type == "text" or right_type == "text"
+    both_text = left_type == "text" and right_type == "text"
+    is_eq_op = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
+    is_text_cmp = is_eq_op and both_text
+    is_text_concat = op == "+" and either_text
+    mut result = ConvResult{function: right_result.function, scope: right_result.scope, id: 0 - 1}
+    if is_text_cmp:
+        mut ir_op = "text_eq"
+        if op == "!=":
+            ir_op = "text_ne"
+        if op == "<":
+            ir_op = "text_lt"
+        if op == "<=":
+            ir_op = "text_le"
+        if op == ">":
+            ir_op = "text_gt"
+        if op == ">=":
+            ir_op = "text_ge"
+        pr = ir_fn_push(right_result.function, ir_text_cmp(ir_op, left_result.id, right_result.id))
+        result = ConvResult{function: pr.function, scope: right_result.scope, id: pr.id}
+    if is_text_concat:
+        mut current_fn = right_result.function
+        mut left_id = left_result.id
+        mut right_id = right_result.id
+        if left_type != "text":
+            pr_l = ir_fn_push(current_fn, ir_int_to_text(left_id))
+            current_fn = pr_l.function
+            left_id = pr_l.id
+        if right_type != "text":
+            pr_r = ir_fn_push(current_fn, ir_int_to_text(right_id))
+            current_fn = pr_r.function
+            right_id = pr_r.id
+        pr_cat = ir_fn_push(current_fn, ir_text_concat(left_id, right_id))
+        result = ConvResult{function: pr_cat.function, scope: right_result.scope, id: pr_cat.id}
+    is_plain_binary = (is_text_cmp == false) and (is_text_concat == false)
+    if is_plain_binary:
+        result = ast_binary_to_ir(right_result.function, right_result.scope, op, left_result.id, right_result.id)
+    result
+
+# Find the label of the basic block currently being emitted into.
+# Scans backward from the end and returns on the FIRST label found —
+# O(distance from last label to end), amortized O(1) in practice.
+fn current_block(fn_value: IRFn) -> Text:
+    insts = fn_value.instructions
+    total = len(insts)
+    mut found = "entry"
+    mut done = 0
+    for index in 0..<total:
+        if done == 0:
+            from_end = total - 1 - index
+            inst = at(insts, from_end)
+            if inst.op == "label":
+                found = inst.name
+                done = 1
+    found
+
+
+fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    cond_node = get(node, "cond")
+    then_node = get(node, "then")
+    else_node = get(node, "else")
+
+    # Unique label names based on current inst position.
+    n = len(fn_value.instructions)
+    then_lbl = "if_{n}_then"
+    else_lbl = "if_{n}_else"
+    merge_lbl = "if_{n}_merge"
+
+    # 1) Evaluate condition.
+    cond_r = ast_expr_to_ir(fn_value, scope, cond_node)
+
+    # 2) br_if cond, then, else
+    pr_br = ir_fn_push(cond_r.function, ir_br_if(cond_r.id, then_lbl, else_lbl))
+    fn_after_br = pr_br.function
+
+    # 3) label then; evaluate A.
+    pr_then_lbl = ir_fn_push(fn_after_br, ir_label(then_lbl))
+    then_r = ast_expr_to_ir(pr_then_lbl.function, cond_r.scope, then_node)
+    then_terminated = is_block_terminated(then_r.function)
+    mut then_end_block = ""
+    mut fn_after_then = then_r.function
+    if then_terminated == 0:
+        then_end_block = current_block(then_r.function)
+        pr_then_br = ir_fn_push(then_r.function, ir_br(merge_lbl))
+        fn_after_then = pr_then_br.function
+
+    # 4) label else; evaluate B.
+    pr_else_lbl = ir_fn_push(fn_after_then, ir_label(else_lbl))
+    else_r = ast_expr_to_ir(pr_else_lbl.function, then_r.scope, else_node)
+    else_terminated = is_block_terminated(else_r.function)
+    mut else_end_block = ""
+    mut fn_after_else = else_r.function
+    if else_terminated == 0:
+        else_end_block = current_block(else_r.function)
+        pr_else_br = ir_fn_push(else_r.function, ir_br(merge_lbl))
+        fn_after_else = pr_else_br.function
+
+    # 5) Merge label. Emit phi only if at least one branch reaches it.
+    pr_merge_lbl = ir_fn_push(fn_after_else, ir_label(merge_lbl))
+    mut result_id = 0 - 1
+    mut result_fn = pr_merge_lbl.function
+    if then_terminated == 0 and else_terminated == 0:
+        both_have_value = then_r.id >= 0 and else_r.id >= 0
+        if both_have_value:
+            then_type = get_value_type(result_fn, then_r.id)
+            else_type = get_value_type(result_fn, else_r.id)
+            # Branch types must agree for the phi to be well-typed.
+            # Skip the check if either branch is void — statement-form `if`
+            # (no else, or one branch with only side effects) legitimately
+            # has void/i64 mismatch and the value isn't used downstream.
+            type_mismatch = then_type != else_type and then_type != "void" and else_type != "void"
+            if type_mismatch:
+                line = if has(node, "line") then get_int(node, "line") else 0
+                col = if has(node, "col") then get_int(node, "col") else 0
+                print_line("orion-self: ERROR at line {line}:{col} — if/else branches have different types ({then_type} vs {else_type})")
+            pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
+            result_id = pr_phi.id
+            result_fn = pr_phi.function
+        else:
+            result_id = 0 - 1
+    if then_terminated == 0 and else_terminated == 1:
+        result_id = then_r.id
+    if then_terminated == 1 and else_terminated == 0:
+        result_id = else_r.id
+    # If both terminated, merge block is dead; result_id stays -1.
+
+    ConvResult{function: result_fn, scope: else_r.scope, id: result_id}
+
+fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    callee = get(node, "callee")
+    args = get_list(node, "args")
+    is_print_line = callee == "print_line" or callee == "println"
+    is_to_text = callee == "to_text"
+    mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    if is_print_line:
+        arg0 = at(args, 0)
+        arg_kind = get(arg0, "kind")
+        if arg_kind == "Str":
+            text = get(arg0, "value")
+            pr = ir_fn_push(fn_value, ir_print_str(text))
+            result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+        else:
+            arg_r = ast_expr_to_ir(fn_value, scope, arg0)
+            arg_type = get_value_type(arg_r.function, arg_r.id)
+            if arg_type == "text":
+                pr = ir_fn_push(arg_r.function, ir_print_text(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+            else:
+                pr = ir_fn_push(arg_r.function, ir_print_int(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_to_text:
+        arg0 = at(args, 0)
+        arg_r = ast_expr_to_ir(fn_value, scope, arg0)
+        arg_type = get_value_type(arg_r.function, arg_r.id)
+        if arg_type == "text":
+            result = arg_r
+        else:
+            pr = ir_fn_push(arg_r.function, ir_int_to_text(arg_r.id))
+            result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    is_at = callee == "at"
+    is_len = callee == "len"
+    is_get = callee == "get"
+    is_has = callee == "has"
+    is_push = callee == "push"
+    is_slice = callee == "slice"
+    is_contains = callee == "contains"
+    is_file_read = callee == "file_read"
+    is_file_write = callee == "file_write"
+    is_argc = callee == "argc"
+    is_argv = callee == "argv"
+    is_b_from_t = callee == "bytes_from_text"
+    is_b_to_t = callee == "bytes_to_text"
+    is_b_slice = callee == "bytes_slice"
+    is_b_concat = callee == "bytes_concat"
+    is_b_zeros = callee == "bytes_zeros"
+    # byte_at/bytes_length alias to list_at/list_len (bytes are lists internally).
+    is_byte_at = callee == "byte_at"
+    is_b_length = callee == "bytes_length"
+    is_slot_get = callee == "slot_get"
+    is_slot_set = callee == "slot_set"
+    # Typed map-get variants — explicit types where inference can't reach.
+    is_get_int = callee == "get_int"
+    is_get_map = callee == "get_map"
+    is_get_list = callee == "get_list"
+    if is_at:
+        list_node = at(args, 0)
+        idx_node = at(args, 1)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
+        # Carry the element type from a parameterised list ("list:text") onto
+        # the list_at inst so downstream type checks (e.g. text_cmp) see it.
+        list_type = get_value_type(idx_r.function, list_r.id)
+        elem_type = extract_list_elem(list_type)
+        at_inst = ir_list_at(list_r.id, idx_r.id)
+        at_inst_typed = Inst{op: at_inst.op, type_text: elem_type, value: at_inst.value, lhs: at_inst.lhs, rhs: at_inst.rhs, name: at_inst.name, args: at_inst.args}
+        pr = ir_fn_push(idx_r.function, at_inst_typed)
+        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+    if is_len:
+        arg_node = at(args, 0)
+        arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
+        arg_type = get_value_type(arg_r.function, arg_r.id)
+        # len(text) → strlen via runtime; len(list/map) → list_len.
+        if arg_type == "text":
+            pr = ir_fn_push(arg_r.function, ir_text_len(arg_r.id))
+            result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+        else:
+            pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
+            result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_get:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        # Infer value type by peeking the source map's first value.
+        # Maps in our codebase are usually homogeneous: all-text or all-int.
+        mut get_type = "text"
+        map_fn = map_r.function
+        map_insts = map_fn.instructions
+        map_inst = at(map_insts, map_r.id)
+        map_args = map_inst.args
+        if map_inst.op == "map_lit" and len(map_args) >= 2:
+            first_val_id = at(map_args, 1)
+            first_val_type = get_value_type(map_fn, first_val_id)
+            if first_val_type == "i64":
+                get_type = "i64"
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, get_type))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_has:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_map_has(map_r.id, key_r.id))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_push:
+        list_node = at(args, 0)
+        val_node = at(args, 1)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
+        pr = ir_fn_push(val_r.function, ir_list_push(list_r.id, val_r.id))
+        result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
+    if is_slice:
+        text_node = at(args, 0)
+        lo_node = at(args, 1)
+        hi_node = at(args, 2)
+        text_r = ast_expr_to_ir(fn_value, scope, text_node)
+        lo_r = ast_expr_to_ir(text_r.function, text_r.scope, lo_node)
+        hi_r = ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node)
+        pr = ir_fn_push(hi_r.function, ir_text_slice(text_r.id, lo_r.id, hi_r.id))
+        result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
+    if is_contains:
+        text_node = at(args, 0)
+        sub_node = at(args, 1)
+        text_r = ast_expr_to_ir(fn_value, scope, text_node)
+        sub_r = ast_expr_to_ir(text_r.function, text_r.scope, sub_node)
+        pr = ir_fn_push(sub_r.function, ir_text_contains(text_r.id, sub_r.id))
+        result = ConvResult{function: pr.function, scope: sub_r.scope, id: pr.id}
+    if is_file_read:
+        path_node = at(args, 0)
+        path_r = ast_expr_to_ir(fn_value, scope, path_node)
+        pr = ir_fn_push(path_r.function, ir_file_read(path_r.id))
+        result = ConvResult{function: pr.function, scope: path_r.scope, id: pr.id}
+    if is_file_write:
+        path_node = at(args, 0)
+        content_node = at(args, 1)
+        path_r = ast_expr_to_ir(fn_value, scope, path_node)
+        content_r = ast_expr_to_ir(path_r.function, path_r.scope, content_node)
+        pr = ir_fn_push(content_r.function, ir_file_write(path_r.id, content_r.id))
+        result = ConvResult{function: pr.function, scope: content_r.scope, id: pr.id}
+    if is_argc:
+        pr = ir_fn_push(fn_value, ir_argc())
+        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    if is_argv:
+        idx_node = at(args, 0)
+        idx_r = ast_expr_to_ir(fn_value, scope, idx_node)
+        pr = ir_fn_push(idx_r.function, ir_argv(idx_r.id))
+        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+    if is_b_from_t:
+        arg_node = at(args, 0)
+        arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
+        pr = ir_fn_push(arg_r.function, ir_bytes_from_text(arg_r.id))
+        result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_b_to_t:
+        arg_node = at(args, 0)
+        arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
+        pr = ir_fn_push(arg_r.function, ir_bytes_to_text(arg_r.id))
+        result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_b_slice:
+        list_node = at(args, 0)
+        lo_node = at(args, 1)
+        hi_node = at(args, 2)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        lo_r = ast_expr_to_ir(list_r.function, list_r.scope, lo_node)
+        hi_r = ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node)
+        pr = ir_fn_push(hi_r.function, ir_bytes_slice(list_r.id, lo_r.id, hi_r.id))
+        result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
+    if is_b_concat:
+        a_node = at(args, 0)
+        b_node = at(args, 1)
+        a_r = ast_expr_to_ir(fn_value, scope, a_node)
+        b_r = ast_expr_to_ir(a_r.function, a_r.scope, b_node)
+        pr = ir_fn_push(b_r.function, ir_bytes_concat(a_r.id, b_r.id))
+        result = ConvResult{function: pr.function, scope: b_r.scope, id: pr.id}
+    if is_b_zeros:
+        n_node = at(args, 0)
+        n_r = ast_expr_to_ir(fn_value, scope, n_node)
+        pr = ir_fn_push(n_r.function, ir_bytes_zeros(n_r.id))
+        result = ConvResult{function: pr.function, scope: n_r.scope, id: pr.id}
+    if is_byte_at:
+        list_node = at(args, 0)
+        idx_node = at(args, 1)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
+        pr = ir_fn_push(idx_r.function, ir_list_at(list_r.id, idx_r.id))
+        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+    if is_b_length:
+        list_node = at(args, 0)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        pr = ir_fn_push(list_r.function, ir_list_len(list_r.id))
+        result = ConvResult{function: pr.function, scope: list_r.scope, id: pr.id}
+    if is_slot_get:
+        key_node = at(args, 0)
+        key_r = ast_expr_to_ir(fn_value, scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_slot_get(key_r.id))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_slot_set:
+        key_node = at(args, 0)
+        val_node = at(args, 1)
+        key_r = ast_expr_to_ir(fn_value, scope, key_node)
+        val_r = ast_expr_to_ir(key_r.function, key_r.scope, val_node)
+        pr = ir_fn_push(val_r.function, ir_slot_set(key_r.id, val_r.id))
+        result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
+    if is_get_int:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "i64"))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_get_map:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "map"))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_get_list:
+        map_node = at(args, 0)
+        key_node = at(args, 1)
+        map_r = ast_expr_to_ir(fn_value, scope, map_node)
+        key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
+        result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false)
+    if is_user_fn:
+        # User-defined fn call. Evaluate each arg and collect SSA ids.
+        total_args = len(args)
+        mut current_fn = fn_value
+        mut current_scope = scope
+        mut arg_ids = []
+        for arg_index in 0..<total_args:
+            arg_node = at(args, arg_index)
+            arg_r = ast_expr_to_ir(current_fn, current_scope, arg_node)
+            current_fn = arg_r.function
+            current_scope = arg_r.scope
+            arg_ids = push(arg_ids, arg_r.id)
+        call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
+        pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
+        result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+    result
+
+fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    op = get(node, "op")
+    operand_r = ast_expr_to_ir(fn_value, scope, get(node, "operand"))
+    if op == "not":
+        pr = ir_fn_push(operand_r.function, ir_inot(operand_r.id))
+        ConvResult{function: pr.function, scope: operand_r.scope, id: pr.id}
+    else:
+        if op == "neg":
+            # -x → 0 - x  (works for both i64 and our int type).
+            pr_z = ir_fn_push(operand_r.function, ir_iconst(0))
+            pr_s = ir_fn_push(pr_z.function, ir_isub(pr_z.id, operand_r.id))
+            ConvResult{function: pr_s.function, scope: operand_r.scope, id: pr_s.id}
+        else:
+            operand_r
+
+# Get the result type ("i64" / "text" / "ptr" / "void") of an SSA value.
+fn get_value_type(fn_value: IRFn, value_id: int) -> Text:
+    if value_id < 0:
+        "void"
+    else:
+        inst = at(fn_value.instructions, value_id)
+        inst.type_text
+
+
+fn ast_str_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    text = get(node, "value")
+    pr = ir_fn_push(fn_value, ir_const_str(text))
+    ConvResult{function: pr.function, scope: scope, id: pr.id}
+
+
+fn ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    items = get_list(node, "items")
+    n_items = len(items)
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut item_ids = []
+    for index in 0..<n_items:
+        item_node = at(items, index)
+        item_r = ast_expr_to_ir(current_fn, current_scope, item_node)
+        current_fn = item_r.function
+        current_scope = item_r.scope
+        item_ids = push(item_ids, item_r.id)
+    # Peek first item's type to encode "list:T". Default i64 for empty lists.
+    mut elem_type = "i64"
+    if n_items > 0:
+        first_id = at(item_ids, 0)
+        elem_type = get_value_type(current_fn, first_id)
+    pr = ir_fn_push(current_fn, ir_list_lit(item_ids, elem_type))
+    ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+
+
+# `match scrutinee: <pattern> -> <body>, ..., _ -> <default>`
+# Lower to a chain of if-tests storing into a result slot.
+fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    scrutinee_node = get(node, "scrutinee")
+    arms = get_list(node, "arms")
+    n_arms = len(arms)
+    n = len(fn_value.instructions)
+    end_lbl = "match_{n}_end"
+
+    scrut_r = ast_expr_to_ir(fn_value, scope, scrutinee_node)
+    scrut_id = scrut_r.id
+    scrut_type = get_value_type(scrut_r.function, scrut_id)
+
+    # Result slot. Best-effort type guess from the first arm body's kind.
+    # Str → text, Int → i64, else i64 default.
+    mut result_type = "i64"
+    if n_arms > 0:
+        first_body = get(at(arms, 0), "body")
+        first_kind = get(first_body, "kind")
+        if first_kind == "Str":
+            result_type = "text"
+    pr_alloca = ir_fn_push(scrut_r.function, ir_alloca(result_type))
+    result_ptr_id = pr_alloca.id
+    mut current_fn = pr_alloca.function
+    mut current_scope = scrut_r.scope
+
+    mut arm_index = 0
+    for arm_idx in 0..<n_arms:
+        arm = at(arms, arm_idx)
+        pat_kind = get(arm, "pat_kind")
+        pat_value = get(arm, "pattern")
+        body_node = get(arm, "body")
+        is_wildcard = pat_kind == "ident" and pat_value == "_"
+
+        body_lbl = "match_{n}_arm_{arm_index}_body"
+        next_lbl = "match_{n}_arm_{arm_index}_next"
+        arm_index = arm_index + 1
+
+        # Flat dispatch — deep nested if/else inside this for-loop
+        # mis-binds (see orion_nesting_bug.md). Each phase guards on
+        # is_wildcard / pat_kind via boolean flags.
+
+        # Detect variant pattern — pat_value is a known enum variant.
+        bindings = if has(arm, "bindings") then get_list(arm, "bindings") else []
+        mut variant_idx = 0 - 1
+        if (not is_wildcard) and pat_kind == "ident":
+            # Try every enum looking for this variant name.
+            n_enums = len(scope.en_names)
+            for ei in 0..<n_enums:
+                en_name = at(scope.en_names, ei)
+                v_idx = scope_lookup_enum_variant(scope, en_name, pat_value)
+                if v_idx >= 0 and variant_idx < 0:
+                    variant_idx = v_idx
+        is_variant = variant_idx >= 0
+
+        # Phase 1: emit pat (skip for wildcard).
+        do_int_pat = (not is_wildcard) and pat_kind == "int"
+        do_str_pat = (not is_wildcard) and pat_kind == "str"
+        do_variant_pat = is_variant
+        mut pat_id = 0 - 1
+        if do_int_pat:
+            pr_pat = ir_fn_push(current_fn, ir_iconst(parse_int(pat_value)))
+            current_fn = pr_pat.function
+            pat_id = pr_pat.id
+        if do_str_pat:
+            pr_pat = ir_fn_push(current_fn, ir_const_str(pat_value))
+            current_fn = pr_pat.function
+            pat_id = pr_pat.id
+        if do_variant_pat:
+            pr_pat = ir_fn_push(current_fn, ir_iconst(variant_idx))
+            current_fn = pr_pat.function
+            pat_id = pr_pat.id
+
+        # Phase 2: emit icmp + branch (skip for wildcard).
+        do_cmp = not is_wildcard
+        do_text_cmp = do_cmp and scrut_type == "text" and not do_variant_pat
+        do_int_cmp = do_cmp and scrut_type != "text" and not do_variant_pat
+        # Variant: load scrut.tag (field 0) then compare.
+        mut eq_id = 0 - 1
+        if do_variant_pat:
+            pr_load_tag = ir_fn_push(current_fn, ir_field_load(scrut_id, 0, "i64"))
+            current_fn = pr_load_tag.function
+            pr_eq = ir_fn_push(current_fn, ir_icmp_eq(pr_load_tag.id, pat_id))
+            current_fn = pr_eq.function
+            eq_id = pr_eq.id
+        if do_text_cmp:
+            pr_eq = ir_fn_push(current_fn, ir_text_cmp("text_eq", scrut_id, pat_id))
+            current_fn = pr_eq.function
+            eq_id = pr_eq.id
+        if do_int_cmp:
+            pr_eq = ir_fn_push(current_fn, ir_icmp_eq(scrut_id, pat_id))
+            current_fn = pr_eq.function
+            eq_id = pr_eq.id
+        if do_cmp:
+            pr_br_if = ir_fn_push(current_fn, ir_br_if(eq_id, body_lbl, next_lbl))
+            current_fn = pr_br_if.function
+            pr_body_lbl = ir_fn_push(current_fn, ir_label(body_lbl))
+            current_fn = pr_body_lbl.function
+
+        # Phase 2b: variant payload binding — load scrut's val_int slot (field 1)
+        # and bind to the first binding name. Crude: assumes int payload.
+        mut body_scope = current_scope
+        if do_variant_pat and len(bindings) > 0:
+            bind_name = at(bindings, 0)
+            pr_load_val = ir_fn_push(current_fn, ir_field_load(scrut_id, 1, "i64"))
+            current_fn = pr_load_val.function
+            body_scope = scope_bind(body_scope, bind_name, pr_load_val.id)
+
+        # Phase 3: body — emit for both wildcard and pattern arms.
+        body_r = ast_expr_to_ir(current_fn, body_scope, body_node)
+        current_fn = body_r.function
+        current_scope = body_r.scope
+        pr_store = ir_fn_push(current_fn, ir_store(result_ptr_id, body_r.id))
+        current_fn = pr_store.function
+        pr_br_end = ir_fn_push(current_fn, ir_br(end_lbl))
+        current_fn = pr_br_end.function
+
+        # Phase 4: next-arm-test label (skip for wildcard).
+        if do_cmp:
+            pr_next_lbl = ir_fn_push(current_fn, ir_label(next_lbl))
+            current_fn = pr_next_lbl.function
+
+    # If no wildcard, ensure the last "next" block has a terminator.
+    # Store 0 as default and br end.
+    if is_block_terminated(current_fn) == 0:
+        pr_zero = ir_fn_push(current_fn, ir_iconst(0))
+        pr_store0 = ir_fn_push(pr_zero.function, ir_store(result_ptr_id, pr_zero.id))
+        pr_br_end = ir_fn_push(pr_store0.function, ir_br(end_lbl))
+        current_fn = pr_br_end.function
+
+    # End block: load result.
+    pr_end_lbl = ir_fn_push(current_fn, ir_label(end_lbl))
+    pr_load = ir_fn_push(pr_end_lbl.function, ir_load(result_ptr_id, result_type))
+    ConvResult{function: pr_load.function, scope: scrut_r.scope, id: pr_load.id}
+
+
+fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    struct_name = get(node, "name")
+    fields = get_list(node, "fields")
+    spec = scope_lookup_data_spec(scope, struct_name)
+    if spec == "":
+        line = if has(node, "line") then get_int(node, "line") else 0
+        col = if has(node, "col") then get_int(node, "col") else 0
+        print_line("orion-self: ERROR at line {line}:{col} — unknown data type `{struct_name}`")
+    parts = parse_data_spec(spec)
+    n_fields_decl = len(parts)
+    n_provided = len(fields)
+    # Build value_ids in declared field order.
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut value_ids = []
+    for di in 0..<n_fields_decl:
+        decl_part = at(parts, di)
+        decl_bs = bytes_from_text(decl_part)
+        mut decl_name = ""
+        mut found_colon = 0
+        decl_bs_n = len(decl_bs)
+        for ci in 0..<decl_bs_n:
+            b = at(decl_bs, ci)
+            if found_colon == 0:
+                if b == 58:
+                    found_colon = 1
+                else:
+                    single = bytes_to_text([b])
+                    decl_name = "{decl_name}{single}"
+        # Search provided fields for decl_name.
+        mut matched_id = 0 - 1
+        for pi in 0..<n_provided:
+            prov = at(fields, pi)
+            if get(prov, "name") == decl_name and matched_id == (0 - 1):
+                val_r = ast_expr_to_ir(current_fn, current_scope, get(prov, "value"))
+                current_fn = val_r.function
+                current_scope = val_r.scope
+                matched_id = val_r.id
+        if matched_id == (0 - 1):
+            # Field missing — default to 0
+            pr_default = ir_fn_push(current_fn, ir_iconst(0))
+            current_fn = pr_default.function
+            matched_id = pr_default.id
+        value_ids = push(value_ids, matched_id)
+    pr = ir_fn_push(current_fn, ir_struct_cons(struct_name, n_fields_decl, value_ids))
+    ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+
+
+fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    obj_node = get(node, "object")
+    field_name = get(node, "field")
+    # Special-case `EnumName.Variant` — obj is an Ident matching a known enum,
+    # field is the variant. Lower to iconst(variant_index).
+    mut handled_enum = false
+    mut enum_result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    obj_kind = get(obj_node, "kind")
+    if obj_kind == "Ident":
+        obj_name = get(obj_node, "name")
+        var_idx = scope_lookup_enum_variant(scope, obj_name, field_name)
+        if var_idx >= 0:
+            pr = ir_fn_push(fn_value, ir_iconst(var_idx))
+            handled_enum = true
+            enum_result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    mut result = enum_result
+    if not handled_enum:
+        obj_r = ast_expr_to_ir(fn_value, scope, obj_node)
+        obj_type = get_value_type(obj_r.function, obj_r.id)
+        mut struct_name = ""
+        obj_bytes = bytes_from_text(obj_type)
+        n = len(obj_bytes)
+        mut past_colon = 0
+        for ci in 0..<n:
+            b = at(obj_bytes, ci)
+            if past_colon == 1:
+                single = bytes_to_text([b])
+                struct_name = "{struct_name}{single}"
+            else:
+                if b == 58:
+                    past_colon = 1
+        spec = scope_lookup_data_spec(scope, struct_name)
+        parts = parse_data_spec(spec)
+        field_idx = find_field_index(parts, field_name)
+        field_type = field_type_at(parts, field_idx)
+        if field_idx < 0:
+            line = if has(node, "line") then get_int(node, "line") else 0
+            col = if has(node, "col") then get_int(node, "col") else 0
+            print_line("orion-self: ERROR at line {line}:{col} — `{struct_name}` has no field `{field_name}`")
+        pr_load = ir_fn_push(obj_r.function, ir_field_load(obj_r.id, field_idx, field_type))
+        result = ConvResult{function: pr_load.function, scope: obj_r.scope, id: pr_load.id}
+    result
+
+
+fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    pairs = get_list(node, "pairs")
+    n_pairs = len(pairs)
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut pair_ids = []
+    for index in 0..<n_pairs:
+        pair = at(pairs, index)
+        key_text = get(pair, "key")
+        val_node = get(pair, "value")
+        # Emit const_str for key, walk value expr.
+        pr_key = ir_fn_push(current_fn, ir_const_str(key_text))
+        current_fn = pr_key.function
+        val_r = ast_expr_to_ir(current_fn, current_scope, val_node)
+        current_fn = val_r.function
+        current_scope = val_r.scope
+        pair_ids = push(pair_ids, pr_key.id)
+        pair_ids = push(pair_ids, val_r.id)
+    pr = ir_fn_push(current_fn, ir_map_lit(pair_ids))
+    ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+
+
+pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    kind = get(node, "kind")
+    is_block = kind == "Block"
+    is_int = kind == "Int"
+    is_str = kind == "Str"
+    is_binary = kind == "Binary"
+    is_ident = kind == "Ident"
+    is_call = kind == "Call"
+    is_if = kind == "If"
+    is_unary = kind == "Unary"
+    is_list_lit = kind == "ListLit"
+    is_map_lit = kind == "MapLit"
+    is_match = kind == "Match"
+    is_struct_cons = kind == "StructCons"
+    is_field = kind == "Field"
+    is_method_call = kind == "MethodCall"
+    is_question = kind == "Question"
+    is_perform = kind == "Perform"
+    mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    if is_block:
+        result = ast_block_to_ir(fn_value, scope, node)
+    if is_int:
+        result = ast_int_to_ir(fn_value, scope, node)
+    if is_str:
+        result = ast_str_to_ir(fn_value, scope, node)
+    if is_list_lit:
+        result = ast_list_lit_to_ir(fn_value, scope, node)
+    if is_map_lit:
+        result = ast_map_lit_to_ir(fn_value, scope, node)
+    if is_match:
+        result = ast_match_to_ir(fn_value, scope, node)
+    if is_struct_cons:
+        result = ast_struct_cons_to_ir(fn_value, scope, node)
+    if is_field:
+        result = ast_field_to_ir(fn_value, scope, node)
+    if is_binary:
+        result = ast_binop_to_ir(fn_value, scope, node)
+    if is_ident:
+        result = ast_ident_to_ir(fn_value, scope, node)
+    if is_call:
+        result = ast_call_to_ir(fn_value, scope, node)
+    if is_if:
+        result = ast_if_to_ir(fn_value, scope, node)
+    if is_unary:
+        result = ast_unary_to_ir(fn_value, scope, node)
+    if is_method_call:
+        method = get(node, "method")
+        receiver = get(node, "receiver")
+        m_args = get_list(node, "args")
+        # Sum type constructor sugar — `EnumName.Variant(arg)` becomes
+        # EnumName{tag: idx, val_int: arg, val_text: ""} (or val_text: arg).
+        # Detect when receiver is an Ident matching a known enum_name.
+        mut is_enum_cons = false
+        mut enum_name = ""
+        mut variant_idx = 0 - 1
+        if get(receiver, "kind") == "Ident":
+            rcv_name = get(receiver, "name")
+            v_idx = scope_lookup_enum_variant(scope, rcv_name, method)
+            if v_idx >= 0:
+                is_enum_cons = true
+                enum_name = rcv_name
+                variant_idx = v_idx
+        if is_enum_cons:
+            # Determine payload slot from arg type. Int → val_int, text → val_text.
+            payload_arg = if len(m_args) > 0 then at(m_args, 0) else {"kind": "Int", "value": "0"}
+            arg_kind = get(payload_arg, "kind")
+            is_text_payload = arg_kind == "Str"
+            # Default zero values for the unused slot.
+            zero_int = {"kind": "Int", "value": "0"}
+            zero_text = {"kind": "Str", "value": ""}
+            tag_field = {"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(variant_idx)}}
+            int_field = if is_text_payload then {"name": "val_int", "value": zero_int} else {"name": "val_int", "value": payload_arg}
+            text_field = if is_text_payload then {"name": "val_text", "value": payload_arg} else {"name": "val_text", "value": zero_text}
+            cons_node = {"kind": "StructCons", "name": enum_name, "fields": [tag_field, int_field, text_field]}
+            result = ast_struct_cons_to_ir(fn_value, scope, cons_node)
+        else:
+            mut new_args_list = [receiver]
+            n_m_args = len(m_args)
+            for ami in 0..<n_m_args:
+                new_args_list = push(new_args_list, at(m_args, ami))
+            line = if has(node, "line") then get_int(node, "line") else 0
+            col = if has(node, "col") then get_int(node, "col") else 0
+            call_node = {"kind": "Call", "callee": method, "args": new_args_list, "line": line, "col": col}
+            result = ast_call_to_ir(fn_value, scope, call_node)
+    # Catch SILENT dispatch failures: only fire if NONE of the kind checks
+    # matched (handled dispatchers legitimately return id=-1 for void blocks).
+    if is_question:
+        # `expr?` desugars to:
+        #   tmp = expr
+        #   if tmp.tag != 0: return tmp
+        #   tmp.val_int   ; the resulting expression value
+        inner = get(node, "inner")
+        inner_r = ast_expr_to_ir(fn_value, scope, inner)
+        tmp_id = inner_r.id
+        mut cur_fn = inner_r.function
+        # Load tag
+        pr_tag = ir_fn_push(cur_fn, ir_field_load(tmp_id, 0, "i64"))
+        cur_fn = pr_tag.function
+        # iconst 0 for compare
+        pr_zero = ir_fn_push(cur_fn, ir_iconst(0))
+        cur_fn = pr_zero.function
+        pr_ne = ir_fn_push(cur_fn, ir_icmp_ne(pr_tag.id, pr_zero.id))
+        cur_fn = pr_ne.function
+        # Branch to return-tmp block or continue
+        n_q = len(cur_fn.instructions)
+        ret_lbl = "q_{n_q}_ret"
+        cont_lbl = "q_{n_q}_cont"
+        pr_br = ir_fn_push(cur_fn, ir_br_if(pr_ne.id, ret_lbl, cont_lbl))
+        cur_fn = pr_br.function
+        # Return-tmp block
+        pr_ret_lbl = ir_fn_push(cur_fn, ir_label(ret_lbl))
+        cur_fn = pr_ret_lbl.function
+        pr_ret = ir_fn_push(cur_fn, ir_return(tmp_id))
+        cur_fn = pr_ret.function
+        # Continue block — unwrap val_int
+        pr_cont_lbl = ir_fn_push(cur_fn, ir_label(cont_lbl))
+        cur_fn = pr_cont_lbl.function
+        pr_val = ir_fn_push(cur_fn, ir_field_load(tmp_id, 1, "i64"))
+        result = ConvResult{function: pr_val.function, scope: inner_r.scope, id: pr_val.id}
+    if is_perform:
+        # MVP: dispatch through thread-local handler table. For now, no
+        # handler is installed, so call the runtime stub which returns 0.
+        # Future: real continuations via Windows Fibers + handler stack.
+        # Args are evaluated and dropped (default handler ignores them).
+        perf_args = get_list(node, "args")
+        n_pa = len(perf_args)
+        mut cur_fn = fn_value
+        mut cur_scope = scope
+        for pi in 0..<n_pa:
+            arg_node = at(perf_args, pi)
+            arg_r = ast_expr_to_ir(cur_fn, cur_scope, arg_node)
+            cur_fn = arg_r.function
+            cur_scope = arg_r.scope
+        # Stub: emit iconst(0). Real impl will lookup handler and call.
+        pr_zero = ir_fn_push(cur_fn, ir_iconst(0))
+        result = ConvResult{function: pr_zero.function, scope: cur_scope, id: pr_zero.id}
+    any_match = is_block or is_int or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform
+    if not any_match:
+        line = if has(node, "line") then get_int(node, "line") else 0
+        col = if has(node, "col") then get_int(node, "col") else 0
+        print_line("orion-self: ERROR at line {line}:{col} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
+        pr_fallback = ir_fn_push(fn_value, ir_iconst(0))
+        result = ConvResult{function: pr_fallback.function, scope: scope, id: pr_fallback.id}
+    result
+
+
+# Map a parser type-node to an IR type string ("text" / "list" / "i64").
+# Given a "list:T" encoding, return T. Fallback "i64" for plain "list".
+fn extract_list_elem(type_text: Text) -> Text:
+    bs = bytes_from_text(type_text)
+    n = len(bs)
+    mut is_param = false
+    if n >= 5:
+        if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
+            is_param = true
+    if not is_param:
+        "i64"
+    else:
+        mut result = ""
+        for ci in 5..<n:
+            single = bytes_to_text([at(bs, ci)])
+            result = "{result}{single}"
+        result
+
+
+fn ast_type_to_ir(type_node: Map) -> Text:
+    kind = get(type_node, "kind")
+    if kind == "List":
+        elem_node = get(type_node, "elem")
+        elem = ast_type_to_ir(elem_node)
+        "list:{elem}"
+    else:
+        name = get(type_node, "name")
+        if name == "Text":
+            "text"
+        else:
+            if name == "Map":
+                "map"
+            else:
+                # Capitalised names (Inst, Item, IRFn, …) are presumed
+                # to be data-struct types. Snake-case / lowercase names
+                # (int, bool, void) get the i64 default.
+                name_bs = bytes_from_text(name)
+                mut starts_cap = false
+                if len(name_bs) > 0:
+                    first = at(name_bs, 0)
+                    if first >= 65 and first <= 90:
+                        starts_cap = true
+                if starts_cap then "struct:{name}" else "i64"
+
+
+# Same as ast_type_to_ir but knows about data structs declared in scope.
+# A Named type whose name matches a struct decl becomes "struct:Name".
+fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
+    kind = get(type_node, "kind")
+    if kind == "List":
+        # Encode element type so list_at can return the right thing.
+        elem_node = get(type_node, "elem")
+        elem_type = ast_type_to_ir_with_scope(elem_node, scope)
+        "list:{elem_type}"
+    else:
+        name = get(type_node, "name")
+        if name == "Text":
+            "text"
+        else:
+            if name == "Map":
+                "map"
+            else:
+                ds_names = scope.ds_names
+                n_structs = len(ds_names)
+                mut is_struct = false
+                for si in 0..<n_structs:
+                    if at(ds_names, si) == name:
+                        is_struct = true
+                if is_struct then "struct:{name}" else "i64"
+
+
+pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
+    name = get(ast_fn, "name")
+    ret_type_node = get(ast_fn, "ret")
+    ret_type = ast_type_to_ir_with_scope(ret_type_node, initial_scope)
+    mut fn_value = ir_fn_new(name, ret_type)
+    params = get_list(ast_fn, "params")
+    n_params = len(params)
+    mut scope = initial_scope
+    for index in 0..<n_params:
+        param = at(params, index)
+        param_name = get(param, "name")
+        param_type_node = get(param, "type")
+        param_type = ast_type_to_ir_with_scope(param_type_node, initial_scope)
+        fn_value = ir_fn_add_param(fn_value, param_name, param_type)
+        pr = ir_fn_push(fn_value, ir_param(index, param_type))
+        fn_value = pr.function
+        scope = scope_bind(scope, param_name, pr.id)
+    body = get(ast_fn, "body")
+    body_result = ast_expr_to_ir(fn_value, scope, body)
+    # Only emit the trailing `ret` if the body didn't already terminate
+    # (avoids double-terminator when the body is e.g. an infinite loop).
+    if is_block_terminated(body_result.function) == 0:
+        ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
+        ret_result.function
+    else:
+        body_result.function
+
+
+pub fn ast_program_to_ir(program: Map) -> IRModule:
+    decls = get_list(program, "decls")
+    total = len(decls)
+    # Pass 1a: collect Data decls and Enum decls first. Pass 1b uses them so
+    # fn ret types like `-> Inst` correctly become "struct:Inst" not "i64",
+    # and `EnumName.Variant` expressions resolve to variant indices.
+    mut sig_scope = scope_empty()
+    for index in 0..<total:
+        decl = at(decls, index)
+        if get(decl, "kind") == "Data":
+            struct_name = get(decl, "name")
+            data_fields = get_list(decl, "fields")
+            n_df = len(data_fields)
+            mut spec = ""
+            for fi in 0..<n_df:
+                fld = at(data_fields, fi)
+                fld_name = get(fld, "name")
+                fld_type = ast_type_to_ir(get(fld, "type"))
+                sep = if fi == 0 then "" else "|"
+                spec = "{spec}{sep}{fld_name}:{fld_type}"
+            sig_scope = scope_add_data_decl(sig_scope, struct_name, spec)
+        if get(decl, "kind") == "Enum":
+            enum_name = get(decl, "name")
+            variants = get_list(decl, "variants")
+            n_vars = len(variants)
+            mut csv = ""
+            for vi in 0..<n_vars:
+                v = at(variants, vi)
+                v_name = get(v, "name")
+                sep = if vi == 0 then "" else ","
+                csv = "{csv}{sep}{v_name}"
+            sig_scope = scope_add_enum_decl(sig_scope, enum_name, csv)
+            # Sum types with payloads — synthesize a uniform tagged-union
+            # struct so `EnumName.Variant(arg)` and match destructuring can
+            # work on top of existing struct machinery. Fields:
+            #   tag       — variant index (int)
+            #   val_int   — int payload (if any)
+            #   val_text  — text payload (if any)
+            sig_scope = scope_add_data_decl(sig_scope, enum_name, "tag:int|val_int:int|val_text:text")
+    # Pass 1b: collect fn signatures, now with struct-aware ret types.
+    for index in 0..<total:
+        decl = at(decls, index)
+        if get(decl, "kind") == "Fn":
+            fn_name = get(decl, "name")
+            ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
+            sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
+
+    # Pass 2: build each fn's body with the signature scope available.
+    mut module = ir_module_new()
+    mut has_main = 0
+    for index in 0..<total:
+        decl = at(decls, index)
+        kind = get(decl, "kind")
+        if kind == "Fn":
+            fn_ir = ast_fn_to_ir(decl, sig_scope)
+            module = ir_module_add_fn(module, fn_ir)
+            if fn_ir.name == "main":
+                has_main = 1
+    if has_main == 0:
+        mut stub = ir_fn_new("main", "i64")
+        zero = ir_fn_push(stub, ir_iconst(0))
+        ret = ir_fn_push(zero.function, ir_return(zero.id))
+        module = ir_module_add_fn(module, ret.function)
+    module
+
+

@@ -1,0 +1,6 @@
+name = "orion_veil_to_wasm"
+version = "0.0.1"
+description = "Turn a Veil DrawCmd list into a wasm render() function"
+
+[orbs]
+orion_emit_wasm = "path:../orion_emit_wasm"

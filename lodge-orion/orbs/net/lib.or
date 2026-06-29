@@ -1,0 +1,35 @@
+# net — HTTP + TCP sockets. Game-friendly minimal API.
+#
+# HTTP for asset/leaderboard/news fetching, TCP for multiplayer.
+# Backed by Rust runtime (lodge-orion). Native (orion.exe) impl: future.
+
+extern fn __os_http_get(url: Text) -> Text
+extern fn __os_http_post(url: Text, body: Text) -> Text
+extern fn __os_tcp_connect(host: Text, port: int) -> int
+extern fn __os_tcp_send(handle: int, data: Text) -> int
+extern fn __os_tcp_recv(handle: int, max_bytes: int) -> Text
+extern fn __os_tcp_close(handle: int)
+
+# HTTP GET — fetch a URL, return body as Text. Empty string on error.
+pub fn http_get(url: Text) -> Text:
+    __os_http_get(url)
+
+# HTTP POST — send body to URL, return response as Text. Empty on error.
+pub fn http_post(url: Text, body: Text) -> Text:
+    __os_http_post(url, body)
+
+# Open a TCP connection. Returns a handle (>0) or -1 on error.
+pub fn tcp_connect(host: Text, port: int) -> int:
+    __os_tcp_connect(host, port)
+
+# Send bytes to a TCP handle. Returns bytes sent or -1 on error.
+pub fn tcp_send(handle: int, data: Text) -> int:
+    __os_tcp_send(handle, data)
+
+# Read up to max_bytes from a TCP handle. Returns the bytes as Text.
+pub fn tcp_recv(handle: int, max_bytes: int) -> Text:
+    __os_tcp_recv(handle, max_bytes)
+
+# Close a TCP handle.
+pub fn tcp_close(handle: int):
+    __os_tcp_close(handle)

@@ -1,0 +1,113 @@
+use orion_emit_wasm
+use io
+use fs
+
+# Veil-on-canvas: pure Orion builds wasm whose exported `render(seq)`
+# calls host imports to draw a small UI scene — header, two cards, a
+# button. This is the architecture every Veil app will share once the
+# resolver feeds DrawCmds through.
+
+# JS-side imports (env namespace, in this order):
+#   0  set_fill(r, g, b)           — sets canvas fill colour
+#   1  fill_rect(x, y, w, h)       — paints a filled rectangle
+#   2  set_stroke(r, g, b)         — sets canvas stroke colour
+#   3  stroke_rect(x, y, w, h)     — paints a rect outline
+#   4  set_font_px(size)           — sets text size (font family fixed)
+#   5  draw_text(x, y, glyph_idx)  — draws one glyph from the JS table
+
+fn idx_set_fill() -> int = comptime 0
+fn idx_fill_rect() -> int = comptime 1
+fn idx_set_stroke() -> int = comptime 2
+fn idx_stroke_rect() -> int = comptime 3
+fn idx_set_font_px() -> int = comptime 4
+fn idx_draw_text() -> int = comptime 5
+
+fn main() -> int:
+    print_line("veil canvas demo — building wasm")
+    mkdir_all("dist")
+
+    module = new_module()
+    m1 = add_import(module, new_import("env", "set_fill", 3, 0))
+    m2 = add_import(m1, new_import("env", "fill_rect", 4, 0))
+    m3 = add_import(m2, new_import("env", "set_stroke", 3, 0))
+    m4 = add_import(m3, new_import("env", "stroke_rect", 4, 0))
+    m5 = add_import(m4, new_import("env", "set_font_px", 1, 0))
+    m6 = add_import(m5, new_import("env", "draw_text", 3, 0))
+
+    render_fn = build_render_fn()
+    m7 = add_fn(m6, render_fn)
+
+    wasm_bytes = encode_module(m7)
+    write_wasm("dist/veil.wasm", wasm_bytes)
+    print_line("wrote dist/veil.wasm")
+
+    write_file("dist/index.html", html_shell())
+    write_file("dist/main.js", canvas_runtime())
+    print_line("wrote dist/index.html + dist/main.js")
+    print_line("open dist/index.html in a browser to see a Veil scene")
+    0
+
+fn build_render_fn() -> WFn:
+    f0 = new_fn("render", 0)
+    f1 = paint_background(f0)
+    f2 = paint_header(f1)
+    f3 = paint_card(f2, 20, 80, 0)      # First card at y=80, glyph "H"
+    f4 = paint_card(f3, 20, 180, 1)     # Second card at y=180, glyph "I"
+    f5 = paint_button(f4)
+    f6 = emit_const(f5, 0)              # Return 0 (wasm needs i32 result)
+    emit_end(f6)
+
+# Whole-canvas slate-50 background: rgb(248,250,252).
+fn paint_background(fn_value: WFn) -> WFn:
+    f1 = emit_call_3(fn_value, idx_set_fill(), 248, 250, 252)
+    emit_call_4(f1, idx_fill_rect(), 0, 0, 480, 320)
+
+# Header band — sky-500 fill, white "title" at (24, 38).
+fn paint_header(fn_value: WFn) -> WFn:
+    f1 = emit_call_3(fn_value, idx_set_fill(), 14, 165, 233)
+    f2 = emit_call_4(f1, idx_fill_rect(), 0, 0, 480, 56)
+    f3 = emit_call_3(f2, idx_set_fill(), 255, 255, 255)
+    f4 = emit_call_1(f3, idx_set_font_px(), 22)
+    emit_call_3(f4, idx_draw_text(), 24, 38, 2)  # glyph 2 = "Veil"
+
+# One card — white fill, slate-200 stroke, label glyph at top-left.
+fn paint_card(fn_value: WFn, x: int, y: int, glyph: int) -> WFn:
+    f1 = emit_call_3(fn_value, idx_set_fill(), 255, 255, 255)
+    f2 = emit_call_4(f1, idx_fill_rect(), x, y, 440, 80)
+    f3 = emit_call_3(f2, idx_set_stroke(), 226, 232, 240)
+    f4 = emit_call_4(f3, idx_stroke_rect(), x, y, 440, 80)
+    f5 = emit_call_3(f4, idx_set_fill(), 15, 23, 42)
+    f6 = emit_call_1(f5, idx_set_font_px(), 16)
+    emit_call_3(f6, idx_draw_text(), x + 16, y + 28, glyph)
+
+# Footer button — sky-500 fill, white label.
+fn paint_button(fn_value: WFn) -> WFn:
+    f1 = emit_call_3(fn_value, idx_set_fill(), 14, 165, 233)
+    f2 = emit_call_4(f1, idx_fill_rect(), 20, 280, 120, 32)
+    f3 = emit_call_3(f2, idx_set_fill(), 255, 255, 255)
+    f4 = emit_call_1(f3, idx_set_font_px(), 14)
+    emit_call_3(f4, idx_draw_text(), 50, 301, 3)  # glyph 3 = "Click"
+
+# Helpers — fixed-arity host call wrappers.
+fn emit_call_1(fn_value: WFn, host_index: int, a: int) -> WFn:
+    f1 = emit_const(fn_value, a)
+    emit_call(f1, host_index)
+
+fn emit_call_3(fn_value: WFn, host_index: int, a: int, b: int, c: int) -> WFn:
+    f1 = emit_const(fn_value, a)
+    f2 = emit_const(f1, b)
+    f3 = emit_const(f2, c)
+    emit_call(f3, host_index)
+
+fn emit_call_4(fn_value: WFn, host_index: int, a: int, b: int, c: int, d: int) -> WFn:
+    f1 = emit_const(fn_value, a)
+    f2 = emit_const(f1, b)
+    f3 = emit_const(f2, c)
+    f4 = emit_const(f3, d)
+    emit_call(f4, host_index)
+
+fn html_shell() -> Text:
+    "<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>Veil — pure Orion</title>\n<style>body\{font-family:system-ui,sans-serif;padding:20px;background:#0f172a;color:#f1f5f9\}h1\{font-weight:600;margin-bottom:16px\}canvas\{display:block;background:#fff;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,0.4)\}</style></head>\n<body><h1>Veil scene — rendered by pure-Orion wasm</h1>\n<canvas id=\"c\" width=\"480\" height=\"320\"></canvas>\n<script src=\"main.js\"></script></body></html>\n"
+
+fn canvas_runtime() -> Text:
+    "// host imports map directly to <canvas> 2D ops. Pure Orion wasm\n// drives the sequence; this file is the painter.\nconst canvas = document.getElementById('c');\nconst ctx = canvas.getContext('2d');\n\n// Tiny glyph table — the wasm passes the index, we paint the label.\nconst glyphs = ['Header', 'Item', 'Veil', 'Click'];\n\nlet currentFont = '16px system-ui, sans-serif';\nlet currentFill = '#000';\nlet currentStroke = '#000';\n\nconst env = \{\n  set_fill: (r, g, b) => \{\n    currentFill = `rgb($\{r\}, $\{g\}, $\{b\})`;\n    ctx.fillStyle = currentFill;\n  \},\n  fill_rect: (x, y, w, h) => \{\n    ctx.fillStyle = currentFill;\n    ctx.fillRect(x, y, w, h);\n  \},\n  set_stroke: (r, g, b) => \{\n    currentStroke = `rgb($\{r\}, $\{g\}, $\{b\})`;\n    ctx.strokeStyle = currentStroke;\n  \},\n  stroke_rect: (x, y, w, h) => \{\n    ctx.strokeStyle = currentStroke;\n    ctx.strokeRect(x, y, w, h);\n  \},\n  set_font_px: (size) => \{\n    currentFont = `$\{size\}px system-ui, sans-serif`;\n    ctx.font = currentFont;\n  \},\n  draw_text: (x, y, glyphIdx) => \{\n    ctx.font = currentFont;\n    ctx.fillStyle = currentFill;\n    ctx.fillText(glyphs[glyphIdx] || '?', x, y);\n  \}\n\};\n\nasync function boot() \{\n  try \{\n    const response = await fetch('veil.wasm');\n    const \{ instance \} = await WebAssembly.instantiateStreaming(response, \{ env \});\n    instance.exports.render();\n  \} catch (e) \{\n    document.body.append(document.createTextNode('boot error: ' + e));\n  \}\n\}\nboot();\n"

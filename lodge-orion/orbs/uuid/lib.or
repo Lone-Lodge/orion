@@ -1,0 +1,59 @@
+# uuid — RFC 4122 v4 (random) UUIDs, fully pure Orion.
+#
+# State is held in slot `"uuid:splitmix"` — same SplitMix64 sequence as
+# the original Rust impl, just with state stored via slot_get/slot_set.
+
+fn splitmix_step(previous_state: int) -> int:
+    new_state = previous_state + 0x9E37_79B9_7F4A_7C15
+    mixed = (new_state ^ (new_state >> 30)) * 0xBF58_476D_1CE4_E5B9
+    mixed2 = (mixed ^ (mixed >> 27)) * 0x94D0_49BB_1331_11EB
+    mixed2 ^ (mixed2 >> 31)
+
+fn next_pair() -> [int]:
+    stored = slot_get("uuid:splitmix")
+    seed = if type_of(stored) == "none" then 0xCAFE_F00D_DEAD_BEEF else stored
+    high_state = seed + 0x9E37_79B9_7F4A_7C15
+    high_value = splitmix_step(seed)
+    low_value = splitmix_step(high_state)
+    slot_set("uuid:splitmix", high_state)
+    [high_value, low_value]
+
+# Hex digit byte code for `value & 15`.
+fn hex_byte(value: int) -> int:
+    nibble = value & 15
+    if nibble < 10 then nibble + 48
+    else nibble + 87
+
+# Push the 16 hex digits of `value` (treated as u64) into `output`.
+fn push_u64_hex(output: [int], value: int) -> [int]:
+    mut buffer = output
+    mut digit_index = 0
+    loop:
+        if digit_index >= 16:
+            break
+        shift = 60 - digit_index * 4
+        buffer = push(buffer, hex_byte(value >> shift))
+        digit_index += 1
+    buffer
+
+# Force the version-4 and variant-10 bits of a UUID pair into the right slots.
+fn force_v4_bits(pair: [int]) -> [int]:
+    high = (at(pair, 0) & 0xFFFF_FFFF_FFFF_0FFF) | 0x0000_0000_0000_4000
+    low = (at(pair, 1) & 0x3FFF_FFFF_FFFF_FFFF) | 0x8000_0000_0000_0000
+    [high, low]
+
+pub fn uuid_v4() -> Text:
+    forced = force_v4_bits(next_pair())
+    hex_bytes = push_u64_hex(push_u64_hex(bytes_zeros(0), at(forced, 0)), at(forced, 1))
+    # Insert dashes at positions 8, 13, 18, 23.
+    mut output = bytes_zeros(0)
+    for index in 0..<32:
+        if index == 8 or index == 12 or index == 16 or index == 20:
+            output = push(output, 45)    # '-'
+        output = push(output, byte_at(hex_bytes, index))
+    bytes_to_text(output)
+
+pub fn uuid_v4_compact() -> Text:
+    forced = force_v4_bits(next_pair())
+    hex_bytes = push_u64_hex(push_u64_hex(bytes_zeros(0), at(forced, 0)), at(forced, 1))
+    bytes_to_text(hex_bytes)

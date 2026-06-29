@@ -1,0 +1,93 @@
+# text — common text helpers callable via method-call syntax.
+#
+# Once you `use text`, you get:
+#   msg.is_empty()
+#   msg.starts_with("hello")
+#   msg.ends_with("!")
+#   msg.byte_count()
+#
+# All thanks to MethodCall desugar: `msg.starts_with("x")` lowers to
+# `starts_with(msg, "x")`.
+
+pub fn is_empty(t: Text) -> int:
+    if len(t) == 0 then 1 else 0
+
+pub fn byte_count(t: Text) -> int:
+    bytes_length(bytes_from_text(t))
+
+pub fn starts_with(t: Text, prefix: Text) -> int:
+    t_bytes = bytes_from_text(t)
+    p_bytes = bytes_from_text(prefix)
+    t_len = bytes_length(t_bytes)
+    p_len = bytes_length(p_bytes)
+    mut result = 1
+    if p_len > t_len:
+        result = 0
+    if p_len <= t_len:
+        for ci in 0..<p_len:
+            tb = byte_at(t_bytes, ci)
+            pb = byte_at(p_bytes, ci)
+            if tb != pb:
+                result = 0
+    result
+
+pub fn ends_with(t: Text, suffix: Text) -> int:
+    t_bytes = bytes_from_text(t)
+    s_bytes = bytes_from_text(suffix)
+    t_len = bytes_length(t_bytes)
+    s_len = bytes_length(s_bytes)
+    mut result = 1
+    if s_len > t_len:
+        result = 0
+    if s_len <= t_len:
+        offset = t_len - s_len
+        for ci in 0..<s_len:
+            tb = byte_at(t_bytes, ci + offset)
+            sb = byte_at(s_bytes, ci)
+            if tb != sb:
+                result = 0
+    result
+
+# Repeat `t` `n` times. Returns "" if n <= 0.
+pub fn repeat(t: Text, n: int) -> Text:
+    mut result = ""
+    if n > 0:
+        for _ in 0..<n:
+            result = "{result}{t}"
+    result
+
+# Reverse the bytes (ASCII-safe only).
+pub fn reverse(t: Text) -> Text:
+    t_bytes = bytes_from_text(t)
+    n = bytes_length(t_bytes)
+    mut out = bytes_zeros(0)
+    for ci in 0..<n:
+        idx = n - 1 - ci
+        out = bytes_concat(out, bytes_slice(t_bytes, idx, idx + 1))
+    bytes_to_text(out)
+
+# Convert ASCII letters to upper case (in place, ASCII only).
+pub fn upper(t: Text) -> Text:
+    t_bytes = bytes_from_text(t)
+    n = bytes_length(t_bytes)
+    mut out = bytes_zeros(0)
+    for ci in 0..<n:
+        b = byte_at(t_bytes, ci)
+        mut new_b = b
+        if b >= 97 and b <= 122:
+            new_b = b - 32
+        out = bytes_concat(out, [new_b])
+    bytes_to_text(out)
+
+# Convert ASCII letters to lower case.
+pub fn lower(t: Text) -> Text:
+    t_bytes = bytes_from_text(t)
+    n = bytes_length(t_bytes)
+    mut out = bytes_zeros(0)
+    for ci in 0..<n:
+        b = byte_at(t_bytes, ci)
+        mut new_b = b
+        if b >= 65 and b <= 90:
+            new_b = b + 32
+        out = bytes_concat(out, [new_b])
+    bytes_to_text(out)

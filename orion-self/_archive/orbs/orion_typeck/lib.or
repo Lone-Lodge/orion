@@ -1,0 +1,112 @@
+use bytes
+use string
+
+# orion_self_typeck — Orion type checker written in Orion. STEP 5 PROOF.
+#
+# Walks the AST produced by `self_parse` and verifies the return type
+# matches what the body evaluates to. Param names are bound to their
+# declared types in a local scope; identifier and binary expressions
+# resolve against it.
+#
+# This is a *proof* — it handles:
+#   - Ident lookup against the param scope
+#   - Int literal → int
+#   - Binary `+`/`-` requiring both operands int → int
+#   - Fn return-type check
+#
+# The full type checker also handles: unification with `Unknown`, generic
+# types, [T] lists, Maps, ownership, control flow, mut bindings, traits,
+# and several thousand lines of detail. Same skeleton — orders of
+# magnitude more cases.
+
+# --- scope: list of {"name": Text, "type": Text} entries ---
+
+fn tck_scope_empty():
+    []
+
+fn tck_scope_bind(scope, name: Text, type_name: Text):
+    push(scope, {"name": name, "type": type_name})
+
+fn tck_scope_lookup(scope, name: Text) -> Text:
+    total = len(scope)
+    mut found = ""
+    for index in 0..<total:
+        entry = at(scope, index)
+        if bytes_to_text(bytes_from_text(get(entry, "name"))) == name:
+            found = bytes_to_text(bytes_from_text(get(entry, "type")))
+    found
+
+# --- expression type inference ---
+
+fn tck_infer_expr(node, scope) -> Text:
+    kind = bytes_to_text(bytes_from_text(get(node, "kind")))
+    if kind == "Int":
+        "int"
+    else:
+        if kind == "Ident":
+            name = bytes_to_text(bytes_from_text(get(node, "name")))
+            looked_up = tck_scope_lookup(scope, name)
+            if looked_up == "":
+                "error:unbound:" + name
+            else:
+                looked_up
+        else:
+            if kind == "Binary":
+                left_type = tck_infer_expr(get(node, "left"), scope)
+                right_type = tck_infer_expr(get(node, "right"), scope)
+                operator = bytes_to_text(bytes_from_text(get(node, "op")))
+                tck_check_binary(operator, left_type, right_type)
+            else:
+                if kind == "Call":
+                    # The proof doesn't model function signatures across
+                    # the program — flag the call as `?` so a richer
+                    # typeck can fill it in later.
+                    "?"
+                else:
+                    "error:unknown-expr"
+
+fn tck_check_binary(op: Text, left_type: Text, right_type: Text) -> Text:
+    if (op == "+" or op == "-") and left_type == "int" and right_type == "int":
+        "int"
+    else:
+        "error:binop:" + op + ":" + left_type + "," + right_type
+
+# --- fn-level check ---
+#
+# Returns "" on success or an error string. Surfaces:
+#   * unbound identifier
+#   * mismatched return type
+#   * unsupported binary op
+
+fn tck_check_fn(fn_node) -> Text:
+    declared_ret = bytes_to_text(bytes_from_text(get(get(fn_node, "ret"), "name")))
+    params = get(fn_node, "params")
+    mut scope = tck_scope_empty()
+    param_count = len(params)
+    for index in 0..<param_count:
+        param = at(params, index)
+        param_name = bytes_to_text(bytes_from_text(get(param, "name")))
+        param_type = bytes_to_text(bytes_from_text(get(get(param, "type"), "name")))
+        scope = tck_scope_bind(scope, param_name, param_type)
+    body_type = tck_infer_expr(get(fn_node, "body"), scope)
+    if str_starts_with(body_type, "error"):
+        body_type
+    else:
+        if body_type == declared_ret:
+            ""
+        else:
+            "error:return:expected " + declared_ret + ", got " + body_type
+
+# --- program-level check ---
+
+pub fn self_typeck(ast) -> [Text]:
+    decls = get(ast, "decls")
+    decl_count = len(decls)
+    mut diagnostics = []
+    for index in 0..<decl_count:
+        fn_node = at(decls, index)
+        result = tck_check_fn(fn_node)
+        if result != "":
+            fn_name = bytes_to_text(bytes_from_text(get(fn_node, "name")))
+            diagnostics = push(diagnostics, "in fn " + fn_name + ": " + result)
+    diagnostics

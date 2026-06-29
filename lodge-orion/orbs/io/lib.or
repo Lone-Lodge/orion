@@ -1,0 +1,29 @@
+# io — file I/O and line-based stdio. Pure Orion on top of OS primitives.
+
+extern fn __os_read_file(path: Text) -> Text
+extern fn __os_write_file(path: Text, contents: Text) -> bool
+extern fn __os_write_bytes(path: Text, content_bytes: [int]) -> bool
+extern fn __os_print_line(line: Text)
+extern fn __os_read_line() -> Text
+extern fn __os_file_exists(path: Text) -> bool
+
+pub fn read_file(path: Text) -> Text:
+    __os_read_file(path)
+
+pub fn write_file(path: Text, contents: Text) -> bool:
+    __os_write_file(path, contents)
+
+# Write a raw [int] byte sequence to disk. Use for binary outputs
+# (PE/ELF/Mach-O exes, PNGs, etc.) where bytes_to_text would corrupt
+# values ≥ 0x80 via UTF-8 lossy replacement.
+pub fn write_file_bytes(path: Text, content_bytes: [int]) -> bool:
+    __os_write_bytes(path, content_bytes)
+
+pub fn print_line(line: Text):
+    __os_print_line(line)
+
+pub fn read_line() -> Text:
+    __os_read_line()
+
+pub fn file_exists(path: Text) -> bool:
+    __os_file_exists(path)

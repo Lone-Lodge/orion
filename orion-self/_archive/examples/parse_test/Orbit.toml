@@ -1,0 +1,10 @@
+[package]
+name = "parse-test"
+version = "0.0.1"
+
+[orbs]
+orion_lex = "path:../../orbs/orion_lex"
+orion_parse = "path:../../orbs/orion_parse"
+bytes = "*"
+io = "*"
+fs = "*"

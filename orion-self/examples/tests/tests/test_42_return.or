@@ -1,0 +1,9 @@
+fn find_first(target: int) -> int:
+    nums = [10, 42, 99, 7]
+    for x in nums:
+        if x == target:
+            return x
+    return 0 - 1
+
+fn main() -> int:
+    find_first(42)

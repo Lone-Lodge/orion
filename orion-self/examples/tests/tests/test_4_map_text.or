@@ -1,0 +1,12 @@
+fn main() -> int:
+    m = {"kind": "Block", "name": "main"}
+    mut score = 0
+    if get(m, "kind") == "Block":
+        score = score + 1
+    if get(m, "name") == "main":
+        score = score + 1
+    if has(m, "kind"):
+        score = score + 1
+    if not has(m, "missing"):
+        score = score + 1
+    score

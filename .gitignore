@@ -1,0 +1,40 @@
+# orion monorepo (lodge-orion + orion-self).
+# Other lone-lodge projects live in sibling dirs with their own repos.
+
+# === Sibling projects (their own repos) ===
+astra/
+atlas/
+skriva/
+veil/
+
+# === Build artifacts ===
+**/target/
+**/dist/
+**/node_modules/
+**/.cargo/
+**/.rustup/
+
+# === Generated files ===
+*.exe
+*.dll
+*.obj
+*.ll
+*.pdb
+*.lib
+*.exp
+
+# === IDE / OS ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# === Scratch / temp ===
+scratchpad/
+*.log
+nul
+
+# === Lock files we don't track (regenerate from manifests) ===
+Cargo.lock

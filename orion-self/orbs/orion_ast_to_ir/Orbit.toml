@@ -1,0 +1,6 @@
+name = "orion_ast_to_ir"
+version = "0.1.0"
+description = "Walk an Orion AST and produce typed IR for v2 codegen"
+
+[orbs]
+orion_ir = "path:../orion_ir"

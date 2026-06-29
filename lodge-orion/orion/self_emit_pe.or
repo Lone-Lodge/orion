@@ -1,0 +1,129 @@
+# self_emit_pe — emit a minimal Windows x64 PE file in pure Orion.
+#
+# "Like Go": no external linker, no gcc, no C runtime. Orion code
+# produces a 1024-byte .exe whose entry point does `mov eax, 42; ret`,
+# which Windows treats as the process exit code.
+#
+# Layout (file offsets):
+#   0x000  DOS header (MZ + e_lfanew → 0x40)
+#   0x040  PE\0\0 + COFF header + PE32+ optional header (240 B)
+#   0x148  Section header for .text (40 B)
+#   0x200  .text content (machine code), padded to 0x200
+#
+# Total file size: 0x400 = 1024 bytes.
+#
+# Buffer state lives in a `pe:buf` slot to dodge the "everything is
+# immutable" friction — each `set(list, i, v)` returns a new list, so
+# we re-stash it after every write.
+
+# --- buffer slot wrappers ---
+
+fn pe_buf_get():
+    slot_get("pe:buf")
+
+fn pe_buf_init(size: int):
+    slot_set("pe:buf", bytes_zeros(size))
+
+fn pe_buf_take():
+    slot_get("pe:buf")
+
+# --- little-endian byte writers (read-modify-write the slot) ---
+
+fn pe_write_u8(offset: int, value: int):
+    # Mask to a single byte. write_file_bytes clamps >255 to 255, which
+    # is wrong for u16/u32 writes that chain through here — we want the
+    # LSB. `% 256` is the canonical fix; Orion's `%` does C-style trunc.
+    masked = value - (value / 256) * 256
+    slot_set("pe:buf", set(pe_buf_get(), offset, masked))
+
+fn pe_write_u16(offset: int, value: int):
+    pe_write_u8(offset, value)
+    pe_write_u8(offset + 1, value / 256)
+
+fn pe_write_u32(offset: int, value: int):
+    pe_write_u8(offset, value)
+    pe_write_u8(offset + 1, value / 256)
+    pe_write_u8(offset + 2, value / 65536)
+    pe_write_u8(offset + 3, value / 16777216)
+
+# 64-bit fields are passed as (low_u32, high_u32) — Orion ints are i64
+# but Map/Int handling gets cranky with values > 2^31 in some paths, so
+# splitting keeps everything in safe territory.
+fn pe_write_u64(offset: int, low_u32: int, high_u32: int):
+    pe_write_u32(offset, low_u32)
+    pe_write_u32(offset + 4, high_u32)
+
+fn pe_write_bytes(offset: int, byte_list):
+    count = len(byte_list)
+    for index in 0..<count:
+        pe_write_u8(offset + index, at(byte_list, index))
+
+pub fn pe_build():
+    pe_buf_init(1024)
+
+    # ---- DOS header ----
+    pe_write_u8(0, 77)             # 'M'
+    pe_write_u8(1, 90)             # 'Z'
+    pe_write_u32(60, 64)           # e_lfanew → PE header at 0x40
+
+    # ---- PE signature @ 0x40 ----
+    pe_write_u8(64, 80)            # 'P'
+    pe_write_u8(65, 69)            # 'E'
+
+    # ---- COFF header @ 0x44 ----
+    pe_write_u16(68, 34404)        # Machine: 0x8664 (AMD64)
+    pe_write_u16(70, 1)            # NumberOfSections
+    pe_write_u16(84, 240)          # SizeOfOptionalHeader (PE32+)
+    pe_write_u16(86, 34)           # 0x22: EXECUTABLE_IMAGE | LARGE_ADDR_AWARE
+
+    # ---- Optional header @ 0x58 ----
+    pe_write_u16(88, 523)          # Magic: 0x20b (PE32+)
+    pe_write_u8(90, 14)            # MajorLinkerVersion
+    pe_write_u32(92, 512)          # SizeOfCode
+    pe_write_u32(104, 4096)        # AddressOfEntryPoint (RVA = 0x1000)
+    pe_write_u32(108, 4096)        # BaseOfCode
+
+    # ImageBase @ 0x70 (8 bytes): 0x140000000  → low=0x40000000, high=1
+    pe_write_u64(112, 1073741824, 1)
+
+    pe_write_u32(120, 4096)        # SectionAlignment (0x1000)
+    pe_write_u32(124, 512)         # FileAlignment   (0x200)
+    pe_write_u16(128, 6)           # MajorOSVersion
+    pe_write_u16(136, 6)           # MajorSubsystemVersion
+    pe_write_u32(144, 8192)        # SizeOfImage     (0x2000)
+    pe_write_u32(148, 512)         # SizeOfHeaders   (0x200)
+    pe_write_u16(156, 3)           # Subsystem: CONSOLE
+
+    pe_write_u64(160, 1048576, 0)  # SizeOfStackReserve = 0x100000
+    pe_write_u64(168, 4096, 0)     # SizeOfStackCommit  = 0x1000
+    pe_write_u64(176, 1048576, 0)  # SizeOfHeapReserve  = 0x100000
+    pe_write_u64(184, 4096, 0)     # SizeOfHeapCommit   = 0x1000
+    pe_write_u32(196, 16)          # NumberOfRvaAndSizes
+
+    # ---- Section header @ 0x148 ----
+    # ".text\0\0\0" = [46, 116, 101, 120, 116, 0, 0, 0]
+    section_name = push(push(push(push(push(push(push(push([], 46), 116), 101), 120), 116), 0), 0), 0)
+    pe_write_bytes(328, section_name)
+    pe_write_u32(336, 512)         # VirtualSize
+    pe_write_u32(340, 4096)        # VirtualAddress (RVA = 0x1000)
+    pe_write_u32(344, 512)         # SizeOfRawData
+    pe_write_u32(348, 512)         # PointerToRawData (file offset = 0x200)
+    pe_write_u32(364, 1610612768)  # 0x60000020: CODE | EXECUTE | READ
+
+    # ---- .text section @ 0x200 ----
+    # mov eax, 42      → B8 2A 00 00 00
+    # ret              → C3
+    pe_write_u8(512, 184)          # 0xB8
+    pe_write_u8(513, 42)           # 0x2A — the exit code we want
+    pe_write_u8(517, 195)          # 0xC3 — RET
+
+    pe_buf_take()
+
+pub fn self_emit_pe_run():
+    pe_bytes = pe_build()
+    print("PE bytes built — length:")
+    print(len(pe_bytes))
+    mkdir_all("build")
+    output_path = "build/orion.exe"
+    write_file_bytes(output_path, pe_bytes)
+    print("wrote " + output_path)

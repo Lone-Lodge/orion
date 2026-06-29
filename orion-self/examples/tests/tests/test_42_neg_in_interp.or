@@ -1,0 +1,12 @@
+fn main() -> int:
+    x = -5
+    y = -10
+    # Just var ref in interp (no expression)
+    msg = "x={x} y={y}"
+    if contains(msg, "x=-5"):
+        if contains(msg, "y=-10"):
+            42
+        else:
+            0
+    else:
+        0

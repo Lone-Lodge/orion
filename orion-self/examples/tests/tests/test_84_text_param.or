@@ -1,0 +1,5 @@
+fn length_score(name: Text) -> int:
+    if name == "Orion" then 42 else 0
+
+fn main() -> int:
+    length_score("Orion") + length_score("Orion")

@@ -1,0 +1,8 @@
+# String interpolation: `{ … }` embeds any expression, converted to text.
+#   orion run examples/strings.or demo
+
+fn greet(name: Text, hp: int) -> int:
+    print("hello {name} — hp {hp}, doubled {hp * 2}")
+    0
+
+fn demo() -> int = greet("Mae", 21)
