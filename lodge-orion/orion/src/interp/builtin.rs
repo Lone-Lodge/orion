@@ -47,6 +47,10 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     // the LLVM emit pass can lower the same calls to `<N x i64>` vector
     // ops once the IR backend gains vector type support.
     ("vec_add", 2), ("vec_sub", 2), ("vec_mul", 2), ("vec_dot", 2),
+    // Async runtime primitives. `time_now_ms` is wall-clock (deterministic
+    // mode forbids it); `monotonic_ms` is the safe alternative for
+    // measuring elapsed time. `sleep_ms` yields to the OS.
+    ("time_now_ms", 0), ("monotonic_ms", 0), ("sleep_ms", 1),
 ];
 
 pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
@@ -108,6 +112,28 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         "vec_sub" => vec_op(&args, "vec_sub", |x, y| x.wrapping_sub(y)),
         "vec_mul" => vec_op(&args, "vec_mul", |x, y| x.wrapping_mul(y)),
         "vec_dot" => vec_dot(&args),
+        "time_now_ms" => {
+            let ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            Ok(Value::Int(ms))
+        }
+        "monotonic_ms" => {
+            use std::sync::OnceLock;
+            static START: OnceLock<std::time::Instant> = OnceLock::new();
+            let start = START.get_or_init(std::time::Instant::now);
+            Ok(Value::Int(start.elapsed().as_millis() as i64))
+        }
+        "sleep_ms" => {
+            let Value::Int(ms) = &args[0] else {
+                return Err(run_err(format!("sleep_ms expects an int, got {:?}", args[0])));
+            };
+            if *ms > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(*ms as u64));
+            }
+            Ok(Value::Unit)
+        }
         _ => unreachable!("BUILTINS guarded above"),
     }
 }

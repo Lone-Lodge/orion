@@ -1,6 +1,9 @@
 fn main() -> int:
-    a = [1, 2, 3, 4]
-    b = [10, 20, 30, 40]
-    dot = vec_dot(a, b)
-    print(dot)
-    dot
+    t0 = monotonic_ms()
+    sleep_ms(50)
+    t1 = monotonic_ms()
+    delta = t1 - t0
+    print("elapsed_ms:")
+    print(delta)
+    # 42 if elapsed > 30ms
+    if delta > 30 then 42 else 0

@@ -44,6 +44,7 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     ("ptr_to_bytes", 2), ("bytes_to_ptr", 1),
     ("cpu_count", 0), ("thread_id", 0),
     ("vec_add", 2), ("vec_sub", 2), ("vec_mul", 2), ("vec_dot", 2),
+    ("time_now_ms", 0), ("monotonic_ms", 0), ("sleep_ms", 1),
     // Change-detection (§13) — entities that gained / had-fields-written /
     // lost a component since the last `tick_events_clear`.
     ("added", 1), ("changed", 1), ("removed", 1),

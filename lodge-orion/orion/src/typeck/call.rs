@@ -61,6 +61,13 @@ impl Cx {
                 }
                 Ty::Int
             }
+            "time_now_ms" | "monotonic_ms" => Ty::Int,
+            "sleep_ms" => {
+                for a in args {
+                    self.infer(a, scope)?;
+                }
+                Ty::Unit
+            }
             "sqrt" | "abs" | "max" | "min" | "floor" | "ceil" | "round" | "pow" | "clamp" | "sign"
             | "sin" | "cos" | "tan" | "atan2" | "exp" | "ln" | "log2"
             | "to_int" | "to_float" => {
