@@ -1821,10 +1821,13 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut current_fn = fn_value
     mut current_scope = scope
     mut last_id = 0 - 1
+    init_defers = []
+    mut defer_exprs = init_defers
     for index in 0..<total_stmts:
         stmt = at(stmts, index)
         stmt_kind = get(stmt, "kind")
         is_expr = stmt_kind == "ExprStmt"
+        is_defer = stmt_kind == "Defer"
         is_let = stmt_kind == "LetOrAssign" or stmt_kind == "MutLet"
         is_if_block = stmt_kind == "IfBlock"
         is_for_range = stmt_kind == "ForRange"
@@ -1907,6 +1910,13 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             er = ast_expr_to_ir(current_fn, current_scope, ret_expr)
             current_fn = er.function
             current_scope = er.scope
+            n_defers = len(defer_exprs)
+            for di in 0..<n_defers:
+                rev_idx = n_defers - 1 - di
+                def_expr = at(defer_exprs, rev_idx)
+                def_r = ast_expr_to_ir(current_fn, current_scope, def_expr)
+                current_fn = def_r.function
+                current_scope = def_r.scope
             pr_ret = ir_fn_push(current_fn, ir_return(er.id))
             current_fn = pr_ret.function
             last_id = er.id
@@ -1915,11 +1925,21 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_fn = er.function
             current_scope = er.scope
             last_id = er.id
-        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_match_stmt
+        if already_done == 0 and is_defer:
+            defer_exprs = push(defer_exprs, get(stmt, "expr"))
+        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
             print_line("orion-self: ERROR at line {line}:{col} — unhandled statement kind `{stmt_kind}` (skipping)")
+    if is_block_terminated(current_fn) == 0:
+        n_end_defers = len(defer_exprs)
+        for di in 0..<n_end_defers:
+            rev_idx = n_end_defers - 1 - di
+            def_expr = at(defer_exprs, rev_idx)
+            def_r = ast_expr_to_ir(current_fn, current_scope, def_expr)
+            current_fn = def_r.function
+            current_scope = def_r.scope
     ConvResult{function: current_fn, scope: current_scope, id: last_id}
 fn ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     body_node = get(node, "body")
@@ -2450,6 +2470,40 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     result_ptr_id = pr_alloca.id
     mut current_fn = pr_alloca.function
     mut current_scope = scrut_r.scope
+    mut has_wildcard = false
+    mut matched_count = 0
+    mut matched_enum = ""
+    for chk_idx in 0..<n_arms:
+        chk_arm = at(arms, chk_idx)
+        chk_pk = get(chk_arm, "pat_kind")
+        chk_pv = get(chk_arm, "pattern")
+        if chk_pk == "ident" and chk_pv == "_":
+            has_wildcard = true
+        if chk_pk == "ident" and chk_pv != "_":
+            n_enums_chk = len(scope.en_names)
+            for ei in 0..<n_enums_chk:
+                en_name_chk = at(scope.en_names, ei)
+                v_idx_chk = scope_lookup_enum_variant(scope, en_name_chk, chk_pv)
+                if v_idx_chk >= 0:
+                    matched_count = matched_count + 1
+                    matched_enum = en_name_chk
+    if not has_wildcard and matched_enum != "":
+        en_total = len(scope.en_names)
+        mut total_variants = 0
+        for ei2 in 0..<en_total:
+            if at(scope.en_names, ei2) == matched_enum:
+                csv = at(scope.en_variants, ei2)
+                csv_bytes = bytes_from_text(csv)
+                total_variants = 1
+                csv_len = len(csv_bytes)
+                for ci in 0..<csv_len:
+                    if at(csv_bytes, ci) == 44:
+                        total_variants = total_variants + 1
+        if matched_count < total_variants:
+            mline = if has(node, "line") then get_int(node, "line") else 0
+            mcol = if has(node, "col") then get_int(node, "col") else 0
+            missing = total_variants - matched_count
+            print_line("orion-self: ERROR at line {mline}:{mcol} — non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
     mut arm_index = 0
     for arm_idx in 0..<n_arms:
         arm = at(arms, arm_idx)
