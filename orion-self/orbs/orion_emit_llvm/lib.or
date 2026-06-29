@@ -533,7 +533,7 @@ fn llvm_type_of(orion_type: Text) -> Text:
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
-    if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or is_struct or is_list_elem then "ptr" else "i64"
+    if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem then "ptr" else "i64"
 
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).

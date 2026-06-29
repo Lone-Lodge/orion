@@ -2896,13 +2896,16 @@ fn ast_type_to_ir(type_node: Map) -> Text:
             if name == "Map":
                 "map"
             else:
-                name_bs = bytes_from_text(name)
-                mut starts_cap = false
-                if len(name_bs) > 0:
-                    first = at(name_bs, 0)
-                    if first >= 65 and first <= 90:
-                        starts_cap = true
-                if starts_cap then "struct:{name}" else "i64"
+                if name == "fn" or name == "ptr":
+                    "fn"
+                else:
+                    name_bs = bytes_from_text(name)
+                    mut starts_cap = false
+                    if len(name_bs) > 0:
+                        first = at(name_bs, 0)
+                        if first >= 65 and first <= 90:
+                            starts_cap = true
+                    if starts_cap then "struct:{name}" else "i64"
 fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
     kind = get(type_node, "kind")
     if kind == "List":
@@ -2917,13 +2920,16 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
             if name == "Map":
                 "map"
             else:
-                ds_names = scope.ds_names
-                n_structs = len(ds_names)
-                mut is_struct = false
-                for si in 0..<n_structs:
-                    if at(ds_names, si) == name:
-                        is_struct = true
-                if is_struct then "struct:{name}" else "i64"
+                if name == "fn" or name == "ptr":
+                    "fn"
+                else:
+                    ds_names = scope.ds_names
+                    n_structs = len(ds_names)
+                    mut is_struct = false
+                    for si in 0..<n_structs:
+                        if at(ds_names, si) == name:
+                            is_struct = true
+                    if is_struct then "struct:{name}" else "i64"
 pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
     name = get(ast_fn, "name")
     ret_type_node = get(ast_fn, "ret")
@@ -3397,7 +3403,7 @@ fn llvm_type_of(orion_type: Text) -> Text:
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
-    if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or is_struct or is_list_elem then "ptr" else "i64"
+    if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem then "ptr" else "i64"
 fn list_elem_type(list_type: Text) -> Text:
     bs = bytes_from_text(list_type)
     n = len(bs)

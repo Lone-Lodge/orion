@@ -1603,16 +1603,21 @@ fn ast_type_to_ir(type_node: Map) -> Text:
             if name == "Map":
                 "map"
             else:
-                # Capitalised names (Inst, Item, IRFn, …) are presumed
-                # to be data-struct types. Snake-case / lowercase names
-                # (int, bool, void) get the i64 default.
-                name_bs = bytes_from_text(name)
-                mut starts_cap = false
-                if len(name_bs) > 0:
-                    first = at(name_bs, 0)
-                    if first >= 65 and first <= 90:
-                        starts_cap = true
-                if starts_cap then "struct:{name}" else "i64"
+                if name == "fn" or name == "ptr":
+                    # Function pointer / generic pointer — encode as "fn"
+                    # so llvm_type_of returns "ptr" in the emit step.
+                    "fn"
+                else:
+                    # Capitalised names (Inst, Item, IRFn, …) are presumed
+                    # to be data-struct types. Snake-case / lowercase names
+                    # (int, bool, void) get the i64 default.
+                    name_bs = bytes_from_text(name)
+                    mut starts_cap = false
+                    if len(name_bs) > 0:
+                        first = at(name_bs, 0)
+                        if first >= 65 and first <= 90:
+                            starts_cap = true
+                    if starts_cap then "struct:{name}" else "i64"
 
 
 # Same as ast_type_to_ir but knows about data structs declared in scope.
@@ -1632,13 +1637,16 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
             if name == "Map":
                 "map"
             else:
-                ds_names = scope.ds_names
-                n_structs = len(ds_names)
-                mut is_struct = false
-                for si in 0..<n_structs:
-                    if at(ds_names, si) == name:
-                        is_struct = true
-                if is_struct then "struct:{name}" else "i64"
+                if name == "fn" or name == "ptr":
+                    "fn"
+                else:
+                    ds_names = scope.ds_names
+                    n_structs = len(ds_names)
+                    mut is_struct = false
+                    for si in 0..<n_structs:
+                        if at(ds_names, si) == name:
+                            is_struct = true
+                    if is_struct then "struct:{name}" else "i64"
 
 
 pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
