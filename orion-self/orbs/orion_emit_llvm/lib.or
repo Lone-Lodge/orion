@@ -111,6 +111,12 @@ fn icmp_cc(op: Text) -> Text:
 fn find_fn_return_type(module: IRModule, fn_name: Text) -> Text:
     n = len(module.functions)
     mut result = "i64"
+    # Built-in runtime fns we provide in emit_runtime — return types are
+    # known statically, no AST entry exists for them.
+    if fn_name == "__orion_resume_int":
+        result = "void"
+    if fn_name == "__orion_perform_int":
+        result = "i64"
     for index in 0..<n:
         f = at(module.functions, index)
         if f.name == fn_name:
@@ -161,7 +167,21 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             sep = if ai == 0 then "" else ", "
             arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
         ret_ty = llvm_type_of(find_fn_return_type(module, inst.name))
-        result = "    {value_ref(my_id)} = call {ret_ty} @{inst.name}({arg_text})"
+        # Void calls (e.g. resume_int) can't be assigned. Emit a dummy
+        # SSA slot for downstream consumers, then call separately.
+        if ret_ty == "void":
+            result = "    call void @{inst.name}({arg_text})\n    {value_ref(my_id)} = add i64 0, 0"
+        else:
+            result = "    {value_ref(my_id)} = call {ret_ty} @{inst.name}({arg_text})"
+
+    if op == "perform_int":
+        # perform_int: emits a call to @__orion_perform_int with the
+        # handler fn as a ptr-valued constant argument. The handler
+        # name is in inst.name; the int arg's SSA id is in inst.lhs.
+        # Resulting SSA value holds the handler's return (or, if the
+        # handler resumed, the resumed value).
+        arg_ref = value_ref(inst.lhs)
+        result = "    {value_ref(my_id)} = call i64 @__orion_perform_int(ptr @{inst.name}, i64 {arg_ref})"
 
     if op == "label":
         # Emit basic-block label (no leading 4-space indent).
@@ -488,7 +508,10 @@ fn llvm_type_of(orion_type: Text) -> Text:
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
-    if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or is_struct or is_list_elem then "ptr" else "i64"
+    if orion_type == "void":
+        "void"
+    else:
+        if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or is_struct or is_list_elem then "ptr" else "i64"
 
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).
@@ -564,6 +587,42 @@ fn emit_runtime() -> Text:
     text = "{text}declare ptr @strcat(ptr, ptr)\n"
     text = "{text}declare i32 @strcmp(ptr, ptr)\n"
     text = "{text}declare i32 @snprintf(ptr, i64, ptr, ...)\n"
+    # Effects runtime: one-shot continuations via setjmp/longjmp.
+    # On Windows MSVCRT setjmp expands to _setjmp(env, frame_addr). We emit
+    # the same sequence clang generates for plain C setjmp. The `#sjlj_rt`
+    # attribute group carries the returns_twice marker on the CALL site.
+    text = "{text}declare i32 @_setjmp(ptr, ptr)\n"
+    text = "{text}declare void @longjmp(ptr, i32)\n"
+    text = "{text}declare ptr @llvm.frameaddress.p0(i32 immarg)\n"
+    text = "{text}@__orion_current_k = global ptr null\n"
+    text = "{text}@__orion_resume_value = global i64 0\n"
+    text = "{text}define i64 @__orion_perform_int(ptr %handler_fn, i64 %arg) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %jb = alloca [64 x i64], align 16\n"
+    text = "{text}  %old_k = load ptr, ptr @__orion_current_k\n"
+    text = "{text}  store ptr %jb, ptr @__orion_current_k\n"
+    text = "{text}  %fp = call ptr @llvm.frameaddress.p0(i32 0)\n"
+    text = "{text}  %sj = call i32 @_setjmp(ptr %jb, ptr %fp) #99\n"
+    text = "{text}  %is_first = icmp eq i32 %sj, 0\n"
+    text = "{text}  br i1 %is_first, label %first_call, label %resumed\n"
+    text = "{text}first_call:\n"
+    text = "{text}  %ret = call i64 %handler_fn(i64 %arg)\n"
+    text = "{text}  store ptr %old_k, ptr @__orion_current_k\n"
+    text = "{text}  ret i64 %ret\n"
+    text = "{text}resumed:\n"
+    text = "{text}  %v = load i64, ptr @__orion_resume_value\n"
+    text = "{text}  store ptr %old_k, ptr @__orion_current_k\n"
+    text = "{text}  ret i64 %v\n"
+    text = "{text}\}\n"
+    text = "{text}define void @__orion_resume_int(i64 %value) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  store i64 %value, ptr @__orion_resume_value\n"
+    text = "{text}  %k = load ptr, ptr @__orion_current_k\n"
+    text = "{text}  call void @longjmp(ptr %k, i32 1) #98\n"
+    text = "{text}  unreachable\n"
+    text = "{text}\}\n"
+    text = "{text}attributes #99 = \{ returns_twice \}\n"
+    text = "{text}attributes #98 = \{ noreturn \}\n"
     text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
     text = "{text}\n"
