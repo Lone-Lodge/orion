@@ -62,3 +62,37 @@ void __orion_resume_text(char *value) {
     resume_text_value = value;
     longjmp(*current_k, 1);
 }
+
+/* Timing primitives — backbone of the async runtime. Windows-only for now;
+ * port to POSIX (clock_gettime + nanosleep) is a few extra ifdefs. */
+#ifdef _WIN32
+#include <windows.h>
+long long __orion_time_now_ms(void) {
+    FILETIME ft; GetSystemTimeAsFileTime(&ft);
+    unsigned long long t = ((unsigned long long)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    /* FILETIME is 100ns intervals since 1601-01-01; offset to Unix epoch. */
+    return (long long)((t - 116444736000000000ULL) / 10000ULL);
+}
+long long __orion_monotonic_ms(void) {
+    return (long long)GetTickCount64();
+}
+void __orion_sleep_ms(long long ms) {
+    if (ms > 0) Sleep((DWORD)ms);
+}
+#else
+#include <time.h>
+long long __orion_time_now_ms(void) {
+    struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+long long __orion_monotonic_ms(void) {
+    struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+void __orion_sleep_ms(long long ms) {
+    if (ms > 0) {
+        struct timespec t = { ms / 1000, (ms % 1000) * 1000000 };
+        nanosleep(&t, NULL);
+    }
+}
+#endif

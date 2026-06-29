@@ -816,6 +816,9 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_vec_sub = callee == "vec_sub"
     is_vec_mul = callee == "vec_mul"
     is_vec_dot = callee == "vec_dot"
+    is_time_now_ms = callee == "time_now_ms"
+    is_monotonic_ms = callee == "monotonic_ms"
+    is_sleep_ms = callee == "sleep_ms"
     is_contains = callee == "contains"
     is_file_read = callee == "file_read"
     is_file_write = callee == "file_write"
@@ -912,6 +915,16 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
         pr = ir_fn_push(b_r.function, ir_vec_dot(a_r.id, b_r.id))
         result = ConvResult{function: pr.function, scope: b_r.scope, id: pr.id}
+    if is_time_now_ms:
+        pr = ir_fn_push(fn_value, ir_time_now_ms())
+        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    if is_monotonic_ms:
+        pr = ir_fn_push(fn_value, ir_monotonic_ms())
+        result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+    if is_sleep_ms:
+        ms_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        pr = ir_fn_push(ms_r.function, ir_sleep_ms(ms_r.id))
+        result = ConvResult{function: pr.function, scope: ms_r.scope, id: pr.id}
     if is_slice:
         text_node = at(args, 0)
         lo_node = at(args, 1)
@@ -1024,7 +1037,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false)
     if is_resume_int:
         arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_int", [arg_r.id], "void"))

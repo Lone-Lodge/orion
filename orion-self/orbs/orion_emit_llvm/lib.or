@@ -436,6 +436,14 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         result = "    {value_ref(my_id)} = call ptr @orion_vec_mul(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
     if op == "vec_dot":
         result = "    {value_ref(my_id)} = call i64 @orion_vec_dot(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+    if op == "time_now_ms":
+        result = "    {value_ref(my_id)} = call i64 @__orion_time_now_ms()"
+    if op == "monotonic_ms":
+        result = "    {value_ref(my_id)} = call i64 @__orion_monotonic_ms()"
+    if op == "sleep_ms":
+        l1 = "    call void @__orion_sleep_ms(i64 {value_ref(inst.value)})"
+        l2 = "    {value_ref(my_id)} = add i64 0, 0"
+        result = "{l1}\n{l2}"
 
     if op == "map_lit":
         # args alternates key/val: [k0, v0, k1, v1, ...]
@@ -632,6 +640,9 @@ fn emit_runtime() -> Text:
     text = "{text}declare void @__orion_resume_int(i64)\n"
     text = "{text}declare ptr @__orion_perform_text(ptr, ptr)\n"
     text = "{text}declare void @__orion_resume_text(ptr)\n"
+    text = "{text}declare i64 @__orion_time_now_ms()\n"
+    text = "{text}declare i64 @__orion_monotonic_ms()\n"
+    text = "{text}declare void @__orion_sleep_ms(i64)\n"
     text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
     text = "{text}\n"

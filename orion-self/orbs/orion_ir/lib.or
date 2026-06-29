@@ -234,6 +234,14 @@ pub fn ir_vec_mul(a_id: int, b_id: int) -> Inst:
 pub fn ir_vec_dot(a_id: int, b_id: int) -> Inst:
     Inst{op: "vec_dot", type_text: "i64", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 
+# Async runtime primitives.
+pub fn ir_time_now_ms() -> Inst:
+    Inst{op: "time_now_ms", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_monotonic_ms() -> Inst:
+    Inst{op: "monotonic_ms", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
+pub fn ir_sleep_ms(ms_id: int) -> Inst:
+    Inst{op: "sleep_ms", type_text: "void", value: ms_id, lhs: 0, rhs: 0, name: "", args: []}
+
 
 # --- Maps (text key → i64 value) ---
 # A map is a ptr to a heap buffer laid out as
