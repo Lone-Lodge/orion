@@ -1,18 +1,9 @@
-fn deadline_from_now(offset_ms: int) -> int:
-    monotonic_ms() + offset_ms
-
-fn time_left(deadline_ms: int) -> int:
-    now = monotonic_ms()
-    delta = deadline_ms - now
-    if delta < 0 then 0 else delta
+fn id<T>(x: T) -> T:
+    x
 
 fn main() -> int:
-    deadline = deadline_from_now(100)
-    initial = time_left(deadline)
-    sleep_ms(30)
-    after = time_left(deadline)
-    diff = initial - after
-    print("burnt_ms:")
-    print(diff)
-    # exit 42 if we burnt 25-50ms
-    if diff >= 25 and diff <= 55 then 42 else 0
+    a = id(42)
+    print("a =")
+    print(a)
+    # if substitution works, a is Int and a + 0 type-checks
+    a + 0

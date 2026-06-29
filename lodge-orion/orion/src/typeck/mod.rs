@@ -123,8 +123,8 @@ pub(crate) fn span_of(e: &Expr) -> Option<Span> {
 pub(crate) struct Cx {
     /// component name -> field name -> type
     pub(crate) data: HashMap<String, HashMap<String, Ty>>,
-    /// function/query name -> (parameter types, return type)
-    pub(crate) fns: HashMap<String, (Vec<Ty>, Ty)>,
+    /// function/query name -> (parameter types, return type, generic type-param names)
+    pub(crate) fns: HashMap<String, (Vec<Ty>, Ty, Vec<String>)>,
     /// enum name -> its variant names (for exhaustiveness)
     pub(crate) enums: HashMap<String, Vec<String>>,
     /// variant name -> (enum name, payload types)
@@ -166,17 +166,17 @@ fn build_cx(program: &Program, enums_set: &HashSet<String>) -> Cx {
             Decl::Fn(f) => {
                 let ps = f.params.iter().map(|p| p.ty.as_ref().map(&resolve).unwrap_or(Ty::Unknown)).collect();
                 let ret = f.ret.as_ref().map(&resolve).unwrap_or(Ty::Unknown);
-                fns.insert(f.name.clone(), (ps, ret));
+                fns.insert(f.name.clone(), (ps, ret, f.generics.clone()));
             }
             Decl::Query(q) => {
                 let ps = q.params.iter().map(|p| p.ty.as_ref().map(&resolve).unwrap_or(Ty::Unknown)).collect();
                 let ret = q.ret.as_ref().map(&resolve).unwrap_or(Ty::Unknown);
-                fns.insert(q.name.clone(), (ps, ret));
+                fns.insert(q.name.clone(), (ps, ret, Vec::new()));
             }
             Decl::System(s) => {
                 // Systems are callable from a tick driver; they return Unit.
                 let ps = s.params.iter().map(|p| p.ty.as_ref().map(&resolve).unwrap_or(Ty::Unknown)).collect();
-                fns.insert(s.name.clone(), (ps, Ty::Unit));
+                fns.insert(s.name.clone(), (ps, Ty::Unit, Vec::new()));
             }
             Decl::Impl(_) | Decl::Trait(_) => {
                 // Methods register at check-time via a separate pass — they're

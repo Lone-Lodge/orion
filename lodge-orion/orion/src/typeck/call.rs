@@ -159,9 +159,15 @@ impl Cx {
     }
 
     fn call_user_fn(&self, name: &str, args: &[Expr], scope: &HashMap<String, Ty>) -> Result<Option<Ty>, TypeError> {
-        let Some((params, ret)) = self.fns.get(name) else {
+        let Some((params, ret, generics)) = self.fns.get(name) else {
             return Ok(None);
         };
+        // Generic vars currently lower to Ty::Unknown via ty_of, which
+        // assignable() already treats as wildcards. We track `generics`
+        // here for future HM-style substitution; today the Unknown path
+        // gives erasure-based generics for free.
+        let _ = generics;
+        let mut arg_tys: Vec<Ty> = Vec::with_capacity(args.len());
         for (i, a) in args.iter().enumerate() {
             let at = self.infer(a, scope)?;
             if let Some(pt) = params.get(i) {
@@ -172,6 +178,7 @@ impl Cx {
                     );
                 }
             }
+            arg_tys.push(at);
         }
         Ok(Some(ret.clone()))
     }

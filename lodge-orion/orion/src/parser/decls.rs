@@ -181,7 +181,7 @@ impl Parser<'_> {
         let params = self.params()?;
         let ret = self.return_type()?;
         Ok(FnDecl {
-            public, deterministic: false, name, params, ret,
+            public, deterministic: false, name, generics: Vec::new(), params, ret,
             body: FnBody::Extern,
             file: self.file,
         })
@@ -190,9 +190,9 @@ impl Parser<'_> {
     fn fn_decl(&mut self, public: bool, base: u32) -> Result<FnDecl, ParseError> {
         self.eat(&Tok::Fn)?;
         let name = self.ident()?;
-        // Optional generic type-param list `<T, U>`. Erasure-based:
-        // parser accepts and discards. Type vars fall through as `Unknown`
-        // which the type system already treats as i64/ptr.
+        // Optional generic type-param list `<T, U>`. Names are captured so
+        // the typechecker can substitute them at call sites (HM-flavoured).
+        let mut generics = Vec::new();
         if self.check(&Tok::Lt) {
             self.bump();
             loop {
@@ -200,14 +200,18 @@ impl Parser<'_> {
                     self.bump();
                     break;
                 }
-                // Token-skip: an ident, comma, or anything other than `>`.
-                self.bump();
+                // Capture an ident as a generic type-var name; skip commas.
+                if let Ok(n) = self.ident() {
+                    generics.push(n);
+                } else {
+                    self.bump();
+                }
             }
         }
         let params = self.params()?;
         let ret = self.return_type()?;
         let body = self.fn_body(base)?;
-        Ok(FnDecl { public, deterministic: false, name, params, ret, body, file: self.file })
+        Ok(FnDecl { public, deterministic: false, name, generics, params, ret, body, file: self.file })
     }
 
     fn fn_body(&mut self, base: u32) -> Result<FnBody, ParseError> {
@@ -292,6 +296,7 @@ impl Parser<'_> {
             public: true,
             deterministic: false,
             name,
+            generics: Vec::new(),
             params,
             ret,
             body: FnBody::Extern,

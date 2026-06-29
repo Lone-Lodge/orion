@@ -79,6 +79,10 @@ pub struct FnDecl {
     /// inside the body — guarantees lockstep-safe replay for netcode.
     pub deterministic: bool,
     pub name: String,
+    /// Generic type parameters from `fn name<T, U>(...)`. Empty for
+    /// non-generic fns. Names appearing here are treated as type variables
+    /// in `params` and `ret` — substituted by the typechecker at call sites.
+    pub generics: Vec<String>,
     pub params: Vec<Param>,
     pub ret: Option<Type>,
     pub body: FnBody,
