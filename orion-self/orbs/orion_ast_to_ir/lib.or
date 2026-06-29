@@ -1810,26 +1810,52 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             lam_params = get_list(lam, "params")
                             n_lp = len(lam_params)
                             lam_body = get(lam, "body")
+                            # Worklist-based capture scan: visit expressions
+                            # iteratively, recurse into Binary/Call/Unary/If.
+                            # Ident nodes not in lam_params become captures.
+                            init_work = [lam_body]
+                            mut worklist = init_work
                             mut caps = slice([""], 0, 0)
-                            if get(lam_body, "kind") == "Binary":
-                                bl = get(lam_body, "left")
-                                br = get(lam_body, "right")
-                                if get(bl, "kind") == "Ident":
-                                    bl_name = get(bl, "name")
-                                    mut bl_is_param = false
-                                    for lp_i in 0..<n_lp:
-                                        if at(lam_params, lp_i) == bl_name:
-                                            bl_is_param = true
-                                    if not bl_is_param:
-                                        caps = push(caps, bl_name)
-                                if get(br, "kind") == "Ident":
-                                    br_name = get(br, "name")
-                                    mut br_is_param = false
-                                    for lp_j in 0..<n_lp:
-                                        if at(lam_params, lp_j) == br_name:
-                                            br_is_param = true
-                                    if not br_is_param:
-                                        caps = push(caps, br_name)
+                            mut seen_caps = slice([""], 0, 0)
+                            loop:
+                                w_n = len(worklist)
+                                if w_n == 0:
+                                    break
+                                cur = at(worklist, w_n - 1)
+                                worklist = slice(worklist, 0, w_n - 1)
+                                ck = get(cur, "kind")
+                                if ck == "Ident":
+                                    cn = get(cur, "name")
+                                    mut is_param = false
+                                    for lp_w in 0..<n_lp:
+                                        if at(lam_params, lp_w) == cn:
+                                            is_param = true
+                                    mut already = false
+                                    n_seen = len(seen_caps)
+                                    for sc in 0..<n_seen:
+                                        if at(seen_caps, sc) == cn:
+                                            already = true
+                                    # Skip global fn names (heuristic: don't
+                                    # capture identifiers that look like
+                                    # known fn names — they're not values).
+                                    # For MVP, accept all non-param idents.
+                                    if not is_param and not already:
+                                        caps = push(caps, cn)
+                                        seen_caps = push(seen_caps, cn)
+                                if ck == "Binary":
+                                    worklist = push(worklist, get(cur, "left"))
+                                    worklist = push(worklist, get(cur, "right"))
+                                if ck == "Unary":
+                                    worklist = push(worklist, get(cur, "operand"))
+                                if ck == "Call":
+                                    call_args = get_list(cur, "args")
+                                    n_ca = len(call_args)
+                                    for cai in 0..<n_ca:
+                                        worklist = push(worklist, at(call_args, cai))
+                                if ck == "If":
+                                    worklist = push(worklist, get(cur, "cond"))
+                                    worklist = push(worklist, get(cur, "then"))
+                                    worklist = push(worklist, get(cur, "else"))
                             n_caps = len(caps)
                             init_typed = get_list(decl, "params")
                             mut typed_params = init_typed

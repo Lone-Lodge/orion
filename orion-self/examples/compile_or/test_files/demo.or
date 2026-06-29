@@ -1,9 +1,6 @@
-fn id<T>(x: T) -> T:
-    x
-
 fn main() -> int:
-    a = id(20)
-    b = id("hello")
-    # a should be Int. If HM works, a + 22 typechecks; if a is Unknown,
-    # also passes. Real proof: try Text into Int-expecting position.
-    a + 22
+    threshold = 30
+    bonus = 12
+    # 30 + 12 = 42 from then-branch (captures bonus)
+    classify = |y| if y > threshold then y + bonus else 0
+    classify(31)
