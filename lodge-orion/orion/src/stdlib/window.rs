@@ -226,10 +226,30 @@ mod win32 {
                 push_event(Event { kind: "mouse_move", key: 0, x, y });
                 0
             }
-            WM_LBUTTONDOWN => { push_event(Event { kind: "mouse_down", key: 1, x: 0.0, y: 0.0 }); 0 }
-            WM_LBUTTONUP   => { push_event(Event { kind: "mouse_up",   key: 1, x: 0.0, y: 0.0 }); 0 }
-            WM_RBUTTONDOWN => { push_event(Event { kind: "mouse_down", key: 2, x: 0.0, y: 0.0 }); 0 }
-            WM_RBUTTONUP   => { push_event(Event { kind: "mouse_up",   key: 2, x: 0.0, y: 0.0 }); 0 }
+            WM_LBUTTONDOWN => {
+                let x = (lparam & 0xFFFF) as i16 as f64;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as f64;
+                push_event(Event { kind: "mouse_down", key: 1, x, y });
+                0
+            }
+            WM_LBUTTONUP => {
+                let x = (lparam & 0xFFFF) as i16 as f64;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as f64;
+                push_event(Event { kind: "mouse_up", key: 1, x, y });
+                0
+            }
+            WM_RBUTTONDOWN => {
+                let x = (lparam & 0xFFFF) as i16 as f64;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as f64;
+                push_event(Event { kind: "mouse_down", key: 2, x, y });
+                0
+            }
+            WM_RBUTTONUP => {
+                let x = (lparam & 0xFFFF) as i16 as f64;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as f64;
+                push_event(Event { kind: "mouse_up", key: 2, x, y });
+                0
+            }
             WM_SIZE => {
                 let w = (lparam & 0xFFFF) as f64;
                 let h = ((lparam >> 16) & 0xFFFF) as f64;
