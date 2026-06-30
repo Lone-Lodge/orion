@@ -102,8 +102,17 @@ impl Checker<'_> {
         if let Some(arity) = builtin_arity(name) {
             return check_arity(name, *span, args.len(), arity);
         }
-        if let Some(arity) = self.variants.get(name.as_str()).copied() {
-            return self.check_variant_call(name, *span, args.len(), arity);
+        if let Some(arities) = self.variants.get(name.as_str()) {
+            // Multiple enums may export the same variant name with
+            // different arities; accept the call if any registered arity
+            // matches the supplied arg count, else report against the
+            // first-declared arity for the diagnostic.
+            if arities.contains(&args.len()) {
+                return Ok(());
+            }
+            if let Some(&first) = arities.first() {
+                return self.check_variant_call(name, *span, args.len(), first);
+            }
         }
         if scope.contains_key(name) {
             // `name` is a local — could be a closure bound to a `let` /

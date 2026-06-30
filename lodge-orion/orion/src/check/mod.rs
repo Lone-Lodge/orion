@@ -189,8 +189,15 @@ fn build_checker(program: &Program) -> Checker<'_> {
             }
             Decl::Enum(e) => {
                 for v in &e.variants {
-                    variants.insert(v.name.as_str(), v.payload.len());
-                    variant_origin.insert(v.name.as_str(), (e.file, e.public));
+                    let arities = variants.entry(v.name.as_str()).or_insert_with(Vec::new);
+                    let arity = v.payload.len();
+                    if !arities.contains(&arity) {
+                        arities.push(arity);
+                    }
+                    // Origin records the FIRST enum that declared this
+                    // variant name; cross-enum collisions still respect
+                    // the first-seen visibility for now.
+                    variant_origin.entry(v.name.as_str()).or_insert((e.file, e.public));
                 }
             }
             _ => {}
@@ -201,7 +208,9 @@ fn build_checker(program: &Program) -> Checker<'_> {
 
 pub(crate) struct Checker<'a> {
     pub(crate) fns: HashMap<&'a str, (usize, usize)>,
-    pub(crate) variants: HashMap<&'a str, usize>,
+    /// Variant name → set of arities (one entry per enum that declared it).
+    /// Multi-arity tolerates cross-enum collisions like Tok::Require + Stmt::Require(Expr).
+    pub(crate) variants: HashMap<&'a str, Vec<usize>>,
     /// (def-file, is_public) for each fn/system.
     pub(crate) fn_origin: HashMap<&'a str, (u32, bool)>,
     /// (def-file, is_public) for each enum variant.

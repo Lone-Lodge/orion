@@ -52,7 +52,12 @@ pub struct Interp<'a> {
     pub(crate) fns: HashMap<&'a str, &'a FnDecl>,
     pub(crate) systems: HashMap<&'a str, &'a SystemDecl>,
     /// enum variant name -> payload arity.
-    pub(crate) variants: HashMap<String, usize>,
+    /// Variant name → set of arities seen. A name may appear in multiple
+    /// enums with different arities (e.g. `Tok::Require` nullary vs
+    /// `Stmt::Require(Expr)` unary). Lookup picks the matching arity by
+    /// call-site context, so collisions degrade gracefully instead of
+    /// silently overwriting.
+    pub(crate) variants: HashMap<String, Vec<usize>>,
     /// `(data_type, method)` -> the implementing `fn` (§14, static dispatch).
     pub(crate) methods: HashMap<(String, String), &'a FnDecl>,
     /// data type name -> its declaration. Used at field-write time so we
@@ -81,7 +86,11 @@ impl<'a> Interp<'a> {
                 Decl::Data(d) => { data_decls.insert(d.name.as_str(), d); }
                 Decl::Enum(e) => {
                     for v in &e.variants {
-                        variants.insert(v.name.clone(), v.payload.len());
+                        let arities = variants.entry(v.name.clone()).or_insert_with(Vec::new);
+                        let arity = v.payload.len();
+                        if !arities.contains(&arity) {
+                            arities.push(arity);
+                        }
                     }
                 }
                 Decl::Impl(i) => {
