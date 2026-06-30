@@ -43,6 +43,7 @@ pub fn register(interp: &Interp) {
         let stdout = std::io::stdout();
         let mut h = stdout.lock();
         let _ = writeln!(h, "{line}");
+        let _ = h.flush();   // flush per line so bg-task tails see live output
         Ok(Value::Unit)
     });
     interp.register_extern("__os_read_line", |_args| {
