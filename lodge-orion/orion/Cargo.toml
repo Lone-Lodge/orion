@@ -48,6 +48,9 @@ cranelift-native = "0.133.0"
 cranelift-object = "0.133"
 # Blocking HTTP client for `net` orb — minimal, no async runtime.
 ureq = "2"
+# Astra — small typed host-agnostic language for game logic. Vendored
+# into crates/ so atlas_astra can host it without a network dep.
+astra-lang = { path = "../crates/astra-lang" }
 
 # Platform-binding deps used by stdlib orbs. Keep this list curated and
 # justified — every dep here ships with `orbit` to every user's project.

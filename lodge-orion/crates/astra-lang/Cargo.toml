@@ -1,0 +1,11 @@
+[package]
+name = "astra-lang"
+version = "0.0.1"
+edition = "2024"
+description = "Astra: a small, typed, host-agnostic language for authored game logic."
+
+[lib]
+name = "astra"
+path = "src/lib.rs"
+
+[dependencies]

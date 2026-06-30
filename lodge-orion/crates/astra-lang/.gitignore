@@ -1,0 +1,4 @@
+/target
+/playground/target
+/docs/book
+Cargo.lock
