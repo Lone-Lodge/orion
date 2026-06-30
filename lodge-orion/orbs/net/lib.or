@@ -1,35 +1,83 @@
-# net — HTTP + TCP sockets. Game-friendly minimal API.
-#
-# HTTP for asset/leaderboard/news fetching, TCP for multiplayer.
-# Backed by Rust runtime (lodge-orion). Native (orion.exe) impl: future.
+# net — HTTP/1.1 client (pure Orion) + TCP client/server (OS primitives).
+# WebSocket protocol lives in the `atlas_ws` orb on top of these TCP primitives.
+# HTTP is plain HTTP only — TLS requires a separate TLS orb.
 
-extern fn __os_http_get(url: Text) -> Text
-extern fn __os_http_post(url: Text, body: Text) -> Text
 extern fn __os_tcp_connect(host: Text, port: int) -> int
 extern fn __os_tcp_send(handle: int, data: Text) -> int
 extern fn __os_tcp_recv(handle: int, max_bytes: int) -> Text
 extern fn __os_tcp_close(handle: int)
+extern fn __os_tcp_listen(port: int) -> int
+extern fn __os_tcp_accept(server: int) -> int
+extern fn __os_tcp_close_server(server: int)
 
-# HTTP GET — fetch a URL, return body as Text. Empty string on error.
-pub fn http_get(url: Text) -> Text:
-    __os_http_get(url)
+# TCP client
+pub fn tcp_connect(host: Text, port: int) -> int: __os_tcp_connect(host, port)
+pub fn tcp_send(handle: int, data: Text) -> int: __os_tcp_send(handle, data)
+pub fn tcp_recv(handle: int, max_bytes: int) -> Text: __os_tcp_recv(handle, max_bytes)
+pub fn tcp_close(handle: int): __os_tcp_close(handle)
 
-# HTTP POST — send body to URL, return response as Text. Empty on error.
-pub fn http_post(url: Text, body: Text) -> Text:
-    __os_http_post(url, body)
+# TCP server
+pub fn tcp_listen(port: int) -> int: __os_tcp_listen(port)
+pub fn tcp_accept(server: int) -> int: __os_tcp_accept(server)
+pub fn tcp_close_server(server: int): __os_tcp_close_server(server)
 
-# Open a TCP connection. Returns a handle (>0) or -1 on error.
-pub fn tcp_connect(host: Text, port: int) -> int:
-    __os_tcp_connect(host, port)
+# ---- HTTP/1.1 client — pure Orion ----
 
-# Send bytes to a TCP handle. Returns bytes sent or -1 on error.
-pub fn tcp_send(handle: int, data: Text) -> int:
-    __os_tcp_send(handle, data)
+# Strip HTTP headers: return only the body after the first blank line.
+fn http_strip_headers(response: Text) -> Text:
+    parts = str_split(response, "\r\n\r\n")
+    n_parts = len(parts)
+    if n_parts < 2:
+        response
+    else:
+        mut body_parts = []
+        for i in 1..<n_parts:
+            body_parts = push(body_parts, at(parts, i))
+        str_join(body_parts, "\r\n\r\n")
 
-# Read up to max_bytes from a TCP handle. Returns the bytes as Text.
-pub fn tcp_recv(handle: int, max_bytes: int) -> Text:
-    __os_tcp_recv(handle, max_bytes)
+pub fn http_get(url_text: Text) -> Text:
+    parsed = url_parse(url_text)
+    host = parsed.host
+    port_text = parsed.port
+    path = parsed.path
+    query = parsed.query
+    port = if port_text == "" then 80 else str_to_int(port_text)
+    base_path = if path == "" then "/" else path
+    full_path = if query == "" then base_path else base_path + "?" + query
+    handle = tcp_connect(host, port)
+    if handle < 0:
+        ""
+    else:
+        req = "GET " + full_path + " HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n\r\n"
+        tcp_send(handle, req)
+        mut response = ""
+        loop:
+            chunk = tcp_recv(handle, 4096)
+            if chunk == "":
+                break
+            response = response + chunk
+        tcp_close(handle)
+        http_strip_headers(response)
 
-# Close a TCP handle.
-pub fn tcp_close(handle: int):
-    __os_tcp_close(handle)
+pub fn http_post(url_text: Text, body: Text) -> Text:
+    parsed = url_parse(url_text)
+    host = parsed.host
+    port_text = parsed.port
+    path = parsed.path
+    port = if port_text == "" then 80 else str_to_int(port_text)
+    base_path = if path == "" then "/" else path
+    content_length = bytes_length(bytes_from_text(body))
+    handle = tcp_connect(host, port)
+    if handle < 0:
+        ""
+    else:
+        req = "POST " + base_path + " HTTP/1.1\r\nHost: " + host + "\r\nContent-Length: " + fmt_int(content_length, 0) + "\r\nContent-Type: application/x-www-form-urlencoded\r\nConnection: close\r\n\r\n" + body
+        tcp_send(handle, req)
+        mut response = ""
+        loop:
+            chunk = tcp_recv(handle, 4096)
+            if chunk == "":
+                break
+            response = response + chunk
+        tcp_close(handle)
+        http_strip_headers(response)

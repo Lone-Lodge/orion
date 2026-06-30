@@ -126,3 +126,88 @@ pub fn sha256(text: Text) -> Text:
 
 pub fn sha256_short(text: Text) -> Text:
     bytes_to_text(bytes_slice(bytes_from_text(sha256(text)), 0, 8))
+
+# ----- SHA-1 (FIPS 180-4) — required for WebSocket handshake -----
+# Same structure as SHA-256 above: pure Orion on the bytes orb.
+
+fn sha1_h0() -> [int]:
+    [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0]
+
+fn rotl32(x: int, n: int) -> int:
+    ((x << n) | (x >> (32 - n))) & 0xFFFFFFFF
+
+fn sha1_f(t: int, b: int, c: int, d: int) -> int:
+    if t < 20 then
+        ((b & c) | (~b & d)) & 0xFFFFFFFF
+    else if t < 40 then
+        (b ^ c ^ d) & 0xFFFFFFFF
+    else if t < 60 then
+        ((b & c) | (b & d) | (c & d)) & 0xFFFFFFFF
+    else
+        (b ^ c ^ d) & 0xFFFFFFFF
+
+fn sha1_k(t: int) -> int:
+    if t < 20 then 0x5A827999
+    else if t < 40 then 0x6ED9EBA1
+    else if t < 60 then 0x8F1BBCDC
+    else 0xCA62C1D6
+
+fn sha1_pad(message: [int]) -> [int]:
+    msg_len = bytes_length(message)
+    bit_len = msg_len * 8
+    mut padded = bytes_concat(message, push(bytes_zeros(0), 0x80))
+    loop:
+        remainder = bytes_length(padded) % 64
+        if remainder == 56:
+            break
+        padded = push(padded, 0)
+    padded = push(padded, (bit_len >> 56) & 0xFF)
+    padded = push(padded, (bit_len >> 48) & 0xFF)
+    padded = push(padded, (bit_len >> 40) & 0xFF)
+    padded = push(padded, (bit_len >> 32) & 0xFF)
+    padded = push(padded, (bit_len >> 24) & 0xFF)
+    padded = push(padded, (bit_len >> 16) & 0xFF)
+    padded = push(padded, (bit_len >> 8) & 0xFF)
+    padded = push(padded, bit_len & 0xFF)
+    padded
+
+fn sha1_bytes(message: [int]) -> [int]:
+    padded = sha1_pad(message)
+    padded_len = bytes_length(padded)
+    mut h = sha1_h0()
+    mut chunk_offset = 0
+    loop:
+        if chunk_offset >= padded_len:
+            break
+        mut w = bytes_zeros(0)
+        for i in 0..<16:
+            w = push(w, read_be_u32(padded, chunk_offset + i * 4))
+        for i in 16..<80:
+            expanded = rotl32(at(w, i - 3) ^ at(w, i - 8) ^ at(w, i - 14) ^ at(w, i - 16), 1)
+            w = push(w, expanded)
+        mut a = at(h, 0)
+        mut b = at(h, 1)
+        mut c = at(h, 2)
+        mut d = at(h, 3)
+        mut e = at(h, 4)
+        for t in 0..<80:
+            temp = (rotl32(a, 5) + sha1_f(t, b, c, d) + e + sha1_k(t) + at(w, t)) & 0xFFFFFFFF
+            e = d
+            d = c
+            c = rotl32(b, 30)
+            b = a
+            a = temp
+        h = [(at(h, 0) + a) & 0xFFFFFFFF, (at(h, 1) + b) & 0xFFFFFFFF, (at(h, 2) + c) & 0xFFFFFFFF, (at(h, 3) + d) & 0xFFFFFFFF, (at(h, 4) + e) & 0xFFFFFFFF]
+        chunk_offset += 64
+    mut digest = bytes_zeros(0)
+    for i in 0..<5:
+        digest = push_be_u32(digest, at(h, i))
+    digest
+
+# SHA-1 hex string.
+pub fn sha1(text: Text) -> Text:
+    hex_encode_bytes(sha1_bytes(bytes_from_text(text)))
+
+# SHA-1 raw bytes — used by WebSocket handshake before base64 encoding.
+pub fn sha1_raw(text: Text) -> [int]:
+    sha1_bytes(bytes_from_text(text))
