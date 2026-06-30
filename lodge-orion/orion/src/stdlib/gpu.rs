@@ -119,6 +119,7 @@ mod d3d12 {
     }
 
     thread_local! { static STATE: RefCell<State> = RefCell::new(State::default()); }
+    thread_local! { static BUF_USAGE: RefCell<std::collections::HashMap<i64, String>> = RefCell::new(std::collections::HashMap::new()); }
 
     /// Returns the most recently created device id, or 0 if none.
     /// Used by the cmd extern handlers since the Orion side passes the
@@ -133,7 +134,28 @@ mod d3d12 {
 
         interp.register_extern("__os_gpu_init", |args| {
             let hwnd = args.first().and_then(|v| v.as_int()).unwrap_or(0);
-            match init_device(hwnd as isize, 800, 600) {
+            // Query the window's actual client area so the backbuffer matches.
+            // Avoids the previous 800×600 hardcode that caused stretched / off-screen
+            // rendering when the window wasn't that exact size.
+            let (mut w, mut h) = (800u32, 600u32);
+            #[cfg(windows)]
+            unsafe {
+                // Use windows_sys (already feature-enabled for WindowsAndMessaging
+                // in Cargo.toml) — the `windows` crate is D3D12-only here.
+                use windows_sys::Win32::Foundation::{HWND as HwndSys, RECT as RectSys};
+                use windows_sys::Win32::UI::WindowsAndMessaging::GetClientRect;
+                let mut rect = RectSys { left: 0, top: 0, right: 0, bottom: 0 };
+                let hwnd_t = hwnd as HwndSys;
+                if GetClientRect(hwnd_t, &mut rect) != 0 {
+                    let cw = (rect.right - rect.left) as u32;
+                    let ch = (rect.bottom - rect.top) as u32;
+                    if cw > 0 && ch > 0 {
+                        w = cw;
+                        h = ch;
+                    }
+                }
+            }
+            match init_device(hwnd as isize, w, h) {
                 Ok(id) => Ok(Value::Int(id)),
                 Err(e) => Err(crate::interp::run_err(format!("d3d12 init failed: {e:?}"))),
             }
@@ -144,10 +166,19 @@ mod d3d12 {
         // upload calls. `create_buffer` is just a fresh handle the
         // user passes back to write_buffer.
         interp.register_extern("__os_gpu_create_buffer", |args| {
-            // Usage hint is `args[2]` ('vertex' / 'index' / 'uniform').
-            // We dispatch on it in write_buffer; here we just allocate.
-            let _ = args;
-            Ok(Value::Int(1))
+            // Hand out a fresh id per buffer and record its usage hint
+            // ('vertex' / 'index' / 'uniform') so write_buffer knows
+            // where to upload without guessing from data shape.
+            let usage = match args.get(2) {
+                Some(Value::Text(s)) => s.clone(),
+                _ => String::from("vertex"),
+            };
+            BUF_USAGE.with(|m| {
+                let mut m = m.borrow_mut();
+                let id = (m.len() as i64) + 1;     // 1-indexed, monotonic
+                m.insert(id, usage);
+                Ok(Value::Int(id))
+            })
         });
         interp.register_extern("__os_gpu_write_buffer", |args| {
             let dev_id = args.first().and_then(|v| v.as_int()).unwrap_or(0);
@@ -161,16 +192,18 @@ mod d3d12 {
                 }).collect(),
                 _ => Vec::new(),
             };
-            // Heuristic: if every float is a small non-negative integer
-            // it's an index list — promote to a u32 index buffer.
-            let looks_indexed = !floats.is_empty()
-                && floats.iter().all(|f| *f >= 0.0 && f.fract() == 0.0 && *f < 65536.0)
-                && buf_id != 1; // first buffer created is the vertex one
-            if looks_indexed {
-                let indices: Vec<u32> = floats.iter().map(|f| *f as u32).collect();
-                let _ = upload_indices(dev_id, &indices);
-            } else {
-                let _ = upload_vertices(dev_id, &floats);
+            // Dispatch by recorded usage. Falls back to vertex when no
+            // usage was recorded (handles tests that bypass create_buffer).
+            let usage = BUF_USAGE.with(|m| m.borrow().get(&buf_id).cloned())
+                .unwrap_or_else(|| String::from("vertex"));
+            match usage.as_str() {
+                "index" => {
+                    let indices: Vec<u32> = floats.iter().map(|f| *f as u32).collect();
+                    let _ = upload_indices(dev_id, &indices);
+                }
+                _ => {
+                    let _ = upload_vertices(dev_id, &floats);
+                }
             }
             Ok(Value::Unit)
         });
@@ -719,7 +752,7 @@ mod d3d12 {
                 rtv.ptr += (d.frame_index * d.rtv_descriptor_size) as usize;
                 d.cmd_list.OMSetRenderTargets(1, Some(&rtv), false, None);
 
-                let clear: [f32; 4] = [0.10, 0.10, 0.15, 1.0];
+                let clear: [f32; 4] = [0.05, 0.06, 0.10, 1.0];   // near-black for visible blocks
                 d.cmd_list.ClearRenderTargetView(rtv, &clear, None);
 
                 d.cmd_list.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
