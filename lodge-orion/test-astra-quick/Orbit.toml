@@ -1,6 +1,0 @@
-[package]
-name = "astra_quick"
-version = "0.0.1"
-
-[orbs]
-astra = "*"

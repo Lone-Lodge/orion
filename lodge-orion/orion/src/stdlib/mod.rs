@@ -6,7 +6,6 @@
 //! orb's SOURCE to `target/orbit_modules/<name>.or`, and calls `register` on
 //! the live `Interp` before executing user code.
 
-mod astra_bridge;
 mod audio;
 mod base64;
 mod bytes;
@@ -97,7 +96,6 @@ pub const ORBS: &[Orb] = &[
     Orb { name: "audio",       source: audio::SOURCE,       register: audio::register,       deps: &[] },
     Orb { name: "gpu",         source: gpu::SOURCE,         register: gpu::register,         deps: &["window"] },
     Orb { name: "wgsl",        source: wgsl::SOURCE,        register: wgsl::register,        deps: &[] },
-    Orb { name: "astra",       source: astra_bridge::SOURCE, register: astra_bridge::register, deps: &[] },
 ];
 
 /// Find a bundled orb by name, or `None` if it's not part of the stdlib.

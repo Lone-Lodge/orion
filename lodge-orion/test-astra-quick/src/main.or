@@ -1,5 +1,0 @@
-use astra
-
-fn main() -> int:
-    print("hi")
-    0
