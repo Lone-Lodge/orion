@@ -1,0 +1,176 @@
+use io
+use env
+use image
+use bytes
+use string
+use format
+
+fn print_usage():
+    print_line("Usage: orbit run tools/asset_pipeline.or <input-file> [out-dir]")
+
+fn basename(path: Text) -> Text:
+    # naive basename: last '/' or '\\' or full string
+    mut i = len(path) - 1
+    loop:
+        if i < 0:
+            break
+        c = byte_at(bytes_from_text(path), i)
+        if c == 47 or c == 92:
+            return substring(path, i + 1, len(path))
+        i = i - 1
+    path
+
+fn change_ext(name: Text, new_ext: Text) -> Text:
+    dot = str_rfind(name, '.')
+    if dot < 0:
+        name + new_ext
+    else:
+        substring(name, 0, dot) + new_ext
+
+# Utility: read little-endian u16 from [int] at offset
+fn read_u16_le(bytes_arr: [int], offset: int) -> int:
+    (byte_at(bytes_arr, offset) | (byte_at(bytes_arr, offset + 1) << 8)) & 0xFFFF
+
+# TGA loader (uncompressed true-color only): returns Map like image_load_png
+fn load_tga_bytes(path: Text):
+    data = read_file_bytes(path)
+    if len(data) < 18:
+        return none
+    id_len = byte_at(data, 0)
+    color_map_type = byte_at(data, 1)
+    image_type = byte_at(data, 2)
+    # we only support image_type == 2 (uncompressed true-color)
+    if image_type != 2:
+        return none
+    width = read_u16_le(data, 12)
+    height = read_u16_le(data, 14)
+    bpp = byte_at(data, 16)
+    if not (bpp == 24 or bpp == 32):
+        return none
+    pixel_depth = bpp / 8
+    header_end = 18 + id_len
+    expected = width * height * pixel_depth
+    if len(data) < header_end + expected:
+        return none
+    mut pixels = bytes_zeros(0)
+    mut src = header_end
+    for y in 0..<height:
+        for x in 0..<width:
+            # TGA stores B, G, R, (A)
+            b = byte_at(data, src)
+            g = byte_at(data, src + 1)
+            r = byte_at(data, src + 2)
+            a = if pixel_depth == 4 then byte_at(data, src + 3) else 255
+            pixels = push(pixels, r)
+            pixels = push(pixels, g)
+            pixels = push(pixels, b)
+            pixels = push(pixels, a)
+            src = src + pixel_depth
+    {"width": width, "height": height, "channels": 4, "pixels": pixels}
+
+# PPM P6 loader (binary PPM)
+fn load_ppm_bytes(path: Text):
+    data = read_file_bytes(path)
+    if len(data) < 3:
+        return none
+    # Expect ASCII header: magic, width, height, maxval, then single whitespace, then binary pixels
+    # Parse tokens skipping comments
+    mut tokens = []
+    mut i = 0
+    mut cur = bytes_zeros(0)
+    while i < len(data) and len(tokens) < 4:
+        c = byte_at(data, i)
+        if c == 35: # '#', comment till newline
+            loop:
+                if i >= len(data) or byte_at(data, i) == 10:
+                    break
+                i = i + 1
+            i = i + 1
+            continue
+        if c == 9 or c == 10 or c == 13 or c == 32:
+            if len(cur) > 0:
+                tokens = push(tokens, bytes_to_text(cur))
+                cur = bytes_zeros(0)
+            i = i + 1
+            continue
+        cur = push(cur, c)
+        i = i + 1
+    if len(cur) > 0 and len(tokens) < 4:
+        tokens = push(tokens, bytes_to_text(cur))
+    if len(tokens) < 4:
+        return none
+    magic = at(tokens, 0)
+    if magic != "P6":
+        return none
+    w = str_to_int(at(tokens, 1))
+    h = str_to_int(at(tokens, 2))
+    maxv = str_to_int(at(tokens, 3))
+    if maxv > 255 or maxv <= 0:
+        return none
+    # i currently at first byte after header tokens parsing — find single whitespace that separates header from data
+    # scan forward to next newline after tokens[3]
+    # simple approach: find sequence of 3 tokens end — reuse i as data start
+    data_start = i
+    expected = w * h * 3
+    if len(data) < data_start + expected:
+        return none
+    mut pixels = bytes_zeros(0)
+    mut src = data_start
+    for k in 0..<(w*h):
+        r = byte_at(data, src)
+        g = byte_at(data, src + 1)
+        b = byte_at(data, src + 2)
+        pixels = push(pixels, r)
+        pixels = push(pixels, g)
+        pixels = push(pixels, b)
+        pixels = push(pixels, 255)
+        src = src + 3
+    {"width": w, "height": h, "channels": 4, "pixels": pixels}
+
+fn try_process(input: Text, outdir: Text):
+    base = basename(input)
+    outname = change_ext(base, ".png")
+    outpath = outdir + "/" + outname
+    data = read_file_bytes(input)
+    if len(data) >= 8 and at(bytes_from_text(bytes_to_text(data)), 0) == 137 and at(bytes_from_text(bytes_to_text(data)),1) == 80:
+        # PNG signature — normalize via image_load_png and re-save to ensure consistent format
+        res = image_load_png(input)
+        if res == none:
+            print_line("Failed to load PNG: " + input)
+            return
+        width = res.width
+        height = res.height
+        pixels = res.pixels
+        image_save_png(outpath, width, height, pixels)
+        print_line("Converted PNG -> " + outpath)
+        return
+    # Try TGA by extension
+    ext = substring(base, if str_contains(base, ".") then str_rfind(base, '.') else len(base), len(base))
+    if ext == ".tga" or ext == ".TGA" or (len(data) >= 3 and byte_at(data, 2) == 2) :
+        img = load_tga_bytes(input)
+        if img == none:
+            print_line("TGA not supported or failed: " + input)
+            return
+        image_save_png(outpath, img.width, img.height, img.pixels)
+        print_line("Converted TGA -> " + outpath)
+        return
+    # Try PPM
+    if len(data) >= 2 and byte_at(data,0) == 80 and byte_at(data,1) == 54:
+        img = load_ppm_bytes(input)
+        if img == none:
+            print_line("PPM failed: " + input)
+            return
+        image_save_png(outpath, img.width, img.height, img.pixels)
+        print_line("Converted PPM -> " + outpath)
+        return
+    print_line("Unsupported format or failed to parse: " + input)
+
+fn main():
+    argc = env.arg_count()
+    if argc < 2:
+        print_usage()
+        env.exit_with(1)
+    input = env.arg(1)
+    outdir = if argc > 2 then env.arg(2) else "out_assets"
+    # ensure outdir exists — naive: try write a file or let underlying fs handle
+    try_process(input, outdir)

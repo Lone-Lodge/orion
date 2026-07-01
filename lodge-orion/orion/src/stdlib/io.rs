@@ -58,6 +58,18 @@ pub fn register(interp: &Interp) {
         }
         Ok(Value::Text(buf))
     });
+
+    interp.register_extern("__os_read_bytes", |args| {
+        let path = as_text(&args[0]);
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                let list: Vec<Value> = bytes.into_iter().map(|b| Value::Int(b as i64)).collect();
+                Ok(Value::List(std::sync::Arc::new(list)))
+            }
+            Err(_) => Ok(Value::List(std::sync::Arc::new(Vec::new()))),
+        }
+    });
+
     interp.register_extern("__os_file_exists", |args| {
         let path = as_text(&args[0]);
         Ok(Value::Bool(std::path::Path::new(&path).exists()))

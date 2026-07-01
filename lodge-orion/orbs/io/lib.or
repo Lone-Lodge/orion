@@ -2,6 +2,7 @@
 
 extern fn __os_read_file(path: Text) -> Text
 extern fn __os_write_file(path: Text, contents: Text) -> bool
+extern fn __os_read_bytes(path: Text) -> [int]
 extern fn __os_write_bytes(path: Text, content_bytes: [int]) -> bool
 extern fn __os_print_line(line: Text)
 extern fn __os_read_line() -> Text
@@ -10,12 +11,15 @@ extern fn __os_file_exists(path: Text) -> bool
 pub fn read_file(path: Text) -> Text:
     __os_read_file(path)
 
+# Read raw bytes from disk as a [int] list. Useful for binary formats (TGA, JPG).
+pub fn read_file_bytes(path: Text) -> [int]:
+    __os_read_bytes(path)
+
 pub fn write_file(path: Text, contents: Text) -> bool:
     __os_write_file(path, contents)
 
 # Write a raw [int] byte sequence to disk. Use for binary outputs
-# (PE/ELF/Mach-O exes, PNGs, etc.) where bytes_to_text would corrupt
-# values ≥ 0x80 via UTF-8 lossy replacement.
+# (PE/ELF/Mach-O exes, PNGs, audio, anything non-text).
 pub fn write_file_bytes(path: Text, content_bytes: [int]) -> bool:
     __os_write_bytes(path, content_bytes)
 
