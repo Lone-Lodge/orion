@@ -4,28 +4,17 @@ use image
 use bytes
 use string
 use format
+use fs
+use path
 
 fn print_usage():
-    print_line("Usage: orbit run tools/asset_pipeline.or <input-file> [out-dir]")
+    print_line("Usage: orbit run tools/asset_pipeline.or <input-file-or-dir> [out-dir]")
 
 fn basename(path: Text) -> Text:
-    # naive basename: last '/' or '\\' or full string
-    mut i = len(path) - 1
-    loop:
-        if i < 0:
-            break
-        c = byte_at(bytes_from_text(path), i)
-        if c == 47 or c == 92:
-            return substring(path, i + 1, len(path))
-        i = i - 1
-    path
+    path_filename(path)
 
 fn change_ext(name: Text, new_ext: Text) -> Text:
-    dot = str_rfind(name, '.')
-    if dot < 0:
-        name + new_ext
-    else:
-        substring(name, 0, dot) + new_ext
+    path_stem(name) + new_ext
 
 # Utility: read little-endian u16 from [int] at offset
 fn read_u16_le(bytes_arr: [int], offset: int) -> int:
@@ -128,11 +117,27 @@ fn load_ppm_bytes(path: Text):
     {"width": w, "height": h, "channels": 4, "pixels": pixels}
 
 fn try_process(input: Text, outdir: Text):
-    base = basename(input)
+    # ensure outdir exists
+    mkdir_ok = fs.mkdir_all(outdir)
+    # If input is a directory, recurse
+    if fs.is_dir(input):
+        entries = fs.list_dir(input)
+        for i in 0..<len(entries):
+            name = at(entries, i)
+            child = path.path_join(input, name)
+            if fs.is_dir(child):
+                child_out = path.path_join(outdir, name)
+                try_process(child, child_out)
+            else:
+                try_process(child, outdir)
+        return
+
+    base = path.path_filename(input)
     outname = change_ext(base, ".png")
-    outpath = outdir + "/" + outname
+    outpath = path.path_join(outdir, outname)
     data = read_file_bytes(input)
-    if len(data) >= 8 and at(bytes_from_text(bytes_to_text(data)), 0) == 137 and at(bytes_from_text(bytes_to_text(data)),1) == 80:
+    # PNG signature check
+    if len(data) >= 8 and byte_at(data,0) == 137 and byte_at(data,1) == 80 and byte_at(data,2) == 78 and byte_at(data,3) == 71 and byte_at(data,4) == 13 and byte_at(data,5) == 10 and byte_at(data,6) == 26 and byte_at(data,7) == 10:
         # PNG signature — normalize via image_load_png and re-save to ensure consistent format
         res = image_load_png(input)
         if res == none:
@@ -145,8 +150,8 @@ fn try_process(input: Text, outdir: Text):
         print_line("Converted PNG -> " + outpath)
         return
     # Try TGA by extension
-    ext = substring(base, if str_contains(base, ".") then str_rfind(base, '.') else len(base), len(base))
-    if ext == ".tga" or ext == ".TGA" or (len(data) >= 3 and byte_at(data, 2) == 2) :
+    ext = path.path_extension(base)
+    if ext == "tga" or ext == "TGA" or (len(data) >= 3 and byte_at(data, 2) == 2) :
         img = load_tga_bytes(input)
         if img == none:
             print_line("TGA not supported or failed: " + input)
@@ -172,5 +177,4 @@ fn main():
         env.exit_with(1)
     input = env.arg(1)
     outdir = if argc > 2 then env.arg(2) else "out_assets"
-    # ensure outdir exists — naive: try write a file or let underlying fs handle
     try_process(input, outdir)
