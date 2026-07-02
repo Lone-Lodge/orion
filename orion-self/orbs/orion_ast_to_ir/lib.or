@@ -557,8 +557,15 @@ fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
     # Body: load element, bind var(s), walk body.
     # continue targets step_lbl so the counter still increments.
+    # Carry the element type from a parameterised list ("list:struct:X")
+    # onto the loop variable — otherwise `for r in xs: r.field` loses
+    # the struct type and field access fails. Same trick as is_at.
     pr_body_lbl = ir_fn_push(pr_br_loop.function, ir_label(body_lbl))
-    pr_at = ir_fn_push(pr_body_lbl.function, ir_list_at(list_id, cur_id))
+    fin_list_type = get_value_type(pr_body_lbl.function, list_id)
+    fin_elem_type = extract_list_elem(fin_list_type)
+    fin_at_inst = ir_list_at(list_id, cur_id)
+    fin_at_typed = Inst{op: fin_at_inst.op, type_text: fin_elem_type, value: fin_at_inst.value, lhs: fin_at_inst.lhs, rhs: fin_at_inst.rhs, name: fin_at_inst.name, args: fin_at_inst.args}
+    pr_at = ir_fn_push(pr_body_lbl.function, fin_at_typed)
     elem_id = pr_at.id
     mut body_scope = scope_bind(iter_r.scope, var_name, elem_id)
     if index_var_name != "":
@@ -875,9 +882,30 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
     ConvResult{function: result_fn, scope: else_r.scope, id: result_id}
 
+# Bare enum-variant constructor: `KeyPress(x)` without the EnumName
+# prefix — mirror lodge-orion's variant probe. Returns the enum name
+# or "" when the callee is no variant.
+fn find_variant_enum(scope: Scope, callee: Text) -> Text:
+    n_enums = len(scope.en_names)
+    mut found_enum = ""
+    for ei in 0..<n_enums:
+        if found_enum == "":
+            en_name = at(scope.en_names, ei)
+            v_idx = scope_lookup_enum_variant(scope, en_name, callee)
+            if v_idx >= 0:
+                found_enum = en_name
+    found_enum
+
 fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     callee = get(node, "callee")
     args = get_list(node, "args")
+    # Variant-as-callee → route through the EnumName.Variant(...) sugar
+    # (same MethodCall lowering path). Checked BEFORE builtins/user fns —
+    # a variant name shadows nothing else by construction.
+    vc_enum = find_variant_enum(scope, callee)
+    if vc_enum != "":
+        vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": vc_enum}, "method": callee, "args": args}
+        return ast_expr_to_ir(fn_value, scope, vc_node)
     is_print_line = callee == "print_line" or callee == "println"
     is_to_text = callee == "to_text"
     is_to_float = callee == "to_float"
