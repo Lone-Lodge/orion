@@ -522,6 +522,10 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
     if op == "list_lit":
         n = len(inst.args)
+        # NOTE: interning `[]` to a shared constant crashed the game in
+        # window/input paths (harness passed) — something appends via a
+        # write path the cap-0 guard doesn't cover. Root-cause before
+        # retrying; the emitted global + bounds-checked list_set stay.
         mut text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
         for ai in 0..<n:
             item_id = at(inst.args, ai)
@@ -1217,6 +1221,10 @@ fn emit_runtime() -> Text:
     # must NEVER touch the arena: growth/init go straight to malloc and
     # keys are copied on insert (callers routinely pass arena-built keys).
     text = "{text}@orion_slots = global ptr null\n\n"
+    # The interned empty list: [cap=0, len=0]. `constant` so any write
+    # that slips past the guards faults immediately instead of
+    # corrupting every empty list in the program.
+    text = "{text}@orion_empty_list = constant [2 x i64] zeroinitializer\n\n"
     text = "{text}define ptr @orion_persist_text(ptr %s) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %n = call i64 @strlen(ptr %s)\n"
@@ -1450,11 +1458,23 @@ fn emit_runtime() -> Text:
     text = "{text}exit:\n"
     text = "{text}  ret ptr %out\n"
     text = "{text}\}\n\n"
+    # Bounds-checked: an OOB set is a silent no-op. Guards the interned
+    # empty list (len 0 → every index rejected) and turns stray writes
+    # into non-corruption.
     text = "{text}define void @orion_list_set(ptr %list, i64 %idx, i64 %val) \{\n"
     text = "{text}entry:\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %list, i64 1\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  %neg = icmp slt i64 %idx, 0\n"
+    text = "{text}  %oob = icmp sge i64 %idx, %len\n"
+    text = "{text}  %bad = or i1 %neg, %oob\n"
+    text = "{text}  br i1 %bad, label %skip, label %write\n"
+    text = "{text}write:\n"
     text = "{text}  %offset = add i64 %idx, 2\n"
     text = "{text}  %slot = getelementptr i64, ptr %list, i64 %offset\n"
     text = "{text}  store i64 %val, ptr %slot\n"
+    text = "{text}  ret void\n"
+    text = "{text}skip:\n"
     text = "{text}  ret void\n"
     text = "{text}\}\n\n"
     # Copying push — persistent value semantics (the result is a FRESH
