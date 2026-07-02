@@ -54,6 +54,7 @@ long long orion_arena_on(void) {
 }
 
 long long orion_arena_off(void) { arena_on = 0; return 1; }
+long long orion_arena_active(void) { return arena_on; }
 long long orion_arena_reset(void) { arena_used = 0; return 1; }
 long long orion_arena_used(void) { return (long long)arena_used; }
 /* Obstack-style partial rewind — callers save a watermark, evacuate
