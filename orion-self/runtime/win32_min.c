@@ -130,6 +130,12 @@ int64_t win_open(const char* title, int64_t w, int64_t h) {
     return (int64_t)(uintptr_t)hwnd;
 }
 
+void win_set_title(int64_t hwnd, const char* title) {
+    wchar_t* wtitle = to_wide(title);
+    SetWindowTextW((HWND)(uintptr_t)hwnd, wtitle);
+    free(wtitle);
+}
+
 // Returns 1 if the window loop should keep going, 0 on WM_QUIT.
 int64_t win_pump(void) {
     MSG msg;

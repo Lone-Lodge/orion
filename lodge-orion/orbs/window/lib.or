@@ -30,3 +30,7 @@ pub fn window_close(window_id: int):
 # degrade in Orion code when running on a platform without a window.
 pub fn window_ready() -> bool:
     __os_window_ready()
+
+# Title updates are a native nicety; the interpreted backend ignores them.
+pub fn window_set_title(window_id: int, title: Text):
+    0
