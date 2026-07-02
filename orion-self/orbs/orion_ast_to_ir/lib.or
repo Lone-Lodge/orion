@@ -1125,6 +1125,8 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         arg_type = get_value_type(arg_r.function, arg_r.id)
         # len(text) → strlen; len(map) → handle slot 2 (NOT list_len —
         # a map handle's slot 1 is capacity); len(list) → list_len.
+        # Untyped args are an ERROR: static dispatch would silently pick
+        # the wrong length (strlen on a list header etc).
         if arg_type == "text":
             pr = ir_fn_push(arg_r.function, ir_text_len(arg_r.id))
             result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
@@ -1133,8 +1135,13 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
                 result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
             else:
-                pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
-                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+                if is_list_type(arg_type):
+                    pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
+                    result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+                else:
+                    compile_error("orion-self: ERROR — len() on untyped value (type `{arg_type}`) — read it through a typed accessor (get_int/get_map/get_list or a typed fn) so len knows the shape")
+                    pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
+                    result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
         map_node = at(args, 0)
         key_node = at(args, 1)
@@ -1968,6 +1975,17 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
 # Map a parser type-node to an IR type string ("text" / "list" / "i64").
 # Given a "list:T" encoding, return T. Fallback "i64" for plain "list".
+fn is_list_type(type_text: Text) -> bool:
+    if type_text == "list":
+        true
+    else:
+        bs = bytes_from_text(type_text)
+        n = len(bs)
+        if n >= 5:
+            at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58
+        else:
+            false
+
 fn extract_list_elem(type_text: Text) -> Text:
     bs = bytes_from_text(type_text)
     n = len(bs)
