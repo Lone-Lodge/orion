@@ -322,6 +322,33 @@ pub fn ir_map_get(map_id: int, key_id: int, value_type: Text) -> Inst:
 pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
     Inst{op: "map_has", type_text: "i64", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
+# set(map, key, val) — mutates in place (indirect handle survives
+# growth) and re-yields the map so `m = set(m, k, v)` value-semantics
+# call sites keep working. Same aliasing caveat as list_push_mut.
+pub fn ir_map_set_val(map_id: int, key_id: int, val_id: int) -> Inst:
+    Inst{op: "map_set_val", type_text: "map", value: map_id, lhs: key_id, rhs: val_id, name: "", args: []}
+
+# set(list, index, val) — in-place store, re-yields the list.
+pub fn ir_list_set_val(list_id: int, idx_id: int, val_id: int, list_type: Text) -> Inst:
+    Inst{op: "list_set_val", type_text: list_type, value: list_id, lhs: idx_id, rhs: val_id, name: "", args: []}
+
+pub fn ir_map_len(map_id: int) -> Inst:
+    Inst{op: "map_len", type_text: "i64", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
+
+pub fn ir_map_keys(map_id: int) -> Inst:
+    Inst{op: "map_keys", type_text: "list:text", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
+
+pub fn ir_map_values(map_id: int) -> Inst:
+    Inst{op: "map_values", type_text: "list", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
+
+# get_or(map, key, default) — result typed after the default value.
+pub fn ir_map_get_or(map_id: int, key_id: int, dflt_id: int, value_type: Text) -> Inst:
+    Inst{op: "map_get_or", type_text: value_type, value: map_id, lhs: key_id, rhs: dflt_id, name: "", args: []}
+
+# f64 → Text ("%g") for interpolation and to_text.
+pub fn ir_f64_to_text(value_id: int) -> Inst:
+    Inst{op: "f64_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+
 
 # --- Structs (data decls) ---
 # A struct value is a ptr to a heap buffer of i64 slots, one per field.

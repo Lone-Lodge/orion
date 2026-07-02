@@ -768,11 +768,11 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         mut left_id = left_result.id
         mut right_id = right_result.id
         if left_type != "text":
-            pr_l = ir_fn_push(current_fn, ir_int_to_text(left_id))
+            pr_l = if left_type == "f64" then ir_fn_push(current_fn, ir_f64_to_text(left_id)) else ir_fn_push(current_fn, ir_int_to_text(left_id))
             current_fn = pr_l.function
             left_id = pr_l.id
         if right_type != "text":
-            pr_r = ir_fn_push(current_fn, ir_int_to_text(right_id))
+            pr_r = if right_type == "f64" then ir_fn_push(current_fn, ir_f64_to_text(right_id)) else ir_fn_push(current_fn, ir_int_to_text(right_id))
             current_fn = pr_r.function
             right_id = pr_r.id
         pr_cat = ir_fn_push(current_fn, ir_text_concat(left_id, right_id))
@@ -928,13 +928,21 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if arg_type == "text":
             result = arg_r
         else:
-            pr = ir_fn_push(arg_r.function, ir_int_to_text(arg_r.id))
-            result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+            if arg_type == "f64":
+                pr = ir_fn_push(arg_r.function, ir_f64_to_text(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+            else:
+                pr = ir_fn_push(arg_r.function, ir_int_to_text(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     is_at = callee == "at"
     is_len = callee == "len"
     is_get = callee == "get"
     is_has = callee == "has"
     is_push = callee == "push"
+    is_set_call = callee == "set"
+    is_map_keys = callee == "map_keys"
+    is_map_values = callee == "map_values"
+    is_get_or = callee == "get_or"
     is_slice = callee == "slice"
     is_vec_add = callee == "vec_add"
     is_vec_sub = callee == "vec_sub"
@@ -979,13 +987,18 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         arg_node = at(args, 0)
         arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
         arg_type = get_value_type(arg_r.function, arg_r.id)
-        # len(text) → strlen via runtime; len(list/map) → list_len.
+        # len(text) → strlen; len(map) → handle slot 2 (NOT list_len —
+        # a map handle's slot 1 is capacity); len(list) → list_len.
         if arg_type == "text":
             pr = ir_fn_push(arg_r.function, ir_text_len(arg_r.id))
             result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
         else:
-            pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
-            result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+            if arg_type == "map":
+                pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+            else:
+                pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
         map_node = at(args, 0)
         key_node = at(args, 1)
@@ -1012,6 +1025,46 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_has(map_r.id, key_r.id))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+    if is_set_call:
+        # set(target, key/idx, val) — map when the target types as a map
+        # or the key is text; list when the target types as a list or the
+        # key is an int index. Mirrors lodge-orion's dynamic dispatch.
+        sc_tgt = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        sc_key = ast_expr_to_ir(sc_tgt.function, sc_tgt.scope, at(args, 1))
+        sc_val = ast_expr_to_ir(sc_key.function, sc_key.scope, at(args, 2))
+        sc_tgt_type = get_value_type(sc_val.function, sc_tgt.id)
+        sc_key_type = get_value_type(sc_val.function, sc_key.id)
+        sc_tgt_bs = bytes_from_text(sc_tgt_type)
+        mut sc_is_list = false
+        if len(sc_tgt_bs) >= 4:
+            if at(sc_tgt_bs, 0) == 108 and at(sc_tgt_bs, 1) == 105 and at(sc_tgt_bs, 2) == 115 and at(sc_tgt_bs, 3) == 116:
+                sc_is_list = true
+        mut sc_is_map = sc_tgt_type == "map"
+        if not sc_is_list:
+            if not sc_is_map:
+                sc_is_map = sc_key_type == "text"
+                sc_is_list = not sc_is_map
+        if sc_is_map:
+            pr_ms = ir_fn_push(sc_val.function, ir_map_set_val(sc_tgt.id, sc_key.id, sc_val.id))
+            result = ConvResult{function: pr_ms.function, scope: sc_val.scope, id: pr_ms.id}
+        if sc_is_list:
+            pr_ls = ir_fn_push(sc_val.function, ir_list_set_val(sc_tgt.id, sc_key.id, sc_val.id, sc_tgt_type))
+            result = ConvResult{function: pr_ls.function, scope: sc_val.scope, id: pr_ls.id}
+    if is_map_keys:
+        mk_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        pr_mk = ir_fn_push(mk_r.function, ir_map_keys(mk_r.id))
+        result = ConvResult{function: pr_mk.function, scope: mk_r.scope, id: pr_mk.id}
+    if is_map_values:
+        mv_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        pr_mv = ir_fn_push(mv_r.function, ir_map_values(mv_r.id))
+        result = ConvResult{function: pr_mv.function, scope: mv_r.scope, id: pr_mv.id}
+    if is_get_or:
+        go_map = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        go_key = ast_expr_to_ir(go_map.function, go_map.scope, at(args, 1))
+        go_dflt = ast_expr_to_ir(go_key.function, go_key.scope, at(args, 2))
+        go_type = get_value_type(go_dflt.function, go_dflt.id)
+        pr_go = ir_fn_push(go_dflt.function, ir_map_get_or(go_map.id, go_key.id, go_dflt.id, go_type))
+        result = ConvResult{function: pr_go.function, scope: go_dflt.scope, id: pr_go.id}
     if is_push:
         list_node = at(args, 0)
         val_node = at(args, 1)
@@ -1161,7 +1214,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false)
     if is_resume_int:
         arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_int", [arg_r.id], "void"))

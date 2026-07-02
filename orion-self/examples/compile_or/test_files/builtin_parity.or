@@ -1,0 +1,28 @@
+fn main() -> int:
+    # set on maps (returns the map, value-semantics call style)
+    mut m = {"a": 1}
+    m = set(m, "b", 2)
+    m = set(m, "a", 10)
+    print_line(get_int(m, "a"))
+    print_line(get_int(m, "b"))
+    # len(map) vs len(list)
+    print_line(len(m))
+    # get_or
+    print_line(get_or(m, "missing", 99))
+    print_line(get_or(m, "b", 99))
+    # map_keys / map_values
+    ks = map_keys(m)
+    print_line(len(ks))
+    print_line(at(ks, 0))
+    vs = map_values(m)
+    print_line(at(vs, 1))
+    # set on lists
+    mut xs = [1, 2, 3]
+    xs = set(xs, 1, 42)
+    print_line(at(xs, 1))
+    # float interpolation + to_text(float)
+    speed = 2.5
+    print_line("speed is {speed} units")
+    t = to_text(1.25)
+    print_line(t)
+    0

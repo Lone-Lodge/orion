@@ -605,6 +605,62 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
                 text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {value_ref(val_id)})"
         result = text
 
+    if op == "map_set_val":
+        # value is map_id, lhs is key_id, rhs is val_id. Mutate, then
+        # re-yield the map pointer as this inst's SSA value.
+        msv_val_inst = at(fn_value.instructions, inst.rhs)
+        msv_val_ty = llvm_type_of(msv_val_inst.type_text)
+        if msv_val_ty == "ptr":
+            tmp = "%v{my_id}.p"
+            l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.rhs)} to i64"
+            l2 = "    call void @orion_map_set(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {tmp})"
+            l3 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
+            result = "{l1}\n{l2}\n{l3}"
+        else:
+            l1 = "    call void @orion_map_set(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+            l2 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
+            result = "{l1}\n{l2}"
+
+    if op == "list_set_val":
+        lsv_val_inst = at(fn_value.instructions, inst.rhs)
+        lsv_val_ty = llvm_type_of(lsv_val_inst.type_text)
+        if lsv_val_ty == "ptr":
+            tmp = "%v{my_id}.p"
+            l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.rhs)} to i64"
+            l2 = "    call void @orion_list_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {tmp})"
+            l3 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
+            result = "{l1}\n{l2}\n{l3}"
+        else:
+            l1 = "    call void @orion_list_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+            l2 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
+            result = "{l1}\n{l2}"
+
+    if op == "map_len":
+        result = "    {value_ref(my_id)} = call i64 @orion_map_len(ptr {value_ref(inst.value)})"
+
+    if op == "map_keys":
+        result = "    {value_ref(my_id)} = call ptr @orion_map_keys(ptr {value_ref(inst.value)})"
+
+    if op == "map_values":
+        result = "    {value_ref(my_id)} = call ptr @orion_map_values(ptr {value_ref(inst.value)})"
+
+    if op == "map_get_or":
+        # Default's LLVM shape decides casts: ptr defaults round-trip
+        # through i64 storage.
+        mgo_ty = llvm_type_of(inst.type_text)
+        if mgo_ty == "ptr":
+            dtmp = "%v{my_id}.d"
+            rtmp = "%v{my_id}.r"
+            l1 = "    {dtmp} = ptrtoint ptr {value_ref(inst.rhs)} to i64"
+            l2 = "    {rtmp} = call i64 @orion_map_get_or(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {dtmp})"
+            l3 = "    {value_ref(my_id)} = inttoptr i64 {rtmp} to ptr"
+            result = "{l1}\n{l2}\n{l3}"
+        else:
+            result = "    {value_ref(my_id)} = call i64 @orion_map_get_or(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+
+    if op == "f64_to_text":
+        result = "    {value_ref(my_id)} = call ptr @orion_f64_to_text(double {value_ref(inst.value)})"
+
     if op == "map_get":
         # map_get returns i64. The caller decides via type_text whether to
         # cast back to ptr (for text/list/map) or keep as i64.
@@ -871,6 +927,7 @@ fn emit_runtime() -> Text:
     text = "{text}declare void @__orion_sleep_ms(i64)\n"
     text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
     text = "{text}@.fmt_float = private unnamed_addr constant [4 x i8] c\"%g\\0A\\00\"\n"
+    text = "{text}@.fmt_g = private unnamed_addr constant [3 x i8] c\"%g\\00\"\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
     text = "{text}\n"
     text = "{text}define ptr @orion_text_concat(ptr %a, ptr %b) \{\n"
@@ -1326,6 +1383,76 @@ fn emit_runtime() -> Text:
     text = "{text}  br label %hdr\n"
     text = "{text}miss:\n"
     text = "{text}  ret i64 0\n"
+    text = "{text}\}\n\n"
+    # map_len: length lives at handle slot 2 (indirect layout).
+    text = "{text}define i64 @orion_map_len(ptr %map) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  ret i64 %len\n"
+    text = "{text}\}\n\n"
+    # map_keys / map_values: snapshot into a fresh pre-sized list.
+    text = "{text}define ptr @orion_map_keys(ptr %map) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %entries = load ptr, ptr %map\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  %out = call ptr @orion_list_new(i64 %len)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %len\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  %ki = mul i64 %i, 2\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %entries, i64 %ki\n"
+    text = "{text}  %k_int = load i64, ptr %k_slot\n"
+    text = "{text}  call void @orion_list_set(ptr %out, i64 %i, i64 %k_int)\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  ret ptr %out\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_map_values(ptr %map) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %entries = load ptr, ptr %map\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  %out = call ptr @orion_list_new(i64 %len)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %len\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  %ki = mul i64 %i, 2\n"
+    text = "{text}  %vi = add i64 %ki, 1\n"
+    text = "{text}  %v_slot = getelementptr i64, ptr %entries, i64 %vi\n"
+    text = "{text}  %v_int = load i64, ptr %v_slot\n"
+    text = "{text}  call void @orion_list_set(ptr %out, i64 %i, i64 %v_int)\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  ret ptr %out\n"
+    text = "{text}\}\n\n"
+    # get_or(map, key, default) — default when the key is absent.
+    text = "{text}define i64 @orion_map_get_or(ptr %map, ptr %key, i64 %dflt) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %has = call i64 @orion_map_has(ptr %map, ptr %key)\n"
+    text = "{text}  %miss = icmp eq i64 %has, 0\n"
+    text = "{text}  br i1 %miss, label %use_dflt, label %fetch\n"
+    text = "{text}use_dflt:\n"
+    text = "{text}  ret i64 %dflt\n"
+    text = "{text}fetch:\n"
+    text = "{text}  %v = call i64 @orion_map_get(ptr %map, ptr %key)\n"
+    text = "{text}  ret i64 %v\n"
+    text = "{text}\}\n\n"
+    # f64 → text via snprintf %g (for interpolation and to_text).
+    text = "{text}define ptr @orion_f64_to_text(double %v) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %buf = call ptr @malloc(i64 32)\n"
+    text = "{text}  %_n = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_g, double %v)\n"
+    text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
     # SIMD-style elementwise vector ops over int lists. Scalar fallback;
     # autovectorizer may lift to <N x i64> via -Os.
