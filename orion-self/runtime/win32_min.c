@@ -16,9 +16,63 @@
 #include <string.h>
 #include <stdlib.h>
 
+/* ---- Input events -------------------------------------------------
+ * Fixed ring buffer filled by wnd_proc during win_pump; drained from
+ * Orion via win_event_next()/win_event_kind()/x/y/key. All-i64 API so
+ * the Orion externs stay trivially typed.
+ *
+ * Kinds: 1 mouse_down, 2 mouse_up, 3 mouse_move, 4 key_down,
+ *        5 key_up, 6 close, 7 resize.
+ * key: mouse button (1 left, 2 right, 3 middle) or virtual-key code.
+ * For resize, x/y carry the new client width/height. */
+
+typedef struct { long long kind, key, x, y; } OrionEvent;
+
+#define EV_CAP 256
+static OrionEvent ev_ring[EV_CAP];
+static int ev_head = 0, ev_tail = 0;   /* pop at head, push at tail */
+static OrionEvent ev_current;
+
+static void ev_push(long long kind, long long key, long long x, long long y) {
+    int next = (ev_tail + 1) % EV_CAP;
+    if (next == ev_head) return;       /* full: drop newest (potato-simple) */
+    ev_ring[ev_tail].kind = kind;
+    ev_ring[ev_tail].key = key;
+    ev_ring[ev_tail].x = x;
+    ev_ring[ev_tail].y = y;
+    ev_tail = next;
+}
+
+long long win_event_next(void) {
+    if (ev_head == ev_tail) return 0;
+    ev_current = ev_ring[ev_head];
+    ev_head = (ev_head + 1) % EV_CAP;
+    return 1;
+}
+
+long long win_event_kind(void) { return ev_current.kind; }
+long long win_event_key(void)  { return ev_current.key; }
+long long win_event_x(void)    { return ev_current.x; }
+long long win_event_y(void)    { return ev_current.y; }
+
+static long long lp_x(LPARAM lp) { return (long long)(short)LOWORD(lp); }
+static long long lp_y(LPARAM lp) { return (long long)(short)HIWORD(lp); }
+
 static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-    if (msg == WM_CLOSE) { DestroyWindow(hwnd); return 0; }
-    if (msg == WM_DESTROY) { PostQuitMessage(0); return 0; }
+    switch (msg) {
+    case WM_LBUTTONDOWN: ev_push(1, 1, lp_x(lp), lp_y(lp)); return 0;
+    case WM_RBUTTONDOWN: ev_push(1, 2, lp_x(lp), lp_y(lp)); return 0;
+    case WM_MBUTTONDOWN: ev_push(1, 3, lp_x(lp), lp_y(lp)); return 0;
+    case WM_LBUTTONUP:   ev_push(2, 1, lp_x(lp), lp_y(lp)); return 0;
+    case WM_RBUTTONUP:   ev_push(2, 2, lp_x(lp), lp_y(lp)); return 0;
+    case WM_MBUTTONUP:   ev_push(2, 3, lp_x(lp), lp_y(lp)); return 0;
+    case WM_MOUSEMOVE:   ev_push(3, 0, lp_x(lp), lp_y(lp)); return 0;
+    case WM_KEYDOWN:     ev_push(4, (long long)wp, 0, 0); return 0;
+    case WM_KEYUP:       ev_push(5, (long long)wp, 0, 0); return 0;
+    case WM_SIZE:        ev_push(7, 0, (long long)LOWORD(lp), (long long)HIWORD(lp)); return 0;
+    case WM_CLOSE:       ev_push(6, 0, 0, 0); DestroyWindow(hwnd); return 0;
+    case WM_DESTROY:     PostQuitMessage(0); return 0;
+    }
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 

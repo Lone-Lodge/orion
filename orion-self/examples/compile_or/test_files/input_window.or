@@ -1,0 +1,51 @@
+extern fn win_open(title: Text, w: int, h: int) -> int
+extern fn win_pump() -> int
+extern fn win_close(hwnd: int)
+extern fn win_event_next() -> int
+extern fn win_event_kind() -> int
+extern fn win_event_key() -> int
+extern fn win_event_x() -> int
+extern fn win_event_y() -> int
+
+
+fn main() -> int:
+    hwnd = win_open("Orion input test - click, type, press Esc", 640, 480)
+    if hwnd == 0:
+        print_line("window failed")
+        return 1
+    print_line("window open - click/type in it; Esc or close to exit")
+    mut running = 1
+    loop:
+        if running == 0:
+            break
+        keep = win_pump()
+        if keep == 0:
+            break
+        loop:
+            has_event = win_event_next()
+            if has_event == 0:
+                break
+            kind = win_event_kind()
+            if kind == 1:
+                b = win_event_key()
+                ex = win_event_x()
+                ey = win_event_y()
+                print_line("mouse_down button={b} at {ex},{ey}")
+            if kind == 2:
+                b2 = win_event_key()
+                print_line("mouse_up button={b2}")
+            if kind == 4:
+                vk = win_event_key()
+                print_line("key_down vk={vk}")
+                if vk == 27:
+                    running = 0
+            if kind == 6:
+                print_line("close requested")
+                running = 0
+            if kind == 7:
+                w = win_event_x()
+                h = win_event_y()
+                print_line("resized to {w}x{h}")
+    win_close(hwnd)
+    print_line("bye")
+    0
