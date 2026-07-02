@@ -34,7 +34,10 @@ static size_t arena_used = 0;
 static int arena_on = 0;
 static int arena_warned = 0;
 
-#define ARENA_DEFAULT (16u * 1024u * 1024u)
+/* Measured high-water with the obstack eval: ~300KB (cubsy, busiest
+ * dispatch). 4MB covers the render epoch (~2.5MB) with headroom; overflow falls back to malloc
+ * with a stderr warning, so undersizing degrades instead of breaking. */
+#define ARENA_DEFAULT (4u * 1024u * 1024u)
 
 long long orion_arena_init(long long bytes) {
     if (arena_base) free(arena_base);
@@ -91,6 +94,9 @@ static long long alloc_malloc = 0;
 long long orion_alloc_total(void) { return alloc_total; }
 long long orion_alloc_malloc_total(void) { return alloc_malloc; }
 
+static size_t arena_high = 0;
+long long orion_arena_high(void) { return (long long)arena_high; }
+
 void *orion_alloc(long long size) {
     alloc_total += size;
     if (arena_on && arena_base) {
@@ -98,6 +104,7 @@ void *orion_alloc(long long size) {
         if (arena_used + need <= arena_cap) {
             void *p = arena_base + arena_used;
             arena_used += need;
+            if (arena_used > arena_high) arena_high = arena_used;
             return p;
         }
         if (!arena_warned) {
