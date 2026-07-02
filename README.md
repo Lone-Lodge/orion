@@ -37,13 +37,20 @@ Bootstrap from scratch (no orion.exe yet): build `orbit.exe` in
 `lodge-orion/orion` (`cargo build --release`) and run the bundle through
 `examples/compile_or` once, then switch to the self-compile loop above.
 
-Compile a game (native):
+Compile a game (native) — see cubsy/build.cmd for the full recipe:
 
 ```
-orion.exe src/main.or game.ll <orb roots: atlas/orbs_native atlas/orbs astra/orbs veil/orbs>
-clang game.ll runtime/orion_rt.c runtime/win32_min.c runtime/d3d12_min.c \
-  -Os -o game.exe -luser32 -lgdi32 -ld3d12 -ldxgi -ld3dcompiler
+build        game.exe       GDI software renderer — runs GPU-less, ~27MB RAM
+build gpu    game_gpu.exe   D3D12 backend
+build ship   game_ship.exe  GDI + ALL assets embedded (config + scripts as
+                            byte arrays via runtime/tools/embed_assets.ps1) —
+                            one standalone file, zero file I/O
 ```
+
+Renderer backends share the og_* API; pick at link time (gdi_min.c OR
+d3d12_min.c). Dev builds read assets from disk, so script hot reload
+works ("dev": 1 in the project json swaps changed .astra bundles live,
+parse-gated). Ship builds run from the embedded table.
 
 Dev loop (interpreted, instant): `orbit run src/main.or` from the project dir.
 
