@@ -944,6 +944,8 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @orion_arena_rewind(i64)\n"
     text = "{text}declare i64 @orion_alloc_total()\n"
     text = "{text}declare i64 @orion_alloc_malloc_total()\n"
+    text = "{text}declare i64 @orion_embedded_has(ptr)\n"
+    text = "{text}declare ptr @orion_embedded_text(ptr)\n"
     # Compile-error counter — compiler diagnostics bump this; drivers
     # read it and refuse to write output / exit non-zero when > 0.
     text = "{text}@orion_err_count = global i64 0\n"

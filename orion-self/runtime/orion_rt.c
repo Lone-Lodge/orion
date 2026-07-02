@@ -69,6 +69,21 @@ __attribute__((constructor)) static void orion_stdio_init(void) {
 }
 #endif
 
+/* Embedded assets: a build step generates a strong scripts_embed.c
+ * (tools/embed_assets.ps1) that overrides these weak defaults; the
+ * plain build misses every lookup and games read from disk instead.
+ * Callers must gate orion_embedded_text behind orion_embedded_has. */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((weak)) long long orion_embedded_has(const char *path) {
+    (void)path;
+    return 0;
+}
+__attribute__((weak)) const char *orion_embedded_text(const char *path) {
+    (void)path;
+    return "";
+}
+#endif
+
 /* Allocation telemetry: total requested bytes, and the subset served
  * by malloc (arena misses + arena-off) — perf probes read both. */
 static long long alloc_total = 0;
