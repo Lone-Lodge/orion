@@ -291,16 +291,18 @@ fn slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
 # call (~quadratic for 25k tokens). We track `last_kind` in a
 # separate scalar slot so we never have to read the (now huge)
 # token list back just to peek at its last element.
-fn slx_push_token(tokens: [Map], token: Map) -> [Map]:
+fn slx_push_token(tokens_in: [Map], token: Map) -> [Map]:
     last_kind = slot_get("slx:last_kind")
     is_newline = get(token, "kind") == "newline"
     last_was_newline = last_kind == "newline" or last_kind == ""
     suppress = is_newline and last_was_newline
-    mut result = tokens
+    mut tokens = tokens_in
     if not suppress:
-        result = push(tokens, token)
+        # Self-rebind form → native in-place push (amortized O(1)).
+        # Safe: every caller rebinds `tokens = slx_push_token(tokens, t)`.
+        tokens = push(tokens, token)
         slot_set("slx:last_kind", get(token, "kind"))
-    result
+    tokens
 
 pub fn self_lex(source: Text) -> [Map]:
     bytes = bytes_from_text(source)

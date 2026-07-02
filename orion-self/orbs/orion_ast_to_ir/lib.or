@@ -158,6 +158,29 @@ fn field_type_at(parts: [Text], idx: int) -> Text:
                     found_colon = 1
         type_buf
 
+# True when the statement is `NAME = push(NAME, v)` — the self-rebind
+# form whose old list value is dead, eligible for in-place push.
+fn is_self_push_stmt(name: Text, value_node: Map) -> bool:
+    if get(value_node, "kind") != "Call":
+        return false
+    if get(value_node, "callee") != "push":
+        return false
+    sp_args = get_list(value_node, "args")
+    if len(sp_args) != 2:
+        return false
+    sp_arg0 = at(sp_args, 0)
+    if get(sp_arg0, "kind") != "Ident":
+        return false
+    get(sp_arg0, "name") == name
+
+# Lower `x = push(x, v)` via list_push_mut (in-place, amortized O(1)).
+fn lower_self_push(fn_value: IRFn, scope: Scope, value_node: Map) -> ConvResult:
+    sp_args = get_list(value_node, "args")
+    list_r = ast_expr_to_ir(fn_value, scope, at(sp_args, 0))
+    val_r = ast_expr_to_ir(list_r.function, list_r.scope, at(sp_args, 1))
+    pr = ir_fn_push(val_r.function, ir_list_push_mut(list_r.id, val_r.id))
+    ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
+
 fn scope_add_fn_sig(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
     new_names = push(scope.fn_sig_names, fn_name)
     new_rets = push(scope.fn_sig_rets, ret_type)
@@ -179,7 +202,7 @@ fn scope_lookup_fn_ret_loc(scope: Scope, fn_name: Text, node: Map) -> Text:
     if found == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        print_line("orion-self: ERROR at line {line}:{col} — call to unknown function `{fn_name}` (returning i64 as guess)")
+        compile_error("orion-self: ERROR at line {line}:{col} — call to unknown function `{fn_name}` (returning i64 as guess)")
         result = "i64"
     result
 
@@ -352,7 +375,14 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             last_id = er.id
         if already_done == 0 and is_let:
             name = get(stmt, "name")
-            er = ast_expr_to_ir(current_fn, current_scope, get(stmt, "value"))
+            # `x = push(x, v)` self-rebind → in-place list_push_mut
+            # (amortized O(1)). The old value of x is dead after this
+            # statement, so mutating the buffer is safe. Every other
+            # push stays the copying kind (persistent value semantics —
+            # the compiler's scope stacks depend on it). Expression-form
+            # if (not mut+branches) so `er` is one dominating value.
+            value_node = get(stmt, "value")
+            er = if is_self_push_stmt(name, value_node) then lower_self_push(current_fn, current_scope, value_node) else ast_expr_to_ir(current_fn, current_scope, value_node)
             current_fn = er.function
             current_scope = er.scope
             # If this is MutLet (fresh mut binding): alloca + store + bind as mut.
@@ -384,7 +414,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     if slot_ll != new_ll:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        print_line("orion-self: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                        compile_error("orion-self: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
                     pr_store = ir_fn_push(current_fn, ir_store(ptr_id, er.id))
                     current_fn = pr_store.function
                     last_id = pr_store.id
@@ -453,7 +483,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
-            print_line("orion-self: ERROR at line {line}:{col} — unhandled statement kind `{stmt_kind}` (skipping)")
+            compile_error("orion-self: ERROR at line {line}:{col} — unhandled statement kind `{stmt_kind}` (skipping)")
     # Emit any pending deferred exprs (LIFO) at end of block — unless the
     # block already terminated via return (in which case defers ran before
     # the return).
@@ -576,7 +606,11 @@ fn ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     pr_header_lbl = ir_fn_push(pr_br_to_header.function, ir_label(header_lbl))
     pr_load_cur = ir_fn_push(pr_header_lbl.function, ir_load(counter_ptr_id, "i64"))
     cur_id = pr_load_cur.id
-    pr_cmp = ir_fn_push(pr_load_cur.function, ir_icmp_lt(cur_id, high_r.id))
+    # `..=` (inclusive) compares <=; `..<` compares <. Without this the
+    # inclusive form silently dropped the last iteration.
+    inclusive = if has(node, "inclusive") then get_int(node, "inclusive") else 0
+    cmp_inst = if inclusive == 1 then ir_icmp_le(cur_id, high_r.id) else ir_icmp_lt(cur_id, high_r.id)
+    pr_cmp = ir_fn_push(pr_load_cur.function, cmp_inst)
     pr_br_loop = ir_fn_push(pr_cmp.function, ir_br_if(pr_cmp.id, body_lbl, end_lbl))
 
     # Body block. continue → step (so counter increments).
@@ -626,7 +660,7 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             # captured as a single ident. Emit a sentinel iconst(0).
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            print_line("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
+            compile_error("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
             pr = ir_fn_push(fn_value, ir_iconst(0))
             result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     is_real_mut = found_id >= 0 and is_mut == 1
@@ -770,7 +804,7 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             if type_mismatch:
                 line = if has(node, "line") then get_int(node, "line") else 0
                 col = if has(node, "col") then get_int(node, "col") else 0
-                print_line("orion-self: ERROR at line {line}:{col} — if/else branches have different types ({then_type} vs {else_type})")
+                compile_error("orion-self: ERROR at line {line}:{col} — if/else branches have different types ({then_type} vs {else_type})")
             pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
             result_id = pr_phi.id
             result_fn = pr_phi.function
@@ -1197,7 +1231,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             mline = if has(node, "line") then get_int(node, "line") else 0
             mcol = if has(node, "col") then get_int(node, "col") else 0
             missing = total_variants - matched_count
-            print_line("orion-self: ERROR at line {mline}:{mcol} — non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
+            compile_error("orion-self: ERROR at line {mline}:{mcol} — non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
 
     mut arm_index = 0
     for arm_idx in 0..<n_arms:
@@ -1316,7 +1350,7 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if spec == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        print_line("orion-self: ERROR at line {line}:{col} — unknown data type `{struct_name}`")
+        compile_error("orion-self: ERROR at line {line}:{col} — unknown data type `{struct_name}`")
     parts = parse_data_spec(spec)
     n_fields_decl = len(parts)
     n_provided = len(fields)
@@ -1395,7 +1429,7 @@ fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if field_idx < 0:
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            print_line("orion-self: ERROR at line {line}:{col} — `{struct_name}` has no field `{field_name}`")
+            compile_error("orion-self: ERROR at line {line}:{col} — `{struct_name}` has no field `{field_name}`")
         pr_load = ir_fn_push(obj_r.function, ir_field_load(obj_r.id, field_idx, field_type))
         result = ConvResult{function: pr_load.function, scope: obj_r.scope, id: pr_load.id}
     result
@@ -1612,7 +1646,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        print_line("orion-self: ERROR at line {line}:{col} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
+        compile_error("orion-self: ERROR at line {line}:{col} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
         pr_fallback = ir_fn_push(fn_value, ir_iconst(0))
         result = ConvResult{function: pr_fallback.function, scope: scope, id: pr_fallback.id}
     result
@@ -1981,14 +2015,23 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             #   val_text  — text payload (if any)
             sig_scope = scope_add_data_decl(sig_scope, enum_name, "tag:int|val_int:int|val_text:text")
     # Pass 1b: collect fn signatures, now with struct-aware ret types.
+    # ExternFn decls register too — their calls type like any fn call
+    # (no more "unknown function, i64 as guess" for declared externs).
     for index in 0..<total:
         decl = at(decls, index)
-        if get(decl, "kind") == "Fn":
+        decl_kind_1b = get(decl, "kind")
+        if decl_kind_1b == "Fn":
             fn_name = get(decl, "name")
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
+        if decl_kind_1b == "ExternFn":
+            ext_name = get(decl, "name")
+            ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
+            sig_scope = scope_add_fn_sig(sig_scope, ext_name, ext_ret)
 
     # Pass 2: build each fn's body with the signature scope available.
+    # ExternFn becomes a body-less IRFn (params + ret, zero instructions);
+    # emit turns those into `declare` lines with real LLVM types.
     mut module = ir_module_new()
     mut has_main = 0
     for index in 0..<total:
@@ -1999,6 +2042,16 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             module = ir_module_add_fn(module, fn_ir)
             if fn_ir.name == "main":
                 has_main = 1
+        if kind == "ExternFn":
+            ext_ret2 = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
+            mut ext_fn = ir_fn_new(get(decl, "name"), ext_ret2)
+            ext_params = get_list(decl, "params")
+            n_ext_params = len(ext_params)
+            for epi in 0..<n_ext_params:
+                ep = at(ext_params, epi)
+                ep_type = ast_type_to_ir_with_scope(get(ep, "type"), sig_scope)
+                ext_fn = ir_fn_add_param(ext_fn, get(ep, "name"), ep_type)
+            module = ir_module_add_fn(module, ext_fn)
     if has_main == 0:
         mut stub = ir_fn_new("main", "i64")
         zero = ir_fn_push(stub, ir_iconst(0))

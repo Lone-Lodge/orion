@@ -946,7 +946,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                         for_cursor = for_cursor + 1
                     for_body_col = psr_peek_col(tokens, for_cursor)
                     for_body_result = psr_parse_body_at(tokens, for_cursor, for_body_col)
-                    statements = push(statements, {"kind": "ForRange", "var": for_var_name, "low": get_map(low_result, "node"), "high": get_map(high_result, "node"), "body": get_map(for_body_result, "node")})
+                    statements = push(statements, {"kind": "ForRange", "var": for_var_name, "low": get_map(low_result, "node"), "high": get_map(high_result, "node"), "inclusive": if range_op_val == "..=" then 1 else 0, "body": get_map(for_body_result, "node")})
                     cursor = get_int(for_body_result, "next")
                 if not is_range:
                     if psr_peek_kind(tokens, for_cursor) == "symbol" and psr_peek_value(tokens, for_cursor) == ":":
@@ -1299,20 +1299,27 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
 
 # --- top-level ---
 
-# Skip whatever comes after `extern fn name(params) -> type` — there's
-# no body, just the declaration. Returns the next cursor position.
-fn psr_skip_extern_fn(tokens: [Map], position: int) -> int:
-    # Already past `extern fn`; consume name + params + optional `-> ret`.
+# Parse `extern fn name(params) -> type` into an ExternFn decl node.
+# No body — the symbol is resolved at link time (C shim / runtime fn).
+# The signature matters: ast_to_ir uses the return type so extern calls
+# are typed correctly (ptr for Text, i64 for int) instead of guessed,
+# and emit declares the real LLVM signature.
+fn psr_parse_extern_fn(tokens: [Map], position: int) -> Map:
+    # Already past `extern fn`; sitting on the name.
     mut cursor = position
-    # Skip name
-    if psr_peek_kind(tokens, cursor) == "ident":
+    name = psr_peek_value(tokens, cursor)
+    cursor = cursor + 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
         cursor = cursor + 1
-    # Skip everything until the next newline (declaration is one line).
-    loop:
-        if psr_peek_kind(tokens, cursor) == "newline" or psr_peek_kind(tokens, cursor) == "eof":
-            break
+    params_result = psr_parse_params(tokens, cursor)
+    cursor = get_int(params_result, "next")
+    mut return_node = {"kind": "Named", "name": "Unit"}
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
         cursor = cursor + 1
-    cursor
+        ret_result = psr_parse_type(tokens, cursor)
+        return_node = get_map(ret_result, "node")
+        cursor = get_int(ret_result, "next")
+    {"node": {"kind": "ExternFn", "name": name, "params": get_map(params_result, "node"), "ret": return_node}, "next": cursor}
 
 # Skip `use NAME` — one line.
 fn psr_skip_use(tokens: [Map], position: int) -> int:
@@ -1385,12 +1392,12 @@ pub fn self_parse(tokens: [Map]) -> Map:
             decls = push(decls, get_map(decl_result, "node"))
             cursor = get_int(decl_result, "next")
         if is_extern:
-            # Skip `extern fn ...` declaration entirely — only the body
-            # of real functions needs codegen.
             cursor = cursor + 1
             if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "fn":
                 cursor = cursor + 1
-            cursor = psr_skip_extern_fn(tokens, cursor)
+            decl_result = psr_parse_extern_fn(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
         if is_use:
             cursor = psr_skip_use(tokens, cursor)
         not_recognized = not (is_fn or is_data or is_enum or is_effect or is_system or is_impl or is_trait or is_extern or is_use)

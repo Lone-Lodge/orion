@@ -74,6 +74,24 @@ pub fn register(interp: &Interp) {
         let path = as_text(&args[0]);
         Ok(Value::Bool(std::path::Path::new(&path).exists()))
     });
+
+    // Compile-error counter mirroring @orion_err_count in orion-self's
+    // native runtime. orion_ir declares these as `extern fn` so the
+    // same compiler source runs interpreted (here) and native (there).
+    interp.register_extern("orion_err_bump", |_args| {
+        ERR_COUNT.with(|c| {
+            let n = c.get() + 1;
+            c.set(n);
+            Ok(Value::Int(n))
+        })
+    });
+    interp.register_extern("orion_err_get", |_args| {
+        Ok(Value::Int(ERR_COUNT.with(|c| c.get())))
+    });
+}
+
+thread_local! {
+    static ERR_COUNT: std::cell::Cell<i64> = const { std::cell::Cell::new(0) };
 }
 
 fn as_text(v: &Value) -> String {

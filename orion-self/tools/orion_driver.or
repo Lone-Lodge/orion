@@ -3,6 +3,10 @@
 # Reads a .or file, runs it through lex → parse → AST → IR → LLVM-text,
 # writes the result to out.ll (or stdout if omitted). No timing, no orb
 # loading — everything is bundled above.
+#
+# Fail-fast: any compile_error() reported during lowering/emit makes
+# the driver refuse to write output and exit non-zero. A miscompiled
+# module must never reach clang looking like a success.
 
 fn main() -> int:
     if argc() < 2:
@@ -16,10 +20,15 @@ fn main() -> int:
         ast = self_parse(tokens)
         module = ast_program_to_ir(ast)
         llvm_text = emit_module(module)
-        ok = file_write(out_path, llvm_text)
-        if ok == 1:
-            print_line(out_path)
-            0
-        else:
-            print_line("write failed")
+        n_errors = compile_errors()
+        if n_errors > 0:
+            print_line("orion-self: compilation FAILED with {n_errors} error(s) — no output written")
             0 - 1
+        else:
+            ok = file_write(out_path, llvm_text)
+            if ok == 1:
+                print_line(out_path)
+                0
+            else:
+                print_line("write failed")
+                0 - 1

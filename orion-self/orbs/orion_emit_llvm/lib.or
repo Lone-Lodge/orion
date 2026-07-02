@@ -527,6 +527,17 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         else:
             result = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
+    if op == "list_push_mut":
+        val_inst = at(fn_value.instructions, inst.lhs)
+        val_ty = llvm_type_of(val_inst.type_text)
+        if val_ty == "ptr":
+            tmp = "%v{my_id}.p"
+            l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
+            l2 = "    {value_ref(my_id)} = call ptr @orion_list_push_mut(ptr {value_ref(inst.value)}, i64 {tmp})"
+            result = "{l1}\n{l2}"
+        else:
+            result = "    {value_ref(my_id)} = call ptr @orion_list_push_mut(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+
     # SIMD-style vector ops over int lists. Lowered to elementwise runtime
     # fns (orion_vec_add/sub/mul return ptr; orion_vec_dot returns i64).
     if op == "vec_add":
@@ -637,6 +648,13 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         else:
             result = "    ret {ret_ty} {value_ref(inst.value)}"
 
+    # An op no branch above handled would silently emit a placeholder
+    # `add i64 0, 0` — valid LLVM, wrong program. If `result` still
+    # equals the default sentinel, no branch matched: count it as a
+    # compile error so drivers refuse to ship the module.
+    if result == "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}":
+        compile_error("orion-self: ERROR — IR op `{op}` has no LLVM lowering (fn `{fn_value.name}`)")
+
     result
 
 
@@ -684,6 +702,16 @@ fn emit_param_list(params: [Param]) -> Text:
         result = "{result}{sep}{ty} %p{index}"
     result
 
+# Types only (no %pN names) — for `declare` lines.
+fn emit_param_types(params: [Param]) -> Text:
+    n = len(params)
+    mut result = ""
+    for index in 0..<n:
+        sep = if index == 0 then "" else ", "
+        ty = llvm_type_of(at(params, index).type_text)
+        result = "{result}{sep}{ty}"
+    result
+
 
 pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
     name = fn_value.name
@@ -729,6 +757,23 @@ fn emit_runtime() -> Text:
     text = "{text}declare i32 @printf(ptr, ...)\n"
     text = "{text}declare i32 @puts(ptr)\n"
     text = "{text}declare ptr @malloc(i64)\n"
+    # Compile-error counter — compiler diagnostics bump this; drivers
+    # read it and refuse to write output / exit non-zero when > 0.
+    text = "{text}@orion_err_count = global i64 0\n"
+    # Returns i64 (not void) — Orion externs without `->` type as i64
+    # at call sites, and the define must match the call's type.
+    text = "{text}define i64 @orion_err_bump() \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %n = load i64, ptr @orion_err_count\n"
+    text = "{text}  %n1 = add i64 %n, 1\n"
+    text = "{text}  store i64 %n1, ptr @orion_err_count\n"
+    text = "{text}  ret i64 %n1\n"
+    text = "{text}\}\n"
+    text = "{text}define i64 @orion_err_get() \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %n = load i64, ptr @orion_err_count\n"
+    text = "{text}  ret i64 %n\n"
+    text = "{text}\}\n\n"
     text = "{text}declare i64 @strlen(ptr)\n"
     text = "{text}declare ptr @strcpy(ptr, ptr)\n"
     text = "{text}declare ptr @strcat(ptr, ptr)\n"
@@ -991,74 +1036,123 @@ fn emit_runtime() -> Text:
     text = "{text}  %_close = call i32 @fclose(ptr %fp)\n"
     text = "{text}  ret i64 1\n"
     text = "{text}\}\n\n"
-    # Lists: heap buffer [i64 length, i64 item0, ...]
+    # Lists: heap buffer [i64 cap, i64 len, i64 item0, ...].
+    # push is amortized O(1): in-place while len < cap, doubling grow
+    # otherwise. Callers MUST rebind (`x = push(x, v)`) — on grow a new
+    # buffer is returned; in-place returns the same pointer, so a stale
+    # alias may observe the append. The whole codebase uses the rebind
+    # convention. list_new(n) is PRE-SIZED (len = n) — list literals
+    # and bytes builders fill slots 0..n-1 via list_set.
     text = "{text}define ptr @orion_list_new(i64 %cap) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %bytes = mul i64 %cap, 8\n"
-    text = "{text}  %total = add i64 %bytes, 8\n"
+    text = "{text}  %total = add i64 %bytes, 16\n"
     text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
     text = "{text}  store i64 %cap, ptr %buf\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %buf, i64 1\n"
+    text = "{text}  store i64 %cap, ptr %len_slot\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
     text = "{text}define i64 @orion_list_len(ptr %list) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %len = load i64, ptr %list\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %list, i64 1\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
     text = "{text}  ret i64 %len\n"
     text = "{text}\}\n\n"
     text = "{text}define i64 @orion_list_at(ptr %list, i64 %idx) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %offset = add i64 %idx, 1\n"
+    text = "{text}  %offset = add i64 %idx, 2\n"
     text = "{text}  %slot = getelementptr i64, ptr %list, i64 %offset\n"
     text = "{text}  %val = load i64, ptr %slot\n"
     text = "{text}  ret i64 %val\n"
     text = "{text}\}\n\n"
     text = "{text}define void @orion_list_set(ptr %list, i64 %idx, i64 %val) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %offset = add i64 %idx, 1\n"
+    text = "{text}  %offset = add i64 %idx, 2\n"
     text = "{text}  %slot = getelementptr i64, ptr %list, i64 %offset\n"
     text = "{text}  store i64 %val, ptr %slot\n"
     text = "{text}  ret void\n"
     text = "{text}\}\n\n"
+    # Copying push — persistent value semantics (the result is a FRESH
+    # buffer; the input list is untouched). Used for every push except
+    # the `x = push(x, v)` self-rebind statement. Result gets 2x spare
+    # capacity so a chain of subsequent self-rebind pushes runs in-place.
     text = "{text}define ptr @orion_list_push(ptr %list, i64 %val) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %old_len = load i64, ptr %list\n"
-    text = "{text}  %new_len = add i64 %old_len, 1\n"
-    text = "{text}  %new_list = call ptr @orion_list_new(i64 %new_len)\n"
-    text = "{text}  br label %hdr\n"
-    text = "{text}hdr:\n"
-    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
-    text = "{text}  %done = icmp sge i64 %i, %old_len\n"
-    text = "{text}  br i1 %done, label %after, label %bdy\n"
-    text = "{text}bdy:\n"
-    text = "{text}  %item = call i64 @orion_list_at(ptr %list, i64 %i)\n"
-    text = "{text}  call void @orion_list_set(ptr %new_list, i64 %i, i64 %item)\n"
-    text = "{text}  %i_next = add i64 %i, 1\n"
-    text = "{text}  br label %hdr\n"
-    text = "{text}after:\n"
-    text = "{text}  call void @orion_list_set(ptr %new_list, i64 %old_len, i64 %val)\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %list, i64 1\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  %need = add i64 %len, 1\n"
+    text = "{text}  %cap2 = mul i64 %need, 2\n"
+    text = "{text}  %too_small = icmp slt i64 %cap2, 4\n"
+    text = "{text}  %new_cap = select i1 %too_small, i64 4, i64 %cap2\n"
+    text = "{text}  %bytes = mul i64 %new_cap, 8\n"
+    text = "{text}  %total = add i64 %bytes, 16\n"
+    text = "{text}  %new_list = call ptr @malloc(i64 %total)\n"
+    text = "{text}  store i64 %new_cap, ptr %new_list\n"
+    text = "{text}  %new_len_slot = getelementptr i64, ptr %new_list, i64 1\n"
+    text = "{text}  store i64 %need, ptr %new_len_slot\n"
+    text = "{text}  %dst_items = getelementptr i64, ptr %new_list, i64 2\n"
+    text = "{text}  %src_items = getelementptr i64, ptr %list, i64 2\n"
+    text = "{text}  %copy_bytes = mul i64 %len, 8\n"
+    text = "{text}  %_cp = call ptr @memcpy(ptr %dst_items, ptr %src_items, i64 %copy_bytes)\n"
+    text = "{text}  %app_idx = add i64 %len, 2\n"
+    text = "{text}  %app_slot = getelementptr i64, ptr %new_list, i64 %app_idx\n"
+    text = "{text}  store i64 %val, ptr %app_slot\n"
     text = "{text}  ret ptr %new_list\n"
     text = "{text}\}\n\n"
-    # Maps: heap buffer [i64 length, i64 key0_ptr, i64 val0, i64 key1_ptr, i64 val1, ...]
+    # In-place push (amortized O(1)) — the self-rebind fast path.
+    text = "{text}define ptr @orion_list_push_mut(ptr %list, i64 %val) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %cap = load i64, ptr %list\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %list, i64 1\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  %has_room = icmp slt i64 %len, %cap\n"
+    text = "{text}  br i1 %has_room, label %inplace, label %grow\n"
+    text = "{text}inplace:\n"
+    text = "{text}  %slot_idx = add i64 %len, 2\n"
+    text = "{text}  %slot = getelementptr i64, ptr %list, i64 %slot_idx\n"
+    text = "{text}  store i64 %val, ptr %slot\n"
+    text = "{text}  %new_len = add i64 %len, 1\n"
+    text = "{text}  store i64 %new_len, ptr %len_slot\n"
+    text = "{text}  ret ptr %list\n"
+    text = "{text}grow:\n"
+    text = "{text}  %fallback = call ptr @orion_list_push(ptr %list, i64 %val)\n"
+    text = "{text}  ret ptr %fallback\n"
+    text = "{text}\}\n\n"
+    # Maps: INDIRECT layout. Handle = [ptr entries, i64 cap, i64 len];
+    # entries buffer = [k0_ptr, v0, k1_ptr, v1, ...]. Growth swaps the
+    # inner buffer only, so every held map handle stays valid — the old
+    # flat layout had NO capacity check and the 17th append into the
+    # cap-16 slot store wrote past its allocation (heap corruption).
     text = "{text}define ptr @orion_map_new(i64 %cap) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %entry_bytes = mul i64 %cap, 16\n"
-    text = "{text}  %total = add i64 %entry_bytes, 8\n"
-    text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
-    text = "{text}  store i64 0, ptr %buf\n"
-    text = "{text}  ret ptr %buf\n"
+    text = "{text}  %too_small = icmp slt i64 %cap, 4\n"
+    text = "{text}  %cap2 = select i1 %too_small, i64 4, i64 %cap\n"
+    text = "{text}  %handle = call ptr @malloc(i64 24)\n"
+    text = "{text}  %entry_bytes = mul i64 %cap2, 16\n"
+    text = "{text}  %entries = call ptr @malloc(i64 %entry_bytes)\n"
+    text = "{text}  store ptr %entries, ptr %handle\n"
+    text = "{text}  %cap_slot = getelementptr i64, ptr %handle, i64 1\n"
+    text = "{text}  store i64 %cap2, ptr %cap_slot\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %handle, i64 2\n"
+    text = "{text}  store i64 0, ptr %len_slot\n"
+    text = "{text}  ret ptr %handle\n"
     text = "{text}\}\n\n"
     text = "{text}define void @orion_map_set(ptr %map, ptr %key, i64 %val) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %len = load i64, ptr %map\n"
+    text = "{text}  %entries = load ptr, ptr %map\n"
+    text = "{text}  %cap_slot = getelementptr i64, ptr %map, i64 1\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %cap = load i64, ptr %cap_slot\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
     text = "{text}  br label %hdr\n"
     text = "{text}hdr:\n"
     text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
     text = "{text}  %done = icmp sge i64 %i, %len\n"
-    text = "{text}  br i1 %done, label %append, label %check\n"
+    text = "{text}  br i1 %done, label %maybe_grow, label %check\n"
     text = "{text}check:\n"
     text = "{text}  %idx2 = mul i64 %i, 2\n"
-    text = "{text}  %ki = add i64 %idx2, 1\n"
-    text = "{text}  %k_slot = getelementptr i64, ptr %map, i64 %ki\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %entries, i64 %idx2\n"
     text = "{text}  %k_int = load i64, ptr %k_slot\n"
     text = "{text}  %k_ptr = inttoptr i64 %k_int to ptr\n"
     text = "{text}  %cmp = call i32 @strcmp(ptr %k_ptr, ptr %key)\n"
@@ -1068,26 +1162,40 @@ fn emit_runtime() -> Text:
     text = "{text}  %i_next = add i64 %i, 1\n"
     text = "{text}  br label %hdr\n"
     text = "{text}update:\n"
-    text = "{text}  %vi = add i64 %idx2, 2\n"
-    text = "{text}  %v_slot = getelementptr i64, ptr %map, i64 %vi\n"
+    text = "{text}  %vi = add i64 %idx2, 1\n"
+    text = "{text}  %v_slot = getelementptr i64, ptr %entries, i64 %vi\n"
     text = "{text}  store i64 %val, ptr %v_slot\n"
     text = "{text}  ret void\n"
+    text = "{text}maybe_grow:\n"
+    text = "{text}  %full = icmp sge i64 %len, %cap\n"
+    text = "{text}  br i1 %full, label %grow, label %append\n"
+    text = "{text}grow:\n"
+    text = "{text}  %new_cap = mul i64 %cap, 2\n"
+    text = "{text}  %new_bytes = mul i64 %new_cap, 16\n"
+    text = "{text}  %new_entries = call ptr @malloc(i64 %new_bytes)\n"
+    text = "{text}  %old_bytes = mul i64 %len, 16\n"
+    text = "{text}  %_cp = call ptr @memcpy(ptr %new_entries, ptr %entries, i64 %old_bytes)\n"
+    text = "{text}  store ptr %new_entries, ptr %map\n"
+    text = "{text}  store i64 %new_cap, ptr %cap_slot\n"
+    text = "{text}  br label %append\n"
     text = "{text}append:\n"
-    text = "{text}  %new_idx2 = mul i64 %len, 2\n"
-    text = "{text}  %new_ki = add i64 %new_idx2, 1\n"
-    text = "{text}  %new_vi = add i64 %new_idx2, 2\n"
-    text = "{text}  %new_k_slot = getelementptr i64, ptr %map, i64 %new_ki\n"
-    text = "{text}  %new_v_slot = getelementptr i64, ptr %map, i64 %new_vi\n"
+    text = "{text}  %entries2 = load ptr, ptr %map\n"
+    text = "{text}  %app_idx2 = mul i64 %len, 2\n"
+    text = "{text}  %app_k_slot = getelementptr i64, ptr %entries2, i64 %app_idx2\n"
+    text = "{text}  %app_vi = add i64 %app_idx2, 1\n"
+    text = "{text}  %app_v_slot = getelementptr i64, ptr %entries2, i64 %app_vi\n"
     text = "{text}  %key_int = ptrtoint ptr %key to i64\n"
-    text = "{text}  store i64 %key_int, ptr %new_k_slot\n"
-    text = "{text}  store i64 %val, ptr %new_v_slot\n"
+    text = "{text}  store i64 %key_int, ptr %app_k_slot\n"
+    text = "{text}  store i64 %val, ptr %app_v_slot\n"
     text = "{text}  %new_len = add i64 %len, 1\n"
-    text = "{text}  store i64 %new_len, ptr %map\n"
+    text = "{text}  store i64 %new_len, ptr %len_slot\n"
     text = "{text}  ret void\n"
     text = "{text}\}\n\n"
     text = "{text}define i64 @orion_map_get(ptr %map, ptr %key) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %len = load i64, ptr %map\n"
+    text = "{text}  %entries = load ptr, ptr %map\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
     text = "{text}  br label %hdr\n"
     text = "{text}hdr:\n"
     text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
@@ -1095,16 +1203,15 @@ fn emit_runtime() -> Text:
     text = "{text}  br i1 %done, label %miss, label %body\n"
     text = "{text}body:\n"
     text = "{text}  %ki = mul i64 %i, 2\n"
-    text = "{text}  %ki1 = add i64 %ki, 1\n"
-    text = "{text}  %vi = add i64 %ki, 2\n"
-    text = "{text}  %k_slot = getelementptr i64, ptr %map, i64 %ki1\n"
+    text = "{text}  %vi = add i64 %ki, 1\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %entries, i64 %ki\n"
     text = "{text}  %k_int = load i64, ptr %k_slot\n"
     text = "{text}  %k_ptr = inttoptr i64 %k_int to ptr\n"
     text = "{text}  %cmp = call i32 @strcmp(ptr %k_ptr, ptr %key)\n"
     text = "{text}  %eq = icmp eq i32 %cmp, 0\n"
     text = "{text}  br i1 %eq, label %hit, label %step\n"
     text = "{text}hit:\n"
-    text = "{text}  %v_slot = getelementptr i64, ptr %map, i64 %vi\n"
+    text = "{text}  %v_slot = getelementptr i64, ptr %entries, i64 %vi\n"
     text = "{text}  %v = load i64, ptr %v_slot\n"
     text = "{text}  ret i64 %v\n"
     text = "{text}step:\n"
@@ -1115,7 +1222,9 @@ fn emit_runtime() -> Text:
     text = "{text}\}\n\n"
     text = "{text}define i64 @orion_map_has(ptr %map, ptr %key) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %len = load i64, ptr %map\n"
+    text = "{text}  %entries = load ptr, ptr %map\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
     text = "{text}  br label %hdr\n"
     text = "{text}hdr:\n"
     text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
@@ -1123,8 +1232,7 @@ fn emit_runtime() -> Text:
     text = "{text}  br i1 %done, label %miss, label %body\n"
     text = "{text}body:\n"
     text = "{text}  %ki = mul i64 %i, 2\n"
-    text = "{text}  %ki1 = add i64 %ki, 1\n"
-    text = "{text}  %k_slot = getelementptr i64, ptr %map, i64 %ki1\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %entries, i64 %ki\n"
     text = "{text}  %k_int = load i64, ptr %k_slot\n"
     text = "{text}  %k_ptr = inttoptr i64 %k_int to ptr\n"
     text = "{text}  %cmp = call i32 @strcmp(ptr %k_ptr, ptr %key)\n"
@@ -1183,7 +1291,18 @@ pub fn emit_module(module: IRModule) -> Text:
     total = len(module.functions)
     for index in 0..<total:
         fn_value = at(module.functions, index)
-        text = "{text}{emit_fn(fn_value, strings, module)}\n"
+        # Body-less fn = extern declaration → typed declare; the symbol
+        # resolves at link time (C shim / libc). Runtime symbols skip
+        # even the declare: emit_runtime DEFINES those and LLVM rejects
+        # declare+define of one name in a module. Guard-if style, not
+        # if/else — lodge-orion's dangling-else binds else to the inner if.
+        is_extern_decl = len(fn_value.instructions) == 0
+        if is_extern_decl:
+            if not is_runtime_symbol(fn_value.name):
+                ret_ll = llvm_type_of(fn_value.return_type)
+                text = "{text}declare {ret_ll} @{fn_value.name}({emit_param_types(fn_value.params)})\n\n"
+        if not is_extern_decl:
+            text = "{text}{emit_fn(fn_value, strings, module)}\n"
     # Wrapper @main: stash argc/argv to globals so argc()/argv(i) can read
     # them, then delegate to user's orion_main. We always emit this — if
     # the user didn't define a main, clang will complain about undefined

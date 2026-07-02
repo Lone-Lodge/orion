@@ -46,6 +46,25 @@ pub fn ir_type_bool() -> Text: "bool"
 pub fn ir_type_void() -> Text: "void"
 
 
+# --- Compile diagnostics ---
+# Global error counter lives in the runtime (@orion_err_count).
+# Natively the compiler's own emitted runtime defines these; under
+# lodge-orion they're registered as interpreter builtins. Drivers call
+# compile_errors() after the pipeline and refuse to write output when
+# any error was reported — no more "prints ERROR, exits 0, links a
+# miscompiled exe".
+
+extern fn orion_err_bump() -> int
+extern fn orion_err_get() -> int
+
+pub fn compile_error(msg: Text):
+    print_line(msg)
+    orion_err_bump()
+
+pub fn compile_errors() -> int:
+    orion_err_get()
+
+
 # --- Instruction builders ---
 
 pub fn ir_iconst(value: int) -> Inst:
@@ -223,6 +242,14 @@ pub fn ir_list_len(list_id: int) -> Inst:
 pub fn ir_list_push(list_id: int, val_id: int) -> Inst:
     Inst{op: "list_push", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
 
+# In-place push — ONLY emitted for the self-rebind statement form
+# `x = push(x, v)`, where the old list value is dead after the
+# statement. Amortized O(1) vs list_push's O(n) copy. Callers holding
+# an alias to x across a self-rebind push observe the mutation — same
+# caveat as lodge-orion's Arc::get_mut fast path.
+pub fn ir_list_push_mut(list_id: int, val_id: int) -> Inst:
+    Inst{op: "list_push_mut", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
+
 # SIMD-style elementwise vector ops. Returns a new int list (vec_add/sub/mul)
 # or i64 (vec_dot).
 pub fn ir_vec_add(a_id: int, b_id: int) -> Inst:
@@ -331,9 +358,14 @@ pub fn ir_fn_add_param(fn_value: IRFn, param_name: Text, param_type: Text) -> IR
     IRFn{name: fn_value.name, return_type: fn_value.return_type, params: new_params, instructions: fn_value.instructions}
 
 pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
-    new_id = len(fn_value.instructions)
-    new_instructions = push(fn_value.instructions, inst)
-    new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: new_instructions}
+    # Self-rebind form (`insts = push(insts, inst)`) hits the in-place
+    # push_mut fast path natively — this is the compiler's hottest
+    # call. Safe because every caller follows `pr = ir_fn_push(f, i)`
+    # with pr.function, dropping the old IRFn.
+    mut insts = fn_value.instructions
+    new_id = len(insts)
+    insts = push(insts, inst)
+    new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
     PushResult{function: new_fn, id: new_id}
 
 
