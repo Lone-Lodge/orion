@@ -67,9 +67,7 @@ fn load_ppm_bytes(path: Text):
     mut tokens = []
     mut i = 0
     mut cur = bytes_zeros(0)
-    loop:
-        if not (i < len(buf) and len(tokens) < 4):
-            break
+    while i < len(buf) and len(tokens) < 4:
         c = byte_at(buf, i)
         if c == 35: # '#', comment till newline
             loop:
@@ -99,8 +97,6 @@ fn load_ppm_bytes(path: Text):
     if maxv > 255 or maxv <= 0:
         return none
     # i currently at first byte after header tokens parsing — find single whitespace that separates header from data
-    # scan forward to next newline after tokens[3]
-    # simple approach: find sequence of 3 tokens end — reuse i as data start
     data_start = i
     expected = w * h * 3
     if len(buf) < data_start + expected:
@@ -162,7 +158,7 @@ fn try_process(input: Text, outdir: Text):
         print_line("Converted TGA -> " + outpath)
         return
     # Try PPM
-    if len(data) >= 2 and byte_at(data,0) == 80 and byte_at(data,1) == 54:
+    if len(buf) >= 2 and byte_at(buf,0) == 80 and byte_at(buf,1) == 54:
         img = load_ppm_bytes(input)
         if img == none:
             print_line("PPM failed: " + input)

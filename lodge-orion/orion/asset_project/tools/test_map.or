@@ -1,0 +1,9 @@
+fn a():
+    {"width": 1}
+
+fn b():
+    res = a()
+    print_line("w=" + str(get(res, "width")))
+
+fn main():
+    b()
