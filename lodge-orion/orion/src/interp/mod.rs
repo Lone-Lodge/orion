@@ -5,7 +5,7 @@
 //!   - `ops`      — arithmetic, comparison, equality on values
 //!   - `builtin`  — the built-in function library (max/min/get/…)
 
-mod builtin;
+pub(crate) mod builtin;
 mod expr;
 mod ops;
 mod stmt;

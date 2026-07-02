@@ -26,33 +26,11 @@ pub(crate) fn err_at<T>(msg: impl Into<String>, span: Span) -> Result<T, CheckEr
     Err(CheckError { message: msg.into(), span: Some(span) })
 }
 
-pub(crate) const BUILTINS: &[(&str, usize)] = &[
-    ("max", 2), ("min", 2), ("abs", 1), ("sqrt", 1), ("print", 1),
-    ("floor", 1), ("ceil", 1), ("round", 1), ("pow", 2), ("clamp", 3),
-    ("sign", 1), ("len", 1), ("get_or", 3), ("get", 2), ("has", 2),
-    // typed get aliases — keep in sync with interp/builtin.rs
-    ("get_int", 2), ("get_map", 2), ("get_list", 2),
-    ("set", 3), ("at", 2), ("push", 2), ("slice", 3),
-    ("to_int", 1), ("to_float", 1),
-    ("type_of", 1),
-    ("map_keys", 1), ("map_values", 1),
-    ("slot_get", 1), ("slot_set", 2), ("slot_push", 2), ("slot_set_at", 3),
-    ("slot_has", 1), ("slot_get_int", 1),
-    ("eprint", 1),
-    ("sin", 1), ("cos", 1), ("tan", 1), ("atan2", 2),
-    ("exp", 1), ("ln", 1), ("log2", 1),
-    ("ptr_alloc", 1), ("ptr_free", 1),
-    ("ptr_read_u8", 2), ("ptr_read_u32", 2), ("ptr_read_u64", 2),
-    ("ptr_write_u8", 3), ("ptr_write_u32", 3), ("ptr_write_u64", 3),
-    ("ptr_to_bytes", 2), ("bytes_to_ptr", 1),
-    ("cpu_count", 0), ("thread_id", 0),
-    ("vec_add", 2), ("vec_sub", 2), ("vec_mul", 2), ("vec_dot", 2),
-    ("time_now_ms", 0), ("monotonic_ms", 0), ("sleep_ms", 1),
-    // Change-detection (§13) — entities that gained / had-fields-written /
-    // lost a component since the last `tick_events_clear`.
-    ("added", 1), ("changed", 1), ("removed", 1),
-    ("tick_events_clear", 0),
-];
+// One builtin table shared with the interpreter — a checker-local copy
+// drifted and rejected valid programs. §13 names (added/changed/removed/
+// tick_events_clear) dispatch outside builtin() and stay special-cased
+// in expr.rs.
+pub(crate) use crate::interp::builtin::BUILTINS;
 
 pub fn check(program: &Program) -> Result<(), CheckError> {
     let cx = build_checker(program);
