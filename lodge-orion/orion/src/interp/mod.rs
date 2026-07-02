@@ -227,6 +227,24 @@ impl<'a> Interp<'a> {
             if name == "orion_embedded_list" {
                 return Ok(Value::Text(String::new()));
             }
+            if name == "orion_file_stamp" {
+                let Some(Value::Text(path)) = args.first() else {
+                    return Ok(Value::Int(0));
+                };
+                let stamp = std::fs::metadata(path.as_str())
+                    .ok()
+                    .map(|m| {
+                        let mtime = m
+                            .modified()
+                            .ok()
+                            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                            .map(|d| d.as_secs() as i64)
+                            .unwrap_or(0);
+                        mtime * 131 + m.len() as i64
+                    })
+                    .unwrap_or(0);
+                return Ok(Value::Int(stamp));
+            }
             if name.starts_with("orion_alloc_") || name.starts_with("orion_embedded_") {
                 return Ok(Value::Int(0));
             }

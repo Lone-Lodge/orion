@@ -956,6 +956,7 @@ fn emit_runtime() -> Text:
     text = "{text}declare ptr @orion_embedded_text(ptr)\n"
     text = "{text}declare ptr @orion_embedded_list()\n"
     text = "{text}declare ptr @orion_dir_list(ptr)\n"
+    text = "{text}declare i64 @orion_file_stamp(ptr)\n"
     # libm — float math builtins lower to these.
     text = "{text}declare double @sqrt(double)\n"
     text = "{text}declare double @sin(double)\n"

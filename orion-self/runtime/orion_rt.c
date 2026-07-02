@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 /* ---- Frame arena ---------------------------------------------------
  * Every runtime allocation (lists, maps, text concat/join, structs)
@@ -55,6 +56,20 @@ long long orion_arena_on(void) {
 
 long long orion_arena_off(void) { arena_on = 0; return 1; }
 long long orion_arena_active(void) { return arena_on; }
+
+/* Change stamp for a file: mixes mtime and size, 0 when missing.
+ * Lets hot-reload polls skip reading unchanged files entirely. */
+long long orion_file_stamp(const char *path) {
+#if defined(_WIN32)
+    struct _stat64 st;
+    if (_stat64(path, &st) != 0) return 0;
+    return (long long)st.st_mtime * 131 + (long long)st.st_size;
+#else
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return (long long)st.st_mtime * 131 + (long long)st.st_size;
+#endif
+}
 long long orion_arena_reset(void) { arena_used = 0; return 1; }
 long long orion_arena_used(void) { return (long long)arena_used; }
 /* Obstack-style partial rewind — callers save a watermark, evacuate
