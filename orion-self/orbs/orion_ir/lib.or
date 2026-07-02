@@ -226,6 +226,13 @@ pub fn ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
 pub fn ir_list_slice(list_id: int, lo_id: int, hi_id: int, list_type: Text) -> Inst:
     Inst{op: "list_slice", type_text: list_type, value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
+# Float math — name holds the libm symbol (sqrt/sin/.../log).
+pub fn ir_fmath1(libm: Text, arg_id: int) -> Inst:
+    Inst{op: "fmath1", type_text: "f64", value: arg_id, lhs: 0, rhs: 0, name: libm, args: []}
+
+pub fn ir_fmath2(libm: Text, a_id: int, b_id: int) -> Inst:
+    Inst{op: "fmath2", type_text: "f64", value: a_id, lhs: b_id, rhs: 0, name: libm, args: []}
+
 # contains(text, sub) — returns i64 1 if sub appears anywhere in text, else 0.
 pub fn ir_text_contains(text_id: int, sub_id: int) -> Inst:
     Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}

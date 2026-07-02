@@ -559,6 +559,12 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         else:
             result = "    {value_ref(my_id)} = call i64 @orion_list_len(ptr {value_ref(inst.value)})"
 
+    if op == "fmath1":
+        result = "    {value_ref(my_id)} = call double @{inst.name}(double {value_ref(inst.value)})"
+
+    if op == "fmath2":
+        result = "    {value_ref(my_id)} = call double @{inst.name}(double {value_ref(inst.value)}, double {value_ref(inst.lhs)})"
+
     if op == "list_slice":
         ls_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
         if ls_ll == "i64":
@@ -946,6 +952,19 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @orion_alloc_malloc_total()\n"
     text = "{text}declare i64 @orion_embedded_has(ptr)\n"
     text = "{text}declare ptr @orion_embedded_text(ptr)\n"
+    # libm — float math builtins lower to these.
+    text = "{text}declare double @sqrt(double)\n"
+    text = "{text}declare double @sin(double)\n"
+    text = "{text}declare double @cos(double)\n"
+    text = "{text}declare double @tan(double)\n"
+    text = "{text}declare double @exp(double)\n"
+    text = "{text}declare double @log(double)\n"
+    text = "{text}declare double @log2(double)\n"
+    text = "{text}declare double @floor(double)\n"
+    text = "{text}declare double @ceil(double)\n"
+    text = "{text}declare double @round(double)\n"
+    text = "{text}declare double @atan2(double, double)\n"
+    text = "{text}declare double @pow(double, double)\n"
     # Compile-error counter — compiler diagnostics bump this; drivers
     # read it and refuse to write output / exit non-zero when > 0.
     text = "{text}@orion_err_count = global i64 0\n"
