@@ -63,6 +63,11 @@ pub extern fn orion_err_get() -> int
 # in the emitted runtime natively; io.rs mirrors it for lodge-orion.
 pub extern fn orion_text_join(parts: [Text]) -> Text
 
+# Float literal text → IEEE-754 bits as "0x%016X" hex Text (strtod in
+# orion_rt.c; io.rs mirrors). Text-in/text-out keeps doubles out of the
+# compiler's own source so gen N-1 can always compile gen N.
+pub extern fn orion_f64_literal_hex(s: Text) -> Text
+
 pub fn compile_error(msg: Text):
     print_line(msg)
     orion_err_bump()
@@ -133,10 +138,37 @@ pub fn ir_return_void() -> Inst:
 pub fn ir_print_int(value_id: int) -> Inst:
     Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
+pub fn ir_print_float(value_id: int) -> Inst:
+    Inst{op: "print_float", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+
 # Select: result = if cond != 0 then then_id else else_id.
 # Branchless via cmov — works for any tree-shaped IR.
 pub fn ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
     Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
+
+
+# --- Floats (f64 / LLVM double) ---
+
+# Float constant. The literal TEXT is kept in `name`; emit converts it
+# to an exact hex bit-pattern via orion_f64_literal_hex at compile time
+# (decimal FP literals like 0.1 are rejected by LLVM unless exact).
+pub fn ir_fconst(literal: Text) -> Inst:
+    Inst{op: "fconst", type_text: "f64", value: 0, lhs: 0, rhs: 0, name: literal, args: []}
+
+# Float arithmetic: op_name is fadd/fsub/fmul/fdiv.
+pub fn ir_fbin(op_name: Text, lhs: int, rhs: int) -> Inst:
+    Inst{op: op_name, type_text: "f64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+
+# Float comparison: cc is oeq/one/olt/ole/ogt/oge. Produces i64 0/1.
+pub fn ir_fcmp(cc: Text, lhs: int, rhs: int) -> Inst:
+    Inst{op: "fcmp", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: cc, args: []}
+
+# int → float / float → int conversions.
+pub fn ir_sitofp(value_id: int) -> Inst:
+    Inst{op: "sitofp", type_text: "f64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+
+pub fn ir_fptosi(value_id: int) -> Inst:
+    Inst{op: "fptosi", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # --- Function calls ---

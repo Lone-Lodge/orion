@@ -643,6 +643,11 @@ fn ast_int_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     pr = ir_fn_push(fn_value, ir_iconst(parse_int(value_text)))
     ConvResult{function: pr.function, scope: scope, id: pr.id}
 
+fn ast_float_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    value_text = get(node, "value")
+    pr = ir_fn_push(fn_value, ir_fconst(value_text))
+    ConvResult{function: pr.function, scope: scope, id: pr.id}
+
 fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     name = get(node, "name")
     found_id = scope_lookup(scope, name)
@@ -673,6 +678,51 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     result
 
+# Float binop lowering: promote any i64 operand via sitofp, then
+# fadd/fsub/fmul/fdiv for arithmetic or fcmp+zext for comparisons.
+fn ast_float_binop_to_ir(fn_in: IRFn, scope: Scope, op: Text, left_id: int, left_type: Text, right_id: int, right_type: Text) -> ConvResult:
+    mut current_fn = fn_in
+    mut l_id = left_id
+    mut r_id = right_id
+    if left_type != "f64":
+        pr_l = ir_fn_push(current_fn, ir_sitofp(l_id))
+        current_fn = pr_l.function
+        l_id = pr_l.id
+    if right_type != "f64":
+        pr_r = ir_fn_push(current_fn, ir_sitofp(r_id))
+        current_fn = pr_r.function
+        r_id = pr_r.id
+    mut cc = ""
+    if op == "==":
+        cc = "oeq"
+    if op == "!=":
+        cc = "one"
+    if op == "<":
+        cc = "olt"
+    if op == "<=":
+        cc = "ole"
+    if op == ">":
+        cc = "ogt"
+    if op == ">=":
+        cc = "oge"
+    if cc != "":
+        pr_c = ir_fn_push(current_fn, ir_fcmp(cc, l_id, r_id))
+        return ConvResult{function: pr_c.function, scope: scope, id: pr_c.id}
+    mut fop = ""
+    if op == "+":
+        fop = "fadd"
+    if op == "-":
+        fop = "fsub"
+    if op == "*":
+        fop = "fmul"
+    if op == "/":
+        fop = "fdiv"
+    if fop == "":
+        compile_error("orion-self: ERROR — operator `{op}` not supported for f64 operands")
+        fop = "fadd"
+    pr_f = ir_fn_push(current_fn, ir_fbin(fop, l_id, r_id))
+    ConvResult{function: pr_f.function, scope: scope, id: pr_f.id}
+
 fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     op = get(node, "op")
     left_result = ast_expr_to_ir(fn_value, scope, get(node, "left"))
@@ -681,6 +731,14 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     right_type = get_value_type(right_result.function, right_result.id)
     either_text = left_type == "text" or right_type == "text"
     both_text = left_type == "text" and right_type == "text"
+    # Float dispatch FIRST: either operand f64 → float arithmetic/cmp
+    # (auto-promoting the int side via sitofp). Must run before the
+    # ptr-shaped strcmp heuristic — an f64 is not ptr-shaped, but it
+    # must never fall into the i64 integer ops either.
+    either_float = left_type == "f64" or right_type == "f64"
+    is_eq_op = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
+    if either_float:
+        return ast_float_binop_to_ir(right_result.function, right_result.scope, op, left_result.id, left_type, right_result.id, right_type)
     # Both operands ptr-shaped at LLVM level → treat as text_cmp. This
     # catches the common self-hosting case where the compiler lost the
     # explicit text tag (list_at from an untyped list, get from a map)
@@ -688,7 +746,6 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     left_ll = if left_type == "i64" then "i64" else "ptr"
     right_ll = if right_type == "i64" then "i64" else "ptr"
     both_ptr = left_ll == "ptr" and right_ll == "ptr"
-    is_eq_op = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
     is_text_cmp = is_eq_op and (both_text or both_ptr)
     is_text_concat = op == "+" and either_text
     mut result = ConvResult{function: right_result.function, scope: right_result.scope, id: 0 - 1}
@@ -823,9 +880,27 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     args = get_list(node, "args")
     is_print_line = callee == "print_line" or callee == "println"
     is_to_text = callee == "to_text"
+    is_to_float = callee == "to_float"
+    is_to_int = callee == "to_int"
     is_resume_int = callee == "resume_int"
     is_resume_text = callee == "resume_text"
     mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    if is_to_float:
+        tf_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        tf_type = get_value_type(tf_r.function, tf_r.id)
+        if tf_type == "f64":
+            result = tf_r
+        else:
+            tf_pr = ir_fn_push(tf_r.function, ir_sitofp(tf_r.id))
+            result = ConvResult{function: tf_pr.function, scope: tf_r.scope, id: tf_pr.id}
+    if is_to_int:
+        ti_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        ti_type = get_value_type(ti_r.function, ti_r.id)
+        if ti_type == "f64":
+            ti_pr = ir_fn_push(ti_r.function, ir_fptosi(ti_r.id))
+            result = ConvResult{function: ti_pr.function, scope: ti_r.scope, id: ti_pr.id}
+        else:
+            result = ti_r
     if is_print_line:
         arg0 = at(args, 0)
         arg_kind = get(arg0, "kind")
@@ -840,8 +915,12 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 pr = ir_fn_push(arg_r.function, ir_print_text(arg_r.id))
                 result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
             else:
-                pr = ir_fn_push(arg_r.function, ir_print_int(arg_r.id))
-                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+                if arg_type == "f64":
+                    pr = ir_fn_push(arg_r.function, ir_print_float(arg_r.id))
+                    result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+                else:
+                    pr = ir_fn_push(arg_r.function, ir_print_int(arg_r.id))
+                    result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_to_text:
         arg0 = at(args, 0)
         arg_r = ast_expr_to_ir(fn_value, scope, arg0)
@@ -1082,7 +1161,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false)
     if is_resume_int:
         arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_int", [arg_r.id], "void"))
@@ -1461,6 +1540,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     kind = get(node, "kind")
     is_block = kind == "Block"
     is_int = kind == "Int"
+    is_float_lit = kind == "Float"
     is_str = kind == "Str"
     is_binary = kind == "Binary"
     is_ident = kind == "Ident"
@@ -1480,6 +1560,8 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         result = ast_block_to_ir(fn_value, scope, node)
     if is_int:
         result = ast_int_to_ir(fn_value, scope, node)
+    if is_float_lit:
+        result = ast_float_to_ir(fn_value, scope, node)
     if is_str:
         result = ast_str_to_ir(fn_value, scope, node)
     if is_list_lit:
@@ -1642,7 +1724,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         else:
             pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_name, arg_id))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
-    any_match = is_block or is_int or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform
+    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
@@ -1690,16 +1772,19 @@ fn ast_type_to_ir(type_node: Map) -> Text:
                     # so llvm_type_of returns "ptr" in the emit step.
                     "fn"
                 else:
-                    # Capitalised names (Inst, Item, IRFn, …) are presumed
-                    # to be data-struct types. Snake-case / lowercase names
-                    # (int, bool, void) get the i64 default.
-                    name_bs = bytes_from_text(name)
-                    mut starts_cap = false
-                    if len(name_bs) > 0:
-                        first = at(name_bs, 0)
-                        if first >= 65 and first <= 90:
-                            starts_cap = true
-                    if starts_cap then "struct:{name}" else "i64"
+                    if name == "float" or name == "f64":
+                        "f64"
+                    else:
+                        # Capitalised names (Inst, Item, IRFn, …) are presumed
+                        # to be data-struct types. Snake-case / lowercase names
+                        # (int, bool, void) get the i64 default.
+                        name_bs = bytes_from_text(name)
+                        mut starts_cap = false
+                        if len(name_bs) > 0:
+                            first = at(name_bs, 0)
+                            if first >= 65 and first <= 90:
+                                starts_cap = true
+                        if starts_cap then "struct:{name}" else "i64"
 
 
 # Same as ast_type_to_ir but knows about data structs declared in scope.
@@ -1722,13 +1807,16 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
                 if name == "fn" or name == "ptr":
                     "fn"
                 else:
-                    ds_names = scope.ds_names
-                    n_structs = len(ds_names)
-                    mut is_struct = false
-                    for si in 0..<n_structs:
-                        if at(ds_names, si) == name:
-                            is_struct = true
-                    if is_struct then "struct:{name}" else "i64"
+                    if name == "float" or name == "f64":
+                        "f64"
+                    else:
+                        ds_names = scope.ds_names
+                        n_structs = len(ds_names)
+                        mut is_struct = false
+                        for si in 0..<n_structs:
+                            if at(ds_names, si) == name:
+                                is_struct = true
+                        if is_struct then "struct:{name}" else "i64"
 
 
 pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:

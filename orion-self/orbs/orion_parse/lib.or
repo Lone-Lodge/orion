@@ -243,6 +243,7 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         not_node = {"node": {"kind": "Unary", "op": "neg", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
     is_ident = kind == "ident"
     is_int = kind == "int"
+    is_float = kind == "float"
     is_str = kind == "str"
     is_lbracket = kind == "symbol" and value == "["
     is_lbrace = kind == "symbol" and value == "\{"
@@ -317,6 +318,8 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         result = {"node": {"kind": "Int", "value": "0"}, "next": position + 1}
     if is_int:
         result = {"node": {"kind": "Int", "value": value}, "next": position + 1}
+    if is_float:
+        result = {"node": {"kind": "Float", "value": value}, "next": position + 1}
     if is_str:
         result = {"node": psr_interpolate_str(value), "next": position + 1}
     if is_lbracket:

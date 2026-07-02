@@ -89,6 +89,14 @@ pub fn register(interp: &Interp) {
         Ok(Value::Int(ERR_COUNT.with(|c| c.get())))
     });
 
+    // Float literal → IEEE-754 bits as hex text. Mirrors
+    // orion_f64_literal_hex in orion_rt.c (compiler float constants).
+    interp.register_extern("orion_f64_literal_hex", |args| {
+        let s = as_text(&args[0]);
+        let d: f64 = s.trim().parse().unwrap_or(0.0);
+        Ok(Value::Text(format!("0x{:016X}", d.to_bits())))
+    });
+
     // String-builder join — one allocation for the whole result.
     // Mirrors @orion_text_join in orion-self's emitted runtime.
     interp.register_extern("orion_text_join", |args| {

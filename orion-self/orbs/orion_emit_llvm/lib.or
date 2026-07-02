@@ -210,7 +210,10 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         if ty == "ptr":
             result = "    {value_ref(my_id)} = getelementptr i8, ptr %p{inst.value}, i64 0"
         else:
-            result = "    {value_ref(my_id)} = add i64 0, %p{inst.value}"
+            if ty == "double":
+                result = "    {value_ref(my_id)} = fadd double %p{inst.value}, 0x0000000000000000"
+            else:
+                result = "    {value_ref(my_id)} = add i64 0, %p{inst.value}"
 
     if op == "call":
         n_args = len(inst.args)
@@ -289,6 +292,27 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         phi_ty = llvm_type_of(then_inst.type_text)
         result = "    {value_ref(my_id)} = phi {phi_ty} [ {value_ref(inst.lhs)}, %{then_lbl} ], [ {value_ref(inst.rhs)}, %{else_lbl} ]"
 
+    if op == "fconst":
+        # Exact IEEE-754 bits via strtod at compile time — LLVM rejects
+        # inexact decimal FP literals (0.1), hex form is always exact.
+        hex_bits = orion_f64_literal_hex(inst.name)
+        result = "    {value_ref(my_id)} = fadd double {hex_bits}, 0x0000000000000000"
+
+    if op == "fadd" or op == "fsub" or op == "fmul" or op == "fdiv":
+        result = "    {value_ref(my_id)} = {op} double {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+
+    if op == "fcmp":
+        fb = "%v{my_id}.b"
+        l1 = "    {fb} = fcmp {inst.name} double {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+        l2 = "    {value_ref(my_id)} = zext i1 {fb} to i64"
+        result = "{l1}\n{l2}"
+
+    if op == "sitofp":
+        result = "    {value_ref(my_id)} = sitofp i64 {value_ref(inst.value)} to double"
+
+    if op == "fptosi":
+        result = "    {value_ref(my_id)} = fptosi double {value_ref(inst.value)} to i64"
+
     if op == "iadd":
         result = "    {value_ref(my_id)} = add i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
     if op == "isub":
@@ -351,6 +375,11 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         # Side-effect call. Emit a sentinel %vN = 0 after so the SSA slot
         # is defined (in case a phi or downstream consumer references it).
         l1 = "    call i32 (ptr, ...) @printf(ptr @.fmt_int, i64 {value_ref(inst.value)})"
+        l2 = "    {value_ref(my_id)} = add i64 0, 0"
+        result = "{l1}\n{l2}"
+
+    if op == "print_float":
+        l1 = "    call i32 (ptr, ...) @printf(ptr @.fmt_float, double {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
@@ -671,7 +700,10 @@ fn llvm_type_of(orion_type: Text) -> Text:
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
-    if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem then "ptr" else "i64"
+    if orion_type == "f64":
+        "double"
+    else:
+        if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem then "ptr" else "i64"
 
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).
@@ -762,6 +794,9 @@ fn emit_runtime() -> Text:
     text = "{text}declare i32 @printf(ptr, ...)\n"
     text = "{text}declare i32 @puts(ptr)\n"
     text = "{text}declare ptr @malloc(i64)\n"
+    # Float-literal hex conversion lives in orion_rt.c (strtod) — declare
+    # here since the orion_ prefix skips the auto-extern-declare path.
+    text = "{text}declare ptr @orion_f64_literal_hex(ptr)\n"
     # Compile-error counter — compiler diagnostics bump this; drivers
     # read it and refuse to write output / exit non-zero when > 0.
     text = "{text}@orion_err_count = global i64 0\n"
@@ -835,6 +870,7 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @__orion_monotonic_ms()\n"
     text = "{text}declare void @__orion_sleep_ms(i64)\n"
     text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
+    text = "{text}@.fmt_float = private unnamed_addr constant [4 x i8] c\"%g\\0A\\00\"\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
     text = "{text}\n"
     text = "{text}define ptr @orion_text_concat(ptr %a, ptr %b) \{\n"

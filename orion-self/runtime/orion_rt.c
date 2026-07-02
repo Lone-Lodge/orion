@@ -10,6 +10,22 @@
 
 #include <setjmp.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+/* Float-literal support for the compiler: parse a decimal literal with
+ * strtod and return its IEEE-754 bit pattern as a 16-digit hex string
+ * ("0x3FE0000000000000"). String-in/string-out so the COMPILER's own
+ * source needs no double type — the previous-generation compiler can
+ * always build the next one (no bootstrap chicken-egg). */
+const char *orion_f64_literal_hex(const char *s) {
+    union { double d; unsigned long long i; } u;
+    u.d = strtod(s, NULL);
+    char *buf = (char *)malloc(19);
+    snprintf(buf, 19, "0x%016llX", u.i);
+    return buf;
+}
 
 /* Thread-local stack of one jmp_buf — only one perform pending at a time
  * for the MVP. Nested perform/resume requires a real stack here. */

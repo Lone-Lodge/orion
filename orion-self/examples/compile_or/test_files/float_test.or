@@ -1,0 +1,23 @@
+fn scale(v: float, factor: float) -> float:
+    v * factor
+
+fn main() -> int:
+    a = 0.1
+    b = 0.2
+    sum = a + b
+    print_line(sum)
+    half = 1.0 / 2.0
+    print_line(half)
+    mixed = 3 * 1.5
+    print_line(mixed)
+    scaled = scale(10.0, 2.5)
+    print_line(scaled)
+    big = to_float(7)
+    print_line(big)
+    mut acc = 0.0
+    for i in 0..<4:
+        acc = acc + 0.25
+    print_line(acc)
+    if sum > 0.3 or sum < 0.3:
+        print_line("0.1+0.2 != 0.3 exactly (IEEE-754 works)")
+    to_int(scaled)
