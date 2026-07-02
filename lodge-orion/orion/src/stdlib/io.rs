@@ -97,6 +97,14 @@ pub fn register(interp: &Interp) {
         Ok(Value::Text(format!("0x{:016X}", d.to_bits())))
     });
 
+    // Frame-arena controls are native-runtime concerns; under the
+    // interpreter Rust owns memory, so these are honest no-ops.
+    interp.register_extern("orion_arena_init", |_| Ok(Value::Int(1)));
+    interp.register_extern("orion_arena_on", |_| Ok(Value::Int(1)));
+    interp.register_extern("orion_arena_off", |_| Ok(Value::Int(1)));
+    interp.register_extern("orion_arena_reset", |_| Ok(Value::Int(1)));
+    interp.register_extern("orion_arena_used", |_| Ok(Value::Int(0)));
+
     // String-builder join — one allocation for the whole result.
     // Mirrors @orion_text_join in orion-self's emitted runtime.
     interp.register_extern("orion_text_join", |args| {

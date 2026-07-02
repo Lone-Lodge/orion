@@ -68,6 +68,16 @@ pub extern fn orion_text_join(parts: [Text]) -> Text
 # compiler's own source so gen N-1 can always compile gen N.
 pub extern fn orion_f64_literal_hex(s: Text) -> Text
 
+# Frame arena (orion_rt.c). Game loops: reset+on at frame start, off
+# before persistent mutation (or keep persistent state pre-sized so
+# in-place set/push_mut never allocates). Interp mirrors are no-ops —
+# lodge-orion's Rust owns memory there.
+pub extern fn orion_arena_init(bytes: int) -> int
+pub extern fn orion_arena_on() -> int
+pub extern fn orion_arena_off() -> int
+pub extern fn orion_arena_reset() -> int
+pub extern fn orion_arena_used() -> int
+
 pub fn compile_error(msg: Text):
     print_line(msg)
     orion_err_bump()

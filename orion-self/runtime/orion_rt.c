@@ -14,6 +14,65 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ---- Frame arena ---------------------------------------------------
+ * Every runtime allocation (lists, maps, text concat/join, structs)
+ * routes through orion_alloc. Default mode = plain malloc (compilers
+ * and tools never notice). A game loop flips to arena mode per frame:
+ *
+ *   orion_arena_reset(); orion_arena_on();
+ *   ...gameplay + render (all transients land in the bump arena)...
+ *   orion_arena_off();   // before mutating persistent state, or keep
+ *                        // persistent state pre-sized so in-place
+ *                        // set/push_mut never allocates
+ *
+ * Overflow falls back to malloc (correct but leaky) with a one-time
+ * stderr warning — raise the size with orion_arena_init(bytes). */
+
+static unsigned char *arena_base = NULL;
+static size_t arena_cap = 0;
+static size_t arena_used = 0;
+static int arena_on = 0;
+static int arena_warned = 0;
+
+#define ARENA_DEFAULT (16u * 1024u * 1024u)
+
+long long orion_arena_init(long long bytes) {
+    if (arena_base) free(arena_base);
+    arena_cap = (size_t)bytes;
+    arena_base = (unsigned char *)malloc(arena_cap);
+    arena_used = 0;
+    return arena_base ? 1 : 0;
+}
+
+long long orion_arena_on(void) {
+    if (!arena_base) orion_arena_init(ARENA_DEFAULT);
+    arena_on = 1;
+    return 1;
+}
+
+long long orion_arena_off(void) { arena_on = 0; return 1; }
+long long orion_arena_reset(void) { arena_used = 0; return 1; }
+long long orion_arena_used(void) { return (long long)arena_used; }
+
+void *orion_alloc(long long size) {
+    if (arena_on && arena_base) {
+        size_t need = ((size_t)size + 15u) & ~(size_t)15u;
+        if (arena_used + need <= arena_cap) {
+            void *p = arena_base + arena_used;
+            arena_used += need;
+            return p;
+        }
+        if (!arena_warned) {
+            fprintf(stderr,
+                "[orion] arena overflow (%llu bytes cap) - falling back to "
+                "malloc; raise with orion_arena_init\n",
+                (unsigned long long)arena_cap);
+            arena_warned = 1;
+        }
+    }
+    return malloc((size_t)size);
+}
+
 /* Float-literal support for the compiler: parse a decimal literal with
  * strtod and return its IEEE-754 bit pattern as a 16-digit hex string
  * ("0x3FE0000000000000"). String-in/string-out so the COMPILER's own

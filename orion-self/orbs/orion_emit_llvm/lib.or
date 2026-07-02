@@ -679,7 +679,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "struct_cons":
         n_fields = inst.value
         bytes_needed = n_fields * 8
-        mut text2 = "    {value_ref(my_id)} = call ptr @malloc(i64 {bytes_needed})"
+        mut text2 = "    {value_ref(my_id)} = call ptr @orion_alloc(i64 {bytes_needed})"
         for fi in 0..<n_fields:
             val_id = at(inst.args, fi)
             val_inst = at(fn_value.instructions, val_id)
@@ -853,6 +853,16 @@ fn emit_runtime() -> Text:
     # Float-literal hex conversion lives in orion_rt.c (strtod) — declare
     # here since the orion_ prefix skips the auto-extern-declare path.
     text = "{text}declare ptr @orion_f64_literal_hex(ptr)\n"
+    # Frame-arena allocator (orion_rt.c): ALL runtime allocations route
+    # through orion_alloc — malloc passthrough unless a game loop turns
+    # the arena on per frame. Control fns declared too — orion_ prefix
+    # skips the auto-extern path but these live in C, not inline IR.
+    text = "{text}declare ptr @orion_alloc(i64)\n"
+    text = "{text}declare i64 @orion_arena_init(i64)\n"
+    text = "{text}declare i64 @orion_arena_on()\n"
+    text = "{text}declare i64 @orion_arena_off()\n"
+    text = "{text}declare i64 @orion_arena_reset()\n"
+    text = "{text}declare i64 @orion_arena_used()\n"
     # Compile-error counter — compiler diagnostics bump this; drivers
     # read it and refuse to write output / exit non-zero when > 0.
     text = "{text}@orion_err_count = global i64 0\n"
@@ -889,7 +899,7 @@ fn emit_runtime() -> Text:
     text = "{text}  br label %sum_hdr\n"
     text = "{text}alloc:\n"
     text = "{text}  %bufsz = add i64 %total, 1\n"
-    text = "{text}  %buf = call ptr @malloc(i64 %bufsz)\n"
+    text = "{text}  %buf = call ptr @orion_alloc(i64 %bufsz)\n"
     text = "{text}  br label %cp_hdr\n"
     text = "{text}cp_hdr:\n"
     text = "{text}  %j = phi i64 [ 0, %alloc ], [ %j_next, %cp_bdy ]\n"
@@ -936,14 +946,14 @@ fn emit_runtime() -> Text:
     text = "{text}  %lb = call i64 @strlen(ptr %b)\n"
     text = "{text}  %sum = add i64 %la, %lb\n"
     text = "{text}  %total = add i64 %sum, 1\n"
-    text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
+    text = "{text}  %buf = call ptr @orion_alloc(i64 %total)\n"
     text = "{text}  %_1 = call ptr @strcpy(ptr %buf, ptr %a)\n"
     text = "{text}  %_2 = call ptr @strcat(ptr %buf, ptr %b)\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
     text = "{text}define ptr @orion_int_to_text(i64 %n) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %buf = call ptr @malloc(i64 32)\n"
+    text = "{text}  %buf = call ptr @orion_alloc(i64 32)\n"
     text = "{text}  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
@@ -961,7 +971,7 @@ fn emit_runtime() -> Text:
     text = "{text}  %hi_final = select i1 %hi_lt_lo, i64 %lo_safe, i64 %hi_safe\n"
     text = "{text}  %slice_len = sub i64 %hi_final, %lo_safe\n"
     text = "{text}  %total = add i64 %slice_len, 1\n"
-    text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
+    text = "{text}  %buf = call ptr @orion_alloc(i64 %total)\n"
     text = "{text}  %src_off = getelementptr i8, ptr %src, i64 %lo_safe\n"
     text = "{text}  %_ = call ptr @memcpy(ptr %buf, ptr %src_off, i64 %slice_len)\n"
     text = "{text}  %term = getelementptr i8, ptr %buf, i64 %slice_len\n"
@@ -1002,7 +1012,7 @@ fn emit_runtime() -> Text:
     text = "{text}entry:\n"
     text = "{text}  %list_len = call i64 @orion_list_len(ptr %list)\n"
     text = "{text}  %buf_sz = add i64 %list_len, 1\n"
-    text = "{text}  %buf = call ptr @malloc(i64 %buf_sz)\n"
+    text = "{text}  %buf = call ptr @orion_alloc(i64 %buf_sz)\n"
     text = "{text}  br label %hdr\n"
     text = "{text}hdr:\n"
     text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
@@ -1153,7 +1163,7 @@ fn emit_runtime() -> Text:
     text = "{text}  %size = call i64 @ftell(ptr %fp)\n"
     text = "{text}  %_rew = call i32 @fseek(ptr %fp, i64 0, i32 0)\n"
     text = "{text}  %buf_sz = add i64 %size, 1\n"
-    text = "{text}  %buf = call ptr @malloc(i64 %buf_sz)\n"
+    text = "{text}  %buf = call ptr @orion_alloc(i64 %buf_sz)\n"
     text = "{text}  %_read = call i64 @fread(ptr %buf, i64 1, i64 %size, ptr %fp)\n"
     text = "{text}  %term = getelementptr i8, ptr %buf, i64 %size\n"
     text = "{text}  store i8 0, ptr %term\n"
@@ -1185,7 +1195,7 @@ fn emit_runtime() -> Text:
     text = "{text}entry:\n"
     text = "{text}  %bytes = mul i64 %cap, 8\n"
     text = "{text}  %total = add i64 %bytes, 16\n"
-    text = "{text}  %buf = call ptr @malloc(i64 %total)\n"
+    text = "{text}  %buf = call ptr @orion_alloc(i64 %total)\n"
     text = "{text}  store i64 %cap, ptr %buf\n"
     text = "{text}  %len_slot = getelementptr i64, ptr %buf, i64 1\n"
     text = "{text}  store i64 %cap, ptr %len_slot\n"
@@ -1225,7 +1235,7 @@ fn emit_runtime() -> Text:
     text = "{text}  %new_cap = select i1 %too_small, i64 4, i64 %cap2\n"
     text = "{text}  %bytes = mul i64 %new_cap, 8\n"
     text = "{text}  %total = add i64 %bytes, 16\n"
-    text = "{text}  %new_list = call ptr @malloc(i64 %total)\n"
+    text = "{text}  %new_list = call ptr @orion_alloc(i64 %total)\n"
     text = "{text}  store i64 %new_cap, ptr %new_list\n"
     text = "{text}  %new_len_slot = getelementptr i64, ptr %new_list, i64 1\n"
     text = "{text}  store i64 %need, ptr %new_len_slot\n"
@@ -1266,9 +1276,9 @@ fn emit_runtime() -> Text:
     text = "{text}entry:\n"
     text = "{text}  %too_small = icmp slt i64 %cap, 4\n"
     text = "{text}  %cap2 = select i1 %too_small, i64 4, i64 %cap\n"
-    text = "{text}  %handle = call ptr @malloc(i64 24)\n"
+    text = "{text}  %handle = call ptr @orion_alloc(i64 24)\n"
     text = "{text}  %entry_bytes = mul i64 %cap2, 16\n"
-    text = "{text}  %entries = call ptr @malloc(i64 %entry_bytes)\n"
+    text = "{text}  %entries = call ptr @orion_alloc(i64 %entry_bytes)\n"
     text = "{text}  store ptr %entries, ptr %handle\n"
     text = "{text}  %cap_slot = getelementptr i64, ptr %handle, i64 1\n"
     text = "{text}  store i64 %cap2, ptr %cap_slot\n"
@@ -1310,7 +1320,7 @@ fn emit_runtime() -> Text:
     text = "{text}grow:\n"
     text = "{text}  %new_cap = mul i64 %cap, 2\n"
     text = "{text}  %new_bytes = mul i64 %new_cap, 16\n"
-    text = "{text}  %new_entries = call ptr @malloc(i64 %new_bytes)\n"
+    text = "{text}  %new_entries = call ptr @orion_alloc(i64 %new_bytes)\n"
     text = "{text}  %old_bytes = mul i64 %len, 16\n"
     text = "{text}  %_cp = call ptr @memcpy(ptr %new_entries, ptr %entries, i64 %old_bytes)\n"
     text = "{text}  store ptr %new_entries, ptr %map\n"
@@ -1450,7 +1460,7 @@ fn emit_runtime() -> Text:
     # f64 → text via snprintf %g (for interpolation and to_text).
     text = "{text}define ptr @orion_f64_to_text(double %v) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %buf = call ptr @malloc(i64 32)\n"
+    text = "{text}  %buf = call ptr @orion_alloc(i64 32)\n"
     text = "{text}  %_n = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_g, double %v)\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
