@@ -60,6 +60,15 @@ long long orion_arena_rewind(long long mark) {
     return 1;
 }
 
+/* Unbuffered stdout so prints survive crashes and kills. MSVCRT treats
+ * _IOLBF as full buffering, so _IONBF is the only honest option; game
+ * print volume is low enough that it costs nothing. */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((constructor)) static void orion_stdio_init(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);
+}
+#endif
+
 /* Allocation telemetry: total requested bytes, and the subset served
  * by malloc (arena misses + arena-off) — perf probes read both. */
 static long long alloc_total = 0;
