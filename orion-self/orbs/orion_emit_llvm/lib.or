@@ -526,10 +526,13 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
     if op == "list_lit":
         n = len(inst.args)
-        # NOTE: interning `[]` to a shared constant crashed the game in
-        # window/input paths (harness passed) — something appends via a
-        # write path the cap-0 guard doesn't cover. Root-cause before
-        # retrying; the emitted global + bounds-checked list_set stay.
+        # `[]` interns to one shared constant: cap 0 forces every push —
+        # plain, push_mut, and the retired implicit rewrite is gone —
+        # down the grow/copy path, and bounds-checked list_set rejects
+        # all writes. Empty literals in per-frame code otherwise malloc
+        # 16 bytes each, forever (~32 B per idle frame in cubsy).
+        if n == 0:
+            return "    {value_ref(my_id)} = getelementptr i64, ptr @orion_empty_list, i64 0"
         mut text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
         for ai in 0..<n:
             item_id = at(inst.args, ai)
