@@ -613,17 +613,21 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
     if op == "map_set_val":
         # value is map_id, lhs is key_id, rhs is val_id. Mutate, then
-        # re-yield the map pointer as this inst's SSA value.
+        # re-yield the map pointer as this inst's SSA value. Key shape
+        # picks the runtime family (i64 → _ik value compare).
+        msv_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
+        msv_fam = if msv_key == "i64" then "orion_map_set_ik" else "orion_map_set"
+        msv_kty = if msv_key == "i64" then "i64" else "ptr"
         msv_val_inst = at(fn_value.instructions, inst.rhs)
         msv_val_ty = llvm_type_of(msv_val_inst.type_text)
         if msv_val_ty == "ptr":
             tmp = "%v{my_id}.p"
             l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.rhs)} to i64"
-            l2 = "    call void @orion_map_set(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {tmp})"
+            l2 = "    call void @{msv_fam}(ptr {value_ref(inst.value)}, {msv_kty} {value_ref(inst.lhs)}, i64 {tmp})"
             l3 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
             result = "{l1}\n{l2}\n{l3}"
         else:
-            l1 = "    call void @orion_map_set(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+            l1 = "    call void @{msv_fam}(ptr {value_ref(inst.value)}, {msv_kty} {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
             l2 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
             result = "{l1}\n{l2}"
 
@@ -651,36 +655,47 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         result = "    {value_ref(my_id)} = call ptr @orion_map_values(ptr {value_ref(inst.value)})"
 
     if op == "map_get_or":
-        # Default's LLVM shape decides casts: ptr defaults round-trip
-        # through i64 storage.
+        # Key's LLVM shape picks the runtime family: i64 keys → _ik
+        # (value compare), ptr keys → strcmp. Default's shape decides
+        # the result cast.
+        mgo_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
+        mgo_fam = if mgo_key == "i64" then "orion_map_get_or_ik" else "orion_map_get_or"
+        mgo_kty = if mgo_key == "i64" then "i64" else "ptr"
         mgo_ty = llvm_type_of(inst.type_text)
         if mgo_ty == "ptr":
             dtmp = "%v{my_id}.d"
             rtmp = "%v{my_id}.r"
             l1 = "    {dtmp} = ptrtoint ptr {value_ref(inst.rhs)} to i64"
-            l2 = "    {rtmp} = call i64 @orion_map_get_or(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {dtmp})"
+            l2 = "    {rtmp} = call i64 @{mgo_fam}(ptr {value_ref(inst.value)}, {mgo_kty} {value_ref(inst.lhs)}, i64 {dtmp})"
             l3 = "    {value_ref(my_id)} = inttoptr i64 {rtmp} to ptr"
             result = "{l1}\n{l2}\n{l3}"
         else:
-            result = "    {value_ref(my_id)} = call i64 @orion_map_get_or(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+            result = "    {value_ref(my_id)} = call i64 @{mgo_fam}(ptr {value_ref(inst.value)}, {mgo_kty} {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
 
     if op == "f64_to_text":
         result = "    {value_ref(my_id)} = call ptr @orion_f64_to_text(double {value_ref(inst.value)})"
 
     if op == "map_get":
         # map_get returns i64. The caller decides via type_text whether to
-        # cast back to ptr (for text/list/map) or keep as i64.
+        # cast back to ptr (for text/list/map) or keep as i64. Key shape
+        # picks the runtime family (i64 → _ik value compare).
+        mg_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
+        mg_fam = if mg_key == "i64" then "orion_map_get_ik" else "orion_map_get"
+        mg_kty = if mg_key == "i64" then "i64" else "ptr"
         ty = llvm_type_of(inst.type_text)
         if ty == "ptr":
             int_name = "%v{my_id}.i"
-            l1 = "    {int_name} = call i64 @orion_map_get(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+            l1 = "    {int_name} = call i64 @{mg_fam}(ptr {value_ref(inst.value)}, {mg_kty} {value_ref(inst.lhs)})"
             l2 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
             result = "{l1}\n{l2}"
         else:
-            result = "    {value_ref(my_id)} = call i64 @orion_map_get(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+            result = "    {value_ref(my_id)} = call i64 @{mg_fam}(ptr {value_ref(inst.value)}, {mg_kty} {value_ref(inst.lhs)})"
 
     if op == "map_has":
-        result = "    {value_ref(my_id)} = call i64 @orion_map_has(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+        mh_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
+        mh_fam = if mh_key == "i64" then "orion_map_has_ik" else "orion_map_has"
+        mh_kty = if mh_key == "i64" then "i64" else "ptr"
+        result = "    {value_ref(my_id)} = call i64 @{mh_fam}(ptr {value_ref(inst.value)}, {mh_kty} {value_ref(inst.lhs)})"
 
     if op == "struct_cons":
         n_fields = inst.value
@@ -1422,6 +1437,122 @@ fn emit_runtime() -> Text:
     text = "{text}  br label %hdr\n"
     text = "{text}miss:\n"
     text = "{text}  ret i64 0\n"
+    text = "{text}\}\n\n"
+    # Int-keyed map family (_ik): same indirect layout, keys compared
+    # by i64 VALUE instead of strcmp. Emit picks the family per call
+    # site from the key operand's LLVM shape. One map must stick to
+    # one key kind (atlas: buckets keyed by eid, config by text).
+    text = "{text}define void @orion_map_set_ik(ptr %map, i64 %key, i64 %val) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %entries = load ptr, ptr %map\n"
+    text = "{text}  %cap_slot = getelementptr i64, ptr %map, i64 1\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %cap = load i64, ptr %cap_slot\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %len\n"
+    text = "{text}  br i1 %done, label %maybe_grow, label %check\n"
+    text = "{text}check:\n"
+    text = "{text}  %idx2 = mul i64 %i, 2\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %entries, i64 %idx2\n"
+    text = "{text}  %k_int = load i64, ptr %k_slot\n"
+    text = "{text}  %eq = icmp eq i64 %k_int, %key\n"
+    text = "{text}  br i1 %eq, label %update, label %step\n"
+    text = "{text}step:\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}update:\n"
+    text = "{text}  %vi = add i64 %idx2, 1\n"
+    text = "{text}  %v_slot = getelementptr i64, ptr %entries, i64 %vi\n"
+    text = "{text}  store i64 %val, ptr %v_slot\n"
+    text = "{text}  ret void\n"
+    text = "{text}maybe_grow:\n"
+    text = "{text}  %full = icmp sge i64 %len, %cap\n"
+    text = "{text}  br i1 %full, label %grow, label %append\n"
+    text = "{text}grow:\n"
+    text = "{text}  %new_cap = mul i64 %cap, 2\n"
+    text = "{text}  %new_bytes = mul i64 %new_cap, 16\n"
+    text = "{text}  %new_entries = call ptr @orion_alloc(i64 %new_bytes)\n"
+    text = "{text}  %old_bytes = mul i64 %len, 16\n"
+    text = "{text}  %_cp = call ptr @memcpy(ptr %new_entries, ptr %entries, i64 %old_bytes)\n"
+    text = "{text}  store ptr %new_entries, ptr %map\n"
+    text = "{text}  store i64 %new_cap, ptr %cap_slot\n"
+    text = "{text}  br label %append\n"
+    text = "{text}append:\n"
+    text = "{text}  %entries2 = load ptr, ptr %map\n"
+    text = "{text}  %app_idx2 = mul i64 %len, 2\n"
+    text = "{text}  %app_k_slot = getelementptr i64, ptr %entries2, i64 %app_idx2\n"
+    text = "{text}  %app_vi = add i64 %app_idx2, 1\n"
+    text = "{text}  %app_v_slot = getelementptr i64, ptr %entries2, i64 %app_vi\n"
+    text = "{text}  store i64 %key, ptr %app_k_slot\n"
+    text = "{text}  store i64 %val, ptr %app_v_slot\n"
+    text = "{text}  %new_len = add i64 %len, 1\n"
+    text = "{text}  store i64 %new_len, ptr %len_slot\n"
+    text = "{text}  ret void\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_map_get_ik(ptr %map, i64 %key) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %entries = load ptr, ptr %map\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %len\n"
+    text = "{text}  br i1 %done, label %miss, label %body\n"
+    text = "{text}body:\n"
+    text = "{text}  %ki = mul i64 %i, 2\n"
+    text = "{text}  %vi = add i64 %ki, 1\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %entries, i64 %ki\n"
+    text = "{text}  %k_int = load i64, ptr %k_slot\n"
+    text = "{text}  %eq = icmp eq i64 %k_int, %key\n"
+    text = "{text}  br i1 %eq, label %hit, label %step\n"
+    text = "{text}hit:\n"
+    text = "{text}  %v_slot = getelementptr i64, ptr %entries, i64 %vi\n"
+    text = "{text}  %v = load i64, ptr %v_slot\n"
+    text = "{text}  ret i64 %v\n"
+    text = "{text}step:\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}miss:\n"
+    text = "{text}  ret i64 0\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_map_has_ik(ptr %map, i64 %key) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %entries = load ptr, ptr %map\n"
+    text = "{text}  %len_slot = getelementptr i64, ptr %map, i64 2\n"
+    text = "{text}  %len = load i64, ptr %len_slot\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %len\n"
+    text = "{text}  br i1 %done, label %miss, label %body\n"
+    text = "{text}body:\n"
+    text = "{text}  %ki = mul i64 %i, 2\n"
+    text = "{text}  %k_slot = getelementptr i64, ptr %entries, i64 %ki\n"
+    text = "{text}  %k_int = load i64, ptr %k_slot\n"
+    text = "{text}  %eq = icmp eq i64 %k_int, %key\n"
+    text = "{text}  br i1 %eq, label %hit, label %step\n"
+    text = "{text}hit:\n"
+    text = "{text}  ret i64 1\n"
+    text = "{text}step:\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}miss:\n"
+    text = "{text}  ret i64 0\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_map_get_or_ik(ptr %map, i64 %key, i64 %dflt) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %has = call i64 @orion_map_has_ik(ptr %map, i64 %key)\n"
+    text = "{text}  %miss = icmp eq i64 %has, 0\n"
+    text = "{text}  br i1 %miss, label %use_dflt, label %fetch\n"
+    text = "{text}use_dflt:\n"
+    text = "{text}  ret i64 %dflt\n"
+    text = "{text}fetch:\n"
+    text = "{text}  %v = call i64 @orion_map_get_ik(ptr %map, i64 %key)\n"
+    text = "{text}  ret i64 %v\n"
     text = "{text}\}\n\n"
     # map_len: length lives at handle slot 2 (indirect layout).
     text = "{text}define i64 @orion_map_len(ptr %map) \{\n"
