@@ -235,11 +235,16 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     is_not = kind == "ident" and value == "not"
     is_neg = kind == "symbol" and value == "-"
     mut not_node = {"node": {"kind": "Error", "msg": ""}, "next": position}
+    # Operand includes the POSTFIX chain — `not s.ok` must negate the
+    # field read, not read `.ok` off the negation (which typed as i64
+    # and broke every `if not step.ok:` in astra_parser).
     if is_not:
-        operand_result = psr_parse_primary(tokens, position + 1)
+        op_prim = psr_parse_primary(tokens, position + 1)
+        operand_result = psr_parse_postfix(tokens, get_int(op_prim, "next"), get_map(op_prim, "node"))
         not_node = {"node": {"kind": "Unary", "op": "not", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
     if is_neg:
-        operand_result = psr_parse_primary(tokens, position + 1)
+        op_prim = psr_parse_primary(tokens, position + 1)
+        operand_result = psr_parse_postfix(tokens, get_int(op_prim, "next"), get_map(op_prim, "node"))
         not_node = {"node": {"kind": "Unary", "op": "neg", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
     is_ident = kind == "ident"
     is_int = kind == "int"
@@ -595,6 +600,10 @@ fn psr_parse_list_literal(tokens: [Map], position: int) -> Map:
 # layout rules, which a future pass tackles).
 fn psr_parse_if(tokens: [Map], position: int) -> Map:
     # We're on `if`.
+    # NOTE: adding line/col capture here (if_tok = at(tokens, position)
+    # etc.) made gen1 DROP those statements — an engine-divergence bug
+    # between interp-run and native-run compiler. Bisect before
+    # reintroducing; see memory notes 2026-07-02.
     cond_result = psr_parse_expr(tokens, position + 1)
     cursor_after_cond = get_int(cond_result, "next")
     # Expect `then`.

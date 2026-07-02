@@ -1410,14 +1410,27 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     scrut_id = scrut_r.id
     scrut_type = get_value_type(scrut_r.function, scrut_id)
 
-    # Result slot. Best-effort type guess from the first arm body's kind.
-    # Str → text, Int → i64, else i64 default.
+    # Result slot type: probe the WILDCARD arm's body by lowering it
+    # against a scratch copy of the fn — IRFn is a value, discarding
+    # the probe costs nothing, and wildcard bodies have no pattern
+    # bindings so the current scope suffices. This types matches whose
+    # arms return structs/enums (astra's Value) correctly instead of
+    # guessing i64. Fallback: first-arm Str heuristic, then i64.
     mut result_type = "i64"
-    if n_arms > 0:
-        first_body = get(at(arms, 0), "body")
-        first_kind = get(first_body, "kind")
-        if first_kind == "Str":
-            result_type = "text"
+    mut probed = false
+    for pai in 0..<n_arms:
+        arm_probe = at(arms, pai)
+        if get(arm_probe, "pat_kind") == "ident" and get(arm_probe, "pattern") == "_" and not probed:
+            wc_r = ast_expr_to_ir(scrut_r.function, scrut_r.scope, get(arm_probe, "body"))
+            if wc_r.id >= 0:
+                result_type = get_value_type(wc_r.function, wc_r.id)
+                probed = true
+    if not probed:
+        if n_arms > 0:
+            first_body = get(at(arms, 0), "body")
+            first_kind = get(first_body, "kind")
+            if first_kind == "Str":
+                result_type = "text"
     pr_alloca = ir_fn_push(scrut_r.function, ir_alloca(result_type))
     result_ptr_id = pr_alloca.id
     mut current_fn = pr_alloca.function
