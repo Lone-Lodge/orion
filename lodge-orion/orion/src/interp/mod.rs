@@ -210,6 +210,23 @@ impl<'a> Interp<'a> {
             if name.starts_with("orion_arena_") {
                 return Ok(Value::Int(1));
             }
+            if name == "orion_dir_list" {
+                let Some(Value::Text(dir)) = args.first() else {
+                    return Ok(Value::Text(String::new()));
+                };
+                let mut names: Vec<String> = Vec::new();
+                if let Ok(rd) = std::fs::read_dir(dir.as_str()) {
+                    for e in rd.flatten() {
+                        if e.path().is_file() {
+                            names.push(e.file_name().to_string_lossy().into_owned());
+                        }
+                    }
+                }
+                return Ok(Value::Text(names.join("\n")));
+            }
+            if name == "orion_embedded_list" {
+                return Ok(Value::Text(String::new()));
+            }
             if name.starts_with("orion_alloc_") || name.starts_with("orion_embedded_") {
                 return Ok(Value::Int(0));
             }

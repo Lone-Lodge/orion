@@ -948,10 +948,13 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @orion_arena_reset()\n"
     text = "{text}declare i64 @orion_arena_used()\n"
     text = "{text}declare i64 @orion_arena_rewind(i64)\n"
+    text = "{text}declare i64 @orion_arena_high()\n"
     text = "{text}declare i64 @orion_alloc_total()\n"
     text = "{text}declare i64 @orion_alloc_malloc_total()\n"
     text = "{text}declare i64 @orion_embedded_has(ptr)\n"
     text = "{text}declare ptr @orion_embedded_text(ptr)\n"
+    text = "{text}declare ptr @orion_embedded_list()\n"
+    text = "{text}declare ptr @orion_dir_list(ptr)\n"
     # libm — float math builtins lower to these.
     text = "{text}declare double @sqrt(double)\n"
     text = "{text}declare double @sin(double)\n"

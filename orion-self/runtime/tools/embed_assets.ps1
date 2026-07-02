@@ -36,5 +36,9 @@ for ($j = 0; $j -lt $i; $j++) {
 }
 [void]$sb.AppendLine("    return `"`";")
 [void]$sb.AppendLine("}")
+$allPaths = ($Files | ForEach-Object { $_.Replace('\', '/') }) -join '\n'
+[void]$sb.AppendLine("const char *orion_embedded_list(void) {")
+[void]$sb.AppendLine("    return `"$allPaths`";")
+[void]$sb.AppendLine("}")
 [System.IO.File]::WriteAllText($Out, $sb.ToString())
 Write-Host "embedded $i assets -> $Out"
