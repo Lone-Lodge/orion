@@ -333,15 +333,15 @@ pub fn self_lex(source: Text) -> [Map]:
         if is_string:
             scanned = slx_scan_string(bytes, cursor, byte_count, line, col)
             tokens = slx_push_token(tokens, get(scanned, "token"))
-            cursor = get(scanned, "next")
+            cursor = get_int(scanned, "next")
         if is_digit:
             scanned = slx_scan_number(bytes, cursor, byte_count, line, col)
             tokens = slx_push_token(tokens, get(scanned, "token"))
-            cursor = get(scanned, "next")
+            cursor = get_int(scanned, "next")
         if is_ident:
             scanned = slx_scan_ident(bytes, cursor, byte_count, line, col)
             tokens = slx_push_token(tokens, get(scanned, "token"))
-            cursor = get(scanned, "next")
+            cursor = get_int(scanned, "next")
         is_unknown = not (is_nl or is_ws or is_comment or is_string or is_digit or is_ident)
         if is_unknown:
             op_text = slx_scan_op(bytes, cursor, byte_count)

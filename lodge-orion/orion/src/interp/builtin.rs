@@ -8,6 +8,10 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     ("max", 2), ("min", 2), ("abs", 1), ("sqrt", 1), ("print", 1),
     ("floor", 1), ("ceil", 1), ("round", 1), ("pow", 2), ("clamp", 3),
     ("sign", 1), ("len", 1), ("get_or", 3), ("get", 2), ("has", 2),
+    // Typed map-get aliases used by orion-self typechecker to pin element
+    // types where inference can't. Runtime is dynamically typed so all
+    // three simply delegate to `get`.
+    ("get_int", 2), ("get_map", 2), ("get_list", 2),
     ("set", 3), ("at", 2), ("push", 2), ("slice", 3),
     // numeric conversion
     ("to_int", 1), ("to_float", 1),
@@ -84,6 +88,9 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         "eprint" => eprint(&args),
         "get_or" => get_or(&args),
         "get" => get(&args),
+        "get_int" => get(&args),
+        "get_map" => get(&args),
+        "get_list" => get(&args),
         "has" => has(&args),
         "set" => set(args),
         "at" => at(&args),

@@ -259,11 +259,9 @@ mod d3d12 {
         interp.register_extern("__os_gpu_submit", |_| Ok(Value::Unit));
         interp.register_extern("__os_gpu_present", |_args| {
             let dev_id = current_device();
-            eprintln!("[present] start dev={dev_id}");
             if let Err(e) = present(dev_id) {
                 eprintln!("[present] error: {e:?}");
             }
-            eprintln!("[present] done");
             Ok(Value::Unit)
         });
         interp.register_extern("__os_gpu_destroy", |args| {

@@ -647,8 +647,15 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     right_type = get_value_type(right_result.function, right_result.id)
     either_text = left_type == "text" or right_type == "text"
     both_text = left_type == "text" and right_type == "text"
+    # Both operands ptr-shaped at LLVM level → treat as text_cmp. This
+    # catches the common self-hosting case where the compiler lost the
+    # explicit text tag (list_at from an untyped list, get from a map)
+    # but the source is comparing two text values by content.
+    left_ll = if left_type == "i64" then "i64" else "ptr"
+    right_ll = if right_type == "i64" then "i64" else "ptr"
+    both_ptr = left_ll == "ptr" and right_ll == "ptr"
     is_eq_op = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
-    is_text_cmp = is_eq_op and both_text
+    is_text_cmp = is_eq_op and (both_text or both_ptr)
     is_text_concat = op == "+" and either_text
     mut result = ConvResult{function: right_result.function, scope: right_result.scope, id: 0 - 1}
     if is_text_cmp:
@@ -751,11 +758,15 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if both_have_value:
             then_type = get_value_type(result_fn, then_r.id)
             else_type = get_value_type(result_fn, else_r.id)
-            # Branch types must agree for the phi to be well-typed.
-            # Skip the check if either branch is void — statement-form `if`
-            # (no else, or one branch with only side effects) legitimately
-            # has void/i64 mismatch and the value isn't used downstream.
-            type_mismatch = then_type != else_type and then_type != "void" and else_type != "void"
+            # Branch types must agree for the phi to be well-typed at the
+            # LLVM layer. All ptr-typed values (text/list/map/struct:T) share
+            # the same LLVM storage, so we only flag when one side is i64
+            # and the other is ptr-shaped. Skip when either is void —
+            # statement-form `if` legitimately has void/i64 mismatch and the
+            # value isn't used downstream.
+            then_ll = if then_type == "i64" then "i64" else "ptr"
+            else_ll = if else_type == "i64" then "i64" else "ptr"
+            type_mismatch = then_ll != else_ll and then_type != "void" and else_type != "void"
             if type_mismatch:
                 line = if has(node, "line") then get_int(node, "line") else 0
                 col = if has(node, "col") then get_int(node, "col") else 0
@@ -1906,7 +1917,8 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                                                     cap_names = push(cap_names, cur_cap)
                                                     cur_cap = ""
                                                 if cb != 44:
-                                                    cur_cap = "{cur_cap}{bytes_to_text(bytes_slice(cap_bs, cbi, cbi + 1))}"
+                                                    next_cbi = cbi + 1
+                                                    cur_cap = "{cur_cap}{bytes_to_text(bytes_slice(cap_bs, cbi, next_cbi))}"
                                             if cur_cap != "":
                                                 cap_names = push(cap_names, cur_cap)
                                             old_args = get_list(expr, "args")

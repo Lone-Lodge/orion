@@ -54,6 +54,60 @@ fn string_list_index(strings: [Text], target: Text) -> int:
     found
 
 
+# True if `name` is a runtime symbol already declared/defined by the
+# emitted runtime prelude (orion_* helpers, __orion_* effect shims,
+# libc functions clang links against). Used to skip re-declaring these
+# as user externs.
+fn is_runtime_symbol(name: Text) -> bool:
+    bs = bytes_from_text(name)
+    n = len(bs)
+    # orion_* prefix
+    starts_orion = n >= 6 and at(bs, 0) == 111 and at(bs, 1) == 114 and at(bs, 2) == 105 and at(bs, 3) == 111 and at(bs, 4) == 110 and at(bs, 5) == 95
+    # __orion_* prefix
+    starts_uu_orion = n >= 8 and at(bs, 0) == 95 and at(bs, 1) == 95 and at(bs, 2) == 111 and at(bs, 3) == 114 and at(bs, 4) == 105 and at(bs, 5) == 111 and at(bs, 6) == 110 and at(bs, 7) == 95
+    is_libc = name == "puts" or name == "printf" or name == "malloc" or name == "strlen" or name == "strcpy" or name == "strcat" or name == "strcmp" or name == "snprintf" or name == "memcpy" or name == "strstr" or name == "fopen" or name == "fclose" or name == "fread" or name == "fwrite" or name == "ftell" or name == "fseek"
+    starts_orion or starts_uu_orion or is_libc
+
+# True if `name` is defined by a user-level fn in the module.
+fn is_module_defined(module: IRModule, name: Text) -> bool:
+    n_fns = len(module.functions)
+    mut found = false
+    for fi in 0..<n_fns:
+        f = at(module.functions, fi)
+        if f.name == name:
+            found = true
+    found
+
+# Walk the module for `call @name(...)` ops where `name` is neither a
+# module-defined fn nor a runtime symbol → emit `declare i64 @name(...)`
+# with the caller's arg types. Signatures default to i64 return since
+# ast_to_ir already types unknown-fn returns as i64.
+fn collect_extern_calls(module: IRModule) -> [Text]:
+    n_fns = len(module.functions)
+    mut names = []
+    mut declares = []
+    for fi in 0..<n_fns:
+        fn_value = at(module.functions, fi)
+        n_insts = len(fn_value.instructions)
+        for ii in 0..<n_insts:
+            inst = at(fn_value.instructions, ii)
+            if inst.op == "call":
+                name = inst.name
+                if not is_runtime_symbol(name):
+                    if not is_module_defined(module, name):
+                        if string_list_index(names, name) < 0:
+                            names = push(names, name)
+                            n_args = len(inst.args)
+                            mut sig = ""
+                            for ai in 0..<n_args:
+                                arg_id = at(inst.args, ai)
+                                arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
+                                sep = if ai == 0 then "" else ", "
+                                sig = "{sig}{sep}{arg_ty}"
+                            declares = push(declares, "declare i64 @{name}({sig})")
+    declares
+
+
 # Walk the module to collect every distinct string literal used by
 # print_str or const_str instructions. Returned list is in first-seen order.
 fn collect_strings(module: IRModule) -> [Text]:
@@ -249,7 +303,24 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if is_icmp:
         cc = icmp_cc(op)
         bool_name = "%v{my_id}.b"
-        l1 = "    {bool_name} = icmp {cc} i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+        lhs_ll = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
+        rhs_ll = llvm_type_of(ssa_value_type(inst.rhs, fn_value, module))
+        both_i64 = lhs_ll == "i64" and rhs_ll == "i64"
+        both_ptr = lhs_ll == "ptr" and rhs_ll == "ptr"
+        # ptrtoint any ptr operand so we can always do icmp i64. Both-ptr
+        # keeps identity semantics; mixed casts the ptr side to i64.
+        mut prelude = ""
+        mut lhs_ref = value_ref(inst.lhs)
+        mut rhs_ref = value_ref(inst.rhs)
+        icmp_ty = if both_ptr then "ptr" else "i64"
+        if both_ptr == false:
+            if lhs_ll == "ptr":
+                lhs_ref = "%v{my_id}.pl"
+                prelude = "    {lhs_ref} = ptrtoint ptr {value_ref(inst.lhs)} to i64\n"
+            if rhs_ll == "ptr":
+                rhs_ref = "%v{my_id}.pr"
+                prelude = "{prelude}    {rhs_ref} = ptrtoint ptr {value_ref(inst.rhs)} to i64\n"
+        l1 = "{prelude}    {bool_name} = icmp {cc} {icmp_ty} {lhs_ref}, {rhs_ref}"
         l2 = "    {value_ref(my_id)} = zext i1 {bool_name} to i64"
         result = "{l1}\n{l2}"
 
@@ -328,16 +399,46 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         result = "{l1}\n{l2}\n{l3}"
 
     if op == "bytes_from_text":
-        result = "    {value_ref(my_id)} = call ptr @orion_bytes_from_text(ptr {value_ref(inst.value)})"
+        v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        if v_ll == "ptr":
+            result = "    {value_ref(my_id)} = call ptr @orion_bytes_from_text(ptr {value_ref(inst.value)})"
+        else:
+            cst = "%v{my_id}.arg"
+            l1 = "    {cst} = inttoptr i64 {value_ref(inst.value)} to ptr"
+            l2 = "    {value_ref(my_id)} = call ptr @orion_bytes_from_text(ptr {cst})"
+            result = "{l1}\n{l2}"
 
     if op == "bytes_to_text":
-        result = "    {value_ref(my_id)} = call ptr @orion_bytes_to_text(ptr {value_ref(inst.value)})"
+        v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        if v_ll == "ptr":
+            result = "    {value_ref(my_id)} = call ptr @orion_bytes_to_text(ptr {value_ref(inst.value)})"
+        else:
+            cst = "%v{my_id}.arg"
+            l1 = "    {cst} = inttoptr i64 {value_ref(inst.value)} to ptr"
+            l2 = "    {value_ref(my_id)} = call ptr @orion_bytes_to_text(ptr {cst})"
+            result = "{l1}\n{l2}"
 
     if op == "bytes_slice":
-        result = "    {value_ref(my_id)} = call ptr @orion_bytes_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+        v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        if v_ll == "ptr":
+            result = "    {value_ref(my_id)} = call ptr @orion_bytes_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+        else:
+            cst = "%v{my_id}.arg"
+            l1 = "    {cst} = inttoptr i64 {value_ref(inst.value)} to ptr"
+            l2 = "    {value_ref(my_id)} = call ptr @orion_bytes_slice(ptr {cst}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+            result = "{l1}\n{l2}"
 
     if op == "bytes_concat":
-        result = "    {value_ref(my_id)} = call ptr @orion_bytes_concat(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
+        v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        l_ll = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
+        a_ref = if v_ll == "ptr" then value_ref(inst.value) else "%v{my_id}.a"
+        b_ref = if l_ll == "ptr" then value_ref(inst.lhs) else "%v{my_id}.b"
+        mut prelude = ""
+        if v_ll != "ptr":
+            prelude = "    {a_ref} = inttoptr i64 {value_ref(inst.value)} to ptr\n"
+        if l_ll != "ptr":
+            prelude = "{prelude}    {b_ref} = inttoptr i64 {value_ref(inst.lhs)} to ptr\n"
+        result = "{prelude}    {value_ref(my_id)} = call ptr @orion_bytes_concat(ptr {a_ref}, ptr {b_ref})"
 
     if op == "bytes_zeros":
         result = "    {value_ref(my_id)} = call ptr @orion_bytes_zeros(i64 {value_ref(inst.value)})"
@@ -1065,6 +1166,14 @@ fn emit_runtime() -> Text:
 pub fn emit_module(module: IRModule) -> Text:
     mut text = "; orion_emit_llvm output\n"
     text = "{text}{emit_runtime()}"
+    # Emit declares for every user extern call — any `call @name` where
+    # `name` isn't a user fn and isn't a runtime helper already declared
+    # above. Without these declares clang rejects the .ll before linking.
+    externs = collect_extern_calls(module)
+    n_ext = len(externs)
+    for xi in 0..<n_ext:
+        text = "{text}{at(externs, xi)}\n"
+    text = "{text}\n"
     # Emit one global per distinct string literal in the module.
     strings = collect_strings(module)
     n_strings = len(strings)

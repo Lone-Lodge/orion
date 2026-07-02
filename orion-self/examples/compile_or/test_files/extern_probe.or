@@ -1,0 +1,3 @@
+fn main() -> int:
+    my_test_call(42)
+    0

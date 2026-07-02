@@ -38,3 +38,9 @@ nul
 
 # === Lock files we don't track (regenerate from manifests) ===
 Cargo.lock
+
+# Copilot agent worktrees (transient)
+copilot-worktrees/
+
+# Native-compile smoke-test output
+orion-self/examples/compile_or/hello_output.txt

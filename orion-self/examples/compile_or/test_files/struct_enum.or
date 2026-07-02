@@ -1,0 +1,21 @@
+data Point: x: int, y: int
+
+enum Color:
+    Red
+    Green
+    Blue
+
+fn color_code(c: Color) -> int:
+    match c:
+        Red -> 0xff0000
+        Green -> 0x00ff00
+        Blue -> 0x0000ff
+
+fn dist_sq(p: Point) -> int:
+    p.x * p.x + p.y * p.y
+
+fn main() -> int:
+    pt = Point{x: 3, y: 4}
+    d = dist_sq(pt)
+    c = color_code(Color.Green)
+    d + c

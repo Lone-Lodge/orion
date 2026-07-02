@@ -1,0 +1,11 @@
+fn main() -> int:
+    print_line("Hello from native Orion")
+    src = file_read("hello_input.txt")
+    print_line("File contents:")
+    print_line(src)
+    ok = file_write("hello_output.txt", "written by native orion")
+    if ok == 1:
+        print_line("wrote hello_output.txt")
+    else:
+        print_line("write failed")
+    0

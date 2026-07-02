@@ -1,0 +1,60 @@
+use orion_lex
+use orion_parse
+use orion_ir
+use orion_ast_to_ir
+use orion_emit_llvm
+use io
+use fs
+use time
+use bytes
+use process
+
+
+fn int_to_text(value: int) -> Text:
+    if value == 0:
+        "0"
+    else:
+        digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        mut n = if value < 0 then 0 - value else value
+        mut chars = ""
+        for _ in 0..<20:
+            if n > 0:
+                d = at(digits, n % 10)
+                chars = "{d}{chars}"
+                n = n / 10
+        if value < 0 then "-{chars}" else chars
+
+
+fn main() -> int:
+    input = "E:/lone-lodge/orion-self/dist/orion_self_bundled.or"
+    print_line("Reading {input}")
+    src = read_file(input)
+    src_bytes = bytes_from_text(src)
+    print_line("  source: {int_to_text(len(src_bytes))} bytes")
+
+    t0 = now()
+    tokens = self_lex(src)
+    d0 = elapsed(t0)
+    print_line("  lex:    {int_to_text(len(tokens))} tokens ({int_to_text(to_int(d0 * 1000.0))} ms)")
+
+    t1 = now()
+    ast = self_parse(tokens)
+    d1 = elapsed(t1)
+    decls = get(ast, "decls")
+    print_line("  parse:  {int_to_text(len(decls))} decls  ({int_to_text(to_int(d1 * 1000.0))} ms)")
+
+    t2 = now()
+    module = ast_program_to_ir(ast)
+    d2 = elapsed(t2)
+    print_line("  ir:     {int_to_text(len(module.functions))} fns   ({int_to_text(to_int(d2 * 1000.0))} ms)")
+
+    t3 = now()
+    llvm_text = emit_module(module)
+    d3 = elapsed(t3)
+    print_line("  emit:   {int_to_text(len(bytes_from_text(llvm_text)))} bytes ({int_to_text(to_int(d3 * 1000.0))} ms)")
+
+    mkdir_all("dist")
+    ll_path = "dist/orion_self_bundled.ll"
+    write_file(ll_path, llvm_text)
+    print_line("  wrote:  {ll_path}")
+    0
