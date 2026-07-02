@@ -35,6 +35,60 @@ fn scope_add_enum_decl(scope: Scope, enum_name: Text, variant_csv: Text) -> Scop
     new_vars = push(scope.en_variants, variant_csv)
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: new_names, en_variants: new_vars}
 
+# True if the name contains '$' — synthetic "Enum$Variant" payload
+# entries in the enum tables, never real enums.
+fn contains_dollar(name: Text) -> bool:
+    bs = bytes_from_text(name)
+    n = len(bs)
+    mut found = false
+    for i in 0..<n:
+        if at(bs, i) == 36:
+            found = true
+    found
+
+# Count fields in a "name:type|name:type" data spec (pipes + 1).
+fn count_spec_fields(spec: Text) -> int:
+    bs = bytes_from_text(spec)
+    n = len(bs)
+    if n == 0:
+        return 0
+    mut pipes = 0
+    for i in 0..<n:
+        if at(bs, i) == 124:
+            pipes = pipes + 1
+    pipes + 1
+
+# Payload type spec for one variant: comma csv of IR types, stored as
+# a synthetic "Enum$Variant" entry in the enum tables. "" = no payload
+# (or unknown variant).
+fn scope_lookup_variant_payloads(scope: Scope, enum_name: Text, variant: Text) -> Text:
+    key = "{enum_name}${variant}"
+    total = len(scope.en_names)
+    mut result = ""
+    for index in 0..<total:
+        if at(scope.en_names, index) == key:
+            result = at(scope.en_variants, index)
+    result
+
+# Split a comma csv into parts (payload type lists are tiny).
+fn split_csv(csv: Text) -> [Text]:
+    bs = bytes_from_text(csv)
+    n = len(bs)
+    mut parts = []
+    mut current = ""
+    if n == 0:
+        return parts
+    for i in 0..<n:
+        b = at(bs, i)
+        if b == 44:
+            parts = push(parts, current)
+            current = ""
+        else:
+            single = bytes_to_text(bytes_slice(bs, i, i + 1))
+            current = "{current}{single}"
+    parts = push(parts, current)
+    parts
+
 # Find the index of a variant in an enum. -1 if not enum or no match.
 fn scope_lookup_enum_variant(scope: Scope, enum_name: Text, variant: Text) -> int:
     total = len(scope.en_names)
@@ -661,13 +715,17 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_mut = scope_is_mut(scope, name)
     mut result = ConvResult{function: fn_value, scope: scope, id: found_id}
     if found_id < 0:
-        # Not a local — check if it's a known global fn. If so, produce
-        # a fn-ref value (first-class function reference).
+        # Not a local — zero-payload enum variant as a bare ident
+        # (`Nop`), then known global fn (fn-ref), then error.
+        bare_enum = find_variant_enum(scope, name)
         fn_ret = scope_lookup_fn_ret(scope, name)
-        if fn_ret != "":
+        if bare_enum != "":
+            vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": bare_enum}, "method": name, "args": []}
+            result = ast_expr_to_ir(fn_value, scope, vc_node)
+        if bare_enum == "" and fn_ret != "":
             pr_fnref = ir_fn_push(fn_value, ir_fn_ref(name))
             result = ConvResult{function: pr_fnref.function, scope: scope, id: pr_fnref.id}
-        if fn_ret == "":
+        if bare_enum == "" and fn_ret == "":
             # Unknown ident — likely a `{expr}` interpolation the parser
             # captured as a single ident. Emit a sentinel iconst(0).
             line = if has(node, "line") then get_int(node, "line") else 0
@@ -891,9 +949,10 @@ fn find_variant_enum(scope: Scope, callee: Text) -> Text:
     for ei in 0..<n_enums:
         if found_enum == "":
             en_name = at(scope.en_names, ei)
-            v_idx = scope_lookup_enum_variant(scope, en_name, callee)
-            if v_idx >= 0:
-                found_enum = en_name
+            if not contains_dollar(en_name):
+                v_idx = scope_lookup_enum_variant(scope, en_name, callee)
+                if v_idx >= 0:
+                    found_enum = en_name
     found_enum
 
 fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
@@ -1410,16 +1469,22 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         # is_wildcard / pat_kind via boolean flags.
 
         # Detect variant pattern — pat_value is a known enum variant.
+        # Capture WHICH enum matched so payload bindings can retype
+        # loads with the variant's declared payload types. Synthetic
+        # "Enum$Variant" payload entries are skipped via the $ guard.
         bindings = if has(arm, "bindings") then get_list(arm, "bindings") else []
         mut variant_idx = 0 - 1
+        mut variant_enum = ""
         if (not is_wildcard) and pat_kind == "ident":
             # Try every enum looking for this variant name.
             n_enums = len(scope.en_names)
             for ei in 0..<n_enums:
                 en_name = at(scope.en_names, ei)
-                v_idx = scope_lookup_enum_variant(scope, en_name, pat_value)
-                if v_idx >= 0 and variant_idx < 0:
-                    variant_idx = v_idx
+                if not contains_dollar(en_name):
+                    v_idx = scope_lookup_enum_variant(scope, en_name, pat_value)
+                    if v_idx >= 0 and variant_idx < 0:
+                        variant_idx = v_idx
+                        variant_enum = en_name
         is_variant = variant_idx >= 0
 
         # Phase 1: emit pat (skip for wildcard).
@@ -1466,14 +1531,22 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             pr_body_lbl = ir_fn_push(current_fn, ir_label(body_lbl))
             current_fn = pr_body_lbl.function
 
-        # Phase 2b: variant payload binding — load scrut's val_int slot (field 1)
-        # and bind to the first binding name. Crude: assumes int payload.
+        # Phase 2b: variant payload bindings — binding i loads slot p{i}
+        # (field index 1+i) RETYPED to the variant's declared payload
+        # type at that position, so `Spawn(comps) -> do_spawn(s, comps)`
+        # types comps as map, `Relate(a, kind, b)` gets i64/text/i64.
         mut body_scope = current_scope
-        if do_variant_pat and len(bindings) > 0:
-            bind_name = at(bindings, 0)
-            pr_load_val = ir_fn_push(current_fn, ir_field_load(scrut_id, 1, "i64"))
-            current_fn = pr_load_val.function
-            body_scope = scope_bind(body_scope, bind_name, pr_load_val.id)
+        n_arm_bindings = len(bindings)
+        if do_variant_pat and n_arm_bindings > 0:
+            payload_csv = scope_lookup_variant_payloads(scope, variant_enum, pat_value)
+            payload_types = split_csv(payload_csv)
+            n_payload_types = len(payload_types)
+            for abi in 0..<n_arm_bindings:
+                bind_name = at(bindings, abi)
+                bind_type = if abi < n_payload_types then at(payload_types, abi) else "i64"
+                pr_load_val = ir_fn_push(current_fn, ir_field_load(scrut_id, 1 + abi, bind_type))
+                current_fn = pr_load_val.function
+                body_scope = scope_bind(body_scope, bind_name, pr_load_val.id)
 
         # Phase 3: body — emit for both wildcard and pattern arms.
         body_r = ast_expr_to_ir(current_fn, body_scope, body_node)
@@ -1707,17 +1780,18 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 enum_name = rcv_name
                 variant_idx = v_idx
         if is_enum_cons:
-            # Determine payload slot from arg type. Int → val_int, text → val_text.
-            payload_arg = if len(m_args) > 0 then at(m_args, 0) else {"kind": "Int", "value": "0"}
-            arg_kind = get(payload_arg, "kind")
-            is_text_payload = arg_kind == "Str"
-            # Default zero values for the unused slot.
+            # Positional payload slots: arg i → field p{i}. Unused slots
+            # up to the enum's synthesized width pad with zero (the width
+            # comes from the registered ds spec's field count - 1).
+            spec = scope_lookup_data_spec(scope, enum_name)
+            n_slots = count_spec_fields(spec) - 1
             zero_int = {"kind": "Int", "value": "0"}
-            zero_text = {"kind": "Str", "value": ""}
-            tag_field = {"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(variant_idx)}}
-            int_field = if is_text_payload then {"name": "val_int", "value": zero_int} else {"name": "val_int", "value": payload_arg}
-            text_field = if is_text_payload then {"name": "val_text", "value": payload_arg} else {"name": "val_text", "value": zero_text}
-            cons_node = {"kind": "StructCons", "name": enum_name, "fields": [tag_field, int_field, text_field]}
+            mut cons_fields = [{"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(variant_idx)}}]
+            n_cargs = len(m_args)
+            for pfi in 0..<n_slots:
+                pf_val = if pfi < n_cargs then at(m_args, pfi) else zero_int
+                cons_fields = push(cons_fields, {"name": "p{pfi}", "value": pf_val})
+            cons_node = {"kind": "StructCons", "name": enum_name, "fields": cons_fields}
             result = ast_struct_cons_to_ir(fn_value, scope, cons_node)
         else:
             mut new_args_list = [receiver]
@@ -2184,19 +2258,37 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             variants = get_list(decl, "variants")
             n_vars = len(variants)
             mut csv = ""
+            mut max_payloads = 0
             for vi in 0..<n_vars:
                 v = at(variants, vi)
                 v_name = get(v, "name")
                 sep = if vi == 0 then "" else ","
                 csv = "{csv}{sep}{v_name}"
+                # Per-variant payload TYPE spec, stored as a synthetic
+                # "Enum$Variant" entry in the enum tables (comma csv of
+                # IR types). Match-arm bindings retype loads with these.
+                v_payloads = get_list(v, "payload")
+                n_pl = len(v_payloads)
+                if n_pl > max_payloads:
+                    max_payloads = n_pl
+                mut pl_csv = ""
+                for pli in 0..<n_pl:
+                    pl_sep = if pli == 0 then "" else ","
+                    pl_type = ast_type_to_ir(at(v_payloads, pli))
+                    pl_csv = "{pl_csv}{pl_sep}{pl_type}"
+                sig_scope = scope_add_enum_decl(sig_scope, "{enum_name}${v_name}", pl_csv)
             sig_scope = scope_add_enum_decl(sig_scope, enum_name, csv)
             # Sum types with payloads — synthesize a uniform tagged-union
-            # struct so `EnumName.Variant(arg)` and match destructuring can
-            # work on top of existing struct machinery. Fields:
-            #   tag       — variant index (int)
-            #   val_int   — int payload (if any)
-            #   val_text  — text payload (if any)
-            sig_scope = scope_add_data_decl(sig_scope, enum_name, "tag:int|val_int:int|val_text:text")
+            # struct: tag (variant index) + positional i64 payload slots
+            # p0..pN (ptr payloads live in i64 slots via ptrtoint; match
+            # bindings retype per the variant's payload spec). Minimum 2
+            # slots so the `?`-operator's index-1 access always exists.
+            if max_payloads < 2:
+                max_payloads = 2
+            mut union_spec = "tag:int"
+            for si in 0..<max_payloads:
+                union_spec = "{union_spec}|p{si}:int"
+            sig_scope = scope_add_data_decl(sig_scope, enum_name, union_spec)
     # Pass 1b: collect fn signatures, now with struct-aware ret types.
     # ExternFn decls register too — their calls type like any fn call
     # (no more "unknown function, i64 as guess" for declared externs).
