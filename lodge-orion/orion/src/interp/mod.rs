@@ -203,6 +203,14 @@ impl<'a> Interp<'a> {
     pub(crate) fn call_extern(&self, name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         let externs = self.externs.read().unwrap();
         let Some(f) = externs.get(name) else {
+            // Native runtime hooks (frame arena, alloc telemetry) are no-ops
+            // here — shared orbs declare them and must run unchanged.
+            if name.starts_with("orion_arena_") {
+                return Ok(Value::Int(1));
+            }
+            if name.starts_with("orion_alloc_") {
+                return Ok(Value::Int(0));
+            }
             return Err(run_err(format!("extern fn `{name}` has no registered impl")));
         };
         f(args)

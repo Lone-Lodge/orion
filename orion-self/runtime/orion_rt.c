@@ -53,8 +53,22 @@ long long orion_arena_on(void) {
 long long orion_arena_off(void) { arena_on = 0; return 1; }
 long long orion_arena_reset(void) { arena_used = 0; return 1; }
 long long orion_arena_used(void) { return (long long)arena_used; }
+/* Obstack-style partial rewind — callers save a watermark, evacuate
+ * their result, and free everything above it in one move. */
+long long orion_arena_rewind(long long mark) {
+    if (mark >= 0 && (size_t)mark <= arena_used) arena_used = (size_t)mark;
+    return 1;
+}
+
+/* Allocation telemetry: total requested bytes, and the subset served
+ * by malloc (arena misses + arena-off) — perf probes read both. */
+static long long alloc_total = 0;
+static long long alloc_malloc = 0;
+long long orion_alloc_total(void) { return alloc_total; }
+long long orion_alloc_malloc_total(void) { return alloc_malloc; }
 
 void *orion_alloc(long long size) {
+    alloc_total += size;
     if (arena_on && arena_base) {
         size_t need = ((size_t)size + 15u) & ~(size_t)15u;
         if (arena_used + need <= arena_cap) {
@@ -70,6 +84,7 @@ void *orion_alloc(long long size) {
             arena_warned = 1;
         }
     }
+    alloc_malloc += size;
     return malloc((size_t)size);
 }
 

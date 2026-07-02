@@ -27,6 +27,10 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     // probing with a pair that works identically native (orion-self
     // emits orion_slot_has/orion_slot_get_int) and interpreted.
     ("slot_has", 1), ("slot_get_int", 1),
+    // Native frame-arena hooks — interp no-ops so shared orbs run unchanged.
+    ("orion_arena_on", 0), ("orion_arena_off", 0), ("orion_arena_reset", 0),
+    ("orion_arena_rewind", 1), ("orion_arena_used", 0),
+    ("orion_alloc_total", 0),
     // O(1) amortized append directly into a slot-stored List — avoids the
     // `slot_set(name, push(slot_get(name), v))` quadratic blow-up when the
     // list grows long (codegen buffers, byte streams, etc.).
@@ -106,6 +110,9 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         }
         "slot_push" => slot_push(&args),
         "slot_set_at" => slot_set_at(&args),
+        // Native frame-arena hooks — no-ops here (the interpreter GCs via Rc).
+        "orion_arena_on" | "orion_arena_off" | "orion_arena_reset" | "orion_arena_rewind" => Ok(Value::Int(1)),
+        "orion_alloc_total" | "orion_arena_used" => Ok(Value::Int(0)),
         "eprint" => eprint(&args),
         "get_or" => get_or(&args),
         "get" => get(&args),
