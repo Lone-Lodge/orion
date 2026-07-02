@@ -944,15 +944,25 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 # prefix — mirror lodge-orion's variant probe. Returns the enum name
 # or "" when the callee is no variant.
 fn find_variant_enum(scope: Scope, callee: Text) -> Text:
+    # Bare variant names share one global namespace natively — two enums
+    # exporting the same variant resolve differently interp vs native
+    # (caught live: atlas Effect::Spawn vs astra Tok::Spawn), so ambiguity
+    # is a hard error rather than a silent first-hit.
     n_enums = len(scope.en_names)
     mut found_enum = ""
+    mut second_enum = ""
     for ei in 0..<n_enums:
-        if found_enum == "":
-            en_name = at(scope.en_names, ei)
-            if not contains_dollar(en_name):
+        en_name = at(scope.en_names, ei)
+        if not contains_dollar(en_name):
+            if en_name != found_enum:
                 v_idx = scope_lookup_enum_variant(scope, en_name, callee)
                 if v_idx >= 0:
-                    found_enum = en_name
+                    if found_enum == "":
+                        found_enum = en_name
+                    else:
+                        second_enum = en_name
+    if second_enum != "":
+        compile_error("orion-self: ERROR — ambiguous bare enum variant `{callee}` (defined in both `{found_enum}` and `{second_enum}`) — rename one variant or qualify the use")
     found_enum
 
 fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:

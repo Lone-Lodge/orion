@@ -540,16 +540,24 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         src_inst = at(fn_value.instructions, inst.value)
         elem = list_elem_type(src_inst.type_text)
         elem_ll = llvm_type_of(elem)
+        la_i64 = llvm_type_of(ssa_value_type(inst.value, fn_value, module)) == "i64"
+        la_src = if la_i64 then "%v{my_id}.m" else value_ref(inst.value)
+        la_pre = if la_i64 then "    {la_src} = inttoptr i64 {value_ref(inst.value)} to ptr\n" else ""
         if elem_ll == "ptr":
             int_name = "%v{my_id}.i"
-            l1 = "    {int_name} = call i64 @orion_list_at(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+            l1 = "    {int_name} = call i64 @orion_list_at(ptr {la_src}, i64 {value_ref(inst.lhs)})"
             l2 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
-            result = "{l1}\n{l2}"
+            result = "{la_pre}{l1}\n{l2}"
         else:
-            result = "    {value_ref(my_id)} = call i64 @orion_list_at(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+            result = "{la_pre}    {value_ref(my_id)} = call i64 @orion_list_at(ptr {la_src}, i64 {value_ref(inst.lhs)})"
 
     if op == "list_len":
-        result = "    {value_ref(my_id)} = call i64 @orion_list_len(ptr {value_ref(inst.value)})"
+        ll_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        if ll_ll == "i64":
+            llp = "%v{my_id}.m"
+            result = "    {llp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call i64 @orion_list_len(ptr {llp})"
+        else:
+            result = "    {value_ref(my_id)} = call i64 @orion_list_len(ptr {value_ref(inst.value)})"
 
     if op == "list_push":
         val_inst = at(fn_value.instructions, inst.lhs)
