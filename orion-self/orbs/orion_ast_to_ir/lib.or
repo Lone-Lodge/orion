@@ -965,7 +965,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if vc_enum != "":
         vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": vc_enum}, "method": callee, "args": args}
         return ast_expr_to_ir(fn_value, scope, vc_node)
-    is_print_line = callee == "print_line" or callee == "println"
+    is_print_line = callee == "print_line" or callee == "println" or callee == "print"
     is_to_text = callee == "to_text"
     is_to_float = callee == "to_float"
     is_to_int = callee == "to_int"

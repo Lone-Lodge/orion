@@ -646,13 +646,28 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             result = "{l1}\n{l2}"
 
     if op == "map_len":
-        result = "    {value_ref(my_id)} = call i64 @orion_map_len(ptr {value_ref(inst.value)})"
+        ml_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        if ml_ll == "i64":
+            mlp = "%v{my_id}.m"
+            result = "    {mlp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call i64 @orion_map_len(ptr {mlp})"
+        else:
+            result = "    {value_ref(my_id)} = call i64 @orion_map_len(ptr {value_ref(inst.value)})"
 
     if op == "map_keys":
-        result = "    {value_ref(my_id)} = call ptr @orion_map_keys(ptr {value_ref(inst.value)})"
+        mk_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        if mk_ll == "i64":
+            mkp = "%v{my_id}.m"
+            result = "    {mkp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call ptr @orion_map_keys(ptr {mkp})"
+        else:
+            result = "    {value_ref(my_id)} = call ptr @orion_map_keys(ptr {value_ref(inst.value)})"
 
     if op == "map_values":
-        result = "    {value_ref(my_id)} = call ptr @orion_map_values(ptr {value_ref(inst.value)})"
+        mv_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        if mv_ll == "i64":
+            mvp = "%v{my_id}.m"
+            result = "    {mvp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call ptr @orion_map_values(ptr {mvp})"
+        else:
+            result = "    {value_ref(my_id)} = call ptr @orion_map_values(ptr {value_ref(inst.value)})"
 
     if op == "map_get_or":
         # Key's LLVM shape picks the runtime family: i64 keys → _ik
@@ -762,7 +777,23 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             else:
                 result = "    ret i64 0"
         else:
-            result = "    ret {ret_ty} {value_ref(inst.value)}"
+            # Bit-preserving coercion when the value's shape disagrees
+            # with the declared return type (untyped map reads flowing
+            # out of int-returning fns and vice versa).
+            val_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+            if ret_ty == "i64" and val_ll == "ptr":
+                rc = "%v{my_id}.rc"
+                l1 = "    {rc} = ptrtoint ptr {value_ref(inst.value)} to i64"
+                l2 = "    ret i64 {rc}"
+                result = "{l1}\n{l2}"
+            else:
+                if ret_ty == "ptr" and val_ll == "i64":
+                    rc = "%v{my_id}.rc"
+                    l1 = "    {rc} = inttoptr i64 {value_ref(inst.value)} to ptr"
+                    l2 = "    ret ptr {rc}"
+                    result = "{l1}\n{l2}"
+                else:
+                    result = "    ret {ret_ty} {value_ref(inst.value)}"
 
     # An op no branch above handled would silently emit a placeholder
     # `add i64 0, 0` — valid LLVM, wrong program. If `result` still
