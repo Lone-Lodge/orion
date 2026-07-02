@@ -1,47 +1,6 @@
-# Self-hosted driver: orion_self foo.or [out.ll]
-#
-# Reads a .or file, runs it through lex → parse → AST → IR → LLVM-text,
-# writes the result to out.ll (or stdout if omitted). No timing, no orb
-# loading — everything is bundled above.
-#
-# Fail-fast: any compile_error() reported during lowering/emit makes
-# the driver refuse to write output and exit non-zero. A miscompiled
-# module must never reach clang looking like a success.
+# Bundle-flow entry: bundle_orbs.sh appends this after the orbs
+# (orion_driver among them — the single source of truth for the
+# driver logic is orbs/orion_driver/lib.or).
 
 fn main() -> int:
-    if argc() < 2:
-        print_line("usage: orion_self <input.or> [output.ll]")
-        0 - 1
-    else:
-        in_path = argv(1)
-        out_path = if argc() >= 3 then argv(2) else "out.ll"
-        src = file_read(in_path)
-        t0 = monotonic_ms()
-        tokens = self_lex(src)
-        t1 = monotonic_ms()
-        ast = self_parse(tokens)
-        t2 = monotonic_ms()
-        module = ast_program_to_ir(ast)
-        t3 = monotonic_ms()
-        llvm_text = emit_module(module)
-        t4 = monotonic_ms()
-        d_lex = t1 - t0
-        d_parse = t2 - t1
-        d_ir = t3 - t2
-        d_emit = t4 - t3
-        print_line("lex   ms: {d_lex}")
-        print_line("parse ms: {d_parse}")
-        print_line("ir    ms: {d_ir}")
-        print_line("emit  ms: {d_emit}")
-        n_errors = compile_errors()
-        if n_errors > 0:
-            print_line("orion-self: compilation FAILED with {n_errors} error(s) — no output written")
-            0 - 1
-        else:
-            ok = file_write(out_path, llvm_text)
-            if ok == 1:
-                print_line(out_path)
-                0
-            else:
-                print_line("write failed")
-                0 - 1
+    driver_main()
