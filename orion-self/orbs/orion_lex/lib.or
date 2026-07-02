@@ -298,9 +298,10 @@ fn slx_push_token(tokens_in: [Map], token: Map) -> [Map]:
     suppress = is_newline and last_was_newline
     mut tokens = tokens_in
     if not suppress:
-        # Self-rebind form → native in-place push (amortized O(1)).
-        # Safe: every caller rebinds `tokens = slx_push_token(tokens, t)`.
-        tokens = push(tokens, token)
+        # Explicit in-place push. Audited: every caller rebinds
+        # `tokens = slx_push_token(tokens, t)` so the old list has no
+        # live alias.
+        tokens = push_mut(tokens, token)
         slot_set("slx:last_kind", get(token, "kind"))
     tokens
 

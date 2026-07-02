@@ -123,6 +123,10 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         "set" => set(args),
         "at" => at(&args),
         "push" => push(args),
+        // Explicit in-place push under the native compiler; the interp's
+        // copying push is a valid (slower) implementation of the same
+        // semantics.
+        "push_mut" => push(args),
         "slice" => slice(&args),
         "sin" => float1(&args, f64::sin, "sin"),
         "cos" => float1(&args, f64::cos, "cos"),

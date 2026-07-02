@@ -430,11 +430,13 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if already_done == 0 and is_let:
             name = get(stmt, "name")
             # `x = push(x, v)` self-rebind → in-place list_push_mut
-            # (amortized O(1)). The old value of x is dead after this
-            # statement, so mutating the buffer is safe. Every other
-            # push stays the copying kind (persistent value semantics —
-            # the compiler's scope stacks depend on it). Expression-form
-            # if (not mut+branches) so `er` is one dominating value.
+            # (amortized O(1)). UNSOUND when x aliases shared data (bit
+            # us in astra merge_bindings) — the plan is to retire this
+            # in favor of explicit push_mut everywhere, but a straight
+            # flip ballooned compile-time garbage (copying push per
+            # token/instruction) and overflowed the frame arena in
+            # game eval. Needs the arena-headroom pass first — see
+            # memory roadmap. Expression-form if so `er` dominates.
             value_node = get(stmt, "value")
             er = if is_self_push_stmt(name, value_node) then lower_self_push(current_fn, current_scope, value_node) else ast_expr_to_ir(current_fn, current_scope, value_node)
             current_fn = er.function
@@ -1073,6 +1075,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_get = callee == "get"
     is_has = callee == "has"
     is_push = callee == "push"
+    is_push_mut = callee == "push_mut"
     is_set_call = callee == "set"
     is_map_keys = callee == "map_keys"
     is_map_values = callee == "map_values"
@@ -1214,6 +1217,17 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
         pr = ir_fn_push(val_r.function, ir_list_push(list_r.id, val_r.id))
+        result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
+    if is_push_mut:
+        # Explicit in-place append for accumulators the caller KNOWS it
+        # owns (audited hot paths: lexer token list). This is the opt-in
+        # that lets `x = push(x, v)` become safe-by-default without
+        # regressing O(1) spots to copy-per-push.
+        list_node = at(args, 0)
+        val_node = at(args, 1)
+        list_r = ast_expr_to_ir(fn_value, scope, list_node)
+        val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
+        pr = ir_fn_push(val_r.function, ir_list_push_mut(list_r.id, val_r.id))
         result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
     if is_vec_add:
         a_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
@@ -1372,7 +1386,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
     if is_resume_int:
         arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_int", [arg_r.id], "void"))

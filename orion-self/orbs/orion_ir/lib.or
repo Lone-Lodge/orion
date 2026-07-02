@@ -454,13 +454,12 @@ pub fn ir_fn_add_param(fn_value: IRFn, param_name: Text, param_type: Text) -> IR
     IRFn{name: fn_value.name, return_type: fn_value.return_type, params: new_params, instructions: fn_value.instructions}
 
 pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
-    # Self-rebind form (`insts = push(insts, inst)`) hits the in-place
-    # push_mut fast path natively — this is the compiler's hottest
-    # call. Safe because every caller follows `pr = ir_fn_push(f, i)`
-    # with pr.function, dropping the old IRFn.
+    # Explicit in-place push — the compiler's hottest call. Audited:
+    # every caller follows `pr = ir_fn_push(f, i)` with pr.function,
+    # dropping the old IRFn, so no live alias sees the mutation.
     mut insts = fn_value.instructions
     new_id = len(insts)
-    insts = push(insts, inst)
+    insts = push_mut(insts, inst)
     new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
     PushResult{function: new_fn, id: new_id}
 
