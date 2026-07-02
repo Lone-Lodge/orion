@@ -23,6 +23,10 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     // `slot_set`. Used by stateful orbs (random/uuid/log) to keep their state
     // without escaping to Rust.
     ("slot_get", 1), ("slot_set", 2),
+    // Typed slot probes — replace `type_of(slot_get(k))`-style dynamic
+    // probing with a pair that works identically native (orion-self
+    // emits orion_slot_has/orion_slot_get_int) and interpreted.
+    ("slot_has", 1), ("slot_get_int", 1),
     // O(1) amortized append directly into a slot-stored List — avoids the
     // `slot_set(name, push(slot_get(name), v))` quadratic blow-up when the
     // list grows long (codegen buffers, byte streams, etc.).
@@ -83,6 +87,23 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         "map_values" => map_values(&args),
         "slot_get" => slot_get(&args),
         "slot_set" => slot_set(&args),
+        "slot_has" => {
+            let Value::Text(name) = &args[0] else {
+                return Err(run_err(format!("slot_has expects a Text name, got {:?}", args[0])));
+            };
+            let has = SLOTS.with(|cells| cells.borrow().contains_key(name.as_str()));
+            Ok(Value::Int(if has { 1 } else { 0 }))
+        }
+        "slot_get_int" => {
+            let Value::Text(name) = &args[0] else {
+                return Err(run_err(format!("slot_get_int expects a Text name, got {:?}", args[0])));
+            };
+            let v = SLOTS.with(|cells| match cells.borrow().get(name.as_str()) {
+                Some(Value::Int(n)) => *n,
+                _ => 0,
+            });
+            Ok(Value::Int(v))
+        }
         "slot_push" => slot_push(&args),
         "slot_set_at" => slot_set_at(&args),
         "eprint" => eprint(&args),

@@ -342,6 +342,15 @@ pub fn ir_map_set_val(map_id: int, key_id: int, val_id: int) -> Inst:
 pub fn ir_list_set_val(list_id: int, idx_id: int, val_id: int, list_type: Text) -> Inst:
     Inst{op: "list_set_val", type_text: list_type, value: list_id, lhs: idx_id, rhs: val_id, name: "", args: []}
 
+# slot_has(key) → 0/1; slot_get_int(key) → raw i64 (0 when unset).
+# The typed pair that replaces interp-only `type_of(slot_get(k))`
+# probing — works identically native and interpreted.
+pub fn ir_slot_has(key_id: int) -> Inst:
+    Inst{op: "slot_has", type_text: "i64", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
+
+pub fn ir_slot_get_int(key_id: int) -> Inst:
+    Inst{op: "slot_get_int", type_text: "i64", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
+
 pub fn ir_map_len(map_id: int) -> Inst:
     Inst{op: "map_len", type_text: "i64", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
 

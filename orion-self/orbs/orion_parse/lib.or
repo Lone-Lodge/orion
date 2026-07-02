@@ -604,10 +604,21 @@ fn psr_parse_if(tokens: [Map], position: int) -> Map:
         cursor = cursor_after_cond + 1
     then_result = psr_parse_expr(tokens, cursor)
     cursor = get_int(then_result, "next")
-    has_else = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "else"
+    # Allow newlines between `then EXPR` and `else` so multi-line
+    # expression-form if works as a fn body:
+    #     if len(pb) > len(sb) then false
+    #     else compare_prefix(...)
+    # Only consume the newlines when an `else` actually follows —
+    # otherwise the newline ends the statement as before.
+    peek_cursor = psr_skip_newlines(tokens, cursor)
+    peek_is_else = psr_peek_kind(tokens, peek_cursor) == "ident" and psr_peek_value(tokens, peek_cursor) == "else"
+    # `else:` (colon right after) is BLOCK-form else belonging to an
+    # enclosing `if cond:` — never steal it for the expression form.
+    peek_is_block_else = peek_is_else and psr_peek_kind(tokens, peek_cursor + 1) == "symbol" and psr_peek_value(tokens, peek_cursor + 1) == ":"
+    has_else = peek_is_else and (not peek_is_block_else)
     mut else_node = {"kind": "Int", "value": "0"}
     if has_else:
-        else_result = psr_parse_expr(tokens, cursor + 1)
+        else_result = psr_parse_expr(tokens, peek_cursor + 1)
         else_node = get_map(else_result, "node")
         cursor = get_int(else_result, "next")
     {"node": {"kind": "If", "cond": get_map(cond_result, "node"), "then": get_map(then_result, "node"), "else": else_node}, "next": cursor}

@@ -476,6 +476,12 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         # Always returns ptr; type_text on inst tells caller what to do.
         result = "    {value_ref(my_id)} = call ptr @orion_slot_get(ptr {value_ref(inst.value)})"
 
+    if op == "slot_has":
+        result = "    {value_ref(my_id)} = call i64 @orion_slot_has(ptr {value_ref(inst.value)})"
+
+    if op == "slot_get_int":
+        result = "    {value_ref(my_id)} = call i64 @orion_slot_get_int(ptr {value_ref(inst.value)})"
+
     if op == "slot_set":
         # val_id may be i64 or ptr — cast ptr→i64 for uniform storage.
         val_inst = at(fn_value.instructions, inst.lhs)
@@ -1139,6 +1145,29 @@ fn emit_runtime() -> Text:
     text = "{text}  %m2 = load ptr, ptr @orion_slots\n"
     text = "{text}  call void @orion_map_set(ptr %m2, ptr %key, i64 %val)\n"
     text = "{text}  ret i64 0\n"
+    text = "{text}\}\n\n"
+    # slot_has / slot_get_int: typed slot probes (no ptr round-trip).
+    text = "{text}define i64 @orion_slot_has(ptr %key) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %m = load ptr, ptr @orion_slots\n"
+    text = "{text}  %is_null = icmp eq ptr %m, null\n"
+    text = "{text}  br i1 %is_null, label %no, label %chk\n"
+    text = "{text}no:\n"
+    text = "{text}  ret i64 0\n"
+    text = "{text}chk:\n"
+    text = "{text}  %has = call i64 @orion_map_has(ptr %m, ptr %key)\n"
+    text = "{text}  ret i64 %has\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_slot_get_int(ptr %key) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %m = load ptr, ptr @orion_slots\n"
+    text = "{text}  %is_null = icmp eq ptr %m, null\n"
+    text = "{text}  br i1 %is_null, label %zero, label %get\n"
+    text = "{text}zero:\n"
+    text = "{text}  ret i64 0\n"
+    text = "{text}get:\n"
+    text = "{text}  %v = call i64 @orion_map_get(ptr %m, ptr %key)\n"
+    text = "{text}  ret i64 %v\n"
     text = "{text}\}\n\n"
     # File I/O via libc stdio.
     text = "{text}declare ptr @fopen(ptr, ptr)\n"

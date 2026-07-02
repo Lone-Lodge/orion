@@ -1053,6 +1053,8 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_b_length = callee == "bytes_length"
     is_slot_get = callee == "slot_get"
     is_slot_set = callee == "slot_set"
+    is_slot_has = callee == "slot_has"
+    is_slot_get_int = callee == "slot_get_int"
     # Typed map-get variants — explicit types where inference can't reach.
     is_get_int = callee == "get_int"
     is_get_map = callee == "get_map"
@@ -1280,6 +1282,14 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         val_r = ast_expr_to_ir(key_r.function, key_r.scope, val_node)
         pr = ir_fn_push(val_r.function, ir_slot_set(key_r.id, val_r.id))
         result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
+    if is_slot_has:
+        sh_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        pr_sh = ir_fn_push(sh_r.function, ir_slot_has(sh_r.id))
+        result = ConvResult{function: pr_sh.function, scope: sh_r.scope, id: pr_sh.id}
+    if is_slot_get_int:
+        sgi_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        pr_sgi = ir_fn_push(sgi_r.function, ir_slot_get_int(sgi_r.id))
+        result = ConvResult{function: pr_sgi.function, scope: sgi_r.scope, id: pr_sgi.id}
     if is_get_int:
         map_node = at(args, 0)
         key_node = at(args, 1)
@@ -1301,7 +1311,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false)
     if is_resume_int:
         arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_int", [arg_r.id], "void"))
