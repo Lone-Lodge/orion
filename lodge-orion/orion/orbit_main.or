@@ -114,15 +114,13 @@ fn cmd_build():
         exit_with(1)
 
 fn cmd_run():
-    # `orbit run [file.or] <fn> [args...]` — if arg 2 ends with .or use it
-    # as the source file; otherwise default to src/main.or.
+    # `orbit run [file.or] [fn] [args...]` — file defaults to src/main.or,
+    # fn defaults to main. Bare `orbit run` in a project dir Just Works.
     second = first_param()
     has_path = str_ends_with(second, ".or")
     path = if has_path then second else "src/main.or"
     fname_index = if has_path then 3 else 2
-    if arg_count() <= fname_index:
-        die("usage: orbit run [file.or] <fn> [args...]")
-    fname = arg(fname_index)
+    fname = if arg_count() <= fname_index then "main" else arg(fname_index)
     rest = args_after(fname_index + 1)
     if not __os_orbit_run(path, fname, rest):
         exit_with(1)
