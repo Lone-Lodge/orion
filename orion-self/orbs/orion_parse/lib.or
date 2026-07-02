@@ -1287,6 +1287,12 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
     has_equals = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "="
     if has_equals:
         cursor += 1
+        # `= comptime EXPR` — treat comptime as an annotation and parse
+        # the expr normally. (Folding is an optimization; parsing
+        # `comptime` as an identifier used to desync the decl loop into
+        # an infinite re-parse.)
+        if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "comptime":
+            cursor += 1
         expr_result = psr_parse_expr(tokens, cursor)
         body_node = {"kind": "Block", "stmts": push([], {"kind": "ExprStmt", "expr": get_map(expr_result, "node")})}
         cursor = get_int(expr_result, "next")

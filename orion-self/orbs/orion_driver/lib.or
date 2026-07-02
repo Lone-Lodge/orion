@@ -125,6 +125,8 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
         if src == "":
             print_line("note: `use {name}` unresolved (assuming builtin)")
             continue
+        src_bytes = len(bytes_from_text(src))
+        print_line("orb: {name} ({src_bytes} bytes)")
         chunks = push(chunks, src)
         chunks = push(chunks, "\n")
         deps = drv_uses_of(src)

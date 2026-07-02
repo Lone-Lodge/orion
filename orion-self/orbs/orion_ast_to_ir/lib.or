@@ -1808,6 +1808,14 @@ fn extract_list_elem(type_text: Text) -> Text:
 
 fn ast_type_to_ir(type_node: Map) -> Text:
     kind = get(type_node, "kind")
+    # Range types (`0...255`) erase to i64 — refinement checking is a
+    # future pass. Also guard nodes without a name field: a missing map
+    # key is a null ptr natively, and strcmp(null) segfaults.
+    if kind == "Range":
+        return "i64"
+    if not has(type_node, "name"):
+        if kind != "List":
+            return "i64"
     if kind == "List":
         elem_node = get(type_node, "elem")
         elem = ast_type_to_ir(elem_node)
@@ -1844,6 +1852,12 @@ fn ast_type_to_ir(type_node: Map) -> Text:
 # A Named type whose name matches a struct decl becomes "struct:Name".
 fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
     kind = get(type_node, "kind")
+    # Same Range/missing-name guards as ast_type_to_ir.
+    if kind == "Range":
+        return "i64"
+    if not has(type_node, "name"):
+        if kind != "List":
+            return "i64"
     if kind == "List":
         # Encode element type so list_at can return the right thing.
         elem_node = get(type_node, "elem")
