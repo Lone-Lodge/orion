@@ -148,11 +148,32 @@ long long __orion_time_now_ms(void) {
     /* FILETIME is 100ns intervals since 1601-01-01; offset to Unix epoch. */
     return (long long)((t - 116444736000000000ULL) / 10000ULL);
 }
+/* QPC + high-res waitable timer: GetTickCount64/Sleep quantize to the
+ * 15.6ms scheduler tick, capping any sleep-paced loop at ~30fps. */
 long long __orion_monotonic_ms(void) {
-    return (long long)GetTickCount64();
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER c;
+    if (!freq.QuadPart) QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&c);
+    return (long long)(c.QuadPart * 1000 / freq.QuadPart);
 }
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
 void __orion_sleep_ms(long long ms) {
-    if (ms > 0) Sleep((DWORD)ms);
+    static HANDLE timer;
+    if (ms <= 0) return;
+    if (!timer)
+        timer = CreateWaitableTimerExW(NULL, NULL,
+                    CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    if (timer) {
+        LARGE_INTEGER due;
+        due.QuadPart = -ms * 10000LL;
+        SetWaitableTimer(timer, &due, 0, NULL, NULL, FALSE);
+        WaitForSingleObject(timer, INFINITE);
+    } else {
+        Sleep((DWORD)ms);
+    }
 }
 #else
 #include <time.h>

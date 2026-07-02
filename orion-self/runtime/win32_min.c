@@ -138,7 +138,10 @@ int64_t win_pump(void) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
-    Sleep(16);  // ~60 Hz — trivial frame pacing so we don't burn CPU.
+    /* No sleep here — frame pacing is the app loop's job
+     * (atlas app_frame_sleep_since). A raw Sleep(16) quantizes to the
+     * 15.6ms scheduler tick and doubled up with the app's own pacing,
+     * capping every game at ~25fps. */
     return 1;
 }
 
