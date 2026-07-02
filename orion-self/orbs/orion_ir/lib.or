@@ -54,8 +54,14 @@ pub fn ir_type_void() -> Text: "void"
 # any error was reported — no more "prints ERROR, exits 0, links a
 # miscompiled exe".
 
-extern fn orion_err_bump() -> int
-extern fn orion_err_get() -> int
+pub extern fn orion_err_bump() -> int
+pub extern fn orion_err_get() -> int
+
+# Join a list of Text into one Text: two passes (sum strlens, then one
+# malloc + memcpy per part). O(total bytes) — the string-builder
+# primitive that replaces O(n²) repeated-concat accumulation. Defined
+# in the emitted runtime natively; io.rs mirrors it for lodge-orion.
+pub extern fn orion_text_join(parts: [Text]) -> Text
 
 pub fn compile_error(msg: Text):
     print_line(msg)

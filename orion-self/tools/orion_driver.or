@@ -16,10 +16,23 @@ fn main() -> int:
         in_path = argv(1)
         out_path = if argc() >= 3 then argv(2) else "out.ll"
         src = file_read(in_path)
+        t0 = monotonic_ms()
         tokens = self_lex(src)
+        t1 = monotonic_ms()
         ast = self_parse(tokens)
+        t2 = monotonic_ms()
         module = ast_program_to_ir(ast)
+        t3 = monotonic_ms()
         llvm_text = emit_module(module)
+        t4 = monotonic_ms()
+        d_lex = t1 - t0
+        d_parse = t2 - t1
+        d_ir = t3 - t2
+        d_emit = t4 - t3
+        print_line("lex   ms: {d_lex}")
+        print_line("parse ms: {d_parse}")
+        print_line("ir    ms: {d_ir}")
+        print_line("emit  ms: {d_emit}")
         n_errors = compile_errors()
         if n_errors > 0:
             print_line("orion-self: compilation FAILED with {n_errors} error(s) — no output written")

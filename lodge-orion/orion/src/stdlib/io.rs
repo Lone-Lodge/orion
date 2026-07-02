@@ -88,6 +88,25 @@ pub fn register(interp: &Interp) {
     interp.register_extern("orion_err_get", |_args| {
         Ok(Value::Int(ERR_COUNT.with(|c| c.get())))
     });
+
+    // String-builder join — one allocation for the whole result.
+    // Mirrors @orion_text_join in orion-self's emitted runtime.
+    interp.register_extern("orion_text_join", |args| {
+        let Some(Value::List(items)) = args.first() else {
+            return Ok(Value::Text(String::new()));
+        };
+        let total: usize = items.iter().map(|v| match v {
+            Value::Text(s) => s.len(),
+            _ => 0,
+        }).sum();
+        let mut out = String::with_capacity(total);
+        for v in items.iter() {
+            if let Value::Text(s) = v {
+                out.push_str(s);
+            }
+        }
+        Ok(Value::Text(out))
+    });
 }
 
 thread_local! {

@@ -726,14 +726,19 @@ pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
         param_list = emit_param_list(fn_value.params)
         is_user_main = name == "main"
         emit_name = if is_user_main then "orion_main" else name
-        mut text = "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n"
+        # Chunk list + single join, NOT repeated `"{text}{line}"` concat —
+        # concat re-copies the whole accumulated text per line, O(n²)
+        # over a multi-thousand-instruction function body.
+        mut chunks = []
+        chunks = push(chunks, "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n")
         total = len(fn_value.instructions)
         for index in 0..<total:
             inst = at(fn_value.instructions, index)
             line = emit_instruction(inst, index, strings, fn_value, module)
-            text = "{text}{line}\n"
-        text = "{text}\}\n"
-        text
+            chunks = push(chunks, line)
+            chunks = push(chunks, "\n")
+        chunks = push(chunks, "\}\n")
+        orion_text_join(chunks)
 
 
 # Emit the global for a single string literal.
@@ -773,6 +778,46 @@ fn emit_runtime() -> Text:
     text = "{text}entry:\n"
     text = "{text}  %n = load i64, ptr @orion_err_count\n"
     text = "{text}  ret i64 %n\n"
+    text = "{text}\}\n\n"
+    # text_join(parts): sum strlens, one malloc, memcpy each part.
+    text = "{text}define ptr @orion_text_join(ptr %parts) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %n = call i64 @orion_list_len(ptr %parts)\n"
+    text = "{text}  br label %sum_hdr\n"
+    text = "{text}sum_hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %sum_bdy ]\n"
+    text = "{text}  %total = phi i64 [ 0, %entry ], [ %total_next, %sum_bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %n\n"
+    text = "{text}  br i1 %done, label %alloc, label %sum_bdy\n"
+    text = "{text}sum_bdy:\n"
+    text = "{text}  %p_int = call i64 @orion_list_at(ptr %parts, i64 %i)\n"
+    text = "{text}  %p = inttoptr i64 %p_int to ptr\n"
+    text = "{text}  %l = call i64 @strlen(ptr %p)\n"
+    text = "{text}  %total_next = add i64 %total, %l\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %sum_hdr\n"
+    text = "{text}alloc:\n"
+    text = "{text}  %bufsz = add i64 %total, 1\n"
+    text = "{text}  %buf = call ptr @malloc(i64 %bufsz)\n"
+    text = "{text}  br label %cp_hdr\n"
+    text = "{text}cp_hdr:\n"
+    text = "{text}  %j = phi i64 [ 0, %alloc ], [ %j_next, %cp_bdy ]\n"
+    text = "{text}  %off = phi i64 [ 0, %alloc ], [ %off_next, %cp_bdy ]\n"
+    text = "{text}  %cp_done = icmp sge i64 %j, %n\n"
+    text = "{text}  br i1 %cp_done, label %fin, label %cp_bdy\n"
+    text = "{text}cp_bdy:\n"
+    text = "{text}  %q_int = call i64 @orion_list_at(ptr %parts, i64 %j)\n"
+    text = "{text}  %q = inttoptr i64 %q_int to ptr\n"
+    text = "{text}  %ql = call i64 @strlen(ptr %q)\n"
+    text = "{text}  %dst = getelementptr i8, ptr %buf, i64 %off\n"
+    text = "{text}  %_c = call ptr @memcpy(ptr %dst, ptr %q, i64 %ql)\n"
+    text = "{text}  %off_next = add i64 %off, %ql\n"
+    text = "{text}  %j_next = add i64 %j, 1\n"
+    text = "{text}  br label %cp_hdr\n"
+    text = "{text}fin:\n"
+    text = "{text}  %term = getelementptr i8, ptr %buf, i64 %total\n"
+    text = "{text}  store i8 0, ptr %term\n"
+    text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
     text = "{text}declare i64 @strlen(ptr)\n"
     text = "{text}declare ptr @strcpy(ptr, ptr)\n"
@@ -1272,22 +1317,27 @@ fn emit_runtime() -> Text:
 
 
 pub fn emit_module(module: IRModule) -> Text:
-    mut text = "; orion_emit_llvm output\n"
-    text = "{text}{emit_runtime()}"
+    # Chunk list + one join at the end — repeated concat would re-copy
+    # the growing megabyte module text once per appended piece.
+    mut chunks = []
+    chunks = push(chunks, "; orion_emit_llvm output\n")
+    chunks = push(chunks, emit_runtime())
     # Emit declares for every user extern call — any `call @name` where
     # `name` isn't a user fn and isn't a runtime helper already declared
     # above. Without these declares clang rejects the .ll before linking.
     externs = collect_extern_calls(module)
     n_ext = len(externs)
     for xi in 0..<n_ext:
-        text = "{text}{at(externs, xi)}\n"
-    text = "{text}\n"
+        chunks = push(chunks, at(externs, xi))
+        chunks = push(chunks, "\n")
+    chunks = push(chunks, "\n")
     # Emit one global per distinct string literal in the module.
     strings = collect_strings(module)
     n_strings = len(strings)
     for index in 0..<n_strings:
-        text = "{text}{emit_string_global(at(strings, index), index)}\n"
-    text = "{text}\n"
+        chunks = push(chunks, emit_string_global(at(strings, index), index))
+        chunks = push(chunks, "\n")
+    chunks = push(chunks, "\n")
     total = len(module.functions)
     for index in 0..<total:
         fn_value = at(module.functions, index)
@@ -1300,22 +1350,23 @@ pub fn emit_module(module: IRModule) -> Text:
         if is_extern_decl:
             if not is_runtime_symbol(fn_value.name):
                 ret_ll = llvm_type_of(fn_value.return_type)
-                text = "{text}declare {ret_ll} @{fn_value.name}({emit_param_types(fn_value.params)})\n\n"
+                chunks = push(chunks, "declare {ret_ll} @{fn_value.name}({emit_param_types(fn_value.params)})\n\n")
         if not is_extern_decl:
-            text = "{text}{emit_fn(fn_value, strings, module)}\n"
+            chunks = push(chunks, emit_fn(fn_value, strings, module))
+            chunks = push(chunks, "\n")
     # Wrapper @main: stash argc/argv to globals so argc()/argv(i) can read
     # them, then delegate to user's orion_main. We always emit this — if
     # the user didn't define a main, clang will complain about undefined
     # orion_main, which is the correct error.
-    text = "{text}@orion_argc = global i64 0\n"
-    text = "{text}@orion_argv = global ptr null\n\n"
-    text = "{text}define i32 @main(i32 %argc, ptr %argv) \{\n"
-    text = "{text}entry:\n"
-    text = "{text}  %argc64 = sext i32 %argc to i64\n"
-    text = "{text}  store i64 %argc64, ptr @orion_argc\n"
-    text = "{text}  store ptr %argv, ptr @orion_argv\n"
-    text = "{text}  %ret = call i64 @orion_main()\n"
-    text = "{text}  %ret32 = trunc i64 %ret to i32\n"
-    text = "{text}  ret i32 %ret32\n"
-    text = "{text}\}\n"
-    text
+    chunks = push(chunks, "@orion_argc = global i64 0\n")
+    chunks = push(chunks, "@orion_argv = global ptr null\n\n")
+    chunks = push(chunks, "define i32 @main(i32 %argc, ptr %argv) \{\n")
+    chunks = push(chunks, "entry:\n")
+    chunks = push(chunks, "  %argc64 = sext i32 %argc to i64\n")
+    chunks = push(chunks, "  store i64 %argc64, ptr @orion_argc\n")
+    chunks = push(chunks, "  store ptr %argv, ptr @orion_argv\n")
+    chunks = push(chunks, "  %ret = call i64 @orion_main()\n")
+    chunks = push(chunks, "  %ret32 = trunc i64 %ret to i32\n")
+    chunks = push(chunks, "  ret i32 %ret32\n")
+    chunks = push(chunks, "\}\n")
+    orion_text_join(chunks)
