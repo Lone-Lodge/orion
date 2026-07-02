@@ -57,6 +57,23 @@ long long orion_arena_on(void) {
 long long orion_arena_off(void) { arena_on = 0; return 1; }
 long long orion_arena_active(void) { return arena_on; }
 
+/* Lifetime tripwire: a pointer that lies inside the arena buffer is
+ * arena-born and dies at the next reset — storing it in a persistent
+ * structure is always a latent use-after-reset. Emitted slot-store
+ * code calls this for every pointer value; costs two compares. */
+void orion_arena_ptr_guard(const char *p, const char *key) {
+    static int warned = 0;
+    if (!arena_base || warned >= 16) return;
+    if ((const unsigned char *)p >= arena_base &&
+        (const unsigned char *)p < arena_base + arena_cap) {
+        fprintf(stderr,
+                "[orion] WARNING: arena pointer stored in persistent slot "
+                "'%s' - it dangles at the next arena reset\n",
+                key);
+        warned++;
+    }
+}
+
 /* Change stamp for a file: mixes mtime and size, 0 when missing.
  * Lets hot-reload polls skip reading unchanged files entirely. */
 long long orion_file_stamp(const char *path) {

@@ -488,9 +488,10 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         val_ty = llvm_type_of(val_inst.type_text)
         if val_ty == "ptr":
             tmp = "%v{my_id}.sp"
+            l0 = "    call void @orion_arena_ptr_guard(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.value)})"
             l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
             l2 = "    {value_ref(my_id)} = call i64 @orion_slot_set(ptr {value_ref(inst.value)}, i64 {tmp})"
-            result = "{l1}\n{l2}"
+            result = "{l0}\n{l1}\n{l2}"
         else:
             result = "    {value_ref(my_id)} = call i64 @orion_slot_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
@@ -957,6 +958,7 @@ fn emit_runtime() -> Text:
     text = "{text}declare ptr @orion_embedded_list()\n"
     text = "{text}declare ptr @orion_dir_list(ptr)\n"
     text = "{text}declare i64 @orion_file_stamp(ptr)\n"
+    text = "{text}declare void @orion_arena_ptr_guard(ptr, ptr)\n"
     # libm — float math builtins lower to these.
     text = "{text}declare double @sqrt(double)\n"
     text = "{text}declare double @sin(double)\n"

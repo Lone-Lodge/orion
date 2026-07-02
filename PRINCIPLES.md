@@ -40,6 +40,37 @@ forbids it. Old-school demoscene discipline, next-gen language design.
    interpreter; native compile is for shipping speed. Both must stay
    fast — a slow tool teaches slow habits.
 
+### Memory rules (no GC — every malloc is forever)
+
+The runtime has no garbage collector: heap memory is either freed by
+the frame arena's reset or lives until exit. That makes leaks a
+LANGUAGE-level concern, enforced by these invariants and tripwires:
+
+1. **Idle frames allocate zero bytes.** Enforced: atlas
+   `app_idle_alloc_check` warns after ~2s of steady idle drip; the
+   dev title shows live malloc KB/s next to fps. If KB/s isn't ~0
+   with hands off, that's a bug — find it before shipping.
+2. **Persistent stores are arena-immune.** The slot store grows via
+   malloc and copies keys on insert; the emitted slot-store path
+   calls `orion_arena_ptr_guard`, which warns whenever a pointer that
+   lives inside the arena is stored persistently (it would dangle at
+   the next reset). Cache trees are built with the arena forced off
+   (astra `compile()` guard).
+3. **Per-frame transients live in the arena.** Render packs, query
+   effects, display lists — open an epoch, consume, reset. Anything
+   escaping an epoch must be evacuated (`outcome_copy`) first.
+4. **Transient UI state never enters the tick log.** Drag positions,
+   dirty flags, mouse-move streams use `res_set_int_silent` /
+   `channel_emit_silent`. The rewind log records meaningful effects
+   only; rewind consumers re-seed transient state.
+5. **Never alias-then-self-push.** `mut x = <shared list>` followed
+   by `x = push(x, v)` mutates the shared spine in place (the
+   self-rebind fast path assumes ownership). Start accumulators from
+   `[]`. Compiler-enforced ownership tracking is the planned fix.
+6. **Steady-state polls must be stat-only.** Hot-reload checks use
+   `orion_file_stamp` (mtime+size); file contents are read only when
+   a stamp moves.
+
 ### Anti-goals
 
 - Feature parity with Unreal. We win by being 1000x smaller, not by
