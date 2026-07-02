@@ -1208,8 +1208,15 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         text_r = ast_expr_to_ir(fn_value, scope, text_node)
         lo_r = ast_expr_to_ir(text_r.function, text_r.scope, lo_node)
         hi_r = ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node)
-        pr = ir_fn_push(hi_r.function, ir_text_slice(text_r.id, lo_r.id, hi_r.id))
-        result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
+        # Interp slice() is list-only; text keeps the old lowering for
+        # any text-typed arg.
+        sl_type = get_value_type(hi_r.function, text_r.id)
+        if sl_type == "text":
+            pr = ir_fn_push(hi_r.function, ir_text_slice(text_r.id, lo_r.id, hi_r.id))
+            result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
+        else:
+            pr = ir_fn_push(hi_r.function, ir_list_slice(text_r.id, lo_r.id, hi_r.id, sl_type))
+            result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
     if is_contains:
         text_node = at(args, 0)
         sub_node = at(args, 1)

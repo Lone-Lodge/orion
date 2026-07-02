@@ -221,6 +221,11 @@ pub fn ir_text_len(value_id: int) -> Inst:
 pub fn ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
+# slice(list, lo, hi) — half-open, clamped; type_text carries the
+# source list type so element typing survives the slice.
+pub fn ir_list_slice(list_id: int, lo_id: int, hi_id: int, list_type: Text) -> Inst:
+    Inst{op: "list_slice", type_text: list_type, value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
+
 # contains(text, sub) — returns i64 1 if sub appears anywhere in text, else 0.
 pub fn ir_text_contains(text_id: int, sub_id: int) -> Inst:
     Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
