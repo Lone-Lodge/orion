@@ -92,7 +92,7 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
                 return Err(run_err(format!("slot_has expects a Text name, got {:?}", args[0])));
             };
             let has = SLOTS.with(|cells| cells.borrow().contains_key(name.as_str()));
-            Ok(Value::Int(if has { 1 } else { 0 }))
+            Ok(Value::Bool(has))
         }
         "slot_get_int" => {
             let Value::Text(name) = &args[0] else {
