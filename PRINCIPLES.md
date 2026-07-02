@@ -32,8 +32,8 @@ forbids it. Old-school demoscene discipline, next-gen language design.
 4. **Measure, don't vibe.** Driver prints per-phase ms. Every perf PR
    states before/after numbers. The triple-bootstrap fixpoint is the
    correctness gate; the budget table is the speed gate.
-5. **Fast is a feature of the LANGUAGE.** Growable lists with
-   self-rebind in-place push, one-malloc text_join, exact-hex float
+5. **Fast is a feature of the LANGUAGE.** Explicit `push_mut` for
+   audited owned accumulators, one-malloc text_join, exact-hex float
    constants — the primitives game code sits on are O(right) by
    default. Astra rules compile down to the same primitives.
 6. **Dev loop counts too.** orbit run boots a game instantly under the
@@ -63,10 +63,12 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
    dirty flags, mouse-move streams use `res_set_int_silent` /
    `channel_emit_silent`. The rewind log records meaningful effects
    only; rewind consumers re-seed transient state.
-5. **Never alias-then-self-push.** `mut x = <shared list>` followed
-   by `x = push(x, v)` mutates the shared spine in place (the
-   self-rebind fast path assumes ownership). Start accumulators from
-   `[]`. Compiler-enforced ownership tracking is the planned fix.
+5. **`push` is value-semantic, always.** `x = push(x, v)` copies like
+   every other push — the implicit in-place rewrite is retired, so
+   aliased-spine mutation is impossible to write by accident. Audited
+   owned accumulators (fresh `[]`, no live alias, rebound every call)
+   opt into `push_mut(x, v)` explicitly; the audit note lives at the
+   call site.
 6. **Steady-state polls must be stat-only.** Hot-reload checks use
    `orion_file_stamp` (mtime+size); file contents are read only when
    a stamp moves.

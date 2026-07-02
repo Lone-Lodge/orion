@@ -212,29 +212,6 @@ fn field_type_at(parts: [Text], idx: int) -> Text:
                     found_colon = 1
         type_buf
 
-# True when the statement is `NAME = push(NAME, v)` — the self-rebind
-# form whose old list value is dead, eligible for in-place push.
-fn is_self_push_stmt(name: Text, value_node: Map) -> bool:
-    if get(value_node, "kind") != "Call":
-        return false
-    if get(value_node, "callee") != "push":
-        return false
-    sp_args = get_list(value_node, "args")
-    if len(sp_args) != 2:
-        return false
-    sp_arg0 = at(sp_args, 0)
-    if get(sp_arg0, "kind") != "Ident":
-        return false
-    get(sp_arg0, "name") == name
-
-# Lower `x = push(x, v)` via list_push_mut (in-place, amortized O(1)).
-fn lower_self_push(fn_value: IRFn, scope: Scope, value_node: Map) -> ConvResult:
-    sp_args = get_list(value_node, "args")
-    list_r = ast_expr_to_ir(fn_value, scope, at(sp_args, 0))
-    val_r = ast_expr_to_ir(list_r.function, list_r.scope, at(sp_args, 1))
-    pr = ir_fn_push(val_r.function, ir_list_push_mut(list_r.id, val_r.id))
-    ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
-
 fn scope_add_fn_sig(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
     new_names = push(scope.fn_sig_names, fn_name)
     new_rets = push(scope.fn_sig_rets, ret_type)
@@ -429,16 +406,13 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             last_id = er.id
         if already_done == 0 and is_let:
             name = get(stmt, "name")
-            # `x = push(x, v)` self-rebind → in-place list_push_mut
-            # (amortized O(1)). UNSOUND when x aliases shared data (bit
-            # us in astra merge_bindings) — the plan is to retire this
-            # in favor of explicit push_mut everywhere, but a straight
-            # flip ballooned compile-time garbage (copying push per
-            # token/instruction) and overflowed the frame arena in
-            # game eval. Needs the arena-headroom pass first — see
-            # memory roadmap. Expression-form if so `er` dominates.
+            # `x = push(x, v)` is a plain copying push like every push —
+            # value semantics hold unconditionally. The old implicit
+            # in-place rewrite silently mutated shared spines when x was
+            # an alias (astra's compile cache, let-destructure envs).
+            # Audited hot accumulators opt into `push_mut(x, v)`.
             value_node = get(stmt, "value")
-            er = if is_self_push_stmt(name, value_node) then lower_self_push(current_fn, current_scope, value_node) else ast_expr_to_ir(current_fn, current_scope, value_node)
+            er = ast_expr_to_ir(current_fn, current_scope, value_node)
             current_fn = er.function
             current_scope = er.scope
             # If this is MutLet (fresh mut binding): alloca + store + bind as mut.
