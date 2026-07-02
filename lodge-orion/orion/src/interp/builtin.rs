@@ -127,6 +127,11 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         // copying push is a valid (slower) implementation of the same
         // semantics.
         "push_mut" => push(args),
+        // Struct field by declaration index. Natively a struct is raw
+        // slots in decl order; here struct instances are insertion-
+        // ordered maps, so the nth pair is the nth field.
+        "struct_field_int" => struct_field(&args),
+        "struct_field_text" => struct_field(&args),
         "slice" => slice(&args),
         "sin" => float1(&args, f64::sin, "sin"),
         "cos" => float1(&args, f64::cos, "cos"),
@@ -490,6 +495,19 @@ fn map_keys(args: &[Value]) -> Result<Value, RunError> {
         return Err(run_err(format!("map_keys expects a map, got {:?}", args[0])));
     };
     Ok(Value::List(std::sync::Arc::new(pairs.iter().map(|(k, _)| k.clone()).collect())))
+}
+
+fn struct_field(args: &[Value]) -> Result<Value, RunError> {
+    let Value::Map(pairs) = &args[0] else {
+        return Err(run_err(format!("struct_field expects a struct, got {:?}", args[0])));
+    };
+    let Value::Int(i) = &args[1] else {
+        return Err(run_err("struct_field expects an int index".to_string()));
+    };
+    pairs
+        .get(*i as usize)
+        .map(|(_, v)| v.clone())
+        .ok_or_else(|| run_err(format!("struct_field index {i} out of range")))
 }
 
 fn map_values(args: &[Value]) -> Result<Value, RunError> {

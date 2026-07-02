@@ -171,6 +171,10 @@ fn find_fn_return_type(module: IRModule, fn_name: Text) -> Text:
         result = "void"
     if fn_name == "__orion_perform_int":
         result = "i64"
+    if fn_name == "orion_struct_field_int":
+        result = "i64"
+    if fn_name == "orion_struct_field_text":
+        result = "text"
     for index in 0..<n:
         f = at(module.functions, index)
         if f.name == fn_name:
@@ -1416,6 +1420,21 @@ fn emit_runtime() -> Text:
     text = "{text}  %len_slot = getelementptr i64, ptr %buf, i64 1\n"
     text = "{text}  store i64 %cap, ptr %len_slot\n"
     text = "{text}  ret ptr %buf\n"
+    text = "{text}\}\n\n"
+    # Struct field by declaration index — structs are raw i64 slots in
+    # decl order. The text variant re-attaches the pointer type.
+    text = "{text}define i64 @orion_struct_field_int(ptr %s, i64 %i) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %slot = getelementptr i64, ptr %s, i64 %i\n"
+    text = "{text}  %v = load i64, ptr %slot\n"
+    text = "{text}  ret i64 %v\n"
+    text = "{text}\}\n\n"
+    text = "{text}define ptr @orion_struct_field_text(ptr %s, i64 %i) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %slot = getelementptr i64, ptr %s, i64 %i\n"
+    text = "{text}  %v = load i64, ptr %slot\n"
+    text = "{text}  %p = inttoptr i64 %v to ptr\n"
+    text = "{text}  ret ptr %p\n"
     text = "{text}\}\n\n"
     text = "{text}define i64 @orion_list_len(ptr %list) \{\n"
     text = "{text}entry:\n"
