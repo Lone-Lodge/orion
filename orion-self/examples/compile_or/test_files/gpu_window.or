@@ -6,11 +6,11 @@ extern fn win_event_kind() -> int
 extern fn win_event_key() -> int
 extern fn win_event_x() -> int
 extern fn win_event_y() -> int
-extern fn gpu_init(hwnd: int, w: int, h: int) -> int
-extern fn gpu_begin(r: int, g: int, b: int)
-extern fn gpu_rect(x: int, y: int, w: int, h: int, r: int, g: int, b: int)
-extern fn gpu_present() -> int
-extern fn gpu_shutdown()
+extern fn og_init(hwnd: int, w: int, h: int) -> int
+extern fn og_begin(r: int, g: int, b: int)
+extern fn og_rect(x: int, y: int, w: int, h: int, r: int, g: int, b: int)
+extern fn og_present() -> int
+extern fn og_shutdown()
 
 
 fn main() -> int:
@@ -18,9 +18,9 @@ fn main() -> int:
     if hwnd == 0:
         print_line("window failed")
         return 1
-    ok = gpu_init(hwnd, 800, 600)
+    ok = og_init(hwnd, 800, 600)
     if ok == 0:
-        print_line("gpu_init failed")
+        print_line("og_init failed")
         return 1
     print_line("gpu up - click to place blocks, move mouse, Esc to quit")
 
@@ -52,9 +52,9 @@ fn main() -> int:
             if kind == 6:
                 running = 0
 
-        gpu_begin(24, 26, 34)
+        og_begin(24, 26, 34)
         # board frame
-        gpu_rect(40, 40, 720, 520, 40, 44, 56)
+        og_rect(40, 40, 720, 520, 40, 44, 56)
         # placed blocks (grid-snapped 40px)
         n = len(blocks_x)
         for i in 0..<n:
@@ -62,14 +62,14 @@ fn main() -> int:
             by = at(blocks_y, i)
             sx = (bx / 40) * 40
             sy = (by / 40) * 40
-            gpu_rect(sx, sy, 36, 36, 231, 76, 255)
+            og_rect(sx, sy, 36, 36, 231, 76, 255)
         # cursor ghost follows the mouse
         gx = (mx / 40) * 40
         gy = (my / 40) * 40
-        gpu_rect(gx, gy, 36, 36, 80, 200, 120)
-        gpu_present()
+        og_rect(gx, gy, 36, 36, 80, 200, 120)
+        og_present()
 
-    gpu_shutdown()
+    og_shutdown()
     win_close(hwnd)
     print_line("bye")
     0

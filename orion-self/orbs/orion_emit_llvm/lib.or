@@ -712,19 +712,29 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
                 text2 = "{text2}\n    {int_name} = ptrtoint ptr {value_ref(val_id)} to i64"
                 text2 = "{text2}\n    store i64 {int_name}, ptr {slot_name}"
             else:
-                text2 = "{text2}\n    store i64 {value_ref(val_id)}, ptr {slot_name}"
+                if val_ty == "double":
+                    bits_name = "%v{my_id}.f{fi}.b"
+                    text2 = "{text2}\n    {bits_name} = bitcast double {value_ref(val_id)} to i64"
+                    text2 = "{text2}\n    store i64 {bits_name}, ptr {slot_name}"
+                else:
+                    text2 = "{text2}\n    store i64 {value_ref(val_id)}, ptr {slot_name}"
         result = text2
 
     if op == "field_load":
         ty = llvm_type_of(inst.type_text)
         slot_name = "%v{my_id}.slot"
         l1 = "    {slot_name} = getelementptr i64, ptr {value_ref(inst.value)}, i64 {inst.lhs}"
+        if ty == "double":
+            fl_bits = "%v{my_id}.b"
+            l2d = "    {fl_bits} = load i64, ptr {slot_name}"
+            l3d = "    {value_ref(my_id)} = bitcast i64 {fl_bits} to double"
+            result = "{l1}\n{l2d}\n{l3d}"
         if ty == "ptr":
             int_name = "%v{my_id}.i"
             l2 = "    {int_name} = load i64, ptr {slot_name}"
             l3 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
             result = "{l1}\n{l2}\n{l3}"
-        else:
+        if ty == "i64":
             l2 = "    {value_ref(my_id)} = load i64, ptr {slot_name}"
             result = "{l1}\n{l2}"
 

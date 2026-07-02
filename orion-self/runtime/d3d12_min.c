@@ -6,9 +6,9 @@
  * dependency chain.
  *
  * CORRECT frame model (unlike gpu.rs's per-draw-submit):
- *   gpu_begin(r,g,b)          reset frame, remember clear color
- *   gpu_rect(x,y,w,h,r,g,b)   append 6 verts (pixel coords, 0-255 col)
- *   gpu_present()             record ONE command list: barrier, clear,
+ *   og_begin(r,g,b)          reset frame, remember clear color
+ *   og_rect(x,y,w,h,r,g,b)   append 6 verts (pixel coords, 0-255 col)
+ *   og_present()             record ONE command list: barrier, clear,
  *                             draw all, barrier, execute, present,
  *                             fence-wait (full sync — correct first,
  *                             overlap later)
@@ -65,7 +65,7 @@ static void fence_sync(void) {
     }
 }
 
-long long gpu_init(long long hwnd_i, long long width, long long height) {
+long long og_init(long long hwnd_i, long long width, long long height) {
     HWND hwnd = (HWND)(uintptr_t)hwnd_i;
     g_width = (int)width;
     g_height = (int)height;
@@ -205,7 +205,7 @@ long long gpu_init(long long hwnd_i, long long width, long long height) {
     return 1;
 }
 
-void gpu_begin(long long r, long long g, long long b) {
+void og_begin(long long r, long long g, long long b) {
     g_nverts = 0;
     g_clear[0] = (float)r / 255.0f;
     g_clear[1] = (float)g / 255.0f;
@@ -215,7 +215,7 @@ void gpu_begin(long long r, long long g, long long b) {
 
 /* Append one rect = 2 triangles = 6 verts. Pixel coords → NDC here so
  * the shader stays a passthrough. */
-void gpu_rect(long long x, long long y, long long w, long long h,
+void og_rect(long long x, long long y, long long w, long long h,
               long long r, long long g, long long b) {
     if (g_nverts + 6 > MAX_VERTS) return;
     float x0 = (float)x / (float)g_width * 2.0f - 1.0f;
@@ -234,7 +234,7 @@ void gpu_rect(long long x, long long y, long long w, long long h,
     g_nverts += 6;
 }
 
-long long gpu_present(void) {
+long long og_present(void) {
     UINT frame = IDXGISwapChain3_GetCurrentBackBufferIndex(g_swap);
 
     ID3D12CommandAllocator_Reset(g_alloc);
@@ -282,7 +282,7 @@ long long gpu_present(void) {
     return 1;
 }
 
-void gpu_shutdown(void) {
+void og_shutdown(void) {
     if (g_queue) fence_sync();
     /* Deliberately no Release cascade — process exit reclaims
      * everything; a game calls this once. */
