@@ -22,7 +22,6 @@
 #include <windows.h>
 #include <d3d12.h>
 #include <dxgi1_4.h>
-#include <d3dcompiler.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -50,11 +49,10 @@ static int                  g_width, g_height;
 static int                  g_nverts;
 static float                g_clear[4];
 
-static const char *SHADER_SRC =
-    "struct VSIn  { float2 pos : POSITION; float4 col : COLOR; };\n"
-    "struct VSOut { float4 pos : SV_POSITION; float4 col : COLOR; };\n"
-    "VSOut vs(VSIn i) { VSOut o; o.pos = float4(i.pos, 0, 1); o.col = i.col; return o; }\n"
-    "float4 ps(VSOut i) : SV_TARGET { return i.col; }\n";
+/* Shaders precompiled to DXBC at build time (fxc, see tools/shaders) —
+ * no d3dcompiler DLL at runtime: fewer deps, faster cold start. */
+#include "vs_dxbc.h"
+#include "ps_dxbc.h"
 
 static void fence_sync(void) {
     g_fence_val++;
@@ -134,21 +132,6 @@ long long og_init(long long hwnd_i, long long width, long long height) {
         &IID_ID3D12RootSignature, (void **)&g_rootsig);
     ID3D10Blob_Release(sig);
 
-    /* Shaders compiled at init from the embedded source. */
-    ID3DBlob *vs, *ps, *serr = NULL;
-    if (FAILED(D3DCompile(SHADER_SRC, strlen(SHADER_SRC), NULL, NULL, NULL,
-                          "vs", "vs_5_0", 0, 0, &vs, &serr))) {
-        if (serr) fprintf(stderr, "[gpu] vs: %s\n",
-                          (char *)ID3D10Blob_GetBufferPointer(serr));
-        return 0;
-    }
-    if (FAILED(D3DCompile(SHADER_SRC, strlen(SHADER_SRC), NULL, NULL, NULL,
-                          "ps", "ps_5_0", 0, 0, &ps, &serr))) {
-        if (serr) fprintf(stderr, "[gpu] ps: %s\n",
-                          (char *)ID3D10Blob_GetBufferPointer(serr));
-        return 0;
-    }
-
     D3D12_INPUT_ELEMENT_DESC layout[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0,
           D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -158,10 +141,10 @@ long long og_init(long long hwnd_i, long long width, long long height) {
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pd = {0};
     pd.pRootSignature = g_rootsig;
-    pd.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs);
-    pd.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs);
-    pd.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps);
-    pd.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps);
+    pd.VS.pShaderBytecode = g_vs_dxbc;
+    pd.VS.BytecodeLength = sizeof(g_vs_dxbc);
+    pd.PS.pShaderBytecode = g_ps_dxbc;
+    pd.PS.BytecodeLength = sizeof(g_ps_dxbc);
     pd.InputLayout.pInputElementDescs = layout;
     pd.InputLayout.NumElements = 2;
     pd.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
@@ -177,9 +160,6 @@ long long og_init(long long hwnd_i, long long width, long long height) {
     if (FAILED(ID3D12Device_CreateGraphicsPipelineState(g_dev, &pd,
                &IID_ID3D12PipelineState, (void **)&g_pso)))
         return 0;
-    ID3D10Blob_Release(vs);
-    ID3D10Blob_Release(ps);
-
     /* Persistent upload-heap vertex buffer, mapped once. */
     D3D12_HEAP_PROPERTIES hp = {0};
     hp.Type = D3D12_HEAP_TYPE_UPLOAD;

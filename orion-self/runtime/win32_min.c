@@ -58,8 +58,21 @@ long long win_event_y(void)    { return ev_current.y; }
 static long long lp_x(LPARAM lp) { return (long long)(short)LOWORD(lp); }
 static long long lp_y(LPARAM lp) { return (long long)(short)HIWORD(lp); }
 
+/* Software backends (gdi_min) register a repaint hook so WM_PAINT
+ * restores the framebuffer instead of erasing to the class brush. */
+void (*win_paint_hook)(void) = 0;
+
 static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
+    case WM_PAINT:
+        if (win_paint_hook) {
+            PAINTSTRUCT ps;
+            BeginPaint(hwnd, &ps);
+            win_paint_hook();
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        break;
     case WM_LBUTTONDOWN: ev_push(1, 1, lp_x(lp), lp_y(lp)); return 0;
     case WM_RBUTTONDOWN: ev_push(1, 2, lp_x(lp), lp_y(lp)); return 0;
     case WM_MBUTTONDOWN: ev_push(1, 3, lp_x(lp), lp_y(lp)); return 0;
