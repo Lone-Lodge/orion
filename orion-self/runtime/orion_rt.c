@@ -212,20 +212,46 @@ long long orion_persist_off(void) {
  * A pool overrides the persist scope while selected (the caller is
  * explicitly choosing a shorter lifetime). */
 
-#define POOL_COUNT 4
+/* Pools are DYNAMIC: every world allocates its own set via
+ * orion_pool_alloc (atlas takes 4 per world — snapshot ring x2 +
+ * tick log x2), so region-as-world scales without shared lifetime
+ * clocks. Same retirement proofs, per world. */
 #define POOL_START (128u * 1024u)
-static unsigned char *pool_base[POOL_COUNT];
-static size_t pool_cap[POOL_COUNT];
-static size_t pool_used[POOL_COUNT];
-static size_t pool_high[POOL_COUNT];
-static orion_ovf *pool_ovf[POOL_COUNT];
-static size_t pool_ovf_bytes[POOL_COUNT];
+static unsigned char **pool_base = NULL;
+static size_t *pool_cap = NULL;
+static size_t *pool_used = NULL;
+static size_t *pool_high = NULL;
+static orion_ovf **pool_ovf = NULL;
+static size_t *pool_ovf_bytes = NULL;
+static long long pool_count = 0;
+static long long pool_room = 0;
 static int pool_active = -1;
-static const char *pool_names[POOL_COUNT] = {"pool0", "pool1", "pool2",
-                                             "pool3"};
+
+long long orion_pool_alloc(void) {
+    if (pool_count == pool_room) {
+        pool_room = pool_room == 0 ? 8 : pool_room * 2;
+        pool_base = (unsigned char **)realloc(pool_base,
+                                              pool_room * sizeof(void *));
+        pool_cap = (size_t *)realloc(pool_cap, pool_room * sizeof(size_t));
+        pool_used = (size_t *)realloc(pool_used, pool_room * sizeof(size_t));
+        pool_high = (size_t *)realloc(pool_high, pool_room * sizeof(size_t));
+        pool_ovf = (orion_ovf **)realloc(pool_ovf, pool_room * sizeof(void *));
+        pool_ovf_bytes =
+            (size_t *)realloc(pool_ovf_bytes, pool_room * sizeof(size_t));
+    }
+    long long i = pool_count;
+    pool_base[i] = NULL;
+    pool_cap[i] = 0;
+    pool_used[i] = 0;
+    pool_high[i] = 0;
+    pool_ovf[i] = NULL;
+    pool_ovf_bytes[i] = 0;
+    pool_count++;
+    return i;
+}
 
 long long orion_pool_on(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     if (!pool_base[i]) {
         pool_base[i] = (unsigned char *)malloc(POOL_START);
         pool_cap[i] = POOL_START;
@@ -238,26 +264,26 @@ long long orion_pool_on(long long i) {
 long long orion_pool_off(void) { pool_active = -1; return 1; }
 
 long long orion_pool_used(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_used[i];
 }
 long long orion_pool_high(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_high[i];
 }
 long long orion_pool_cap(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_cap[i];
 }
 
 long long orion_pool_reset(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     size_t need = pool_used[i] + pool_ovf_bytes[i];
     ovf_drain(&pool_ovf[i], &pool_ovf_bytes[i]);
     if (pool_base[i] && pool_used[i] > 0) {
         memset(pool_base[i], 0xDD, pool_used[i]);
     }
-    region_fit(pool_names[i], &pool_base[i], &pool_cap[i], need);
+    region_fit("pool", &pool_base[i], &pool_cap[i], need);
     pool_used[i] = 0;
     return 1;
 }

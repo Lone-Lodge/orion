@@ -977,6 +977,7 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @orion_frame_used()\n"
     text = "{text}declare i64 @orion_persist_on()\n"
     text = "{text}declare i64 @orion_persist_off()\n"
+    text = "{text}declare i64 @orion_pool_alloc()\n"
     text = "{text}declare i64 @orion_pool_on(i64)\n"
     text = "{text}declare i64 @orion_pool_off()\n"
     text = "{text}declare i64 @orion_pool_reset(i64)\n"
