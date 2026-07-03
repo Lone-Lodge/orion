@@ -1,0 +1,16 @@
+use board
+
+entity Block { col: int, row: int, color: Text }
+
+fn cell_out_of_bounds(cell, col, row):
+    target_col = col + cell.dc
+    target_row = row - cell.dr
+    target_col < 0 or target_col >= board_width or target_row < 0 or target_row >= board_height
+
+fn cell_collides(cell, col, row, blocks):
+    target_col = col + cell.dc
+    target_row = row - cell.dr
+    exists block in blocks where block.col == target_col and block.row == target_row
+
+fn placement_fits(cells, col, row, blocks):
+    none cell in cells where cell_out_of_bounds(cell, col, row) or cell_collides(cell, col, row, blocks)
