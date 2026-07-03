@@ -98,7 +98,13 @@ impl Cx {
                 }
                 Ty::Int
             }
-            "time_now_ms" | "monotonic_ms" => Ty::Int,
+            "time_now_ms" | "monotonic_ms" | "argc" => Ty::Int,
+            "argv" => {
+                for a in args {
+                    self.infer(a, scope)?;
+                }
+                Ty::Text
+            }
             "sleep_ms" => {
                 for a in args {
                     self.infer(a, scope)?;

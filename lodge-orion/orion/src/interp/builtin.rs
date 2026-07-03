@@ -21,6 +21,10 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     // Remove a key from a map, returning the map (native: in-place
     // swap-remove; interp: copy-on-write retain).
     ("map_remove", 2),
+    // Process args. orbit run does not forward game args, so the interp
+    // reports none — mode overrides are a native-exe affair; the interp
+    // dev loop reads the project config.
+    ("argc", 0), ("argv", 1),
     // numeric conversion
     ("to_int", 1), ("to_float", 1),
     // runtime type introspection
@@ -141,6 +145,8 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         "struct_field_int" => struct_field(&args),
         "struct_field_text" => struct_field(&args),
         "map_remove" => map_remove(args),
+        "argc" => Ok(Value::Int(1)),
+        "argv" => Ok(Value::Text(String::new())),
         "slice" => slice(&args),
         "sin" => float1(&args, f64::sin, "sin"),
         "cos" => float1(&args, f64::cos, "cos"),
