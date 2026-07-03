@@ -46,10 +46,17 @@ The runtime has no garbage collector: heap memory is either freed by
 the frame arena's reset or lives until exit. That makes leaks a
 LANGUAGE-level concern, enforced by these invariants and tripwires:
 
+0. **Three lifetimes, nothing else.** Every allocation is epoch
+   (render/dispatch arena), frame (the DEFAULT — dies at the
+   end-of-frame reset), or persist (an explicit orion_persist scope:
+   the world, the log, caches). The frame reset poisons its memory,
+   so a missed persist crashes deterministically on the next frame
+   instead of leaking. Any new world-writing API must be a persist
+   scope.
 1. **Idle frames allocate zero bytes.** Enforced: atlas
    `app_idle_alloc_check` warns after ~2s of steady idle drip; the
-   dev title shows live malloc KB/s next to fps. If KB/s isn't ~0
-   with hands off, that's a bug — find it before shipping.
+   dev title shows live persist-growth KB/s next to fps. If KB/s
+   isn't ~0 with hands off, that's a bug — find it before shipping.
 2. **Persistent stores are arena-immune.** The slot store grows via
    malloc and copies keys on insert; the emitted slot-store path
    calls `orion_arena_ptr_guard`, which warns whenever a pointer that
