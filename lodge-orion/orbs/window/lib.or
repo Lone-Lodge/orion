@@ -17,8 +17,38 @@ pub fn window_open(width: int, height: int, title: Text) -> int:
 pub fn window_should_close() -> bool:
     __os_window_should_close()
 
+# Mouse moves are stripped from the event stream and tracked as the
+# LAST position in slots — same contract as the native window orb (an
+# Event per motion frame is permanent heap under the native runtime).
 pub fn window_pump() -> [Event]:
-    __os_window_pump()
+    raw = __os_window_pump()
+    n = len(raw)
+    mut events = []
+    for i in 0..<n:
+        ev = event_at(raw, i)
+        if ev.kind == "mouse_move":
+            slot_set("atlas_native:mouse_x", to_int(ev.x))
+            slot_set("atlas_native:mouse_y", to_int(ev.y))
+            slot_set("atlas_native:mouse_moved", 1)
+        if ev.kind != "mouse_move":
+            events = push(events, ev)
+    events
+
+fn event_at(xs: [Event], i: int) -> Event:
+    at(xs, i)
+
+pub fn window_mouse_x() -> int:
+    if slot_has("atlas_native:mouse_x") then slot_get_int("atlas_native:mouse_x") else 0
+
+pub fn window_mouse_y() -> int:
+    if slot_has("atlas_native:mouse_y") then slot_get_int("atlas_native:mouse_y") else 0
+
+# Consuming flag: true once per pumped batch that contained motion.
+pub fn window_mouse_moved() -> bool:
+    moved = if slot_has("atlas_native:mouse_moved") then slot_get_int("atlas_native:mouse_moved") else 0
+    if moved == 1:
+        slot_set("atlas_native:mouse_moved", 0)
+    moved == 1
 
 pub fn window_swap(window_id: int):
     __os_window_swap(window_id)
