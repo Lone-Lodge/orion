@@ -117,11 +117,15 @@ static wchar_t* to_wide(const char* s) {
 int64_t win_open(const char* title, int64_t w, int64_t h) {
     ensure_class();
     wchar_t* wtitle = to_wide(title);
+    /* w/h are the requested CLIENT size — grow the outer rect by the
+     * frame so games get exactly the pixels they laid out for. */
+    RECT rc = {0, 0, (LONG)w, (LONG)h};
+    AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
     HWND hwnd = CreateWindowExW(
         0, WCLASS, wtitle,
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        (int)w, (int)h,
+        (int)(rc.right - rc.left), (int)(rc.bottom - rc.top),
         NULL, NULL, GetModuleHandleW(NULL), NULL);
     free(wtitle);
     if (!hwnd) return 0;
