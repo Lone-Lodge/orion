@@ -20,12 +20,6 @@ use bytes
 # break/continue targets. Push when entering a loop, do not pop (immutable scope).
 data Scope: names: [Text], ids: [int], mut_flags: [int], loop_headers: [Text], loop_ends: [Text], fn_sig_names: [Text], fn_sig_rets: [Text], ds_names: [Text], ds_specs: [Text], en_names: [Text], en_variants: [Text]
 
-# Typed map-get aliases — orion-self dispatches their callers to typed
-# runtime helpers, but lodge-orion needs an actual definition to interpret.
-pub fn get_int(m: Map, k: Text) -> int: get(m, k)
-pub fn get_map(m: Map, k: Text) -> Map: get(m, k)
-pub fn get_list(m: Map, k: Text) -> [Map]: get(m, k)
-
 fn scope_empty() -> Scope:
     Scope{names: [], ids: [], mut_flags: [], loop_headers: [], loop_ends: [], fn_sig_names: [], fn_sig_rets: [], ds_names: [], ds_specs: [], en_names: [], en_variants: []}
 
@@ -941,6 +935,19 @@ fn coerce_f64(r: ConvResult) -> ConvResult:
         pr = ir_fn_push(r.function, ir_sitofp(r.id))
         ConvResult{function: pr.function, scope: r.scope, id: pr.id}
 
+fn text_list_has(xs: [Text], needle: Text) -> bool:
+    n = len(xs)
+    mut found = false
+    for i in 0..<n:
+        if at(xs, i) == needle:
+            found = true
+    found
+
+# Payload slot count for a variant: "" = 0, else csv entries.
+fn variant_payload_count(scope: Scope, enum_name: Text, variant: Text) -> int:
+    csv = scope_lookup_variant_payloads(scope, enum_name, variant)
+    if csv == "" then 0 else len(split_csv(csv))
+
 fn find_variant_enum(scope: Scope, callee: Text) -> Text:
     # Bare variant names share one global namespace natively — two enums
     # exporting the same variant resolve differently interp vs native
@@ -971,6 +978,16 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     # a variant name shadows nothing else by construction.
     vc_enum = find_variant_enum(scope, callee)
     if vc_enum != "":
+        # Arity is checked here, not trusted: the native compiler used
+        # to accept a 3-arg construction of a 4-payload variant and
+        # emit garbage in the missing slot (the interp checker caught
+        # it; now both do).
+        vc_want = variant_payload_count(scope, vc_enum, callee)
+        vc_got = len(args)
+        if vc_got != vc_want:
+            vc_line = if has(node, "line") then get_int(node, "line") else 0
+            vc_col = if has(node, "col") then get_int(node, "col") else 0
+            compile_error("orion-self: ERROR at line {vc_line}:{vc_col} — variant `{callee}` takes {vc_want} value(s), got {vc_got}")
         vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": vc_enum}, "method": callee, "args": args}
         return ast_expr_to_ir(fn_value, scope, vc_node)
     is_print_line = callee == "print_line" or callee == "println" or callee == "print"
@@ -1631,6 +1648,10 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         # types comps as map, `Relate(a, kind, b)` gets i64/text/i64.
         mut body_scope = current_scope
         n_arm_bindings = len(bindings)
+        if do_variant_pat:
+            arm_want = variant_payload_count(scope, variant_enum, pat_value)
+            if n_arm_bindings != arm_want:
+                compile_error("orion-self: ERROR — match arm `{pat_value}` binds {n_arm_bindings} value(s) but the variant carries {arm_want}")
         if do_variant_pat and n_arm_bindings > 0:
             payload_csv = scope_lookup_variant_payloads(scope, variant_enum, pat_value)
             payload_types = split_csv(payload_csv)
@@ -2397,11 +2418,19 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     # Pass 1b: collect fn signatures, now with struct-aware ret types.
     # ExternFn decls register too — their calls type like any fn call
     # (no more "unknown function, i64 as guess" for declared externs).
+    # Duplicate fn BODIES are a hard error — orbs share one flat
+    # namespace, and a silent double-emit means whichever definition
+    # links last wins (bit us twice: toml/veil line_at, others).
+    # Extern re-declares stay legal; that's the cross-orb convention.
+    mut fn_seen = []
     for index in 0..<total:
         decl = at(decls, index)
         decl_kind_1b = get(decl, "kind")
         if decl_kind_1b == "Fn":
             fn_name = get(decl, "name")
+            if text_list_has(fn_seen, fn_name):
+                compile_error("orion-self: ERROR — duplicate function `{fn_name}` (two orbs in this build define it; rename one)")
+            fn_seen = push_mut(fn_seen, fn_name)
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
         if decl_kind_1b == "ExternFn":

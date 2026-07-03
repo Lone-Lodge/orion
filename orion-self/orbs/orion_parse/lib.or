@@ -22,13 +22,6 @@
 # doesn't have references so we return a new cursor in a {"node": …,
 # "next": …} pair (same pattern as the lexer's scanners).
 
-# Aliases for typed map access. orion-self treats get_int/get_map as
-# builtins that return i64/Map respectively; lodge-orion needs an .or
-# definition. Both call into plain `get`.
-pub fn get_int(m: Map, k: Text) -> int: get(m, k)
-pub fn get_map(m: Map, k: Text) -> Map: get(m, k)
-pub fn get_list(m: Map, k: Text) -> [Map]: get(m, k)
-
 # Interpolation arg classification: numeric literals → Int AST, everything
 # else → Ident (caller resolves). Lets `{fn(21)}` work in addition to
 # `{fn(var_name)}`.
