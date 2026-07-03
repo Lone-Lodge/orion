@@ -109,6 +109,43 @@ long long orion_persist_off(void) {
     return 1;
 }
 
+/* ---- Pools: generational scratch for retiring data ------------------
+ * Two small bump pools for data with RING lifetime (world snapshots):
+ * a generation fills one pool while the other's generation ages out of
+ * the ring; once retired, the pool resets. Bounded by construction.
+ * A pool overrides the persist scope while selected (the caller is
+ * explicitly choosing a shorter lifetime). */
+
+#define POOL_COUNT 2
+#define POOL_DEFAULT (1u * 1024u * 1024u)
+static unsigned char *pool_base[POOL_COUNT] = {NULL, NULL};
+static size_t pool_cap[POOL_COUNT] = {0, 0};
+static size_t pool_used[POOL_COUNT] = {0, 0};
+static int pool_active = -1;
+static int pool_warned = 0;
+
+long long orion_pool_on(long long i) {
+    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (!pool_base[i]) {
+        pool_base[i] = (unsigned char *)malloc(POOL_DEFAULT);
+        pool_cap[i] = POOL_DEFAULT;
+        pool_used[i] = 0;
+    }
+    pool_active = (int)i;
+    return 1;
+}
+
+long long orion_pool_off(void) { pool_active = -1; return 1; }
+
+long long orion_pool_reset(long long i) {
+    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (pool_base[i] && pool_used[i] > 0) {
+        memset(pool_base[i], 0xDD, pool_used[i]);
+    }
+    pool_used[i] = 0;
+    return 1;
+}
+
 /* Lifetime tripwire: a pointer that lies inside the arena buffer is
  * arena-born and dies at the next reset — storing it in a persistent
  * structure is always a latent use-after-reset. Emitted slot-store
@@ -197,10 +234,27 @@ long long orion_alloc_malloc_total(void) { return alloc_malloc; }
 static size_t arena_high = 0;
 long long orion_arena_high(void) { return (long long)arena_high; }
 
-/* Priority: epoch arena (innermost) > persist scope (malloc) >
- * frame region (the frame default) > malloc (setup/tools). */
+/* Priority: epoch arena (innermost) > selected pool (beats persist —
+ * an explicit shorter lifetime) > persist scope (malloc) > frame
+ * region (the frame default) > malloc (setup/tools). */
 void *orion_alloc(long long size) {
     alloc_total += size;
+    if (pool_active >= 0 && !arena_on) {
+        int i = pool_active;
+        size_t need = ((size_t)size + 15u) & ~(size_t)15u;
+        if (pool_used[i] + need <= pool_cap[i]) {
+            void *p = pool_base[i] + pool_used[i];
+            pool_used[i] += need;
+            return p;
+        }
+        if (!pool_warned) {
+            fprintf(stderr,
+                "[orion] pool overflow - falling back to malloc\n");
+            pool_warned = 1;
+        }
+        alloc_malloc += size;
+        return malloc((size_t)size);
+    }
     if (arena_on && arena_base) {
         size_t need = ((size_t)size + 15u) & ~(size_t)15u;
         if (arena_used + need <= arena_cap) {
