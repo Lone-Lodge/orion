@@ -15,41 +15,130 @@
 #include <string.h>
 #include <sys/stat.h>
 
+/* ---- Console: color capability + VT enable --------------------------
+ * ANSI styling is opt-in per stream state: orion_console_color()
+ * answers "is stdout an interactive terminal", and on first ask
+ * switches the console to UTF-8 + virtual-terminal processing so
+ * escape codes and unicode render on classic conhost too. Redirected
+ * output (gates, logs) stays plain text. */
+#if defined(_WIN32)
+#include <io.h>
+__declspec(dllimport) void *__stdcall GetStdHandle(unsigned long which);
+__declspec(dllimport) int __stdcall GetConsoleMode(void *h, unsigned long *m);
+__declspec(dllimport) int __stdcall SetConsoleMode(void *h, unsigned long m);
+__declspec(dllimport) int __stdcall SetConsoleOutputCP(unsigned int cp);
+static int console_color_state = -1;
+long long orion_console_color(void) {
+    if (console_color_state >= 0) return console_color_state;
+    console_color_state = 0;
+    if (_isatty(_fileno(stdout))) {
+        void *h = GetStdHandle((unsigned long)-11); /* STD_OUTPUT_HANDLE */
+        unsigned long mode = 0;
+        if (h && GetConsoleMode(h, &mode) &&
+            SetConsoleMode(h, mode | 0x0004 /* VT processing */)) {
+            SetConsoleOutputCP(65001);
+            console_color_state = 1;
+        }
+    }
+    return console_color_state;
+}
+#else
+#include <unistd.h>
+long long orion_console_color(void) { return isatty(1) ? 1 : 0; }
+#endif
+
+/* Style fragments for the runtime's own messages. Empty when the
+ * stream is not an interactive terminal. */
+static const char *c_dim(void) { return orion_console_color() ? "\x1b[2m" : ""; }
+static const char *c_red(void) { return orion_console_color() ? "\x1b[31;1m" : ""; }
+static const char *c_off(void) { return orion_console_color() ? "\x1b[0m" : ""; }
+
+/* ---- Adaptive regions ------------------------------------------------
+ * Regions (arena, frame, pools) start SMALL and the runtime sizes
+ * them: at a reset the region is empty by definition, so the backing
+ * buffer can be swapped for a bigger one with zero live pointers.
+ * Overflow mid-cycle chains onto a per-region list and is freed
+ * (poisoned) at that same reset — spill is slow for one cycle, never
+ * a leak, and the next reset has grown the buffer to fit. The engine
+ * picks how much it needs; nobody hand-tunes byte counts. Grow-only:
+ * caps converge to less than ~2.7x the real peak per workload. */
+
+typedef struct orion_ovf {
+    struct orion_ovf *next;
+    size_t size;
+} orion_ovf;
+
+static void *ovf_push(orion_ovf **head, size_t *bytes, size_t size) {
+    orion_ovf *b = (orion_ovf *)malloc(sizeof(orion_ovf) + size);
+    if (!b) return NULL;
+    b->next = *head;
+    b->size = size;
+    *head = b;
+    *bytes += size;
+    return (void *)(b + 1);
+}
+
+static void ovf_drain(orion_ovf **head, size_t *bytes) {
+    orion_ovf *b = *head;
+    while (b) {
+        orion_ovf *n = b->next;
+        memset(b + 1, 0xDD, b->size);
+        free(b);
+        b = n;
+    }
+    *head = NULL;
+    *bytes = 0;
+}
+
+/* Swap an EMPTY region's buffer for one that fits what the last cycle
+ * actually needed. Call only at reset. Keeps need <= 3/4 of cap. */
+static void region_fit(const char *name, unsigned char **base, size_t *cap,
+                       size_t need) {
+    size_t want = *cap;
+    if (!*base || need <= (*cap / 4) * 3) return;
+    while ((want / 4) * 3 < need) want *= 2;
+    unsigned char *fresh = (unsigned char *)malloc(want);
+    if (!fresh) return; /* keep the old buffer; spill stays slow */
+    free(*base);
+    *base = fresh;
+    *cap = want;
+    fprintf(stderr, "%s[orion] %s region sized to %llu KB%s\n", c_dim(), name,
+            (unsigned long long)(want / 1024u), c_off());
+}
+
 /* ---- Frame arena ---------------------------------------------------
  * Every runtime allocation (lists, maps, text concat/join, structs)
  * routes through orion_alloc. Default mode = plain malloc (compilers
- * and tools never notice). A game loop flips to arena mode per frame:
+ * and tools never notice). A game loop flips to arena mode per epoch:
  *
  *   orion_arena_reset(); orion_arena_on();
  *   ...gameplay + render (all transients land in the bump arena)...
  *   orion_arena_off();   // before mutating persistent state, or keep
  *                        // persistent state pre-sized so in-place
  *                        // set/push_mut never allocates
- *
- * Overflow falls back to malloc (correct but leaky) with a one-time
- * stderr warning — raise the size with orion_arena_init(bytes). */
+ */
 
 static unsigned char *arena_base = NULL;
 static size_t arena_cap = 0;
 static size_t arena_used = 0;
+static size_t arena_peak = 0; /* max used since last reset (rewind lowers used) */
 static int arena_on = 0;
-static int arena_warned = 0;
+static orion_ovf *arena_ovf = NULL;
+static size_t arena_ovf_bytes = 0;
 
-/* Measured high-water with the obstack eval: ~300KB (cubsy, busiest
- * dispatch). 4MB covers the render epoch (~2.5MB) with headroom; overflow falls back to malloc
- * with a stderr warning, so undersizing degrades instead of breaking. */
-#define ARENA_DEFAULT (4u * 1024u * 1024u)
+#define ARENA_START (256u * 1024u)
 
 long long orion_arena_init(long long bytes) {
     if (arena_base) free(arena_base);
     arena_cap = (size_t)bytes;
     arena_base = (unsigned char *)malloc(arena_cap);
     arena_used = 0;
+    arena_peak = 0;
     return arena_base ? 1 : 0;
 }
 
 long long orion_arena_on(void) {
-    if (!arena_base) orion_arena_init(ARENA_DEFAULT);
+    if (!arena_base) orion_arena_init(ARENA_START);
     arena_on = 1;
     return 1;
 }
@@ -71,11 +160,13 @@ long long orion_arena_active(void) { return arena_on; }
 static unsigned char *frame_base = NULL;
 static size_t frame_cap = 0;
 static size_t frame_used = 0;
+static size_t frame_high = 0;
 static int frame_on = 0;
-static int frame_warned = 0;
 static int persist_depth = 0;
+static orion_ovf *frame_ovf = NULL;
+static size_t frame_ovf_bytes = 0;
 
-#define FRAME_DEFAULT (8u * 1024u * 1024u)
+#define FRAME_START (256u * 1024u)
 
 long long orion_frame_init(long long bytes) {
     if (frame_base) free(frame_base);
@@ -86,7 +177,7 @@ long long orion_frame_init(long long bytes) {
 }
 
 long long orion_frame_on(void) {
-    if (!frame_base) orion_frame_init(FRAME_DEFAULT);
+    if (!frame_base) orion_frame_init(FRAME_START);
     frame_on = 1;
     return 1;
 }
@@ -94,14 +185,19 @@ long long orion_frame_on(void) {
 long long orion_frame_off(void) { frame_on = 0; return 1; }
 
 long long orion_frame_reset(void) {
+    size_t need = frame_used + frame_ovf_bytes;
+    ovf_drain(&frame_ovf, &frame_ovf_bytes);
     if (frame_base && frame_used > 0) {
         memset(frame_base, 0xDD, frame_used);
     }
+    region_fit("frame", &frame_base, &frame_cap, need);
     frame_used = 0;
     return 1;
 }
 
 long long orion_frame_used(void) { return (long long)frame_used; }
+long long orion_frame_high(void) { return (long long)frame_high; }
+long long orion_frame_cap(void) { return (long long)frame_cap; }
 
 long long orion_persist_on(void) { persist_depth++; return 1; }
 long long orion_persist_off(void) {
@@ -116,19 +212,23 @@ long long orion_persist_off(void) {
  * A pool overrides the persist scope while selected (the caller is
  * explicitly choosing a shorter lifetime). */
 
-#define POOL_COUNT 2
-#define POOL_DEFAULT (1u * 1024u * 1024u)
-static unsigned char *pool_base[POOL_COUNT] = {NULL, NULL};
-static size_t pool_cap[POOL_COUNT] = {0, 0};
-static size_t pool_used[POOL_COUNT] = {0, 0};
+#define POOL_COUNT 4
+#define POOL_START (128u * 1024u)
+static unsigned char *pool_base[POOL_COUNT];
+static size_t pool_cap[POOL_COUNT];
+static size_t pool_used[POOL_COUNT];
+static size_t pool_high[POOL_COUNT];
+static orion_ovf *pool_ovf[POOL_COUNT];
+static size_t pool_ovf_bytes[POOL_COUNT];
 static int pool_active = -1;
-static int pool_warned = 0;
+static const char *pool_names[POOL_COUNT] = {"pool0", "pool1", "pool2",
+                                             "pool3"};
 
 long long orion_pool_on(long long i) {
     if (i < 0 || i >= POOL_COUNT) return 0;
     if (!pool_base[i]) {
-        pool_base[i] = (unsigned char *)malloc(POOL_DEFAULT);
-        pool_cap[i] = POOL_DEFAULT;
+        pool_base[i] = (unsigned char *)malloc(POOL_START);
+        pool_cap[i] = POOL_START;
         pool_used[i] = 0;
     }
     pool_active = (int)i;
@@ -137,11 +237,27 @@ long long orion_pool_on(long long i) {
 
 long long orion_pool_off(void) { pool_active = -1; return 1; }
 
+long long orion_pool_used(long long i) {
+    if (i < 0 || i >= POOL_COUNT) return 0;
+    return (long long)pool_used[i];
+}
+long long orion_pool_high(long long i) {
+    if (i < 0 || i >= POOL_COUNT) return 0;
+    return (long long)pool_high[i];
+}
+long long orion_pool_cap(long long i) {
+    if (i < 0 || i >= POOL_COUNT) return 0;
+    return (long long)pool_cap[i];
+}
+
 long long orion_pool_reset(long long i) {
     if (i < 0 || i >= POOL_COUNT) return 0;
+    size_t need = pool_used[i] + pool_ovf_bytes[i];
+    ovf_drain(&pool_ovf[i], &pool_ovf_bytes[i]);
     if (pool_base[i] && pool_used[i] > 0) {
         memset(pool_base[i], 0xDD, pool_used[i]);
     }
+    region_fit(pool_names[i], &pool_base[i], &pool_cap[i], need);
     pool_used[i] = 0;
     return 1;
 }
@@ -156,18 +272,18 @@ void orion_arena_ptr_guard(const char *p, const char *key) {
     if (arena_base && (const unsigned char *)p >= arena_base &&
         (const unsigned char *)p < arena_base + arena_cap) {
         fprintf(stderr,
-                "[orion] FATAL: arena pointer stored in persistent slot "
-                "'%s' - it would dangle at the next arena reset\n",
-                key);
+                "%s[orion] FATAL: arena pointer stored in persistent slot "
+                "'%s' - it would dangle at the next arena reset%s\n",
+                c_red(), key, c_off());
         fflush(stderr);
         abort();
     }
     if (frame_base && (const unsigned char *)p >= frame_base &&
         (const unsigned char *)p < frame_base + frame_cap) {
         fprintf(stderr,
-                "[orion] FATAL: frame-region pointer stored in persistent "
-                "slot '%s' - wrap the write in a persist scope\n",
-                key);
+                "%s[orion] FATAL: frame-region pointer stored in persistent "
+                "slot '%s' - wrap the write in a persist scope%s\n",
+                c_red(), key, c_off());
         fflush(stderr);
         abort();
     }
@@ -186,8 +302,47 @@ long long orion_file_stamp(const char *path) {
     return (long long)st.st_mtime * 131 + (long long)st.st_size;
 #endif
 }
-long long orion_arena_reset(void) { arena_used = 0; return 1; }
+long long orion_arena_reset(void) {
+    size_t need = arena_peak + arena_ovf_bytes;
+    ovf_drain(&arena_ovf, &arena_ovf_bytes);
+    region_fit("arena", &arena_base, &arena_cap, need);
+    arena_used = 0;
+    arena_peak = 0;
+    return 1;
+}
 long long orion_arena_used(void) { return (long long)arena_used; }
+long long orion_arena_cap(void) { return (long long)arena_cap; }
+
+/* Process commit charge (what Task Manager calls private bytes) — the
+ * number the engine's own report anchors on. K32GetProcessMemoryInfo
+ * lives in kernel32 on Win7+, declared by hand to skip psapi. */
+#if defined(_WIN32)
+typedef struct {
+    unsigned long cb;
+    unsigned long PageFaultCount;
+    size_t PeakWorkingSetSize;
+    size_t WorkingSetSize;
+    size_t QuotaPeakPagedPoolUsage;
+    size_t QuotaPagedPoolUsage;
+    size_t QuotaPeakNonPagedPoolUsage;
+    size_t QuotaNonPagedPoolUsage;
+    size_t PagefileUsage;
+    size_t PeakPagefileUsage;
+} orion_pmc;
+__declspec(dllimport) void *__stdcall GetCurrentProcess(void);
+__declspec(dllimport) int __stdcall K32GetProcessMemoryInfo(void *proc,
+                                                            orion_pmc *pmc,
+                                                            unsigned long cb);
+long long orion_os_private_kb(void) {
+    orion_pmc pmc;
+    pmc.cb = sizeof(pmc);
+    if (!K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return 0;
+    return (long long)(pmc.PagefileUsage / 1024u);
+}
+#else
+long long orion_os_private_kb(void) { return 0; }
+#endif
 /* Obstack-style partial rewind — callers save a watermark, evacuate
  * their result, and free everything above it in one move. */
 long long orion_arena_rewind(long long mark) {
@@ -236,7 +391,11 @@ long long orion_arena_high(void) { return (long long)arena_high; }
 
 /* Priority: epoch arena (innermost) > selected pool (beats persist —
  * an explicit shorter lifetime) > persist scope (malloc) > frame
- * region (the frame default) > malloc (setup/tools). */
+ * region (the frame default) > malloc (setup/tools).
+ * Regions never fall through on overflow: the spill chains onto the
+ * region's overflow list (same lifetime, freed at its reset) and the
+ * reset grows the buffer — so overflow costs a slow cycle, not a
+ * leak, and does not count as persist growth. */
 void *orion_alloc(long long size) {
     alloc_total += size;
     if (pool_active >= 0 && !arena_on) {
@@ -245,46 +404,34 @@ void *orion_alloc(long long size) {
         if (pool_used[i] + need <= pool_cap[i]) {
             void *p = pool_base[i] + pool_used[i];
             pool_used[i] += need;
+            if (pool_used[i] > pool_high[i]) pool_high[i] = pool_used[i];
             return p;
         }
-        if (!pool_warned) {
-            fprintf(stderr,
-                "[orion] pool overflow - falling back to malloc\n");
-            pool_warned = 1;
-        }
-        alloc_malloc += size;
-        return malloc((size_t)size);
+        void *p = ovf_push(&pool_ovf[i], &pool_ovf_bytes[i], (size_t)size);
+        if (p) return p;
     }
     if (arena_on && arena_base) {
         size_t need = ((size_t)size + 15u) & ~(size_t)15u;
         if (arena_used + need <= arena_cap) {
             void *p = arena_base + arena_used;
             arena_used += need;
+            if (arena_used > arena_peak) arena_peak = arena_used;
             if (arena_used > arena_high) arena_high = arena_used;
             return p;
         }
-        if (!arena_warned) {
-            fprintf(stderr,
-                "[orion] arena overflow (%llu bytes cap) - falling back to "
-                "malloc; raise with orion_arena_init\n",
-                (unsigned long long)arena_cap);
-            arena_warned = 1;
-        }
+        void *p = ovf_push(&arena_ovf, &arena_ovf_bytes, (size_t)size);
+        if (p) return p;
     }
-    if (frame_on && persist_depth == 0 && frame_base) {
+    if (frame_on && persist_depth == 0 && frame_base && pool_active < 0) {
         size_t need = ((size_t)size + 15u) & ~(size_t)15u;
         if (frame_used + need <= frame_cap) {
             void *p = frame_base + frame_used;
             frame_used += need;
+            if (frame_used > frame_high) frame_high = frame_used;
             return p;
         }
-        if (!frame_warned) {
-            fprintf(stderr,
-                "[orion] frame region overflow (%llu bytes cap) - falling "
-                "back to malloc; raise with orion_frame_init\n",
-                (unsigned long long)frame_cap);
-            frame_warned = 1;
-        }
+        void *p = ovf_push(&frame_ovf, &frame_ovf_bytes, (size_t)size);
+        if (p) return p;
     }
     alloc_malloc += size;
     return malloc((size_t)size);

@@ -11,6 +11,28 @@ extern fn __os_orbit_stdlib_orbs() -> [Text]
 extern fn __os_orbit_build(path: Text) -> bool
 extern fn __os_orbit_run(path: Text, fname: Text, args: [Text]) -> bool
 extern fn __os_orbit_test(path: Text) -> int
+extern fn orion_console_color() -> int
+
+# ---------- console style (ANSI, tty-gated) ----------
+
+fn sty(code: Text, s: Text) -> Text:
+    if orion_console_color() == 1:
+        e = bytes_to_text(push([], 27))
+        "{e}[{code}m{s}{e}[0m"
+    else:
+        s
+
+fn c_dim(s: Text) -> Text:
+    sty("2", s)
+
+fn c_bold(s: Text) -> Text:
+    sty("1", s)
+
+fn c_green(s: Text) -> Text:
+    sty("32", s)
+
+fn c_red(s: Text) -> Text:
+    sty("31;1", s)
 
 # ---------- args helpers ----------
 
@@ -31,14 +53,16 @@ fn first_param() -> Text:
 # ---------- usage / die ----------
 
 fn usage():
-    eprint("orbit — Orion's project tool")
+    title = c_bold("orbit")
+    subtitle = c_dim("Orion's project tool")
+    eprint("{title}  {subtitle}")
     eprint("usage: orbit <new|add|build|run|test|fmt|native|play> ...")
-    eprint("  native [gpu|ship]          compile + link a native exe into build/")
-    eprint("  play [dev|bench|off|interp] build + run (interp = interpreter loop)")
+    eprint("  native [gpu|ship]           " + c_dim("compile + link a native exe into build/"))
+    eprint("  play [dev|bench|off|interp] " + c_dim("build + run (interp = interpreter loop)"))
     exit_with(2)
 
 fn die(message: Text):
-    eprint(message)
+    eprint(c_red(message))
     exit_with(1)
 
 # ---------- list helpers (no `contains` in stdlib yet) ----------
@@ -344,7 +368,7 @@ fn build_native(variant: Text) -> Text:
     remove_file(ll)
     if variant == "ship":
         remove_file("build/scripts_embed.c")
-    print(exe + ": ok")
+    print(c_bold(exe) + " " + c_green("ok"))
     exe
 
 fn cmd_native():

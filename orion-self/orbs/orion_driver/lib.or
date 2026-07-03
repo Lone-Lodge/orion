@@ -106,13 +106,32 @@ fn drv_resolve(name: Text, roots: [Text]) -> Text:
                 src = attempt
     src
 
+extern fn orion_console_color() -> int
+
+fn drv_sty(code: Text, s: Text) -> Text:
+    if orion_console_color() == 1:
+        e = bytes_to_text(push([], 27))
+        "{e}[{code}m{s}{e}[0m"
+    else:
+        s
+
+fn drv_dim(s: Text) -> Text:
+    drv_sty("2", s)
+
+fn drv_red(s: Text) -> Text:
+    drv_sty("31;1", s)
+
 # Discover the whole use-graph from the entry source; return the
 # combined program text (orbs in discovery order, entry last).
+# Quiet by design: one dim summary line instead of a line per orb —
+# unresolved `use` means builtin, which is the normal case, not news.
 fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
     mut queue = drv_uses_of(entry_src)
     mut loaded_names = []
     mut chunks = []
     mut qi = 0
+    mut orb_count = 0
+    mut orb_bytes = 0
     loop:
         if qi >= len(queue):
             break
@@ -123,16 +142,17 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
         loaded_names = push(loaded_names, name)
         src = drv_resolve(name, roots)
         if src == "":
-            print_line("note: `use {name}` unresolved (assuming builtin)")
             continue
-        src_bytes = len(bytes_from_text(src))
-        print_line("orb: {name} ({src_bytes} bytes)")
+        orb_count = orb_count + 1
+        orb_bytes = orb_bytes + len(bytes_from_text(src))
         chunks = push(chunks, src)
         chunks = push(chunks, "\n")
         deps = drv_uses_of(src)
         n_deps = len(deps)
         for di in 0..<n_deps:
             queue = push(queue, at(deps, di))
+    okb = orb_bytes / 1024
+    print_line(drv_dim("  orbs {orb_count} ({okb} KB)"))
     chunks = push(chunks, entry_src)
     orion_text_join(chunks)
 
@@ -171,19 +191,17 @@ pub fn driver_main() -> int:
         d_parse = t2 - t1
         d_ir = t3 - t2
         d_emit = t4 - t3
-        print_line("lex   ms: {d_lex}")
-        print_line("parse ms: {d_parse}")
-        print_line("ir    ms: {d_ir}")
-        print_line("emit  ms: {d_emit}")
+        d_total = t4 - t0
+        print_line(drv_dim("  compiled {d_total} ms (lex {d_lex} | parse {d_parse} | ir {d_ir} | emit {d_emit})"))
         n_errors = compile_errors()
         if n_errors > 0:
-            print_line("orion-self: compilation FAILED with {n_errors} error(s) — no output written")
+            print_line(drv_red("orion-self: compilation FAILED with {n_errors} error(s) — no output written"))
             0 - 1
         else:
             ok = file_write(out_path, llvm_text)
             if ok == 1:
-                print_line(out_path)
+                print_line(drv_dim("  {out_path}"))
                 0
             else:
-                print_line("write failed")
+                print_line(drv_red("write failed"))
                 0 - 1

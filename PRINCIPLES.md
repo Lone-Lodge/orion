@@ -46,13 +46,21 @@ The runtime has no garbage collector: heap memory is either freed by
 the frame arena's reset or lives until exit. That makes leaks a
 LANGUAGE-level concern, enforced by these invariants and tripwires:
 
-0. **Three lifetimes, nothing else.** Every allocation is epoch
+0. **Four lifetimes, nothing else.** Every allocation is epoch
    (render/dispatch arena), frame (the DEFAULT — dies at the
-   end-of-frame reset), or persist (an explicit orion_persist scope:
-   the world, the log, caches). The frame reset poisons its memory,
-   so a missed persist crashes deterministically on the next frame
+   end-of-frame reset), ring (a generational pool: snapshots and the
+   tick log — a generation fills one pool while the other's ages out
+   of its ring, then the reclaimed pool resets), or persist (an
+   explicit orion_persist scope: the world, caches). Resets poison
+   their memory, so a missed persist crashes deterministically
    instead of leaking. Any new world-writing API must be a persist
-   scope.
+   scope; anything a consumer retains out of a ring value must be
+   evacuated (orion_persist_text). Region SIZES are the runtime's
+   job, not a config knob: regions start small and re-size at reset
+   (the only moment they are empty by definition); mid-cycle
+   overflow chains onto the region and is freed at that same reset —
+   spill costs one slow cycle, never a leak. The engine converges to
+   what each game actually needs.
 1. **Idle frames allocate zero bytes.** Enforced: atlas
    `app_idle_alloc_check` warns after ~2s of steady idle drip; the
    dev title shows live persist-growth KB/s next to fps. If KB/s
@@ -61,8 +69,12 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
    malloc and copies keys on insert; the emitted slot-store path
    calls `orion_arena_ptr_guard`, which warns whenever a pointer that
    lives inside the arena is stored persistently (it would dangle at
-   the next reset). Cache trees are built with the arena forced off
-   (astra `compile()` guard).
+   the next reset). Compilers run INSIDE an epoch and EVACUATE: astra
+   `compile()` parses in the arena and deep-copies only the live tree
+   to persist (ast_copy_* — every new AST variant needs its copy arm;
+   a missed one is a deterministic poison crash on first dispatch).
+   Persisting the whole compile cost 6.4MB for 10KB of scripts; the
+   evacuated tree is ~190KB.
 3. **Per-frame transients live in the arena.** Render packs, query
    effects, display lists — open an epoch, consume, reset. Anything
    escaping an epoch must be evacuated (`outcome_copy`) first.
@@ -76,9 +88,11 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
    owned accumulators (fresh `[]`, no live alias, rebound every call)
    opt into `push_mut(x, v)` explicitly; the audit note lives at the
    call site.
-6. **Steady-state polls must be stat-only.** Hot-reload checks use
-   `orion_file_stamp` (mtime+size); file contents are read only when
-   a stamp moves.
+6. **Steady-state polls must be stat-only AND transient.** Hot-reload
+   checks use `orion_file_stamp` (mtime+size); file contents are read
+   only when a stamp moves. Never wrap a poll in a persist scope —
+   persist the WRITE (the swap, the cache insert), not the probe. An
+   over-wide persist scope is the one leak the poison can't catch.
 
 ### Anti-goals
 

@@ -175,6 +175,8 @@ fn find_fn_return_type(module: IRModule, fn_name: Text) -> Text:
         result = "i64"
     if fn_name == "orion_struct_field_text":
         result = "text"
+    if fn_name == "orion_persist_text":
+        result = "text"
     for index in 0..<n:
         f = at(module.functions, index)
         if f.name == fn_name:
@@ -983,6 +985,14 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @orion_arena_rewind(i64)\n"
     text = "{text}declare i64 @orion_arena_high()\n"
     text = "{text}declare i64 @orion_alloc_total()\n"
+    text = "{text}declare i64 @orion_arena_cap()\n"
+    text = "{text}declare i64 @orion_frame_high()\n"
+    text = "{text}declare i64 @orion_frame_cap()\n"
+    text = "{text}declare i64 @orion_pool_used(i64)\n"
+    text = "{text}declare i64 @orion_pool_high(i64)\n"
+    text = "{text}declare i64 @orion_pool_cap(i64)\n"
+    text = "{text}declare i64 @orion_os_private_kb()\n"
+    text = "{text}declare i64 @orion_console_color()\n"
     text = "{text}declare i64 @orion_alloc_malloc_total()\n"
     text = "{text}declare i64 @orion_embedded_has(ptr)\n"
     text = "{text}declare ptr @orion_embedded_text(ptr)\n"

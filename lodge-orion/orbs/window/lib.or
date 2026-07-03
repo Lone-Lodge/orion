@@ -21,11 +21,11 @@ pub fn window_should_close() -> bool:
 # LAST position in slots — same contract as the native window orb (an
 # Event per motion frame is permanent heap under the native runtime).
 pub fn window_pump() -> [Event]:
-    raw = __os_window_pump()
-    n = len(raw)
+    pumped = __os_window_pump()
+    n = len(pumped)
     mut events = []
     for i in 0..<n:
-        ev = event_at(raw, i)
+        ev = event_at(pumped, i)
         if ev.kind == "mouse_move":
             slot_set("atlas_native:mouse_x", to_int(ev.x))
             slot_set("atlas_native:mouse_y", to_int(ev.y))

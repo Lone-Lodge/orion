@@ -207,9 +207,78 @@ impl<'a> Interp<'a> {
             // assets) are no-ops here — shared orbs declare them and must
             // run unchanged. embedded_has = 0 keeps games on the file path,
             // so embedded_text is never reached.
+            // Identity under the interpreter: no pools to evacuate from.
+            if name == "orion_persist_text" {
+                return Ok(args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(Value::Text(String::new())));
+            }
+            // Terminal capability: styled output only when stdout is
+            // an interactive console (redirected logs stay plain).
+            // First hit also flips conhost into VT + UTF-8 mode.
+            if name == "orion_console_color" {
+                use std::io::IsTerminal;
+                if !std::io::stdout().is_terminal() {
+                    return Ok(Value::Int(0));
+                }
+                #[cfg(windows)]
+                unsafe {
+                    unsafe extern "system" {
+                        fn GetStdHandle(which: u32) -> *mut std::ffi::c_void;
+                        fn GetConsoleMode(h: *mut std::ffi::c_void, m: *mut u32) -> i32;
+                        fn SetConsoleMode(h: *mut std::ffi::c_void, m: u32) -> i32;
+                        fn SetConsoleOutputCP(cp: u32) -> i32;
+                    }
+                    let h = GetStdHandle(-11i32 as u32);
+                    let mut mode: u32 = 0;
+                    if !h.is_null() && GetConsoleMode(h, &mut mode) != 0 {
+                        SetConsoleMode(h, mode | 0x0004);
+                        SetConsoleOutputCP(65001);
+                    }
+                }
+                return Ok(Value::Int(1));
+            }
+            // Real commit charge even under the interpreter — the mem
+            // report should never lie about the process.
+            if name == "orion_os_private_kb" {
+                #[cfg(windows)]
+                {
+                    #[repr(C)]
+                    struct Pmc {
+                        cb: u32,
+                        page_fault_count: u32,
+                        peak_ws: usize,
+                        ws: usize,
+                        qppu: usize,
+                        qpu: usize,
+                        qpnpu: usize,
+                        qnpu: usize,
+                        pagefile: usize,
+                        peak_pagefile: usize,
+                    }
+                    unsafe extern "system" {
+                        fn GetCurrentProcess() -> *mut std::ffi::c_void;
+                        fn K32GetProcessMemoryInfo(
+                            h: *mut std::ffi::c_void,
+                            pmc: *mut Pmc,
+                            cb: u32,
+                        ) -> i32;
+                    }
+                    unsafe {
+                        let mut pmc: Pmc = std::mem::zeroed();
+                        pmc.cb = std::mem::size_of::<Pmc>() as u32;
+                        if K32GetProcessMemoryInfo(GetCurrentProcess(), &mut pmc, pmc.cb) != 0 {
+                            return Ok(Value::Int((pmc.pagefile / 1024) as i64));
+                        }
+                    }
+                }
+                return Ok(Value::Int(0));
+            }
             if name.starts_with("orion_arena_")
                 || name.starts_with("orion_frame_")
                 || name.starts_with("orion_persist_")
+                || name.starts_with("orion_pool_")
             {
                 return Ok(Value::Int(1));
             }
