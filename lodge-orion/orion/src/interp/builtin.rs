@@ -13,6 +13,11 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     // three simply delegate to `get`.
     ("get_int", 2), ("get_map", 2), ("get_list", 2),
     ("set", 3), ("at", 2), ("push", 2), ("slice", 3),
+    // Explicit in-place push (native); interp delegates to copying push.
+    ("push_mut", 2),
+    // Struct field by declaration index (native: raw slot; interp: nth
+    // insertion-ordered pair).
+    ("struct_field_int", 2), ("struct_field_text", 2),
     // numeric conversion
     ("to_int", 1), ("to_float", 1),
     // runtime type introspection
@@ -498,16 +503,17 @@ fn map_keys(args: &[Value]) -> Result<Value, RunError> {
 }
 
 fn struct_field(args: &[Value]) -> Result<Value, RunError> {
-    let Value::Map(pairs) = &args[0] else {
-        return Err(run_err(format!("struct_field expects a struct, got {:?}", args[0])));
-    };
     let Value::Int(i) = &args[1] else {
         return Err(run_err("struct_field expects an int index".to_string()));
     };
-    pairs
-        .get(*i as usize)
-        .map(|(_, v)| v.clone())
-        .ok_or_else(|| run_err(format!("struct_field index {i} out of range")))
+    let field = match &args[0] {
+        Value::Data { fields, .. } => fields.get(*i as usize).map(|(_, v)| v.clone()),
+        Value::Map(pairs) => pairs.get(*i as usize).map(|(_, v)| v.clone()),
+        other => {
+            return Err(run_err(format!("struct_field expects a struct, got {other:?}")));
+        }
+    };
+    field.ok_or_else(|| run_err(format!("struct_field index {i} out of range")))
 }
 
 fn map_values(args: &[Value]) -> Result<Value, RunError> {

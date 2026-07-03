@@ -66,11 +66,25 @@ impl Cx {
                 }
                 Ty::Bool
             }
-            "get_or" | "get" | "set" | "at" | "push" | "slice" => {
+            "get_or" | "get" | "set" | "at" | "push" | "push_mut" | "slice" => {
                 for a in args {
                     self.infer(a, scope)?;
                 }
                 Ty::Unknown
+            }
+            // Struct field by declaration index — native reads raw slots,
+            // the interp reads the nth insertion-ordered pair.
+            "struct_field_int" => {
+                for a in args {
+                    self.infer(a, scope)?;
+                }
+                Ty::Int
+            }
+            "struct_field_text" => {
+                for a in args {
+                    self.infer(a, scope)?;
+                }
+                Ty::Text
             }
             "vec_add" | "vec_sub" | "vec_mul" => {
                 for a in args {
