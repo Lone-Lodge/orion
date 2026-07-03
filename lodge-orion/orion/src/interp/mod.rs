@@ -296,6 +296,28 @@ impl<'a> Interp<'a> {
                 }
                 return Ok(Value::Text(names.join("\n")));
             }
+            // Non-blocking console line for the dev console: a reader
+            // thread feeds a channel; try_recv per poll, "" when idle.
+            if name == "orion_console_readline" {
+                use std::sync::mpsc::{channel, Receiver};
+                use std::sync::{Mutex, OnceLock};
+                static RX: OnceLock<Mutex<Receiver<String>>> = OnceLock::new();
+                let rx = RX.get_or_init(|| {
+                    let (tx, rx) = channel();
+                    std::thread::spawn(move || {
+                        use std::io::BufRead;
+                        let stdin = std::io::stdin();
+                        for line in stdin.lock().lines().map_while(Result::ok) {
+                            if tx.send(line).is_err() {
+                                break;
+                            }
+                        }
+                    });
+                    Mutex::new(rx)
+                });
+                let line = rx.lock().unwrap().try_recv().unwrap_or_default();
+                return Ok(Value::Text(line));
+            }
             if name == "orion_dir_subdirs" {
                 let Some(Value::Text(dir)) = args.first() else {
                     return Ok(Value::Text(String::new()));

@@ -537,6 +537,61 @@ static void orion_crash_filter_install(void) {
 /* Newline-joined file names in `dir` (no paths, no subdirs). Empty
  * text when the directory is missing — callers fall back to the
  * embedded asset list in ship builds. */
+/* Non-blocking console line: returns a COMPLETE line once, else "".
+ * Polled once per frame by the dev console. Interactive terminals
+ * accumulate keystrokes (echoed, backspace handled) via _kbhit;
+ * redirected stdin (an agent driving a running game through a pipe)
+ * drains available bytes via PeekNamedPipe. Zero alloc when idle. */
+#include <conio.h>
+const char *orion_console_readline(void) {
+    static char buf[512];
+    static size_t blen = 0;
+    static char out[512];
+    if (_isatty(_fileno(stdin))) {
+        while (_kbhit()) {
+            int c = _getch();
+            if (c == '\r' || c == '\n') {
+                putchar('\n');
+                buf[blen] = 0;
+                memcpy(out, buf, blen + 1);
+                blen = 0;
+                if (out[0] != 0) return out;
+                continue;
+            }
+            if (c == 8) {
+                if (blen > 0) {
+                    blen--;
+                    printf("\b \b");
+                }
+                continue;
+            }
+            if (c >= 32 && c < 127 && blen < 511) {
+                buf[blen++] = (char)c;
+                putchar(c);
+            }
+        }
+        return "";
+    }
+    HANDLE h = GetStdHandle((DWORD)-10); /* STD_INPUT_HANDLE */
+    DWORD avail = 0;
+    if (!PeekNamedPipe(h, NULL, 0, NULL, &avail, NULL)) return "";
+    while (avail > 0 && blen < 511) {
+        char c;
+        DWORD rd = 0;
+        if (!ReadFile(h, &c, 1, &rd, NULL) || rd == 0) break;
+        avail--;
+        if (c == '\n') {
+            buf[blen] = 0;
+            memcpy(out, buf, blen + 1);
+            blen = 0;
+            if (out[0] != 0) return out;
+            continue;
+        }
+        if (c != '\r') buf[blen++] = c;
+    }
+    return "";
+}
+
 /* Newline-joined SUBDIRECTORY names in `dir` (no . / .., one level).
  * Feature-grouped script dirs are discovered with this. */
 const char *orion_dir_subdirs(const char *dir) {
