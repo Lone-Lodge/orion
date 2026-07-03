@@ -374,6 +374,9 @@ fn build_native(variant: Text) -> Text:
     link_args = push(link_args, exe)
     link_args = push(link_args, "-luser32")
     link_args = push(link_args, "-lgdi32")
+    # Always emit the link map: the runtime's crash filter prints
+    # module-relative offsets, and this is what resolves them.
+    link_args = push(link_args, "-Wl,/MAP:build/" + name + ".map")
     if variant == "gpu":
         link_args = push(link_args, "-ld3d12")
         link_args = push(link_args, "-ldxgi")

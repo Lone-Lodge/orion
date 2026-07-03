@@ -353,9 +353,15 @@ long long orion_arena_rewind(long long mark) {
 /* Unbuffered stdout so prints survive crashes and kills. MSVCRT treats
  * _IOLBF as full buffering, so _IONBF is the only honest option; game
  * print volume is low enough that it costs nothing. */
+#if defined(_WIN32)
+static void orion_crash_filter_install(void);
+#endif
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((constructor)) static void orion_stdio_init(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
+#if defined(_WIN32)
+    orion_crash_filter_install();
+#endif
 }
 #endif
 
@@ -506,6 +512,27 @@ void __orion_resume_text(char *value) {
  * port to POSIX (clock_gettime + nanosleep) is a few extra ifdefs. */
 #ifdef _WIN32
 #include <windows.h>
+
+/* Crash forensics: on an unhandled fault, print the exception code
+ * and the MODULE-RELATIVE offset (symbolizable against the link map
+ * orbit emits next to the exe) before dying. Fail fast, but say
+ * where. */
+static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
+    unsigned long long base = (unsigned long long)GetModuleHandleA(NULL);
+    unsigned long long at =
+        (unsigned long long)info->ExceptionRecord->ExceptionAddress;
+    fprintf(stderr,
+            "%s[orion] FATAL: exception 0x%lx at module+0x%llx - look the "
+            "offset up in build/<name>.map%s\n",
+            c_red(), (unsigned long)info->ExceptionRecord->ExceptionCode,
+            at - base, c_off());
+    fflush(stderr);
+    return EXCEPTION_CONTINUE_SEARCH; /* still crash, still WER */
+}
+
+static void orion_crash_filter_install(void) {
+    SetUnhandledExceptionFilter(orion_crash_filter);
+}
 
 /* Newline-joined file names in `dir` (no paths, no subdirs). Empty
  * text when the directory is missing — callers fall back to the
