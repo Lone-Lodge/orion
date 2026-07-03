@@ -325,6 +325,20 @@ fn nb_ship_files(name: Text) -> Text:
             joined = joined + ",scripts/" + file
     joined
 
+# ZERO-GLUE: a game is scripts/ + a toml. When src/main.or is absent,
+# orbit synthesizes the entry (project_run with the package name as
+# config + prefix). An existing src/main.or wins — custom host glue
+# is an opt-in escape hatch, not a requirement.
+fn entry_path(name: Text) -> Text:
+    if file_exists("src/main.or"):
+        "src/main.or"
+    else:
+        q = bytes_to_text(push([], 34))
+        src = "use atlas_project\n\nfn main() -> int:\n    project_run(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")\n"
+        mkdir_all("target")
+        write_file("target/main_gen.or", src)
+        "target/main_gen.or"
+
 fn build_native(variant: Text) -> Text:
     if not file_exists("Orbit.toml"):
         die("orbit: no Orbit.toml in this directory")
@@ -338,7 +352,7 @@ fn build_native(variant: Text) -> Text:
     suffix = if variant == "" then "" else "_" + variant
     exe = "build/" + name + suffix + ".exe"
     ll = "build/" + name + ".ll"
-    mut compile_args = ["src/main.or", ll]
+    mut compile_args = [entry_path(name), ll]
     dirs = nb_orb_dirs(lines)
     dir_total = len(dirs)
     for d_index in 0..<dir_total:
@@ -388,7 +402,9 @@ fn cmd_play():
         play_native(mode)
 
 fn play_interp():
-    if not __os_orbit_run("src/main.or", "main", []):
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    if not __os_orbit_run(entry_path(name), "main", []):
         exit_with(1)
 
 fn play_native(mode: Text):
