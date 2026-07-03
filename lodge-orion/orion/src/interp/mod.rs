@@ -296,6 +296,21 @@ impl<'a> Interp<'a> {
                 }
                 return Ok(Value::Text(names.join("\n")));
             }
+            if name == "orion_dir_subdirs" {
+                let Some(Value::Text(dir)) = args.first() else {
+                    return Ok(Value::Text(String::new()));
+                };
+                let mut names: Vec<String> = Vec::new();
+                if let Ok(rd) = std::fs::read_dir(dir.as_str()) {
+                    for e in rd.flatten() {
+                        let fname = e.file_name().to_string_lossy().into_owned();
+                        if e.path().is_dir() && !fname.starts_with('.') {
+                            names.push(fname);
+                        }
+                    }
+                }
+                return Ok(Value::Text(names.join("\n")));
+            }
             if name == "orion_embedded_list" {
                 return Ok(Value::Text(String::new()));
             }

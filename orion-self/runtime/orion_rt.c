@@ -537,6 +537,33 @@ static void orion_crash_filter_install(void) {
 /* Newline-joined file names in `dir` (no paths, no subdirs). Empty
  * text when the directory is missing — callers fall back to the
  * embedded asset list in ship builds. */
+/* Newline-joined SUBDIRECTORY names in `dir` (no . / .., one level).
+ * Feature-grouped script dirs are discovered with this. */
+const char *orion_dir_subdirs(const char *dir) {
+    char pattern[1024];
+    WIN32_FIND_DATAA fd;
+    snprintf(pattern, sizeof(pattern), "%s\\*", dir);
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return "";
+    size_t cap = 1024, len = 0;
+    char *out = (char *)malloc(cap);
+    out[0] = 0;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
+        if (fd.cFileName[0] == '.') continue;
+        size_t n = strlen(fd.cFileName);
+        if (len + n + 2 > cap) {
+            cap *= 2;
+            out = (char *)realloc(out, cap);
+        }
+        if (len > 0) out[len++] = '\n';
+        memcpy(out + len, fd.cFileName, n + 1);
+        len += n;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return out;
+}
+
 const char *orion_dir_list(const char *dir) {
     char pattern[1024];
     WIN32_FIND_DATAA fd;
