@@ -60,17 +60,19 @@ long long orion_arena_active(void) { return arena_on; }
 /* Lifetime tripwire: a pointer that lies inside the arena buffer is
  * arena-born and dies at the next reset — storing it in a persistent
  * structure is always a latent use-after-reset. Emitted slot-store
- * code calls this for every pointer value; costs two compares. */
+ * code calls this for every pointer value; costs two compares.
+ * Fail fast: the store is already corrupt the moment this fires, and
+ * the alternative is a wandering strcmp crash minutes later. */
 void orion_arena_ptr_guard(const char *p, const char *key) {
-    static int warned = 0;
-    if (!arena_base || warned >= 16) return;
+    if (!arena_base) return;
     if ((const unsigned char *)p >= arena_base &&
         (const unsigned char *)p < arena_base + arena_cap) {
         fprintf(stderr,
-                "[orion] WARNING: arena pointer stored in persistent slot "
-                "'%s' - it dangles at the next arena reset\n",
+                "[orion] FATAL: arena pointer stored in persistent slot "
+                "'%s' - it would dangle at the next arena reset\n",
                 key);
-        warned++;
+        fflush(stderr);
+        abort();
     }
 }
 
