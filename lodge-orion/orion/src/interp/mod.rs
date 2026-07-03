@@ -207,7 +207,10 @@ impl<'a> Interp<'a> {
             // assets) are no-ops here — shared orbs declare them and must
             // run unchanged. embedded_has = 0 keeps games on the file path,
             // so embedded_text is never reached.
-            if name.starts_with("orion_arena_") {
+            if name.starts_with("orion_arena_")
+                || name.starts_with("orion_frame_")
+                || name.starts_with("orion_persist_")
+            {
                 return Ok(Value::Int(1));
             }
             if name == "orion_dir_list" {

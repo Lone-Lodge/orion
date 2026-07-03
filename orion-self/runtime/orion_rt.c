@@ -57,6 +57,58 @@ long long orion_arena_on(void) {
 long long orion_arena_off(void) { arena_on = 0; return 1; }
 long long orion_arena_active(void) { return arena_on; }
 
+/* ---- Frame region: allocations die at end of frame by DEFAULT -------
+ * Three lifetimes, nothing else:
+ *   epoch   — the bump arena above (render/dispatch), nests innermost
+ *   frame   — this region: on for the whole game frame, reset at its
+ *             end; the default for everything the frame allocates
+ *   persist — orion_persist_on/off scopes route to malloc: the world,
+ *             the log, caches — anything that must outlive the frame
+ * A missed persist is not a slow leak: the reset POISONS the used
+ * range, so a use-after-frame read crashes deterministically on the
+ * next frame in every build. */
+
+static unsigned char *frame_base = NULL;
+static size_t frame_cap = 0;
+static size_t frame_used = 0;
+static int frame_on = 0;
+static int frame_warned = 0;
+static int persist_depth = 0;
+
+#define FRAME_DEFAULT (8u * 1024u * 1024u)
+
+long long orion_frame_init(long long bytes) {
+    if (frame_base) free(frame_base);
+    frame_cap = (size_t)bytes;
+    frame_base = (unsigned char *)malloc(frame_cap);
+    frame_used = 0;
+    return frame_base ? 1 : 0;
+}
+
+long long orion_frame_on(void) {
+    if (!frame_base) orion_frame_init(FRAME_DEFAULT);
+    frame_on = 1;
+    return 1;
+}
+
+long long orion_frame_off(void) { frame_on = 0; return 1; }
+
+long long orion_frame_reset(void) {
+    if (frame_base && frame_used > 0) {
+        memset(frame_base, 0xDD, frame_used);
+    }
+    frame_used = 0;
+    return 1;
+}
+
+long long orion_frame_used(void) { return (long long)frame_used; }
+
+long long orion_persist_on(void) { persist_depth++; return 1; }
+long long orion_persist_off(void) {
+    if (persist_depth > 0) persist_depth--;
+    return 1;
+}
+
 /* Lifetime tripwire: a pointer that lies inside the arena buffer is
  * arena-born and dies at the next reset — storing it in a persistent
  * structure is always a latent use-after-reset. Emitted slot-store
@@ -64,12 +116,20 @@ long long orion_arena_active(void) { return arena_on; }
  * Fail fast: the store is already corrupt the moment this fires, and
  * the alternative is a wandering strcmp crash minutes later. */
 void orion_arena_ptr_guard(const char *p, const char *key) {
-    if (!arena_base) return;
-    if ((const unsigned char *)p >= arena_base &&
+    if (arena_base && (const unsigned char *)p >= arena_base &&
         (const unsigned char *)p < arena_base + arena_cap) {
         fprintf(stderr,
                 "[orion] FATAL: arena pointer stored in persistent slot "
                 "'%s' - it would dangle at the next arena reset\n",
+                key);
+        fflush(stderr);
+        abort();
+    }
+    if (frame_base && (const unsigned char *)p >= frame_base &&
+        (const unsigned char *)p < frame_base + frame_cap) {
+        fprintf(stderr,
+                "[orion] FATAL: frame-region pointer stored in persistent "
+                "slot '%s' - wrap the write in a persist scope\n",
                 key);
         fflush(stderr);
         abort();
@@ -137,6 +197,8 @@ long long orion_alloc_malloc_total(void) { return alloc_malloc; }
 static size_t arena_high = 0;
 long long orion_arena_high(void) { return (long long)arena_high; }
 
+/* Priority: epoch arena (innermost) > persist scope (malloc) >
+ * frame region (the frame default) > malloc (setup/tools). */
 void *orion_alloc(long long size) {
     alloc_total += size;
     if (arena_on && arena_base) {
@@ -153,6 +215,21 @@ void *orion_alloc(long long size) {
                 "malloc; raise with orion_arena_init\n",
                 (unsigned long long)arena_cap);
             arena_warned = 1;
+        }
+    }
+    if (frame_on && persist_depth == 0 && frame_base) {
+        size_t need = ((size_t)size + 15u) & ~(size_t)15u;
+        if (frame_used + need <= frame_cap) {
+            void *p = frame_base + frame_used;
+            frame_used += need;
+            return p;
+        }
+        if (!frame_warned) {
+            fprintf(stderr,
+                "[orion] frame region overflow (%llu bytes cap) - falling "
+                "back to malloc; raise with orion_frame_init\n",
+                (unsigned long long)frame_cap);
+            frame_warned = 1;
         }
     }
     alloc_malloc += size;
