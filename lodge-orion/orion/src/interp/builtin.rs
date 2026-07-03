@@ -18,6 +18,9 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     // Struct field by declaration index (native: raw slot; interp: nth
     // insertion-ordered pair).
     ("struct_field_int", 2), ("struct_field_text", 2),
+    // Remove a key from a map, returning the map (native: in-place
+    // swap-remove; interp: copy-on-write retain).
+    ("map_remove", 2),
     // numeric conversion
     ("to_int", 1), ("to_float", 1),
     // runtime type introspection
@@ -137,6 +140,7 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         // ordered maps, so the nth pair is the nth field.
         "struct_field_int" => struct_field(&args),
         "struct_field_text" => struct_field(&args),
+        "map_remove" => map_remove(args),
         "slice" => slice(&args),
         "sin" => float1(&args, f64::sin, "sin"),
         "cos" => float1(&args, f64::cos, "cos"),
@@ -578,6 +582,19 @@ fn has(args: &[Value]) -> Result<Value, RunError> {
         return Err(run_err(format!("has expects a map, got {:?}", args[0])));
     };
     Ok(Value::Bool(pairs.iter().any(|(k, _)| values_equal(k, &args[1]))))
+}
+
+fn map_remove(mut args: Vec<Value>) -> Result<Value, RunError> {
+    let key = args.pop().unwrap();
+    let target = args.pop().unwrap();
+    match target {
+        Value::Map(mut pairs_arc) => {
+            let pairs = std::sync::Arc::make_mut(&mut pairs_arc);
+            pairs.retain(|(k, _)| !values_equal(k, &key));
+            Ok(Value::Map(pairs_arc))
+        }
+        other => Err(run_err(format!("map_remove expects a map, got {other:?}"))),
+    }
 }
 
 fn set(mut args: Vec<Value>) -> Result<Value, RunError> {

@@ -350,6 +350,9 @@ pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
 pub fn ir_map_set_val(map_id: int, key_id: int, val_id: int) -> Inst:
     Inst{op: "map_set_val", type_text: "map", value: map_id, lhs: key_id, rhs: val_id, name: "", args: []}
 
+pub fn ir_map_remove(map_id: int, key_id: int) -> Inst:
+    Inst{op: "map_remove", type_text: "map", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
+
 # set(list, index, val) — in-place store, re-yields the list.
 pub fn ir_list_set_val(list_id: int, idx_id: int, val_id: int, list_type: Text) -> Inst:
     Inst{op: "list_set_val", type_text: list_type, value: list_id, lhs: idx_id, rhs: val_id, name: "", args: []}

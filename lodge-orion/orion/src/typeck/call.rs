@@ -66,7 +66,7 @@ impl Cx {
                 }
                 Ty::Bool
             }
-            "get_or" | "get" | "set" | "at" | "push" | "push_mut" | "slice" => {
+            "get_or" | "get" | "set" | "at" | "push" | "push_mut" | "slice" | "map_remove" => {
                 for a in args {
                     self.infer(a, scope)?;
                 }

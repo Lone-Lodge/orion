@@ -1052,6 +1052,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_push_mut = callee == "push_mut"
     is_struct_field_int = callee == "struct_field_int"
     is_struct_field_text = callee == "struct_field_text"
+    is_map_remove = callee == "map_remove"
     is_set_call = callee == "set"
     is_map_keys = callee == "map_keys"
     is_map_values = callee == "map_values"
@@ -1217,6 +1218,13 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
         pr = ir_fn_push(b_r.function, ir_call("orion_struct_field_text", [a_r.id, b_r.id], "text"))
         result = ConvResult{function: pr.function, scope: b_r.scope, id: pr.id}
+    if is_map_remove:
+        # In-place swap-remove keyed by text or int (family picked at
+        # emit from the key's shape). Yields the map back.
+        m_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        k_r = ast_expr_to_ir(m_r.function, m_r.scope, at(args, 1))
+        pr = ir_fn_push(k_r.function, ir_map_remove(m_r.id, k_r.id))
+        result = ConvResult{function: pr.function, scope: k_r.scope, id: pr.id}
     if is_vec_add:
         a_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
@@ -1374,7 +1382,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume_int == false) and (is_resume_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
     if is_resume_int:
         arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         pr = ir_fn_push(arg_r.function, ir_call("__orion_resume_int", [arg_r.id], "void"))
