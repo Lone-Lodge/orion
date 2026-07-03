@@ -8,7 +8,23 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     ("max", 2), ("min", 2), ("abs", 1), ("sqrt", 1), ("print", 1),
     ("floor", 1), ("ceil", 1), ("round", 1), ("pow", 2), ("clamp", 3),
     ("sign", 1), ("len", 1), ("get_or", 3), ("get", 2), ("has", 2),
+    // Typed map-get aliases used by orion-self typechecker to pin element
+    // types where inference can't. Runtime is dynamically typed so all
+    // three simply delegate to `get`.
+    ("get_int", 2), ("get_map", 2), ("get_list", 2),
     ("set", 3), ("at", 2), ("push", 2), ("slice", 3),
+    // Explicit in-place push (native); interp delegates to copying push.
+    ("push_mut", 2),
+    // Struct field by declaration index (native: raw slot; interp: nth
+    // insertion-ordered pair).
+    ("struct_field_int", 2), ("struct_field_text", 2),
+    // Remove a key from a map, returning the map (native: in-place
+    // swap-remove; interp: copy-on-write retain).
+    ("map_remove", 2),
+    // Process args. orbit run does not forward game args, so the interp
+    // reports none — mode overrides are a native-exe affair; the interp
+    // dev loop reads the project config.
+    ("argc", 0), ("argv", 1),
     // numeric conversion
     ("to_int", 1), ("to_float", 1),
     // runtime type introspection
@@ -19,6 +35,14 @@ pub(crate) const BUILTINS: &[(&str, usize)] = &[
     // `slot_set`. Used by stateful orbs (random/uuid/log) to keep their state
     // without escaping to Rust.
     ("slot_get", 1), ("slot_set", 2),
+    // Typed slot probes — replace `type_of(slot_get(k))`-style dynamic
+    // probing with a pair that works identically native (orion-self
+    // emits orion_slot_has/orion_slot_get_int) and interpreted.
+    ("slot_has", 1), ("slot_get_int", 1),
+    // Native frame-arena hooks — interp no-ops so shared orbs run unchanged.
+    ("orion_arena_on", 0), ("orion_arena_off", 0), ("orion_arena_reset", 0),
+    ("orion_arena_rewind", 1), ("orion_arena_used", 0),
+    ("orion_alloc_total", 0),
     // O(1) amortized append directly into a slot-stored List — avoids the
     // `slot_set(name, push(slot_get(name), v))` quadratic blow-up when the
     // list grows long (codegen buffers, byte streams, etc.).
@@ -79,15 +103,50 @@ pub(crate) fn builtin(name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         "map_values" => map_values(&args),
         "slot_get" => slot_get(&args),
         "slot_set" => slot_set(&args),
+        "slot_has" => {
+            let Value::Text(name) = &args[0] else {
+                return Err(run_err(format!("slot_has expects a Text name, got {:?}", args[0])));
+            };
+            let has = SLOTS.with(|cells| cells.borrow().contains_key(name.as_str()));
+            Ok(Value::Bool(has))
+        }
+        "slot_get_int" => {
+            let Value::Text(name) = &args[0] else {
+                return Err(run_err(format!("slot_get_int expects a Text name, got {:?}", args[0])));
+            };
+            let v = SLOTS.with(|cells| match cells.borrow().get(name.as_str()) {
+                Some(Value::Int(n)) => *n,
+                _ => 0,
+            });
+            Ok(Value::Int(v))
+        }
         "slot_push" => slot_push(&args),
         "slot_set_at" => slot_set_at(&args),
+        // Native frame-arena hooks — no-ops here (the interpreter GCs via Rc).
+        "orion_arena_on" | "orion_arena_off" | "orion_arena_reset" | "orion_arena_rewind" => Ok(Value::Int(1)),
+        "orion_alloc_total" | "orion_arena_used" => Ok(Value::Int(0)),
         "eprint" => eprint(&args),
         "get_or" => get_or(&args),
         "get" => get(&args),
+        "get_int" => get(&args),
+        "get_map" => get(&args),
+        "get_list" => get(&args),
         "has" => has(&args),
         "set" => set(args),
         "at" => at(&args),
         "push" => push(args),
+        // Explicit in-place push under the native compiler; the interp's
+        // copying push is a valid (slower) implementation of the same
+        // semantics.
+        "push_mut" => push(args),
+        // Struct field by declaration index. Natively a struct is raw
+        // slots in decl order; here struct instances are insertion-
+        // ordered maps, so the nth pair is the nth field.
+        "struct_field_int" => struct_field(&args),
+        "struct_field_text" => struct_field(&args),
+        "map_remove" => map_remove(args),
+        "argc" => Ok(Value::Int(1)),
+        "argv" => Ok(Value::Text(String::new())),
         "slice" => slice(&args),
         "sin" => float1(&args, f64::sin, "sin"),
         "cos" => float1(&args, f64::cos, "cos"),
@@ -453,6 +512,20 @@ fn map_keys(args: &[Value]) -> Result<Value, RunError> {
     Ok(Value::List(std::sync::Arc::new(pairs.iter().map(|(k, _)| k.clone()).collect())))
 }
 
+fn struct_field(args: &[Value]) -> Result<Value, RunError> {
+    let Value::Int(i) = &args[1] else {
+        return Err(run_err("struct_field expects an int index".to_string()));
+    };
+    let field = match &args[0] {
+        Value::Data { fields, .. } => fields.get(*i as usize).map(|(_, v)| v.clone()),
+        Value::Map(pairs) => pairs.get(*i as usize).map(|(_, v)| v.clone()),
+        other => {
+            return Err(run_err(format!("struct_field expects a struct, got {other:?}")));
+        }
+    };
+    field.ok_or_else(|| run_err(format!("struct_field index {i} out of range")))
+}
+
 fn map_values(args: &[Value]) -> Result<Value, RunError> {
     let Value::Map(pairs) = &args[0] else {
         return Err(run_err(format!("map_values expects a map, got {:?}", args[0])));
@@ -515,6 +588,19 @@ fn has(args: &[Value]) -> Result<Value, RunError> {
         return Err(run_err(format!("has expects a map, got {:?}", args[0])));
     };
     Ok(Value::Bool(pairs.iter().any(|(k, _)| values_equal(k, &args[1]))))
+}
+
+fn map_remove(mut args: Vec<Value>) -> Result<Value, RunError> {
+    let key = args.pop().unwrap();
+    let target = args.pop().unwrap();
+    match target {
+        Value::Map(mut pairs_arc) => {
+            let pairs = std::sync::Arc::make_mut(&mut pairs_arc);
+            pairs.retain(|(k, _)| !values_equal(k, &key));
+            Ok(Value::Map(pairs_arc))
+        }
+        other => Err(run_err(format!("map_remove expects a map, got {other:?}"))),
+    }
 }
 
 fn set(mut args: Vec<Value>) -> Result<Value, RunError> {

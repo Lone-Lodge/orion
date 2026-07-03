@@ -1,14 +1,24 @@
 # string — text manipulation, pure Orion on top of `bytes`.
-# `str_upper` / `str_lower` stay native — Unicode case folding needs tables.
-
-extern fn __os_str_upper(text: Text) -> Text
-extern fn __os_str_lower(text: Text) -> Text
+# `str_upper` / `str_lower` are ASCII-only (A-Z ↔ a-z, delta = 32).
+# Full Unicode case folding would need multi-megabyte tables — out of scope.
 
 pub fn str_upper(text: Text) -> Text:
-    __os_str_upper(text)
+    src = bytes_from_text(text)
+    n = bytes_length(src)
+    mut out = bytes_zeros(0)
+    for i in 0..<n:
+        b = byte_at(src, i)
+        out = push(out, if b >= 97 and b <= 122 then b - 32 else b)
+    bytes_to_text(out)
 
 pub fn str_lower(text: Text) -> Text:
-    __os_str_lower(text)
+    src = bytes_from_text(text)
+    n = bytes_length(src)
+    mut out = bytes_zeros(0)
+    for i in 0..<n:
+        b = byte_at(src, i)
+        out = push(out, if b >= 65 and b <= 90 then b + 32 else b)
+    bytes_to_text(out)
 
 fn is_whitespace_byte(byte: int) -> bool:
     byte == 32 or byte == 9 or byte == 10 or byte == 13

@@ -63,7 +63,7 @@ impl Interp<'_> {
         if let (AssignOp::Set, Expr::Var(target_name, _)) = (op, target) {
             if let Expr::Call { callee, args } = value {
                 if let Expr::Var(callee_name, _) = callee.as_ref() {
-                    if callee_name == "push" && args.len() == 2 {
+                    if (callee_name == "push" || callee_name == "push_mut") && args.len() == 2 {
                         if let Expr::Var(list_var, _) = &args[0] {
                             if list_var == target_name {
                                 let val = self.eval(&args[1], env)?;

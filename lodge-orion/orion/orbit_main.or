@@ -11,6 +11,28 @@ extern fn __os_orbit_stdlib_orbs() -> [Text]
 extern fn __os_orbit_build(path: Text) -> bool
 extern fn __os_orbit_run(path: Text, fname: Text, args: [Text]) -> bool
 extern fn __os_orbit_test(path: Text) -> int
+extern fn orion_console_color() -> int
+
+# ---------- console style (ANSI, tty-gated) ----------
+
+fn sty(code: Text, s: Text) -> Text:
+    if orion_console_color() == 1:
+        e = bytes_to_text(push([], 27))
+        "{e}[{code}m{s}{e}[0m"
+    else:
+        s
+
+fn c_dim(s: Text) -> Text:
+    sty("2", s)
+
+fn c_bold(s: Text) -> Text:
+    sty("1", s)
+
+fn c_green(s: Text) -> Text:
+    sty("32", s)
+
+fn c_red(s: Text) -> Text:
+    sty("31;1", s)
 
 # ---------- args helpers ----------
 
@@ -31,12 +53,16 @@ fn first_param() -> Text:
 # ---------- usage / die ----------
 
 fn usage():
-    eprint("orbit — Orion's project tool")
-    eprint("usage: orbit <new|add|build|run|test|fmt> ...")
+    title = c_bold("orbit")
+    subtitle = c_dim("Orion's project tool")
+    eprint("{title}  {subtitle}")
+    eprint("usage: orbit <new|add|build|run|test|fmt|native|play> ...")
+    eprint("  native [gpu|ship]           " + c_dim("compile + link a native exe into build/"))
+    eprint("  play [dev|bench|off|interp] " + c_dim("build + run (interp = interpreter loop)"))
     exit_with(2)
 
 fn die(message: Text):
-    eprint(message)
+    eprint(c_red(message))
     exit_with(1)
 
 # ---------- list helpers (no `contains` in stdlib yet) ----------
@@ -114,15 +140,13 @@ fn cmd_build():
         exit_with(1)
 
 fn cmd_run():
-    # `orbit run [file.or] <fn> [args...]` — if arg 2 ends with .or use it
-    # as the source file; otherwise default to src/main.or.
+    # `orbit run [file.or] [fn] [args...]` — file defaults to src/main.or,
+    # fn defaults to main. Bare `orbit run` in a project dir Just Works.
     second = first_param()
     has_path = str_ends_with(second, ".or")
     path = if has_path then second else "src/main.or"
     fname_index = if has_path then 3 else 2
-    if arg_count() <= fname_index:
-        die("usage: orbit run [file.or] <fn> [args...]")
-    fname = arg(fname_index)
+    fname = if arg_count() <= fname_index then "main" else arg(fname_index)
     rest = args_after(fname_index + 1)
     if not __os_orbit_run(path, fname, rest):
         exit_with(1)
@@ -234,6 +258,146 @@ fn cmd_fmt():
         else:
             die("orbit fmt: `" + start_dir + "` not found")
 
+# ---------- native build & play ----------
+#
+# `orbit native [gpu|ship]` compiles the project with the self-hosted
+# orion compiler and links with clang. `orbit play [mode]` builds and
+# runs it; mode `interp` routes to the interpreter loop, anything else
+# (dev/bench/off) is handed to the game as its launch mode.
+# Toolchain paths come from Orbit.toml's optional [native] section:
+#   compiler = "../orion-self/dist/orion.exe"
+#   runtime  = "../orion-self/runtime"
+# Orb search dirs derive from the [orbs] path deps; each parent dir's
+# orbs_native sibling goes first so native backends win name clashes.
+
+fn nb_text_at(xs: [Text], index: int) -> Text:
+    at(xs, index)
+
+fn nb_lines(text: Text) -> [Text]:
+    str_split(text, "\n")
+
+fn nb_quoted(line: Text) -> Text:
+    pieces = str_split(line, "\"")
+    if len(pieces) >= 2 then at(pieces, 1) else ""
+
+fn nb_setting(lines: [Text], key: Text, fallback: Text) -> Text:
+    total = len(lines)
+    mut found = fallback
+    mut taken = false
+    for index in 0..<total:
+        line = str_trim(at(lines, index))
+        if not taken and str_starts_with(line, key + " ="):
+            found = nb_quoted(line)
+            taken = true
+    found
+
+fn nb_orb_dirs(lines: [Text]) -> [Text]:
+    total = len(lines)
+    mut parents = []
+    for index in 0..<total:
+        line = at(lines, index)
+        if str_contains(line, "\"path:"):
+            rel = str_replace(nb_quoted(line), "path:", "")
+            parent = path_parent(rel)
+            if not list_contains(parents, parent):
+                parents = push(parents, parent)
+    mut dirs = []
+    parent_total = len(parents)
+    for p_index in 0..<parent_total:
+        parent = nb_text_at(parents, p_index)
+        native_sibling = path_parent(parent) + "/orbs_native"
+        if is_dir(native_sibling) and not list_contains(dirs, native_sibling):
+            dirs = push(dirs, native_sibling)
+    for p2_index in 0..<parent_total:
+        dirs = push(dirs, at(parents, p2_index))
+    dirs
+
+fn nb_clang() -> Text:
+    if capture_stdout("where", ["clang"]) == "" then "C:\\Program Files\\LLVM\\bin\\clang.exe" else "clang"
+
+fn nb_ship_files(name: Text) -> Text:
+    mut joined = name + ".toml"
+    scripts = list_dir("scripts")
+    script_total = len(scripts)
+    for index in 0..<script_total:
+        file = nb_text_at(scripts, index)
+        if str_ends_with(file, ".astra"):
+            joined = joined + ",scripts/" + file
+    joined
+
+fn build_native(variant: Text) -> Text:
+    if not file_exists("Orbit.toml"):
+        die("orbit: no Orbit.toml in this directory")
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    compiler = nb_setting(lines, "compiler", "../orion-self/dist/orion.exe")
+    runtime = nb_setting(lines, "runtime", "../orion-self/runtime")
+    if not file_exists(compiler):
+        die("orbit: native compiler not found at `" + compiler + "` — set [native] compiler in Orbit.toml")
+    mkdir_all("build")
+    suffix = if variant == "" then "" else "_" + variant
+    exe = "build/" + name + suffix + ".exe"
+    ll = "build/" + name + ".ll"
+    mut compile_args = ["src/main.or", ll]
+    dirs = nb_orb_dirs(lines)
+    dir_total = len(dirs)
+    for d_index in 0..<dir_total:
+        compile_args = push(compile_args, at(dirs, d_index))
+    if run_command(compiler, compile_args) != 0:
+        die("orbit: native compile failed")
+    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/win32_min.c"]
+    if variant == "gpu":
+        link_args = push(link_args, runtime + "/d3d12_min.c")
+    else:
+        link_args = push(link_args, runtime + "/gdi_min.c")
+    if variant == "ship":
+        embed_rc = run_command("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", runtime + "/tools/embed_assets.ps1", "-Out", "build/scripts_embed.c", "-Files", nb_ship_files(name)])
+        if embed_rc != 0:
+            die("orbit: asset embed failed")
+        link_args = push(link_args, "build/scripts_embed.c")
+    link_args = push(link_args, "-Os")
+    link_args = push(link_args, "-o")
+    link_args = push(link_args, exe)
+    link_args = push(link_args, "-luser32")
+    link_args = push(link_args, "-lgdi32")
+    if variant == "gpu":
+        link_args = push(link_args, "-ld3d12")
+        link_args = push(link_args, "-ldxgi")
+    if run_command(nb_clang(), link_args) != 0:
+        die("orbit: link failed")
+    remove_file(ll)
+    if variant == "ship":
+        remove_file("build/scripts_embed.c")
+    print(c_bold(exe) + " " + c_green("ok"))
+    exe
+
+fn cmd_native():
+    variant = first_param()
+    if variant == "" or variant == "gpu" or variant == "ship":
+        build_native(variant)
+    else:
+        die("usage: orbit native [gpu|ship]")
+
+# Guard-style split — an else after a nested if binds to the inner
+# one (interp parser dangling-else).
+fn cmd_play():
+    mode = first_param()
+    if mode == "interp":
+        play_interp()
+    if mode != "interp":
+        play_native(mode)
+
+fn play_interp():
+    if not __os_orbit_run("src/main.or", "main", []):
+        exit_with(1)
+
+fn play_native(mode: Text):
+    exe = build_native("")
+    mut game_args = []
+    if mode != "":
+        game_args = push(game_args, mode)
+    exit_with(run_command(exe, game_args))
+
 # ---------- entrypoint ----------
 
 pub fn main():
@@ -256,4 +420,10 @@ pub fn main():
                         if command == "fmt":
                             cmd_fmt()
                         else:
-                            usage()
+                            if command == "native":
+                                cmd_native()
+                            else:
+                                if command == "play":
+                                    cmd_play()
+                                else:
+                                    usage()

@@ -5,7 +5,7 @@
 //!   - `ops`      — arithmetic, comparison, equality on values
 //!   - `builtin`  — the built-in function library (max/min/get/…)
 
-mod builtin;
+pub(crate) mod builtin;
 mod expr;
 mod ops;
 mod stmt;
@@ -52,7 +52,12 @@ pub struct Interp<'a> {
     pub(crate) fns: HashMap<&'a str, &'a FnDecl>,
     pub(crate) systems: HashMap<&'a str, &'a SystemDecl>,
     /// enum variant name -> payload arity.
-    pub(crate) variants: HashMap<String, usize>,
+    /// Variant name → set of arities seen. A name may appear in multiple
+    /// enums with different arities (e.g. `Tok::Require` nullary vs
+    /// `Stmt::Require(Expr)` unary). Lookup picks the matching arity by
+    /// call-site context, so collisions degrade gracefully instead of
+    /// silently overwriting.
+    pub(crate) variants: HashMap<String, Vec<usize>>,
     /// `(data_type, method)` -> the implementing `fn` (§14, static dispatch).
     pub(crate) methods: HashMap<(String, String), &'a FnDecl>,
     /// data type name -> its declaration. Used at field-write time so we
@@ -81,7 +86,11 @@ impl<'a> Interp<'a> {
                 Decl::Data(d) => { data_decls.insert(d.name.as_str(), d); }
                 Decl::Enum(e) => {
                     for v in &e.variants {
-                        variants.insert(v.name.clone(), v.payload.len());
+                        let arities = variants.entry(v.name.clone()).or_insert_with(Vec::new);
+                        let arity = v.payload.len();
+                        if !arities.contains(&arity) {
+                            arities.push(arity);
+                        }
                     }
                 }
                 Decl::Impl(i) => {
@@ -194,6 +203,123 @@ impl<'a> Interp<'a> {
     pub(crate) fn call_extern(&self, name: &str, args: Vec<Value>) -> Result<Value, RunError> {
         let externs = self.externs.read().unwrap();
         let Some(f) = externs.get(name) else {
+            // Native runtime hooks (frame arena, alloc telemetry, embedded
+            // assets) are no-ops here — shared orbs declare them and must
+            // run unchanged. embedded_has = 0 keeps games on the file path,
+            // so embedded_text is never reached.
+            // Identity under the interpreter: no pools to evacuate from.
+            if name == "orion_persist_text" {
+                return Ok(args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(Value::Text(String::new())));
+            }
+            // Terminal capability: styled output only when stdout is
+            // an interactive console (redirected logs stay plain).
+            // First hit also flips conhost into VT + UTF-8 mode.
+            if name == "orion_console_color" {
+                use std::io::IsTerminal;
+                if !std::io::stdout().is_terminal() {
+                    return Ok(Value::Int(0));
+                }
+                #[cfg(windows)]
+                unsafe {
+                    unsafe extern "system" {
+                        fn GetStdHandle(which: u32) -> *mut std::ffi::c_void;
+                        fn GetConsoleMode(h: *mut std::ffi::c_void, m: *mut u32) -> i32;
+                        fn SetConsoleMode(h: *mut std::ffi::c_void, m: u32) -> i32;
+                        fn SetConsoleOutputCP(cp: u32) -> i32;
+                    }
+                    let h = GetStdHandle(-11i32 as u32);
+                    let mut mode: u32 = 0;
+                    if !h.is_null() && GetConsoleMode(h, &mut mode) != 0 {
+                        SetConsoleMode(h, mode | 0x0004);
+                        SetConsoleOutputCP(65001);
+                    }
+                }
+                return Ok(Value::Int(1));
+            }
+            // Real commit charge even under the interpreter — the mem
+            // report should never lie about the process.
+            if name == "orion_os_private_kb" {
+                #[cfg(windows)]
+                {
+                    #[repr(C)]
+                    struct Pmc {
+                        cb: u32,
+                        page_fault_count: u32,
+                        peak_ws: usize,
+                        ws: usize,
+                        qppu: usize,
+                        qpu: usize,
+                        qpnpu: usize,
+                        qnpu: usize,
+                        pagefile: usize,
+                        peak_pagefile: usize,
+                    }
+                    unsafe extern "system" {
+                        fn GetCurrentProcess() -> *mut std::ffi::c_void;
+                        fn K32GetProcessMemoryInfo(
+                            h: *mut std::ffi::c_void,
+                            pmc: *mut Pmc,
+                            cb: u32,
+                        ) -> i32;
+                    }
+                    unsafe {
+                        let mut pmc: Pmc = std::mem::zeroed();
+                        pmc.cb = std::mem::size_of::<Pmc>() as u32;
+                        if K32GetProcessMemoryInfo(GetCurrentProcess(), &mut pmc, pmc.cb) != 0 {
+                            return Ok(Value::Int((pmc.pagefile / 1024) as i64));
+                        }
+                    }
+                }
+                return Ok(Value::Int(0));
+            }
+            if name.starts_with("orion_arena_")
+                || name.starts_with("orion_frame_")
+                || name.starts_with("orion_persist_")
+                || name.starts_with("orion_pool_")
+            {
+                return Ok(Value::Int(1));
+            }
+            if name == "orion_dir_list" {
+                let Some(Value::Text(dir)) = args.first() else {
+                    return Ok(Value::Text(String::new()));
+                };
+                let mut names: Vec<String> = Vec::new();
+                if let Ok(rd) = std::fs::read_dir(dir.as_str()) {
+                    for e in rd.flatten() {
+                        if e.path().is_file() {
+                            names.push(e.file_name().to_string_lossy().into_owned());
+                        }
+                    }
+                }
+                return Ok(Value::Text(names.join("\n")));
+            }
+            if name == "orion_embedded_list" {
+                return Ok(Value::Text(String::new()));
+            }
+            if name == "orion_file_stamp" {
+                let Some(Value::Text(path)) = args.first() else {
+                    return Ok(Value::Int(0));
+                };
+                let stamp = std::fs::metadata(path.as_str())
+                    .ok()
+                    .map(|m| {
+                        let mtime = m
+                            .modified()
+                            .ok()
+                            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                            .map(|d| d.as_secs() as i64)
+                            .unwrap_or(0);
+                        mtime * 131 + m.len() as i64
+                    })
+                    .unwrap_or(0);
+                return Ok(Value::Int(stamp));
+            }
+            if name.starts_with("orion_alloc_") || name.starts_with("orion_embedded_") {
+                return Ok(Value::Int(0));
+            }
             return Err(run_err(format!("extern fn `{name}` has no registered impl")));
         };
         f(args)

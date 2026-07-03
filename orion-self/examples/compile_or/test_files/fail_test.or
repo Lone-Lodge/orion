@@ -1,0 +1,3 @@
+fn main() -> int:
+    undefined_fn_xyz(1)
+    0

@@ -22,13 +22,6 @@
 # doesn't have references so we return a new cursor in a {"node": …,
 # "next": …} pair (same pattern as the lexer's scanners).
 
-# Aliases for typed map access. orion-self treats get_int/get_map as
-# builtins that return i64/Map respectively; lodge-orion needs an .or
-# definition. Both call into plain `get`.
-pub fn get_int(m: Map, k: Text) -> int: get(m, k)
-pub fn get_map(m: Map, k: Text) -> Map: get(m, k)
-pub fn get_list(m: Map, k: Text) -> [Map]: get(m, k)
-
 # Interpolation arg classification: numeric literals → Int AST, everything
 # else → Ident (caller resolves). Lets `{fn(21)}` work in addition to
 # `{fn(var_name)}`.
@@ -235,14 +228,20 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     is_not = kind == "ident" and value == "not"
     is_neg = kind == "symbol" and value == "-"
     mut not_node = {"node": {"kind": "Error", "msg": ""}, "next": position}
+    # Operand includes the POSTFIX chain — `not s.ok` must negate the
+    # field read, not read `.ok` off the negation (which typed as i64
+    # and broke every `if not step.ok:` in astra_parser).
     if is_not:
-        operand_result = psr_parse_primary(tokens, position + 1)
+        op_prim = psr_parse_primary(tokens, position + 1)
+        operand_result = psr_parse_postfix(tokens, get_int(op_prim, "next"), get_map(op_prim, "node"))
         not_node = {"node": {"kind": "Unary", "op": "not", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
     if is_neg:
-        operand_result = psr_parse_primary(tokens, position + 1)
+        op_prim = psr_parse_primary(tokens, position + 1)
+        operand_result = psr_parse_postfix(tokens, get_int(op_prim, "next"), get_map(op_prim, "node"))
         not_node = {"node": {"kind": "Unary", "op": "neg", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
     is_ident = kind == "ident"
     is_int = kind == "int"
+    is_float = kind == "float"
     is_str = kind == "str"
     is_lbracket = kind == "symbol" and value == "["
     is_lbrace = kind == "symbol" and value == "\{"
@@ -317,6 +316,8 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         result = {"node": {"kind": "Int", "value": "0"}, "next": position + 1}
     if is_int:
         result = {"node": {"kind": "Int", "value": value}, "next": position + 1}
+    if is_float:
+        result = {"node": {"kind": "Float", "value": value}, "next": position + 1}
     if is_str:
         result = {"node": psr_interpolate_str(value), "next": position + 1}
     if is_lbracket:
@@ -592,6 +593,10 @@ fn psr_parse_list_literal(tokens: [Map], position: int) -> Map:
 # layout rules, which a future pass tackles).
 fn psr_parse_if(tokens: [Map], position: int) -> Map:
     # We're on `if`.
+    # NOTE: adding line/col capture here (if_tok = at(tokens, position)
+    # etc.) made gen1 DROP those statements — an engine-divergence bug
+    # between interp-run and native-run compiler. Bisect before
+    # reintroducing; see memory notes 2026-07-02.
     cond_result = psr_parse_expr(tokens, position + 1)
     cursor_after_cond = get_int(cond_result, "next")
     # Expect `then`.
@@ -601,10 +606,21 @@ fn psr_parse_if(tokens: [Map], position: int) -> Map:
         cursor = cursor_after_cond + 1
     then_result = psr_parse_expr(tokens, cursor)
     cursor = get_int(then_result, "next")
-    has_else = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "else"
+    # Allow newlines between `then EXPR` and `else` so multi-line
+    # expression-form if works as a fn body:
+    #     if len(pb) > len(sb) then false
+    #     else compare_prefix(...)
+    # Only consume the newlines when an `else` actually follows —
+    # otherwise the newline ends the statement as before.
+    peek_cursor = psr_skip_newlines(tokens, cursor)
+    peek_is_else = psr_peek_kind(tokens, peek_cursor) == "ident" and psr_peek_value(tokens, peek_cursor) == "else"
+    # `else:` (colon right after) is BLOCK-form else belonging to an
+    # enclosing `if cond:` — never steal it for the expression form.
+    peek_is_block_else = peek_is_else and psr_peek_kind(tokens, peek_cursor + 1) == "symbol" and psr_peek_value(tokens, peek_cursor + 1) == ":"
+    has_else = peek_is_else and (not peek_is_block_else)
     mut else_node = {"kind": "Int", "value": "0"}
     if has_else:
-        else_result = psr_parse_expr(tokens, cursor + 1)
+        else_result = psr_parse_expr(tokens, peek_cursor + 1)
         else_node = get_map(else_result, "node")
         cursor = get_int(else_result, "next")
     {"node": {"kind": "If", "cond": get_map(cond_result, "node"), "then": get_map(then_result, "node"), "else": else_node}, "next": cursor}
@@ -946,7 +962,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                         for_cursor = for_cursor + 1
                     for_body_col = psr_peek_col(tokens, for_cursor)
                     for_body_result = psr_parse_body_at(tokens, for_cursor, for_body_col)
-                    statements = push(statements, {"kind": "ForRange", "var": for_var_name, "low": get_map(low_result, "node"), "high": get_map(high_result, "node"), "body": get_map(for_body_result, "node")})
+                    statements = push(statements, {"kind": "ForRange", "var": for_var_name, "low": get_map(low_result, "node"), "high": get_map(high_result, "node"), "inclusive": if range_op_val == "..=" then 1 else 0, "body": get_map(for_body_result, "node")})
                     cursor = get_int(for_body_result, "next")
                 if not is_range:
                     if psr_peek_kind(tokens, for_cursor) == "symbol" and psr_peek_value(tokens, for_cursor) == ":":
@@ -1284,6 +1300,12 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
     has_equals = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "="
     if has_equals:
         cursor += 1
+        # `= comptime EXPR` — treat comptime as an annotation and parse
+        # the expr normally. (Folding is an optimization; parsing
+        # `comptime` as an identifier used to desync the decl loop into
+        # an infinite re-parse.)
+        if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "comptime":
+            cursor += 1
         expr_result = psr_parse_expr(tokens, cursor)
         body_node = {"kind": "Block", "stmts": push([], {"kind": "ExprStmt", "expr": get_map(expr_result, "node")})}
         cursor = get_int(expr_result, "next")
@@ -1299,20 +1321,27 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
 
 # --- top-level ---
 
-# Skip whatever comes after `extern fn name(params) -> type` — there's
-# no body, just the declaration. Returns the next cursor position.
-fn psr_skip_extern_fn(tokens: [Map], position: int) -> int:
-    # Already past `extern fn`; consume name + params + optional `-> ret`.
+# Parse `extern fn name(params) -> type` into an ExternFn decl node.
+# No body — the symbol is resolved at link time (C shim / runtime fn).
+# The signature matters: ast_to_ir uses the return type so extern calls
+# are typed correctly (ptr for Text, i64 for int) instead of guessed,
+# and emit declares the real LLVM signature.
+fn psr_parse_extern_fn(tokens: [Map], position: int) -> Map:
+    # Already past `extern fn`; sitting on the name.
     mut cursor = position
-    # Skip name
-    if psr_peek_kind(tokens, cursor) == "ident":
+    name = psr_peek_value(tokens, cursor)
+    cursor = cursor + 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
         cursor = cursor + 1
-    # Skip everything until the next newline (declaration is one line).
-    loop:
-        if psr_peek_kind(tokens, cursor) == "newline" or psr_peek_kind(tokens, cursor) == "eof":
-            break
+    params_result = psr_parse_params(tokens, cursor)
+    cursor = get_int(params_result, "next")
+    mut return_node = {"kind": "Named", "name": "Unit"}
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
         cursor = cursor + 1
-    cursor
+        ret_result = psr_parse_type(tokens, cursor)
+        return_node = get_map(ret_result, "node")
+        cursor = get_int(ret_result, "next")
+    {"node": {"kind": "ExternFn", "name": name, "params": get_map(params_result, "node"), "ret": return_node}, "next": cursor}
 
 # Skip `use NAME` — one line.
 fn psr_skip_use(tokens: [Map], position: int) -> int:
@@ -1385,12 +1414,12 @@ pub fn self_parse(tokens: [Map]) -> Map:
             decls = push(decls, get_map(decl_result, "node"))
             cursor = get_int(decl_result, "next")
         if is_extern:
-            # Skip `extern fn ...` declaration entirely — only the body
-            # of real functions needs codegen.
             cursor = cursor + 1
             if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "fn":
                 cursor = cursor + 1
-            cursor = psr_skip_extern_fn(tokens, cursor)
+            decl_result = psr_parse_extern_fn(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
         if is_use:
             cursor = psr_skip_use(tokens, cursor)
         not_recognized = not (is_fn or is_data or is_enum or is_effect or is_system or is_impl or is_trait or is_extern or is_use)

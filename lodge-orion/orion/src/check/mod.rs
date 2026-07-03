@@ -26,30 +26,11 @@ pub(crate) fn err_at<T>(msg: impl Into<String>, span: Span) -> Result<T, CheckEr
     Err(CheckError { message: msg.into(), span: Some(span) })
 }
 
-pub(crate) const BUILTINS: &[(&str, usize)] = &[
-    ("max", 2), ("min", 2), ("abs", 1), ("sqrt", 1), ("print", 1),
-    ("floor", 1), ("ceil", 1), ("round", 1), ("pow", 2), ("clamp", 3),
-    ("sign", 1), ("len", 1), ("get_or", 3), ("get", 2), ("has", 2),
-    ("set", 3), ("at", 2), ("push", 2), ("slice", 3),
-    ("to_int", 1), ("to_float", 1),
-    ("type_of", 1),
-    ("map_keys", 1), ("map_values", 1),
-    ("slot_get", 1), ("slot_set", 2), ("slot_push", 2), ("slot_set_at", 3),
-    ("eprint", 1),
-    ("sin", 1), ("cos", 1), ("tan", 1), ("atan2", 2),
-    ("exp", 1), ("ln", 1), ("log2", 1),
-    ("ptr_alloc", 1), ("ptr_free", 1),
-    ("ptr_read_u8", 2), ("ptr_read_u32", 2), ("ptr_read_u64", 2),
-    ("ptr_write_u8", 3), ("ptr_write_u32", 3), ("ptr_write_u64", 3),
-    ("ptr_to_bytes", 2), ("bytes_to_ptr", 1),
-    ("cpu_count", 0), ("thread_id", 0),
-    ("vec_add", 2), ("vec_sub", 2), ("vec_mul", 2), ("vec_dot", 2),
-    ("time_now_ms", 0), ("monotonic_ms", 0), ("sleep_ms", 1),
-    // Change-detection (§13) — entities that gained / had-fields-written /
-    // lost a component since the last `tick_events_clear`.
-    ("added", 1), ("changed", 1), ("removed", 1),
-    ("tick_events_clear", 0),
-];
+// One builtin table shared with the interpreter — a checker-local copy
+// drifted and rejected valid programs. §13 names (added/changed/removed/
+// tick_events_clear) dispatch outside builtin() and stay special-cased
+// in expr.rs.
+pub(crate) use crate::interp::builtin::BUILTINS;
 
 pub fn check(program: &Program) -> Result<(), CheckError> {
     let cx = build_checker(program);
@@ -189,8 +170,15 @@ fn build_checker(program: &Program) -> Checker<'_> {
             }
             Decl::Enum(e) => {
                 for v in &e.variants {
-                    variants.insert(v.name.as_str(), v.payload.len());
-                    variant_origin.insert(v.name.as_str(), (e.file, e.public));
+                    let arities = variants.entry(v.name.as_str()).or_insert_with(Vec::new);
+                    let arity = v.payload.len();
+                    if !arities.contains(&arity) {
+                        arities.push(arity);
+                    }
+                    // Origin records the FIRST enum that declared this
+                    // variant name; cross-enum collisions still respect
+                    // the first-seen visibility for now.
+                    variant_origin.entry(v.name.as_str()).or_insert((e.file, e.public));
                 }
             }
             _ => {}
@@ -201,7 +189,9 @@ fn build_checker(program: &Program) -> Checker<'_> {
 
 pub(crate) struct Checker<'a> {
     pub(crate) fns: HashMap<&'a str, (usize, usize)>,
-    pub(crate) variants: HashMap<&'a str, usize>,
+    /// Variant name → set of arities (one entry per enum that declared it).
+    /// Multi-arity tolerates cross-enum collisions like Tok::Require + Stmt::Require(Expr).
+    pub(crate) variants: HashMap<&'a str, Vec<usize>>,
     /// (def-file, is_public) for each fn/system.
     pub(crate) fn_origin: HashMap<&'a str, (u32, bool)>,
     /// (def-file, is_public) for each enum variant.

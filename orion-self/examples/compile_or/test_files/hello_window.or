@@ -1,0 +1,19 @@
+extern fn win_open(title: Text, w: int, h: int) -> int
+extern fn win_pump() -> int
+extern fn win_close(hwnd: int)
+
+
+fn main() -> int:
+    print_line("Opening native Orion window...")
+    hwnd = win_open("Hello from native Orion", 640, 480)
+    if hwnd == 0:
+        print_line("CreateWindowExW failed")
+        return 1
+    print_line("Window is open. Close it to exit.")
+    loop:
+        keep = win_pump()
+        if keep == 0:
+            break
+    win_close(hwnd)
+    print_line("Window closed. Bye.")
+    0

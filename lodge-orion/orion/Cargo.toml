@@ -46,12 +46,7 @@ cranelift-jit = "0.133.0"
 cranelift-module = "0.133.0"
 cranelift-native = "0.133.0"
 cranelift-object = "0.133"
-# Blocking HTTP client for `net` orb — minimal, no async runtime.
-ureq = "2"
-
-# Platform-binding deps used by stdlib orbs. Keep this list curated and
-# justified — every dep here ships with `orbit` to every user's project.
-png = "0.17"   # `image` orb — PNG decode/encode, pure-Rust via miniz_oxide
+miniz_oxide = "0.6"   # DEFLATE/zlib for PNG decode/encode (small, pure Rust)
 cpal = "0.15"  # `audio` orb — cross-platform audio output (WASAPI/CoreAudio/ALSA)
 
 # `window` + `gpu` orbs — raw OS FFI, no winit/wgpu deps. Just type

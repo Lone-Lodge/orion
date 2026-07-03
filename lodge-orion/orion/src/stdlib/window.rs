@@ -185,30 +185,26 @@ mod win32 {
             let mut count = 0;
             while PeekMessageW(&mut msg, ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
                 count += 1;
-                eprintln!("[pump] msg=0x{:x}", msg.message);
                 if msg.message == WM_QUIT {
-                    eprintln!("[pump] WM_QUIT received");
                     STATE.with(|s| { if let Some(st) = s.borrow_mut().as_mut() { st.should_close = true; }});
                     break;
                 }
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
-            if count > 0 { eprintln!("[pump] processed {count} messages"); }
+            let _ = count;
         }
     }
 
     unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         match msg {
             WM_CLOSE => {
-                eprintln!("[wndproc] WM_CLOSE");
                 push_event(Event { kind: "close", key: 0, x: 0.0, y: 0.0 });
                 STATE.with(|s| { if let Some(st) = s.borrow_mut().as_mut() { st.should_close = true; }});
                 unsafe { DestroyWindow(hwnd); }
                 0
             }
             WM_DESTROY => {
-                eprintln!("[wndproc] WM_DESTROY");
                 unsafe { PostQuitMessage(0); }
                 0
             }
@@ -226,10 +222,30 @@ mod win32 {
                 push_event(Event { kind: "mouse_move", key: 0, x, y });
                 0
             }
-            WM_LBUTTONDOWN => { push_event(Event { kind: "mouse_down", key: 1, x: 0.0, y: 0.0 }); 0 }
-            WM_LBUTTONUP   => { push_event(Event { kind: "mouse_up",   key: 1, x: 0.0, y: 0.0 }); 0 }
-            WM_RBUTTONDOWN => { push_event(Event { kind: "mouse_down", key: 2, x: 0.0, y: 0.0 }); 0 }
-            WM_RBUTTONUP   => { push_event(Event { kind: "mouse_up",   key: 2, x: 0.0, y: 0.0 }); 0 }
+            WM_LBUTTONDOWN => {
+                let x = (lparam & 0xFFFF) as i16 as f64;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as f64;
+                push_event(Event { kind: "mouse_down", key: 1, x, y });
+                0
+            }
+            WM_LBUTTONUP => {
+                let x = (lparam & 0xFFFF) as i16 as f64;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as f64;
+                push_event(Event { kind: "mouse_up", key: 1, x, y });
+                0
+            }
+            WM_RBUTTONDOWN => {
+                let x = (lparam & 0xFFFF) as i16 as f64;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as f64;
+                push_event(Event { kind: "mouse_down", key: 2, x, y });
+                0
+            }
+            WM_RBUTTONUP => {
+                let x = (lparam & 0xFFFF) as i16 as f64;
+                let y = ((lparam >> 16) & 0xFFFF) as i16 as f64;
+                push_event(Event { kind: "mouse_up", key: 2, x, y });
+                0
+            }
             WM_SIZE => {
                 let w = (lparam & 0xFFFF) as f64;
                 let h = ((lparam >> 16) & 0xFFFF) as f64;

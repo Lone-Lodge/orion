@@ -105,8 +105,10 @@ impl Interp<'_> {
     }
 
     fn eval_var(&self, name: &str, env: &Env) -> Result<Value, RunError> {
-        // A nullary enum variant is a value when named bare.
-        if self.variants.get(name) == Some(&0) {
+        // A nullary enum variant is a value when named bare. The same name
+        // may be registered with multiple arities (cross-enum collision);
+        // accept the bare form if any registration is nullary.
+        if self.variants.get(name).map(|v| v.contains(&0)).unwrap_or(false) {
             return Ok(Value::Enum { variant: name.to_string(), payload: vec![] });
         }
         env.get(name).cloned().ok_or_else(|| run_err(format!("unknown name `{name}`")))

@@ -86,7 +86,7 @@ pub const ORBS: &[Orb] = &[
     Orb { name: "crypto",      source: crypto::SOURCE,      register: crypto::register,      deps: &["bytes"] },
     Orb { name: "uuid",        source: uuid::SOURCE,        register: uuid::register,        deps: &["bytes"] },
     Orb { name: "url",         source: url::SOURCE,         register: url::register,         deps: &["bytes"] },
-    Orb { name: "net",         source: net::SOURCE,         register: net::register,         deps: &[] },
+    Orb { name: "net",         source: net::SOURCE,         register: net::register,         deps: &["bytes", "string", "format", "url"] },
     Orb { name: "bytes",       source: bytes::SOURCE,       register: bytes::register,       deps: &[] },
     Orb { name: "time_format", source: time_format::SOURCE, register: time_format::register, deps: &["bytes", "string", "format"] },
     Orb { name: "xml",         source: xml::SOURCE,         register: xml::register,         deps: &["bytes"] },
