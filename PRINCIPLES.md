@@ -14,7 +14,8 @@ forbids it. Old-school demoscene discipline, next-gen language design.
 | Compiler .exe | ≤ 1 MB | 311 KB |
 | Cold start → first frame | ≤ 200 ms | (measure at phase 3) |
 | Native full rebuild of a game | ≤ 1 s | compiler self-compiles in 292 ms |
-| Idle RAM, 2D game | ≤ 64 MB | (measure at phase 3) |
+| Idle RAM, 2D game (working set) | ≤ 64 MB | active WS ~2.4 MB live session (event-driven idle lets the OS trim) |
+| Commit (private bytes) | ≤ 192 MB with d3d12 (driver-dominated), ≤ 32 MB gdi | 106 MB measured (cubsy d3d12) — commit is the promise, WS the footprint |
 | Perf floor | 60 fps on integrated graphics, 2-core CPU | software backend 240 fps, d3d12 ~1400 fps (cubsy, 1280×720 windowed) |
 | Perf ceiling honesty | GPU backend must be uncapped-capable (no hidden vsync/adapter traps) | ✓ tearing + adapter logged at init |
 | Idle cost | 0 frames rendered, 0 heap bytes while nothing happens | ✓ atlas/gates/idle: draws=0 malloc=0B over 300 ticks |
