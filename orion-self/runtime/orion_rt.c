@@ -422,14 +422,42 @@ __attribute__((weak)) long long orion_audio_play(long long id, long long gain,
     (void)id; (void)gain; (void)pan; (void)pitch; (void)bus;
     return audio_null_plays++;
 }
-__attribute__((weak)) long long orion_audio_music(long long id, long long gain) {
-    (void)id; (void)gain;
+__attribute__((weak)) long long orion_audio_loop(long long id, long long gain,
+                                                 long long pan, long long pitch,
+                                                 long long bus,
+                                                 long long fade_ms) {
+    (void)id; (void)gain; (void)pan; (void)pitch; (void)bus; (void)fade_ms;
     return audio_null_plays++;
 }
-__attribute__((weak)) long long orion_audio_stop_music(void) { return 1; }
+__attribute__((weak)) long long orion_audio_voice_gain(long long handle,
+                                                       long long gain,
+                                                       long long fade_ms) {
+    (void)handle; (void)gain; (void)fade_ms;
+    return 1;
+}
+__attribute__((weak)) long long orion_audio_stop_voice(long long handle,
+                                                       long long fade_ms) {
+    (void)handle; (void)fade_ms;
+    return 1;
+}
+__attribute__((weak)) long long orion_audio_music(long long id, long long gain,
+                                                  long long fade_ms) {
+    (void)id; (void)gain; (void)fade_ms;
+    return audio_null_plays++;
+}
+__attribute__((weak)) long long orion_audio_layer(long long id, long long gain,
+                                                  long long fade_ms) {
+    (void)id; (void)gain; (void)fade_ms;
+    return audio_null_plays++;
+}
+__attribute__((weak)) long long orion_audio_stop_music(long long fade_ms) {
+    (void)fade_ms;
+    return 1;
+}
 __attribute__((weak)) long long orion_audio_bus_gain(long long bus,
-                                                     long long gain) {
-    (void)bus; (void)gain;
+                                                     long long gain,
+                                                     long long fade_ms) {
+    (void)bus; (void)gain; (void)fade_ms;
     return 1;
 }
 __attribute__((weak)) long long orion_audio_playing(void) { return 0; }
