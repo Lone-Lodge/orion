@@ -22,6 +22,7 @@
 #include <windows.h>
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include <dxgi1_5.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -35,18 +36,22 @@ static ID3D12CommandQueue  *g_queue;
 static IDXGISwapChain3     *g_swap;
 static ID3D12DescriptorHeap *g_rtv_heap;
 static ID3D12Resource      *g_backbuf[FRAME_COUNT];
-static ID3D12CommandAllocator *g_alloc;
+static ID3D12CommandAllocator *g_alloc[FRAME_COUNT]; /* one per in-flight frame */
 static ID3D12GraphicsCommandList *g_list;
 static ID3D12RootSignature *g_rootsig;
 static ID3D12PipelineState *g_pso;
-static ID3D12Resource      *g_vbuf;      /* persistent upload heap */
+static ID3D12Resource      *g_vbuf;      /* upload ring: FRAME_COUNT slots */
 static Vert                *g_vmap;      /* persistently mapped */
 static ID3D12Fence         *g_fence;
 static HANDLE               g_fence_evt;
 static UINT64               g_fence_val;
+static UINT64               g_frame_fence[FRAME_COUNT]; /* last submit per slot */
 static UINT                 g_rtv_size;
 static int                  g_width, g_height;
 static int                  g_nverts;
+static int                  g_frame;     /* current backbuffer slot */
+static int                  g_vsync = 0; /* uncapped by default; og_vsync opts in */
+static int                  g_tearing = 0;
 static float                g_clear[4];
 
 /* Shaders precompiled to DXBC at build time (fxc, see tools/shaders) —
@@ -81,6 +86,21 @@ long long og_init(long long hwnd_i, long long width, long long height) {
     IDXGIFactory4 *factory;
     if (FAILED(CreateDXGIFactory1(&IID_IDXGIFactory4, (void **)&factory)))
         return 0;
+    /* Tearing support = uncapped present on flip-model. Queried via
+     * IDXGIFactory5; absent (old Win10) we still run, just without
+     * the unlocked rate. */
+    {
+        IDXGIFactory5 *f5 = NULL;
+        if (SUCCEEDED(IDXGIFactory4_QueryInterface(factory, &IID_IDXGIFactory5,
+                                                   (void **)&f5))) {
+            BOOL allow = FALSE;
+            if (SUCCEEDED(IDXGIFactory5_CheckFeatureSupport(f5,
+                    DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow, sizeof(allow))))
+                g_tearing = allow ? 1 : 0;
+            IDXGIFactory5_Release(f5);
+        }
+    }
+    fprintf(stderr, "[d3d12] tearing=%d\n", g_tearing);
     DXGI_SWAP_CHAIN_DESC1 sd = {0};
     sd.BufferCount = FRAME_COUNT;
     sd.Width = (UINT)width;
@@ -89,6 +109,7 @@ long long og_init(long long hwnd_i, long long width, long long height) {
     sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     sd.SampleDesc.Count = 1;
+    sd.Flags = g_tearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
     IDXGISwapChain1 *swap1;
     if (FAILED(IDXGIFactory4_CreateSwapChainForHwnd(factory,
                (IUnknown *)g_queue, hwnd, &sd, NULL, NULL, &swap1)))
@@ -114,10 +135,12 @@ long long og_init(long long hwnd_i, long long width, long long height) {
         rtv.ptr += g_rtv_size;
     }
 
-    ID3D12Device_CreateCommandAllocator(g_dev, D3D12_COMMAND_LIST_TYPE_DIRECT,
-        &IID_ID3D12CommandAllocator, (void **)&g_alloc);
+    for (int i = 0; i < FRAME_COUNT; i++)
+        ID3D12Device_CreateCommandAllocator(g_dev,
+            D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
+            (void **)&g_alloc[i]);
     ID3D12Device_CreateCommandList(g_dev, 0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-        g_alloc, NULL, &IID_ID3D12GraphicsCommandList, (void **)&g_list);
+        g_alloc[0], NULL, &IID_ID3D12GraphicsCommandList, (void **)&g_list);
     ID3D12GraphicsCommandList_Close(g_list);
 
     /* Root signature: empty, just allow the input layout. */
@@ -165,7 +188,7 @@ long long og_init(long long hwnd_i, long long width, long long height) {
     hp.Type = D3D12_HEAP_TYPE_UPLOAD;
     D3D12_RESOURCE_DESC rd = {0};
     rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    rd.Width = MAX_VERTS * sizeof(Vert);
+    rd.Width = (UINT64)FRAME_COUNT * MAX_VERTS * sizeof(Vert); /* ring */
     rd.Height = 1;
     rd.DepthOrArraySize = 1;
     rd.MipLevels = 1;
@@ -185,7 +208,17 @@ long long og_init(long long hwnd_i, long long width, long long height) {
     return 1;
 }
 
+/* Wait only for THIS slot's previous submission — with FRAME_COUNT
+ * slots the CPU records frame N while the GPU draws frame N-1. This
+ * is the overlap the v0.0 "full sync per present" left on the table
+ * (it played at half vsync). */
 void og_begin(long long r, long long g, long long b) {
+    g_frame = (int)IDXGISwapChain3_GetCurrentBackBufferIndex(g_swap);
+    if (ID3D12Fence_GetCompletedValue(g_fence) < g_frame_fence[g_frame]) {
+        ID3D12Fence_SetEventOnCompletion(g_fence, g_frame_fence[g_frame],
+                                         g_fence_evt);
+        WaitForSingleObject(g_fence_evt, INFINITE);
+    }
     g_nverts = 0;
     g_clear[0] = (float)r / 255.0f;
     g_clear[1] = (float)g / 255.0f;
@@ -204,7 +237,7 @@ void og_rect(long long x, long long y, long long w, long long h,
     float y1 = 1.0f - (float)(y + h) / (float)g_height * 2.0f;
     float cr = (float)r / 255.0f, cg = (float)g / 255.0f,
           cb = (float)b / 255.0f;
-    Vert *v = g_vmap + g_nverts;
+    Vert *v = g_vmap + (size_t)g_frame * MAX_VERTS + g_nverts;
     v[0] = (Vert){x0, y0, cr, cg, cb, 1};
     v[1] = (Vert){x1, y0, cr, cg, cb, 1};
     v[2] = (Vert){x0, y1, cr, cg, cb, 1};
@@ -215,10 +248,10 @@ void og_rect(long long x, long long y, long long w, long long h,
 }
 
 long long og_present(void) {
-    UINT frame = IDXGISwapChain3_GetCurrentBackBufferIndex(g_swap);
+    UINT frame = (UINT)g_frame;
 
-    ID3D12CommandAllocator_Reset(g_alloc);
-    ID3D12GraphicsCommandList_Reset(g_list, g_alloc, g_pso);
+    ID3D12CommandAllocator_Reset(g_alloc[frame]);
+    ID3D12GraphicsCommandList_Reset(g_list, g_alloc[frame], g_pso);
 
     D3D12_RESOURCE_BARRIER barrier = {0};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -243,7 +276,8 @@ long long og_present(void) {
         ID3D12GraphicsCommandList_IASetPrimitiveTopology(g_list,
             D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         D3D12_VERTEX_BUFFER_VIEW vbv;
-        vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(g_vbuf);
+        vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(g_vbuf) +
+                             (UINT64)frame * MAX_VERTS * sizeof(Vert);
         vbv.StrideInBytes = sizeof(Vert);
         vbv.SizeInBytes = (UINT)(g_nverts * sizeof(Vert));
         ID3D12GraphicsCommandList_IASetVertexBuffers(g_list, 0, 1, &vbv);
@@ -257,8 +291,44 @@ long long og_present(void) {
 
     ID3D12CommandList *lists[] = {(ID3D12CommandList *)g_list};
     ID3D12CommandQueue_ExecuteCommandLists(g_queue, 1, lists);
-    IDXGISwapChain3_Present(g_swap, 1, 0);
-    fence_sync();   /* full sync per frame — correct first, overlap later */
+    /* 0x200 = DXGI_PRESENT_ALLOW_TEARING — required for uncapped
+     * present on flip-model when vsync is off. */
+    IDXGISwapChain3_Present(g_swap, g_vsync ? 1 : 0,
+                            (!g_vsync && g_tearing) ? 0x200 : 0);
+    g_fence_val++;
+    ID3D12CommandQueue_Signal(g_queue, g_fence, g_fence_val);
+    g_frame_fence[frame] = g_fence_val;
+    return 1;
+}
+
+long long og_vsync(long long on) {
+    g_vsync = on ? 1 : 0;
+    return 1;
+}
+
+long long og_caps(void) { return 2; /* 1 = software, 2 = d3d12 */ }
+
+long long og_resize(long long w, long long h) {
+    if (!g_swap || w <= 0 || h <= 0) return 0;
+    fence_sync(); /* full drain: backbuffers must be unreferenced */
+    for (int i = 0; i < FRAME_COUNT; i++) {
+        ID3D12Resource_Release(g_backbuf[i]);
+        g_backbuf[i] = NULL;
+    }
+    if (FAILED(IDXGISwapChain3_ResizeBuffers(g_swap, FRAME_COUNT, (UINT)w,
+            (UINT)h, DXGI_FORMAT_R8G8B8A8_UNORM,
+            g_tearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0)))
+        return 0;
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv;
+    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(g_rtv_heap, &rtv);
+    for (int i = 0; i < FRAME_COUNT; i++) {
+        IDXGISwapChain3_GetBuffer(g_swap, i, &IID_ID3D12Resource,
+                                  (void **)&g_backbuf[i]);
+        ID3D12Device_CreateRenderTargetView(g_dev, g_backbuf[i], NULL, rtv);
+        rtv.ptr += g_rtv_size;
+    }
+    g_width = (int)w;
+    g_height = (int)h;
     return 1;
 }
 

@@ -66,6 +66,24 @@ long long og_present(void) {
     return 1;
 }
 
+long long og_vsync(long long on) {
+    (void)on; /* software blit has no vblank to wait on */
+    return 1;
+}
+
+long long og_caps(void) { return 1; /* 1 = software, 2 = d3d12 */ }
+
+long long og_resize(long long w, long long h) {
+    if (w <= 0 || h <= 0) return 0;
+    uint32_t *fresh = (uint32_t *)malloc((size_t)w * h * 4);
+    if (!fresh) return 0;
+    free(g_fb);
+    g_fb = fresh;
+    g_width = (int)w;
+    g_height = (int)h;
+    return 1;
+}
+
 void og_shutdown(void) {
     win_paint_hook = 0;
     free(g_fb);
