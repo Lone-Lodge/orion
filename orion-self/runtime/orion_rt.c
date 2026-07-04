@@ -485,6 +485,14 @@ __attribute__((weak)) const char *orion_embedded_text(const char *path) {
 __attribute__((weak)) const char *orion_embedded_list(void) {
     return "";
 }
+/* Binary assets (WAVs contain NULs, so _text loses the length):
+ * returns the byte pointer and writes the true size. */
+__attribute__((weak)) const char *orion_embedded_data(const char *path,
+                                                      long long *size) {
+    (void)path;
+    if (size) *size = 0;
+    return "";
+}
 #endif
 
 /* Allocation telemetry: total requested bytes, and the subset served

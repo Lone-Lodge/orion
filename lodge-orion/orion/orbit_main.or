@@ -323,14 +323,56 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
 fn nb_clang() -> Text:
     if capture_stdout("where", ["clang"]) == "" then "C:\\Program Files\\LLVM\\bin\\clang.exe" else "clang"
 
+# Everything a shipped exe must carry: the toml, every script bundle
+# (scripts/ flat or features/<sub>/), the package roots the toml names
+# (paths embed EXACTLY as the runtime resolves them, ../ and all),
+# and the sounds/ WAVs (byte-embedded; the mixer reads them from the
+# manifest when the dir is gone).
+fn nb_add_astra(joined: Text, dir: Text) -> Text:
+    mut out = joined
+    if is_dir(dir):
+        files = list_dir(dir)
+        total = len(files)
+        for index in 0..<total:
+            file = nb_text_at(files, index)
+            if str_ends_with(file, ".astra"):
+                out = out + "," + dir + "/" + file
+    out
+
+fn nb_split_spaces(joined: Text) -> [Text]:
+    pieces = str_split(joined, " ")
+    total = len(pieces)
+    mut out = []
+    for index in 0..<total:
+        piece = nb_text_at(pieces, index)
+        if piece != "":
+            out = push(out, piece)
+    out
+
 fn nb_ship_files(name: Text) -> Text:
     mut joined = name + ".toml"
-    scripts = list_dir("scripts")
-    script_total = len(scripts)
-    for index in 0..<script_total:
-        file = nb_text_at(scripts, index)
-        if str_ends_with(file, ".astra"):
-            joined = joined + ",scripts/" + file
+    joined = nb_add_astra(joined, "scripts")
+    if is_dir("features"):
+        subs = list_dir("features")
+        sub_total = len(subs)
+        for s_index in 0..<sub_total:
+            sub = nb_text_at(subs, s_index)
+            if is_dir("features/" + sub):
+                joined = nb_add_astra(joined, "features/" + sub)
+    game_lines = nb_lines(read_file(name + ".toml"))
+    pkgs = nb_setting(game_lines, "packages", "")
+    if pkgs != "":
+        roots = nb_split_spaces(pkgs)
+        root_total = len(roots)
+        for r_index in 0..<root_total:
+            joined = nb_add_astra(joined, nb_text_at(roots, r_index))
+    if is_dir("sounds"):
+        wavs = list_dir("sounds")
+        wav_total = len(wavs)
+        for w_index in 0..<wav_total:
+            wav = nb_text_at(wavs, w_index)
+            if str_ends_with(wav, ".wav"):
+                joined = joined + ",sounds/" + wav
     joined
 
 # ZERO-GLUE: a game is scripts/ + a toml. When src/main.or is absent,
@@ -375,6 +417,14 @@ fn build_native(variant: Text) -> Text:
         if embed_rc != 0:
             die("orbit: asset embed failed")
         link_args = push(link_args, "build/scripts_embed.c")
+        # Icon + version block: a <name>.rc beside the toml compiles
+        # via llvm-rc and links in; absent = plain exe, no error.
+        if file_exists(name + ".rc"):
+            rc_rc = run_command("C:\\Program Files\\LLVM\\bin\\llvm-rc.exe", ["/FO", "build/" + name + ".res", name + ".rc"])
+            if rc_rc == 0:
+                link_args = push(link_args, "build/" + name + ".res")
+            else:
+                print(c_dim("orbit: llvm-rc failed — shipping without icon"))
     link_args = push(link_args, "-Os")
     link_args = push(link_args, "-o")
     link_args = push(link_args, exe)
@@ -391,6 +441,12 @@ fn build_native(variant: Text) -> Text:
     remove_file(ll)
     if variant == "ship":
         remove_file("build/scripts_embed.c")
+        # Stage under build/ship/ as <name>.exe (never clobbers the
+        # dev exe) and zip it — the artifact you drag to itch.
+        mkdir_all("build/ship")
+        zip_rc = run_command("powershell", ["-NoProfile", "-Command", "Copy-Item build/" + name + "_ship.exe build/ship/" + name + ".exe -Force; Compress-Archive -Force -Path build/ship/" + name + ".exe -DestinationPath build/" + name + "-win64.zip"])
+        if zip_rc == 0:
+            print(c_bold("build/" + name + "-win64.zip") + " " + c_green("ready"))
     print(c_bold(exe) + " " + c_green("ok"))
     exe
 

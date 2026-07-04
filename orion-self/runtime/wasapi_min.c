@@ -247,22 +247,35 @@ static long long oa_rd32(const unsigned char *p) {
 }
 static int oa_rd16(const unsigned char *p) { return p[0] | (p[1] << 8); }
 
+extern long long orion_embedded_has(const char *path);
+extern const char *orion_embedded_data(const char *path, long long *size);
+
 long long orion_audio_load(const char *path) {
     if (oa_nsounds >= OA_MAX_SOUNDS) return -1;
-    FILE *f = fopen(path, "rb");
-    if (!f) return -1;
-    fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    unsigned char *raw = (unsigned char *)malloc(sz);
-    if (!raw || fread(raw, 1, sz, f) != (size_t)sz) {
+    /* Ship builds carry the WAV bytes inside the exe; dev reads disk.
+     * `heap` is NULL for embedded data — free(NULL) is a no-op. */
+    unsigned char *heap = NULL;
+    const unsigned char *raw;
+    long long sz = 0;
+    if (orion_embedded_has(path)) {
+        raw = (const unsigned char *)orion_embedded_data(path, &sz);
+    } else {
+        FILE *f = fopen(path, "rb");
+        if (!f) return -1;
+        fseek(f, 0, SEEK_END);
+        sz = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        heap = (unsigned char *)malloc(sz);
+        if (!heap || fread(heap, 1, sz, f) != (size_t)sz) {
+            fclose(f);
+            free(heap);
+            return -1;
+        }
         fclose(f);
-        free(raw);
-        return -1;
+        raw = heap;
     }
-    fclose(f);
     if (sz < 44 || memcmp(raw, "RIFF", 4) || memcmp(raw + 8, "WAVE", 4)) {
-        free(raw);
+        free(heap);
         return -1;
     }
     int fmt_tag = 0, nch = 0, bits = 0;
@@ -283,7 +296,7 @@ long long orion_audio_load(const char *path) {
     }
     if (data_off < 0 || src_rate <= 0 || nch < 1 || nch > 2 ||
         !(bits == 16 || (bits == 32 && fmt_tag == 3))) {
-        free(raw);
+        free(heap);
         return -1;
     }
     long long src_frames = data_len / (nch * bits / 8);
@@ -291,7 +304,7 @@ long long orion_audio_load(const char *path) {
     long long dst_frames = src_frames * rate / src_rate;
     float *out = (float *)malloc(dst_frames * 2 * sizeof(float));
     if (!out) {
-        free(raw);
+        free(heap);
         return -1;
     }
     const unsigned char *d = raw + data_off;
@@ -317,7 +330,7 @@ long long orion_audio_load(const char *path) {
         out[i * 2] = l0 + (l1 - l0) * t;
         out[i * 2 + 1] = r0 + (r1 - r0) * t;
     }
-    free(raw);
+    free(heap);
     int id = oa_nsounds++;
     oa_sounds[id].frames = out;
     oa_sounds[id].nframes = dst_frames;

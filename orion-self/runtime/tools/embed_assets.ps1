@@ -20,7 +20,7 @@ foreach ($f in $Files) {
     $bytes = [System.IO.File]::ReadAllBytes($f)
     $key = $f.Replace('\', '/')
     [void]$sb.AppendLine("static const char p$i[] = `"$key`";")
-    $hex = ($bytes | ForEach-Object { $_ }) -join ','
+    $hex = [string]::Join(',', $bytes)
     [void]$sb.AppendLine("static const char d$i[] = {$hex,0};")
     $i++
 }
@@ -34,6 +34,13 @@ for ($j = 0; $j -lt $i; $j++) {
 for ($j = 0; $j -lt $i; $j++) {
     [void]$sb.AppendLine("    if (strcmp(path, p$j) == 0) return d$j;")
 }
+[void]$sb.AppendLine("    return `"`";")
+[void]$sb.AppendLine("}")
+[void]$sb.AppendLine("const char *orion_embedded_data(const char *path, long long *size) {")
+for ($j = 0; $j -lt $i; $j++) {
+    [void]$sb.AppendLine("    if (strcmp(path, p$j) == 0) { if (size) *size = sizeof(d$j) - 1; return d$j; }")
+}
+[void]$sb.AppendLine("    if (size) *size = 0;")
 [void]$sb.AppendLine("    return `"`";")
 [void]$sb.AppendLine("}")
 $allPaths = ($Files | ForEach-Object { $_.Replace('\', '/') }) -join '\n'
