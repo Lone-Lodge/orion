@@ -116,6 +116,18 @@ static wchar_t* to_wide(const char* s) {
 
 int64_t win_open(const char* title, int64_t w, int64_t h) {
     ensure_class();
+    /* 1ms timer resolution: without it every Sleep() rounds up to
+     * ~15.6ms and the frame-budget pacing quantizes to 16/31ms —
+     * which plays as sub-30fps stutter. Loaded dynamically so
+     * headless builds never touch winmm. */
+    {
+        HMODULE mm = LoadLibraryA("winmm.dll");
+        if (mm) {
+            typedef unsigned int (WINAPI *TbpFn)(unsigned int);
+            TbpFn tbp = (TbpFn)GetProcAddress(mm, "timeBeginPeriod");
+            if (tbp) tbp(1);
+        }
+    }
     wchar_t* wtitle = to_wide(title);
     /* w/h are the requested CLIENT size — grow the outer rect by the
      * frame so games get exactly the pixels they laid out for. */
