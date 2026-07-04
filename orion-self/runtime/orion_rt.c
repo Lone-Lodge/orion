@@ -628,6 +628,38 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
             "offset up in build/<name>.map%s\n",
             c_red(), (unsigned long)info->ExceptionRecord->ExceptionCode,
             at - base, c_off());
+    /* Self-service minidump: WER is unreliable on dev boxes, so the
+     * filter writes crash.dmp next to the exe (dbghelp loaded
+     * dynamically — zero link cost for headless builds). Open with
+     * `lldb exe -c crash.dmp -o bt`. */
+    {
+        HMODULE dh = LoadLibraryA("dbghelp.dll");
+        if (dh) {
+            typedef BOOL(WINAPI *MdwFn)(HANDLE, DWORD, HANDLE, int, void *,
+                                        void *, void *);
+            MdwFn mdw = (MdwFn)GetProcAddress(dh, "MiniDumpWriteDump");
+            if (mdw) {
+                HANDLE f = CreateFileA("crash.dmp", GENERIC_WRITE, 0, NULL,
+                                       CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+                                       NULL);
+                if (f != INVALID_HANDLE_VALUE) {
+                    struct {
+                        DWORD ThreadId;
+                        PEXCEPTION_POINTERS ExceptionPointers;
+                        BOOL ClientPointers;
+                    } mei = {GetCurrentThreadId(), info, FALSE};
+                    /* 2 = MiniDumpWithFullMemory */
+                    mdw(GetCurrentProcess(), GetCurrentProcessId(), f, 2,
+                        &mei, NULL, NULL);
+                    CloseHandle(f);
+                    fprintf(stderr,
+                            "%s[orion]        crash.dmp written — lldb "
+                            "<exe> -c crash.dmp -o bt%s\n",
+                            c_red(), c_off());
+                }
+            }
+        }
+    }
     /* Access violations carry the faulting data address; a 0xdd..dd
      * byte pattern means a read through region memory poisoned at
      * reset — a lifetime bug, not a wild pointer. */
