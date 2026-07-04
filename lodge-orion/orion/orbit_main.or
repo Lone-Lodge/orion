@@ -478,6 +478,21 @@ fn cmd_native():
     else:
         die("usage: orbit native [gpu|ship]")
 
+# The shadow verdict: compile the candidate, replay the last real
+# session under it, chaos-soak a fresh world, return the verdict.
+# usage: orbit try [soak-ticks] [seed]
+fn cmd_try():
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    ticks = nb_int(first_param(), 8000)
+    seed = nb_int(second_param(), 42)
+    q = bytes_to_text(push([], 34))
+    src = "use atlas_project\n\nfn main() -> int:\n    project_try(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
+    mkdir_all("target")
+    write_file("target/try_gen.or", src)
+    exe = build_native_entry("try", "target/try_gen.or")
+    exit_with(run_command(exe, []))
+
 # The engine plays the game: headless seeded chaos session with
 # invariants (backwards tick = FAIL, screen-change cause ledger).
 # usage: orbit soak [ticks] [seed]
@@ -548,4 +563,7 @@ pub fn main():
                                     if command == "soak":
                                         cmd_soak()
                                     else:
-                                        usage()
+                                        if command == "try":
+                                            cmd_try()
+                                        else:
+                                            usage()
