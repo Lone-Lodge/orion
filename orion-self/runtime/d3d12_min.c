@@ -73,8 +73,38 @@ long long og_init(long long hwnd_i, long long width, long long height) {
     g_width = (int)width;
     g_height = (int)height;
 
-    if (FAILED(D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0,
-                                 &IID_ID3D12Device, (void **)&g_dev)))
+    /* Pick a REAL adapter: the default can be a BMC/software device
+     * (ASPEED on server boards) and everything silently runs at
+     * software speed. Enumerate, skip software-flagged adapters,
+     * take the first that creates a device. */
+    {
+        IDXGIFactory4 *f = NULL;
+        if (SUCCEEDED(CreateDXGIFactory1(&IID_IDXGIFactory4, (void **)&f))) {
+            IDXGIAdapter1 *ad = NULL;
+            for (UINT i = 0;
+                 IDXGIFactory4_EnumAdapters1(f, i, &ad) != DXGI_ERROR_NOT_FOUND;
+                 i++) {
+                DXGI_ADAPTER_DESC1 desc;
+                IDXGIAdapter1_GetDesc1(ad, &desc);
+                if (!(desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) &&
+                    SUCCEEDED(D3D12CreateDevice((IUnknown *)ad,
+                              D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device,
+                              (void **)&g_dev))) {
+                    fprintf(stderr, "[d3d12] adapter: %ls (%lluMB)\n",
+                            desc.Description,
+                            (unsigned long long)(desc.DedicatedVideoMemory /
+                                                 (1024 * 1024)));
+                    IDXGIAdapter1_Release(ad);
+                    break;
+                }
+                IDXGIAdapter1_Release(ad);
+                ad = NULL;
+            }
+            IDXGIFactory4_Release(f);
+        }
+    }
+    if (!g_dev && FAILED(D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0,
+                                           &IID_ID3D12Device, (void **)&g_dev)))
         return 0;
 
     D3D12_COMMAND_QUEUE_DESC qd = {0};
