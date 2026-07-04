@@ -1279,8 +1279,15 @@ fn emit_runtime() -> Text:
     # that slips past the guards faults immediately instead of
     # corrupting every empty list in the program.
     text = "{text}@orion_empty_list = constant [2 x i64] zeroinitializer\n\n"
+    # NULL in = "" out: a missing text (unknown fn result, absent map
+    # field) evacuates to empty instead of strlen(NULL) crashing.
     text = "{text}define ptr @orion_persist_text(ptr %s) \{\n"
     text = "{text}entry:\n"
+    text = "{text}  %is_null = icmp eq ptr %s, null\n"
+    text = "{text}  br i1 %is_null, label %ret_empty, label %copy_it\n"
+    text = "{text}ret_empty:\n"
+    text = "{text}  ret ptr @.empty_str\n"
+    text = "{text}copy_it:\n"
     text = "{text}  %n = call i64 @strlen(ptr %s)\n"
     text = "{text}  %n1 = add i64 %n, 1\n"
     text = "{text}  %copy = call ptr @malloc(i64 %n1)\n"
