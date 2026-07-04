@@ -489,13 +489,18 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         result = "    {value_ref(my_id)} = call i64 @orion_slot_get_int(ptr {value_ref(inst.value)})"
 
     if op == "slot_set":
-        # val_id may be i64 or ptr — cast ptr→i64 for uniform storage.
+        # val_id may be i64 or ptr. Pointer values pass the evacuation
+        # boundary: a region-born value deep-copies to the malloc heap
+        # (typed by the static code below) instead of dangling — the
+        # old guard's abort survives only for types with no copier.
         val_inst = at(fn_value.instructions, inst.lhs)
         val_ty = llvm_type_of(val_inst.type_text)
         if val_ty == "ptr":
+            code = evac_code(val_inst.type_text)
+            evp = "%v{my_id}.ev"
             tmp = "%v{my_id}.sp"
-            l0 = "    call void @orion_arena_ptr_guard(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.value)})"
-            l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
+            l0 = "    {evp} = call ptr @orion_slot_evac(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.value)}, i64 {code})"
+            l1 = "    {tmp} = ptrtoint ptr {evp} to i64"
             l2 = "    {value_ref(my_id)} = call i64 @orion_slot_set(ptr {value_ref(inst.value)}, i64 {tmp})"
             result = "{l0}\n{l1}\n{l2}"
         else:
@@ -853,6 +858,23 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
 # --- Function and module ---
 
+# Evacuation type code for the slot-store boundary — what
+# orion_slot_evac needs to deep-copy a region-born value. 0 = no
+# copier (opaque struct/fn/ptr): in-region still fails fast.
+fn evac_code(orion_type: Text) -> int:
+    if orion_type == "text":
+        1
+    else if orion_type == "list" or orion_type == "list:i64" or orion_type == "list:f64":
+        2
+    else if orion_type == "list:text":
+        3
+    else if orion_type == "map":
+        4
+    else if orion_type == "list:map":
+        5
+    else:
+        0
+
 fn llvm_type_of(orion_type: Text) -> Text:
     mut is_struct = false
     mut is_list_elem = false
@@ -1017,6 +1039,7 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @orion_audio_debug_plays()\n"
     text = "{text}declare void @orion_audio_shutdown()\n"
     text = "{text}declare void @orion_arena_ptr_guard(ptr, ptr)\n"
+    text = "{text}declare ptr @orion_slot_evac(ptr, ptr, i64)\n"
     # libm — float math builtins lower to these.
     text = "{text}declare double @sqrt(double)\n"
     text = "{text}declare double @sin(double)\n"

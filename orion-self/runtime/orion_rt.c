@@ -328,6 +328,95 @@ void orion_arena_ptr_guard(const char *p, const char *key) {
     }
 }
 
+/* ---- Persistence-boundary evacuation (memory-safety class 2) ----
+ * slot_set with a pointer value routes here instead of the guard: a
+ * pointer into the arena/frame region would dangle at the next reset,
+ * so the store EVACUATES a deep copy to the malloc heap, typed by the
+ * code the emitter derived statically at the callsite:
+ *   0 opaque  (struct/fn/unknown — abort if in-region, can't copy)
+ *   1 text    2 flat list    3 list of texts
+ *   4 map     5 list of maps
+ * Layouts mirror the emitted LLVM exactly: list = [cap][len][elems],
+ * map handle = [entries][cap][len] with (key,val) i64 pairs. Map keys
+ * copy when they point into a region (text keys born there); int keys
+ * never alias region addresses in practice. Map VALUES are untyped —
+ * an in-region value still aborts, but now with the reason. */
+static int oe_in_region(const void *p) {
+    return (arena_base && (const unsigned char *)p >= arena_base &&
+            (const unsigned char *)p < arena_base + arena_cap) ||
+           (frame_base && (const unsigned char *)p >= frame_base &&
+            (const unsigned char *)p < frame_base + frame_cap);
+}
+static void oe_fatal(const char *what, const char *key) {
+    fprintf(stderr,
+            "%s[orion] FATAL: %s born in a region stored in persistent "
+            "slot '%s' - no copier for its type; persist the value "
+            "explicitly%s\n",
+            c_red(), what, key, c_off());
+    fflush(stderr);
+    abort();
+}
+static const char *oe_text(const char *p) {
+    if (!p) return "";
+    size_t n = strlen(p) + 1;
+    char *c = (char *)malloc(n);
+    memcpy(c, p, n);
+    return c;
+}
+static long long *oe_list_spine(const long long *src) {
+    long long len = src[1];
+    long long *dst = (long long *)malloc((size_t)(len * 8 + 16));
+    dst[0] = len;
+    dst[1] = len;
+    memcpy(dst + 2, src + 2, (size_t)len * 8);
+    return dst;
+}
+static const char *oe_map(const char *p, const char *key) {
+    const long long *h = (const long long *)p;
+    const long long *ent = (const long long *)(uintptr_t)h[0];
+    long long cap = h[1], len = h[2];
+    if (cap < 4) cap = 4;
+    long long *nh = (long long *)malloc(24);
+    long long *ne = (long long *)malloc((size_t)cap * 16);
+    nh[0] = (long long)(uintptr_t)ne;
+    nh[1] = cap;
+    nh[2] = len;
+    for (long long i = 0; i < len; i++) {
+        long long k = ent[i * 2], v = ent[i * 2 + 1];
+        if (oe_in_region((const void *)(uintptr_t)k))
+            k = (long long)(uintptr_t)oe_text((const char *)(uintptr_t)k);
+        if (oe_in_region((const void *)(uintptr_t)v))
+            oe_fatal("map value", key);
+        ne[i * 2] = k;
+        ne[i * 2 + 1] = v;
+    }
+    return (const char *)nh;
+}
+const char *orion_slot_evac(const char *p, const char *key, long long code) {
+    if (!p || !oe_in_region(p)) return p;
+    if (code == 1) return oe_text(p);
+    if (code == 2) return (const char *)oe_list_spine((const long long *)p);
+    if (code == 3) {
+        long long *d = oe_list_spine((const long long *)p);
+        for (long long i = 0; i < d[1]; i++)
+            if (oe_in_region((const void *)(uintptr_t)d[i + 2]))
+                d[i + 2] = (long long)(uintptr_t)
+                    oe_text((const char *)(uintptr_t)d[i + 2]);
+        return (const char *)d;
+    }
+    if (code == 4) return oe_map(p, key);
+    if (code == 5) {
+        long long *d = oe_list_spine((const long long *)p);
+        for (long long i = 0; i < d[1]; i++)
+            if (oe_in_region((const void *)(uintptr_t)d[i + 2]))
+                d[i + 2] = (long long)(uintptr_t)
+                    oe_map((const char *)(uintptr_t)d[i + 2], key);
+        return (const char *)d;
+    }
+    oe_fatal("value", key);
+    return p;
+}
+
 /* Change stamp for a file: mixes mtime and size, 0 when missing.
  * Lets hot-reload polls skip reading unchanged files entirely. */
 long long orion_file_stamp(const char *path) {
