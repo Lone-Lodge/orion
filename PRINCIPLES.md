@@ -15,7 +15,8 @@ forbids it. Old-school demoscene discipline, next-gen language design.
 | Cold start → first frame | ≤ 200 ms | (measure at phase 3) |
 | Native full rebuild of a game | ≤ 1 s | compiler self-compiles in 292 ms |
 | Idle RAM, 2D game | ≤ 64 MB | (measure at phase 3) |
-| Perf floor | 60 fps on integrated graphics, 2-core CPU | — |
+| Perf floor | 60 fps on integrated graphics, 2-core CPU | software backend 240 fps, d3d12 ~1400 fps (cubsy, 1280×720 windowed) |
+| Perf ceiling honesty | GPU backend must be uncapped-capable (no hidden vsync/adapter traps) | ✓ tearing + adapter logged at init |
 | Runtime dependencies | libc + OS APIs, nothing else | ✓ holds |
 
 ### Rules that keep us under budget

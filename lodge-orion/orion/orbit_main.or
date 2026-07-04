@@ -367,11 +367,9 @@ fn build_native(variant: Text) -> Text:
         compile_args = push(compile_args, at(dirs, d_index))
     if run_command(compiler, compile_args) != 0:
         die("orbit: native compile failed")
-    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/win32_min.c", runtime + "/wasapi_min.c"]
-    if variant == "gpu":
-        link_args = push(link_args, runtime + "/d3d12_min.c")
-    else:
-        link_args = push(link_args, runtime + "/gdi_min.c")
+    # Both renderers always link; ogpu_min.c dispatches at og_init
+    # from the game toml's `renderer = auto|gdi|gpu` (default auto).
+    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/win32_min.c", runtime + "/wasapi_min.c", runtime + "/ogpu_min.c", runtime + "/gdi_min.c", runtime + "/d3d12_min.c"]
     if variant == "ship":
         embed_rc = run_command("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", runtime + "/tools/embed_assets.ps1", "-Out", "build/scripts_embed.c", "-Files", nb_ship_files(name)])
         if embed_rc != 0:
@@ -386,9 +384,8 @@ fn build_native(variant: Text) -> Text:
     # Always emit the link map: the runtime's crash filter prints
     # module-relative offsets, and this is what resolves them.
     link_args = push(link_args, "-Wl,/MAP:build/" + name + ".map")
-    if variant == "gpu":
-        link_args = push(link_args, "-ld3d12")
-        link_args = push(link_args, "-ldxgi")
+    link_args = push(link_args, "-ld3d12")
+    link_args = push(link_args, "-ldxgi")
     if run_command(nb_clang(), link_args) != 0:
         die("orbit: link failed")
     remove_file(ll)

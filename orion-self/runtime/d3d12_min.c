@@ -68,7 +68,7 @@ static void fence_sync(void) {
     }
 }
 
-long long og_init(long long hwnd_i, long long width, long long height) {
+long long dx_og_init(long long hwnd_i, long long width, long long height) {
     HWND hwnd = (HWND)(uintptr_t)hwnd_i;
     g_width = (int)width;
     g_height = (int)height;
@@ -242,7 +242,7 @@ long long og_init(long long hwnd_i, long long width, long long height) {
  * slots the CPU records frame N while the GPU draws frame N-1. This
  * is the overlap the v0.0 "full sync per present" left on the table
  * (it played at half vsync). */
-void og_begin(long long r, long long g, long long b) {
+void dx_og_begin(long long r, long long g, long long b) {
     g_frame = (int)IDXGISwapChain3_GetCurrentBackBufferIndex(g_swap);
     if (ID3D12Fence_GetCompletedValue(g_fence) < g_frame_fence[g_frame]) {
         ID3D12Fence_SetEventOnCompletion(g_fence, g_frame_fence[g_frame],
@@ -258,7 +258,7 @@ void og_begin(long long r, long long g, long long b) {
 
 /* Append one rect = 2 triangles = 6 verts. Pixel coords → NDC here so
  * the shader stays a passthrough. */
-void og_rect(long long x, long long y, long long w, long long h,
+void dx_og_rect(long long x, long long y, long long w, long long h,
               long long r, long long g, long long b) {
     if (g_nverts + 6 > MAX_VERTS) return;
     float x0 = (float)x / (float)g_width * 2.0f - 1.0f;
@@ -277,7 +277,7 @@ void og_rect(long long x, long long y, long long w, long long h,
     g_nverts += 6;
 }
 
-long long og_present(void) {
+long long dx_og_present(void) {
     UINT frame = (UINT)g_frame;
 
     ID3D12CommandAllocator_Reset(g_alloc[frame]);
@@ -331,14 +331,14 @@ long long og_present(void) {
     return 1;
 }
 
-long long og_vsync(long long on) {
+long long dx_og_vsync(long long on) {
     g_vsync = on ? 1 : 0;
     return 1;
 }
 
-long long og_caps(void) { return 2; /* 1 = software, 2 = d3d12 */ }
+long long dx_og_caps(void) { return 2; /* 1 = software, 2 = d3d12 */ }
 
-long long og_resize(long long w, long long h) {
+long long dx_og_resize(long long w, long long h) {
     if (!g_swap || w <= 0 || h <= 0) return 0;
     fence_sync(); /* full drain: backbuffers must be unreferenced */
     for (int i = 0; i < FRAME_COUNT; i++) {
@@ -362,7 +362,7 @@ long long og_resize(long long w, long long h) {
     return 1;
 }
 
-void og_shutdown(void) {
+void dx_og_shutdown(void) {
     if (g_queue) fence_sync();
     /* Deliberately no Release cascade — process exit reclaims
      * everything; a game calls this once. */
