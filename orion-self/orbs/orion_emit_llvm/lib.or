@@ -1012,6 +1012,7 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @orion_frame_high()\n"
     text = "{text}declare i64 @orion_frame_cap()\n"
     text = "{text}declare i64 @orion_pool_used(i64)\n"
+    text = "{text}declare i64 @orion_pool_pressure(i64)\n"
     text = "{text}declare i64 @orion_pool_high(i64)\n"
     text = "{text}declare i64 @orion_pool_cap(i64)\n"
     text = "{text}declare i64 @orion_os_private_kb()\n"

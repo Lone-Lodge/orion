@@ -277,6 +277,13 @@ long long orion_pool_used(long long i) {
     if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_used[i];
 }
+/* True pressure: in-buffer bytes PLUS the overflow chain — a full
+ * pool spills to malloc silently, and compaction thresholds must
+ * see that, not a number frozen at capacity. */
+long long orion_pool_pressure(long long i) {
+    if (i < 0 || i >= pool_count) return 0;
+    return (long long)(pool_used[i] + pool_ovf_bytes[i]);
+}
 long long orion_pool_high(long long i) {
     if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_high[i];
