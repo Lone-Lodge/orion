@@ -33,14 +33,31 @@ static OrionEvent ev_ring[EV_CAP];
 static int ev_head = 0, ev_tail = 0;   /* pop at head, push at tail */
 static OrionEvent ev_current;
 
+/* Input-to-present latency, CPU side: stamp the moment the OS hands
+ * us a user event; the engine samples the age right after present.
+ * (GPU/DWM tail is invisible from here — this measures OUR share.) */
+static LARGE_INTEGER g_last_input_qpc;
+
 static void ev_push(long long kind, long long key, long long x, long long y) {
     int next = (ev_tail + 1) % EV_CAP;
     if (next == ev_head) return;       /* full: drop newest (potato-simple) */
+    if (kind >= 1 && kind <= 5)
+        QueryPerformanceCounter(&g_last_input_qpc);
     ev_ring[ev_tail].kind = kind;
     ev_ring[ev_tail].key = key;
     ev_ring[ev_tail].x = x;
     ev_ring[ev_tail].y = y;
     ev_tail = next;
+}
+
+/* Microseconds since the last user input event landed; -1 = never. */
+long long win_input_age_us(void) {
+    if (g_last_input_qpc.QuadPart == 0) return -1;
+    LARGE_INTEGER now, freq;
+    QueryPerformanceCounter(&now);
+    QueryPerformanceFrequency(&freq);
+    return (now.QuadPart - g_last_input_qpc.QuadPart) * 1000000 /
+           freq.QuadPart;
 }
 
 long long win_event_next(void) {
