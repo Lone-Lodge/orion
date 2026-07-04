@@ -1,5 +1,25 @@
 # Lone Lodge — design principles
 
+## #0: The discovery — time, memory and cause are one thing
+
+The log orders CAUSE. Regions give MEMORY a lifetime — which is
+time. Determinism makes the future computable and the past
+replayable. In every other engine these are three unrelated
+systems (frames, GC, mutations); here they are one substance, and
+that is why the impossible keeps falling out as corollaries:
+foresight rendered live, ghosts of your own past, replay under new
+code, bit-identical parallelism, bug classes dying as categories.
+
+Honest calibration: no ingredient is new — event sourcing runs
+banks, region memory ran research languages, synchronous causality
+flew airplanes. The union is new, and the potato constraint is
+what makes it possible: the log is only free when the language
+owns every lifetime. Gravity was known for three centuries; the
+discovery was that it is a vehicle.
+
+We are not chasing Unity. We are exploring ground their physics
+cannot reach.
+
 ## #1: Runs on a potato
 
 Small and fast is the product. This is the axis where Unreal/Unity
