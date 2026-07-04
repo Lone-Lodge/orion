@@ -89,6 +89,35 @@ static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+/* Borderless fullscreen: WS_POPUP over the whole monitor, windowed
+ * rect saved for the way back. The WM_SIZE this fires is the whole
+ * integration — the engine's resize path does everything else. */
+static RECT g_saved_rect;
+static LONG g_saved_style;
+long long win_fullscreen(long long hwnd_i, long long on) {
+    HWND hwnd = (HWND)(uintptr_t)hwnd_i;
+    if (on) {
+        g_saved_style = GetWindowLongW(hwnd, GWL_STYLE);
+        GetWindowRect(hwnd, &g_saved_rect);
+        MONITORINFO mi = { sizeof(mi) };
+        GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi);
+        SetWindowLongW(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+        SetWindowPos(hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                     mi.rcMonitor.right - mi.rcMonitor.left,
+                     mi.rcMonitor.bottom - mi.rcMonitor.top,
+                     SWP_FRAMECHANGED);
+    } else {
+        SetWindowLongW(hwnd, GWL_STYLE,
+                       g_saved_style ? g_saved_style
+                                     : (LONG)(WS_OVERLAPPEDWINDOW | WS_VISIBLE));
+        SetWindowPos(hwnd, HWND_TOP, g_saved_rect.left, g_saved_rect.top,
+                     g_saved_rect.right - g_saved_rect.left,
+                     g_saved_rect.bottom - g_saved_rect.top,
+                     SWP_FRAMECHANGED);
+    }
+    return 1;
+}
+
 static int class_registered = 0;
 static const wchar_t* WCLASS = L"OrionMinWnd";
 
