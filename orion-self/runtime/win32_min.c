@@ -50,6 +50,12 @@ static void ev_push(long long kind, long long key, long long x, long long y) {
     ev_tail = next;
 }
 
+/* Modifier probe for deliberate dev gestures (Ctrl+rightclick =
+ * rewind): async key state, no event plumbing needed. */
+long long win_key_held(long long vk) {
+    return (GetAsyncKeyState((int)vk) & 0x8000) ? 1 : 0;
+}
+
 /* Microseconds since the last user input event landed; -1 = never. */
 long long win_input_age_us(void) {
     if (g_last_input_qpc.QuadPart == 0) return -1;
