@@ -483,6 +483,7 @@ long long orion_audio_stop_music(long long fade_ms) {
 
 long long orion_audio_bus_gain(long long bus, long long gain,
                                long long fade_ms) {
+    if (!oa_ok) return 0; /* uninited oa_cs = write into zero page */
     if (bus < 0 || bus >= OA_BUSES) return 0;
     float g = gain / 100.0f;
     if (g < 0.0f) g = 0.0f;

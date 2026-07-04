@@ -25,6 +25,7 @@
 #include <dxgi1_5.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define FRAME_COUNT 2
 #define MAX_VERTS 65536           /* 10922 rects/frame — plenty for 2D */
@@ -42,6 +43,7 @@ static ID3D12RootSignature *g_rootsig;
 static ID3D12PipelineState *g_pso;
 static ID3D12Resource      *g_vbuf;      /* upload ring: FRAME_COUNT slots */
 static Vert                *g_vmap;      /* persistently mapped */
+static Vert                 g_stage[MAX_VERTS]; /* cached-RAM build buffer */
 static ID3D12Fence         *g_fence;
 static HANDLE               g_fence_evt;
 static UINT64               g_fence_val;
@@ -257,7 +259,11 @@ void dx_og_begin(long long r, long long g, long long b) {
 }
 
 /* Append one rect = 2 triangles = 6 verts. Pixel coords → NDC here so
- * the shader stays a passthrough. */
+ * the shader stays a passthrough.
+ * Verts build in a CACHED staging array, not the mapped upload heap:
+ * the upload heap is write-combined memory where scattered 24-byte
+ * stores cost ~330ns each — st53 measured it. One streaming memcpy
+ * at present is what WC memory is good at. */
 void dx_og_rect(long long x, long long y, long long w, long long h,
               long long r, long long g, long long b) {
     if (g_nverts + 6 > MAX_VERTS) return;
@@ -267,7 +273,7 @@ void dx_og_rect(long long x, long long y, long long w, long long h,
     float y1 = 1.0f - (float)(y + h) / (float)g_height * 2.0f;
     float cr = (float)r / 255.0f, cg = (float)g / 255.0f,
           cb = (float)b / 255.0f;
-    Vert *v = g_vmap + (size_t)g_frame * MAX_VERTS + g_nverts;
+    Vert *v = g_stage + g_nverts;
     v[0] = (Vert){x0, y0, cr, cg, cb, 1};
     v[1] = (Vert){x1, y0, cr, cg, cb, 1};
     v[2] = (Vert){x0, y1, cr, cg, cb, 1};
@@ -279,6 +285,9 @@ void dx_og_rect(long long x, long long y, long long w, long long h,
 
 long long dx_og_present(void) {
     UINT frame = (UINT)g_frame;
+    if (g_nverts > 0)
+        memcpy(g_vmap + (size_t)frame * MAX_VERTS, g_stage,
+               (size_t)g_nverts * sizeof(Vert));
 
     ID3D12CommandAllocator_Reset(g_alloc[frame]);
     ID3D12GraphicsCommandList_Reset(g_list, g_alloc[frame], g_pso);
