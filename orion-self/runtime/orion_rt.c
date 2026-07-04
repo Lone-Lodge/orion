@@ -250,6 +250,12 @@ long long orion_pool_alloc(void) {
     return i;
 }
 
+/* Pool selection is a small STACK: a log/snapshot pool selected
+ * inside a world-state scope must restore the OUTER pool on off,
+ * not drop to persist — that drop was an invisible leak-by-scope. */
+static int pool_prev[8];
+static int pool_depth = 0;
+
 long long orion_pool_on(long long i) {
     if (i < 0 || i >= pool_count) return 0;
     if (!pool_base[i]) {
@@ -257,11 +263,15 @@ long long orion_pool_on(long long i) {
         pool_cap[i] = POOL_START;
         pool_used[i] = 0;
     }
+    if (pool_depth < 8) pool_prev[pool_depth++] = pool_active;
     pool_active = (int)i;
     return 1;
 }
 
-long long orion_pool_off(void) { pool_active = -1; return 1; }
+long long orion_pool_off(void) {
+    pool_active = pool_depth > 0 ? pool_prev[--pool_depth] : -1;
+    return 1;
+}
 
 long long orion_pool_used(long long i) {
     if (i < 0 || i >= pool_count) return 0;
