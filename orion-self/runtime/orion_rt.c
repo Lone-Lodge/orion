@@ -618,6 +618,57 @@ long long orion_arena_high(void) { return (long long)arena_high; }
  * region's overflow list (same lifetime, freed at its reset) and the
  * reset grows the buffer — so overflow costs a slow cycle, not a
  * leak, and does not count as persist growth. */
+/* ---- Malloc-fallback ledger: WHO is dripping? ----
+ * Orb code brackets suspicious regions with orion_ledger_tag(name);
+ * every allocation that falls through to raw malloc credits the
+ * innermost active tag. orion_ledger_dump prints the table. Zero
+ * bookkeeping on region-served allocations — this watches only the
+ * immortal route. Tags nest like pools (small stack). */
+#define OL_MAX 32
+static char ol_names[OL_MAX][24];
+static long long ol_bytes[OL_MAX];
+static int ol_count = 0;
+static int ol_cur = -1;
+static int ol_prev[8];
+static int ol_depth = 0;
+
+long long orion_ledger_tag(const char *name) {
+    int idx = -1;
+    for (int i = 0; i < ol_count; i++)
+        if (strncmp(ol_names[i], name, 23) == 0) { idx = i; break; }
+    if (idx < 0 && ol_count < OL_MAX) {
+        idx = ol_count++;
+        size_t n = strlen(name);
+        if (n > 23) n = 23;
+        memcpy(ol_names[idx], name, n);
+        ol_names[idx][n] = 0;
+        ol_bytes[idx] = 0;
+    }
+    if (ol_depth < 8) ol_prev[ol_depth++] = ol_cur;
+    ol_cur = idx;
+    return idx;
+}
+long long orion_ledger_off(void) {
+    ol_cur = ol_depth > 0 ? ol_prev[--ol_depth] : -1;
+    return 1;
+}
+static long long ol_untagged = 0;
+static void ol_note(long long size) {
+    if (ol_cur >= 0) ol_bytes[ol_cur] += size;
+    else ol_untagged += size;
+}
+long long orion_ledger_dump(void) {
+    long long total = ol_untagged;
+    for (int i = 0; i < ol_count; i++) {
+        total += ol_bytes[i];
+        if (ol_bytes[i] > 0)
+            fprintf(stderr, "[ledger] %-23s %lld B\n", ol_names[i],
+                    ol_bytes[i]);
+    }
+    fprintf(stderr, "[ledger] %-23s %lld B\n", "(untagged)", ol_untagged);
+    return total;
+}
+
 void *orion_alloc(long long size) {
     alloc_total += size;
     if (pool_active >= 0 && !arena_on) {
@@ -656,6 +707,7 @@ void *orion_alloc(long long size) {
         if (p) return p;
     }
     alloc_malloc += size;
+    ol_note(size);
     return malloc((size_t)size);
 }
 
@@ -910,7 +962,15 @@ const char *orion_dir_subdirs(const char *dir) {
         len += n;
     } while (FindNextFileA(h, &fd));
     FindClose(h);
-    return out;
+    /* Evacuate into the scope allocator and free the growth buffer —
+     * the raw malloc leaked one listing per call, forever (the soak
+     * ledger billed script reloads ~16KB each for these). */
+    {
+        char *evac = (char *)orion_alloc((long long)len + 1);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
 }
 
 const char *orion_dir_list(const char *dir) {
@@ -934,7 +994,12 @@ const char *orion_dir_list(const char *dir) {
         len += n;
     } while (FindNextFileA(h, &fd));
     FindClose(h);
-    return out;
+    {
+        char *evac = (char *)orion_alloc((long long)len + 1);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
 }
 long long __orion_time_now_ms(void) {
     FILETIME ft; GetSystemTimeAsFileTime(&ft);

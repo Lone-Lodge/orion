@@ -50,6 +50,21 @@ fn verb() -> Text:
 fn first_param() -> Text:
     if arg_count() < 3 then "" else arg(2)
 
+fn second_param() -> Text:
+    if arg_count() < 4 then "" else arg(3)
+
+fn nb_int(t: Text, fallback: int) -> int:
+    bs = bytes_from_text(t)
+    n = len(bs)
+    if n == 0:
+        return fallback
+    mut v = 0
+    for i in 0..<n:
+        c = at(bs, i)
+        if c >= 48 and c <= 57:
+            v = v * 10 + (c - 48)
+    v
+
 # ---------- usage / die ----------
 
 fn usage():
@@ -390,6 +405,11 @@ fn entry_path(name: Text) -> Text:
         "target/main_gen.or"
 
 fn build_native(variant: Text) -> Text:
+    build_native_entry(variant, "")
+
+# entry_override != "" compiles a custom entry (soak harness) instead
+# of the game's own main.
+fn build_native_entry(variant: Text, entry_override: Text) -> Text:
     if not file_exists("Orbit.toml"):
         die("orbit: no Orbit.toml in this directory")
     lines = nb_lines(read_file("Orbit.toml"))
@@ -402,7 +422,8 @@ fn build_native(variant: Text) -> Text:
     suffix = if variant == "" then "" else "_" + variant
     exe = "build/" + name + suffix + ".exe"
     ll = "build/" + name + ".ll"
-    mut compile_args = [entry_path(name), ll]
+    entry = if entry_override == "" then entry_path(name) else entry_override
+    mut compile_args = [entry, ll]
     dirs = nb_orb_dirs(lines)
     dir_total = len(dirs)
     for d_index in 0..<dir_total:
@@ -457,6 +478,23 @@ fn cmd_native():
     else:
         die("usage: orbit native [gpu|ship]")
 
+# The engine plays the game: headless seeded chaos session with
+# invariants (backwards tick = FAIL, screen-change cause ledger).
+# usage: orbit soak [ticks] [seed]
+fn cmd_soak():
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    t_param = first_param()
+    s_param = second_param()
+    ticks = nb_int(t_param, 20000)
+    seed = nb_int(s_param, 42)
+    q = bytes_to_text(push([], 34))
+    src = "use atlas_project\n\nfn main() -> int:\n    project_soak(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
+    mkdir_all("target")
+    write_file("target/soak_gen.or", src)
+    exe = build_native_entry("soak", "target/soak_gen.or")
+    exit_with(run_command(exe, []))
+
 # Guard-style split — an else after a nested if binds to the inner
 # one (interp parser dangling-else).
 fn cmd_play():
@@ -507,4 +545,7 @@ pub fn main():
                                 if command == "play":
                                     cmd_play()
                                 else:
-                                    usage()
+                                    if command == "soak":
+                                        cmd_soak()
+                                    else:
+                                        usage()
