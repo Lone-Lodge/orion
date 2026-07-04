@@ -170,3 +170,13 @@ int64_t win_pump(void) {
 void win_close(int64_t hwnd) {
     if (hwnd) DestroyWindow((HWND)(uintptr_t)hwnd);
 }
+
+/* Sleep until timeout OR any input/window message arrives — the
+ * event-driven idle with ZERO added input latency: a click lands,
+ * the loop wakes instantly instead of finishing a Sleep() quantum. */
+int64_t win_wait_input(int64_t ms) {
+    if (ms <= 0) return 0;
+    /* 0x04FF = QS_ALLINPUT */
+    return (int64_t)MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD)ms,
+                                              0x04FF);
+}

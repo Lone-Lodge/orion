@@ -282,6 +282,13 @@ impl<'a> Interp<'a> {
             {
                 return Ok(Value::Int(1));
             }
+            if name == "win_wait_input" {
+                if let Some(Value::Int(ms)) = args.first() {
+                    let ms = (*ms).clamp(0, 1000) as u64;
+                    std::thread::sleep(std::time::Duration::from_millis(ms));
+                }
+                return Ok(Value::Int(0));
+            }
             // Audio null backend under the interpreter: emissions are
             // observable world effects, playback needs the native mixer.
             if name.starts_with("orion_audio_") {
