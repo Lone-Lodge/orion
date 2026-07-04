@@ -628,6 +628,30 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
             "offset up in build/<name>.map%s\n",
             c_red(), (unsigned long)info->ExceptionRecord->ExceptionCode,
             at - base, c_off());
+    /* Poor man's backtrace: scan the crashed thread's stack for
+     * return addresses inside our module and print them
+     * module-relative — every line greps straight into the link map.
+     * No dbghelp, no symbols, always works. */
+    if (info->ContextRecord) {
+        unsigned long long rip = info->ContextRecord->Rip;
+        unsigned long long rsp = info->ContextRecord->Rsp;
+        unsigned long long lo = base, hi = base + 0x200000ULL;
+        fprintf(stderr, "%s[orion]        stack:", c_red());
+        int printed = 0;
+        if (rip >= lo && rip < hi) {
+            fprintf(stderr, " +0x%llx", rip - base);
+            printed++;
+        }
+        unsigned long long *sp = (unsigned long long *)rsp;
+        for (int i = 0; i < 512 && printed < 12; i++) {
+            unsigned long long v = sp[i];
+            if (v >= lo && v < hi) {
+                fprintf(stderr, " +0x%llx", v - base);
+                printed++;
+            }
+        }
+        fprintf(stderr, "%s\n", c_off());
+    }
     /* Self-service minidump: WER is unreliable on dev boxes, so the
      * filter writes crash.dmp next to the exe (dbghelp loaded
      * dynamically — zero link cost for headless builds). Open with
@@ -639,7 +663,7 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                                         void *, void *);
             MdwFn mdw = (MdwFn)GetProcAddress(dh, "MiniDumpWriteDump");
             if (mdw) {
-                HANDLE f = CreateFileA("crash.dmp", GENERIC_WRITE, 0, NULL,
+                HANDLE f = CreateFileA("crash.dmp", GENERIC_READ | GENERIC_WRITE, 0, NULL,
                                        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
                                        NULL);
                 if (f != INVALID_HANDLE_VALUE) {
@@ -648,10 +672,17 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                         PEXCEPTION_POINTERS ExceptionPointers;
                         BOOL ClientPointers;
                     } mei = {GetCurrentThreadId(), info, FALSE};
-                    /* 2 = MiniDumpWithFullMemory */
-                    mdw(GetCurrentProcess(), GetCurrentProcessId(), f, 2,
-                        &mei, NULL, NULL);
+                    /* try full memory, fall back to normal */
+                    BOOL ok = mdw(GetCurrentProcess(), GetCurrentProcessId(),
+                                  f, 2, &mei, NULL, NULL);
+                    if (!ok)
+                        ok = mdw(GetCurrentProcess(), GetCurrentProcessId(),
+                                 f, 0, &mei, NULL, NULL);
+                    if (!ok)
+                        fprintf(stderr, "[orion]        dump failed: %lu\n",
+                                (unsigned long)GetLastError());
                     CloseHandle(f);
+                    if (ok)
                     fprintf(stderr,
                             "%s[orion]        crash.dmp written — lldb "
                             "<exe> -c crash.dmp -o bt%s\n",
