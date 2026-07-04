@@ -1430,6 +1430,14 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
         else:
             call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
+            arity_key = "otir:arity:" + callee
+            if slot_has(arity_key):
+                want = slot_get_int(arity_key)
+                got = len(arg_ids)
+                if got != want:
+                    a_line = if has(node, "line") then get_int(node, "line") else 0
+                    a_col = if has(node, "col") then get_int(node, "col") else 0
+                    compile_error("orion-self: ERROR at line {a_line}:{a_col} — `{callee}` takes {want} argument(s), got {got}")
             pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
     result
@@ -2433,10 +2441,15 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             fn_seen = push_mut(fn_seen, fn_name)
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
+            # Arity registry (compiler slots): a call with the wrong
+            # argument count silently shifts every parameter — caught
+            # here instead of as a runtime pointer crash.
+            slot_set("otir:arity:" + fn_name, len(get_list(decl, "params")))
         if decl_kind_1b == "ExternFn":
             ext_name = get(decl, "name")
             ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, ext_name, ext_ret)
+            slot_set("otir:arity:" + ext_name, len(get_list(decl, "params")))
 
     # Pass 2: build each fn's body with the signature scope available.
     # ExternFn becomes a body-less IRFn (params + ret, zero instructions);

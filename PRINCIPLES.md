@@ -94,6 +94,24 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
    persist the WRITE (the swap, the cache insert), not the probe. An
    over-wide persist scope is the one leak the poison can't catch.
 
+### Determinism rules (the log is only worth what replay proves)
+
+1. **Game logic is integer-only.** libm floats are not bit-identical
+   across machines — replay verification, leaderboards and lockstep
+   break silently. Floats belong to the render side only.
+2. **Fixed timestep.** world_tick(16) is the standard; wall-clock
+   never reaches rules. Frame pacing is presentation, not simulation.
+3. **Effects are outcomes, not simulation.** when-rules + dirty
+   gating keep the log sparse. Particles, animation and physics
+   tweens are DERIVED render data — never entities, never effects.
+   The effect log has a density ceiling; respect it by construction.
+4. **Slot store is engine caches only** — unlogged and
+   non-deterministic, so game state never lives there. Game state
+   lives in worlds, where it is effects and history.
+5. **Flat namespaces need manners.** Prefix resources per feature
+   (ui_*, drag_*); text resources end _script/_truths/_txt so the
+   int-only auto-ctx skips them.
+
 ### Anti-goals
 
 - Feature parity with Unreal. We win by being 1000x smaller, not by

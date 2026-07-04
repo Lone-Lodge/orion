@@ -288,6 +288,19 @@ long long orion_pool_reset(long long i) {
     return 1;
 }
 
+/* Map keys are OWNED by the map: text keys copy on FIRST insert, so a
+ * caller's transient key can never dangle inside a longer-lived map.
+ * The copy allocates in the current scope — the same lifetime as the
+ * spine growth the insert may do. Kills the shared-key-pointer bug
+ * class (two poison-caught crashes in one day) at the language level. */
+void *orion_alloc(long long size);
+const char *orion_key_copy(const char *key) {
+    size_t n = strlen(key) + 1;
+    char *copy = (char *)orion_alloc((long long)n);
+    memcpy(copy, key, n);
+    return copy;
+}
+
 /* Lifetime tripwire: a pointer that lies inside the arena buffer is
  * arena-born and dies at the next reset — storing it in a persistent
  * structure is always a latent use-after-reset. Emitted slot-store
@@ -552,6 +565,21 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
             "offset up in build/<name>.map%s\n",
             c_red(), (unsigned long)info->ExceptionRecord->ExceptionCode,
             at - base, c_off());
+    /* Access violations carry the faulting data address; a 0xdd..dd
+     * byte pattern means a read through region memory poisoned at
+     * reset — a lifetime bug, not a wild pointer. */
+    if (info->ExceptionRecord->ExceptionCode == 0xC0000005 &&
+        info->ExceptionRecord->NumberParameters >= 2) {
+        unsigned long long bad = info->ExceptionRecord->ExceptionInformation[1];
+        int poison = ((bad >> 8) & 0xffffffffULL) == 0xddddddddULL ||
+                     (bad & 0xffffffff00ULL) == 0xdddddddd00ULL ||
+                     ((bad >> 16) & 0xffffffffULL) == 0xddddddddULL;
+        fprintf(stderr, "%s[orion]        %s address 0x%llx%s%s\n", c_red(),
+                info->ExceptionRecord->ExceptionInformation[0] ? "writing"
+                                                               : "reading",
+                bad, poison ? " (0xDD poison: reset region memory)" : "",
+                c_off());
+    }
     fflush(stderr);
     return EXCEPTION_CONTINUE_SEARCH; /* still crash, still WER */
 }

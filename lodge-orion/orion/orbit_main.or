@@ -130,7 +130,15 @@ fn cmd_add():
 
 fn resolve_path() -> Text:
     candidate = first_param()
-    if candidate == "" then "src/main.or" else candidate
+    mut path = candidate
+    if candidate == "":
+        path = "src/main.or"
+        # Zero-glue projects have no src/main.or — synthesize the
+        # entry here too, so check/build/test match native/play.
+        if not file_exists("src/main.or") and file_exists("Orbit.toml"):
+            lines = nb_lines(read_file("Orbit.toml"))
+            path = entry_path(nb_setting(lines, "name", "game"))
+    path
 
 fn cmd_build():
     path = resolve_path()
