@@ -282,6 +282,14 @@ impl<'a> Interp<'a> {
             {
                 return Ok(Value::Int(1));
             }
+            // Audio null backend under the interpreter: emissions are
+            // observable world effects, playback needs the native mixer.
+            if name.starts_with("orion_audio_") {
+                return Ok(Value::Int(match name {
+                    "orion_audio_init" | "orion_audio_bus_gain" => 1,
+                    _ => 0,
+                }));
+            }
             if name == "orion_dir_list" {
                 let Some(Value::Text(dir)) = args.first() else {
                     return Ok(Value::Text(String::new()));

@@ -404,6 +404,41 @@ __attribute__((constructor)) static void orion_stdio_init(void) {
 }
 #endif
 
+/* Audio null backend: weak stubs COUNT instead of play. Linking
+ * wasapi_min.c (orbit native does) overrides them with the real
+ * mixer; headless gates link without it and assert the counters —
+ * audio is testable because emission and playback are separate. */
+#if defined(__GNUC__) || defined(__clang__)
+static long long audio_null_plays = 0;
+static long long audio_null_sounds = 0;
+__attribute__((weak)) long long orion_audio_init(void) { return 1; }
+__attribute__((weak)) long long orion_audio_load(const char *path) {
+    (void)path;
+    return audio_null_sounds++;
+}
+__attribute__((weak)) long long orion_audio_play(long long id, long long gain,
+                                                 long long pan, long long pitch,
+                                                 long long bus) {
+    (void)id; (void)gain; (void)pan; (void)pitch; (void)bus;
+    return audio_null_plays++;
+}
+__attribute__((weak)) long long orion_audio_music(long long id, long long gain) {
+    (void)id; (void)gain;
+    return audio_null_plays++;
+}
+__attribute__((weak)) long long orion_audio_stop_music(void) { return 1; }
+__attribute__((weak)) long long orion_audio_bus_gain(long long bus,
+                                                     long long gain) {
+    (void)bus; (void)gain;
+    return 1;
+}
+__attribute__((weak)) long long orion_audio_playing(void) { return 0; }
+__attribute__((weak)) long long orion_audio_debug_plays(void) {
+    return audio_null_plays;
+}
+__attribute__((weak)) void orion_audio_shutdown(void) {}
+#endif
+
 /* Embedded assets: a build step generates a strong scripts_embed.c
  * (tools/embed_assets.ps1) that overrides these weak defaults; the
  * plain build misses every lookup and games read from disk instead.

@@ -367,7 +367,7 @@ fn build_native(variant: Text) -> Text:
         compile_args = push(compile_args, at(dirs, d_index))
     if run_command(compiler, compile_args) != 0:
         die("orbit: native compile failed")
-    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/win32_min.c"]
+    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/win32_min.c", runtime + "/wasapi_min.c"]
     if variant == "gpu":
         link_args = push(link_args, runtime + "/d3d12_min.c")
     else:
@@ -382,6 +382,7 @@ fn build_native(variant: Text) -> Text:
     link_args = push(link_args, exe)
     link_args = push(link_args, "-luser32")
     link_args = push(link_args, "-lgdi32")
+    link_args = push(link_args, "-lole32")
     # Always emit the link map: the runtime's crash filter prints
     # module-relative offsets, and this is what resolves them.
     link_args = push(link_args, "-Wl,/MAP:build/" + name + ".map")
