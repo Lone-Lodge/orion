@@ -32,12 +32,34 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
 
 ### Phase A — the language describes TRUTH, not steps
 
-- [ ] **A1. Reactive `derive`** (#1, #11) — `derive alive := health > 0`.
-  A resource that is ALWAYS its expression; the runtime recomputes it
-  when a dep changes (deps are known from facts — the dependency net).
-  This is idea #1 made syntax: a graph, not an instruction list.
-  Kills manual cache invalidation (#11: `derive TotalHealth := sum(Health)`).
-  *Touches:* `lang` + `sims`. *Scope:* M. *Foundational — do first.*
+- [x] **A1. Reactive `derive`** (#1, #11) — `derive alive = health > 0`. ✓ 2026-07-05
+  SHIPPED as parser sugar (no core-datatype surgery after all): `derive
+  NAME = EXPR` desugars to a Tick rule `SetVar(NAME, EXPR)`, reusing the
+  whole rule->dispatch->set pipeline. Lexer `Derive` keyword + parser
+  branch, ~40 lines, gate st89 (alive tracks health>0). The program
+  describes what is TRUE. v2 follow-up: recompute only when a dep changes
+  (facts.reads of the expr) instead of every tick — the reactive net.
+  **SCOPED to the file (2026-07-05), execute in this order:**
+  1. `astra_lexer/lib.or` — add `Derive` to the `Tok` enum; `keyword_of`
+     maps `"derive"` → `Derive`. (Mirror `const`/`Const` exactly.)
+  2. `astra_parser/lib.or` — reuse the `=` (Assign) form of
+     `parse_const_decl` (no `:=` needed). Add `data Derivation: name, value`
+     (or reuse ConstDecl shape). Add `derivations` to `ParseResult` —
+     BOTH construction sites (the fail branch ~L132 and the ok branch
+     ~L134) must add the field. Add a `Derive` dispatch branch in `parse`.
+  3. `astra_run/lib.or` — add `derivations` to `data Compiled` and thread
+     it through EVERY `Compiled{...}` literal (compile, compile_c,
+     compiled_copy, the empty/fallback) — grep `Compiled{` first, miss
+     none or astra won't build.
+  4. `atlas_project/lib.or` — in `run_sims`, after the rule passes and
+     before drain, recompute each derivation: `res_set_int_silent(world,
+     "{prefix}{name}", eval_in_env(expr, ctx, funcs))`. v1 recomputes
+     every pass; the reactive-only-when-deps-change optimization (via
+     facts.reads of the derive expr) is a v2 follow-up.
+  5. Gate st89: a bundle with `derive alive = health > 0`; set health>0
+     → alive==1; set health=0 → alive==0, WITHOUT any rule writing alive.
+  RISK: ParseResult + Compiled are constructed in many places; a missed
+  literal breaks astra compilation. Do step 3's grep first.
 
 - [ ] **A2. Laws-sugar** (#7) — `law Death:`, `entity becomes Dead`,
   `after 1.5s:`. Sugar over existing when/set/spawn so a rule reads
