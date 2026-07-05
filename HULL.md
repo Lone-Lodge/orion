@@ -92,6 +92,15 @@ compile emits nid-resolved refs, auto-ctx array, dispatch paths.
 1-2 blocks. Measure with st63 before/after; expect the largest
 single sims win since the 30x.
 
+⭐ HARVEST SHIPPED 2026-07-05 (the H1 headers pay rent, deferred
+from H1 by design): orion_text_eq — same-ptr, then length, then
+cached header hash; only equal hashes touch bytes. text_eq/ne and
+all five text-key map families route through it; stored map keys
+are headered copies by construction so the reject is provenance-
+safe. Fixpoint v3==v4; gate st75. Dirty sims 158us -> 95us/frame
+(-40%) same machine same hour. The nid rewrite above remains the
+main dig — this was the toll it collects on the way in.
+
 ## H4. World: views subscribe to effects (columnar is just view #1)
 
 Today: state maps-of-maps; the plan said "columnar SoA" which is
