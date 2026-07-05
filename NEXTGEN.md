@@ -152,9 +152,22 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     correct hp stays clean; symmetric). Read-only, additive; cubsy soak
     green. v1: int resources (text divergence not seen — game facts that
     matter for belief are positions/hp/flags).
-  - [ ] **`belief NAME:` blocks** — astra syntax to declare a named belief
-    world and seed its (possibly wrong) facts. Rides project_fork + the
-    divergence primitive. `lang` + thin atlas wiring. M.
+  - [x] **`belief NAME:` blocks** ✓ 2026-07-05 — astra syntax for an
+    agent's believed facts, shipped as PURE PARSER SUGAR (no separate
+    World object, no fork lifecycle — the clean reframing, like after).
+    A belief is a resource NAMESPACE: `belief Guard: player_x = 5`
+    desugars to a Tick rule setting `belief:Guard:player_x = 5`, so the
+    belief is re-asserted each tick and its divergence from the real
+    `player_x` is a resource-prefix comparison. `belief_wrong(world,
+    prefix, name)` (atlas_project) scans `<prefix>belief:<name>:<fact>`
+    and returns the bare facts that disagree with reality — exactly what
+    the agent believes that ISN'T true. Gates st100 (desugar: facts land
+    in the namespace, never touch real facts) + st101 (belief_wrong names
+    exactly the wrong fact, hp stays clean, converges to 0 when the agent
+    learns the truth); cubsy soak 2000 deterministic, no regression.
+    Lexer `Belief` keyword + parser branch + parse_belief_decl, ~45 lines.
+    NOTE: this namespace model does NOT simulate the belief forward — for
+    that see foresee-on-belief below (the fork model, distinct slice).
   - [ ] **Foresee-on-belief** — an agent plans over its belief world
     (project_foresee on the fork), so the plan can be WRONG when the
     belief is. The payoff: emergent mistakes, discovery, mystery. M.
