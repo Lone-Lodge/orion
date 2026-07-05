@@ -158,6 +158,14 @@ B6. **Saving**: the log IS the save — append it continuously
     loss becomes impossible by construction; "Saving..." dies as
     a concept. Databases call it WAL and need racks. Closest to
     reach of the whole dig (the recorder almost does it).
+    ⭐ FIRST SLICE SHIPPED 2026-07-05: the crash report survives
+    to crash.txt (unbuffered tee — the filter itself may die),
+    autosave heartbeat rides the compact-poll site (full=1
+    fidelity), recovery boot sees the marker and stands where it
+    stood. Gate st72. The full log-append form (crash = replay,
+    not checkpoint) remains the bedrock dig; the next language
+    step is supervision — rule quarantine + in-process rewind
+    (needs the fn-ref/SEH bridge).
 B8. **Device input**: the log records INTENT ("place piece col
     3"), device->intent is a pure replaceable layer. Replays
     survive UI redesign (replay-diff robust across versions!),
