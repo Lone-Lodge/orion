@@ -79,7 +79,7 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     (schedule a body to run N seconds later). The valuable, harder half —
     the only remaining piece of A2. *Touches:* `sims`. M.
 
-- [~] **A3. Relations first-class** (#5, #6) — CREATE done; QUERY next.
+- [x] **A3. Relations first-class** (#5, #6) — CREATE + QUERY ✓ 2026-07-05.
   - [x] **`relate A kind B`** ✓ 2026-07-05 — creates a real atlas relation
     from a rule (`relate player owns sword`), forward+reverse queryable via
     related_to/from. Stmt.RelateStmt -> AstraRelate -> atlas Relate. Two
