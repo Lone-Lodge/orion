@@ -39,6 +39,12 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
   branch, ~40 lines, gate st89 (alive tracks health>0). The program
   describes what is TRUE. v2 follow-up: recompute only when a dep changes
   (facts.reads of the expr) instead of every tick — the reactive net.
+  **RUNTIME BUG FOUND + FIXED 2026-07-05:** st89 proved derive at the
+  EFFECT level, but the set-drain (apply_set) dropped bool payloads to 0
+  — so `derive alive = health > 0` stored 0 at runtime regardless. Fixed
+  apply_set to store {"bool": b} as 1/0 (gate st106); cubsy soak
+  bit-identical (it uses no bool sets, so zero behavior change). derive-
+  with-a-predicate now tracks truth live, not just in the gate.
   **SCOPED to the file (2026-07-05), execute in this order:**
   1. `astra_lexer/lib.or` — add `Derive` to the `Tok` enum; `keyword_of`
      maps `"derive"` → `Derive`. (Mirror `const`/`Const` exactly.)
@@ -202,10 +208,26 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
   *Touches:* `lang` (parser only). *Scope:* was L; the parallel-resource
   reframing made it S.
 
-- [ ] **B3. Constraints / goals** (#8) — `goal: NPC inside House`,
-  `constraints: avoid Water, avoid Fire`. Runtime solves the HOW.
-  Describe the world, not the behavior — emergence (#9) is the payoff.
-  *Touches:* `lang` + `rt` (solver). *Scope:* L, spekulativt.
+- [~] **B3. Constraints / goals** (#8) — the world states its INTENT.
+  - [x] **Declaration + evaluation** ✓ 2026-07-05 — `goal NAME = cond`
+    and `constraint NAME = cond` desugar (like derive) to a Tick rule
+    keeping `goal:NAME` / `constraint:NAME` at 1 while the predicate
+    holds (coerced to int). The engine continuously SCORES intent —
+    `goals_met(world, prefix)` lists achieved goals, `constraints_
+    violated` lists broken ones. Goals/constraints are first-class,
+    queryable, always-current facts a rule can react to (`when
+    constraints_violated...`). Gate st105 (goal reach met, far unmet;
+    constraint wet violated; both desugar + runtime queries); cubsy soak
+    green. Lexer Goal/Constraint keywords + parse_prefixed_derive; the
+    top-level dispatch was flattened into parse_belief_goal_or_rule.
+  - [ ] **The SOLVER** — runtime plans HOW to achieve a goal under the
+    constraints (pathfind/search). This is the genuinely speculative,
+    L-scope half — emergence (#9) is its payoff. The declaration layer
+    above is the foundation it stands on: a solver needs the goal/
+    constraint predicates to score candidate plans against, which now
+    exist as scannable facts. Distinct future arc.
+  *Touches:* `lang` (parser) + `rt` (queries; solver later). *Scope:* the
+  declaration layer was S; the solver stays L/speculative.
 
 ### Phase C — execute the parallelism, close the runtime loops
 
