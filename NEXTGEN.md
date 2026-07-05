@@ -72,16 +72,28 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     the law: `law Gravity: on Tick(): ...` gives an otherwise-anonymous
     rule the name `Gravity`, so facts/why/quarantine identify it. Pure
     parser sugar over parse_rule (Law keyword + parse_law_decl). Gate st91.
+    VALIDATED IN PRODUCTION: cubsy's scoring rule is now `law LineClear:`
+    — soak identical (behavior unchanged), and `why score` shows
+    `line_clear/LineClear` instead of anonymous `line_clear/Tick`.
   - [ ] **`after Ns:` delayed effect** — needs a timer wheel in sims
     (schedule a body to run N seconds later). The valuable, harder half —
     the only remaining piece of A2. *Touches:* `sims`. M.
 
 - [ ] **A3. Relations first-class** (#5, #6) — `relation owns(Player, Item)`,
   `when npc hates player and npc sees player: npc attacks player`.
-  atlas_ecs already has Relate/Unrelate effects — this is the astra
-  syntax + a relation query in eval. Makes the world a network, not
-  a component table.
-  *Touches:* `lang` + `rt` (relation index). *Scope:* M.
+  Makes the world a network, not a component table.
+  **SCOPED (2026-07-05): the RUNTIME is already DONE** — atlas_ecs has
+  Relate/Unrelate effects, bidirectional relations_fwd/rev index, cascade
+  cleanup on despawn, AND the queries `related_to(world, src, kind)` /
+  `related_from(world, target, kind)`. What remains is astra SYNTAX:
+  1. A relate statement in a rule body -> a new AstraEffect (AstraRelate)
+     mapped to atlas Relate. NOTE: AstraEffect is a core enum constructed
+     in many places (like ParseResult) — grep `AstraEffect`/each variant
+     first, or astra won't build. This is why it is NOT A1/A2-clean sugar.
+  2. A relation query builtin (`hates(x)` / `x hates y`) that the host
+     (atlas) resolves via related_to/from — eval is host-agnostic, so it
+     routes through a ctx binding or a host callback, not pure eval.
+  *Touches:* `lang` (astra effect+eval) + a thin atlas mapping. *Scope:* M.
 
 ### Phase B — knowledge, uncertainty, intent
 
