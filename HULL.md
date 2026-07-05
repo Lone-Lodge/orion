@@ -198,6 +198,16 @@ B9. **Determinism as discipline**: law — exactly THREE
     logged; the checker PROVES a bundle hides no randomness.
     Deterministic AI stops being a promise and becomes a
     certificate.
+    ⭐ FIRST INSTRUMENT SHIPPED 2026-07-05: project_state_sig —
+    the H1 hash of the full save text (compaction-proven
+    deterministic) is a per-frame state FINGERPRINT. Same code +
+    same input => an identical fingerprint trajectory, checkable
+    by eye or by gate. sig_first_divergence names the frame two
+    trajectories part: replay-diff (B3, the past under new code)
+    and the speedrun proof ride the same one int. Gate st79.
+    Still owed: intent-capture in the recorder (it logs effects,
+    not inputs) so a RECORDED session can be diffed across a
+    rebuilt binary, not just two in-process runs.
 B10. **Code as files**: a rule's identity = hash of its AST
     (Unison, for gameplay). Swap one rule = recompile one rule
     (B3's atom); global eternal compile cache; rules shared
