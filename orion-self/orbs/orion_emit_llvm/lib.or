@@ -1081,6 +1081,8 @@ fn emit_runtime() -> Text:
     text = "{text}declare void @orion_audio_shutdown()\n"
     text = "{text}declare void @orion_arena_ptr_guard(ptr, ptr)\n"
     text = "{text}declare ptr @orion_slot_evac(ptr, ptr, i64)\n"
+    text = "{text}declare void @orion_crumb(ptr, ptr, i64)\n"
+    text = "{text}declare void @orion_crumb_rule(ptr)\n"
     # libm — float math builtins lower to these.
     text = "{text}declare double @sqrt(double)\n"
     text = "{text}declare double @sin(double)\n"

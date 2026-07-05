@@ -843,6 +843,53 @@ void __orion_resume_text(char *value) {
  * and the MODULE-RELATIVE offset (symbolizable against the link map
  * orbit emits next to the exe) before dying. Fail fast, but say
  * where. */
+/* ---- The WHY: cause breadcrumbs ----
+ * The engine always knows which bundle/event/rule is executing —
+ * a crash should say so. Dispatch layers drop crumbs (bounded
+ * copies into static rings, zero alloc, ~20ns); the crash filter
+ * prints the trail newest-first. WHAT (exception+poison), WHERE
+ * (symbolized stack), WHY (this trail): the full diagnosis. */
+#define CRUMB_N 8
+static char crumb_bundle[CRUMB_N][40];
+static char crumb_event[CRUMB_N][24];
+static long long crumb_tick_v[CRUMB_N];
+static int crumb_head = -1;
+static char crumb_rule[64];
+
+static void crumb_copy(char *dst, const char *src, size_t cap) {
+    size_t i = 0;
+    if (src)
+        while (src[i] && i < cap - 1) { dst[i] = src[i]; i++; }
+    dst[i] = 0;
+}
+
+void orion_crumb(const char *bundle, const char *event, long long tick) {
+    crumb_head = (crumb_head + 1) % CRUMB_N;
+    crumb_copy(crumb_bundle[crumb_head], bundle, sizeof crumb_bundle[0]);
+    crumb_copy(crumb_event[crumb_head], event, sizeof crumb_event[0]);
+    crumb_tick_v[crumb_head] = tick;
+    crumb_rule[0] = 0;
+}
+
+void orion_crumb_rule(const char *rule) {
+    crumb_copy(crumb_rule, rule, sizeof crumb_rule);
+}
+
+static void crash_print_crumbs(void) {
+    if (crumb_head < 0) return;
+    if (crumb_rule[0])
+        fprintf(stderr, "%s[orion]   while rule `%s`%s\n", c_red(),
+                crumb_rule, c_off());
+    fprintf(stderr, "%s[orion]   cause trail:", c_red());
+    for (int k = 0; k < CRUMB_N; k++) {
+        int i = (crumb_head - k + CRUMB_N) % CRUMB_N;
+        if (!crumb_bundle[i][0] && !crumb_event[i][0]) break;
+        fprintf(stderr, " %s/%s@%lld", crumb_bundle[i], crumb_event[i],
+                crumb_tick_v[i]);
+    }
+    fprintf(stderr, "%s\n", c_off());
+}
+
 /* Crashes symbolize THEMSELVES: the filter loads the link map that
  * orbit always emits next to the exe (<exe>.map) and resolves every
  * module-relative offset to `function +0x..` inline. No debugger,
@@ -909,6 +956,7 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
     crash_sym(at - base, sym, sizeof sym);
     fprintf(stderr, "%s[orion] FATAL: exception 0x%lx at %s%s\n", c_red(),
             (unsigned long)info->ExceptionRecord->ExceptionCode, sym, c_off());
+    crash_print_crumbs();
     /* Backtrace: scan the crashed thread's stack for return addresses
      * inside our module, symbolized inline. No dbghelp, always works. */
     if (info->ContextRecord) {
