@@ -203,12 +203,24 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
   deterministically (bit-identical to serial). World-first #1, executed.
   *Touches:* `rt` + `arch`. *Scope:* L. *Needs the deterministic-parallel proof.*
 
-- [ ] **C2. Runtime provenance → timeline + live `explain`** (#2, #10) —
-  tag each logged effect with the rule/event/tick that caused it, so
-  `explain wolf.dead` walks the ACTUAL playthrough ("Player emitted
-  Attack → DamageTaken(12) → Health<0 → Death rule"), and a timeline
-  view lists events with their causes. why/affects are the static
-  graph; this is the runtime instance on top of it.
+- [~] **C2. Runtime provenance → timeline + live `explain`** (#2, #10) —
+  why/affects are the static causal graph; this is the live instance.
+  - [x] **`resource_history(world, key)`** ✓ 2026-07-05 — a resource's
+    ACTUAL value-trajectory across the playthrough, walked from the tick
+    log (which already records every logged SetResource with its tick).
+    `explain score` shows what score really was, tick by tick, in THIS
+    run — no hot-path change, the data was already there. Gate st103
+    (score 5@t0 → 20@t1 → 100@t2 recovered in order, hp separate); cubsy
+    soak green. Byte-matches the key (native Text == is pointer eq).
+  - [ ] **Cause enrichment** — tag each change with the RULE/event that
+    caused it ("Death rule set wolf.dead because Health<0"). The crux
+    (honestly scoped): the SetVar effect loses its rule identity by drain
+    time (drain runs after ALL bundles in a pass). Needs either per-bundle
+    draining with a `cur_bundle` slot, or threading cause through the
+    effect payload from dispatch. That is the real M-scope runtime work;
+    the value-history above is the clean slice that needs no plumbing.
+  - [ ] **Timeline view** — a tool listing all logged changes across
+    resources by tick (rides resource_history over the full key set).
   *Touches:* `rt` (log provenance) + `tool`. *Scope:* M.
 
 - [ ] **C3. Self-learning scheduler** (belief #5) — measure per-rule
