@@ -109,6 +109,43 @@ and upgrade to (bundle nid, rule index) once H3 lands. This is
 the causality query's first link AND the agent's DisplayList-diff
 surface. Cheap, rides on H3.
 
+## BEDROCK — beneath the hull (assumptions we have not yet torn up)
+
+Not scheduled. Inscribed so the expeditions know what they are
+walking toward. Three inherited assumptions, each removable:
+
+B1. **The tick** (Spacewar 1962): why does time advance in fixed
+    slices at all? Tear it out: time = the log's index; effects
+    ARE the clock; rules subscribe to change instead of being
+    polled. Cost becomes proportional to CHANGE, not to time —
+    worlds at different rates for free, sub-tick causality,
+    determinism by definition. We already proved half of it
+    (idle = 0 frames); the Oracle is an exercise in this.
+
+B2. **The pointer**: why is identity a memory address? Next floor
+    down from regions: identity = BIRTH COORDINATE in the log —
+    not where a value lives but when and why it arose. A pointer
+    becomes a time coordinate; serialization, network sync and
+    structural sharing across forks become free (same coordinate
+    system everywhere). Unison did this for code; nobody has done
+    it for living game state via cause. H3's nids are the first
+    step down this mine. Open problem: hot-path cost of
+    coordinates vs raw pointers (likely hybrid).
+
+B3. **The code/data wall**: why does code live OUTSIDE the
+    timeline? Game events enter the log; code changes enter git —
+    two separate universes. Tear the wall: code changes are
+    effects too. The timeline contains its own evolution;
+    replay-diff stops being a tool and becomes a property (the
+    log KNOWS when the rules changed); hot-swap is just an
+    effect; version control and the runtime merge. Git and the
+    engine become the same thing. Zero-build is this bedrock's
+    kindergarten.
+
+B4 (engineering-deep, not new space): deterministic math as a
+    language type (fixed-point/rationals with a guarantee) — the
+    door future physics needs for bit-identical cross-platform.
+
 ## Untouched by design (frozen is a feature)
 
 Effect log format; the six-pool world lifetime model; orb
