@@ -68,11 +68,13 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     parse_set_stmt accept `Becomes` alongside `Assign`). Reads like a
     world rule, means a state set. Gate st90; cubsy check + soak green.
     Cleared the one dead reserved keyword.
-  - [ ] **`law NAME:` grouping** — a named block of rules (cosmetic
-    label + optional shared `require`). Pure parser sugar. S.
+  - [x] **`law NAME:`** ✓ 2026-07-05 — names the following rule after
+    the law: `law Gravity: on Tick(): ...` gives an otherwise-anonymous
+    rule the name `Gravity`, so facts/why/quarantine identify it. Pure
+    parser sugar over parse_rule (Law keyword + parse_law_decl). Gate st91.
   - [ ] **`after Ns:` delayed effect** — needs a timer wheel in sims
-    (schedule a body to run N seconds later). The valuable, harder half.
-    *Touches:* `sims`. M.
+    (schedule a body to run N seconds later). The valuable, harder half —
+    the only remaining piece of A2. *Touches:* `sims`. M.
 
 - [ ] **A3. Relations first-class** (#5, #6) — `relation owns(Player, Item)`,
   `when npc hates player and npc sees player: npc attacks player`.
