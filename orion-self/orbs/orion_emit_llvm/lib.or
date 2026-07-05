@@ -390,16 +390,19 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         result = "{l1}\n{l2}"
 
     if op == "print_str":
-        # Look up the global name for this string and call puts.
+        # Look up the global name for this string and call puts —
+        # the bytes start 16 past the H1 header.
         idx = string_list_index(strings, inst.name)
-        l1 = "    call i32 @puts(ptr @.str_{idx})"
+        ps_name = "%v{my_id}.ps"
+        l0 = "    {ps_name} = getelementptr i8, ptr @.str_{idx}, i64 16"
+        l1 = "    call i32 @puts(ptr {ps_name})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
-        result = "{l1}\n{l2}"
+        result = "{l0}\n{l1}\n{l2}"
 
     if op == "const_str":
         idx = string_list_index(strings, inst.name)
         # Pointer to the first byte of the global string.
-        result = "    {value_ref(my_id)} = getelementptr i8, ptr @.str_{idx}, i64 0"
+        result = "    {value_ref(my_id)} = getelementptr i8, ptr @.str_{idx}, i64 16"
 
     if op == "text_concat":
         result = "    {value_ref(my_id)} = call ptr @orion_text_concat(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.rhs)})"
@@ -408,7 +411,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         result = "    {value_ref(my_id)} = call ptr @orion_int_to_text(i64 {value_ref(inst.value)})"
 
     if op == "text_len":
-        result = "    {value_ref(my_id)} = call i64 @strlen(ptr {value_ref(inst.value)})"
+        result = "    {value_ref(my_id)} = call i64 @orion_tlen(ptr {value_ref(inst.value)})"
 
     if op == "text_slice":
         result = "    {value_ref(my_id)} = call ptr @orion_text_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
@@ -430,8 +433,12 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         arr_name = "%v{my_id}.arr"
         l1 = "    {arr_name} = load ptr, ptr @orion_argv"
         l2 = "    {slot_name} = getelementptr ptr, ptr {arr_name}, i64 {value_ref(inst.value)}"
-        l3 = "    {value_ref(my_id)} = load ptr, ptr {slot_name}"
-        result = "{l1}\n{l2}\n{l3}"
+        raw_name = "%v{my_id}.raw"
+        l3 = "    {raw_name} = load ptr, ptr {slot_name}"
+        # argv strings are foreign C strings — wrap into headered
+        # texts at the boundary.
+        l4 = "    {value_ref(my_id)} = call ptr @orion_text_from_c(ptr {raw_name})"
+        result = "{l1}\n{l2}\n{l3}\n{l4}"
 
     if op == "bytes_from_text":
         v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
@@ -959,13 +966,43 @@ pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
         orion_text_join(chunks)
 
 
-# Emit the global for a single string literal.
-# Format: @.str_N = private unnamed_addr constant [LEN x i8] c"<bytes>\00"
+# Emit the global for a single string literal, H1-headered:
+# [hash:i64 LE][len:i64 LE][bytes][NUL], align 8 — references GEP
+# +16 to the bytes. Hash is BAKED (rodata cannot lazy-write):
+# polynomial base 131 seed 5381 mod 1e9+7, identical to the
+# runtime's orion_text_hash, remapped 0 -> 1.
 fn emit_string_global(text_value: Text, idx: int) -> Text:
     bs = bytes_from_text(text_value)
-    n = len(bs) + 1                          # +1 for null terminator
+    blen = len(bs)
+    n = blen + 17
     escaped = llvm_escape(text_value)
-    "@.str_{idx} = private unnamed_addr constant [{n} x i8] c\"{escaped}\\00\""
+    h = bake_hash(bs)
+    header = i64_le_escapes(h) + i64_le_escapes(blen)
+    "@.str_{idx} = private unnamed_addr constant [{n} x i8] c\"{header}{escaped}\\00\", align 8"
+
+fn bake_hash(bs: [int]) -> int:
+    n = len(bs)
+    mut h = 5381
+    for i in 0..<n:
+        h = (h * 131 + at(bs, i)) - ((h * 131 + at(bs, i)) / 1000000007) * 1000000007
+    if h == 0 then 1 else h
+
+fn i64_le_escapes(v: int) -> Text:
+    mut out = ""
+    mut x = v
+    for i in 0..<8:
+        b = x - (x / 256) * 256
+        out = out + "\\" + hex2(b)
+        x = x / 256
+    out
+
+fn hex2(b: int) -> Text:
+    hi = b / 16
+    lo = b - hi * 16
+    hex1(hi) + hex1(lo)
+
+fn hex1(d: int) -> Text:
+    if d == 0 then "0" else if d == 1 then "1" else if d == 2 then "2" else if d == 3 then "3" else if d == 4 then "4" else if d == 5 then "5" else if d == 6 then "6" else if d == 7 then "7" else if d == 8 then "8" else if d == 9 then "9" else if d == 10 then "A" else if d == 11 then "B" else if d == 12 then "C" else if d == 13 then "D" else if d == 14 then "E" else "F"
 
 
 # Runtime helpers in LLVM IR. Defined alongside user code so we can
@@ -1087,13 +1124,13 @@ fn emit_runtime() -> Text:
     text = "{text}sum_bdy:\n"
     text = "{text}  %p_int = call i64 @orion_list_at(ptr %parts, i64 %i)\n"
     text = "{text}  %p = inttoptr i64 %p_int to ptr\n"
-    text = "{text}  %l = call i64 @strlen(ptr %p)\n"
+    text = "{text}  %l = call i64 @orion_tlen(ptr %p)\n"
     text = "{text}  %total_next = add i64 %total, %l\n"
     text = "{text}  %i_next = add i64 %i, 1\n"
     text = "{text}  br label %sum_hdr\n"
     text = "{text}alloc:\n"
     text = "{text}  %bufsz = add i64 %total, 1\n"
-    text = "{text}  %buf = call ptr @orion_alloc(i64 %bufsz)\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 %total)\n"
     text = "{text}  br label %cp_hdr\n"
     text = "{text}cp_hdr:\n"
     text = "{text}  %j = phi i64 [ 0, %alloc ], [ %j_next, %cp_bdy ]\n"
@@ -1103,7 +1140,7 @@ fn emit_runtime() -> Text:
     text = "{text}cp_bdy:\n"
     text = "{text}  %q_int = call i64 @orion_list_at(ptr %parts, i64 %j)\n"
     text = "{text}  %q = inttoptr i64 %q_int to ptr\n"
-    text = "{text}  %ql = call i64 @strlen(ptr %q)\n"
+    text = "{text}  %ql = call i64 @orion_tlen(ptr %q)\n"
     text = "{text}  %dst = getelementptr i8, ptr %buf, i64 %off\n"
     text = "{text}  %_c = call ptr @memcpy(ptr %dst, ptr %q, i64 %ql)\n"
     text = "{text}  %off_next = add i64 %off, %ql\n"
@@ -1115,6 +1152,18 @@ fn emit_runtime() -> Text:
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
     text = "{text}declare i64 @strlen(ptr)\n"
+    # H1: texts carry [hash][len] before the byte pointer. tlen is
+    # the O(1) length read; alloc/seal/from_c live in orion_rt.c.
+    text = "{text}declare ptr @orion_text_alloc(i64)\n"
+    text = "{text}declare ptr @orion_text_seal(ptr)\n"
+    text = "{text}declare ptr @orion_text_from_c(ptr)\n"
+    text = "{text}declare i64 @orion_text_hash(ptr)\n"
+    text = "{text}define i64 @orion_tlen(ptr %p) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %hp = getelementptr i8, ptr %p, i64 -8\n"
+    text = "{text}  %l = load i64, ptr %hp\n"
+    text = "{text}  ret i64 %l\n"
+    text = "{text}\}\n\n"
     text = "{text}declare ptr @strcpy(ptr, ptr)\n"
     text = "{text}declare ptr @strcat(ptr, ptr)\n"
     text = "{text}declare i32 @strcmp(ptr, ptr)\n"
@@ -1136,27 +1185,27 @@ fn emit_runtime() -> Text:
     text = "{text}\n"
     text = "{text}define ptr @orion_text_concat(ptr %a, ptr %b) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %la = call i64 @strlen(ptr %a)\n"
-    text = "{text}  %lb = call i64 @strlen(ptr %b)\n"
+    text = "{text}  %la = call i64 @orion_tlen(ptr %a)\n"
+    text = "{text}  %lb = call i64 @orion_tlen(ptr %b)\n"
     text = "{text}  %sum = add i64 %la, %lb\n"
-    text = "{text}  %total = add i64 %sum, 1\n"
-    text = "{text}  %buf = call ptr @orion_alloc(i64 %total)\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 %sum)\n"
     text = "{text}  %_1 = call ptr @strcpy(ptr %buf, ptr %a)\n"
     text = "{text}  %_2 = call ptr @strcat(ptr %buf, ptr %b)\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
     text = "{text}define ptr @orion_int_to_text(i64 %n) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %buf = call ptr @orion_alloc(i64 32)\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 31)\n"
     text = "{text}  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)\n"
-    text = "{text}  ret ptr %buf\n"
+    text = "{text}  %sealed = call ptr @orion_text_seal(ptr %buf)\n"
+    text = "{text}  ret ptr %sealed\n"
     text = "{text}\}\n\n"
     # slice(text, lo, hi): copy bytes [lo, hi) into a new null-terminated buffer.
     # Clamps lo/hi to [0, strlen] for safety.
     text = "{text}declare ptr @memcpy(ptr, ptr, i64)\n\n"
     text = "{text}define ptr @orion_text_slice(ptr %src, i64 %lo, i64 %hi) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %src_len = call i64 @strlen(ptr %src)\n"
+    text = "{text}  %src_len = call i64 @orion_tlen(ptr %src)\n"
     text = "{text}  %lo_neg = icmp slt i64 %lo, 0\n"
     text = "{text}  %lo_safe = select i1 %lo_neg, i64 0, i64 %lo\n"
     text = "{text}  %hi_big = icmp sgt i64 %hi, %src_len\n"
@@ -1164,8 +1213,7 @@ fn emit_runtime() -> Text:
     text = "{text}  %hi_lt_lo = icmp slt i64 %hi_safe, %lo_safe\n"
     text = "{text}  %hi_final = select i1 %hi_lt_lo, i64 %lo_safe, i64 %hi_safe\n"
     text = "{text}  %slice_len = sub i64 %hi_final, %lo_safe\n"
-    text = "{text}  %total = add i64 %slice_len, 1\n"
-    text = "{text}  %buf = call ptr @orion_alloc(i64 %total)\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 %slice_len)\n"
     text = "{text}  %src_off = getelementptr i8, ptr %src, i64 %lo_safe\n"
     text = "{text}  %_ = call ptr @memcpy(ptr %buf, ptr %src_off, i64 %slice_len)\n"
     text = "{text}  %term = getelementptr i8, ptr %buf, i64 %slice_len\n"
@@ -1184,7 +1232,7 @@ fn emit_runtime() -> Text:
     # bytes_from_text: Text → [int] (list of byte values).
     text = "{text}define ptr @orion_bytes_from_text(ptr %src) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %src_len = call i64 @strlen(ptr %src)\n"
+    text = "{text}  %src_len = call i64 @orion_tlen(ptr %src)\n"
     text = "{text}  %list = call ptr @orion_list_new(i64 %src_len)\n"
     text = "{text}  br label %hdr\n"
     text = "{text}hdr:\n"
@@ -1205,8 +1253,7 @@ fn emit_runtime() -> Text:
     text = "{text}define ptr @orion_bytes_to_text(ptr %list) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %list_len = call i64 @orion_list_len(ptr %list)\n"
-    text = "{text}  %buf_sz = add i64 %list_len, 1\n"
-    text = "{text}  %buf = call ptr @orion_alloc(i64 %buf_sz)\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 %list_len)\n"
     text = "{text}  br label %hdr\n"
     text = "{text}hdr:\n"
     text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
@@ -1313,13 +1360,16 @@ fn emit_runtime() -> Text:
     text = "{text}  %is_null = icmp eq ptr %s, null\n"
     text = "{text}  br i1 %is_null, label %ret_empty, label %copy_it\n"
     text = "{text}ret_empty:\n"
-    text = "{text}  ret ptr @.empty_str\n"
+    text = "{text}  %eo = getelementptr i8, ptr @.empty_str, i64 16\n"
+    text = "{text}  ret ptr %eo\n"
     text = "{text}copy_it:\n"
-    text = "{text}  %n = call i64 @strlen(ptr %s)\n"
-    text = "{text}  %n1 = add i64 %n, 1\n"
-    text = "{text}  %copy = call ptr @malloc(i64 %n1)\n"
-    text = "{text}  %_ = call ptr @memcpy(ptr %copy, ptr %s, i64 %n1)\n"
-    text = "{text}  ret ptr %copy\n"
+    text = "{text}  %n = call i64 @orion_tlen(ptr %s)\n"
+    text = "{text}  %tot = add i64 %n, 17\n"
+    text = "{text}  %src_base = getelementptr i8, ptr %s, i64 -16\n"
+    text = "{text}  %copy = call ptr @malloc(i64 %tot)\n"
+    text = "{text}  %_ = call ptr @memcpy(ptr %copy, ptr %src_base, i64 %tot)\n"
+    text = "{text}  %out = getelementptr i8, ptr %copy, i64 16\n"
+    text = "{text}  ret ptr %out\n"
     text = "{text}\}\n\n"
     text = "{text}define ptr @orion_map_new_persist() \{\n"
     text = "{text}entry:\n"
@@ -1401,7 +1451,8 @@ fn emit_runtime() -> Text:
     text = "{text}  %miss = icmp eq i64 %has, 0\n"
     text = "{text}  br i1 %miss, label %empty, label %fetch\n"
     text = "{text}empty:\n"
-    text = "{text}  ret ptr @.empty_str\n"
+    text = "{text}  %eo = getelementptr i8, ptr @.empty_str, i64 16\n"
+    text = "{text}  ret ptr %eo\n"
     text = "{text}fetch:\n"
     text = "{text}  %raw = call i64 @orion_map_get(ptr %m2, ptr %key)\n"
     text = "{text}  %p = inttoptr i64 %raw to ptr\n"
@@ -1453,7 +1504,9 @@ fn emit_runtime() -> Text:
     text = "{text}declare i64 @ftell(ptr)\n"
     text = "{text}@.fmode_r = private unnamed_addr constant [3 x i8] c\"rb\\00\"\n"
     text = "{text}@.fmode_w = private unnamed_addr constant [3 x i8] c\"wb\\00\"\n"
-    text = "{text}@.empty_str = private unnamed_addr constant [1 x i8] c\"\\00\"\n\n"
+    # Headered empty text: hash 5381 (0x1505 LE) + len 0 + NUL, the
+    # pointer everyone returns is blob+16.
+    text = "{text}@.empty_str = private unnamed_addr constant [17 x i8] c\"\\05\\15\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\", align 8\n\n"
     # file_read(path) → Text. Returns "" on open failure.
     text = "{text}define ptr @orion_file_read(ptr %path) \{\n"
     text = "{text}entry:\n"
@@ -1461,13 +1514,13 @@ fn emit_runtime() -> Text:
     text = "{text}  %is_null = icmp eq ptr %fp, null\n"
     text = "{text}  br i1 %is_null, label %err, label %ok\n"
     text = "{text}err:\n"
-    text = "{text}  ret ptr @.empty_str\n"
+    text = "{text}  %eo = getelementptr i8, ptr @.empty_str, i64 16\n"
+    text = "{text}  ret ptr %eo\n"
     text = "{text}ok:\n"
     text = "{text}  %_seek = call i32 @fseek(ptr %fp, i64 0, i32 2)\n"
     text = "{text}  %size = call i64 @ftell(ptr %fp)\n"
     text = "{text}  %_rew = call i32 @fseek(ptr %fp, i64 0, i32 0)\n"
-    text = "{text}  %buf_sz = add i64 %size, 1\n"
-    text = "{text}  %buf = call ptr @orion_alloc(i64 %buf_sz)\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 %size)\n"
     text = "{text}  %_read = call i64 @fread(ptr %buf, i64 1, i64 %size, ptr %fp)\n"
     text = "{text}  %term = getelementptr i8, ptr %buf, i64 %size\n"
     text = "{text}  store i8 0, ptr %term\n"
@@ -1483,7 +1536,7 @@ fn emit_runtime() -> Text:
     text = "{text}err:\n"
     text = "{text}  ret i64 0\n"
     text = "{text}ok:\n"
-    text = "{text}  %len = call i64 @strlen(ptr %content)\n"
+    text = "{text}  %len = call i64 @orion_tlen(ptr %content)\n"
     text = "{text}  %_wrote = call i64 @fwrite(ptr %content, i64 1, i64 %len, ptr %fp)\n"
     text = "{text}  %_close = call i32 @fclose(ptr %fp)\n"
     text = "{text}  ret i64 1\n"
@@ -2013,9 +2066,10 @@ fn emit_runtime() -> Text:
     # f64 → text via snprintf %g (for interpolation and to_text).
     text = "{text}define ptr @orion_f64_to_text(double %v) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %buf = call ptr @orion_alloc(i64 32)\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 31)\n"
     text = "{text}  %_n = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_g, double %v)\n"
-    text = "{text}  ret ptr %buf\n"
+    text = "{text}  %sealed = call ptr @orion_text_seal(ptr %buf)\n"
+    text = "{text}  ret ptr %sealed\n"
     text = "{text}\}\n\n"
     # SIMD-style elementwise vector ops over int lists. Scalar fallback;
     # autovectorizer may lift to <N x i64> via -Os.

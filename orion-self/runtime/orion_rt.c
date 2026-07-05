@@ -305,6 +305,60 @@ long long orion_pool_reset(long long i) {
     return 1;
 }
 
+/* ---- H1: texts carry identity — [hash:i64][len:i64][bytes..NUL],
+ * the POINTER aims at bytes so every strcmp/fprintf/extern keeps
+ * working. len() is a load at p[-8]; hash at p[-16] is LAZY for
+ * heap texts (0 = not yet computed) and BAKED for constants
+ * (rodata is unwritable). Hash algo must be identical here and in
+ * the emitter's compile-time baking: polynomial base 131, seed
+ * 5381, mod 1e9+7 — no overflow in plain i64, no XOR needed. */
+#define OTX_MOD 1000000007LL
+
+void *orion_alloc(long long size);
+
+typedef struct { long long h; long long l; char z[1]; } OrionEmptyText;
+static const OrionEmptyText otx_empty = {5381, 0, {0}};
+const char *orion_text_empty(void) { return otx_empty.z; }
+
+char *orion_text_alloc(long long len) {
+    char *base = (char *)orion_alloc(len + 17);
+    ((long long *)base)[0] = 0;
+    ((long long *)base)[1] = len;
+    base[16 + len] = 0;
+    return base + 16;
+}
+
+long long orion_tlen_c(const char *p) { return ((const long long *)p)[-1]; }
+
+/* Fix the header length after a C formatter wrote into the buffer
+ * (snprintf paths do not know their length up front). */
+char *orion_text_seal(char *p) {
+    ((long long *)p)[-1] = (long long)strlen(p);
+    ((long long *)p)[-2] = 0;
+    return p;
+}
+
+/* Wrap a foreign C string (argv, env) into a headered text. */
+const char *orion_text_from_c(const char *s) {
+    if (!s || !s[0]) return otx_empty.z;
+    size_t n = strlen(s);
+    char *p = orion_text_alloc((long long)n);
+    memcpy(p, s, n);
+    return p;
+}
+
+long long orion_text_hash(const char *p) {
+    long long h = ((const long long *)p)[-2];
+    if (h != 0) return h;
+    long long len = ((const long long *)p)[-1];
+    h = 5381;
+    for (long long i = 0; i < len; i++)
+        h = (h * 131 + (unsigned char)p[i]) % OTX_MOD;
+    if (h == 0) h = 1;
+    ((long long *)p)[-2] = h;
+    return h;
+}
+
 /* Map keys are OWNED by the map: text keys copy on FIRST insert, so a
  * caller's transient key can never dangle inside a longer-lived map.
  * The copy allocates in the current scope — the same lifetime as the
@@ -312,8 +366,8 @@ long long orion_pool_reset(long long i) {
  * class (two poison-caught crashes in one day) at the language level. */
 void *orion_alloc(long long size);
 const char *orion_key_copy(const char *key) {
-    size_t n = strlen(key) + 1;
-    char *copy = (char *)orion_alloc((long long)n);
+    size_t n = strlen(key);
+    char *copy = orion_text_alloc((long long)n);
     memcpy(copy, key, n);
     return copy;
 }
@@ -374,11 +428,13 @@ static void oe_fatal(const char *what, const char *key) {
     abort();
 }
 static const char *oe_text(const char *p) {
-    if (!p) return "";
-    size_t n = strlen(p) + 1;
-    char *c = (char *)malloc(n);
-    memcpy(c, p, n);
-    return c;
+    if (!p) return otx_empty.z;
+    size_t n = strlen(p);
+    char *c = (char *)malloc(n + 17);
+    ((long long *)c)[0] = 0;
+    ((long long *)c)[1] = (long long)n;
+    memcpy(c + 16, p, n + 1);
+    return c + 16;
 }
 static long long *oe_list_spine(const long long *src) {
     long long len = src[1];
@@ -584,12 +640,12 @@ __attribute__((weak)) long long orion_embedded_has(const char *path) {
 }
 __attribute__((weak)) const char *orion_embedded_text(const char *path) {
     (void)path;
-    return "";
+    return otx_empty.z;
 }
 /* Newline-joined paths of every embedded asset — lets ship builds
  * enumerate "directories" they no longer have. */
 __attribute__((weak)) const char *orion_embedded_list(void) {
-    return "";
+    return otx_empty.z;
 }
 /* Binary assets (WAVs contain NULs, so _text loses the length):
  * returns the byte pointer and writes the true size. */
@@ -597,7 +653,7 @@ __attribute__((weak)) const char *orion_embedded_data(const char *path,
                                                       long long *size) {
     (void)path;
     if (size) *size = 0;
-    return "";
+    return otx_empty.z;
 }
 #endif
 
@@ -719,9 +775,11 @@ void *orion_alloc(long long size) {
 const char *orion_f64_literal_hex(const char *s) {
     union { double d; unsigned long long i; } u;
     u.d = strtod(s, NULL);
-    char *buf = (char *)malloc(19);
-    snprintf(buf, 19, "0x%016llX", u.i);
-    return buf;
+    char *buf = (char *)malloc(19 + 16);
+    ((long long *)buf)[0] = 0;
+    ((long long *)buf)[1] = 18;
+    snprintf(buf + 16, 19, "0x%016llX", u.i);
+    return buf + 16;
 }
 
 /* Thread-local stack of one jmp_buf — only one perform pending at a time
@@ -889,10 +947,16 @@ static void orion_crash_filter_install(void) {
  * redirected stdin (an agent driving a running game through a pipe)
  * drains available bytes via PeekNamedPipe. Zero alloc when idle. */
 #include <conio.h>
+static const char *crl_seal(char *out) {
+    ((long long *)out)[-2] = 0;
+    ((long long *)out)[-1] = (long long)strlen(out);
+    return out;
+}
 const char *orion_console_readline(void) {
     static char buf[512];
     static size_t blen = 0;
-    static char out[512];
+    static char out_raw[512 + 16];
+    char *out = out_raw + 16;
     if (_isatty(_fileno(stdin))) {
         while (_kbhit()) {
             int c = _getch();
@@ -901,7 +965,7 @@ const char *orion_console_readline(void) {
                 buf[blen] = 0;
                 memcpy(out, buf, blen + 1);
                 blen = 0;
-                if (out[0] != 0) return out;
+                if (out[0] != 0) return crl_seal(out);
                 continue;
             }
             if (c == 8) {
@@ -916,11 +980,11 @@ const char *orion_console_readline(void) {
                 putchar(c);
             }
         }
-        return "";
+        return otx_empty.z;
     }
     HANDLE h = GetStdHandle((DWORD)-10); /* STD_INPUT_HANDLE */
     DWORD avail = 0;
-    if (!PeekNamedPipe(h, NULL, 0, NULL, &avail, NULL)) return "";
+    if (!PeekNamedPipe(h, NULL, 0, NULL, &avail, NULL)) return otx_empty.z;
     while (avail > 0 && blen < 511) {
         char c;
         DWORD rd = 0;
@@ -930,12 +994,12 @@ const char *orion_console_readline(void) {
             buf[blen] = 0;
             memcpy(out, buf, blen + 1);
             blen = 0;
-            if (out[0] != 0) return out;
+            if (out[0] != 0) return crl_seal(out);
             continue;
         }
         if (c != '\r') buf[blen++] = c;
     }
-    return "";
+    return otx_empty.z;
 }
 
 /* Newline-joined SUBDIRECTORY names in `dir` (no . / .., one level).
@@ -945,7 +1009,7 @@ const char *orion_dir_subdirs(const char *dir) {
     WIN32_FIND_DATAA fd;
     snprintf(pattern, sizeof(pattern), "%s\\*", dir);
     HANDLE h = FindFirstFileA(pattern, &fd);
-    if (h == INVALID_HANDLE_VALUE) return "";
+    if (h == INVALID_HANDLE_VALUE) return otx_empty.z;
     size_t cap = 1024, len = 0;
     char *out = (char *)malloc(cap);
     out[0] = 0;
@@ -966,7 +1030,7 @@ const char *orion_dir_subdirs(const char *dir) {
      * the raw malloc leaked one listing per call, forever (the soak
      * ledger billed script reloads ~16KB each for these). */
     {
-        char *evac = (char *)orion_alloc((long long)len + 1);
+        char *evac = orion_text_alloc((long long)len);
         memcpy(evac, out, len + 1);
         free(out);
         return evac;
@@ -978,7 +1042,7 @@ const char *orion_dir_list(const char *dir) {
     WIN32_FIND_DATAA fd;
     snprintf(pattern, sizeof(pattern), "%s\\*", dir);
     HANDLE h = FindFirstFileA(pattern, &fd);
-    if (h == INVALID_HANDLE_VALUE) return "";
+    if (h == INVALID_HANDLE_VALUE) return otx_empty.z;
     size_t cap = 4096, len = 0;
     char *out = (char *)malloc(cap);
     out[0] = 0;
@@ -995,7 +1059,7 @@ const char *orion_dir_list(const char *dir) {
     } while (FindNextFileA(h, &fd));
     FindClose(h);
     {
-        char *evac = (char *)orion_alloc((long long)len + 1);
+        char *evac = orion_text_alloc((long long)len);
         memcpy(evac, out, len + 1);
         free(out);
         return evac;
