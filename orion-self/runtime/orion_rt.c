@@ -658,6 +658,15 @@ __attribute__((weak)) const char *orion_embedded_data(const char *path,
 }
 #endif
 
+/* Counter rack for probe builds: temporary orb instrumentation taps
+ * orion_ctr_add, gates read totals. Sixteen anonymous slots — the
+ * probe defines what they mean, nothing here persists meaning. */
+static long long octr[16];
+void octr_add(long long i, long long n) {
+    if (i >= 0 && i < 16) octr[i] += n;
+}
+long long octr_get(long long i) { return (i >= 0 && i < 16) ? octr[i] : 0; }
+
 /* Allocation telemetry: total requested bytes, and the subset served
  * by malloc (arena misses + arena-off) — perf probes read both. */
 static long long alloc_total = 0;
