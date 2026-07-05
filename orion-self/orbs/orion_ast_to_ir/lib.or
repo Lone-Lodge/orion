@@ -539,6 +539,7 @@ fn ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     pr_header = ir_fn_push(pr_br_in.function, ir_label(header_lbl))
     # 3) Walk body inside loop scope.
     body_r = ast_expr_to_ir(pr_header.function, body_scope, body_node)
+    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
     # 4) If body didn't terminate (no break/continue at end), loop back.
     mut fn_after_body = body_r.function
     if is_block_terminated(fn_after_body) == 0:
@@ -596,6 +597,7 @@ fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         body_scope = scope_bind(body_scope, index_var_name, cur_id)
     body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
     body_r = ast_expr_to_ir(pr_at.function, body_scope, body_node)
+    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
 
     # Fall through from body into step block.
     mut fn_after_body = body_r.function
@@ -649,6 +651,7 @@ fn ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut body_scope = scope_bind(high_r.scope, var_name, cur_id)
     body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
     body_r = ast_expr_to_ir(pr_body_lbl.function, body_scope, body_node)
+    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
 
     # Fall through from body into step block.
     mut fn_after_body = body_r.function
@@ -835,6 +838,30 @@ fn current_block(fn_value: IRFn) -> Text:
     found
 
 
+# Checker law (two halves):
+# 1. Immutable bindings are BLOCK-SCOPED: names born inside a
+#    branch/arm die at its end (scope_truncate below). Leaked SSA
+#    ids into the continuation were the st60 invalid-IR class; no
+#    compiling code can rely on the leak (such IR never verified).
+# 2. Rebinding an OUTER immutable inside a branch/loop is an
+#    ERROR: under block scoping the assignment cannot escape, so
+#    the author's intent silently dies — demand `mut` instead.
+fn scope_truncate(s: Scope, keep: int) -> Scope:
+    Scope{names: slice(s.names, 0, keep), ids: slice(s.ids, 0, keep), mut_flags: slice(s.mut_flags, 0, keep), loop_headers: s.loop_headers, loop_ends: s.loop_ends, fn_sig_names: s.fn_sig_names, fn_sig_rets: s.fn_sig_rets, ds_names: s.ds_names, ds_specs: s.ds_specs, en_names: s.en_names, en_variants: s.en_variants}
+
+fn check_branch_shadows(before: int, s: Scope, where_txt: Text, node: Map):
+    total = len(s.names)
+    for i in before..<total:
+        nm = at(s.names, i)
+        if at(s.mut_flags, i) == 0:
+            mut outer = 0
+            for j in 0..<before:
+                if at(s.names, j) == nm:
+                    outer = 1
+            if outer == 1:
+                line = if has(node, "line") then get_int(node, "line") else 0
+                compile_error("orion-self: ERROR at line {line} — `{nm}` is reassigned inside a {where_txt}; immutable rebinding cannot cross a block boundary (declare it `mut`, or use an if-expression)")
+
 fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     cond_node = get(node, "cond")
     then_node = get(node, "then")
@@ -854,8 +881,10 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     fn_after_br = pr_br.function
 
     # 3) label then; evaluate A.
+    scope_before = len(cond_r.scope.names)
     pr_then_lbl = ir_fn_push(fn_after_br, ir_label(then_lbl))
     then_r = ast_expr_to_ir(pr_then_lbl.function, cond_r.scope, then_node)
+    check_branch_shadows(scope_before, then_r.scope, "branch", node)
     then_terminated = is_block_terminated(then_r.function)
     mut then_end_block = ""
     mut fn_after_then = then_r.function
@@ -864,9 +893,11 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         pr_then_br = ir_fn_push(then_r.function, ir_br(merge_lbl))
         fn_after_then = pr_then_br.function
 
-    # 4) label else; evaluate B.
+    # 4) label else; evaluate B — from the TRUNCATED scope: then's
+    # branch-locals are dead here by law.
     pr_else_lbl = ir_fn_push(fn_after_then, ir_label(else_lbl))
-    else_r = ast_expr_to_ir(pr_else_lbl.function, then_r.scope, else_node)
+    else_r = ast_expr_to_ir(pr_else_lbl.function, scope_truncate(then_r.scope, scope_before), else_node)
+    check_branch_shadows(scope_before, else_r.scope, "branch", node)
     else_terminated = is_block_terminated(else_r.function)
     mut else_end_block = ""
     mut fn_after_else = else_r.function
@@ -908,7 +939,9 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         result_id = else_r.id
     # If both terminated, merge block is dead; result_id stays -1.
 
-    ConvResult{function: result_fn, scope: else_r.scope, id: result_id}
+    # Branch-locals die at the boundary — the continuation sees the
+    # scope as it was before the if (law half 1).
+    ConvResult{function: result_fn, scope: scope_truncate(else_r.scope, scope_before), id: result_id}
 
 # Bare enum-variant constructor: `KeyPress(x)` without the EnumName
 # prefix — mirror lodge-orion's variant probe. Returns the enum name
@@ -1654,6 +1687,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         # (field index 1+i) RETYPED to the variant's declared payload
         # type at that position, so `Spawn(comps) -> do_spawn(s, comps)`
         # types comps as map, `Relate(a, kind, b)` gets i64/text/i64.
+        arm_start_names = len(current_scope.names)
         mut body_scope = current_scope
         n_arm_bindings = len(bindings)
         if do_variant_pat:
@@ -1672,9 +1706,12 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 body_scope = scope_bind(body_scope, bind_name, pr_load_val.id)
 
         # Phase 3: body — emit for both wildcard and pattern arms.
+        arm_before = len(body_scope.names)
         body_r = ast_expr_to_ir(current_fn, body_scope, body_node)
+        check_branch_shadows(arm_before, body_r.scope, "match arm", node)
         current_fn = body_r.function
-        current_scope = body_r.scope
+        # Arm-locals (payload binds included) die with the arm.
+        current_scope = scope_truncate(body_r.scope, arm_start_names)
         pr_store = ir_fn_push(current_fn, ir_store(result_ptr_id, body_r.id))
         current_fn = pr_store.function
         pr_br_end = ir_fn_push(current_fn, ir_br(end_lbl))
