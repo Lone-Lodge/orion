@@ -75,9 +75,21 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     VALIDATED IN PRODUCTION: cubsy's scoring rule is now `law LineClear:`
     — soak identical (behavior unchanged), and `why score` shows
     `line_clear/LineClear` instead of anonymous `line_clear/Tick`.
-  - [ ] **`after Ns:` delayed effect** — needs a timer wheel in sims
-    (schedule a body to run N seconds later). The valuable, harder half —
-    the only remaining piece of A2. *Touches:* `sims`. M.
+  - [ ] **`after Ns:` delayed effect** — the last A2 piece.
+    **ATTACKED then reverted (2026-07-05):** the LANGUAGE side is clean and
+    was fully written — `After` keyword, `Stmt.AfterStmt(Expr, Text, Expr)`,
+    `AstraEffect.AstraAfter(int, Text, Value)`, parser `after N: name =
+    value`, eval snapshotting the value, all exhaustive matches (compiler-
+    guided). The wall is the RUNTIME storage: the timer queue lives in
+    world state (so it saves/rewinds), and its text records must be built
+    in the STATE POOL or their bytes dangle at the next region reset —
+    that pool-lifetime dance, plus the prefix-at-queue-time coupling (the
+    bare script name needs the world prefix, known only to the sims), plus
+    a per-tick `world_timers_fire` call, is a real memory-lifetime slice.
+    Do it with a fresh window: build the timer text under state_alloc_on,
+    store the ALREADY-prefixed name (sims sets an `atlas:cur_prefix` slot
+    the queuer reads), and call world_timers_fire once per tick in run_sims.
+    *Touches:* `rt` + `sims`. M. Reverted cleanly; A3 milestone intact.
 
 - [x] **A3. Relations first-class** (#5, #6) — CREATE + QUERY ✓ 2026-07-05.
   - [x] **`relate A kind B`** ✓ 2026-07-05 — creates a real atlas relation
