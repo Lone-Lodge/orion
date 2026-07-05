@@ -97,9 +97,13 @@ from H1 by design): orion_text_eq — same-ptr, then length, then
 cached header hash; only equal hashes touch bytes. text_eq/ne and
 all five text-key map families route through it; stored map keys
 are headered copies by construction so the reject is provenance-
-safe. Fixpoint v3==v4; gate st75. Dirty sims 158us -> 95us/frame
-(-40%) same machine same hour. The nid rewrite above remains the
-main dig — this was the toll it collects on the way in.
+safe. Fixpoint v3==v4; gate st75. HONEST number after the
+dangling-else find (the first -40% claim benchmarked a dead
+dispatch pipeline): dirty sims 312 -> 246us/frame, -21%, dispatch
+live. CORRECTION from probe st76: eval binding-scans are ~0/frame
+in the sims path — the "largest remaining cost" claim above is
+FALSIFIED for sims; the nid dig's value sits in event dispatch
+and the auto-ctx build (unmeasured). Measure before digging.
 
 ## H4. World: views subscribe to effects (columnar is just view #1)
 
