@@ -94,6 +94,17 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
      (atlas) resolves via related_to/from — eval is host-agnostic, so it
      routes through a ctx binding or a host callback, not pure eval.
   *Touches:* `lang` (astra effect+eval) + a thin atlas mapping. *Scope:* M.
+  **DEEPER SCOPE (2026-07-05, after attacking it):** the CREATE side is
+  clean-ish — AstraEffect maps to atlas via CHANNELS (`to_atlas_effect`
+  -> ToChannel), so `relate a owns b` can desugar to `emit relate {...}`
+  and an atlas drain applies the atlas Relate effect (no core-enum change
+  needed after all — reuse AstraEmit). The QUERY side is the real design
+  question: astra_eval is deliberately HOST-AGNOSTIC (no world access),
+  so `when npc hates player` cannot resolve in eval. The clean answer:
+  the host uses FACTS to see which relation queries a rule needs, pre-
+  computes them via related_to/from, and injects them as ctx bindings —
+  the same auto-ctx mechanism, extended to relations. That is the design
+  to make first; then create+query land together.
 
 ### Phase B — knowledge, uncertainty, intent
 
