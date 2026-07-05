@@ -79,8 +79,16 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     (schedule a body to run N seconds later). The valuable, harder half —
     the only remaining piece of A2. *Touches:* `sims`. M.
 
-- [ ] **A3. Relations first-class** (#5, #6) — `relation owns(Player, Item)`,
-  `when npc hates player and npc sees player: npc attacks player`.
+- [~] **A3. Relations first-class** (#5, #6) — CREATE done; QUERY next.
+  - [x] **`relate A kind B`** ✓ 2026-07-05 — creates a real atlas relation
+    from a rule (`relate player owns sword`), forward+reverse queryable via
+    related_to/from. Stmt.RelateStmt -> AstraRelate -> atlas Relate. Two
+    core enums grew, compiler-guided (proved core-enum surgery is safe
+    when done compiler-first). Gate st92; cubsy soak green.
+  - [ ] **QUERY (`when npc hates player`)** — the host-agnostic eval
+    boundary. Clean design: inject the relations index as a ctx binding
+    and add a `related(x, kind)` builtin that reads it (eval stays data-
+    driven, no world access). `lang` + a thin atlas ctx injection. M.
   Makes the world a network, not a component table.
   **SCOPED (2026-07-05): the RUNTIME is already DONE** — atlas_ecs has
   Relate/Unrelate effects, bidirectional relations_fwd/rev index, cascade
