@@ -146,6 +146,39 @@ B4 (engineering-deep, not new space): deterministic math as a
     language type (fixed-point/rationals with a guarantee) — the
     door future physics needs for bit-identical cross-platform.
 
+Second dig (2026-07-05, user demanded MORE — the thread: move
+EVERYTHING into the log and things keep falling out free):
+
+B5. **The frame**: with facts + render-as-view the engine can
+    statically derive which PIXELS an effect can touch —
+    footprints all the way down to damage rects. Provably minimal
+    redraw; causality analysis as a rendering optimizer.
+B6. **Saving**: the log IS the save — append it continuously
+    (it's KBs), compaction = checkpoint, crash = replay. Progress
+    loss becomes impossible by construction; "Saving..." dies as
+    a concept. Databases call it WAL and need racks. Closest to
+    reach of the whole dig (the recorder almost does it).
+B8. **Device input**: the log records INTENT ("place piece col
+    3"), device->intent is a pure replaceable layer. Replays
+    survive UI redesign (replay-diff robust across versions!),
+    accessibility free, humans/bots/agents indistinguishable at
+    log level (the soak already proved it silently).
+B9. **Determinism as discipline**: law — exactly THREE
+    nondeterminism sources (input, boot seed, external/AI), all
+    logged; the checker PROVES a bundle hides no randomness.
+    Deterministic AI stops being a promise and becomes a
+    certificate.
+B10. **Code as files**: a rule's identity = hash of its AST
+    (Unison, for gameplay). Swap one rule = recompile one rule
+    (B3's atom); global eternal compile cache; rules shared
+    across games with automatic dedup — gameplay as a library
+    ecosystem with addresses.
+B14. **Netcode as heroism**: foresee = prediction of remote
+    intent, rewind = rollback when truth arrives. That is GGPO —
+    generalized to every game in the engine as a property of two
+    primitives already on the map. Perceived zero-latency
+    multiplayer as an engine trait.
+
 ## Untouched by design (frozen is a feature)
 
 Effect log format; the six-pool world lifetime model; orb
