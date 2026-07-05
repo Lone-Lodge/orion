@@ -35,6 +35,50 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
 - [x] **Multiple worlds** (belief #3) — the Oracle (fork + foresee). `rt`
 - [x] **Determinism / time first-class** (#4 laws) — bit-identical replay + fingerprints. `rt`
 - [x] **Crash trinity / self-symbolizing** (#2, #16) — what/where/why on any fault. `rt`
+- [x] **Time-as-query** ✓ 2026-07-05 — `resource_at_tick(world, key, t)`,
+  `first_tick_at_least(world, key, threshold)`, `first_tick_equal` (atlas_ecs).
+  The log records every change and replay is deterministic, so any PAST
+  state is a query — "what was score at tick 400?", "when did it first
+  cross 100?" — impossible in a polling engine (Unity/Godot cache history
+  by hand or lose it). Builds on world_timeline. Gate st110; cubsy soak
+  green. First exploitation of the engine per the 3-agent audit below;
+  the substrate for regression-bisect + causality narration. `rt`+`tool`
+
+## THREE-AGENT AUDIT (2026-07-05) — is this genuinely next-gen?
+
+Ran a critical audit across all three layers. The convergent verdict:
+
+- **Orion (language): CONVENTIONAL.** A clean, safe Rust/Zig-class systems
+  language. Genuinely-novel bits are narrow (algebraic effects at OCaml-5
+  level; relational-DB-as-boundary memory model; footprints as an auto-
+  inferred primitive). Type system / control flow / regions are textbook.
+  *Verdict: don't broaden the language — keep it KISS; the value is that
+  it's a clean vehicle for the engine.*
+- **Astra (DSL): 7 real capabilities, the rest is naming sugar.** `when`
+  (edge-triggered), `after`, `relate`, `emit`/`spawn`/`destroy`/`set`,
+  `require`, `count`/`exists`/`none` earn their place. `becomes` is a pure
+  alias; `derive`/`goal`/`constraint` RECOMPUTE EVERY TICK — they describe
+  *steps*, not truth, despite the vision. `belief`/`confidence` are naming
+  conventions. *Consolidation: one `fact NAME = EXPR in NAMESPACE` could
+  replace derive/goal/constraint/belief/confidence.*
+- **Atlas (engine): every unique primitive is BUILT but UNDEREXPLOITED.**
+  Determinism+fingerprints, log-is-truth, fork/foresee, facts — all real,
+  none fully used. *Every next-gen win is available; none needs a new
+  primitive. The gap is product discipline, not capability.*
+
+**The single through-line all three share: facts + the log are computed
+but not USED at runtime.** That is the biggest lever. Two payoffs:
+1. **Reactive net (the #1 de-faking):** derive/goal/constraint recompute
+   only when a dep (facts.reads, which already exists) changed — turns the
+   biggest fake-declarative into real declarative AND kills per-tick churn
+   (a lag win). NEXT recommended build. `lang`+`sims`. M, hot-path care.
+2. **Exploit the log:** time-as-query (SHIPPED above) → regression-bisect
+   (soak finds the tick, fingerprint+facts bisect the RULE that regressed
+   — the self-healing engine, the AI-native thesis realized) → causality
+   narration ("score dropped because …"). Each rides the log + facts.
+
+Full agent reports: the audit ran 2026-07-05; keep this verdict as the
+compass — **the novelty is the engine; stop broadening, start exploiting.**
 
 ---
 
