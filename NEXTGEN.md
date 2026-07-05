@@ -136,12 +136,30 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
 
 ### Phase B — knowledge, uncertainty, intent
 
-- [ ] **B1. Belief worlds** (belief #1) — `belief Guard: Player inside Forest`
+- [~] **B1. Belief worlds** (belief #1) — `belief Guard: Player inside Forest`
   vs `reality: Player inside Castle`. An NPC's world is a fork that may
   diverge from reality; AI reasons over its belief, not a blackboard.
   Belief-vs-reality is a replay-diff between two worlds — our physics
   already does it. Most mystery/discovery flavor.
-  *Touches:* `rt` (belief worlds) + `lang` (belief blocks). *Scope:* L.
+  - [x] **Divergence primitive** ✓ 2026-07-05 — `world_int_diff(a, b)`
+    (atlas_ecs): the exact int-resource keys where two worlds disagree
+    (differ in value, or present in only one). This is "belief-vs-reality
+    is a replay-diff" made concrete and queryable — the engine can now
+    compute what an agent believes that ISN'T true. A belief IS a fork
+    (project_fork, shipped): fork reality → 0 divergence, then the agent's
+    perceptions diverge and the diff names exactly the wrong facts. Gate
+    st99 (fresh belief 0 diff; mis-seen player_x → diff = [player_x],
+    correct hp stays clean; symmetric). Read-only, additive; cubsy soak
+    green. v1: int resources (text divergence not seen — game facts that
+    matter for belief are positions/hp/flags).
+  - [ ] **`belief NAME:` blocks** — astra syntax to declare a named belief
+    world and seed its (possibly wrong) facts. Rides project_fork + the
+    divergence primitive. `lang` + thin atlas wiring. M.
+  - [ ] **Foresee-on-belief** — an agent plans over its belief world
+    (project_foresee on the fork), so the plan can be WRONG when the
+    belief is. The payoff: emergent mistakes, discovery, mystery. M.
+  *Touches:* `rt` (belief worlds) + `lang` (belief blocks). *Scope:* L
+  overall; the divergence primitive was the clean first slice (S).
 
 - [ ] **B2. Uncertainty as a type** (belief #2) — `Door.open confidence 0.73`,
   `Enemy probably at Forest`. A value carries a confidence; queries and
