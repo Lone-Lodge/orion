@@ -168,11 +168,22 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     Lexer `Belief` keyword + parser branch + parse_belief_decl, ~45 lines.
     NOTE: this namespace model does NOT simulate the belief forward — for
     that see foresee-on-belief below (the fork model, distinct slice).
-  - [ ] **Foresee-on-belief** — an agent plans over its belief world
-    (project_foresee on the fork), so the plan can be WRONG when the
-    belief is. The payoff: emergent mistakes, discovery, mystery. M.
+  - [x] **Foresee-on-belief** ✓ 2026-07-05 — `belief_apply(world, prefix,
+    name)` overlays an agent's believed facts onto a world so it can be
+    SIMULATED as the agent imagines it (each real `<prefix><fact>` set to
+    the belief's value). `belief_imagine(world, cfg, prefix, name)` is the
+    full chain: fork reality (project_fork), overlay the belief, hand back
+    a world ready for project_foresee — foreseeing it yields the agent's
+    PLAN, which diverges from reality exactly when the belief is wrong
+    (emergent mistakes, the mystery payoff). Gate st102 (belief_apply:
+    player_x 10→5 as imagined, hp untouched, belief namespace intact);
+    belief_imagine composes project_fork (proven) + belief_apply (gated).
   *Touches:* `rt` (belief worlds) + `lang` (belief blocks). *Scope:* L
-  overall; the divergence primitive was the clean first slice (S).
+  overall; each slice landed clean (S) — divergence, blocks, foresee.
+  **B1 COMPLETE** — beliefs are first-class: declarable (`belief NAME:`),
+  diverging (`belief_wrong`), correctable (converges to 0), imaginable
+  (`belief_imagine` → foresee). The clean reframing (namespace, not World)
+  made an L-scope arc land as three S slices.
 
 - [ ] **B2. Uncertainty as a type** (belief #2) — `Door.open confidence 0.73`,
   `Enemy probably at Forest`. A value carries a confidence; queries and
