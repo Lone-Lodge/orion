@@ -867,14 +867,20 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     then_node = get(node, "then")
     else_node = get(node, "else")
 
-    # Unique label names based on current inst position.
-    n = len(fn_value.instructions)
+    # 1) Evaluate the condition FIRST. It may itself be an
+    #    if-EXPRESSION that emits its own if_N_* blocks; taking our
+    #    label suffix from the instruction count AFTER it keeps these
+    #    labels distinct from the condition's. Before, both read the
+    #    same count (the outer if had emitted nothing yet) and collided
+    #    on if_N_then/else/merge — invalid IR (duplicate blocks, tangled
+    #    phi predecessors) whenever an if-expression sat in a condition.
+    cond_r = ast_expr_to_ir(fn_value, scope, cond_node)
+
+    # Unique label names, keyed on the post-condition inst position.
+    n = len(cond_r.function.instructions)
     then_lbl = "if_{n}_then"
     else_lbl = "if_{n}_else"
     merge_lbl = "if_{n}_merge"
-
-    # 1) Evaluate condition.
-    cond_r = ast_expr_to_ir(fn_value, scope, cond_node)
 
     # 2) br_if cond, then, else
     pr_br = ir_fn_push(cond_r.function, ir_br_if(cond_r.id, then_lbl, else_lbl))
