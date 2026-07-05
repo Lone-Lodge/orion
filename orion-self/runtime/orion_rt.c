@@ -9,6 +9,7 @@
  */
 
 #include <setjmp.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -875,19 +876,42 @@ void orion_crumb_rule(const char *rule) {
     crumb_copy(crumb_rule, rule, sizeof crumb_rule);
 }
 
+/* The report goes to stderr AND crash.txt — a console window dies
+ * with the process, a file survives to be read (by the pilot or by
+ * the recovery boot). */
+static FILE *crash_tee = NULL;
+static void crash_line(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "%s", c_red());
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "%s\n", c_off());
+    va_end(ap);
+    if (crash_tee) {
+        va_start(ap, fmt);
+        vfprintf(crash_tee, fmt, ap);
+        fprintf(crash_tee, "\n");
+        va_end(ap);
+    }
+}
+
 static void crash_print_crumbs(void) {
     if (crumb_head < 0) return;
     if (crumb_rule[0])
-        fprintf(stderr, "%s[orion]   while rule `%s`%s\n", c_red(),
-                crumb_rule, c_off());
-    fprintf(stderr, "%s[orion]   cause trail:", c_red());
+        crash_line("[orion]   while rule `%s`", crumb_rule);
+    char trail[512];
+    trail[0] = 0;
+    size_t off = 0;
     for (int k = 0; k < CRUMB_N; k++) {
         int i = (crumb_head - k + CRUMB_N) % CRUMB_N;
         if (!crumb_bundle[i][0] && !crumb_event[i][0]) break;
-        fprintf(stderr, " %s/%s@%lld", crumb_bundle[i], crumb_event[i],
-                crumb_tick_v[i]);
+        int wrote = snprintf(trail + off, sizeof(trail) - off, " %s/%s@%lld",
+                             crumb_bundle[i], crumb_event[i], crumb_tick_v[i]);
+        if (wrote <= 0) break;
+        off += (size_t)wrote;
+        if (off >= sizeof(trail) - 1) break;
     }
-    fprintf(stderr, "%s\n", c_off());
+    crash_line("[orion]   cause trail:%s", trail);
 }
 
 /* Crashes symbolize THEMSELVES: the filter loads the link map that
@@ -953,9 +977,14 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
         (unsigned long long)info->ExceptionRecord->ExceptionAddress;
     char sym[256];
     crash_map_load();
+    crash_tee = fopen("crash.txt", "w");
+    /* Unbuffered: the filter itself may die (nested fault in dbghelp
+     * etc.) — every line must hit disk the moment it is written. */
+    if (crash_tee)
+        setvbuf(crash_tee, NULL, _IONBF, 0);
     crash_sym(at - base, sym, sizeof sym);
-    fprintf(stderr, "%s[orion] FATAL: exception 0x%lx at %s%s\n", c_red(),
-            (unsigned long)info->ExceptionRecord->ExceptionCode, sym, c_off());
+    crash_line("[orion] FATAL: exception 0x%lx at %s",
+               (unsigned long)info->ExceptionRecord->ExceptionCode, sym);
     crash_print_crumbs();
     /* Backtrace: scan the crashed thread's stack for return addresses
      * inside our module, symbolized inline. No dbghelp, always works. */
@@ -966,20 +995,46 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
         int printed = 0;
         if (rip >= lo && rip < hi) {
             crash_sym(rip - base, sym, sizeof sym);
-            fprintf(stderr, "%s[orion]   #%d %s%s\n", c_red(), printed, sym,
-                    c_off());
+            crash_line("[orion]   #%d %s", printed, sym);
             printed++;
         }
+        /* Scan only committed stack: a shallow crash puts the stack
+         * top within 512 words of rsp, and reading past it would
+         * nested-fault and kill the filter mid-report. */
+        unsigned long long slo = 0, shi = 0;
+        GetCurrentThreadStackLimits((PULONG_PTR)&slo, (PULONG_PTR)&shi);
         unsigned long long *sp = (unsigned long long *)rsp;
         for (int i = 0; i < 512 && printed < 12; i++) {
+            if (shi && (unsigned long long)(sp + i + 1) > shi)
+                break;
             unsigned long long v = sp[i];
             if (v >= lo && v < hi) {
                 crash_sym(v - base, sym, sizeof sym);
-                fprintf(stderr, "%s[orion]   #%d %s%s\n", c_red(), printed,
-                        sym, c_off());
+                crash_line("[orion]   #%d %s", printed, sym);
                 printed++;
             }
         }
+    }
+    /* Access violations carry the faulting data address; a 0xdd..dd
+     * byte pattern means a read through region memory poisoned at
+     * reset — a lifetime bug, not a wild pointer. Printed BEFORE the
+     * minidump attempt: dbghelp can nested-fault and kill the filter,
+     * and the diagnosis must never depend on it. */
+    if (info->ExceptionRecord->ExceptionCode == 0xC0000005 &&
+        info->ExceptionRecord->NumberParameters >= 2) {
+        unsigned long long bad = info->ExceptionRecord->ExceptionInformation[1];
+        int poison = ((bad >> 8) & 0xffffffffULL) == 0xddddddddULL ||
+                     (bad & 0xffffffff00ULL) == 0xdddddddd00ULL ||
+                     ((bad >> 16) & 0xffffffffULL) == 0xddddddddULL;
+        crash_line("[orion]        %s address 0x%llx%s",
+                   info->ExceptionRecord->ExceptionInformation[0] ? "writing"
+                                                                  : "reading",
+                   bad, poison ? " (0xDD poison: reset region memory)" : "");
+    }
+    fflush(stderr);
+    if (crash_tee) {
+        fclose(crash_tee);
+        crash_tee = NULL;
     }
     /* Self-service minidump: WER is unreliable on dev boxes, so the
      * filter writes crash.dmp next to the exe (dbghelp loaded
@@ -1020,22 +1075,6 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
             }
         }
     }
-    /* Access violations carry the faulting data address; a 0xdd..dd
-     * byte pattern means a read through region memory poisoned at
-     * reset — a lifetime bug, not a wild pointer. */
-    if (info->ExceptionRecord->ExceptionCode == 0xC0000005 &&
-        info->ExceptionRecord->NumberParameters >= 2) {
-        unsigned long long bad = info->ExceptionRecord->ExceptionInformation[1];
-        int poison = ((bad >> 8) & 0xffffffffULL) == 0xddddddddULL ||
-                     (bad & 0xffffffff00ULL) == 0xdddddddd00ULL ||
-                     ((bad >> 16) & 0xffffffffULL) == 0xddddddddULL;
-        fprintf(stderr, "%s[orion]        %s address 0x%llx%s%s\n", c_red(),
-                info->ExceptionRecord->ExceptionInformation[0] ? "writing"
-                                                               : "reading",
-                bad, poison ? " (0xDD poison: reset region memory)" : "",
-                c_off());
-    }
-    fflush(stderr);
     return EXCEPTION_CONTINUE_SEARCH; /* still crash, still WER */
 }
 
