@@ -843,38 +843,95 @@ void __orion_resume_text(char *value) {
  * and the MODULE-RELATIVE offset (symbolizable against the link map
  * orbit emits next to the exe) before dying. Fail fast, but say
  * where. */
+/* Crashes symbolize THEMSELVES: the filter loads the link map that
+ * orbit always emits next to the exe (<exe>.map) and resolves every
+ * module-relative offset to `function +0x..` inline. No debugger,
+ * no post-processing, no "look it up" — the crash line IS the
+ * diagnosis. Falls back to raw offsets when the map is missing. */
+static char *crash_map_buf = NULL;
+static void crash_map_load(void) {
+    char path[1024];
+    DWORD n = GetModuleFileNameA(NULL, path, sizeof path);
+    if (n == 0 || n > sizeof(path) - 5) return;
+    /* swap .exe -> .map */
+    char *dot = strrchr(path, '.');
+    if (!dot) return;
+    strcpy(dot, ".map");
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    crash_map_buf = (char *)malloc(sz + 1);
+    if (crash_map_buf && fread(crash_map_buf, 1, sz, f) == (size_t)sz)
+        crash_map_buf[sz] = 0;
+    else {
+        free(crash_map_buf);
+        crash_map_buf = NULL;
+    }
+    fclose(f);
+}
+static void crash_sym(unsigned long long off, char *out, size_t cap) {
+    snprintf(out, cap, "+0x%llx", off);
+    if (!crash_map_buf) return;
+    /* Map lines: " 0001:HHHHHHHH  name ..." — module offset is the
+     * section address + 0x1000. Find the greatest base <= off. */
+    unsigned long long best = 0;
+    char best_name[192] = {0};
+    const char *p = crash_map_buf;
+    while ((p = strstr(p, " 0001:")) != NULL) {
+        unsigned long long a = strtoull(p + 6, NULL, 16) + 0x1000ULL;
+        if (a <= off && a >= best) {
+            const char *q = p + 6;
+            while (*q && *q != ' ') q++;
+            while (*q == ' ') q++;
+            size_t i = 0;
+            while (q[i] && q[i] != ' ' && q[i] != '\r' && q[i] != '\n' &&
+                   i < sizeof(best_name) - 1) {
+                best_name[i] = q[i];
+                i++;
+            }
+            best_name[i] = 0;
+            best = a;
+        }
+        p += 6;
+    }
+    if (best_name[0])
+        snprintf(out, cap, "%s+0x%llx", best_name, off - best);
+}
+
 static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
     unsigned long long base = (unsigned long long)GetModuleHandleA(NULL);
     unsigned long long at =
         (unsigned long long)info->ExceptionRecord->ExceptionAddress;
-    fprintf(stderr,
-            "%s[orion] FATAL: exception 0x%lx at module+0x%llx - look the "
-            "offset up in build/<name>.map%s\n",
-            c_red(), (unsigned long)info->ExceptionRecord->ExceptionCode,
-            at - base, c_off());
-    /* Poor man's backtrace: scan the crashed thread's stack for
-     * return addresses inside our module and print them
-     * module-relative — every line greps straight into the link map.
-     * No dbghelp, no symbols, always works. */
+    char sym[256];
+    crash_map_load();
+    crash_sym(at - base, sym, sizeof sym);
+    fprintf(stderr, "%s[orion] FATAL: exception 0x%lx at %s%s\n", c_red(),
+            (unsigned long)info->ExceptionRecord->ExceptionCode, sym, c_off());
+    /* Backtrace: scan the crashed thread's stack for return addresses
+     * inside our module, symbolized inline. No dbghelp, always works. */
     if (info->ContextRecord) {
         unsigned long long rip = info->ContextRecord->Rip;
         unsigned long long rsp = info->ContextRecord->Rsp;
         unsigned long long lo = base, hi = base + 0x200000ULL;
-        fprintf(stderr, "%s[orion]        stack:", c_red());
         int printed = 0;
         if (rip >= lo && rip < hi) {
-            fprintf(stderr, " +0x%llx", rip - base);
+            crash_sym(rip - base, sym, sizeof sym);
+            fprintf(stderr, "%s[orion]   #%d %s%s\n", c_red(), printed, sym,
+                    c_off());
             printed++;
         }
         unsigned long long *sp = (unsigned long long *)rsp;
         for (int i = 0; i < 512 && printed < 12; i++) {
             unsigned long long v = sp[i];
             if (v >= lo && v < hi) {
-                fprintf(stderr, " +0x%llx", v - base);
+                crash_sym(v - base, sym, sizeof sym);
+                fprintf(stderr, "%s[orion]   #%d %s%s\n", c_red(), printed,
+                        sym, c_off());
                 printed++;
             }
         }
-        fprintf(stderr, "%s\n", c_off());
     }
     /* Self-service minidump: WER is unreliable on dev boxes, so the
      * filter writes crash.dmp next to the exe (dbghelp loaded
