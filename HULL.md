@@ -163,9 +163,18 @@ B6. **Saving**: the log IS the save — append it continuously
     autosave heartbeat rides the compact-poll site (full=1
     fidelity), recovery boot sees the marker and stands where it
     stood. Gate st72. The full log-append form (crash = replay,
-    not checkpoint) remains the bedrock dig; the next language
-    step is supervision — rule quarantine + in-process rewind
-    (needs the fn-ref/SEH bridge).
+    not checkpoint) remains the bedrock dig.
+    ⭐ STEP 2 SHIPPED same day — SUPERVISION: a rule crash no
+    longer ends the process. The fault net (sup_guard5/7, vectored
+    handler + longjmp, full report first) catches AV/div0/illegal
+    at the three frame gates; the rule that shot is quarantined by
+    identity (cid/Trigger#i — astra rules now carry real ids), the
+    world rewinds from the autosave at the frame boundary, play
+    continues. 8 trips and the net comes down (crash storm = sick
+    world = die honest). The fn-ref bridge existed all along: fn
+    refs are raw pointers that survive a C extern round-trip.
+    Gates st73/st74; idle 0/0B; sims unregressed. Erlang for game
+    worlds — world-first #4 has its first slice.
 B8. **Device input**: the log records INTENT ("place piece col
     3"), device->intent is a pure replaceable layer. Replays
     survive UI redesign (replay-diff robust across versions!),
