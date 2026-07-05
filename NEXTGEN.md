@@ -185,10 +185,22 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
   (`belief_imagine` → foresee). The clean reframing (namespace, not World)
   made an L-scope arc land as three S slices.
 
-- [ ] **B2. Uncertainty as a type** (belief #2) — `Door.open confidence 0.73`,
-  `Enemy probably at Forest`. A value carries a confidence; queries and
-  `when` reason over it. Perfect for AI.
-  *Touches:* `lang` (type) + `rt` (value repr). *Scope:* L.
+- [x] **B2. Uncertainty as a type** (belief #2) ✓ 2026-07-05 — a fact
+  carries a certainty and rules reason over it. Shipped as PURE PARSER
+  SUGAR (no value-repr surgery, the clean reframing): `enemy_at = 3
+  confidence 73` tags the fact with a 0-100 certainty stored as a
+  parallel `conf:enemy_at` resource, and `confidence(enemy_at)` reads it
+  back — desugaring to `SetVar(enemy_at,3) + SetVar(conf:enemy_at,73)`
+  and `VarRef("conf:enemy_at")` respectively, both riding auto-ctx. So a
+  rule can `when confidence(enemy_at) > 50: act` — reason over how sure
+  it is. Unknown facts read confidence 0 at runtime (auto-ctx res_get_int
+  default) → a plain fact is implicitly uncertain. Int-percent (0-100),
+  not float 0.73 — stays in the int-fact/potato world; f64 confidence is
+  a follow-up if needed. Gate st104 (write tags conf:, query reads it,
+  >50 reasoning fires); cubsy soak green. Lexer `Confidence` keyword +
+  set-suffix + primary query, ~35 lines.
+  *Touches:* `lang` (parser only). *Scope:* was L; the parallel-resource
+  reframing made it S.
 
 - [ ] **B3. Constraints / goals** (#8) — `goal: NPC inside House`,
   `constraints: avoid Water, avoid Fire`. Runtime solves the HOW.
