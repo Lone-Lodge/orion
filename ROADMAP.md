@@ -37,12 +37,29 @@ gate battery / the recorder). Status: 2026-07-05.
    bit-identical replay on 8 cores. The strongest scientific
    claim. (Converges with Track 2 step 4.)
 
+Replay-diff in one image: git diff for gameplay — play 10 min,
+change ONE number, the engine replays your recorded session under
+the new rule and reports exactly where the timelines diverge
+("tick 3810: the boss would have died 40 ticks earlier"). The
+Oracle diffs futures; replay-diff diffs pasts.
+
 Continents behind these: ghost-selves (log-exchange multiplayer,
-KB letters — falls out of determinism), the petri dish (try+soak+
-curiosity metrics breed MECHANICS), archaeology (causality as
+KB letters — falls out of determinism), archaeology (causality as
 genre), provable worlds (log = verified speedrun submission).
+PARKED (user verdict: most speculative, revisit only if try+soak
+make it nearly free): the petri dish (breeding mechanics).
 
 ## Track 2 — Engine architecture (the arc)
+
+Hull work — but INVENTED THROUGH OUR PHYSICS, not bought from the
+1970s shipyard: texts become hash-consed identity with region
+lifetimes (equality = pointer compare, O(1), everywhere);
+interning becomes DETERMINISTIC LOG-BOUND NAMING (a name's id is
+born as an effect => replay/fork keep identity bit-stable — the
+Oracle and ghost-selves require this); the checker learns OUR laws
+(the splash-teleport class caught statically; every field bug the
+soak finds becomes grammar the checker enforces forever — a
+language whose static analysis is trained by its own telemetry).
 
 1. ⏩ Interning (STARTED): short-key compile cache SHIPPED
    (dirty sims frame 435us -> 288us, -34%). REMAINING: resource/
