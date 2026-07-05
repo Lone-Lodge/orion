@@ -478,6 +478,21 @@ fn cmd_native():
     else:
         die("usage: orbit native [gpu|ship]")
 
+# The game as a queryable surface: every rule's reads/writes/
+# emits/spawns, optionally filtered ("orbit facts score" = which
+# rules touch score).
+# usage: orbit facts [name]
+fn cmd_facts():
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    filter = first_param()
+    q = bytes_to_text(push([], 34))
+    src = "use atlas_project\n\nfn main() -> int:\n    project_facts(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + filter + q + ")\n"
+    mkdir_all("target")
+    write_file("target/facts_gen.or", src)
+    exe = build_native_entry("facts", "target/facts_gen.or")
+    exit_with(run_command(exe, []))
+
 # The shadow verdict: compile the candidate, replay the last real
 # session under it, chaos-soak a fresh world, return the verdict.
 # usage: orbit try [soak-ticks] [seed]
@@ -566,4 +581,7 @@ pub fn main():
                                         if command == "try":
                                             cmd_try()
                                         else:
-                                            usage()
+                                            if command == "facts":
+                                                cmd_facts()
+                                            else:
+                                                usage()
