@@ -19,6 +19,16 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
 - [x] **Forward causality** (#4, #14) — `orbit affects <name>`, the ripple. `tool`
 - [x] **Auto-scheduler from facts** (#3, #9) — `orbit schedule`, hazard-free parallel batches. `tool`
 - [x] **Liveness / dead-write audit** (#13, #16) — `orbit liveness`. `tool`
+- [x] **Analysis suite wired to the CLI** ✓ 2026-07-05 — the four above
+  shipped in atlas_project but were gate-only (orbit dispatch stopped at
+  `facts`). Now real subcommands (orbit_main.or synth_analysis + dispatch
+  + usage; orbit.exe rebuilt). Verified on cubsy: `orbit why score` walks
+  the real chain incl. the line_clear/LineClear law, `orbit schedule` →
+  117 rules/17 batches/0 hazards, `orbit affects`/`liveness` too. The
+  runtime tools (resource_history, world_timeline, belief_wrong,
+  goals_met, belief_apply) remain gate-proven PRIMITIVES; their CLI
+  wrappers (`orbit explain`/`timeline`/`beliefs`/`goals`) need a session-
+  run/replay harness to have a playthrough to read — a clean follow-up.
 - [x] **Transitive facts** — the sound base under all four analyses. `lang`
 - [x] **No tick if nothing changed** (#7) — idle floor 0 draws / 0B. `sims`
 - [x] **Effect inference / self-proving** (#6) — `orion facts`, 249/272 pure. `lang`
