@@ -67,6 +67,38 @@ pub fn register(interp: &Interp) {
         Ok(Value::Text(text))
     });
 
+    // Binary-safe variants — websocket frames and other wire formats carry
+    // bytes >127 that the Text path corrupts (from_utf8_lossy → U+FFFD).
+    interp.register_extern("__os_tcp_send_bytes", |args| {
+        let handle = as_int(&args[0]) as usize;
+        let bytes: Vec<u8> = match &args[1] {
+            Value::List(items) => items.iter().map(|v| match v { Value::Int(i) => *i as u8, _ => 0 }).collect(),
+            _ => Vec::new(),
+        };
+        let sent = STREAMS.with(|c| {
+            let mut v = c.lock().unwrap();
+            v.get_mut(handle).and_then(|s| s.as_mut())
+                .and_then(|s| s.write(&bytes).ok())
+                .map(|n| n as i64).unwrap_or(-1)
+        });
+        Ok(Value::Int(sent))
+    });
+
+    interp.register_extern("__os_tcp_recv_bytes", |args| {
+        let handle = as_int(&args[0]) as usize;
+        let max = as_int(&args[1]) as usize;
+        let out = STREAMS.with(|c| {
+            let mut v = c.lock().unwrap();
+            v.get_mut(handle).and_then(|s| s.as_mut()).map(|s| {
+                let mut buf = vec![0u8; max];
+                let n = s.read(&mut buf).unwrap_or(0);
+                buf.truncate(n);
+                buf.into_iter().map(|b| Value::Int(b as i64)).collect::<Vec<_>>()
+            }).unwrap_or_default()
+        });
+        Ok(Value::List(std::sync::Arc::new(out)))
+    });
+
     interp.register_extern("__os_tcp_close", |args| {
         let handle = as_int(&args[0]) as usize;
         STREAMS.with(|c| { let mut v = c.lock().unwrap(); if let Some(s) = v.get_mut(handle) { *s = None; } });

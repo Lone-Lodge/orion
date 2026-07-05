@@ -22,7 +22,11 @@ fn b64_val(character: int) -> int:
     else -1
 
 pub fn base64_encode(text: Text) -> Text:
-    bytes = bytes_from_text(text)
+    base64_encode_bytes(bytes_from_text(text))
+
+# Binary-safe entry — sha1_raw digests etc. must NOT roundtrip through
+# Text (bytes_to_text mangles non-UTF-8 bytes into U+FFFD).
+pub fn base64_encode_bytes(bytes: [int]) -> Text:
     byte_count = bytes_length(bytes)
     full_triplets = byte_count / 3
     remainder = byte_count - full_triplets * 3

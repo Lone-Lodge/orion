@@ -1,6 +1,7 @@
 # url — percent-encoding (RFC 3986 unreserved set) and minimal URL parsing.
 # Full pure Orion since v0.0.13.
 
+use bytes
 # True if `byte` is in the RFC 3986 unreserved set: ALPHA / DIGIT / "-" / "_" / "." / "~"
 fn is_url_safe(byte: int) -> bool:
     if byte >= 65 and byte <= 90 then true         # 'A'..'Z'

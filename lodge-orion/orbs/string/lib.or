@@ -1,6 +1,8 @@
 # string — text manipulation, pure Orion on top of `bytes`.
 # `str_upper` / `str_lower` are ASCII-only (A-Z ↔ a-z, delta = 32).
 # Full Unicode case folding would need multi-megabyte tables — out of scope.
+use bytes
+
 
 pub fn str_upper(text: Text) -> Text:
     src = bytes_from_text(text)
@@ -233,3 +235,17 @@ pub fn str_to_float(text: Text) -> f64:
         else:
             magnitude = to_float(integer_part) + fractional_part / fractional_divisor
             if is_negative then 0.0 - magnitude else magnitude
+
+# Byte-length (not chars) — matches str_slice/str_index_of offsets so the
+# three compose for header/protocol parsing over ASCII wire formats.
+pub fn str_length(text: Text) -> int:
+    bytes_length(bytes_from_text(text))
+
+pub fn str_slice(text: Text, low: int, high: int) -> Text:
+    bytes_to_text(bytes_slice(bytes_from_text(text), low, high))
+
+# Byte offset of first occurrence, -1 when absent.
+pub fn str_index_of(text: Text, needle: Text) -> int:
+    subject = bytes_from_text(text)
+    needle_bytes = bytes_from_text(needle)
+    find_at(subject, bytes_length(subject), needle_bytes, bytes_length(needle_bytes), 0)

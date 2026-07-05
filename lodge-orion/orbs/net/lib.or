@@ -2,18 +2,29 @@
 # WebSocket protocol lives in the `atlas_ws` orb on top of these TCP primitives.
 # HTTP is plain HTTP only — TLS requires a separate TLS orb.
 
+use bytes
+use string
+use format
+use url
+
 extern fn __os_tcp_connect(host: Text, port: int) -> int
-extern fn __os_tcp_send(handle: int, data: Text) -> int
+extern fn __os_tcp_send(handle: int, payload: Text) -> int
 extern fn __os_tcp_recv(handle: int, max_bytes: int) -> Text
+extern fn __os_tcp_send_bytes(handle: int, payload: [int]) -> int
+extern fn __os_tcp_recv_bytes(handle: int, max_bytes: int) -> [int]
 extern fn __os_tcp_close(handle: int)
 extern fn __os_tcp_listen(port: int) -> int
 extern fn __os_tcp_accept(server: int) -> int
 extern fn __os_tcp_close_server(server: int)
 
-# TCP client
+# TCP client. The Text pair is for ASCII protocols (HTTP); anything
+# carrying bytes >127 must use the _bytes pair — the Text path lossy-
+# decodes UTF-8 and corrupts binary frames.
 pub fn tcp_connect(host: Text, port: int) -> int: __os_tcp_connect(host, port)
-pub fn tcp_send(handle: int, data: Text) -> int: __os_tcp_send(handle, data)
+pub fn tcp_send(handle: int, payload: Text) -> int: __os_tcp_send(handle, payload)
 pub fn tcp_recv(handle: int, max_bytes: int) -> Text: __os_tcp_recv(handle, max_bytes)
+pub fn tcp_send_bytes(handle: int, payload: [int]) -> int: __os_tcp_send_bytes(handle, payload)
+pub fn tcp_recv_bytes(handle: int, max_bytes: int) -> [int]: __os_tcp_recv_bytes(handle, max_bytes)
 pub fn tcp_close(handle: int): __os_tcp_close(handle)
 
 # TCP server
@@ -35,15 +46,24 @@ fn http_strip_headers(response: Text) -> Text:
             body_parts = push(body_parts, at(parts, i))
         str_join(body_parts, "\r\n\r\n")
 
+# Typed seam: fields off the parsed-url map are untyped; a Text param pins them.
+fn pin_text(value: Text) -> Text:
+    value
+
+fn http_full_path(base_path: Text, query_part: Text) -> Text:
+    if query_part == "":
+        base_path
+    else:
+        base_path + "?" + query_part
+
 pub fn http_get(url_text: Text) -> Text:
     parsed = url_parse(url_text)
-    host = parsed.host
-    port_text = parsed.port
-    path = parsed.path
-    query = parsed.query
+    host = pin_text(parsed.host)
+    port_text = pin_text(parsed.port)
+    path = pin_text(parsed.path)
     port = if port_text == "" then 80 else str_to_int(port_text)
     base_path = if path == "" then "/" else path
-    full_path = if query == "" then base_path else base_path + "?" + query
+    full_path = http_full_path(base_path, get(parsed, "query"))
     handle = tcp_connect(host, port)
     if handle < 0:
         ""
@@ -61,9 +81,9 @@ pub fn http_get(url_text: Text) -> Text:
 
 pub fn http_post(url_text: Text, body: Text) -> Text:
     parsed = url_parse(url_text)
-    host = parsed.host
-    port_text = parsed.port
-    path = parsed.path
+    host = pin_text(parsed.host)
+    port_text = pin_text(parsed.port)
+    path = pin_text(parsed.path)
     port = if port_text == "" then 80 else str_to_int(port_text)
     base_path = if path == "" then "/" else path
     content_length = bytes_length(bytes_from_text(body))
