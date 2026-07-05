@@ -66,6 +66,13 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
   like a world law, not a system. `becomes` = set a tag/state;
   `after Ns` = a delayed effect (needs a timer wheel in sims).
   *Touches:* `lang` (+ `sims` for `after`). *Scope:* M.
+  **NOTE (2026-07-05 audit):** `becomes` is ALREADY a lexer keyword but
+  has ZERO handling (tokenized + named, no parse/eval) — the one dead
+  reserved word in astra. NOT pure sugar like A1: `becomes` needs an
+  ECS-state decision (a tag component? an entity field? a resource?),
+  and `after Ns` needs a timer wheel in sims. Design first, then build —
+  do NOT rush at context limit. Until then `x becomes y` parse-errors
+  (loud, not silent), so it is earmarked, not a footgun.
 
 - [ ] **A3. Relations first-class** (#5, #6) — `relation owns(Player, Item)`,
   `when npc hates player and npc sees player: npc attacks player`.
