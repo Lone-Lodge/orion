@@ -1082,6 +1082,120 @@ static void orion_crash_filter_install(void) {
     SetUnhandledExceptionFilter(orion_crash_filter);
 }
 
+/* ---- Supervision: run a rule dispatch under a fault net (B6 step 2).
+ * sup_guard5/7 call an Orion fn ref with the caller's own arguments; a
+ * hardware fault inside does NOT kill the process. The vectored handler
+ * writes the full crash report first (same trinity, same crash.txt —
+ * supervision never costs diagnosis), then steers the faulting thread
+ * into a longjmp back here and the guard returns -1 so the engine can
+ * quarantine the rule and rewind the world. The net exists only while
+ * a guard is armed on this thread; everything else still dies loudly
+ * through the unhandled filter. Stack overflow stays fatal by design:
+ * the report machinery cannot run on an exhausted stack. */
+static jmp_buf guard_jb;
+static volatile unsigned long guard_tid = 0;
+static volatile int guard_armed = 0;
+
+static void guard_bounce(void) { longjmp(guard_jb, 1); }
+
+static LONG WINAPI orion_guard_vector(EXCEPTION_POINTERS *info) {
+    if (!guard_armed || GetCurrentThreadId() != guard_tid)
+        return EXCEPTION_CONTINUE_SEARCH;
+    DWORD code = info->ExceptionRecord->ExceptionCode;
+    if (code != 0xC0000005 /* AV */ && code != 0xC0000094 /* idiv 0 */ &&
+        code != 0xC000001D /* illegal instr */)
+        return EXCEPTION_CONTINUE_SEARCH;
+    guard_armed = 0; /* a fault inside the report must fall through */
+    orion_crash_filter(info);
+    fprintf(stderr, "%s[orion] caught by supervisor — quarantine + rewind%s\n",
+            c_red(), c_off());
+    /* The longjmp must run OUTSIDE the exception dispatcher: point the
+     * resumed context at guard_bounce. Rsp realigned as if just called
+     * (entry alignment = 16n-8); the garbage return address is fine,
+     * guard_bounce never returns. */
+    info->ContextRecord->Rsp = (info->ContextRecord->Rsp & ~0xFULL) - 8;
+    info->ContextRecord->Rip = (unsigned long long)(void *)guard_bounce;
+    return EXCEPTION_CONTINUE_EXECUTION;
+}
+
+/* The fault may abandon region scopes mid-flight (arena on, pool or
+ * ledger stack pushed, persist depth held) — snapshot on arm, restore
+ * on catch, or every later allocation lands in the wrong lifetime. */
+typedef struct {
+    int arena, pactive, pdepth, olc, old, persist;
+} guard_alloc_state;
+
+static void guard_save(guard_alloc_state *s) {
+    s->arena = arena_on;
+    s->pactive = pool_active;
+    s->pdepth = pool_depth;
+    s->olc = ol_cur;
+    s->old = ol_depth;
+    s->persist = persist_depth;
+}
+
+static void guard_restore(const guard_alloc_state *s) {
+    arena_on = s->arena;
+    pool_active = s->pactive;
+    pool_depth = s->pdepth;
+    ol_cur = s->olc;
+    ol_depth = s->old;
+    persist_depth = s->persist;
+}
+
+static void guard_install(void) {
+    static void *vh = NULL;
+    if (!vh) vh = AddVectoredExceptionHandler(1, orion_guard_vector);
+}
+
+long long sup_guard5(long long fn, long long a, long long b, long long c,
+                     long long d, long long e) {
+    guard_install();
+    guard_alloc_state st;
+    guard_save(&st);
+    if (setjmp(guard_jb)) {
+        guard_restore(&st);
+        return -1;
+    }
+    /* Zero the SEH frame slot: longjmp becomes a plain register
+     * restore instead of RtlUnwindEx through frames the fault left
+     * in an unknown state. Nothing between arm and fault owns
+     * destructors — this runtime has none. */
+    ((unsigned long long *)guard_jb)[0] = 0;
+    guard_tid = GetCurrentThreadId();
+    guard_armed = 1;
+    long long r = ((long long (*)(long long, long long, long long, long long,
+                                  long long))fn)(a, b, c, d, e);
+    guard_armed = 0;
+    return r;
+}
+
+long long sup_guard7(long long fn, long long a, long long b, long long c,
+                     long long d, long long e, long long f, long long g) {
+    guard_install();
+    guard_alloc_state st;
+    guard_save(&st);
+    if (setjmp(guard_jb)) {
+        guard_restore(&st);
+        return -1;
+    }
+    ((unsigned long long *)guard_jb)[0] = 0;
+    guard_tid = GetCurrentThreadId();
+    guard_armed = 1;
+    long long r = ((long long (*)(long long, long long, long long, long long,
+                                  long long, long long, long long))fn)(
+        a, b, c, d, e, f, g);
+    guard_armed = 0;
+    return r;
+}
+
+/* Which rule was executing when the guard tripped — the quarantine
+ * key. Headered per H1 (every Text the runtime hands out carries
+ * [hash][len]). */
+const char *sup_rule_name(void) {
+    return orion_text_from_c(crumb_rule[0] ? crumb_rule : "");
+}
+
 /* Newline-joined file names in `dir` (no paths, no subdirs). Empty
  * text when the directory is missing — callers fall back to the
  * embedded asset list in ship builds. */
