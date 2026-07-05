@@ -761,8 +761,27 @@ fn ast_float_binop_to_ir(fn_in: IRFn, scope: Scope, op: Text, left_id: int, left
     pr_f = ir_fn_push(current_fn, ir_fbin(fop, l_id, r_id))
     ConvResult{function: pr_f.function, scope: scope, id: pr_f.id}
 
+# Short-circuit `and`/`or` by lowering through the if path: the right
+# operand's instructions live in a branch block, so they DO NOT run
+# when the left already decides the result. `a and b` == `if a then b
+# else false`; `a or b` == `if a then true else b`. Logical semantics —
+# `and`/`or` are never bitwise here (the bit machinery uses arithmetic,
+# so no value depended on the old eager iand/ior), and the ubiquitous
+# guard `x and unsafe(x)` is finally safe. (Requires the nested-in-
+# condition label fix in ast_if_to_ir — without it the if these
+# synthesize inside conditions collides on labels.)
+fn sc_int(v: Text) -> Map:
+    {"kind": "Int", "value": v}
+
+fn sc_if(cond: Map, then_e: Map, else_e: Map) -> Map:
+    {"kind": "If", "cond": cond, "then": then_e, "else": else_e}
+
 fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     op = get(node, "op")
+    if op == "and":
+        return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "right"), sc_int("0")))
+    if op == "or":
+        return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), sc_int("1"), get(node, "right")))
     left_result = ast_expr_to_ir(fn_value, scope, get(node, "left"))
     right_result = ast_expr_to_ir(left_result.function, left_result.scope, get(node, "right"))
     left_type = get_value_type(right_result.function, left_result.id)
