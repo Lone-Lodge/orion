@@ -244,8 +244,15 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     project_state_sig_bare hashes the save-text, which lists resources in
     insertion order, so two equal states reached in different orders
     fingerprint DIFFERENTLY. Fine for replay (deterministic insertion),
-    but real thread execution needs a CANONICAL (sorted-key) fingerprint
-    to compare parallel results. Prerequisite recorded for the executor.
+    but real thread execution needs a CANONICAL fingerprint.
+  - [x] **Canonical fingerprint** ✓ 2026-07-05 — `project_state_sig_
+    canonical(world, prefix)` sums a per-fact hash (a COMMUTATIVE fold),
+    so insertion order can't change it — two equal states fingerprint the
+    same regardless of the order threads produced them, yet a value change
+    still shifts it. Prefix-normalized, int facts. Gate st108 (order-
+    independent yet value-sensitive; save-text sig stays order-sensitive
+    as found). The executor's parallel-result oracle now exists — one
+    fewer blocker on the threaded executor.
   - [ ] **The threaded EXECUTOR** — a worker pool in orion_rt that runs a
     batch's rules concurrently, joins, applies effects in a canonical
     order. This is the genuine L-scope arch arc (OS threads, sync, the
@@ -271,8 +278,13 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     draining with a `cur_bundle` slot, or threading cause through the
     effect payload from dispatch. That is the real M-scope runtime work;
     the value-history above is the clean slice that needs no plumbing.
-  - [ ] **Timeline view** — a tool listing all logged changes across
-    resources by tick (rides resource_history over the full key set).
+  - [x] **Timeline view** ✓ 2026-07-05 — `world_timeline(world)` lists
+    EVERY logged resource change across the playthrough in tick order —
+    the runtime "what happened", one entry per change (tick, key, value),
+    straight from the log. Where resource_history is one resource's
+    trajectory, this is all of them interleaved (a `timeline` tool or
+    live HUD reads it). Gate st109 (all changes captured, tick order,
+    right key/value).
   *Touches:* `rt` (log provenance) + `tool`. *Scope:* M.
 
 - [ ] **C3. Self-learning scheduler** (belief #5) — measure per-rule
