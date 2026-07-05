@@ -61,7 +61,7 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
   RISK: ParseResult + Compiled are constructed in many places; a missed
   literal breaks astra compilation. Do step 3's grep first.
 
-- [~] **A2. Laws-sugar** (#7) — `becomes` DONE; `law`/`after` are v2.
+- [x] **A2. Laws-sugar** (#7) — `becomes` ✓, `law` ✓, `after` ✓ (all 2026-07-05).
   - [x] **`becomes`** ✓ 2026-07-05 — a law-readable synonym for `=`:
     `when health <= 0: player becomes dead` desugars to `SetVar(player,
     dead)`, reusing the whole assignment path (looks_like_assignment +
@@ -75,21 +75,29 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
     VALIDATED IN PRODUCTION: cubsy's scoring rule is now `law LineClear:`
     — soak identical (behavior unchanged), and `why score` shows
     `line_clear/LineClear` instead of anonymous `line_clear/Tick`.
-  - [ ] **`after Ns:` delayed effect** — the last A2 piece.
-    **ATTACKED then reverted (2026-07-05):** the LANGUAGE side is clean and
-    was fully written — `After` keyword, `Stmt.AfterStmt(Expr, Text, Expr)`,
-    `AstraEffect.AstraAfter(int, Text, Value)`, parser `after N: name =
-    value`, eval snapshotting the value, all exhaustive matches (compiler-
-    guided). The wall is the RUNTIME storage: the timer queue lives in
-    world state (so it saves/rewinds), and its text records must be built
-    in the STATE POOL or their bytes dangle at the next region reset —
-    that pool-lifetime dance, plus the prefix-at-queue-time coupling (the
-    bare script name needs the world prefix, known only to the sims), plus
-    a per-tick `world_timers_fire` call, is a real memory-lifetime slice.
-    Do it with a fresh window: build the timer text under state_alloc_on,
-    store the ALREADY-prefixed name (sims sets an `atlas:cur_prefix` slot
-    the queuer reads), and call world_timers_fire once per tick in run_sims.
-    *Touches:* `rt` + `sims`. M. Reverted cleanly; A3 milestone intact.
+  - [x] **`after Ns:` delayed effect** ✓ 2026-07-05 — the last A2 piece,
+    SHIPPED via a fundamentally cleaner design than the reverted attempt.
+    NO core-enum surgery, NO world-state timer queue, NO text-pool
+    lifetime dance. `after N: name = value` is PURE PARSER SUGAR (like
+    `derive`/`becomes`): it desugars to two int-resource writes inside an
+    always-true block — `__after:name = tick + N` (the fire tick, `tick`
+    from ctx) and `__after_val:name = value` (the value). Int resources
+    save/rewind and self-manage lifetime, so the whole memory problem
+    evaporated. A `world_tick` scan (in atlas_ecs, right after the tick
+    bumps) fires armed timers whose fire tick has arrived: sets
+    `name = __after_val:name`, then disarms (`__after:name = 0`). The
+    prefix is recovered from the key so atlas_ecs stays prefix-agnostic;
+    the scan is gated on an `atlas:any_after` slot that `apply_set` flips
+    the first time an `after` arms, so a game that never uses `after`
+    pays one int read per tick and no scan (potato principle). N is in
+    ticks (frames); N≥1 fires exactly N frames later. `becomes` accepted
+    as the synonym. Gates st95 (desugar) + st96 (world_tick firing) +
+    st97 (full dispatch->drain->tick chain, incl. slot arming); cubsy
+    soak 2000 green (scan dormant, no regression). v1 caveat: int values
+    only, one pending `after` per target name.
+    *Touched:* `lang` (parser only) + `rt` (atlas_ecs scan) + `sims`
+    (apply_set slot). The revert's "wall" was the wrong design, not a
+    real barrier — the resource-based reframing made it an S, not an M.
 
 - [x] **A3. Relations first-class** (#5, #6) — CREATE + QUERY ✓ 2026-07-05.
   - [x] **`relate A kind B`** ✓ 2026-07-05 — creates a real atlas relation
