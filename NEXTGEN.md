@@ -61,18 +61,18 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
   RISK: ParseResult + Compiled are constructed in many places; a missed
   literal breaks astra compilation. Do step 3's grep first.
 
-- [ ] **A2. Laws-sugar** (#7) — `law Death:`, `entity becomes Dead`,
-  `after 1.5s:`. Sugar over existing when/set/spawn so a rule reads
-  like a world law, not a system. `becomes` = set a tag/state;
-  `after Ns` = a delayed effect (needs a timer wheel in sims).
-  *Touches:* `lang` (+ `sims` for `after`). *Scope:* M.
-  **NOTE (2026-07-05 audit):** `becomes` is ALREADY a lexer keyword but
-  has ZERO handling (tokenized + named, no parse/eval) — the one dead
-  reserved word in astra. NOT pure sugar like A1: `becomes` needs an
-  ECS-state decision (a tag component? an entity field? a resource?),
-  and `after Ns` needs a timer wheel in sims. Design first, then build —
-  do NOT rush at context limit. Until then `x becomes y` parse-errors
-  (loud, not silent), so it is earmarked, not a footgun.
+- [~] **A2. Laws-sugar** (#7) — `becomes` DONE; `law`/`after` are v2.
+  - [x] **`becomes`** ✓ 2026-07-05 — a law-readable synonym for `=`:
+    `when health <= 0: player becomes dead` desugars to `SetVar(player,
+    dead)`, reusing the whole assignment path (looks_like_assignment +
+    parse_set_stmt accept `Becomes` alongside `Assign`). Reads like a
+    world rule, means a state set. Gate st90; cubsy check + soak green.
+    Cleared the one dead reserved keyword.
+  - [ ] **`law NAME:` grouping** — a named block of rules (cosmetic
+    label + optional shared `require`). Pure parser sugar. S.
+  - [ ] **`after Ns:` delayed effect** — needs a timer wheel in sims
+    (schedule a body to run N seconds later). The valuable, harder half.
+    *Touches:* `sims`. M.
 
 - [ ] **A3. Relations first-class** (#5, #6) — `relation owns(Player, Item)`,
   `when npc hates player and npc sees player: npc attacks player`.
