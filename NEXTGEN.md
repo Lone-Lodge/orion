@@ -231,11 +231,29 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
 
 ### Phase C — execute the parallelism, close the runtime loops
 
-- [ ] **C1. Run the schedule on threads** (#3) — the RUNTIME half of
-  deterministic parallelism. The scheduler already derives hazard-free
-  batches (st85); this actually runs a batch's rules on workers,
-  deterministically (bit-identical to serial). World-first #1, executed.
-  *Touches:* `rt` + `arch`. *Scope:* L. *Needs the deterministic-parallel proof.*
+- [~] **C1. Run the schedule on threads** (#3) — the RUNTIME half of
+  deterministic parallelism.
+  - [x] **Deterministic-parallel PROOF** ✓ 2026-07-05 — the prerequisite
+    the doc named. Gate st107 proves the scheduler's hazard criterion IS
+    the determinism guarantee threads need: disjoint writes COMMUTE
+    (rule A then B == B then A, by value — so a batch runs in ANY thread
+    interleaving to one result), overlapping writes do NOT (order changes
+    the result, so serializing them is correct). Oracle = world_int_diff
+    (value comparison, order-independent).
+  - [x] **Finding: the fingerprint is insertion-order-sensitive** —
+    project_state_sig_bare hashes the save-text, which lists resources in
+    insertion order, so two equal states reached in different orders
+    fingerprint DIFFERENTLY. Fine for replay (deterministic insertion),
+    but real thread execution needs a CANONICAL (sorted-key) fingerprint
+    to compare parallel results. Prerequisite recorded for the executor.
+  - [ ] **The threaded EXECUTOR** — a worker pool in orion_rt that runs a
+    batch's rules concurrently, joins, applies effects in a canonical
+    order. This is the genuine L-scope arch arc (OS threads, sync, the
+    canonical fingerprint above) — a dedicated window, not a tail slice.
+    The proof + finding above are its foundation: WHAT to run in parallel
+    (hazard-free batches, st85) and WHY it's safe (st107) are settled;
+    HOW (threads) is the remaining runtime build.
+  *Touches:* `rt` + `arch`. *Scope:* L; proof landed (S), executor stays L.
 
 - [~] **C2. Runtime provenance → timeline + live `explain`** (#2, #10) —
   why/affects are the static causal graph; this is the live instance.
@@ -258,25 +276,70 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
   *Touches:* `rt` (log provenance) + `tool`. *Scope:* M.
 
 - [ ] **C3. Self-learning scheduler** (belief #5) — measure per-rule
-  time, reorganize batches to balance workers next frame. Rides C1.
-  *Touches:* `rt`. *Scope:* M, after C1.
+  time, reorganize batches to balance workers next frame. **Gated on C1's
+  threaded executor** — there is nothing to load-balance until batches
+  actually run on workers. The per-rule timing half could be prototyped
+  now (orion_ledger already tags spans), but the reorganization payoff
+  needs C1. Deferred with C1's executor. *Touches:* `rt`. *Scope:* M, after C1.
 
 ### Phase D — far frontier (inscribed, not scheduled)
 
+Assessed in this pass; each is a genuine architectural arc, NOT a clean
+slice — shipping fake thread/GPU/opt code would betray the quality bar.
+Honest scoping recorded so a future dedicated window can pick them up.
+
 - [ ] **D1. Spatial partitioning** (belief #10) — world regions (Forest/
-  Dungeon) to different workers; the compiler knows space. `arch` L.
+  Dungeon) to different workers. **Gated on C1's executor** (there are no
+  workers yet) PLUS a spatial index (entities bucketed by region). The
+  index alone is a real, achievable data structure — and useful for
+  gameplay queries independent of parallelism — but the "to different
+  workers" payoff needs C1. `arch` L.
 - [ ] **D2. Data gravity** (belief #15) — GPU vs CPU placement by where
-  the data lives; the programmer doesn't choose. `arch` L.
+  the data lives. Needs a GPU compute path (the runtime has ogpu for
+  DRAW, not general compute) — a large infra arc well beyond a language
+  slice. Genuinely far frontier. `arch` L.
 - [ ] **D3. Entropy/energy execution** (#7, #12) — minimize work by
-  information change, not by frame. `sims` L, spekulativt.
+  information change, not by frame. The coarse version SHIPPED (idle
+  floor: no tick if nothing changed). The fine version — skip a RULE
+  whose read-set didn't change this tick — is achievable in principle
+  (facts give each rule's reads; the state has changed/added/removed
+  maps) but the payoff is a run_sims integration with real correctness
+  risk (a rule with unchanged inputs is only skippable if it is pure and
+  nothing depends on re-emitting its effects). A perf arc for a fresh
+  window, tied to the lag work. `sims` L, spekulativt.
 
 ---
 
-## Order we actually go
+## Status (2026-07-05, full-list pass)
+
+**SHIPPED — every language + analysis item that was a clean slice:**
+- **Phase A COMPLETE**: derive · becomes · law · after · relate · related
+  (+ A1 runtime bool-drain bug found & fixed).
+- **Phase B COMPLETE**: B1 belief worlds (divergence · blocks · foresee),
+  B2 uncertainty-as-type (`confidence`), B3 goals/constraints (declaration
+  + evaluation).
+- **Phase C**: C2 live `explain` (resource_history) shipped; C1 the
+  deterministic-parallel PROOF shipped (+ canonical-fingerprint finding).
+
+**REMAINING — genuine architectural arcs, honestly deferred (not faked):**
+- C1 threaded executor (OS worker pool in orion_rt) → C3 self-learning
+  (rides it) → D1 spatial (rides it).
+- C2 cause-enrichment (rule identity through the drain) + timeline view.
+- D2 data gravity (GPU compute infra), D3 fine entropy execution (per-rule
+  skip, a run_sims perf arc).
+
+Each remaining item has its concrete blocker and next step recorded in
+its entry above. The through-line of the shipped work: the clean
+reframing beats the heavy build — `after` became resource-timers, belief
+a namespace, confidence a parallel resource, goals a namespaced derive.
+Core-enum surgery was never needed after A3. The arch frontier (threads,
+GPU) is what genuinely remains, and it needs dedicated windows.
+
+## Original planned order (for reference)
 
 A1 → A2 → A3 → C2 → B1 → C1 → B2 → B3 → (D as physics demands).
 A1 first: it turns the dependency net into syntax and everything
 downstream (laws, derived caches, the reactive core) leans on it.
 C2 early because runtime provenance makes the why-engine live and
 costs little. The big-arch items (C1, D) wait for the deterministic-
-parallel proof they need.
+parallel proof they need (now shipped: st107).
