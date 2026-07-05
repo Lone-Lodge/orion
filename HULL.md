@@ -205,9 +205,16 @@ B9. **Determinism as discipline**: law — exactly THREE
     by eye or by gate. sig_first_divergence names the frame two
     trajectories part: replay-diff (B3, the past under new code)
     and the speedrun proof ride the same one int. Gate st79.
-    Still owed: intent-capture in the recorder (it logs effects,
-    not inputs) so a RECORDED session can be diffed across a
-    rebuilt binary, not just two in-process runs.
+    ⭐ LOOP CLOSED same day: the recorder now captures input
+    channels as `i` intent lines, and project_replay_live feeds
+    them back through the real rules (route -> event -> sims) —
+    so a RECORDED session's live trajectory is a function of
+    (intents, current code) and diffs across a rebuilt binary.
+    Console `replay live` writes the baseline, `replay diff`
+    names the first divergence. Gate st80: intents captured,
+    live replay reproduced a run bit-for-bit. Found on the way:
+    Orion's `and`/`or` do NOT short-circuit (a codebase-wide
+    latent bug + perf cost) — flagged as its own language slice.
 B10. **Code as files**: a rule's identity = hash of its AST
     (Unison, for gameplay). Swap one rule = recompile one rule
     (B3's atom); global eternal compile cache; rules shared
