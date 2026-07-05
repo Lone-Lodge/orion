@@ -625,6 +625,10 @@ fn psr_parse_if(tokens: [Map], position: int) -> Map:
         cursor = get_int(else_result, "next")
     {"node": {"kind": "If", "cond": get_map(cond_result, "node"), "then": get_map(then_result, "node"), "else": else_node}, "next": cursor}
 
+# Typed accessor for the else-if ladder lists ([Map] elements).
+fn psr_ifchain_at(xs: [Map], i: int) -> Map:
+    at(xs, i)
+
 fn psr_parse_call(tokens: [Map], position: int, callee_name: Text) -> Map:
     # We're at the ident; `position+1` is `(`. Capture ident's line/col.
     callee_tok = at(tokens, position)
@@ -987,21 +991,67 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             if looks_like_block:
                 actually_if_block = true
                 # Parse the block-form if.
+                if_col = psr_peek_col(tokens, cursor)
                 mut if_cursor = probe_next + 1   # skip `:`
                 then_body_col = psr_peek_col(tokens, if_cursor)
                 then_body_result = psr_parse_body_at(tokens, if_cursor, then_body_col)
                 if_cursor = get_int(then_body_result, "next")
-                # Optional `else:` (must be at the same col as `if`).
-                if_cursor = psr_skip_newlines(tokens, if_cursor)
+                # `else` binds by COLUMN: only an else at this if's own
+                # column belongs to it. Without the check a dedented
+                # else was consumed by the INNERMOST open if
+                # (dangling-else) — the outer branch silently lost its
+                # else. An `else if cond:` on one line is a LADDER
+                # link: it continues THIS if, so every later else at
+                # this column still anchors here. An else that matches
+                # no if's column is an orphan and fails loud.
                 mut else_node = {"kind": "Block", "stmts": []}
-                if psr_peek_kind(tokens, if_cursor) == "ident" and psr_peek_value(tokens, if_cursor) == "else":
+                mut chain_conds = []
+                mut chain_bodies = []
+                loop:
+                    if_cursor = psr_skip_newlines(tokens, if_cursor)
+                    el_here = psr_peek_kind(tokens, if_cursor) == "ident" and psr_peek_value(tokens, if_cursor) == "else" and psr_peek_col(tokens, if_cursor) == if_col
+                    if not el_here:
+                        break
                     if_cursor = if_cursor + 1
-                    if psr_peek_kind(tokens, if_cursor) == "symbol" and psr_peek_value(tokens, if_cursor) == ":":
+                    el_colon = psr_peek_kind(tokens, if_cursor) == "symbol" and psr_peek_value(tokens, if_cursor) == ":"
+                    el_chain = psr_peek_kind(tokens, if_cursor) == "ident" and psr_peek_value(tokens, if_cursor) == "if"
+                    if el_colon:
                         if_cursor = if_cursor + 1
-                    else_body_col = psr_peek_col(tokens, if_cursor)
-                    else_body_result = psr_parse_body_at(tokens, if_cursor, else_body_col)
-                    else_node = get_map(else_body_result, "node")
-                    if_cursor = get_int(else_body_result, "next")
+                        else_body_col = psr_peek_col(tokens, if_cursor)
+                        else_body_result = psr_parse_body_at(tokens, if_cursor, else_body_col)
+                        else_node = get_map(else_body_result, "node")
+                        if_cursor = get_int(else_body_result, "next")
+                        break
+                    mut chained = false
+                    if el_chain:
+                        cc = psr_parse_expr(tokens, if_cursor + 1)
+                        cc_next = get_int(cc, "next")
+                        if psr_peek_kind(tokens, cc_next) == "symbol" and psr_peek_value(tokens, cc_next) == ":":
+                            chained = true
+                            cb_col = psr_peek_col(tokens, cc_next + 1)
+                            cb = psr_parse_body_at(tokens, cc_next + 1, cb_col)
+                            chain_conds = push(chain_conds, get_map(cc, "node"))
+                            chain_bodies = push(chain_bodies, get_map(cb, "node"))
+                            if_cursor = get_int(cb, "next")
+                    if not chained:
+                        # `else` followed by neither `:` nor a block-if
+                        # (e.g. expression-form if): parse as a plain
+                        # body anchored at the next token, as before.
+                        eb_col = psr_peek_col(tokens, if_cursor)
+                        eb = psr_parse_body_at(tokens, if_cursor, eb_col)
+                        else_node = get_map(eb, "node")
+                        if_cursor = get_int(eb, "next")
+                        break
+                # Fold ladder links right-to-left under the final else.
+                # Each link wraps in a Block — an else body is always
+                # a Block node downstream.
+                mut ci = len(chain_conds) - 1
+                loop:
+                    if ci < 0:
+                        break
+                    link = {"kind": "IfBlock", "cond": psr_ifchain_at(chain_conds, ci), "then": psr_ifchain_at(chain_bodies, ci), "else": else_node}
+                    else_node = {"kind": "Block", "stmts": push([], link)}
+                    ci = ci - 1
                 statements = push(statements, {"kind": "IfBlock", "cond": get_map(cond_probe, "node"), "then": get_map(then_body_result, "node"), "else": else_node})
                 cursor = if_cursor
         is_plain_expr = not (is_mut_decl or is_let_or_assign or is_break or is_continue or is_require or is_ensure or is_return or is_destroy or is_loop or is_for or is_match or actually_if_block)

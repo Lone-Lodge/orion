@@ -64,3 +64,7 @@ pub fn window_ready() -> bool:
 # Title updates are a native nicety; the interpreted backend ignores them.
 pub fn window_set_title(window_id: int, title: Text):
     0
+
+# Fullscreen is a native nicety too; the interpreted backend ignores it.
+pub fn window_fullscreen(window_id: int, on: int) -> int:
+    0

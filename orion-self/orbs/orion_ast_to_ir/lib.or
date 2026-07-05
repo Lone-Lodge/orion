@@ -539,6 +539,7 @@ fn ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     pr_header = ir_fn_push(pr_br_in.function, ir_label(header_lbl))
     # 3) Walk body inside loop scope.
     body_r = ast_expr_to_ir(pr_header.function, body_scope, body_node)
+    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
     # 4) If body didn't terminate (no break/continue at end), loop back.
     mut fn_after_body = body_r.function
     if is_block_terminated(fn_after_body) == 0:
@@ -596,6 +597,7 @@ fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         body_scope = scope_bind(body_scope, index_var_name, cur_id)
     body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
     body_r = ast_expr_to_ir(pr_at.function, body_scope, body_node)
+    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
 
     # Fall through from body into step block.
     mut fn_after_body = body_r.function
@@ -649,6 +651,7 @@ fn ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut body_scope = scope_bind(high_r.scope, var_name, cur_id)
     body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
     body_r = ast_expr_to_ir(pr_body_lbl.function, body_scope, body_node)
+    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
 
     # Fall through from body into step block.
     mut fn_after_body = body_r.function
@@ -758,8 +761,27 @@ fn ast_float_binop_to_ir(fn_in: IRFn, scope: Scope, op: Text, left_id: int, left
     pr_f = ir_fn_push(current_fn, ir_fbin(fop, l_id, r_id))
     ConvResult{function: pr_f.function, scope: scope, id: pr_f.id}
 
+# Short-circuit `and`/`or` by lowering through the if path: the right
+# operand's instructions live in a branch block, so they DO NOT run
+# when the left already decides the result. `a and b` == `if a then b
+# else false`; `a or b` == `if a then true else b`. Logical semantics —
+# `and`/`or` are never bitwise here (the bit machinery uses arithmetic,
+# so no value depended on the old eager iand/ior), and the ubiquitous
+# guard `x and unsafe(x)` is finally safe. (Requires the nested-in-
+# condition label fix in ast_if_to_ir — without it the if these
+# synthesize inside conditions collides on labels.)
+fn sc_int(v: Text) -> Map:
+    {"kind": "Int", "value": v}
+
+fn sc_if(cond: Map, then_e: Map, else_e: Map) -> Map:
+    {"kind": "If", "cond": cond, "then": then_e, "else": else_e}
+
 fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     op = get(node, "op")
+    if op == "and":
+        return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "right"), sc_int("0")))
+    if op == "or":
+        return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), sc_int("1"), get(node, "right")))
     left_result = ast_expr_to_ir(fn_value, scope, get(node, "left"))
     right_result = ast_expr_to_ir(left_result.function, left_result.scope, get(node, "right"))
     left_type = get_value_type(right_result.function, left_result.id)
@@ -835,27 +857,59 @@ fn current_block(fn_value: IRFn) -> Text:
     found
 
 
+# Checker law (two halves):
+# 1. Immutable bindings are BLOCK-SCOPED: names born inside a
+#    branch/arm die at its end (scope_truncate below). Leaked SSA
+#    ids into the continuation were the st60 invalid-IR class; no
+#    compiling code can rely on the leak (such IR never verified).
+# 2. Rebinding an OUTER immutable inside a branch/loop is an
+#    ERROR: under block scoping the assignment cannot escape, so
+#    the author's intent silently dies — demand `mut` instead.
+fn scope_truncate(s: Scope, keep: int) -> Scope:
+    Scope{names: slice(s.names, 0, keep), ids: slice(s.ids, 0, keep), mut_flags: slice(s.mut_flags, 0, keep), loop_headers: s.loop_headers, loop_ends: s.loop_ends, fn_sig_names: s.fn_sig_names, fn_sig_rets: s.fn_sig_rets, ds_names: s.ds_names, ds_specs: s.ds_specs, en_names: s.en_names, en_variants: s.en_variants}
+
+fn check_branch_shadows(before: int, s: Scope, where_txt: Text, node: Map):
+    total = len(s.names)
+    for i in before..<total:
+        nm = at(s.names, i)
+        if at(s.mut_flags, i) == 0:
+            mut outer = 0
+            for j in 0..<before:
+                if at(s.names, j) == nm:
+                    outer = 1
+            if outer == 1:
+                line = if has(node, "line") then get_int(node, "line") else 0
+                compile_error("orion-self: ERROR at line {line} — `{nm}` is reassigned inside a {where_txt}; immutable rebinding cannot cross a block boundary (declare it `mut`, or use an if-expression)")
+
 fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     cond_node = get(node, "cond")
     then_node = get(node, "then")
     else_node = get(node, "else")
 
-    # Unique label names based on current inst position.
-    n = len(fn_value.instructions)
+    # 1) Evaluate the condition FIRST. It may itself be an
+    #    if-EXPRESSION that emits its own if_N_* blocks; taking our
+    #    label suffix from the instruction count AFTER it keeps these
+    #    labels distinct from the condition's. Before, both read the
+    #    same count (the outer if had emitted nothing yet) and collided
+    #    on if_N_then/else/merge — invalid IR (duplicate blocks, tangled
+    #    phi predecessors) whenever an if-expression sat in a condition.
+    cond_r = ast_expr_to_ir(fn_value, scope, cond_node)
+
+    # Unique label names, keyed on the post-condition inst position.
+    n = len(cond_r.function.instructions)
     then_lbl = "if_{n}_then"
     else_lbl = "if_{n}_else"
     merge_lbl = "if_{n}_merge"
-
-    # 1) Evaluate condition.
-    cond_r = ast_expr_to_ir(fn_value, scope, cond_node)
 
     # 2) br_if cond, then, else
     pr_br = ir_fn_push(cond_r.function, ir_br_if(cond_r.id, then_lbl, else_lbl))
     fn_after_br = pr_br.function
 
     # 3) label then; evaluate A.
+    scope_before = len(cond_r.scope.names)
     pr_then_lbl = ir_fn_push(fn_after_br, ir_label(then_lbl))
     then_r = ast_expr_to_ir(pr_then_lbl.function, cond_r.scope, then_node)
+    check_branch_shadows(scope_before, then_r.scope, "branch", node)
     then_terminated = is_block_terminated(then_r.function)
     mut then_end_block = ""
     mut fn_after_then = then_r.function
@@ -864,9 +918,11 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         pr_then_br = ir_fn_push(then_r.function, ir_br(merge_lbl))
         fn_after_then = pr_then_br.function
 
-    # 4) label else; evaluate B.
+    # 4) label else; evaluate B — from the TRUNCATED scope: then's
+    # branch-locals are dead here by law.
     pr_else_lbl = ir_fn_push(fn_after_then, ir_label(else_lbl))
-    else_r = ast_expr_to_ir(pr_else_lbl.function, then_r.scope, else_node)
+    else_r = ast_expr_to_ir(pr_else_lbl.function, scope_truncate(then_r.scope, scope_before), else_node)
+    check_branch_shadows(scope_before, else_r.scope, "branch", node)
     else_terminated = is_block_terminated(else_r.function)
     mut else_end_block = ""
     mut fn_after_else = else_r.function
@@ -908,7 +964,9 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         result_id = else_r.id
     # If both terminated, merge block is dead; result_id stays -1.
 
-    ConvResult{function: result_fn, scope: else_r.scope, id: result_id}
+    # Branch-locals die at the boundary — the continuation sees the
+    # scope as it was before the if (law half 1).
+    ConvResult{function: result_fn, scope: scope_truncate(else_r.scope, scope_before), id: result_id}
 
 # Bare enum-variant constructor: `KeyPress(x)` without the EnumName
 # prefix — mirror lodge-orion's variant probe. Returns the enum name
@@ -1430,6 +1488,14 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
         else:
             call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
+            arity_key = "otir:arity:" + callee
+            if slot_has(arity_key):
+                want = slot_get_int(arity_key)
+                got = len(arg_ids)
+                if got != want:
+                    a_line = if has(node, "line") then get_int(node, "line") else 0
+                    a_col = if has(node, "col") then get_int(node, "col") else 0
+                    compile_error("orion-self: ERROR at line {a_line}:{a_col} — `{callee}` takes {want} argument(s), got {got}")
             pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
     result
@@ -1646,6 +1712,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         # (field index 1+i) RETYPED to the variant's declared payload
         # type at that position, so `Spawn(comps) -> do_spawn(s, comps)`
         # types comps as map, `Relate(a, kind, b)` gets i64/text/i64.
+        arm_start_names = len(current_scope.names)
         mut body_scope = current_scope
         n_arm_bindings = len(bindings)
         if do_variant_pat:
@@ -1664,9 +1731,12 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 body_scope = scope_bind(body_scope, bind_name, pr_load_val.id)
 
         # Phase 3: body — emit for both wildcard and pattern arms.
+        arm_before = len(body_scope.names)
         body_r = ast_expr_to_ir(current_fn, body_scope, body_node)
+        check_branch_shadows(arm_before, body_r.scope, "match arm", node)
         current_fn = body_r.function
-        current_scope = body_r.scope
+        # Arm-locals (payload binds included) die with the arm.
+        current_scope = scope_truncate(body_r.scope, arm_start_names)
         pr_store = ir_fn_push(current_fn, ir_store(result_ptr_id, body_r.id))
         current_fn = pr_store.function
         pr_br_end = ir_fn_push(current_fn, ir_br(end_lbl))
@@ -2433,10 +2503,15 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             fn_seen = push_mut(fn_seen, fn_name)
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
+            # Arity registry (compiler slots): a call with the wrong
+            # argument count silently shifts every parameter — caught
+            # here instead of as a runtime pointer crash.
+            slot_set("otir:arity:" + fn_name, len(get_list(decl, "params")))
         if decl_kind_1b == "ExternFn":
             ext_name = get(decl, "name")
             ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, ext_name, ext_ret)
+            slot_set("otir:arity:" + ext_name, len(get_list(decl, "params")))
 
     # Pass 2: build each fn's body with the signature scope available.
     # ExternFn becomes a body-less IRFn (params + ret, zero instructions);

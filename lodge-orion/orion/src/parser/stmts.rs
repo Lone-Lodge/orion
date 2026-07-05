@@ -144,7 +144,10 @@ impl Parser<'_> {
         if self.check(&Tok::Colon) {
             self.bump();
             let then = self.block(base)?;
-            let otherwise = if self.check(&Tok::Else) {
+            // else binds by COLUMN: only an else at this if's own indent
+            // belongs to it — a dedented else belongs to an ENCLOSING if
+            // (dangling-else). Parity with orion-self psr fix 2026-07-05.
+            let otherwise = if self.check(&Tok::Else) && self.cur_col() == base {
                 self.bump();
                 self.eat(&Tok::Colon)?;
                 self.block(base)?

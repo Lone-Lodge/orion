@@ -33,14 +33,37 @@ static OrionEvent ev_ring[EV_CAP];
 static int ev_head = 0, ev_tail = 0;   /* pop at head, push at tail */
 static OrionEvent ev_current;
 
+/* Input-to-present latency, CPU side: stamp the moment the OS hands
+ * us a user event; the engine samples the age right after present.
+ * (GPU/DWM tail is invisible from here — this measures OUR share.) */
+static LARGE_INTEGER g_last_input_qpc;
+
 static void ev_push(long long kind, long long key, long long x, long long y) {
     int next = (ev_tail + 1) % EV_CAP;
     if (next == ev_head) return;       /* full: drop newest (potato-simple) */
+    if (kind >= 1 && kind <= 5)
+        QueryPerformanceCounter(&g_last_input_qpc);
     ev_ring[ev_tail].kind = kind;
     ev_ring[ev_tail].key = key;
     ev_ring[ev_tail].x = x;
     ev_ring[ev_tail].y = y;
     ev_tail = next;
+}
+
+/* Modifier probe for deliberate dev gestures (Ctrl+rightclick =
+ * rewind): async key state, no event plumbing needed. */
+long long win_key_held(long long vk) {
+    return (GetAsyncKeyState((int)vk) & 0x8000) ? 1 : 0;
+}
+
+/* Microseconds since the last user input event landed; -1 = never. */
+long long win_input_age_us(void) {
+    if (g_last_input_qpc.QuadPart == 0) return -1;
+    LARGE_INTEGER now, freq;
+    QueryPerformanceCounter(&now);
+    QueryPerformanceFrequency(&freq);
+    return (now.QuadPart - g_last_input_qpc.QuadPart) * 1000000 /
+           freq.QuadPart;
 }
 
 long long win_event_next(void) {
@@ -89,6 +112,35 @@ static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+/* Borderless fullscreen: WS_POPUP over the whole monitor, windowed
+ * rect saved for the way back. The WM_SIZE this fires is the whole
+ * integration — the engine's resize path does everything else. */
+static RECT g_saved_rect;
+static LONG g_saved_style;
+long long win_fullscreen(long long hwnd_i, long long on) {
+    HWND hwnd = (HWND)(uintptr_t)hwnd_i;
+    if (on) {
+        g_saved_style = GetWindowLongW(hwnd, GWL_STYLE);
+        GetWindowRect(hwnd, &g_saved_rect);
+        MONITORINFO mi = { sizeof(mi) };
+        GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi);
+        SetWindowLongW(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+        SetWindowPos(hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                     mi.rcMonitor.right - mi.rcMonitor.left,
+                     mi.rcMonitor.bottom - mi.rcMonitor.top,
+                     SWP_FRAMECHANGED);
+    } else {
+        SetWindowLongW(hwnd, GWL_STYLE,
+                       g_saved_style ? g_saved_style
+                                     : (LONG)(WS_OVERLAPPEDWINDOW | WS_VISIBLE));
+        SetWindowPos(hwnd, HWND_TOP, g_saved_rect.left, g_saved_rect.top,
+                     g_saved_rect.right - g_saved_rect.left,
+                     g_saved_rect.bottom - g_saved_rect.top,
+                     SWP_FRAMECHANGED);
+    }
+    return 1;
+}
+
 static int class_registered = 0;
 static const wchar_t* WCLASS = L"OrionMinWnd";
 
@@ -116,6 +168,18 @@ static wchar_t* to_wide(const char* s) {
 
 int64_t win_open(const char* title, int64_t w, int64_t h) {
     ensure_class();
+    /* 1ms timer resolution: without it every Sleep() rounds up to
+     * ~15.6ms and the frame-budget pacing quantizes to 16/31ms —
+     * which plays as sub-30fps stutter. Loaded dynamically so
+     * headless builds never touch winmm. */
+    {
+        HMODULE mm = LoadLibraryA("winmm.dll");
+        if (mm) {
+            typedef unsigned int (WINAPI *TbpFn)(unsigned int);
+            TbpFn tbp = (TbpFn)GetProcAddress(mm, "timeBeginPeriod");
+            if (tbp) tbp(1);
+        }
+    }
     wchar_t* wtitle = to_wide(title);
     /* w/h are the requested CLIENT size — grow the outer rect by the
      * frame so games get exactly the pixels they laid out for. */
@@ -157,4 +221,14 @@ int64_t win_pump(void) {
 
 void win_close(int64_t hwnd) {
     if (hwnd) DestroyWindow((HWND)(uintptr_t)hwnd);
+}
+
+/* Sleep until timeout OR any input/window message arrives — the
+ * event-driven idle with ZERO added input latency: a click lands,
+ * the loop wakes instantly instead of finishing a Sleep() quantum. */
+int64_t win_wait_input(int64_t ms) {
+    if (ms <= 0) return 0;
+    /* 0x04FF = QS_ALLINPUT */
+    return (int64_t)MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD)ms,
+                                              0x04FF);
 }

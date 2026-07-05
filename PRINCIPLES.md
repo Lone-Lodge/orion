@@ -1,5 +1,25 @@
 # Lone Lodge — design principles
 
+## #0: The discovery — time, memory and cause are one thing
+
+The log orders CAUSE. Regions give MEMORY a lifetime — which is
+time. Determinism makes the future computable and the past
+replayable. In every other engine these are three unrelated
+systems (frames, GC, mutations); here they are one substance, and
+that is why the impossible keeps falling out as corollaries:
+foresight rendered live, ghosts of your own past, replay under new
+code, bit-identical parallelism, bug classes dying as categories.
+
+Honest calibration: no ingredient is new — event sourcing runs
+banks, region memory ran research languages, synchronous causality
+flew airplanes. The union is new, and the potato constraint is
+what makes it possible: the log is only free when the language
+owns every lifetime. Gravity was known for three centuries; the
+discovery was that it is a vehicle.
+
+We are not chasing Unity. We are exploring ground their physics
+cannot reach.
+
 ## #1: Runs on a potato
 
 Small and fast is the product. This is the axis where Unreal/Unity
@@ -14,8 +34,12 @@ forbids it. Old-school demoscene discipline, next-gen language design.
 | Compiler .exe | ≤ 1 MB | 311 KB |
 | Cold start → first frame | ≤ 200 ms | (measure at phase 3) |
 | Native full rebuild of a game | ≤ 1 s | compiler self-compiles in 292 ms |
-| Idle RAM, 2D game | ≤ 64 MB | (measure at phase 3) |
-| Perf floor | 60 fps on integrated graphics, 2-core CPU | — |
+| Idle RAM, 2D game (working set) | ≤ 64 MB | active WS ~2.4 MB live session (event-driven idle lets the OS trim) |
+| Commit (private bytes) | ≤ 192 MB with d3d12 (driver-dominated), ≤ 32 MB gdi | 106 MB measured (cubsy d3d12) — commit is the promise, WS the footprint |
+| Perf floor | 60 fps on integrated graphics, 2-core CPU | software backend 240 fps, d3d12 ~1400 fps (cubsy, 1280×720 windowed) |
+| Perf ceiling honesty | GPU backend must be uncapped-capable (no hidden vsync/adapter traps) | ✓ tearing + adapter logged at init |
+| Idle cost | 0 frames rendered, 0 heap bytes while nothing happens | ✓ atlas/gates/idle: draws=0 malloc=0B over 300 ticks |
+| Draw submission | rect append must never be the frame budget | 6 ns/og_rect measured (st53): 10k rects = 60 µs CPU |
 | Runtime dependencies | libc + OS APIs, nothing else | ✓ holds |
 
 ### Rules that keep us under budget
@@ -93,6 +117,24 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
    only when a stamp moves. Never wrap a poll in a persist scope —
    persist the WRITE (the swap, the cache insert), not the probe. An
    over-wide persist scope is the one leak the poison can't catch.
+
+### Determinism rules (the log is only worth what replay proves)
+
+1. **Game logic is integer-only.** libm floats are not bit-identical
+   across machines — replay verification, leaderboards and lockstep
+   break silently. Floats belong to the render side only.
+2. **Fixed timestep.** world_tick(16) is the standard; wall-clock
+   never reaches rules. Frame pacing is presentation, not simulation.
+3. **Effects are outcomes, not simulation.** when-rules + dirty
+   gating keep the log sparse. Particles, animation and physics
+   tweens are DERIVED render data — never entities, never effects.
+   The effect log has a density ceiling; respect it by construction.
+4. **Slot store is engine caches only** — unlogged and
+   non-deterministic, so game state never lives there. Game state
+   lives in worlds, where it is effects and history.
+5. **Flat namespaces need manners.** Prefix resources per feature
+   (ui_*, drag_*); text resources end _script/_truths/_txt so the
+   int-only auto-ctx skips them.
 
 ### Anti-goals
 

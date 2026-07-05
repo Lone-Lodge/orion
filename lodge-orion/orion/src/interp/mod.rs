@@ -282,6 +282,21 @@ impl<'a> Interp<'a> {
             {
                 return Ok(Value::Int(1));
             }
+            if name == "win_wait_input" {
+                if let Some(Value::Int(ms)) = args.first() {
+                    let ms = (*ms).clamp(0, 1000) as u64;
+                    std::thread::sleep(std::time::Duration::from_millis(ms));
+                }
+                return Ok(Value::Int(0));
+            }
+            // Audio null backend under the interpreter: emissions are
+            // observable world effects, playback needs the native mixer.
+            if name.starts_with("orion_audio_") {
+                return Ok(Value::Int(match name {
+                    "orion_audio_init" | "orion_audio_bus_gain" => 1,
+                    _ => 0,
+                }));
+            }
             if name == "orion_dir_list" {
                 let Some(Value::Text(dir)) = args.first() else {
                     return Ok(Value::Text(String::new()));
@@ -291,6 +306,43 @@ impl<'a> Interp<'a> {
                     for e in rd.flatten() {
                         if e.path().is_file() {
                             names.push(e.file_name().to_string_lossy().into_owned());
+                        }
+                    }
+                }
+                return Ok(Value::Text(names.join("\n")));
+            }
+            // Non-blocking console line for the dev console: a reader
+            // thread feeds a channel; try_recv per poll, "" when idle.
+            if name == "orion_console_readline" {
+                use std::sync::mpsc::{channel, Receiver};
+                use std::sync::{Mutex, OnceLock};
+                static RX: OnceLock<Mutex<Receiver<String>>> = OnceLock::new();
+                let rx = RX.get_or_init(|| {
+                    let (tx, rx) = channel();
+                    std::thread::spawn(move || {
+                        use std::io::BufRead;
+                        let stdin = std::io::stdin();
+                        for line in stdin.lock().lines().map_while(Result::ok) {
+                            if tx.send(line).is_err() {
+                                break;
+                            }
+                        }
+                    });
+                    Mutex::new(rx)
+                });
+                let line = rx.lock().unwrap().try_recv().unwrap_or_default();
+                return Ok(Value::Text(line));
+            }
+            if name == "orion_dir_subdirs" {
+                let Some(Value::Text(dir)) = args.first() else {
+                    return Ok(Value::Text(String::new()));
+                };
+                let mut names: Vec<String> = Vec::new();
+                if let Ok(rd) = std::fs::read_dir(dir.as_str()) {
+                    for e in rd.flatten() {
+                        let fname = e.file_name().to_string_lossy().into_owned();
+                        if e.path().is_dir() && !fname.starts_with('.') {
+                            names.push(fname);
                         }
                     }
                 }

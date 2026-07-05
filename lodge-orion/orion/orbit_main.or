@@ -50,6 +50,21 @@ fn verb() -> Text:
 fn first_param() -> Text:
     if arg_count() < 3 then "" else arg(2)
 
+fn second_param() -> Text:
+    if arg_count() < 4 then "" else arg(3)
+
+fn nb_int(t: Text, fallback: int) -> int:
+    bs = bytes_from_text(t)
+    n = len(bs)
+    if n == 0:
+        return fallback
+    mut v = 0
+    for i in 0..<n:
+        c = at(bs, i)
+        if c >= 48 and c <= 57:
+            v = v * 10 + (c - 48)
+    v
+
 # ---------- usage / die ----------
 
 fn usage():
@@ -130,7 +145,15 @@ fn cmd_add():
 
 fn resolve_path() -> Text:
     candidate = first_param()
-    if candidate == "" then "src/main.or" else candidate
+    mut path = candidate
+    if candidate == "":
+        path = "src/main.or"
+        # Zero-glue projects have no src/main.or — synthesize the
+        # entry here too, so check/build/test match native/play.
+        if not file_exists("src/main.or") and file_exists("Orbit.toml"):
+            lines = nb_lines(read_file("Orbit.toml"))
+            path = entry_path(nb_setting(lines, "name", "game"))
+    path
 
 fn cmd_build():
     path = resolve_path()
@@ -315,17 +338,78 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
 fn nb_clang() -> Text:
     if capture_stdout("where", ["clang"]) == "" then "C:\\Program Files\\LLVM\\bin\\clang.exe" else "clang"
 
+# Everything a shipped exe must carry: the toml, every script bundle
+# (scripts/ flat or features/<sub>/), the package roots the toml names
+# (paths embed EXACTLY as the runtime resolves them, ../ and all),
+# and the sounds/ WAVs (byte-embedded; the mixer reads them from the
+# manifest when the dir is gone).
+fn nb_add_astra(joined: Text, dir: Text) -> Text:
+    mut out = joined
+    if is_dir(dir):
+        files = list_dir(dir)
+        total = len(files)
+        for index in 0..<total:
+            file = nb_text_at(files, index)
+            if str_ends_with(file, ".astra"):
+                out = out + "," + dir + "/" + file
+    out
+
+fn nb_split_spaces(joined: Text) -> [Text]:
+    pieces = str_split(joined, " ")
+    total = len(pieces)
+    mut out = []
+    for index in 0..<total:
+        piece = nb_text_at(pieces, index)
+        if piece != "":
+            out = push(out, piece)
+    out
+
 fn nb_ship_files(name: Text) -> Text:
     mut joined = name + ".toml"
-    scripts = list_dir("scripts")
-    script_total = len(scripts)
-    for index in 0..<script_total:
-        file = nb_text_at(scripts, index)
-        if str_ends_with(file, ".astra"):
-            joined = joined + ",scripts/" + file
+    joined = nb_add_astra(joined, "scripts")
+    if is_dir("features"):
+        subs = list_dir("features")
+        sub_total = len(subs)
+        for s_index in 0..<sub_total:
+            sub = nb_text_at(subs, s_index)
+            if is_dir("features/" + sub):
+                joined = nb_add_astra(joined, "features/" + sub)
+    game_lines = nb_lines(read_file(name + ".toml"))
+    pkgs = nb_setting(game_lines, "packages", "")
+    if pkgs != "":
+        roots = nb_split_spaces(pkgs)
+        root_total = len(roots)
+        for r_index in 0..<root_total:
+            joined = nb_add_astra(joined, nb_text_at(roots, r_index))
+    if is_dir("sounds"):
+        wavs = list_dir("sounds")
+        wav_total = len(wavs)
+        for w_index in 0..<wav_total:
+            wav = nb_text_at(wavs, w_index)
+            if str_ends_with(wav, ".wav"):
+                joined = joined + ",sounds/" + wav
     joined
 
+# ZERO-GLUE: a game is scripts/ + a toml. When src/main.or is absent,
+# orbit synthesizes the entry (project_run with the package name as
+# config + prefix). An existing src/main.or wins — custom host glue
+# is an opt-in escape hatch, not a requirement.
+fn entry_path(name: Text) -> Text:
+    if file_exists("src/main.or"):
+        "src/main.or"
+    else:
+        q = bytes_to_text(push([], 34))
+        src = "use atlas_project\n\nfn main() -> int:\n    project_run(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")\n"
+        mkdir_all("target")
+        write_file("target/main_gen.or", src)
+        "target/main_gen.or"
+
 fn build_native(variant: Text) -> Text:
+    build_native_entry(variant, "")
+
+# entry_override != "" compiles a custom entry (soak harness) instead
+# of the game's own main.
+fn build_native_entry(variant: Text, entry_override: Text) -> Text:
     if not file_exists("Orbit.toml"):
         die("orbit: no Orbit.toml in this directory")
     lines = nb_lines(read_file("Orbit.toml"))
@@ -338,36 +422,52 @@ fn build_native(variant: Text) -> Text:
     suffix = if variant == "" then "" else "_" + variant
     exe = "build/" + name + suffix + ".exe"
     ll = "build/" + name + ".ll"
-    mut compile_args = ["src/main.or", ll]
+    entry = if entry_override == "" then entry_path(name) else entry_override
+    mut compile_args = [entry, ll]
     dirs = nb_orb_dirs(lines)
     dir_total = len(dirs)
     for d_index in 0..<dir_total:
         compile_args = push(compile_args, at(dirs, d_index))
     if run_command(compiler, compile_args) != 0:
         die("orbit: native compile failed")
-    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/win32_min.c"]
-    if variant == "gpu":
-        link_args = push(link_args, runtime + "/d3d12_min.c")
-    else:
-        link_args = push(link_args, runtime + "/gdi_min.c")
+    # Both renderers always link; ogpu_min.c dispatches at og_init
+    # from the game toml's `renderer = auto|gdi|gpu` (default auto).
+    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/win32_min.c", runtime + "/wasapi_min.c", runtime + "/ogpu_min.c", runtime + "/gdi_min.c", runtime + "/d3d12_min.c"]
     if variant == "ship":
         embed_rc = run_command("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", runtime + "/tools/embed_assets.ps1", "-Out", "build/scripts_embed.c", "-Files", nb_ship_files(name)])
         if embed_rc != 0:
             die("orbit: asset embed failed")
         link_args = push(link_args, "build/scripts_embed.c")
+        # Icon + version block: a <name>.rc beside the toml compiles
+        # via llvm-rc and links in; absent = plain exe, no error.
+        if file_exists(name + ".rc"):
+            rc_rc = run_command("C:\\Program Files\\LLVM\\bin\\llvm-rc.exe", ["/FO", "build/" + name + ".res", name + ".rc"])
+            if rc_rc == 0:
+                link_args = push(link_args, "build/" + name + ".res")
+            else:
+                print(c_dim("orbit: llvm-rc failed — shipping without icon"))
     link_args = push(link_args, "-Os")
     link_args = push(link_args, "-o")
     link_args = push(link_args, exe)
     link_args = push(link_args, "-luser32")
     link_args = push(link_args, "-lgdi32")
-    if variant == "gpu":
-        link_args = push(link_args, "-ld3d12")
-        link_args = push(link_args, "-ldxgi")
+    link_args = push(link_args, "-lole32")
+    # Always emit the link map: the runtime's crash filter prints
+    # module-relative offsets, and this is what resolves them.
+    link_args = push(link_args, "-Wl,/MAP:build/" + name + ".map")
+    link_args = push(link_args, "-ld3d12")
+    link_args = push(link_args, "-ldxgi")
     if run_command(nb_clang(), link_args) != 0:
         die("orbit: link failed")
     remove_file(ll)
     if variant == "ship":
         remove_file("build/scripts_embed.c")
+        # Stage under build/ship/ as <name>.exe (never clobbers the
+        # dev exe) and zip it — the artifact you drag to itch.
+        mkdir_all("build/ship")
+        zip_rc = run_command("powershell", ["-NoProfile", "-Command", "Copy-Item build/" + name + "_ship.exe build/ship/" + name + ".exe -Force; Compress-Archive -Force -Path build/ship/" + name + ".exe -DestinationPath build/" + name + "-win64.zip"])
+        if zip_rc == 0:
+            print(c_bold("build/" + name + "-win64.zip") + " " + c_green("ready"))
     print(c_bold(exe) + " " + c_green("ok"))
     exe
 
@@ -377,6 +477,53 @@ fn cmd_native():
         build_native(variant)
     else:
         die("usage: orbit native [gpu|ship]")
+
+# The game as a queryable surface: every rule's reads/writes/
+# emits/spawns, optionally filtered ("orbit facts score" = which
+# rules touch score).
+# usage: orbit facts [name]
+fn cmd_facts():
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    filter = first_param()
+    q = bytes_to_text(push([], 34))
+    src = "use atlas_project\n\nfn main() -> int:\n    project_facts(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + filter + q + ")\n"
+    mkdir_all("target")
+    write_file("target/facts_gen.or", src)
+    exe = build_native_entry("facts", "target/facts_gen.or")
+    exit_with(run_command(exe, []))
+
+# The shadow verdict: compile the candidate, replay the last real
+# session under it, chaos-soak a fresh world, return the verdict.
+# usage: orbit try [soak-ticks] [seed]
+fn cmd_try():
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    ticks = nb_int(first_param(), 8000)
+    seed = nb_int(second_param(), 42)
+    q = bytes_to_text(push([], 34))
+    src = "use atlas_project\n\nfn main() -> int:\n    project_try(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
+    mkdir_all("target")
+    write_file("target/try_gen.or", src)
+    exe = build_native_entry("try", "target/try_gen.or")
+    exit_with(run_command(exe, []))
+
+# The engine plays the game: headless seeded chaos session with
+# invariants (backwards tick = FAIL, screen-change cause ledger).
+# usage: orbit soak [ticks] [seed]
+fn cmd_soak():
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    t_param = first_param()
+    s_param = second_param()
+    ticks = nb_int(t_param, 20000)
+    seed = nb_int(s_param, 42)
+    q = bytes_to_text(push([], 34))
+    src = "use atlas_project\n\nfn main() -> int:\n    project_soak(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
+    mkdir_all("target")
+    write_file("target/soak_gen.or", src)
+    exe = build_native_entry("soak", "target/soak_gen.or")
+    exit_with(run_command(exe, []))
 
 # Guard-style split — an else after a nested if binds to the inner
 # one (interp parser dangling-else).
@@ -388,7 +535,9 @@ fn cmd_play():
         play_native(mode)
 
 fn play_interp():
-    if not __os_orbit_run("src/main.or", "main", []):
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    if not __os_orbit_run(entry_path(name), "main", []):
         exit_with(1)
 
 fn play_native(mode: Text):
@@ -426,4 +575,13 @@ pub fn main():
                                 if command == "play":
                                     cmd_play()
                                 else:
-                                    usage()
+                                    if command == "soak":
+                                        cmd_soak()
+                                    else:
+                                        if command == "try":
+                                            cmd_try()
+                                        else:
+                                            if command == "facts":
+                                                cmd_facts()
+                                            else:
+                                                usage()

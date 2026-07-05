@@ -9,6 +9,7 @@
  */
 
 #include <setjmp.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -212,54 +213,164 @@ long long orion_persist_off(void) {
  * A pool overrides the persist scope while selected (the caller is
  * explicitly choosing a shorter lifetime). */
 
-#define POOL_COUNT 4
+/* Pools are DYNAMIC: every world allocates its own set via
+ * orion_pool_alloc (atlas takes 4 per world — snapshot ring x2 +
+ * tick log x2), so region-as-world scales without shared lifetime
+ * clocks. Same retirement proofs, per world. */
 #define POOL_START (128u * 1024u)
-static unsigned char *pool_base[POOL_COUNT];
-static size_t pool_cap[POOL_COUNT];
-static size_t pool_used[POOL_COUNT];
-static size_t pool_high[POOL_COUNT];
-static orion_ovf *pool_ovf[POOL_COUNT];
-static size_t pool_ovf_bytes[POOL_COUNT];
+static unsigned char **pool_base = NULL;
+static size_t *pool_cap = NULL;
+static size_t *pool_used = NULL;
+static size_t *pool_high = NULL;
+static orion_ovf **pool_ovf = NULL;
+static size_t *pool_ovf_bytes = NULL;
+static long long pool_count = 0;
+static long long pool_room = 0;
 static int pool_active = -1;
-static const char *pool_names[POOL_COUNT] = {"pool0", "pool1", "pool2",
-                                             "pool3"};
+
+long long orion_pool_alloc(void) {
+    if (pool_count == pool_room) {
+        pool_room = pool_room == 0 ? 8 : pool_room * 2;
+        pool_base = (unsigned char **)realloc(pool_base,
+                                              pool_room * sizeof(void *));
+        pool_cap = (size_t *)realloc(pool_cap, pool_room * sizeof(size_t));
+        pool_used = (size_t *)realloc(pool_used, pool_room * sizeof(size_t));
+        pool_high = (size_t *)realloc(pool_high, pool_room * sizeof(size_t));
+        pool_ovf = (orion_ovf **)realloc(pool_ovf, pool_room * sizeof(void *));
+        pool_ovf_bytes =
+            (size_t *)realloc(pool_ovf_bytes, pool_room * sizeof(size_t));
+    }
+    long long i = pool_count;
+    pool_base[i] = NULL;
+    pool_cap[i] = 0;
+    pool_used[i] = 0;
+    pool_high[i] = 0;
+    pool_ovf[i] = NULL;
+    pool_ovf_bytes[i] = 0;
+    pool_count++;
+    return i;
+}
+
+/* Pool selection is a small STACK: a log/snapshot pool selected
+ * inside a world-state scope must restore the OUTER pool on off,
+ * not drop to persist — that drop was an invisible leak-by-scope. */
+static int pool_prev[8];
+static int pool_depth = 0;
 
 long long orion_pool_on(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     if (!pool_base[i]) {
         pool_base[i] = (unsigned char *)malloc(POOL_START);
         pool_cap[i] = POOL_START;
         pool_used[i] = 0;
     }
+    if (pool_depth < 8) pool_prev[pool_depth++] = pool_active;
     pool_active = (int)i;
     return 1;
 }
 
-long long orion_pool_off(void) { pool_active = -1; return 1; }
+long long orion_pool_off(void) {
+    pool_active = pool_depth > 0 ? pool_prev[--pool_depth] : -1;
+    return 1;
+}
 
 long long orion_pool_used(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_used[i];
 }
+/* True pressure: in-buffer bytes PLUS the overflow chain — a full
+ * pool spills to malloc silently, and compaction thresholds must
+ * see that, not a number frozen at capacity. */
+long long orion_pool_pressure(long long i) {
+    if (i < 0 || i >= pool_count) return 0;
+    return (long long)(pool_used[i] + pool_ovf_bytes[i]);
+}
 long long orion_pool_high(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_high[i];
 }
 long long orion_pool_cap(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_cap[i];
 }
 
 long long orion_pool_reset(long long i) {
-    if (i < 0 || i >= POOL_COUNT) return 0;
+    if (i < 0 || i >= pool_count) return 0;
     size_t need = pool_used[i] + pool_ovf_bytes[i];
     ovf_drain(&pool_ovf[i], &pool_ovf_bytes[i]);
     if (pool_base[i] && pool_used[i] > 0) {
         memset(pool_base[i], 0xDD, pool_used[i]);
     }
-    region_fit(pool_names[i], &pool_base[i], &pool_cap[i], need);
+    region_fit("pool", &pool_base[i], &pool_cap[i], need);
     pool_used[i] = 0;
     return 1;
+}
+
+/* ---- H1: texts carry identity — [hash:i64][len:i64][bytes..NUL],
+ * the POINTER aims at bytes so every strcmp/fprintf/extern keeps
+ * working. len() is a load at p[-8]; hash at p[-16] is LAZY for
+ * heap texts (0 = not yet computed) and BAKED for constants
+ * (rodata is unwritable). Hash algo must be identical here and in
+ * the emitter's compile-time baking: polynomial base 131, seed
+ * 5381, mod 1e9+7 — no overflow in plain i64, no XOR needed. */
+#define OTX_MOD 1000000007LL
+
+void *orion_alloc(long long size);
+
+typedef struct { long long h; long long l; char z[1]; } OrionEmptyText;
+static const OrionEmptyText otx_empty = {5381, 0, {0}};
+const char *orion_text_empty(void) { return otx_empty.z; }
+
+char *orion_text_alloc(long long len) {
+    char *base = (char *)orion_alloc(len + 17);
+    ((long long *)base)[0] = 0;
+    ((long long *)base)[1] = len;
+    base[16 + len] = 0;
+    return base + 16;
+}
+
+long long orion_tlen_c(const char *p) { return ((const long long *)p)[-1]; }
+
+/* Fix the header length after a C formatter wrote into the buffer
+ * (snprintf paths do not know their length up front). */
+char *orion_text_seal(char *p) {
+    ((long long *)p)[-1] = (long long)strlen(p);
+    ((long long *)p)[-2] = 0;
+    return p;
+}
+
+/* Wrap a foreign C string (argv, env) into a headered text. */
+const char *orion_text_from_c(const char *s) {
+    if (!s || !s[0]) return otx_empty.z;
+    size_t n = strlen(s);
+    char *p = orion_text_alloc((long long)n);
+    memcpy(p, s, n);
+    return p;
+}
+
+long long orion_text_hash(const char *p) {
+    long long h = ((const long long *)p)[-2];
+    if (h != 0) return h;
+    long long len = ((const long long *)p)[-1];
+    h = 5381;
+    for (long long i = 0; i < len; i++)
+        h = (h * 131 + (unsigned char)p[i]) % OTX_MOD;
+    if (h == 0) h = 1;
+    ((long long *)p)[-2] = h;
+    return h;
+}
+
+/* Map keys are OWNED by the map: text keys copy on FIRST insert, so a
+ * caller's transient key can never dangle inside a longer-lived map.
+ * The copy allocates in the current scope — the same lifetime as the
+ * spine growth the insert may do. Kills the shared-key-pointer bug
+ * class (two poison-caught crashes in one day) at the language level. */
+void *orion_alloc(long long size);
+const char *orion_key_copy(const char *key) {
+    size_t n = strlen(key);
+    char *copy = orion_text_alloc((long long)n);
+    memcpy(copy, key, n);
+    return copy;
 }
 
 /* Lifetime tripwire: a pointer that lies inside the arena buffer is
@@ -287,6 +398,97 @@ void orion_arena_ptr_guard(const char *p, const char *key) {
         fflush(stderr);
         abort();
     }
+}
+
+/* ---- Persistence-boundary evacuation (memory-safety class 2) ----
+ * slot_set with a pointer value routes here instead of the guard: a
+ * pointer into the arena/frame region would dangle at the next reset,
+ * so the store EVACUATES a deep copy to the malloc heap, typed by the
+ * code the emitter derived statically at the callsite:
+ *   0 opaque  (struct/fn/unknown — abort if in-region, can't copy)
+ *   1 text    2 flat list    3 list of texts
+ *   4 map     5 list of maps
+ * Layouts mirror the emitted LLVM exactly: list = [cap][len][elems],
+ * map handle = [entries][cap][len] with (key,val) i64 pairs. Map keys
+ * copy when they point into a region (text keys born there); int keys
+ * never alias region addresses in practice. Map VALUES are untyped —
+ * an in-region value still aborts, but now with the reason. */
+static int oe_in_region(const void *p) {
+    return (arena_base && (const unsigned char *)p >= arena_base &&
+            (const unsigned char *)p < arena_base + arena_cap) ||
+           (frame_base && (const unsigned char *)p >= frame_base &&
+            (const unsigned char *)p < frame_base + frame_cap);
+}
+static void oe_fatal(const char *what, const char *key) {
+    fprintf(stderr,
+            "%s[orion] FATAL: %s born in a region stored in persistent "
+            "slot '%s' - no copier for its type; persist the value "
+            "explicitly%s\n",
+            c_red(), what, key, c_off());
+    fflush(stderr);
+    abort();
+}
+static const char *oe_text(const char *p) {
+    if (!p) return otx_empty.z;
+    size_t n = strlen(p);
+    char *c = (char *)malloc(n + 17);
+    ((long long *)c)[0] = 0;
+    ((long long *)c)[1] = (long long)n;
+    memcpy(c + 16, p, n + 1);
+    return c + 16;
+}
+static long long *oe_list_spine(const long long *src) {
+    long long len = src[1];
+    long long *dst = (long long *)malloc((size_t)(len * 8 + 16));
+    dst[0] = len;
+    dst[1] = len;
+    memcpy(dst + 2, src + 2, (size_t)len * 8);
+    return dst;
+}
+static const char *oe_map(const char *p, const char *key) {
+    const long long *h = (const long long *)p;
+    const long long *ent = (const long long *)(uintptr_t)h[0];
+    long long cap = h[1], len = h[2];
+    if (cap < 4) cap = 4;
+    long long *nh = (long long *)malloc(24);
+    long long *ne = (long long *)malloc((size_t)cap * 16);
+    nh[0] = (long long)(uintptr_t)ne;
+    nh[1] = cap;
+    nh[2] = len;
+    for (long long i = 0; i < len; i++) {
+        long long k = ent[i * 2], v = ent[i * 2 + 1];
+        if (oe_in_region((const void *)(uintptr_t)k))
+            k = (long long)(uintptr_t)oe_text((const char *)(uintptr_t)k);
+        if (oe_in_region((const void *)(uintptr_t)v))
+            oe_fatal("map value", key);
+        ne[i * 2] = k;
+        ne[i * 2 + 1] = v;
+    }
+    return (const char *)nh;
+}
+const char *orion_slot_evac(const char *p, const char *key, long long code) {
+    if (!p || !oe_in_region(p)) return p;
+    if (code == 1) return oe_text(p);
+    if (code == 2) return (const char *)oe_list_spine((const long long *)p);
+    if (code == 3) {
+        long long *d = oe_list_spine((const long long *)p);
+        for (long long i = 0; i < d[1]; i++)
+            if (oe_in_region((const void *)(uintptr_t)d[i + 2]))
+                d[i + 2] = (long long)(uintptr_t)
+                    oe_text((const char *)(uintptr_t)d[i + 2]);
+        return (const char *)d;
+    }
+    if (code == 4) return oe_map(p, key);
+    if (code == 5) {
+        long long *d = oe_list_spine((const long long *)p);
+        for (long long i = 0; i < d[1]; i++)
+            if (oe_in_region((const void *)(uintptr_t)d[i + 2]))
+                d[i + 2] = (long long)(uintptr_t)
+                    oe_map((const char *)(uintptr_t)d[i + 2], key);
+        return (const char *)d;
+    }
+    oe_fatal("value", key);
+    return p;
 }
 
 /* Change stamp for a file: mixes mtime and size, 0 when missing.
@@ -353,10 +555,79 @@ long long orion_arena_rewind(long long mark) {
 /* Unbuffered stdout so prints survive crashes and kills. MSVCRT treats
  * _IOLBF as full buffering, so _IONBF is the only honest option; game
  * print volume is low enough that it costs nothing. */
+#if defined(_WIN32)
+static void orion_crash_filter_install(void);
+#endif
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((constructor)) static void orion_stdio_init(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
+#if defined(_WIN32)
+    orion_crash_filter_install();
+#endif
 }
+#endif
+
+/* Audio null backend: weak stubs COUNT instead of play. Linking
+ * wasapi_min.c (orbit native does) overrides them with the real
+ * mixer; headless gates link without it and assert the counters —
+ * audio is testable because emission and playback are separate. */
+#if defined(__GNUC__) || defined(__clang__)
+static long long audio_null_plays = 0;
+static long long audio_null_sounds = 0;
+__attribute__((weak)) long long orion_audio_init(void) { return 1; }
+__attribute__((weak)) long long orion_audio_load(const char *path) {
+    (void)path;
+    return audio_null_sounds++;
+}
+__attribute__((weak)) long long orion_audio_play(long long id, long long gain,
+                                                 long long pan, long long pitch,
+                                                 long long bus) {
+    (void)id; (void)gain; (void)pan; (void)pitch; (void)bus;
+    return audio_null_plays++;
+}
+__attribute__((weak)) long long orion_audio_loop(long long id, long long gain,
+                                                 long long pan, long long pitch,
+                                                 long long bus,
+                                                 long long fade_ms) {
+    (void)id; (void)gain; (void)pan; (void)pitch; (void)bus; (void)fade_ms;
+    return audio_null_plays++;
+}
+__attribute__((weak)) long long orion_audio_voice_gain(long long handle,
+                                                       long long gain,
+                                                       long long fade_ms) {
+    (void)handle; (void)gain; (void)fade_ms;
+    return 1;
+}
+__attribute__((weak)) long long orion_audio_stop_voice(long long handle,
+                                                       long long fade_ms) {
+    (void)handle; (void)fade_ms;
+    return 1;
+}
+__attribute__((weak)) long long orion_audio_music(long long id, long long gain,
+                                                  long long fade_ms) {
+    (void)id; (void)gain; (void)fade_ms;
+    return audio_null_plays++;
+}
+__attribute__((weak)) long long orion_audio_layer(long long id, long long gain,
+                                                  long long fade_ms) {
+    (void)id; (void)gain; (void)fade_ms;
+    return audio_null_plays++;
+}
+__attribute__((weak)) long long orion_audio_stop_music(long long fade_ms) {
+    (void)fade_ms;
+    return 1;
+}
+__attribute__((weak)) long long orion_audio_bus_gain(long long bus,
+                                                     long long gain,
+                                                     long long fade_ms) {
+    (void)bus; (void)gain; (void)fade_ms;
+    return 1;
+}
+__attribute__((weak)) long long orion_audio_playing(void) { return 0; }
+__attribute__((weak)) long long orion_audio_debug_plays(void) {
+    return audio_null_plays;
+}
+__attribute__((weak)) void orion_audio_shutdown(void) {}
 #endif
 
 /* Embedded assets: a build step generates a strong scripts_embed.c
@@ -370,14 +641,31 @@ __attribute__((weak)) long long orion_embedded_has(const char *path) {
 }
 __attribute__((weak)) const char *orion_embedded_text(const char *path) {
     (void)path;
-    return "";
+    return otx_empty.z;
 }
 /* Newline-joined paths of every embedded asset — lets ship builds
  * enumerate "directories" they no longer have. */
 __attribute__((weak)) const char *orion_embedded_list(void) {
-    return "";
+    return otx_empty.z;
+}
+/* Binary assets (WAVs contain NULs, so _text loses the length):
+ * returns the byte pointer and writes the true size. */
+__attribute__((weak)) const char *orion_embedded_data(const char *path,
+                                                      long long *size) {
+    (void)path;
+    if (size) *size = 0;
+    return otx_empty.z;
 }
 #endif
+
+/* Counter rack for probe builds: temporary orb instrumentation taps
+ * orion_ctr_add, gates read totals. Sixteen anonymous slots — the
+ * probe defines what they mean, nothing here persists meaning. */
+static long long octr[16];
+void octr_add(long long i, long long n) {
+    if (i >= 0 && i < 16) octr[i] += n;
+}
+long long octr_get(long long i) { return (i >= 0 && i < 16) ? octr[i] : 0; }
 
 /* Allocation telemetry: total requested bytes, and the subset served
  * by malloc (arena misses + arena-off) — perf probes read both. */
@@ -396,6 +684,57 @@ long long orion_arena_high(void) { return (long long)arena_high; }
  * region's overflow list (same lifetime, freed at its reset) and the
  * reset grows the buffer — so overflow costs a slow cycle, not a
  * leak, and does not count as persist growth. */
+/* ---- Malloc-fallback ledger: WHO is dripping? ----
+ * Orb code brackets suspicious regions with orion_ledger_tag(name);
+ * every allocation that falls through to raw malloc credits the
+ * innermost active tag. orion_ledger_dump prints the table. Zero
+ * bookkeeping on region-served allocations — this watches only the
+ * immortal route. Tags nest like pools (small stack). */
+#define OL_MAX 32
+static char ol_names[OL_MAX][24];
+static long long ol_bytes[OL_MAX];
+static int ol_count = 0;
+static int ol_cur = -1;
+static int ol_prev[8];
+static int ol_depth = 0;
+
+long long orion_ledger_tag(const char *name) {
+    int idx = -1;
+    for (int i = 0; i < ol_count; i++)
+        if (strncmp(ol_names[i], name, 23) == 0) { idx = i; break; }
+    if (idx < 0 && ol_count < OL_MAX) {
+        idx = ol_count++;
+        size_t n = strlen(name);
+        if (n > 23) n = 23;
+        memcpy(ol_names[idx], name, n);
+        ol_names[idx][n] = 0;
+        ol_bytes[idx] = 0;
+    }
+    if (ol_depth < 8) ol_prev[ol_depth++] = ol_cur;
+    ol_cur = idx;
+    return idx;
+}
+long long orion_ledger_off(void) {
+    ol_cur = ol_depth > 0 ? ol_prev[--ol_depth] : -1;
+    return 1;
+}
+static long long ol_untagged = 0;
+static void ol_note(long long size) {
+    if (ol_cur >= 0) ol_bytes[ol_cur] += size;
+    else ol_untagged += size;
+}
+long long orion_ledger_dump(void) {
+    long long total = ol_untagged;
+    for (int i = 0; i < ol_count; i++) {
+        total += ol_bytes[i];
+        if (ol_bytes[i] > 0)
+            fprintf(stderr, "[ledger] %-23s %lld B\n", ol_names[i],
+                    ol_bytes[i]);
+    }
+    fprintf(stderr, "[ledger] %-23s %lld B\n", "(untagged)", ol_untagged);
+    return total;
+}
+
 void *orion_alloc(long long size) {
     alloc_total += size;
     if (pool_active >= 0 && !arena_on) {
@@ -434,6 +773,7 @@ void *orion_alloc(long long size) {
         if (p) return p;
     }
     alloc_malloc += size;
+    ol_note(size);
     return malloc((size_t)size);
 }
 
@@ -445,9 +785,11 @@ void *orion_alloc(long long size) {
 const char *orion_f64_literal_hex(const char *s) {
     union { double d; unsigned long long i; } u;
     u.d = strtod(s, NULL);
-    char *buf = (char *)malloc(19);
-    snprintf(buf, 19, "0x%016llX", u.i);
-    return buf;
+    char *buf = (char *)malloc(19 + 16);
+    ((long long *)buf)[0] = 0;
+    ((long long *)buf)[1] = 18;
+    snprintf(buf + 16, 19, "0x%016llX", u.i);
+    return buf + 16;
 }
 
 /* Thread-local stack of one jmp_buf — only one perform pending at a time
@@ -507,15 +849,467 @@ void __orion_resume_text(char *value) {
 #ifdef _WIN32
 #include <windows.h>
 
+/* Crash forensics: on an unhandled fault, print the exception code
+ * and the MODULE-RELATIVE offset (symbolizable against the link map
+ * orbit emits next to the exe) before dying. Fail fast, but say
+ * where. */
+/* ---- The WHY: cause breadcrumbs ----
+ * The engine always knows which bundle/event/rule is executing —
+ * a crash should say so. Dispatch layers drop crumbs (bounded
+ * copies into static rings, zero alloc, ~20ns); the crash filter
+ * prints the trail newest-first. WHAT (exception+poison), WHERE
+ * (symbolized stack), WHY (this trail): the full diagnosis. */
+#define CRUMB_N 8
+static char crumb_bundle[CRUMB_N][40];
+static char crumb_event[CRUMB_N][24];
+static long long crumb_tick_v[CRUMB_N];
+static int crumb_head = -1;
+static char crumb_rule[64];
+
+static void crumb_copy(char *dst, const char *src, size_t cap) {
+    size_t i = 0;
+    if (src)
+        while (src[i] && i < cap - 1) { dst[i] = src[i]; i++; }
+    dst[i] = 0;
+}
+
+void orion_crumb(const char *bundle, const char *event, long long tick) {
+    crumb_head = (crumb_head + 1) % CRUMB_N;
+    crumb_copy(crumb_bundle[crumb_head], bundle, sizeof crumb_bundle[0]);
+    crumb_copy(crumb_event[crumb_head], event, sizeof crumb_event[0]);
+    crumb_tick_v[crumb_head] = tick;
+    crumb_rule[0] = 0;
+}
+
+void orion_crumb_rule(const char *rule) {
+    crumb_copy(crumb_rule, rule, sizeof crumb_rule);
+}
+
+/* The report goes to stderr AND crash.txt — a console window dies
+ * with the process, a file survives to be read (by the pilot or by
+ * the recovery boot). */
+static FILE *crash_tee = NULL;
+static void crash_line(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "%s", c_red());
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "%s\n", c_off());
+    va_end(ap);
+    if (crash_tee) {
+        va_start(ap, fmt);
+        vfprintf(crash_tee, fmt, ap);
+        fprintf(crash_tee, "\n");
+        va_end(ap);
+    }
+}
+
+static void crash_print_crumbs(void) {
+    if (crumb_head < 0) return;
+    if (crumb_rule[0])
+        crash_line("[orion]   while rule `%s`", crumb_rule);
+    char trail[512];
+    trail[0] = 0;
+    size_t off = 0;
+    for (int k = 0; k < CRUMB_N; k++) {
+        int i = (crumb_head - k + CRUMB_N) % CRUMB_N;
+        if (!crumb_bundle[i][0] && !crumb_event[i][0]) break;
+        int wrote = snprintf(trail + off, sizeof(trail) - off, " %s/%s@%lld",
+                             crumb_bundle[i], crumb_event[i], crumb_tick_v[i]);
+        if (wrote <= 0) break;
+        off += (size_t)wrote;
+        if (off >= sizeof(trail) - 1) break;
+    }
+    crash_line("[orion]   cause trail:%s", trail);
+}
+
+/* Crashes symbolize THEMSELVES: the filter loads the link map that
+ * orbit always emits next to the exe (<exe>.map) and resolves every
+ * module-relative offset to `function +0x..` inline. No debugger,
+ * no post-processing, no "look it up" — the crash line IS the
+ * diagnosis. Falls back to raw offsets when the map is missing. */
+static char *crash_map_buf = NULL;
+static void crash_map_load(void) {
+    char path[1024];
+    DWORD n = GetModuleFileNameA(NULL, path, sizeof path);
+    if (n == 0 || n > sizeof(path) - 5) return;
+    /* swap .exe -> .map */
+    char *dot = strrchr(path, '.');
+    if (!dot) return;
+    strcpy(dot, ".map");
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    crash_map_buf = (char *)malloc(sz + 1);
+    if (crash_map_buf && fread(crash_map_buf, 1, sz, f) == (size_t)sz)
+        crash_map_buf[sz] = 0;
+    else {
+        free(crash_map_buf);
+        crash_map_buf = NULL;
+    }
+    fclose(f);
+}
+static void crash_sym(unsigned long long off, char *out, size_t cap) {
+    snprintf(out, cap, "+0x%llx", off);
+    if (!crash_map_buf) return;
+    /* Map lines: " 0001:HHHHHHHH  name ..." — module offset is the
+     * section address + 0x1000. Find the greatest base <= off. */
+    unsigned long long best = 0;
+    char best_name[192] = {0};
+    const char *p = crash_map_buf;
+    while ((p = strstr(p, " 0001:")) != NULL) {
+        unsigned long long a = strtoull(p + 6, NULL, 16) + 0x1000ULL;
+        if (a <= off && a >= best) {
+            const char *q = p + 6;
+            while (*q && *q != ' ') q++;
+            while (*q == ' ') q++;
+            size_t i = 0;
+            while (q[i] && q[i] != ' ' && q[i] != '\r' && q[i] != '\n' &&
+                   i < sizeof(best_name) - 1) {
+                best_name[i] = q[i];
+                i++;
+            }
+            best_name[i] = 0;
+            best = a;
+        }
+        p += 6;
+    }
+    if (best_name[0])
+        snprintf(out, cap, "%s+0x%llx", best_name, off - best);
+}
+
+static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
+    unsigned long long base = (unsigned long long)GetModuleHandleA(NULL);
+    unsigned long long at =
+        (unsigned long long)info->ExceptionRecord->ExceptionAddress;
+    char sym[256];
+    crash_map_load();
+    crash_tee = fopen("crash.txt", "w");
+    /* Unbuffered: the filter itself may die (nested fault in dbghelp
+     * etc.) — every line must hit disk the moment it is written. */
+    if (crash_tee)
+        setvbuf(crash_tee, NULL, _IONBF, 0);
+    crash_sym(at - base, sym, sizeof sym);
+    crash_line("[orion] FATAL: exception 0x%lx at %s",
+               (unsigned long)info->ExceptionRecord->ExceptionCode, sym);
+    crash_print_crumbs();
+    /* Backtrace: scan the crashed thread's stack for return addresses
+     * inside our module, symbolized inline. No dbghelp, always works. */
+    if (info->ContextRecord) {
+        unsigned long long rip = info->ContextRecord->Rip;
+        unsigned long long rsp = info->ContextRecord->Rsp;
+        unsigned long long lo = base, hi = base + 0x200000ULL;
+        int printed = 0;
+        if (rip >= lo && rip < hi) {
+            crash_sym(rip - base, sym, sizeof sym);
+            crash_line("[orion]   #%d %s", printed, sym);
+            printed++;
+        }
+        /* Scan only committed stack: a shallow crash puts the stack
+         * top within 512 words of rsp, and reading past it would
+         * nested-fault and kill the filter mid-report. */
+        unsigned long long slo = 0, shi = 0;
+        GetCurrentThreadStackLimits((PULONG_PTR)&slo, (PULONG_PTR)&shi);
+        unsigned long long *sp = (unsigned long long *)rsp;
+        for (int i = 0; i < 512 && printed < 12; i++) {
+            if (shi && (unsigned long long)(sp + i + 1) > shi)
+                break;
+            unsigned long long v = sp[i];
+            if (v >= lo && v < hi) {
+                crash_sym(v - base, sym, sizeof sym);
+                crash_line("[orion]   #%d %s", printed, sym);
+                printed++;
+            }
+        }
+    }
+    /* Access violations carry the faulting data address; a 0xdd..dd
+     * byte pattern means a read through region memory poisoned at
+     * reset — a lifetime bug, not a wild pointer. Printed BEFORE the
+     * minidump attempt: dbghelp can nested-fault and kill the filter,
+     * and the diagnosis must never depend on it. */
+    if (info->ExceptionRecord->ExceptionCode == 0xC0000005 &&
+        info->ExceptionRecord->NumberParameters >= 2) {
+        unsigned long long bad = info->ExceptionRecord->ExceptionInformation[1];
+        int poison = ((bad >> 8) & 0xffffffffULL) == 0xddddddddULL ||
+                     (bad & 0xffffffff00ULL) == 0xdddddddd00ULL ||
+                     ((bad >> 16) & 0xffffffffULL) == 0xddddddddULL;
+        crash_line("[orion]        %s address 0x%llx%s",
+                   info->ExceptionRecord->ExceptionInformation[0] ? "writing"
+                                                                  : "reading",
+                   bad, poison ? " (0xDD poison: reset region memory)" : "");
+    }
+    fflush(stderr);
+    if (crash_tee) {
+        fclose(crash_tee);
+        crash_tee = NULL;
+    }
+    /* Self-service minidump: WER is unreliable on dev boxes, so the
+     * filter writes crash.dmp next to the exe (dbghelp loaded
+     * dynamically — zero link cost for headless builds). Open with
+     * `lldb exe -c crash.dmp -o bt`. */
+    {
+        HMODULE dh = LoadLibraryA("dbghelp.dll");
+        if (dh) {
+            typedef BOOL(WINAPI *MdwFn)(HANDLE, DWORD, HANDLE, int, void *,
+                                        void *, void *);
+            MdwFn mdw = (MdwFn)GetProcAddress(dh, "MiniDumpWriteDump");
+            if (mdw) {
+                HANDLE f = CreateFileA("crash.dmp", GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                                       CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+                                       NULL);
+                if (f != INVALID_HANDLE_VALUE) {
+                    struct {
+                        DWORD ThreadId;
+                        PEXCEPTION_POINTERS ExceptionPointers;
+                        BOOL ClientPointers;
+                    } mei = {GetCurrentThreadId(), info, FALSE};
+                    /* try full memory, fall back to normal */
+                    BOOL ok = mdw(GetCurrentProcess(), GetCurrentProcessId(),
+                                  f, 2, &mei, NULL, NULL);
+                    if (!ok)
+                        ok = mdw(GetCurrentProcess(), GetCurrentProcessId(),
+                                 f, 0, &mei, NULL, NULL);
+                    if (!ok)
+                        fprintf(stderr, "[orion]        dump failed: %lu\n",
+                                (unsigned long)GetLastError());
+                    CloseHandle(f);
+                    if (ok)
+                    fprintf(stderr,
+                            "%s[orion]        crash.dmp written — lldb "
+                            "<exe> -c crash.dmp -o bt%s\n",
+                            c_red(), c_off());
+                }
+            }
+        }
+    }
+    return EXCEPTION_CONTINUE_SEARCH; /* still crash, still WER */
+}
+
+static void orion_crash_filter_install(void) {
+    SetUnhandledExceptionFilter(orion_crash_filter);
+}
+
+/* ---- Supervision: run a rule dispatch under a fault net (B6 step 2).
+ * sup_guard5/7 call an Orion fn ref with the caller's own arguments; a
+ * hardware fault inside does NOT kill the process. The vectored handler
+ * writes the full crash report first (same trinity, same crash.txt —
+ * supervision never costs diagnosis), then steers the faulting thread
+ * into a longjmp back here and the guard returns -1 so the engine can
+ * quarantine the rule and rewind the world. The net exists only while
+ * a guard is armed on this thread; everything else still dies loudly
+ * through the unhandled filter. Stack overflow stays fatal by design:
+ * the report machinery cannot run on an exhausted stack. */
+static jmp_buf guard_jb;
+static volatile unsigned long guard_tid = 0;
+static volatile int guard_armed = 0;
+
+static void guard_bounce(void) { longjmp(guard_jb, 1); }
+
+static LONG WINAPI orion_guard_vector(EXCEPTION_POINTERS *info) {
+    if (!guard_armed || GetCurrentThreadId() != guard_tid)
+        return EXCEPTION_CONTINUE_SEARCH;
+    DWORD code = info->ExceptionRecord->ExceptionCode;
+    if (code != 0xC0000005 /* AV */ && code != 0xC0000094 /* idiv 0 */ &&
+        code != 0xC000001D /* illegal instr */)
+        return EXCEPTION_CONTINUE_SEARCH;
+    guard_armed = 0; /* a fault inside the report must fall through */
+    orion_crash_filter(info);
+    fprintf(stderr, "%s[orion] caught by supervisor — quarantine + rewind%s\n",
+            c_red(), c_off());
+    /* The longjmp must run OUTSIDE the exception dispatcher: point the
+     * resumed context at guard_bounce. Rsp realigned as if just called
+     * (entry alignment = 16n-8); the garbage return address is fine,
+     * guard_bounce never returns. */
+    info->ContextRecord->Rsp = (info->ContextRecord->Rsp & ~0xFULL) - 8;
+    info->ContextRecord->Rip = (unsigned long long)(void *)guard_bounce;
+    return EXCEPTION_CONTINUE_EXECUTION;
+}
+
+/* The fault may abandon region scopes mid-flight (arena on, pool or
+ * ledger stack pushed, persist depth held) — snapshot on arm, restore
+ * on catch, or every later allocation lands in the wrong lifetime. */
+typedef struct {
+    int arena, pactive, pdepth, olc, old, persist;
+} guard_alloc_state;
+
+static void guard_save(guard_alloc_state *s) {
+    s->arena = arena_on;
+    s->pactive = pool_active;
+    s->pdepth = pool_depth;
+    s->olc = ol_cur;
+    s->old = ol_depth;
+    s->persist = persist_depth;
+}
+
+static void guard_restore(const guard_alloc_state *s) {
+    arena_on = s->arena;
+    pool_active = s->pactive;
+    pool_depth = s->pdepth;
+    ol_cur = s->olc;
+    ol_depth = s->old;
+    persist_depth = s->persist;
+}
+
+static void guard_install(void) {
+    static void *vh = NULL;
+    if (!vh) vh = AddVectoredExceptionHandler(1, orion_guard_vector);
+}
+
+long long sup_guard5(long long fn, long long a, long long b, long long c,
+                     long long d, long long e) {
+    guard_install();
+    guard_alloc_state st;
+    guard_save(&st);
+    if (setjmp(guard_jb)) {
+        guard_restore(&st);
+        return -1;
+    }
+    /* Zero the SEH frame slot: longjmp becomes a plain register
+     * restore instead of RtlUnwindEx through frames the fault left
+     * in an unknown state. Nothing between arm and fault owns
+     * destructors — this runtime has none. */
+    ((unsigned long long *)guard_jb)[0] = 0;
+    guard_tid = GetCurrentThreadId();
+    guard_armed = 1;
+    long long r = ((long long (*)(long long, long long, long long, long long,
+                                  long long))fn)(a, b, c, d, e);
+    guard_armed = 0;
+    return r;
+}
+
+long long sup_guard7(long long fn, long long a, long long b, long long c,
+                     long long d, long long e, long long f, long long g) {
+    guard_install();
+    guard_alloc_state st;
+    guard_save(&st);
+    if (setjmp(guard_jb)) {
+        guard_restore(&st);
+        return -1;
+    }
+    ((unsigned long long *)guard_jb)[0] = 0;
+    guard_tid = GetCurrentThreadId();
+    guard_armed = 1;
+    long long r = ((long long (*)(long long, long long, long long, long long,
+                                  long long, long long, long long))fn)(
+        a, b, c, d, e, f, g);
+    guard_armed = 0;
+    return r;
+}
+
+/* Which rule was executing when the guard tripped — the quarantine
+ * key. Headered per H1 (every Text the runtime hands out carries
+ * [hash][len]). */
+const char *sup_rule_name(void) {
+    return orion_text_from_c(crumb_rule[0] ? crumb_rule : "");
+}
+
 /* Newline-joined file names in `dir` (no paths, no subdirs). Empty
  * text when the directory is missing — callers fall back to the
  * embedded asset list in ship builds. */
+/* Non-blocking console line: returns a COMPLETE line once, else "".
+ * Polled once per frame by the dev console. Interactive terminals
+ * accumulate keystrokes (echoed, backspace handled) via _kbhit;
+ * redirected stdin (an agent driving a running game through a pipe)
+ * drains available bytes via PeekNamedPipe. Zero alloc when idle. */
+#include <conio.h>
+static const char *crl_seal(char *out) {
+    ((long long *)out)[-2] = 0;
+    ((long long *)out)[-1] = (long long)strlen(out);
+    return out;
+}
+const char *orion_console_readline(void) {
+    static char buf[512];
+    static size_t blen = 0;
+    static char out_raw[512 + 16];
+    char *out = out_raw + 16;
+    if (_isatty(_fileno(stdin))) {
+        while (_kbhit()) {
+            int c = _getch();
+            if (c == '\r' || c == '\n') {
+                putchar('\n');
+                buf[blen] = 0;
+                memcpy(out, buf, blen + 1);
+                blen = 0;
+                if (out[0] != 0) return crl_seal(out);
+                continue;
+            }
+            if (c == 8) {
+                if (blen > 0) {
+                    blen--;
+                    printf("\b \b");
+                }
+                continue;
+            }
+            if (c >= 32 && c < 127 && blen < 511) {
+                buf[blen++] = (char)c;
+                putchar(c);
+            }
+        }
+        return otx_empty.z;
+    }
+    HANDLE h = GetStdHandle((DWORD)-10); /* STD_INPUT_HANDLE */
+    DWORD avail = 0;
+    if (!PeekNamedPipe(h, NULL, 0, NULL, &avail, NULL)) return otx_empty.z;
+    while (avail > 0 && blen < 511) {
+        char c;
+        DWORD rd = 0;
+        if (!ReadFile(h, &c, 1, &rd, NULL) || rd == 0) break;
+        avail--;
+        if (c == '\n') {
+            buf[blen] = 0;
+            memcpy(out, buf, blen + 1);
+            blen = 0;
+            if (out[0] != 0) return crl_seal(out);
+            continue;
+        }
+        if (c != '\r') buf[blen++] = c;
+    }
+    return otx_empty.z;
+}
+
+/* Newline-joined SUBDIRECTORY names in `dir` (no . / .., one level).
+ * Feature-grouped script dirs are discovered with this. */
+const char *orion_dir_subdirs(const char *dir) {
+    char pattern[1024];
+    WIN32_FIND_DATAA fd;
+    snprintf(pattern, sizeof(pattern), "%s\\*", dir);
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return otx_empty.z;
+    size_t cap = 1024, len = 0;
+    char *out = (char *)malloc(cap);
+    out[0] = 0;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
+        if (fd.cFileName[0] == '.') continue;
+        size_t n = strlen(fd.cFileName);
+        if (len + n + 2 > cap) {
+            cap *= 2;
+            out = (char *)realloc(out, cap);
+        }
+        if (len > 0) out[len++] = '\n';
+        memcpy(out + len, fd.cFileName, n + 1);
+        len += n;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    /* Evacuate into the scope allocator and free the growth buffer —
+     * the raw malloc leaked one listing per call, forever (the soak
+     * ledger billed script reloads ~16KB each for these). */
+    {
+        char *evac = orion_text_alloc((long long)len);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
+}
+
 const char *orion_dir_list(const char *dir) {
     char pattern[1024];
     WIN32_FIND_DATAA fd;
     snprintf(pattern, sizeof(pattern), "%s\\*", dir);
     HANDLE h = FindFirstFileA(pattern, &fd);
-    if (h == INVALID_HANDLE_VALUE) return "";
+    if (h == INVALID_HANDLE_VALUE) return otx_empty.z;
     size_t cap = 4096, len = 0;
     char *out = (char *)malloc(cap);
     out[0] = 0;
@@ -531,7 +1325,12 @@ const char *orion_dir_list(const char *dir) {
         len += n;
     } while (FindNextFileA(h, &fd));
     FindClose(h);
-    return out;
+    {
+        char *evac = orion_text_alloc((long long)len);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
 }
 long long __orion_time_now_ms(void) {
     FILETIME ft; GetSystemTimeAsFileTime(&ft);

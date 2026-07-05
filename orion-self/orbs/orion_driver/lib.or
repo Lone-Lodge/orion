@@ -156,6 +156,152 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
     chunks = push(chunks, entry_src)
     orion_text_join(chunks)
 
+# ---- Effect inference: facts all the way down (Orion 2 / L2 v0) ----
+# `orion <input> facts` prints every function's inferred effect row
+# instead of emitting LLVM: slot/io/platform/audio/extern/mem/time,
+# or `pure`. Direct effects classify dedicated ops and extern call
+# targets; user calls close transitively. This is the substrate for
+# effect signatures, parallel compiler passes and the B9
+# determinism certificate.
+
+fn drv_fn_at(fs: [IRFn], i: int) -> IRFn:
+    at(fs, i)
+
+fn drv_inst_at(xs: [Inst], i: int) -> Inst:
+    at(xs, i)
+
+fn drv_starts(t: Text, p: Text) -> bool:
+    tb = bytes_from_text(t)
+    pb = bytes_from_text(p)
+    pn = len(pb)
+    if len(tb) < pn:
+        return false
+    for i in 0..<pn:
+        if at(tb, i) != at(pb, i):
+            return false
+    true
+
+fn drv_flag(x: int, f: int) -> bool:
+    (x / f) - (x / (f * 2)) * 2 == 1
+
+fn drv_or(a: int, b: int) -> int:
+    mut out = a
+    mut f = 1
+    for i in 0..<8:
+        if drv_flag(b, f) and not drv_flag(out, f):
+            out = out + f
+        f = f * 2
+    out
+
+fn drv_name_idx(names: [Text], name: Text) -> int:
+    n = len(names)
+    for i in 0..<n:
+        if drv_text_at(names, i) == name:
+            return i
+    0 - 1
+
+fn drv_text_at(xs: [Text], i: int) -> Text:
+    at(xs, i)
+
+fn drv_int_at(xs: [int], i: int) -> int:
+    at(xs, i)
+
+fn drv_call_bits(callee: Text, names: [Text]) -> int:
+    if drv_name_idx(names, callee) >= 0:
+        return 0
+    if drv_starts(callee, "orion_audio"):
+        return 8
+    if drv_starts(callee, "win_") or drv_starts(callee, "og_") or drv_starts(callee, "ogpu_"):
+        return 4
+    if drv_starts(callee, "orion_arena") or drv_starts(callee, "orion_persist") or drv_starts(callee, "orion_pool") or drv_starts(callee, "orion_frame") or drv_starts(callee, "orion_ledger") or drv_starts(callee, "orion_alloc") or drv_starts(callee, "orion_slot"):
+        return 32
+    if drv_starts(callee, "__orion_monotonic") or drv_starts(callee, "__orion_time") or drv_starts(callee, "__orion_sleep"):
+        return 64
+    if drv_starts(callee, "orion_console") or drv_starts(callee, "orion_dir") or drv_starts(callee, "orion_file") or drv_starts(callee, "orion_embedded"):
+        return 2
+    16
+
+fn drv_direct_bits(f: IRFn, names: [Text]) -> int:
+    mut bits = 0
+    n = len(f.instructions)
+    for i in 0..<n:
+        inst = drv_inst_at(f.instructions, i)
+        op = inst.op
+        if op == "slot_set" or op == "slot_get" or op == "slot_has" or op == "slot_get_int":
+            bits = drv_or(bits, 1)
+        if op == "print_int" or op == "print_str" or op == "print_float" or op == "file_read" or op == "file_write":
+            bits = drv_or(bits, 2)
+        if op == "call":
+            bits = drv_or(bits, drv_call_bits(inst.name, names))
+    bits
+
+fn drv_flags_text(bits: int) -> Text:
+    if bits == 0:
+        return "pure"
+    mut out = ""
+    if drv_flag(bits, 1):
+        out = out + " slot"
+    if drv_flag(bits, 2):
+        out = out + " io"
+    if drv_flag(bits, 4):
+        out = out + " platform"
+    if drv_flag(bits, 8):
+        out = out + " audio"
+    if drv_flag(bits, 16):
+        out = out + " extern"
+    if drv_flag(bits, 32):
+        out = out + " mem"
+    if drv_flag(bits, 64):
+        out = out + " time"
+    out
+
+fn drv_facts(module: IRModule) -> int:
+    fns = module.functions
+    n = len(fns)
+    mut names = []
+    for i in 0..<n:
+        f0 = drv_fn_at(fns, i)
+        names = push_mut(names, f0.name)
+    mut bits = []
+    for i in 0..<n:
+        f1 = drv_fn_at(fns, i)
+        bits = push_mut(bits, drv_direct_bits(f1, names))
+    mut pass = 0
+    loop:
+        if pass >= 24:
+            break
+        mut changed = 0
+        mut next = []
+        for i in 0..<n:
+            f2 = drv_fn_at(fns, i)
+            cur = drv_int_at(bits, i)
+            mut acc = cur
+            ni = len(f2.instructions)
+            for j in 0..<ni:
+                inst = drv_inst_at(f2.instructions, j)
+                if inst.op == "call":
+                    idx = drv_name_idx(names, inst.name)
+                    if idx >= 0:
+                        acc = drv_or(acc, drv_int_at(bits, idx))
+            if acc != cur:
+                changed = 1
+            next = push_mut(next, acc)
+        bits = next
+        pass = pass + 1
+        if changed == 0:
+            break
+    mut pure_count = 0
+    for i in 0..<n:
+        b = drv_int_at(bits, i)
+        if b == 0:
+            pure_count = pure_count + 1
+        else:
+            fl = drv_flags_text(b)
+            fname = drv_text_at(names, i)
+            print_line("{fname}:{fl}")
+    print_line("facts: {n} fn(s), {pure_count} pure ({pass} closure passes)")
+    0
+
 pub fn driver_main() -> int:
     if argc() < 2:
         print_line("usage: orion_self <input.or> [output.ll] [orb-root...]")
@@ -185,6 +331,8 @@ pub fn driver_main() -> int:
         t2 = monotonic_ms()
         module = ast_program_to_ir(ast)
         t3 = monotonic_ms()
+        if out_path == "facts":
+            return drv_facts(module)
         llvm_text = emit_module(module)
         t4 = monotonic_ms()
         d_lex = t1 - t0
