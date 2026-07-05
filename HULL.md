@@ -213,8 +213,17 @@ B9. **Determinism as discipline**: law — exactly THREE
     Console `replay live` writes the baseline, `replay diff`
     names the first divergence. Gate st80: intents captured,
     live replay reproduced a run bit-for-bit. Found on the way:
-    Orion's `and`/`or` do NOT short-circuit (a codebase-wide
-    latent bug + perf cost) — flagged as its own language slice.
+    Orion's `and`/`or` did NOT short-circuit — fixed same session
+    (native now matches the interpreter; gate st83).
+    ⭐ CROWNED: replay-diff ACROSS TWO CODEBASES in one process.
+    project_state_sig_bare fingerprints game STATE (prefix-
+    stripped), so two worlds under different prefixes are equal iff
+    they played the same; project_replay_ab re-warms one bundle
+    with an extra rule (a real code change) and fingerprints each
+    frame. Gate st84: identical across prefixes, then a `when
+    tick>10` rule added to world B forks history at exactly frame
+    11 — the past under new code (B3, world-first #3), end to end.
+    The certificate also ships tamper-evident (gate st81).
 B10. **Code as files**: a rule's identity = hash of its AST
     (Unison, for gameplay). Swap one rule = recompile one rule
     (B3's atom); global eternal compile cache; rules shared
