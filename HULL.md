@@ -179,6 +179,37 @@ B14. **Netcode as heroism**: foresee = prediction of remote
     primitives already on the map. Perceived zero-latency
     multiplayer as an engine trait.
 
+## THE LANGUAGE DOCK — Orion's own inherited flaws (audit 2026-07-05)
+
+Verdict: Orion's next-gen-ness lives in its ALLIANCES (runtime,
+log, telemetry->law loop); the language itself still carries
+C-era assumptions. Evidence is our own week. Not "start over" —
+the bootstrap vehicle was exactly right — but the language is the
+next continent. "Orion 2" is TWO moves, not twenty (the potato
+forbids Rust-maximalism):
+
+L1. **Lifetimes into the types.** Today persist/arena are manual
+    API brackets — the whole 21.8MB drip hunt was ONE bug class:
+    hand-managed scopes. Values carry their birth scope in the
+    type; escape analysis assigns regions. Auto-regions is not an
+    optimization, it is the language's missing sentence.
+L2. **Effects into the signatures.** An Orion fn touches slots/
+    IO/externs invisibly; Astra gets facts, Orion has convention.
+    One facts model from Astra rule down to runtime fn — B9's
+    certificate can then cover the ENGINE, and the compiler can
+    parallelize its own passes.
+Craft that follows under them: L3 errors as values with spans
+(st56's slot_get->strlen was the type system's fault — typed
+slots kill the class), L4 ownership-lite so push_mut is checked
+not audited-by-comment, L5 real generics replacing type_text
+strings, L6 thread-ready runtime (pool stack is a GLOBAL STATIC —
+deterministic parallelism's own prerequisite). Astra: the truths
+bitmask caps at 31 when-rules per bundle — a ticking bomb;
+compile-to-Orion remains the moonshot.
+
+Sequence is free: L1 stands on escape analysis (already on the
+arc), L2 stands on the facts machinery H2 is building right now.
+
 ## Untouched by design (frozen is a feature)
 
 Effect log format; the six-pool world lifetime model; orb
