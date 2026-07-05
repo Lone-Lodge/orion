@@ -71,9 +71,15 @@ fn usage():
     title = c_bold("orbit")
     subtitle = c_dim("Orion's project tool")
     eprint("{title}  {subtitle}")
-    eprint("usage: orbit <new|add|build|run|test|fmt|native|play> ...")
+    eprint("usage: orbit <new|add|build|run|test|fmt|native|play|soak|try|facts> ...")
     eprint("  native [gpu|ship]           " + c_dim("compile + link a native exe into build/"))
     eprint("  play [dev|bench|off|interp] " + c_dim("build + run (interp = interpreter loop)"))
+    eprint("  soak [ticks] [seed]         " + c_dim("headless chaos session with invariants"))
+    eprint("  facts [filter]              " + c_dim("effect inference per rule"))
+    eprint("  why <symbol>                " + c_dim("backward causal chain to a resource"))
+    eprint("  affects <symbol>            " + c_dim("forward ripple a resource causes"))
+    eprint("  schedule                    " + c_dim("hazard-free parallel batches"))
+    eprint("  liveness                    " + c_dim("dead-write audit"))
     exit_with(2)
 
 fn die(message: Text):
@@ -493,6 +499,37 @@ fn cmd_facts():
     exe = build_native_entry("facts", "target/facts_gen.or")
     exit_with(run_command(exe, []))
 
+# ---- Static analysis commands: the why-engine and scheduler surface,
+# now reachable from the CLI (the project_ functions shipped but were
+# only gate-tested; this wires them). All read declared facts — no
+# playthrough needed. why/affects take a symbol; schedule/liveness don't.
+fn synth_analysis(fn_name: Text, gen: Text, arg: Text):
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "game")
+    q = bytes_to_text(push([], 34))
+    call = if arg == "" then fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")" else fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + arg + q + ")"
+    src = "use atlas_project\n\nfn main() -> int:\n    " + call + "\n"
+    mkdir_all("target")
+    write_file("target/" + gen + "_gen.or", src)
+    exe = build_native_entry(gen, "target/" + gen + "_gen.or")
+    exit_with(run_command(exe, []))
+
+# usage: orbit why <symbol> — the backward causal chain to <symbol>.
+fn cmd_why():
+    synth_analysis("project_why", "why", first_param())
+
+# usage: orbit affects <symbol> — the forward ripple <symbol> causes.
+fn cmd_affects():
+    synth_analysis("project_affects", "affects", first_param())
+
+# usage: orbit schedule — hazard-free parallel batches from facts.
+fn cmd_schedule():
+    synth_analysis("project_schedule", "schedule", "")
+
+# usage: orbit liveness — dead-write audit.
+fn cmd_liveness():
+    synth_analysis("project_liveness", "liveness", "")
+
 # The shadow verdict: compile the candidate, replay the last real
 # session under it, chaos-soak a fresh world, return the verdict.
 # usage: orbit try [soak-ticks] [seed]
@@ -584,4 +621,16 @@ pub fn main():
                                             if command == "facts":
                                                 cmd_facts()
                                             else:
-                                                usage()
+                                                if command == "why":
+                                                    cmd_why()
+                                                else:
+                                                    if command == "affects":
+                                                        cmd_affects()
+                                                    else:
+                                                        if command == "schedule":
+                                                            cmd_schedule()
+                                                        else:
+                                                            if command == "liveness":
+                                                                cmd_liveness()
+                                                            else:
+                                                                usage()
