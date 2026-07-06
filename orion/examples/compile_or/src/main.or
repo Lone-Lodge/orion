@@ -6,9 +6,6 @@ use orion_emit_llvm
 use os
 
 
-# orion-self's generic `at` is untyped; annotate as Text so "{d}" prints bytes.
-fn text_at(xs: [Text], i: int) -> Text = at(xs, i)
-
 fn int_to_text(value: int) -> Text:
     if value == 0:
         "0"
@@ -18,7 +15,7 @@ fn int_to_text(value: int) -> Text:
         mut chars = ""
         for _ in 0..<20:
             if n > 0:
-                d = text_at(digits, n % 10)
+                d = at(digits, n % 10)
                 chars = "{d}{chars}"
                 n = n / 10
         if value < 0 then "-{chars}" else chars

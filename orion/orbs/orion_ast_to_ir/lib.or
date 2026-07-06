@@ -413,7 +413,9 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             # Else if it's LetOrAssign on an existing mut var: just store.
             # Else: regular SSA-style bind (immutable shadowing).
             if stmt_kind == "MutLet":
-                value_type = get_value_type(current_fn, er.id)
+                # A `mut x: T = e` annotation sets the slot type directly —
+                # inference can't recover the element type of an empty `[]`.
+                value_type = if has(stmt, "decl_type") then ast_type_to_ir_with_scope(get_map(stmt, "decl_type"), current_scope) else get_value_type(current_fn, er.id)
                 pr_alloca = ir_fn_push(current_fn, ir_alloca(value_type))
                 ptr_id = pr_alloca.id
                 pr_store = ir_fn_push(pr_alloca.function, ir_store(ptr_id, er.id))
