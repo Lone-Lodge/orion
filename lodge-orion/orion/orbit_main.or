@@ -80,6 +80,7 @@ fn usage():
     eprint("  affects <symbol>            " + c_dim("forward ripple a resource causes"))
     eprint("  schedule                    " + c_dim("hazard-free parallel batches"))
     eprint("  liveness                    " + c_dim("dead-write audit"))
+    eprint("  doc [filter]                " + c_dim("rules' behavior, queryable, from facts"))
     exit_with(2)
 
 fn die(message: Text):
@@ -530,6 +531,13 @@ fn cmd_schedule():
 fn cmd_liveness():
     synth_analysis("project_liveness", "liveness", "")
 
+# usage: orbit doc [filter] — rules' behavior projected from declared
+# facts (reads/writes/emits). `orbit doc score` filters to one resource.
+# The "*" sentinel keeps the no-filter case on synth_analysis's 3-arg path.
+fn cmd_doc():
+    p = first_param()
+    synth_analysis("project_doc", "doc", if p == "" then "*" else p)
+
 # The shadow verdict: compile the candidate, replay the last real
 # session under it, chaos-soak a fresh world, return the verdict.
 # usage: orbit try [soak-ticks] [seed]
@@ -633,4 +641,7 @@ pub fn main():
                                                             if command == "liveness":
                                                                 cmd_liveness()
                                                             else:
-                                                                usage()
+                                                                if command == "doc":
+                                                                    cmd_doc()
+                                                                else:
+                                                                    usage()
