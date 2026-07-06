@@ -2,7 +2,7 @@
 # Exercises every syntactic construct used in orbs/.
 # DO NOT hand-edit — regenerate with the script.
 
-enum SumStatus: Ok, Err
+enum SumStatus: Ok(int), Err(int)
 data CovObj: field: int, name: Text
 
 fn double_int(x: int) -> int:

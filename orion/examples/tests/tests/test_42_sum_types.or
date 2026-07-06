@@ -1,4 +1,4 @@
-enum Maybe: Some, None
+enum Maybe: Some(int), None(int)
 
 fn safe_div(a: int, b: int) -> Maybe:
     if b == 0:

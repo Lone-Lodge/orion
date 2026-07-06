@@ -46,8 +46,14 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text) -> int:
     decls = get_list(ast, "decls")
     if len(decls) == 0:
         return 0
+    # A type/lowering error makes the .ll unsound; building + running it
+    # anyway is how malformed tests used to silently pass. compile_errors()
+    # is a process-global counter, so compare the delta for THIS file.
+    errs_before = compile_errors()
     module = ast_program_to_ir(ast)
     llvm_text = emit_module(module)
+    if compile_errors() > errs_before:
+        return 0
     write_file(ll_path, llvm_text)
     clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
     rt_c = "E:/lone-lodge/orion/runtime/orion_rt.c"
