@@ -50,7 +50,7 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text) -> int:
     llvm_text = emit_module(module)
     write_file(ll_path, llvm_text)
     clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
-    rt_c = "E:/lone-lodge/orion-self/runtime/orion_rt.c"
+    rt_c = "E:/lone-lodge/orion/runtime/orion_rt.c"
     args = [ll_path, rt_c, "-Os", "-o", exe_path]
     exit_code = run_command(clang_path, args)
     if exit_code == 0 then 1 else 0

@@ -298,8 +298,8 @@ fn cmd_fmt():
 # runs it; mode `interp` routes to the interpreter loop, anything else
 # (dev/bench/off) is handed to the game as its launch mode.
 # Toolchain paths come from Orbit.toml's optional [native] section:
-#   compiler = "../orion-self/dist/orion.exe"
-#   runtime  = "../orion-self/runtime"
+#   compiler = "../orion/dist/orion.exe"
+#   runtime  = "../orion/runtime"
 # Orb search dirs derive from the [orbs] path deps; each parent dir's
 # orbs_native sibling goes first so native backends win name clashes.
 
@@ -424,8 +424,8 @@ fn build_native_entry(variant: Text, entry_override: Text) -> Text:
         die("orbit: no Orbit.toml in this directory")
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
-    compiler = nb_setting(lines, "compiler", "../orion-self/dist/orion.exe")
-    runtime = nb_setting(lines, "runtime", "../orion-self/runtime")
+    compiler = nb_setting(lines, "compiler", "../orion/dist/orion.exe")
+    runtime = nb_setting(lines, "runtime", "../orion/runtime")
     if not file_exists(compiler):
         die("orbit: native compiler not found at `" + compiler + "` — set [native] compiler in Orbit.toml")
     mkdir_all("build")
@@ -493,8 +493,8 @@ fn cli_build(path: Text) -> Text:
         die("orbit: no Orbit.toml in this directory")
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "prog")
-    compiler = nb_setting(lines, "compiler", "../orion-self/dist/orion.exe")
-    runtime = nb_setting(lines, "runtime", "../orion-self/runtime")
+    compiler = nb_setting(lines, "compiler", "../orion/dist/orion.exe")
+    runtime = nb_setting(lines, "runtime", "../orion/runtime")
     if not file_exists(compiler):
         die("orbit: compiler not found at `" + compiler + "` — set [native] compiler in Orbit.toml")
     mkdir_all("build")

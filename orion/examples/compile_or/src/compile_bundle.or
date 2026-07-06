@@ -26,7 +26,7 @@ fn int_to_text(value: int) -> Text:
 
 
 fn main() -> int:
-    input = "E:/lone-lodge/orion-self/dist/orion_self_bundled.or"
+    input = "E:/lone-lodge/orion/dist/orion_self_bundled.or"
     print_line("Reading {input}")
     src = read_file(input)
     src_bytes = bytes_from_text(src)

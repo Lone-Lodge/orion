@@ -103,7 +103,7 @@ pub fn compile_file(input: Text, output: Text):
     clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
     # Include orion_rt.c — provides __orion_perform_int / __orion_resume_int
     # for effect continuations. Compiled together with the .ll.
-    rt_c = "E:/lone-lodge/orion-self/runtime/orion_rt.c"
+    rt_c = "E:/lone-lodge/orion/runtime/orion_rt.c"
     args = [ll_path, rt_c, "-Os", "-o", output]
     exit_code = run_command(clang_path, args)
     d_link = elapsed(t_link)
