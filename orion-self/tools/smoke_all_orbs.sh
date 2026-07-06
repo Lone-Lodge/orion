@@ -9,7 +9,7 @@ set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DEMO="$ROOT/examples/compile_or/test_files/demo.or"
 
-ORION_BIN="E:/lone-lodge/lodge-orion/orion/target/release/orbit.exe"
+ORION_BIN="$ROOT/dist/orbit.exe"
 
 compile_orb() {
     local orb=$1

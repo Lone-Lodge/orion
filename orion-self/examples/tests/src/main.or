@@ -3,11 +3,7 @@ use orion_parse
 use orion_ir
 use orion_ast_to_ir
 use orion_emit_llvm
-use io
-use fs
-use time
-use process
-use bytes
+use os
 
 # Orion test runner — LLVM backend.
 #
@@ -66,6 +62,11 @@ fn fmt_ms(seconds: f64) -> Text:
     "{ms_int}ms"
 
 
+# Typed element access: orion-self's generic `at` returns an untyped value,
+# which interpolates as a pointer. Annotating the return as Text makes
+# "{filename}" print the bytes.
+fn text_at(xs: [Text], i: int) -> Text = at(xs, i)
+
 fn main() -> int:
     mkdir_all("dist")
     raw_files = list_dir("tests")
@@ -77,7 +78,7 @@ fn main() -> int:
     init_files = []
     mut files = init_files
     for raw_index in 0..<raw_total:
-        raw_name = at(raw_files, raw_index)
+        raw_name = text_at(raw_files, raw_index)
         name_bytes = bytes_from_text(raw_name)
         name_len = len(name_bytes)
         mut is_or_file = false
@@ -101,7 +102,7 @@ fn main() -> int:
     mut total_bytes = 0
 
     for file_index in 0..<total_tests:
-        filename = at(files, file_index)
+        filename = text_at(files, file_index)
         src_path = "tests/{filename}"
         ll_path = "dist/{filename}.ll"
         exe_path = "dist/{filename}.exe"

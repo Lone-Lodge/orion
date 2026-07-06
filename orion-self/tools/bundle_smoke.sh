@@ -31,7 +31,7 @@ cd "$ROOT/examples/compile_or"
 rm -rf target
 echo "Compiling..."
 START=$(date +%s)
-E:/lone-lodge/lodge-orion/orion/target/release/orbit.exe run src/main.or main 2>&1 | tee /tmp/bundle_smoke.log | grep -E "ERROR|FAILED|Done"
+"$ROOT/dist/orbit.exe" run src/main.or main 2>&1 | tee /tmp/bundle_smoke.log | grep -E "ERROR|FAILED|Done"
 END=$(date +%s)
 echo "Elapsed: $((END-START))s"
 

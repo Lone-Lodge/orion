@@ -1,14 +1,14 @@
 name = "tests"
 version = "0.1.0"
 
+# Self-hosted: orbit compiles this with orion.exe + clang (no lodge-orion).
+compiler = "../../dist/orion.exe"
+runtime = "../../runtime"
+
 [orbs]
 orion_lex = "path:../../orbs/orion_lex"
 orion_parse = "path:../../orbs/orion_parse"
 orion_ir = "path:../../orbs/orion_ir"
 orion_ast_to_ir = "path:../../orbs/orion_ast_to_ir"
 orion_emit_llvm = "path:../../orbs/orion_emit_llvm"
-io = "*"
-fs = "*"
-time = "*"
-process = "*"
-bytes = "*"
+os = "path:../../orbs/os"

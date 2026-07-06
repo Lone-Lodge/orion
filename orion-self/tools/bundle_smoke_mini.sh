@@ -51,7 +51,7 @@ cd "$ROOT/examples/compile_or"
 rm -rf target dist
 echo "Compiling..."
 START=$(date +%s)
-timeout 600 E:/lone-lodge/lodge-orion/orion/target/release/orbit.exe run src/main.or main 2>&1 | tee /tmp/mini_smoke.log | grep -E "ERROR|FAILED|Done|orion-self:"
+timeout 600 "$ROOT/dist/orbit.exe" run src/main.or main 2>&1 | tee /tmp/mini_smoke.log | grep -E "ERROR|FAILED|Done|orion-self:"
 END=$(date +%s)
 echo ""
 echo "Elapsed: $((END-START))s"

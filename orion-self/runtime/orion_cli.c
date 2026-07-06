@@ -80,6 +80,15 @@ long long is_dir(const char *path) {
 }
 long long is_file(const char *path) { return file_exists(path); }
 
+/* Milliseconds since boot — the test runner times compiles with now()/elapsed. */
+long long now(void) { return (long long)GetTickCount64(); }
+
+long long file_size(const char *path) {
+    WIN32_FILE_ATTRIBUTE_DATA d;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return -1;
+    return ((long long)d.nFileSizeHigh << 32) | (long long)d.nFileSizeLow;
+}
+
 /* Run a command and capture its stdout as one string (static buffer;
  * orion-self copies the returned bytes into a headered Text). */
 const char *capture(const char *cmd) {
@@ -107,6 +116,7 @@ const char *capture(const char *cmd) {
 
 #else /* POSIX */
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -129,6 +139,17 @@ long long is_dir(const char *path) {
     return (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) ? 1 : 0;
 }
 long long is_file(const char *path) { return file_exists(path); }
+
+long long now(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+long long file_size(const char *path) {
+    struct stat st;
+    return stat(path, &st) == 0 ? (long long)st.st_size : -1;
+}
 
 const char *capture(const char *cmd) {
     static char cbuf[65536];

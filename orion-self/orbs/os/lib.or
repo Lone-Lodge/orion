@@ -15,6 +15,11 @@ extern fn is_dir(path: Text) -> int
 extern fn is_file(path: Text) -> int
 extern fn exit_with(code: int)
 extern fn eprint(s: Text) -> int
+extern fn now() -> int
+extern fn file_size(path: Text) -> int
+
+# Milliseconds between now() and an earlier now() — timing metric.
+pub fn elapsed(start: int) -> int = now() - start
 
 # orion-self builtins under orbit's names (file_read/argv/argc live in the
 # compiler, not an orb — callable directly).

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# AOT-bootstrap pipeline:
-#   1. Bundle all 5 orbs + driver into one .or
-#   2. Use lodge-orion to compile the bundle → orion.exe (slow, last time!)
-#   3. orion.exe is the self-hosted compiler — no more lodge-orion needed
-#
-# Run from orion-self/ root.
+# DEPRECATED — do not use. This bootstrapped orion.exe *through lodge-orion*,
+# but orion-self has since outgrown lodge-orion's parser (`else if` etc.), so
+# lodge-orion can no longer parse the compiler. Use tools/self_bootstrap.sh,
+# which rebuilds orion.exe with orion.exe itself (fixpoint-checked, ~1s, no
+# lodge-orion). Kept only as a record of the original bootstrap.
+echo "aot_bootstrap.sh is DEPRECATED — use tools/self_bootstrap.sh instead." >&2
+exit 1
 
 set -e
 
