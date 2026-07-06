@@ -81,6 +81,7 @@ fn usage():
     eprint("  schedule                    " + c_dim("hazard-free parallel batches"))
     eprint("  liveness                    " + c_dim("dead-write audit"))
     eprint("  doc [filter]                " + c_dim("rules' behavior, queryable, from facts"))
+    eprint("  bisect <stem>               " + c_dim("replay-diff: name the rule a change forks"))
     exit_with(2)
 
 fn die(message: Text):
@@ -538,6 +539,9 @@ fn cmd_doc():
     p = first_param()
     synth_analysis("project_doc", "doc", if p == "" then "*" else p)
 
+fn cmd_bisect():
+    synth_analysis("project_bisect", "bisect", first_param())
+
 # The shadow verdict: compile the candidate, replay the last real
 # session under it, chaos-soak a fresh world, return the verdict.
 # usage: orbit try [soak-ticks] [seed]
@@ -644,4 +648,7 @@ pub fn main():
                                                                 if command == "doc":
                                                                     cmd_doc()
                                                                 else:
-                                                                    usage()
+                                                                    if command == "bisect":
+                                                                        cmd_bisect()
+                                                                    else:
+                                                                        usage()
