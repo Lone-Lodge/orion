@@ -21,6 +21,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* orion_rt.c wraps a raw C string into a headered orion Text; without it a
+ * returned `const char*` isn't a real Text and `==` against a literal fails. */
+extern const char *orion_text_from_c(const char *s);
+
 #ifdef _WIN32
 #include <windows.h>
 
@@ -81,15 +85,24 @@ long long is_file(const char *path) { return file_exists(path); }
 const char *capture(const char *cmd) {
     static char cbuf[65536];
     cbuf[0] = 0;
-    FILE *p = _popen(cmd, "r");
-    if (!p) return cbuf;
+    /* cmd.exe strips the outermost quote pair from a `cmd /c` string, so a
+     * command like `"where" "clang"` becomes the garbage `where" "clang`.
+     * Wrap in one extra outer pair — cmd strips that, leaving ours intact. */
+    char wbuf[65600];
+    size_t w = 0, j = 0;
+    wbuf[w++] = '"';
+    while (cmd[j] && w < sizeof(wbuf) - 2) wbuf[w++] = cmd[j++];
+    wbuf[w++] = '"';
+    wbuf[w] = 0;
+    FILE *p = _popen(wbuf, "r");
+    if (!p) return orion_text_from_c(cbuf);
     size_t total = 0, n;
     while (total < sizeof(cbuf) - 1 &&
            (n = fread(cbuf + total, 1, sizeof(cbuf) - 1 - total, p)) > 0)
         total += n;
     cbuf[total] = 0;
     _pclose(p);
-    return cbuf;
+    return orion_text_from_c(cbuf);
 }
 
 #else /* POSIX */
@@ -121,14 +134,14 @@ const char *capture(const char *cmd) {
     static char cbuf[65536];
     cbuf[0] = 0;
     FILE *p = popen(cmd, "r");
-    if (!p) return cbuf;
+    if (!p) return orion_text_from_c(cbuf);
     size_t total = 0, n;
     while (total < sizeof(cbuf) - 1 &&
            (n = fread(cbuf + total, 1, sizeof(cbuf) - 1 - total, p)) > 0)
         total += n;
     cbuf[total] = 0;
     pclose(p);
-    return cbuf;
+    return orion_text_from_c(cbuf);
 }
 #endif
 

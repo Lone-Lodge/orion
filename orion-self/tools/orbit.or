@@ -1,3 +1,7 @@
+# orbit — Orion project tool, self-hosted. Compiled by orion.exe, linked
+# with orion_cli.c + orion_rt.c. No lodge-orion, no interpreter.
+use os
+
 # orbit — Orion's project tool, written in Orion.
 #
 # `new` and `add` are pure Orion (filesystem + TOML manipulation).

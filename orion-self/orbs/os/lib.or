@@ -13,7 +13,7 @@ extern fn remove_file(path: Text) -> int
 extern fn file_exists(path: Text) -> int
 extern fn is_dir(path: Text) -> int
 extern fn is_file(path: Text) -> int
-extern fn exit_with(code: int) -> int
+extern fn exit_with(code: int)
 extern fn eprint(s: Text) -> int
 
 # orion-self builtins under orbit's names (file_read/argv/argc live in the
@@ -36,7 +36,14 @@ fn os_join(acc: Text, args: [Text], i: int) -> Text:
     else:
         os_join("{acc} {os_quote(at(args, i))}", args, i + 1)
 
-pub fn run_command(cmd: Text, args: [Text]) -> int = sys_run(os_join(os_quote(cmd), args, 0))
+# CreateProcessA resolves a forward-slash *relative* command (e.g.
+# "build/app.exe") by searching the CALLER exe's directory, not the cwd — so a
+# just-built exe isn't found. Backslashes make it a plain cwd-relative path
+# (no search). Convert only the command; args keep their slashes (clang source
+# paths and linker flags like "/STACK" must stay intact).
+fn win_path(p: Text) -> Text = str_replace(p, "/", "\\")
+
+pub fn run_command(cmd: Text, args: [Text]) -> int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))
 
 extern fn capture(cmd: Text) -> Text
 pub fn capture_stdout(cmd: Text, args: [Text]) -> Text = capture(os_join(os_quote(cmd), args, 0))

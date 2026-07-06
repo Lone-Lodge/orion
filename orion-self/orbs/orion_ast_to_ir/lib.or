@@ -952,7 +952,8 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             if type_mismatch:
                 line = if has(node, "line") then get_int(node, "line") else 0
                 col = if has(node, "col") then get_int(node, "col") else 0
-                compile_error("orion-self: ERROR at line {line}:{col} — if/else branches have different types ({then_type} vs {else_type})")
+                bad_fn = result_fn.name
+                compile_error("orion-self: ERROR in fn {bad_fn} (line {line}:{col}) — if/else branches have different types ({then_type} vs {else_type})")
             pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
             result_id = pr_phi.id
             result_fn = pr_phi.function
