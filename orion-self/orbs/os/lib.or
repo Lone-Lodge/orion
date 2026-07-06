@@ -1,0 +1,39 @@
+# os — CLI / OS primitives for self-hosted tools (orbit), under the names
+# orbit already uses. Splits into three sources:
+#   - C externs (orion_cli.c): sys_run, fs ops, exit, eprint.
+#   - orion-self builtins re-exposed: read_file=file_read, arg=argv, ...
+#   - run_command(cmd, [args]) joins to one line and calls sys_run.
+#
+# With this orb, orbit_main.or compiles under orion-self with zero changes
+# to its call sites — the last piece before a native, lodge-orion-free orbit.
+
+extern fn sys_run(cmd: Text) -> int
+extern fn mkdir_all(path: Text) -> int
+extern fn remove_file(path: Text) -> int
+extern fn file_exists(path: Text) -> int
+extern fn is_dir(path: Text) -> int
+extern fn is_file(path: Text) -> int
+extern fn exit_with(code: int) -> int
+extern fn eprint(s: Text) -> int
+
+# orion-self builtins under orbit's names (file_read/argv/argc live in the
+# compiler, not an orb — callable directly).
+pub fn read_file(p: Text) -> Text = file_read(p)
+pub fn arg(i: int) -> Text = argv(i)
+pub fn arg_count() -> int = argc()
+
+pub fn write_file(p: Text, c: Text) -> int:
+    file_write(p, c)
+    0
+
+# Join a command + its args into one line. Each arg is double-quoted so
+# paths with spaces (e.g. "C:/Program Files/LLVM/...") survive.
+fn os_quote(a: Text) -> Text = "\"{a}\""
+
+fn os_join(acc: Text, args: [Text], i: int) -> Text:
+    if i >= len(args):
+        acc
+    else:
+        os_join("{acc} {os_quote(at(args, i))}", args, i + 1)
+
+pub fn run_command(cmd: Text, args: [Text]) -> int = sys_run(os_join(os_quote(cmd), args, 0))

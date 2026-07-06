@@ -25,8 +25,9 @@
 #include <windows.h>
 
 /* Run a command line synchronously; return its exit code (-1 on spawn
- * failure). CreateProcessA needs a mutable command buffer. */
-long long run_command(const char *cmd) {
+ * failure). CreateProcessA needs a mutable command buffer. The os orb's
+ * run_command(cmd, [args]) joins into one line and calls this. */
+long long sys_run(const char *cmd) {
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     char buf[32768];
@@ -80,7 +81,7 @@ long long is_file(const char *path) { return file_exists(path); }
 #include <unistd.h>
 #include <string.h>
 
-long long run_command(const char *cmd) { return (long long)system(cmd); }
+long long sys_run(const char *cmd) { return (long long)system(cmd); }
 long long mkdir_all(const char *path) {
     char buf[4096]; strncpy(buf, path, sizeof(buf) - 1); buf[sizeof(buf) - 1] = 0;
     for (char *p = buf + 1; *p; p++) {
@@ -104,5 +105,12 @@ long long is_file(const char *path) { return file_exists(path); }
 /* Exit the process with a code. */
 long long exit_with(long long code) {
     exit((int)code);
+    return 0;
+}
+
+/* Print a line to stderr (diagnostics / usage). */
+long long eprint(const char *s) {
+    fputs(s, stderr);
+    fputc('\n', stderr);
     return 0;
 }
