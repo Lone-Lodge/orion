@@ -1,7 +1,0 @@
-name = "time"
-version = "0.0.1"
-description = "orion stdlib orb: time"
-license = "MIT"
-
-[orbs]
-# add inter-orb deps here when introduced

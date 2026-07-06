@@ -1,6 +1,0 @@
-use io
-use env
-use format
-fn main():
-    data = read_file_bytes("tools/test_assets/test.ppm")
-    print_line("len=" + fmt_int(len(data),0))

@@ -1,7 +1,0 @@
-name = "noise"
-version = "0.0.1"
-description = "orion stdlib orb: noise"
-license = "MIT"
-
-[orbs]
-# add inter-orb deps here when introduced

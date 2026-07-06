@@ -1,6 +1,0 @@
-name = "gpu"
-version = "0.0.1"
-description = "orion stdlib orb: WebGPU-shaped graphics API, multi-backend"
-license = "MIT"
-
-[orbs]

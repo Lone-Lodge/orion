@@ -1,8 +1,0 @@
-name = "log"
-version = "0.0.1"
-description = "orion stdlib orb: log"
-license = "MIT"
-
-[orbs]
-time = { built-in = true }
-format = { built-in = true }

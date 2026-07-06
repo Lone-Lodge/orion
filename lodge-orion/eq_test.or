@@ -1,4 +1,0 @@
-fn main() -> int:
-    node = {"kind": "Int"}
-    direct = get(node, "kind") == "Int"
-    if direct then 42 else 0

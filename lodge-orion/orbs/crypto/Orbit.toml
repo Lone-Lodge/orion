@@ -1,7 +1,0 @@
-name = "crypto"
-version = "0.0.1"
-description = "orion stdlib orb: crypto"
-license = "MIT"
-
-[orbs]
-bytes = { built-in = true }

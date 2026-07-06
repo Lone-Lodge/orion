@@ -1,6 +1,0 @@
-name = "wgsl"
-version = "0.0.1"
-description = "orion stdlib orb: WGSL → HLSL/MSL/GLSL translator. Pure Orion."
-license = "MIT"
-
-[orbs]

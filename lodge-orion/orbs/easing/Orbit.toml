@@ -1,7 +1,0 @@
-name = "easing"
-version = "0.0.1"
-description = "orion stdlib orb: easing"
-license = "MIT"
-
-[orbs]
-# add inter-orb deps here when introduced
