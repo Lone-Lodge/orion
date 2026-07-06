@@ -1,0 +1,352 @@
+use orion_ir
+use orion_lex
+use orion_parse
+use orion_ast_to_ir
+use orion_emit_llvm
+
+# Self-hosted driver: orion_self <input.or> [output.ll] [orb-root...]
+#
+# MULTI-ORB: scans the entry file for `use NAME` lines, resolves each
+# name to an orb source (NAME/lib.or under a set of search roots),
+# recursively discovers that orb's own uses, and compiles everything
+# as one program. Replaces tools/bundle_orbs.sh — no bash, one command
+# builds a whole dependency graph.
+#
+# Resolution roots (first hit wins): any extra argv paths, then
+# <entry-dir>/orbs/, <entry-dir>/../orbs/, <entry-dir>/../../orbs/,
+# orbs/, ../orbs/. Unresolved names print a note and are skipped —
+# builtins (bytes/io/fs/...) live in the compiler, not in orb files.
+#
+# Declaration order doesn't matter: ast_program_to_ir collects all
+# signatures before lowering bodies, so orbs concat in discovery order
+# with the entry last. The parser already skips `use` lines.
+#
+# Fail-fast: any compile_error() during lowering/emit → no output,
+# exit non-zero.
+
+fn drv_dirname(path: Text) -> Text:
+    bs = bytes_from_text(path)
+    n = len(bs)
+    mut last_sep = 0 - 1
+    for i in 0..<n:
+        c = at(bs, i)
+        if c == 47 or c == 92:
+            last_sep = i
+    if last_sep < 0:
+        "."
+    else:
+        bytes_to_text(bytes_slice(bs, 0, last_sep))
+
+# "use foo" → "foo"; anything else → "".
+fn drv_use_name(line: Text) -> Text:
+    bs = bytes_from_text(line)
+    n = len(bs)
+    if n < 5:
+        return ""
+    is_use = at(bs, 0) == 117 and at(bs, 1) == 115 and at(bs, 2) == 101 and at(bs, 3) == 32
+    if not is_use:
+        return ""
+    mut name = ""
+    mut i = 4
+    loop:
+        if i >= n:
+            break
+        c = at(bs, i)
+        if c == 32 or c == 13 or c == 10 or c == 35:
+            break
+        single = bytes_to_text(bytes_slice(bs, i, i + 1))
+        name = "{name}{single}"
+        i = i + 1
+    name
+
+# All `use` names in a source, by walking its lines.
+fn drv_uses_of(src: Text) -> [Text]:
+    bs = bytes_from_text(src)
+    n = len(bs)
+    mut names = []
+    mut line_start = 0
+    mut i = 0
+    loop:
+        if i > n:
+            break
+        at_end = i == n
+        mut is_nl = false
+        if not at_end:
+            is_nl = at(bs, i) == 10
+        if at_end or is_nl:
+            line = bytes_to_text(bytes_slice(bs, line_start, i))
+            name = drv_use_name(line)
+            if name != "":
+                names = push(names, name)
+            line_start = i + 1
+        if at_end:
+            break
+        i = i + 1
+    names
+
+fn drv_list_has(items: [Text], needle: Text) -> bool:
+    n = len(items)
+    mut found = false
+    for i in 0..<n:
+        if at(items, i) == needle:
+            found = true
+    found
+
+# Try each root for NAME/lib.or. Empty text = not found (orb sources
+# are never empty).
+fn drv_resolve(name: Text, roots: [Text]) -> Text:
+    n = len(roots)
+    mut src = ""
+    for i in 0..<n:
+        if src == "":
+            root = at(roots, i)
+            candidate = "{root}{name}/lib.or"
+            attempt = file_read(candidate)
+            if attempt != "":
+                src = attempt
+    src
+
+extern fn orion_console_color() -> int
+
+fn drv_sty(code: Text, s: Text) -> Text:
+    if orion_console_color() == 1:
+        e = bytes_to_text(push([], 27))
+        "{e}[{code}m{s}{e}[0m"
+    else:
+        s
+
+fn drv_dim(s: Text) -> Text:
+    drv_sty("2", s)
+
+fn drv_red(s: Text) -> Text:
+    drv_sty("31;1", s)
+
+# Discover the whole use-graph from the entry source; return the
+# combined program text (orbs in discovery order, entry last).
+# Quiet by design: one dim summary line instead of a line per orb —
+# unresolved `use` means builtin, which is the normal case, not news.
+fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
+    mut queue = drv_uses_of(entry_src)
+    mut loaded_names = []
+    mut chunks = []
+    mut qi = 0
+    mut orb_count = 0
+    mut orb_bytes = 0
+    loop:
+        if qi >= len(queue):
+            break
+        name = at(queue, qi)
+        qi = qi + 1
+        if drv_list_has(loaded_names, name):
+            continue
+        loaded_names = push(loaded_names, name)
+        src = drv_resolve(name, roots)
+        if src == "":
+            continue
+        orb_count = orb_count + 1
+        orb_bytes = orb_bytes + len(bytes_from_text(src))
+        chunks = push(chunks, src)
+        chunks = push(chunks, "\n")
+        deps = drv_uses_of(src)
+        n_deps = len(deps)
+        for di in 0..<n_deps:
+            queue = push(queue, at(deps, di))
+    okb = orb_bytes / 1024
+    print_line(drv_dim("  orbs {orb_count} ({okb} KB)"))
+    chunks = push(chunks, entry_src)
+    orion_text_join(chunks)
+
+# ---- Effect inference: facts all the way down (Orion 2 / L2 v0) ----
+# `orion <input> facts` prints every function's inferred effect row
+# instead of emitting LLVM: slot/io/platform/audio/extern/mem/time,
+# or `pure`. Direct effects classify dedicated ops and extern call
+# targets; user calls close transitively. This is the substrate for
+# effect signatures, parallel compiler passes and the B9
+# determinism certificate.
+
+fn drv_fn_at(fs: [IRFn], i: int) -> IRFn:
+    at(fs, i)
+
+fn drv_inst_at(xs: [Inst], i: int) -> Inst:
+    at(xs, i)
+
+fn drv_starts(t: Text, p: Text) -> bool:
+    tb = bytes_from_text(t)
+    pb = bytes_from_text(p)
+    pn = len(pb)
+    if len(tb) < pn:
+        return false
+    for i in 0..<pn:
+        if at(tb, i) != at(pb, i):
+            return false
+    true
+
+fn drv_flag(x: int, f: int) -> bool:
+    (x / f) - (x / (f * 2)) * 2 == 1
+
+fn drv_or(a: int, b: int) -> int:
+    mut out = a
+    mut f = 1
+    for i in 0..<8:
+        if drv_flag(b, f) and not drv_flag(out, f):
+            out = out + f
+        f = f * 2
+    out
+
+fn drv_name_idx(names: [Text], name: Text) -> int:
+    n = len(names)
+    for i in 0..<n:
+        if at(names, i) == name:
+            return i
+    0 - 1
+
+fn drv_int_at(xs: [int], i: int) -> int:
+    at(xs, i)
+
+fn drv_call_bits(callee: Text, names: [Text]) -> int:
+    if drv_name_idx(names, callee) >= 0:
+        return 0
+    if drv_starts(callee, "orion_audio"):
+        return 8
+    if drv_starts(callee, "win_") or drv_starts(callee, "og_") or drv_starts(callee, "ogpu_"):
+        return 4
+    if drv_starts(callee, "orion_arena") or drv_starts(callee, "orion_persist") or drv_starts(callee, "orion_pool") or drv_starts(callee, "orion_frame") or drv_starts(callee, "orion_ledger") or drv_starts(callee, "orion_alloc") or drv_starts(callee, "orion_slot"):
+        return 32
+    if drv_starts(callee, "__orion_monotonic") or drv_starts(callee, "__orion_time") or drv_starts(callee, "__orion_sleep"):
+        return 64
+    if drv_starts(callee, "orion_console") or drv_starts(callee, "orion_dir") or drv_starts(callee, "orion_file") or drv_starts(callee, "orion_embedded"):
+        return 2
+    16
+
+fn drv_direct_bits(f: IRFn, names: [Text]) -> int:
+    mut bits = 0
+    n = len(f.instructions)
+    for i in 0..<n:
+        inst = drv_inst_at(f.instructions, i)
+        op = inst.op
+        if op == "slot_set" or op == "slot_get" or op == "slot_has" or op == "slot_get_int":
+            bits = drv_or(bits, 1)
+        if op == "print_int" or op == "print_str" or op == "print_float" or op == "file_read" or op == "file_write":
+            bits = drv_or(bits, 2)
+        if op == "call":
+            bits = drv_or(bits, drv_call_bits(inst.name, names))
+    bits
+
+fn drv_flags_text(bits: int) -> Text:
+    if bits == 0:
+        return "pure"
+    mut out = ""
+    if drv_flag(bits, 1):
+        out = out + " slot"
+    if drv_flag(bits, 2):
+        out = out + " io"
+    if drv_flag(bits, 4):
+        out = out + " platform"
+    if drv_flag(bits, 8):
+        out = out + " audio"
+    if drv_flag(bits, 16):
+        out = out + " extern"
+    if drv_flag(bits, 32):
+        out = out + " mem"
+    if drv_flag(bits, 64):
+        out = out + " time"
+    out
+
+fn drv_facts(module: IRModule) -> int:
+    fns = module.functions
+    n = len(fns)
+    mut names = []
+    for i in 0..<n:
+        f0 = drv_fn_at(fns, i)
+        names = push_mut(names, f0.name)
+    mut bits = []
+    for i in 0..<n:
+        f1 = drv_fn_at(fns, i)
+        bits = push_mut(bits, drv_direct_bits(f1, names))
+    mut pass = 0
+    loop:
+        if pass >= 24:
+            break
+        mut changed = 0
+        mut next = []
+        for i in 0..<n:
+            f2 = drv_fn_at(fns, i)
+            cur = drv_int_at(bits, i)
+            mut acc = cur
+            ni = len(f2.instructions)
+            for j in 0..<ni:
+                inst = drv_inst_at(f2.instructions, j)
+                if inst.op == "call":
+                    idx = drv_name_idx(names, inst.name)
+                    if idx >= 0:
+                        acc = drv_or(acc, drv_int_at(bits, idx))
+            if acc != cur:
+                changed = 1
+            next = push_mut(next, acc)
+        bits = next
+        pass = pass + 1
+        if changed == 0:
+            break
+    mut pure_count = 0
+    for i in 0..<n:
+        b = drv_int_at(bits, i)
+        if b == 0:
+            pure_count = pure_count + 1
+        else:
+            fl = drv_flags_text(b)
+            fname = at(names, i)
+            print_line("{fname}:{fl}")
+    print_line("facts: {n} fn(s), {pure_count} pure ({pass} closure passes)")
+    0
+
+pub fn driver_main() -> int:
+    if argc() < 2:
+        print_line("usage: orion_self <input.or> [output.ll] [orb-root...]")
+        0 - 1
+    else:
+        in_path = argv(1)
+        out_path = if argc() >= 3 then argv(2) else "out.ll"
+        entry_src = file_read(in_path)
+        if entry_src == "":
+            print_line("orion: cannot read `{in_path}`")
+            return 0 - 1
+        base = drv_dirname(in_path)
+        mut roots = []
+        for ai in 3..<argc():
+            extra = argv(ai)
+            roots = push(roots, "{extra}/")
+        roots = push(roots, "{base}/orbs/")
+        roots = push(roots, "{base}/../orbs/")
+        roots = push(roots, "{base}/../../orbs/")
+        roots = push(roots, "orbs/")
+        roots = push(roots, "../orbs/")
+        src = drv_collect(entry_src, roots)
+        t0 = monotonic_ms()
+        tokens = self_lex(src)
+        t1 = monotonic_ms()
+        ast = self_parse(tokens)
+        t2 = monotonic_ms()
+        module = ast_program_to_ir(ast)
+        t3 = monotonic_ms()
+        if out_path == "facts":
+            return drv_facts(module)
+        llvm_text = emit_module(module)
+        t4 = monotonic_ms()
+        d_lex = t1 - t0
+        d_parse = t2 - t1
+        d_ir = t3 - t2
+        d_emit = t4 - t3
+        d_total = t4 - t0
+        print_line(drv_dim("  compiled {d_total} ms (lex {d_lex} | parse {d_parse} | ir {d_ir} | emit {d_emit})"))
+        n_errors = compile_errors()
+        if n_errors > 0:
+            print_line(drv_red("orion: compilation FAILED with {n_errors} error(s) — no output written"))
+            0 - 1
+        else:
+            ok = file_write(out_path, llvm_text)
+            if ok == 1:
+                print_line(drv_dim("  {out_path}"))
+                0
+            else:
+                print_line(drv_red("write failed"))
+                0 - 1

@@ -1,7 +1,0 @@
-use fs
-
-fn main():
-    if fs.file_exists("asset_pipeline.yaml"):
-        print_line("yes")
-    else:
-        print_line("no")

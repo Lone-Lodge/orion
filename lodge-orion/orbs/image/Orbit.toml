@@ -1,7 +1,0 @@
-name = "image"
-version = "0.0.1"
-description = "orion stdlib orb: image"
-license = "MIT"
-
-[orbs]
-bytes = { built-in = true }

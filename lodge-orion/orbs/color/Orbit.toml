@@ -1,8 +1,0 @@
-name = "color"
-version = "0.0.1"
-description = "orion stdlib orb: color"
-license = "MIT"
-
-[orbs]
-bytes = { built-in = true }
-string = { built-in = true }

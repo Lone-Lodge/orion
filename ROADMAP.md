@@ -43,9 +43,9 @@ the new rule and reports exactly where the timelines diverge
 ("tick 3810: the boss would have died 40 ticks earlier"). The
 Oracle diffs futures; replay-diff diffs pasts.
 
-Continents behind these: ghost-selves (log-exchange multiplayer,
+Continents behind these: ghost-selves (trail-exchange multiplayer,
 KB letters — falls out of determinism), archaeology (causality as
-genre), provable worlds (log = verified speedrun submission).
+genre), provable worlds (trail = verified speedrun submission).
 PARKED (user verdict: most speculative, revisit only if try+soak
 make it nearly free): the petri dish (breeding mechanics).
 
@@ -69,7 +69,7 @@ language whose static analysis is trained by its own telemetry).
    atlas => text 35x cheaper). The capability gap between tech
    demo and game. Cubsy gets beautiful; Veil gets its surface.
 3. **Columnar components** (SoA + dense eid index) behind the
-   log contract — "state is a cache of the log" makes the swap
+   trail contract — "state is a cache of the trail" makes the swap
    semantics-free.
 4. **Footprint scheduling** = Track 1 step 4.
 5. Moonshot: **Astra compiles to Orion** (AST -> Orion source ->
@@ -93,7 +93,7 @@ language whose static analysis is trained by its own telemetry).
 
 ## Research triage (from the 24-idea sweep — what we ruled OUT)
 
-CRDTs (merge without order — but ORDER is our soul; input-log
+CRDTs (merge without order — but ORDER is our soul; input-trail
 lockstep wins for games), GPU sims (kills determinism and console
 portability; sims are 288us — nothing to save), differential
 programming (gradients = floats = the enemy; our answer is seeded
