@@ -11,7 +11,8 @@
 set -e
 LINES=${1:-1500}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-BUNDLE=$ROOT/examples/compile_or/test_files/bundle.or
+# bundle_minified.sh writes here.
+BUNDLE=$ROOT/dist/orion_self_bundled_min.or
 DEMO=$ROOT/examples/compile_or/test_files/demo.or
 
 if [ ! -f "$BUNDLE" ]; then
