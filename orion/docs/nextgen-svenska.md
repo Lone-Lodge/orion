@@ -114,14 +114,35 @@ deterministiskt* istället för att läcka. Säkert — men felet fångas vid k�
 
 **Next-gen-steget: flytta samma garanti till KOMPILERINGSTID.**
 
-### Riktning (i skivor, minst risk först)
+### Verklighetskoll (kod-grundad, 2026-07-06)
 
-1. **Statisk region-escape-check (bygger på befintlig footprint-inferens).**
-   `orion facts` räknar redan ut vad varje fn läser/skriver. Utöka passet att
-   räkna ut varje värdes *region* och flagga när en `frame`- eller `ring`-pekare
-   lagras i `persist` — det `orion_arena_ptr_guard` idag varnar om i *runtime*
-   blir ett **kompileringsfel**. Poison-kraschen finns kvar som skyddsnät, men
-   de flesta fångas innan de körs. *Ingen ny syntax — bara passet.* Skiva: M.
+Efter att ha läst kompilatorn: **region-modellen finns INTE i språket.** De fyra
+livstiderna bor helt i C-runtimen (`runtime/orion_rt.c`), anropade via
+`extern fn orion_arena_on/off/reset/reset` från `orion_ir/lib.or`. Footprint-/
+renhets-analysen (`orbit facts`) är **atlas**-verktyg, inte språket. Kompilatorns
+typkontroll och IR (`data Inst: op, type_text, value, lhs, rhs, name, args` i
+`orion_ir/lib.or`) bär **ingen** region-information alls, och
+`orion_arena_ptr_guard` är en *runtime*-varning i C — inte en kompileringstids-
+check.
+
+Konsekvens: det finns inget footprint-pass i språket att "utöka". Att göra
+region-säkerheten statisk kräver att man **inför region-som-typ** i orion från
+grunden — en L-arc, inte en M-tweak. Den ärliga minsta första skivan nedan.
+
+### Riktning (i skivor, minst risk först — omskattad mot verkligheten)
+
+1. **Region-som-typ, minimal seed.** Ge `data Inst` (och typkontrollens värde-
+   representation) ett `region`-fält (0=okänd, 1=frame, 2=ring, 3=persist).
+   Litterala allokeringar och `orion_arena_*`-scope sätter det; allt annat ärver.
+   Ingen ny *syntax* — bara ett fält och propagering. Detta är förutsättningen
+   för allt övrigt och den enda biten som är ren infrastruktur. Skiva: M–L.
+   *Berör:* `orion_ir` (Inst-fältet) + `orion_ast_to_ir` (propagering).
+
+2. **Statisk region-escape-check (kräver #1).** När region-fältet finns: flagga
+   när ett `frame`/`ring`-värde lagras i ett `persist`-scope — det
+   `orion_arena_ptr_guard` idag *varnar* om i runtime blir ett **kompileringsfel**
+   via `compile_error(...)` (finns redan i `orion_ir/lib.or:81`). Poison-kraschen
+   kvar som skyddsnät. Skiva: M, *ovanpå #1*.
 
 2. **`move`/linjära värden för ägda ackumulatorer.** Idag är `push` värde-
    semantisk och `push_mut` en *audit-not vid anropsstället* (människan lovar
@@ -205,8 +226,8 @@ minst yta, minst risk för fel.
 | 5a | Uttömmande `when` (varning) | astra | S | låg |
 | 5b | `when` över relationer/beliefs | astra+atlas | M | medel (A3-design klar) |
 | 2 | Reaktivt nät (skip via facts.reads) | atlas | M | medel (hot-path + renhet) |
-| 4.1 | Statisk region-escape-check | **orion** | M | medel (utökar facts-passet) |
-| 4.2 | `move`/linjära ägda värden | **orion** | L | hög (nytt i typsystemet) |
+| 4.1 | Region-som-typ (seed) → escape-check | **orion** | M–L | medel (INGET region-pass finns än — bygg från grunden) |
+| 4.2 | `move`/linjära ägda värden | **orion** | L | hög (nytt i typsystemet, kräver 4.1) |
 
 Punkt 1 (AI-vänligt: "koden ska vara enklare") är inte en separat rad — den är
 *resultatet* av alla ovan: beskriv sanning (`fact`), inte steg; låt motorn välja
@@ -215,9 +236,27 @@ check). Enklare kod är utfallet, inte en feature.
 
 ---
 
-## Att bygga detta på riktigt
+## Att bygga detta på riktigt — byggblockeraren
 
-Punkt 3, 5 och 2 kräver **astra**- och **atlas**-repona i sessionen (koden bor
-där, inte här). Punkt 4 är orion-språk och kan byggas i det här repot. Lägg
-till astra/atlas så portas specarna ovan mekaniskt — de är skrivna för att vara
-det.
+Punkt 3, 5 och 2 kräver **astra**- och **atlas**-repona (koden bor där). Punkt 4
+är orion-språk och hör hemma i det här repot.
+
+**MEN:** i en web-session går kompilatorn inte att bygga eller köra. Varje
+byggväg (`tools/build_orbit.sh`, `tools/self_bootstrap.sh`, `tools/test.sh`)
+kräver en existerande `dist/orion.exe` — men `dist/` är gitignorerad, ingen
+binär är incheckad, och Rust-bootstrappen (lodge-orion) är arkiverad/borttagen.
+clang finns, men inget producerar LLVM-IR:n utan orion.exe, och ingen bootstrap
+skapar den första. Så en ändring i den självkompilerande kompilatorn kan inte
+**gate-bevisas** här — och repots disciplin är gate-bevisade skivor.
+
+För att kunna bygga punkt 4 i en web-session, ett av dessa måste ordnas först:
+1. **Checka in en seed-`orion.exe`** (eller en frisläppt binär) som byggvägarna
+   kan utgå från — då blir `build_orbit.sh` → `test.sh` körbara här.
+2. **Återinför en minimal bootstrap** (t.ex. behåll en frusen `orbit.exe` från
+   den sista gröna byggen) så första IR:n kan produceras.
+3. Annars: språk-kompilator-arbete sker på en maskin som redan har `orion.exe`;
+   den här sessionen levererar den kod-grundade specen ovan, redo att portas.
+
+Tills dess är detta dokument den ärliga planen: specarna är skrivna mot riktiga
+funktioner (`compile_error` i `orion_ir/lib.or:81`, `data Inst`, `orion_arena_*`)
+så att bygget blir mekaniskt när verktygskedjan finns.
