@@ -3,10 +3,10 @@
 # runtime hooks are orion_console_color (tty probe, fallback arm in
 # the interp) and orion_persist_text (identity in the interp).
 #
-#   log_error("cubsy", "no tray slot {i}")     always visible, red
-#   log_warn("reload", "kept old bundle")      yellow
-#   log_info("project", "scripts reloaded")    default ceiling
-#   log_debug("ecs", "packed {n} entities")    hidden until raised
+#   error("cubsy", "no tray slot {i}")     always visible, red
+#   warn("reload", "kept old bundle")      yellow
+#   info("project", "scripts reloaded")    default ceiling
+#   debug("ecs", "packed {n} entities")    hidden until raised
 #
 # Levels: error 0, warn 1, info 2, debug 3. A category shows a line
 # when line-level <= category ceiling; default ceiling is info(2).
@@ -67,19 +67,19 @@ fn ceiling_of(cat: Text) -> int:
 
 # ---- Emit ----
 
-pub fn log_error(cat: Text, msg: Text):
+pub fn error(cat: Text, msg: Text):
     if ceiling_of(cat) >= 0:
         emit_line(0, cat, msg)
 
-pub fn log_warn(cat: Text, msg: Text):
+pub fn warn(cat: Text, msg: Text):
     if ceiling_of(cat) >= 1:
         emit_line(1, cat, msg)
 
-pub fn log_info(cat: Text, msg: Text):
+pub fn info(cat: Text, msg: Text):
     if ceiling_of(cat) >= 2:
         emit_line(2, cat, msg)
 
-pub fn log_debug(cat: Text, msg: Text):
+pub fn debug(cat: Text, msg: Text):
     if ceiling_of(cat) >= 3:
         emit_line(3, cat, msg)
 
