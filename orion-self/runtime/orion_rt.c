@@ -8,6 +8,10 @@
  * with __orion_perform_text, __orion_perform_n etc. as needed.
  */
 
+/* Portable C uses fopen/strcpy; MSVC's CRT flags them "deprecated" in
+ * favour of non-portable _s variants. We stay portable — suppress. */
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
