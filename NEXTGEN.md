@@ -14,7 +14,7 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
 
 ## SHIPPED (the foundation the rest stands on)
 
-- [x] **The log is truth / rewind / replay / save** (#8) — B6, replay-diff, compaction.
+- [x] **The trail is truth / rewind / replay / save** (#8) — B6, replay-diff, compaction.
 - [x] **Why-engine, static** (#2) — `orbit why <name>`, backward causal chain. `tool`
 - [x] **Forward causality** (#4, #14) — `orbit affects <name>`, the ripple. `tool`
 - [x] **Auto-scheduler from facts** (#3, #9) — `orbit schedule`, hazard-free parallel batches. `tool`
@@ -37,7 +37,7 @@ loop · `rt` = orion runtime/atlas ecs · `arch` = a structural change ·
 - [x] **Crash trinity / self-symbolizing** (#2, #16) — what/where/why on any fault. `rt`
 - [x] **Time-as-query** ✓ 2026-07-05 — `resource_at_tick(world, key, t)`,
   `first_tick_at_least(world, key, threshold)`, `first_tick_equal` (atlas_ecs).
-  The log records every change and replay is deterministic, so any PAST
+  The trail records every change and replay is deterministic, so any PAST
   state is a query — "what was score at tick 400?", "when did it first
   cross 100?" — impossible in a polling engine (Unity/Godot cache history
   by hand or lose it). Builds on world_timeline. Gate st110; cubsy soak
@@ -62,20 +62,20 @@ Ran a critical audit across all three layers. The convergent verdict:
   conventions. *Consolidation: one `fact NAME = EXPR in NAMESPACE` could
   replace derive/goal/constraint/belief/confidence.*
 - **Atlas (engine): every unique primitive is BUILT but UNDEREXPLOITED.**
-  Determinism+fingerprints, log-is-truth, fork/foresee, facts — all real,
+  Determinism+fingerprints, trail-is-truth, fork/foresee, facts — all real,
   none fully used. *Every next-gen win is available; none needs a new
   primitive. The gap is product discipline, not capability.*
 
-**The single through-line all three share: facts + the log are computed
+**The single through-line all three share: facts + the trail are computed
 but not USED at runtime.** That is the biggest lever. Two payoffs:
 1. **Reactive net (the #1 de-faking):** derive/goal/constraint recompute
    only when a dep (facts.reads, which already exists) changed — turns the
    biggest fake-declarative into real declarative AND kills per-tick churn
    (a lag win). NEXT recommended build. `lang`+`sims`. M, hot-path care.
-2. **Exploit the log:** time-as-query (SHIPPED above) → regression-bisect
+2. **Exploit the trail:** time-as-query (SHIPPED above) → regression-bisect
    (soak finds the tick, fingerprint+facts bisect the RULE that regressed
    — the self-healing engine, the AI-native thesis realized) → causality
-   narration ("score dropped because …"). Each rides the log + facts.
+   narration ("score dropped because …"). Each rides the trail + facts.
 
 Full agent reports: the audit ran 2026-07-05; keep this verdict as the
 compass — **the novelty is the engine; stop broadening, start exploiting.**
@@ -320,7 +320,7 @@ compass — **the novelty is the engine; stop broadening, start exploiting.**
   why/affects are the static causal graph; this is the live instance.
   - [x] **`resource_history(world, key)`** ✓ 2026-07-05 — a resource's
     ACTUAL value-trajectory across the playthrough, walked from the tick
-    log (which already records every logged SetResource with its tick).
+    trail (which already records every logged SetResource with its tick).
     `explain score` shows what score really was, tick by tick, in THIS
     run — no hot-path change, the data was already there. Gate st103
     (score 5@t0 → 20@t1 → 100@t2 recovered in order, hp separate); cubsy
@@ -335,11 +335,11 @@ compass — **the novelty is the engine; stop broadening, start exploiting.**
   - [x] **Timeline view** ✓ 2026-07-05 — `world_timeline(world)` lists
     EVERY logged resource change across the playthrough in tick order —
     the runtime "what happened", one entry per change (tick, key, value),
-    straight from the log. Where resource_history is one resource's
+    straight from the trail. Where resource_history is one resource's
     trajectory, this is all of them interleaved (a `timeline` tool or
     live HUD reads it). Gate st109 (all changes captured, tick order,
     right key/value).
-  *Touches:* `rt` (log provenance) + `tool`. *Scope:* M.
+  *Touches:* `rt` (trail provenance) + `tool`. *Scope:* M.
 
 - [ ] **C3. Self-learning scheduler** (belief #5) — measure per-rule
   time, reorganize batches to balance workers next frame. **Gated on C1's

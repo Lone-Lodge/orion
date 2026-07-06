@@ -2,7 +2,7 @@
 
 ## #0: The discovery — time, memory and cause are one thing
 
-The log orders CAUSE. Regions give MEMORY a lifetime — which is
+The trail orders CAUSE. Regions give MEMORY a lifetime — which is
 time. Determinism makes the future computable and the past
 replayable. In every other engine these are three unrelated
 systems (frames, GC, mutations); here they are one substance, and
@@ -13,7 +13,7 @@ code, bit-identical parallelism, bug classes dying as categories.
 Honest calibration: no ingredient is new — event sourcing runs
 banks, region memory ran research languages, synchronous causality
 flew airplanes. The union is new, and the potato constraint is
-what makes it possible: the log is only free when the language
+what makes it possible: the trail is only free when the language
 owns every lifetime. Gravity was known for three centuries; the
 discovery was that it is a vehicle.
 
@@ -73,7 +73,7 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
 0. **Four lifetimes, nothing else.** Every allocation is epoch
    (render/dispatch arena), frame (the DEFAULT — dies at the
    end-of-frame reset), ring (a generational pool: snapshots and the
-   tick log — a generation fills one pool while the other's ages out
+   trail — a generation fills one pool while the other's ages out
    of its ring, then the reclaimed pool resets), or persist (an
    explicit orion_persist scope: the world, caches). Resets poison
    their memory, so a missed persist crashes deterministically
@@ -102,9 +102,9 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
 3. **Per-frame transients live in the arena.** Render packs, query
    effects, display lists — open an epoch, consume, reset. Anything
    escaping an epoch must be evacuated (`outcome_copy`) first.
-4. **Transient UI state never enters the tick log.** Drag positions,
+4. **Transient UI state never enters the trail.** Drag positions,
    dirty flags, mouse-move streams use `res_set_int_silent` /
-   `channel_emit_silent`. The rewind log records meaningful effects
+   `channel_emit_silent`. The rewind trail records meaningful effects
    only; rewind consumers re-seed transient state.
 5. **`push` is value-semantic, always.** `x = push(x, v)` copies like
    every other push — the implicit in-place rewrite is retired, so
@@ -118,7 +118,7 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
    persist the WRITE (the swap, the cache insert), not the probe. An
    over-wide persist scope is the one leak the poison can't catch.
 
-### Determinism rules (the log is only worth what replay proves)
+### Determinism rules (the trail is only worth what replay proves)
 
 1. **Game logic is integer-only.** libm floats are not bit-identical
    across machines — replay verification, leaderboards and lockstep
@@ -126,9 +126,9 @@ LANGUAGE-level concern, enforced by these invariants and tripwires:
 2. **Fixed timestep.** world_tick(16) is the standard; wall-clock
    never reaches rules. Frame pacing is presentation, not simulation.
 3. **Effects are outcomes, not simulation.** when-rules + dirty
-   gating keep the log sparse. Particles, animation and physics
+   gating keep the trail sparse. Particles, animation and physics
    tweens are DERIVED render data — never entities, never effects.
-   The effect log has a density ceiling; respect it by construction.
+   The effect trail has a density ceiling; respect it by construction.
 4. **Slot store is engine caches only** — unlogged and
    non-deterministic, so game state never lives there. Game state
    lives in worlds, where it is effects and history.
