@@ -76,7 +76,7 @@ fn main() -> int:
     # KNOWN_BUGS.md get fed to the compiler, produce broken-but-not-crashing
     # .exe's, exit=0 happens to match parse_expected()=0, and we get a
     # silent false pass. Filter at the source.
-    mut files: [Text] = []
+    mut files = []
     for raw_index in 0..<raw_total:
         raw_name = at(raw_files, raw_index)
         name_bytes = bytes_from_text(raw_name)

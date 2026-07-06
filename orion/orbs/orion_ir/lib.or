@@ -466,6 +466,14 @@ pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
     new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
     PushResult{function: new_fn, id: new_id}
 
+# Overwrite the instruction at `idx` — used to back-patch an alloca's element
+# type once inference resolves an empty list (`mut x = []` then `push`). Same
+# in-place caveat as ir_fn_push: the caller drops the old IRFn.
+pub fn ir_fn_set_inst(fn_value: IRFn, idx: int, inst: Inst) -> IRFn:
+    mut insts = fn_value.instructions
+    insts = set(insts, idx, inst)
+    IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
+
 
 # --- Module builders ---
 

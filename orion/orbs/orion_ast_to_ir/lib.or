@@ -441,6 +441,14 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
                         compile_error("orion: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                    # Resolve an empty list's element type from the first
+                    # concrete value stored into it: `mut x = []` allocates
+                    # list:i64 (no element to peek), so `x = push(x, textv)`
+                    # reveals list:text. Back-patch the slot so later
+                    # `at(x, i)` reads the right element type — no annotation.
+                    if slot_type == "list:i64" and is_list_type(new_type) and extract_list_elem(new_type) != "i64":
+                        patched = Inst{op: alloca_inst.op, type_text: new_type, value: alloca_inst.value, lhs: alloca_inst.lhs, rhs: alloca_inst.rhs, name: alloca_inst.name, args: alloca_inst.args}
+                        current_fn = ir_fn_set_inst(current_fn, ptr_id, patched)
                     pr_store = ir_fn_push(current_fn, ir_store(ptr_id, er.id))
                     current_fn = pr_store.function
                     last_id = pr_store.id
@@ -1271,7 +1279,12 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         val_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
-        pr = ir_fn_push(val_r.function, ir_list_push(list_r.id, val_r.id))
+        # Carry the pushed element's type onto the result ("list:T"), so a
+        # `x = push(x, v)` self-rebind can back-patch an empty list's slot.
+        push_val_type = get_value_type(val_r.function, val_r.id)
+        push_base = ir_list_push(list_r.id, val_r.id)
+        push_typed = Inst{op: push_base.op, type_text: "list:{push_val_type}", value: push_base.value, lhs: push_base.lhs, rhs: push_base.rhs, name: push_base.name, args: push_base.args}
+        pr = ir_fn_push(val_r.function, push_typed)
         result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
     if is_push_mut:
         # Explicit in-place append for accumulators the caller KNOWS it

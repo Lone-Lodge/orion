@@ -36,7 +36,22 @@ if diff -q "$DIST/orion_stage1.ll" "$DIST/orion_stage2.ll" >/dev/null; then
     cp "$DIST/orion_new.exe" "$ORION"
     rm -f "$DIST/orion_stage1.ll" "$DIST/orion_stage2.ll" "$DIST/orion_new.exe"
     echo "==> SUCCESS: orion.exe rebuilt, self-hosted, fixpoint reached (no lodge-orion)"
+    exit 0
+fi
+
+# stage1 != stage2 is EXPECTED after an intentional codegen change: the old
+# compiler renders the (new) bundle differently than the new compiler does.
+# The new compiler must still be STABLE — compiling itself reproducibly. So
+# iterate once more: build from stage2 and check stage2 == stage3.
+echo "==> stage1 != stage2 (codegen changed) — iterating to confirm the new compiler is stable"
+"$CLANG" "$DIST/orion_stage2.ll" "$ROOT/runtime/orion_rt.c" -Xlinker /STACK:67108864 -o "$DIST/orion_new2.exe"
+"$DIST/orion_new2.exe" "$BUNDLE" "$DIST/orion_stage3.ll"
+
+if diff -q "$DIST/orion_stage2.ll" "$DIST/orion_stage3.ll" >/dev/null; then
+    cp "$DIST/orion_new2.exe" "$ORION"
+    rm -f "$DIST/orion_stage1.ll" "$DIST/orion_stage2.ll" "$DIST/orion_stage3.ll" "$DIST/orion_new.exe" "$DIST/orion_new2.exe"
+    echo "==> SUCCESS: converged after codegen change (stage2 == stage3), orion.exe rebuilt"
 else
-    echo "==> FAILED: fixpoint mismatch (stage1 != stage2) — orion.exe NOT replaced"
+    echo "==> FAILED: still diverging (stage2 != stage3) — non-deterministic compile, orion.exe NOT replaced"
     exit 1
 fi
