@@ -94,7 +94,7 @@ fn list_contains(haystack: [Text], needle: Text) -> bool:
     total = len(haystack)
     mut found = false
     for index in 0..<total:
-        if at(haystack, index) == needle:
+        if nb_text_at(haystack, index) == needle:
             found = true
     found
 
@@ -225,7 +225,7 @@ fn fmt_normalize(text: Text) -> Text:
     line_count = len(raw_lines)
     mut normalized_lines = []
     for index in 0..<line_count:
-        raw_line = at(raw_lines, index)
+        raw_line = nb_text_at(raw_lines, index)
         without_tabs = fmt_expand_tabs(raw_line)
         stripped = fmt_trim_trailing(without_tabs)
         normalized_lines = push(normalized_lines, stripped)
@@ -234,7 +234,7 @@ fn fmt_normalize(text: Text) -> Text:
     mut output_lines = collapsed
     mut last_was_blank = false
     for index in 0..<line_count:
-        current_line = at(normalized_lines, index)
+        current_line = nb_text_at(normalized_lines, index)
         is_blank = current_line == ""
         keep = not (is_blank and last_was_blank)
         if keep:
@@ -242,10 +242,10 @@ fn fmt_normalize(text: Text) -> Text:
         last_was_blank = is_blank
     # Drop the trailing blank line so str_join + "\n" produces one final LF.
     final_count = len(output_lines)
-    if final_count > 0 and at(output_lines, final_count - 1) == "":
+    if final_count > 0 and nb_text_at(output_lines, final_count - 1) == "":
         mut trimmed = []
         for index in 0..<(final_count - 1):
-            trimmed = push(trimmed, at(output_lines, index))
+            trimmed = push(trimmed, nb_text_at(output_lines, index))
         output_lines = trimmed
     str_join(output_lines, "\n") + "\n"
 
@@ -256,7 +256,7 @@ fn fmt_walk(directory: Text):
     entries = list_dir(directory)
     entry_count = len(entries)
     for index in 0..<entry_count:
-        entry_name = at(entries, index)
+        entry_name = nb_text_at(entries, index)
         full_path = path_join(directory, entry_name)
         is_directory_entry = is_dir(full_path)
         # Skip target/ — generated output we don't want to rewrite.
@@ -316,7 +316,7 @@ fn nb_setting(lines: [Text], key: Text, fallback: Text) -> Text:
     mut found = fallback
     mut taken = false
     for index in 0..<total:
-        line = str_trim(at(lines, index))
+        line = str_trim(nb_text_at(lines, index))
         if not taken and str_starts_with(line, key + " ="):
             found = nb_quoted(line)
             taken = true
@@ -326,7 +326,7 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
     total = len(lines)
     mut parents = []
     for index in 0..<total:
-        line = at(lines, index)
+        line = nb_text_at(lines, index)
         if str_contains(line, "\"path:"):
             rel = str_replace(nb_quoted(line), "path:", "")
             parent = path_parent(rel)
@@ -340,7 +340,7 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
         if is_dir(native_sibling) and not list_contains(dirs, native_sibling):
             dirs = push(dirs, native_sibling)
     for p2_index in 0..<parent_total:
-        dirs = push(dirs, at(parents, p2_index))
+        dirs = push(dirs, nb_text_at(parents, p2_index))
     dirs
 
 fn nb_clang() -> Text:
@@ -435,7 +435,7 @@ fn build_native_entry(variant: Text, entry_override: Text) -> Text:
     dirs = nb_orb_dirs(lines)
     dir_total = len(dirs)
     for d_index in 0..<dir_total:
-        compile_args = push(compile_args, at(dirs, d_index))
+        compile_args = push(compile_args, nb_text_at(dirs, d_index))
     if run_command(compiler, compile_args) != 0:
         die("orbit: native compile failed")
     # Both renderers always link; ogpu_min.c dispatches at og_init
