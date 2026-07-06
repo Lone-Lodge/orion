@@ -309,7 +309,7 @@ fn nb_lines(text: Text) -> [Text]:
 
 fn nb_quoted(line: Text) -> Text:
     pieces = str_split(line, "\"")
-    if len(pieces) >= 2 then at(pieces, 1) else ""
+    if len(pieces) >= 2 then nb_text_at(pieces, 1) else ""
 
 fn nb_setting(lines: [Text], key: Text, fallback: Text) -> Text:
     total = len(lines)
