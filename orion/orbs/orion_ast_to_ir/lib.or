@@ -1966,6 +1966,17 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 enum_name = rcv_name
                 variant_idx = v_idx
         if is_enum_cons:
+            # Arity check — the qualified `EnumName.Variant(...)` form used to
+            # silently DROP extra args (the loop below only fills declared
+            # slots), so `R.Ok(5)` on `enum R: Ok, Err` dropped the 5 and only
+            # a downstream match arm complained. Point at the construction.
+            # (The bare-variant path in ast_call_to_ir checks the same way.)
+            ec_want = variant_payload_count(scope, enum_name, method)
+            ec_got = len(m_args)
+            if ec_got != ec_want:
+                ec_line = if has(node, "line") then get_int(node, "line") else 0
+                ec_col = if has(node, "col") then get_int(node, "col") else 0
+                compile_error("orion: ERROR at line {ec_line}:{ec_col} — variant `{method}` takes {ec_want} value(s), got {ec_got}")
             # Positional payload slots: arg i → field p{i}. Unused slots
             # up to the enum's synthesized width pad with zero (the width
             # comes from the registered ds spec's field count - 1).
