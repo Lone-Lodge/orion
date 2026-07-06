@@ -1,4 +1,4 @@
-enum Result: Ok, Err
+enum Result: Ok(int), Err(Text)
 
 fn safe_div(a: int, b: int) -> Result:
     if b == 0:
@@ -13,8 +13,13 @@ fn calc(x: int) -> Result:
 fn main() -> int:
     good = calc(2)
     bad = calc(0)
+    # Payload is read via match (enums have no field accessor); .tag is the
+    # discriminant. `?` must unwrap good and short-circuit bad to Err.
+    good_val = match good:
+        Ok(v) -> v
+        Err(_) -> 0
     if good.tag == 0 and bad.tag == 1:
-        if good.val_int == 100:
+        if good_val == 100:
             42
         else:
             0

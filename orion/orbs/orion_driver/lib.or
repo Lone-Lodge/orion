@@ -311,7 +311,7 @@ pub fn driver_main() -> int:
         out_path = if argc() >= 3 then argv(2) else "out.ll"
         entry_src = file_read(in_path)
         if entry_src == "":
-            print_line("orion-self: cannot read `{in_path}`")
+            print_line("orion: cannot read `{in_path}`")
             return 0 - 1
         base = drv_dirname(in_path)
         mut roots = []
@@ -343,7 +343,7 @@ pub fn driver_main() -> int:
         print_line(drv_dim("  compiled {d_total} ms (lex {d_lex} | parse {d_parse} | ir {d_ir} | emit {d_emit})"))
         n_errors = compile_errors()
         if n_errors > 0:
-            print_line(drv_red("orion-self: compilation FAILED with {n_errors} error(s) — no output written"))
+            print_line(drv_red("orion: compilation FAILED with {n_errors} error(s) — no output written"))
             0 - 1
         else:
             ok = file_write(out_path, llvm_text)

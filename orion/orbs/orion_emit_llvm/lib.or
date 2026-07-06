@@ -863,7 +863,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     # equals the default sentinel, no branch matched: count it as a
     # compile error so drivers refuse to ship the module.
     if result == "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}":
-        compile_error("orion-self: ERROR — IR op `{op}` has no LLVM lowering (fn `{fn_value.name}`)")
+        compile_error("orion: ERROR — IR op `{op}` has no LLVM lowering (fn `{fn_value.name}`)")
 
     result
 

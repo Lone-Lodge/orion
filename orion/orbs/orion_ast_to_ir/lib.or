@@ -227,7 +227,7 @@ fn scope_lookup_fn_ret_loc(scope: Scope, fn_name: Text, node: Map) -> Text:
     if found == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion-self: ERROR at line {line}:{col} — call to unknown function `{fn_name}` (returning i64 as guess)")
+        compile_error("orion: ERROR at line {line}:{col} — call to unknown function `{fn_name}` (returning i64 as guess)")
         result = "i64"
     result
 
@@ -438,7 +438,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     if slot_ll != new_ll:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion-self: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                        compile_error("orion: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
                     pr_store = ir_fn_push(current_fn, ir_store(ptr_id, er.id))
                     current_fn = pr_store.function
                     last_id = pr_store.id
@@ -507,7 +507,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
-            compile_error("orion-self: ERROR at line {line}:{col} — unhandled statement kind `{stmt_kind}` (skipping)")
+            compile_error("orion: ERROR at line {line}:{col} — unhandled statement kind `{stmt_kind}` (skipping)")
     # Emit any pending deferred exprs (LIFO) at end of block — unless the
     # block already terminated via return (in which case defers ran before
     # the return).
@@ -703,7 +703,7 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             # captured as a single ident. Emit a sentinel iconst(0).
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion-self: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
+            compile_error("orion: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
             pr = ir_fn_push(fn_value, ir_iconst(0))
             result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     is_real_mut = found_id >= 0 and is_mut == 1
@@ -756,7 +756,7 @@ fn ast_float_binop_to_ir(fn_in: IRFn, scope: Scope, op: Text, left_id: int, left
     if op == "/":
         fop = "fdiv"
     if fop == "":
-        compile_error("orion-self: ERROR — operator `{op}` not supported for f64 operands")
+        compile_error("orion: ERROR — operator `{op}` not supported for f64 operands")
         fop = "fadd"
     pr_f = ir_fn_push(current_fn, ir_fbin(fop, l_id, r_id))
     ConvResult{function: pr_f.function, scope: scope, id: pr_f.id}
@@ -879,7 +879,7 @@ fn check_branch_shadows(before: int, s: Scope, where_txt: Text, node: Map):
                     outer = 1
             if outer == 1:
                 line = if has(node, "line") then get_int(node, "line") else 0
-                compile_error("orion-self: ERROR at line {line} — `{nm}` is reassigned inside a {where_txt}; immutable rebinding cannot cross a block boundary (declare it `mut`, or use an if-expression)")
+                compile_error("orion: ERROR at line {line} — `{nm}` is reassigned inside a {where_txt}; immutable rebinding cannot cross a block boundary (declare it `mut`, or use an if-expression)")
 
 fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     cond_node = get(node, "cond")
@@ -953,7 +953,7 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 line = if has(node, "line") then get_int(node, "line") else 0
                 col = if has(node, "col") then get_int(node, "col") else 0
                 bad_fn = result_fn.name
-                compile_error("orion-self: ERROR in fn {bad_fn} (line {line}:{col}) — if/else branches have different types ({then_type} vs {else_type})")
+                compile_error("orion: ERROR in fn {bad_fn} (line {line}:{col}) — if/else branches have different types ({then_type} vs {else_type})")
             pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
             result_id = pr_phi.id
             result_fn = pr_phi.function
@@ -1026,7 +1026,7 @@ fn find_variant_enum(scope: Scope, callee: Text) -> Text:
                     else:
                         second_enum = en_name
     if second_enum != "":
-        compile_error("orion-self: ERROR — ambiguous bare enum variant `{callee}` (defined in both `{found_enum}` and `{second_enum}`) — rename one variant or qualify the use")
+        compile_error("orion: ERROR — ambiguous bare enum variant `{callee}` (defined in both `{found_enum}` and `{second_enum}`) — rename one variant or qualify the use")
     found_enum
 
 fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
@@ -1046,7 +1046,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if vc_got != vc_want:
             vc_line = if has(node, "line") then get_int(node, "line") else 0
             vc_col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion-self: ERROR at line {vc_line}:{vc_col} — variant `{callee}` takes {vc_want} value(s), got {vc_got}")
+            compile_error("orion: ERROR at line {vc_line}:{vc_col} — variant `{callee}` takes {vc_want} value(s), got {vc_got}")
         vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": vc_enum}, "method": callee, "args": args}
         return ast_expr_to_ir(fn_value, scope, vc_node)
     is_print_line = callee == "print_line" or callee == "println" or callee == "print"
@@ -1195,7 +1195,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
                 else:
-                    compile_error("orion-self: ERROR — len() on untyped value (type `{arg_type}`) — read it through a typed accessor (get_int/get_map/get_list or a typed fn) so len knows the shape")
+                    compile_error("orion: ERROR — len() on untyped value (type `{arg_type}`) — read it through a typed accessor (get_int/get_map/get_list or a typed fn) so len knows the shape")
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
@@ -1496,7 +1496,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 if got != want:
                     a_line = if has(node, "line") then get_int(node, "line") else 0
                     a_col = if has(node, "col") then get_int(node, "col") else 0
-                    compile_error("orion-self: ERROR at line {a_line}:{a_col} — `{callee}` takes {want} argument(s), got {got}")
+                    compile_error("orion: ERROR at line {a_line}:{a_col} — `{callee}` takes {want} argument(s), got {got}")
             pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
     result
@@ -1628,7 +1628,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             mline = if has(node, "line") then get_int(node, "line") else 0
             mcol = if has(node, "col") then get_int(node, "col") else 0
             missing = total_variants - matched_count
-            compile_error("orion-self: ERROR at line {mline}:{mcol} — non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
+            compile_error("orion: ERROR at line {mline}:{mcol} — non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
 
     mut arm_index = 0
     for arm_idx in 0..<n_arms:
@@ -1719,7 +1719,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if do_variant_pat:
             arm_want = variant_payload_count(scope, variant_enum, pat_value)
             if n_arm_bindings != arm_want:
-                compile_error("orion-self: ERROR — match arm `{pat_value}` binds {n_arm_bindings} value(s) but the variant carries {arm_want}")
+                compile_error("orion: ERROR — match arm `{pat_value}` binds {n_arm_bindings} value(s) but the variant carries {arm_want}")
         if do_variant_pat and n_arm_bindings > 0:
             payload_csv = scope_lookup_variant_payloads(scope, variant_enum, pat_value)
             payload_types = split_csv(payload_csv)
@@ -1769,7 +1769,7 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if spec == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion-self: ERROR at line {line}:{col} — unknown data type `{struct_name}`")
+        compile_error("orion: ERROR at line {line}:{col} — unknown data type `{struct_name}`")
     parts = parse_data_spec(spec)
     n_fields_decl = len(parts)
     n_provided = len(fields)
@@ -1848,7 +1848,7 @@ fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if field_idx < 0:
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion-self: ERROR at line {line}:{col} — `{struct_name}` has no field `{field_name}`")
+            compile_error("orion: ERROR at line {line}:{col} — `{struct_name}` has no field `{field_name}`")
         pr_load = ir_fn_push(obj_r.function, ir_field_load(obj_r.id, field_idx, field_type))
         result = ConvResult{function: pr_load.function, scope: obj_r.scope, id: pr_load.id}
     result
@@ -2069,7 +2069,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion-self: ERROR at line {line}:{col} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
+        compile_error("orion: ERROR at line {line}:{col} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
         pr_fallback = ir_fn_push(fn_value, ir_iconst(0))
         result = ConvResult{function: pr_fallback.function, scope: scope, id: pr_fallback.id}
     result
@@ -2268,7 +2268,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                                         if at(cs_lp, ix) == cs_l_name:
                                             found_in_params = true
                                     if not found_in_params and not captures_warned:
-                                        print_line("orion-self: WARNING — lambda likely captures `{cs_l_name}` (env-struct closures not yet supported; capture acts as free var)")
+                                        print_line("orion: WARNING — lambda likely captures `{cs_l_name}` (env-struct closures not yet supported; capture acts as free var)")
                                         captures_warned = true
     mut decls = raw_decls
     if has_any_lambda:
@@ -2500,7 +2500,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
         if decl_kind_1b == "Fn":
             fn_name = get(decl, "name")
             if text_list_has(fn_seen, fn_name):
-                compile_error("orion-self: ERROR — duplicate function `{fn_name}` (two orbs in this build define it; rename one)")
+                compile_error("orion: ERROR — duplicate function `{fn_name}` (two orbs in this build define it; rename one)")
             fn_seen = push_mut(fn_seen, fn_name)
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
