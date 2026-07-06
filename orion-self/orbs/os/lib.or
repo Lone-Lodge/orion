@@ -37,3 +37,135 @@ fn os_join(acc: Text, args: [Text], i: int) -> Text:
         os_join("{acc} {os_quote(at(args, i))}", args, i + 1)
 
 pub fn run_command(cmd: Text, args: [Text]) -> int = sys_run(os_join(os_quote(cmd), args, 0))
+
+extern fn capture(cmd: Text) -> Text
+pub fn capture_stdout(cmd: Text, args: [Text]) -> Text = capture(os_join(os_quote(cmd), args, 0))
+
+# ---- string helpers (orion-self has no shared str lib; roll them over
+# bytes, matching the driver's idioms) ----
+
+pub fn str_starts_with(t: Text, p: Text) -> bool:
+    tb = bytes_from_text(t)
+    pb = bytes_from_text(p)
+    pn = len(pb)
+    if len(tb) < pn:
+        return false
+    for i in 0..<pn:
+        if at(tb, i) != at(pb, i):
+            return false
+    true
+
+pub fn str_ends_with(t: Text, p: Text) -> bool:
+    tb = bytes_from_text(t)
+    pb = bytes_from_text(p)
+    tn = len(tb)
+    pn = len(pb)
+    if tn < pn:
+        return false
+    for i in 0..<pn:
+        if at(tb, tn - pn + i) != at(pb, i):
+            return false
+    true
+
+pub fn str_contains(t: Text, sub: Text) -> bool:
+    tb = bytes_from_text(t)
+    sb = bytes_from_text(sub)
+    tn = len(tb)
+    sn = len(sb)
+    if sn == 0:
+        return true
+    if tn < sn:
+        return false
+    mut i = 0
+    loop:
+        if i > tn - sn:
+            break
+        mut hit = true
+        for j in 0..<sn:
+            if at(tb, i + j) != at(sb, j):
+                hit = false
+        if hit:
+            return true
+        i = i + 1
+    false
+
+pub fn str_trim(t: Text) -> Text:
+    bs = bytes_from_text(t)
+    n = len(bs)
+    mut lo = 0
+    loop:
+        if lo >= n:
+            break
+        c = at(bs, lo)
+        if c == 32 or c == 9 or c == 10 or c == 13:
+            lo = lo + 1
+        else:
+            break
+    mut hi = n
+    loop:
+        if hi <= lo:
+            break
+        c2 = at(bs, hi - 1)
+        if c2 == 32 or c2 == 9 or c2 == 10 or c2 == 13:
+            hi = hi - 1
+        else:
+            break
+    bytes_to_text(bytes_slice(bs, lo, hi))
+
+pub fn str_split(t: Text, sep: Text) -> [Text]:
+    tb = bytes_from_text(t)
+    sb = bytes_from_text(sep)
+    tn = len(tb)
+    sn = len(sb)
+    mut out = []
+    if sn == 0:
+        return push(out, t)
+    mut start = 0
+    mut i = 0
+    loop:
+        if i > tn - sn:
+            break
+        mut hit = true
+        for j in 0..<sn:
+            if at(tb, i + j) != at(sb, j):
+                hit = false
+        if hit:
+            out = push(out, bytes_to_text(bytes_slice(tb, start, i)))
+            i = i + sn
+            start = i
+        else:
+            i = i + 1
+    out = push(out, bytes_to_text(bytes_slice(tb, start, tn)))
+    out
+
+pub fn str_join(parts: [Text], sep: Text) -> Text:
+    n = len(parts)
+    mut out = ""
+    for i in 0..<n:
+        if i == 0:
+            out = at(parts, i)
+        else:
+            out = "{out}{sep}{at(parts, i)}"
+    out
+
+pub fn str_replace(t: Text, pat: Text, rep: Text) -> Text = str_join(str_split(t, pat), rep)
+
+# ---- paths ----
+pub fn path_join(a: Text, b: Text) -> Text = "{a}/{b}"
+
+pub fn path_parent(p: Text) -> Text:
+    bs = bytes_from_text(p)
+    n = len(bs)
+    mut last_sep = 0 - 1
+    for i in 0..<n:
+        c = at(bs, i)
+        if c == 47 or c == 92:
+            last_sep = i
+    if last_sep < 0:
+        "."
+    else:
+        bytes_to_text(bytes_slice(bs, 0, last_sep))
+
+# ---- directory listing (orion_dir_list returns newline-joined names) ----
+extern fn orion_dir_list(dir: Text) -> Text
+pub fn list_dir(dir: Text) -> [Text] = str_split(orion_dir_list(dir), "\n")

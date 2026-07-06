@@ -76,6 +76,22 @@ long long is_dir(const char *path) {
 }
 long long is_file(const char *path) { return file_exists(path); }
 
+/* Run a command and capture its stdout as one string (static buffer;
+ * orion-self copies the returned bytes into a headered Text). */
+const char *capture(const char *cmd) {
+    static char cbuf[65536];
+    cbuf[0] = 0;
+    FILE *p = _popen(cmd, "r");
+    if (!p) return cbuf;
+    size_t total = 0, n;
+    while (total < sizeof(cbuf) - 1 &&
+           (n = fread(cbuf + total, 1, sizeof(cbuf) - 1 - total, p)) > 0)
+        total += n;
+    cbuf[total] = 0;
+    _pclose(p);
+    return cbuf;
+}
+
 #else /* POSIX */
 #include <sys/stat.h>
 #include <unistd.h>
@@ -100,6 +116,20 @@ long long is_dir(const char *path) {
     return (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) ? 1 : 0;
 }
 long long is_file(const char *path) { return file_exists(path); }
+
+const char *capture(const char *cmd) {
+    static char cbuf[65536];
+    cbuf[0] = 0;
+    FILE *p = popen(cmd, "r");
+    if (!p) return cbuf;
+    size_t total = 0, n;
+    while (total < sizeof(cbuf) - 1 &&
+           (n = fread(cbuf + total, 1, sizeof(cbuf) - 1 - total, p)) > 0)
+        total += n;
+    cbuf[total] = 0;
+    pclose(p);
+    return cbuf;
+}
 #endif
 
 /* Exit the process with a code. */
