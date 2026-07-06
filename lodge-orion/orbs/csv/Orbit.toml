@@ -1,7 +1,0 @@
-name = "csv"
-version = "0.0.1"
-description = "orion stdlib orb: csv"
-license = "MIT"
-
-[orbs]
-bytes = { built-in = true }

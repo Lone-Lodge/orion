@@ -1,7 +1,0 @@
-name = "uuid"
-version = "0.0.1"
-description = "orion stdlib orb: uuid"
-license = "MIT"
-
-[orbs]
-bytes = { built-in = true }

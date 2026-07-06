@@ -63,7 +63,7 @@ today — miscompile!), unknown fn (silently "guesses i64" today).
 Cost: astra AST walk (compile cache already yields ASTs), a facts
 store, checker rules, two orion-self checker errors. One block.
 
-## H3. Names: the log owns identity (eval's hidden treasure)
+## H3. Names: the trail owns identity (eval's hidden treasure)
 
 Today: identities are texts everywhere; Astra eval resolves every
 variable reference by scanning Binding LISTS with strcmp — with
@@ -109,7 +109,7 @@ and the auto-ctx build (unmeasured). Measure before digging.
 
 Today: state maps-of-maps; the plan said "columnar SoA" which is
 every engine's answer. Our physics gives a better frame: state is
-a cache of the log, so ANY layout is a **materialized view that
+a cache of the trail, so ANY layout is a **materialized view that
 subscribes to effects** — deterministic, rebuildable, forkable,
 invisible to the save format. Columnar packs = view #1. Morton
 spatial index = view #2 when boards grow. By-value indexes later.
@@ -128,7 +128,7 @@ Not scheduled. Inscribed so the expeditions know what they are
 walking toward. Three inherited assumptions, each removable:
 
 B1. **The tick** (Spacewar 1962): why does time advance in fixed
-    slices at all? Tear it out: time = the log's index; effects
+    slices at all? Tear it out: time = the trail's index; effects
     ARE the clock; rules subscribe to change instead of being
     polled. Cost becomes proportional to CHANGE, not to time —
     worlds at different rates for free, sub-tick causality,
@@ -136,7 +136,7 @@ B1. **The tick** (Spacewar 1962): why does time advance in fixed
     (idle = 0 frames); the Oracle is an exercise in this.
 
 B2. **The pointer**: why is identity a memory address? Next floor
-    down from regions: identity = BIRTH COORDINATE in the log —
+    down from regions: identity = BIRTH COORDINATE in the trail —
     not where a value lives but when and why it arose. A pointer
     becomes a time coordinate; serialization, network sync and
     structural sharing across forks become free (same coordinate
@@ -146,11 +146,11 @@ B2. **The pointer**: why is identity a memory address? Next floor
     coordinates vs raw pointers (likely hybrid).
 
 B3. **The code/data wall**: why does code live OUTSIDE the
-    timeline? Game events enter the log; code changes enter git —
+    timeline? Game events enter the trail; code changes enter git —
     two separate universes. Tear the wall: code changes are
     effects too. The timeline contains its own evolution;
     replay-diff stops being a tool and becomes a property (the
-    log KNOWS when the rules changed); hot-swap is just an
+    trail KNOWS when the rules changed); hot-swap is just an
     effect; version control and the runtime merge. Git and the
     engine become the same thing. Zero-build is this bedrock's
     kindergarten.
@@ -160,13 +160,13 @@ B4 (engineering-deep, not new space): deterministic math as a
     door future physics needs for bit-identical cross-platform.
 
 Second dig (2026-07-05, user demanded MORE — the thread: move
-EVERYTHING into the log and things keep falling out free):
+EVERYTHING into the trail and things keep falling out free):
 
 B5. **The frame**: with facts + render-as-view the engine can
     statically derive which PIXELS an effect can touch —
     footprints all the way down to damage rects. Provably minimal
     redraw; causality analysis as a rendering optimizer.
-B6. **Saving**: the log IS the save — append it continuously
+B6. **Saving**: the trail IS the save — append it continuously
     (it's KBs), compaction = checkpoint, crash = replay. Progress
     loss becomes impossible by construction; "Saving..." dies as
     a concept. Databases call it WAL and need racks. Closest to
@@ -175,7 +175,7 @@ B6. **Saving**: the log IS the save — append it continuously
     to crash.txt (unbuffered tee — the filter itself may die),
     autosave heartbeat rides the compact-poll site (full=1
     fidelity), recovery boot sees the marker and stands where it
-    stood. Gate st72. The full log-append form (crash = replay,
+    stood. Gate st72. The full trail-append form (crash = replay,
     not checkpoint) remains the bedrock dig.
     ⭐ STEP 2 SHIPPED same day — SUPERVISION: a rule crash no
     longer ends the process. The fault net (sup_guard5/7, vectored
@@ -188,11 +188,11 @@ B6. **Saving**: the log IS the save — append it continuously
     refs are raw pointers that survive a C extern round-trip.
     Gates st73/st74; idle 0/0B; sims unregressed. Erlang for game
     worlds — world-first #4 has its first slice.
-B8. **Device input**: the log records INTENT ("place piece col
+B8. **Device input**: the trail records INTENT ("place piece col
     3"), device->intent is a pure replaceable layer. Replays
     survive UI redesign (replay-diff robust across versions!),
     accessibility free, humans/bots/agents indistinguishable at
-    log level (the soak already proved it silently).
+    trail level (the soak already proved it silently).
 B9. **Determinism as discipline**: law — exactly THREE
     nondeterminism sources (input, boot seed, external/AI), all
     logged; the checker PROVES a bundle hides no randomness.
@@ -213,8 +213,17 @@ B9. **Determinism as discipline**: law — exactly THREE
     Console `replay live` writes the baseline, `replay diff`
     names the first divergence. Gate st80: intents captured,
     live replay reproduced a run bit-for-bit. Found on the way:
-    Orion's `and`/`or` do NOT short-circuit (a codebase-wide
-    latent bug + perf cost) — flagged as its own language slice.
+    Orion's `and`/`or` did NOT short-circuit — fixed same session
+    (native now matches the interpreter; gate st83).
+    ⭐ CROWNED: replay-diff ACROSS TWO CODEBASES in one process.
+    project_state_sig_bare fingerprints game STATE (prefix-
+    stripped), so two worlds under different prefixes are equal iff
+    they played the same; project_replay_ab re-warms one bundle
+    with an extra rule (a real code change) and fingerprints each
+    frame. Gate st84: identical across prefixes, then a `when
+    tick>10` rule added to world B forks history at exactly frame
+    11 — the past under new code (B3, world-first #3), end to end.
+    The certificate also ships tamper-evident (gate st81).
 B10. **Code as files**: a rule's identity = hash of its AST
     (Unison, for gameplay). Swap one rule = recompile one rule
     (B3's atom); global eternal compile cache; rules shared
@@ -229,7 +238,7 @@ B14. **Netcode as heroism**: foresee = prediction of remote
 ## THE LANGUAGE DOCK — Orion's own inherited flaws (audit 2026-07-05)
 
 Verdict: Orion's next-gen-ness lives in its ALLIANCES (runtime,
-log, telemetry->law loop); the language itself still carries
+trail, telemetry->law loop); the language itself still carries
 C-era assumptions. Evidence is our own week. Not "start over" —
 the bootstrap vehicle was exactly right — but the language is the
 next continent. "Orion 2" is TWO moves, not twenty (the potato
@@ -259,7 +268,7 @@ arc), L2 stands on the facts machinery H2 is building right now.
 
 ## Untouched by design (frozen is a feature)
 
-Effect log format; the six-pool world lifetime model; orb
+Effect trail format; the six-pool world lifetime model; orb
 contracts (og_*, audio seam, win_*) — frozen surfaces are the
 port strategy; Astra's rule syntax — it is the product.
 

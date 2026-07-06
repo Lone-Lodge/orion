@@ -1,4 +1,0 @@
-# A deliberately broken file, to show Orion's diagnostics.
-# `data Position` is missing its `:` before the fields.
-#   orion check examples/broken.or
-data Position  x: f32, y: f32

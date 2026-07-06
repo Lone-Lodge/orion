@@ -1,7 +1,0 @@
-name = "xml"
-version = "0.0.1"
-description = "orion stdlib orb: xml"
-license = "MIT"
-
-[orbs]
-bytes = { built-in = true }
