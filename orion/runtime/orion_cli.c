@@ -121,10 +121,19 @@ const char *capture(const char *cmd) {
 #else /* POSIX */
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <string.h>
 
-long long sys_run(const char *cmd) { return (long long)system(cmd); }
+/* system() returns a wait-encoded status, not the child's exit code — the
+ * code lives in bits 8-15. Decode it so run_command() yields the real exit
+ * code (matching the Windows CreateProcess path, which returns it directly). */
+long long sys_run(const char *cmd) {
+    int rc = system(cmd);
+    if (rc == -1) return -1;
+    if (WIFEXITED(rc)) return (long long)WEXITSTATUS(rc);
+    return (long long)rc;
+}
 long long mkdir_all(const char *path) {
     char buf[4096]; strncpy(buf, path, sizeof(buf) - 1); buf[sizeof(buf) - 1] = 0;
     for (char *p = buf + 1; *p; p++) {

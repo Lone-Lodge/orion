@@ -37,7 +37,9 @@ fn parse_expected(filename: Text) -> int:
 # Compile one source file. Returns 1 if ok, 0 if compilation failed.
 # rt_obj is the runtime PRE-COMPILED once (see main) — linking that object
 # is ~10x faster than re-compiling orion_rt.c (all of Windows.h) per test.
-fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text) -> int:
+# clang_path / mangle / host_triple are host-specific (see main): the compiler
+# always emits a Windows triple, so off Windows we retarget the IR here.
+fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clang_path: Text, mangle: Text, host_triple: Text) -> int:
     src = read_file(src_path)
     tokens = self_lex(src)
     ast = self_parse(tokens)
@@ -53,14 +55,26 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text) -> i
     # is a process-global counter, so compare the delta for THIS file.
     errs_before = compile_errors()
     module = ast_program_to_ir(ast)
-    llvm_text = emit_module(module)
+    mut llvm_text = emit_module(module)
     if compile_errors() > errs_before:
         return 0
+    # Retarget the baked-in Windows triple to the host (Linux/Mac). The
+    # compiler pins a Windows triple (the effect ABI needs it), so a non-
+    # Windows runner rewrites the two header tokens before clang. mangle "w"
+    # = Windows = leave as-is.
+    # Anchor to the header context ("datalayout = / triple = ") so we patch
+    # only the two module-header lines, never a same-looking byte sequence
+    # inside a program string constant (that would change the constant's
+    # length and desync its LLVM array-size prefix).
+    if mangle != "w":
+        llvm_text = str_replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
+        llvm_text = str_replace(llvm_text, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
     write_file(ll_path, llvm_text)
-    clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
     # Link the pre-built runtime object; -O0 skips the LLVM opt pipeline
     # (tests only assert exit codes, so optimization buys nothing here).
-    args = [ll_path, rt_obj, "-O0", "-o", exe_path]
+    # -Wno-override-module: silence clang's note that our retargeted triple
+    # differs from its own default (harmless; no-op on Windows).
+    args = [ll_path, rt_obj, "-O0", "-Wno-override-module", "-o", exe_path]
     exit_code = run_command(clang_path, args)
     if exit_code == 0 then 1 else 0
 
@@ -73,13 +87,28 @@ fn fmt_ms(seconds: f64) -> Text:
 
 fn main() -> int:
     mkdir_all("dist")
+    # Host-specific toolchain bits. The runner works on Windows/Linux/Mac:
+    # clang location, the datalayout mangling + target triple to retarget the
+    # compiler's Windows IR to, all keyed off host_os() (0=Win 1=Linux 2=Mac).
+    # rt_c is relative to this project dir (examples/tests), so no absolute,
+    # machine-specific path is baked in.
+    os = os_kind()
+    mut clang_path = "clang"
+    mut mangle = "e"
+    mut host_triple = "x86_64-unknown-linux-gnu"
+    if os == 0:
+        clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
+        mangle = "w"
+        host_triple = ""
+    if os == 2:
+        mangle = "o"
+        host_triple = "arm64-apple-macosx"
+    rt_obj = "dist/orion_rt.o"
+    rt_c = "../../runtime/orion_rt.c"
     # Pre-compile the runtime ONCE to an object file. Every test then just
     # links this object instead of re-compiling orion_rt.c (all of Windows.h)
     # from scratch — the single biggest per-test cost.
-    clang_setup = "C:\\Program Files\\LLVM\\bin\\clang.exe"
-    rt_obj = "dist/orion_rt.o"
-    rt_c = "E:/lone-lodge/orion/runtime/orion_rt.c"
-    run_command(clang_setup, ["-c", "-Os", rt_c, "-o", rt_obj])
+    run_command(clang_path, ["-c", "-Os", rt_c, "-o", rt_obj])
     raw_files = list_dir("tests")
     raw_total = len(raw_files)
     # Only run .or files. Without this filter, non-source files like
@@ -129,7 +158,7 @@ fn main() -> int:
         expected = parse_expected(filename)
 
         compile_start = now()
-        ok = compile_one(src_path, ll_path, exe_path, rt_obj)
+        ok = compile_one(src_path, ll_path, exe_path, rt_obj, clang_path, mangle, host_triple)
         compile_ms = elapsed(compile_start)
         total_compile_ms = total_compile_ms + compile_ms
 

@@ -343,7 +343,14 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
     dirs
 
 fn nb_clang() -> Text:
-    if capture_stdout("where", ["clang"]) == "" then "C:\\Program Files\\LLVM\\bin\\clang.exe" else "clang"
+    # POSIX: clang is on PATH. Windows: prefer PATH, else the default LLVM dir
+    # (`where` is a Windows builtin — it doesn't exist on Linux/Mac, so the
+    # probe must be Windows-gated or it returns the wrong fallback).
+    if os_kind() != 0:
+        return "clang"
+    if capture_stdout("where", ["clang"]) == "":
+        return "C:\\Program Files\\LLVM\\bin\\clang.exe"
+    "clang"
 
 # Everything a shipped exe must carry: the toml, every script bundle
 # (scripts/ flat or features/<sub>/), the package roots the toml names
@@ -504,7 +511,27 @@ fn cli_build(path: Text) -> Text:
         compile_args = push(compile_args, at(dirs, d_index))
     if run_command(compiler, compile_args) != 0:
         return ""
-    link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", "-Xlinker", "/STACK:67108864", "-o", exe]
+    # The compiler always emits a Windows triple (effect ABI). Off Windows,
+    # retarget the .ll to the host before clang, else it won't link.
+    if os_kind() != 0:
+        mangle = if os_kind() == 2 then "o" else "e"
+        triple = if os_kind() == 2 then "arm64-apple-macosx" else "x86_64-unknown-linux-gnu"
+        mut txt = read_file(ll)
+        # Anchor to the header context so we never rewrite a same-looking
+        # substring inside a program string constant (that would desync the
+        # constant's LLVM [N x i8] length prefix — e.g. this file itself
+        # carries the Windows-triple literal to do exactly this retarget).
+        txt = str_replace(txt, "datalayout = \"e-m:w", "datalayout = \"e-m:" + mangle)
+        txt = str_replace(txt, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"" + triple + "\"")
+        write_file(ll, txt)
+    # /STACK is a Windows PE linker flag; POSIX raises the stack via ulimit.
+    # -Wno-override-module silences the retargeted-triple note (no-op on Win).
+    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", "-Wno-override-module"]
+    if os_kind() == 0:
+        link_args = push(link_args, "-Xlinker")
+        link_args = push(link_args, "/STACK:67108864")
+    link_args = push(link_args, "-o")
+    link_args = push(link_args, exe)
     if run_command(nb_clang(), link_args) != 0:
         return ""
     remove_file(ll)
