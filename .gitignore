@@ -25,8 +25,10 @@ veil/
 
 # Bootstrap seed — the ONE checked-in binary self-hosting needs (see
 # orion/tools/seed/README.md). Excepted from *.exe so a fresh clone can
-# bootstrap without lodge-orion.
+# bootstrap without lodge-orion. The .ll is the platform-neutral seed:
+# compile it with clang + orion_rt.c to link an orion.exe for ANY OS.
 !orion/tools/seed/orion.exe
+!orion/tools/seed/orion.ll
 
 # === IDE / OS ===
 .vscode/
