@@ -1,0 +1,13 @@
+# Named arguments (Minimal Orion: "namngivna argument — färre fel").
+#
+# `f(name = value)` binds by name, so call-site order can't be wrong. `=` (not
+# `:`) because `:` already means a type annotation. Already supported by the
+# interpreter — this demo just exercises it.
+#
+# Run (lodge-orion interp):  orion run named_args.or main   → expects 47
+
+fn sub(a: int, b: int) -> int:
+    a - b
+
+fn main() -> int:
+    sub(b = 3, a = 50)     # reversed order, still a=50 b=3 → 47

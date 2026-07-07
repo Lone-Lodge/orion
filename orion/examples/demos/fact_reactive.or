@@ -1,0 +1,16 @@
+# `fact` — lazy reactive derived binding (Minimal Orion: "fact som brygga").
+#
+# `fact name = expr` describes a truth, not a step. Reading `name` re-evaluates
+# `expr` in the current scope, so it always reflects the latest inputs — no
+# manual "keep it updated". This is the core's LAZY form (recompute on read);
+# the engine adds recompute-only-on-change (the reactive net) on top.
+#
+# Run (lodge-orion interp):  orion run fact_reactive.or main   → expects 180
+
+fn main() -> int:
+    mut base = 10
+    fact doubled = base * 2     # doubled FOLLOWS base
+    a = doubled                 # base=10  → 20
+    base = 100                  # change the input...
+    b = doubled                 # ...and doubled re-reads it → 200
+    b - a                       # 200 - 20 = 180  (a snapshot would give 0)

@@ -100,8 +100,12 @@ const char *capture(const char *cmd) {
     char wbuf[65600];
     size_t w = 0, j = 0;
     wbuf[w++] = '"';
-    while (cmd[j] && w < sizeof(wbuf) - 2) wbuf[w++] = cmd[j++];
+    while (cmd[j] && w < sizeof(wbuf) - 8) wbuf[w++] = cmd[j++];
     wbuf[w++] = '"';
+    /* Swallow stderr: `where clang` (nb_clang's probe) prints
+     * "INFO: Could not find files..." to stderr on a miss, which _popen
+     * leaves leaking to the console. We only ever want the stdout here. */
+    { const char *r = " 2>nul"; while (*r) wbuf[w++] = *r++; }
     wbuf[w] = 0;
     FILE *p = _popen(wbuf, "r");
     if (!p) return orion_text_from_c(cbuf);
@@ -117,10 +121,19 @@ const char *capture(const char *cmd) {
 #else /* POSIX */
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <string.h>
 
-long long sys_run(const char *cmd) { return (long long)system(cmd); }
+/* system() returns a wait-encoded status, not the child's exit code — the
+ * code lives in bits 8-15. Decode it so run_command() yields the real exit
+ * code (matching the Windows CreateProcess path, which returns it directly). */
+long long sys_run(const char *cmd) {
+    int rc = system(cmd);
+    if (rc == -1) return -1;
+    if (WIFEXITED(rc)) return (long long)WEXITSTATUS(rc);
+    return (long long)rc;
+}
 long long mkdir_all(const char *path) {
     char buf[4096]; strncpy(buf, path, sizeof(buf) - 1); buf[sizeof(buf) - 1] = 0;
     for (char *p = buf + 1; *p; p++) {

@@ -9,6 +9,13 @@ FILTER="${1:-}"
 ORION_BIN="$ROOT/dist/orbit.exe"
 [ -x "$ORION_BIN" ] || { echo "build orbit first: bash tools/build_orbit.sh"; exit 1; }
 
+# POSIX: raise the stack — `orbit run` recurses deep compiling the runner.
+# Windows reserves it in the exe at link (/STACK), so this is POSIX-only.
+case "$(uname -s 2>/dev/null || echo unknown)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || true ;;
+esac
+
 cd "$ROOT/examples/tests"
 
 if [ -n "$FILTER" ]; then
@@ -16,4 +23,7 @@ if [ -n "$FILTER" ]; then
 fi
 
 rm -rf target dist build 2>/dev/null
-"$ORION_BIN" run src/main.or main 2>&1 | grep -E "Pass:|Fail:|FAIL"
+# Stream the runner's per-test rows live (no grep pipe — a pipe both filters
+# out the progress rows and block-buffers, so nothing showed until the end).
+# The runner prints one line per test as it finishes, then the Pass/Fail summary.
+"$ORION_BIN" run src/main.or main

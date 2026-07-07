@@ -4,13 +4,15 @@ A next-gen 2026 programming language: AI-friendly, data-oriented (not OOP), self
 
 ## Layout
 
-- **`orion-self/`** — THE Orion compiler, written in Orion. Self-hosting,
+- **`orion/`** — THE Orion compiler, written in Orion. Self-hosting,
   fixpoint-verified, emits LLVM IR → native exe. `dist/orion.exe` (~290KB)
   is the canonical toolchain. Games built with it run native (cubsy: 279KB,
   full atlas/astra/veil stack, no Rust at runtime).
-- **`lodge-orion/`** — Rust implementation, now the *dev loop only*:
-  `orbit run` gives instant interpreted feedback while editing. Not a
-  runtime dependency of anything shipped. See `lodge-orion/STATUS.md`.
+
+Orion is now **fully self-hosted** — there is no Rust implementation in the
+tree. The compiler builds, self-hosts, and reaches its fixpoint using only
+`dist/orion.exe` + clang (the retired Rust interpreter, lodge-orion, lives
+in git history if ever needed).
 
 ## State
 
@@ -27,15 +29,25 @@ A next-gen 2026 programming language: AI-friendly, data-oriented (not OOP), self
 ## Building
 
 ```
-cd orion-self
-bash tools/bundle_orbs.sh                      # → dist/orion_self_bundled.or
-./dist/orion.exe dist/orion_self_bundled.or out.ll   # self-compile
+cd orion
+bash tools/self_bootstrap.sh    # orion.exe rebuilds itself, fixpoint-verified
+```
+
+This detects the host (Windows / Linux / Mac), retargets the emitted IR, and
+links a native `dist/orion.exe`. To hand-run the self-compile loop instead:
+
+```
+cd orion
+bash tools/bundle_orbs.sh                              # → dist/orion_self_bundled.or
+./dist/orion.exe dist/orion_self_bundled.or out.ll     # self-compile
 clang out.ll runtime/orion_rt.c -Os -o dist/orion.exe
 ```
 
-Bootstrap from scratch (no orion.exe yet): build `orbit.exe` in
-`lodge-orion/orion` (`cargo build --release`) and run the bundle through
-`examples/compile_or` once, then switch to the self-compile loop above.
+Bootstrap from scratch on a fresh clone (no `orion.exe` yet): the committed
+seed IR is the ONE checked-in artifact self-hosting needs —
+`bash tools/bootstrap_from_ll.sh` links `tools/seed/orion.ll` with clang into
+a working `dist/orion.exe`, then run `tools/self_bootstrap.sh`. No Rust,
+no prior binary required.
 
 Compile a game (native) — see cubsy/build.cmd for the full recipe:
 

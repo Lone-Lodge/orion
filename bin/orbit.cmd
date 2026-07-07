@@ -1,3 +1,3 @@
 @echo off
-rem orbit shim - always points at the freshest release build
-"E:\lone-lodge\lodge-orion\orion\target\release\orbit.exe" %*
+rem orbit shim - the self-hosted project tool (built by tools/build_orbit.sh)
+"E:\lone-lodge\orion-self\dist\orbit.exe" %*

@@ -1,0 +1,17 @@
+# `for` as an expression (Minimal Orion: "for-uttryck äter map/filter").
+#
+# In expression position `for x in xs [where cond]: body` collects each body
+# value into a list — map and filter in one construct. In statement position
+# `for x in xs:` stays a side-effect loop. Same keyword, position decides.
+#
+#   ys = for x in xs: x * 2            # map    → [2, 4, 6, 8]
+#   ys = for x in xs where x > 2: x    # filter → [3, 4]
+#   for x in xs: draw(x)               # side effect (unbound)
+#
+# Run (lodge-orion interp):  orion run for_collect.or main   → expects 12
+
+fn main() -> int:
+    xs = [1, 2, 3, 4]
+    doubled = for x in xs: x * 2          # [2, 4, 6, 8]
+    big     = for x in xs where x > 2: x  # [3, 4]
+    at(doubled, 0) + at(doubled, 3) + len(big)   # 2 + 8 + 2 = 12
