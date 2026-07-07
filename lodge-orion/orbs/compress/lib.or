@@ -1,0 +1,39 @@
+# compress — run-length encoding for byte arrays.
+# Format: pairs of (count, byte) where count is 1..=255, so a worst-case
+# input never grows by more than a factor of 2.
+
+pub fn rle_encode(bytes: [int]) -> [int]:
+    byte_count = bytes_length(bytes)
+    mut output = bytes_zeros(0)
+    mut input_index = 0
+    loop:
+        if input_index >= byte_count:
+            break
+        current_byte = byte_at(bytes, input_index)
+        mut run_length = 1
+        loop:
+            if input_index + run_length >= byte_count:
+                break
+            if byte_at(bytes, input_index + run_length) != current_byte:
+                break
+            if run_length >= 255:
+                break
+            run_length += 1
+        output = push(output, run_length)
+        output = push(output, current_byte)
+        input_index += run_length
+    output
+
+pub fn rle_decode(bytes: [int]) -> [int]:
+    byte_count = bytes_length(bytes)
+    mut output = bytes_zeros(0)
+    mut input_index = 0
+    loop:
+        if input_index + 1 >= byte_count:
+            break
+        run_length = byte_at(bytes, input_index)
+        repeated_byte = byte_at(bytes, input_index + 1)
+        for _repetition in 0..<run_length:
+            output = push(output, repeated_byte)
+        input_index += 2
+    output

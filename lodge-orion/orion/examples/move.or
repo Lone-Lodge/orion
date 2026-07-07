@@ -1,0 +1,12 @@
+# Ownership: a `take` parameter consumes its argument (move semantics).
+#   orion run examples/move.or demo
+# Using a value after it's moved is a compile error — try duplicating a
+# `consume(t)` without the `t = 20` rebinding.
+
+fn consume(x: take int) -> int = x
+
+fn demo() -> int:
+    mut t = 10
+    consume(t)     # t is moved here
+    t = 20         # re-initialised, so it can be used again
+    consume(t)

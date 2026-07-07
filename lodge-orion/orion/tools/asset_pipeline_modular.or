@@ -1,0 +1,258 @@
+use io
+use env
+use image
+use bytes
+use string
+use format
+use fs
+use path
+
+fn print_usage():
+    print_line("Usage: orbit run tools/asset_pipeline_modular.or <input-file-or-dir> [out-dir]")
+
+# --- Helpers ---
+fn change_ext(name: Text, new_ext: Text) -> Text:
+    path_stem(name) + new_ext
+
+fn to_lower(t: Text) -> Text:
+    str_lower(t)
+
+# --- Loaders ---
+# TGA (uncompressed true-color)
+fn load_tga_bytes(path: Text):
+    buf = read_file_bytes(path)
+    if len(buf) < 18:
+        return none
+    id_len = byte_at(buf, 0)
+    image_type = byte_at(buf, 2)
+    if image_type != 2:
+        return none
+    width = (byte_at(buf,12) | (byte_at(buf,13) << 8)) & 0xFFFF
+    height = (byte_at(buf,14) | (byte_at(buf,15) << 8)) & 0xFFFF
+    bpp = byte_at(buf, 16)
+    if not (bpp == 24 or bpp == 32):
+        return none
+    pixel_depth = bpp / 8
+    header_end = 18 + id_len
+    expected = width * height * pixel_depth
+    if len(buf) < header_end + expected:
+        return none
+    mut pixels = bytes_zeros(0)
+    mut src = header_end
+    for y in 0..<height:
+        for x in 0..<width:
+            b = byte_at(buf, src)
+            g = byte_at(buf, src + 1)
+            r = byte_at(buf, src + 2)
+            a = if pixel_depth == 4 then byte_at(buf, src + 3) else 255
+            pixels = push(pixels, r)
+            pixels = push(pixels, g)
+            pixels = push(pixels, b)
+            pixels = push(pixels, a)
+            src = src + pixel_depth
+    ret = {"width": width, "height": height, "channels": 4, "pixels": pixels}
+    return ret
+
+# PPM P6 loader (binary PPM)
+fn load_ppm_bytes(path: Text):
+    buf = read_file_bytes(path)
+    if len(buf) < 3:
+        return none
+    # Expect ASCII header: magic, width, height, maxval, then single whitespace, then binary pixels
+    mut tokens = []
+    mut i = 0
+    mut cur = bytes_zeros(0)
+    loop:
+        if not (i < len(buf) and len(tokens) < 4):
+            break
+        c = byte_at(buf, i)
+        # treat literal backslash-n ("\n") sequence as whitespace too
+        if c == 92 and i + 1 < len(buf) and byte_at(buf, i + 1) == 110:
+            if len(cur) > 0:
+                tok = bytes_to_text(cur)
+                tokens = push(tokens, tok)
+                cur = bytes_zeros(0)
+            i = i + 2
+            continue
+        if c == 35: # '#', comment till newline
+            loop:
+                if i >= len(buf) or byte_at(buf, i) == 10:
+                    break
+                i = i + 1
+            i = i + 1
+            continue
+        if c == 9 or c == 10 or c == 13 or c == 32:
+            if len(cur) > 0:
+                tok = bytes_to_text(cur)
+                tokens = push(tokens, tok)
+                cur = bytes_zeros(0)
+            i = i + 1
+            continue
+        cur = push(cur, c)
+        i = i + 1
+    if len(cur) > 0 and len(tokens) < 4:
+        tok = bytes_to_text(cur)
+        tokens = push(tokens, tok)
+    if len(tokens) < 4:
+        return none
+    magic = at(tokens, 0)
+    if magic != "P6":
+        return none
+    w = str_to_int(at(tokens, 1))
+    h = str_to_int(at(tokens, 2))
+    maxv = str_to_int(at(tokens, 3))
+    if maxv > 255 or maxv <= 0:
+        return none
+    # i currently at first byte after header tokens parsing — find single whitespace that separates header from data
+    data_start = i
+    expected = w * h * 3
+    if len(buf) < data_start + expected:
+        return none
+    mut pixels = bytes_zeros(0)
+    mut src = data_start
+    for k in 0..<(w*h):
+        r = byte_at(buf, src)
+        g = byte_at(buf, src + 1)
+        b = byte_at(buf, src + 2)
+        pixels = push(pixels, r)
+        pixels = push(pixels, g)
+        pixels = push(pixels, b)
+        pixels = push(pixels, 255)
+        src = src + 3
+    {"width": w, "height": h, "channels": 4, "pixels": pixels}
+
+# --- Handlers ---
+fn handle_png(path: Text, outpath: Text):
+    res = image_load_png(path)
+    if res == none:
+        print_line("Failed to load PNG: " + path)
+    else:
+        image_save_png(outpath, get(res, "width"), get(res, "height"), get(res, "pixels"))
+        print_line("Converted PNG -> " + outpath)
+
+fn handle_tga(path: Text, outpath: Text):
+    res = load_tga_bytes(path)
+    if res == none:
+        print_line("TGA not supported or failed: " + path)
+    else:
+        image_save_png(outpath, get(res, "width"), get(res, "height"), get(res, "pixels"))
+        print_line("Converted TGA -> " + outpath)
+
+fn handle_ppm(path: Text, outpath: Text):
+    res = load_ppm_bytes(path)
+    if res == none:
+        print_line("PPM failed: " + path)
+    else:
+        image_save_png(outpath, get(res, "width"), get(res, "height"), get(res, "pixels"))
+        print_line("Converted PPM -> " + outpath)
+
+# Registry: try load from YAML (asset_pipeline.yaml) else default
+fn load_yaml_registry():
+    # prefer YAML file in cwd: asset_pipeline.yaml or asset_pipeline.yml
+    mut p = ""
+    if is_file("asset_pipeline.yaml"):
+        p = "asset_pipeline.yaml"
+    if p == "" and is_file("asset_pipeline.yml"):
+        p = "asset_pipeline.yml"
+    if p == "":
+        return none
+    txt = read_file(p)
+    lines = str_split(txt, "\n")
+    mut entries = []
+    for i in 0..<len(lines):
+        ln = str_trim(at(lines, i))
+        if len(ln) == 0:
+            continue
+        if str_starts_with(ln, "#"):
+            continue
+        parts = str_split(ln, ":")
+        if len(parts) < 2:
+            continue
+        key = str_trim(at(parts, 0))
+                val = str_trim(at(parts, 1))
+        # skip top-level 'handlers' key
+        if key == "handlers":
+            continue
+        # support comma-separated exts
+        exts = str_split(val, ",")
+        mut clean_exts = []
+        for j in 0..<len(exts):
+            e = str_trim(at(exts, j))
+            if len(e) > 0:
+                clean_exts = push(clean_exts, to_lower(e))
+        if len(clean_exts) == 0:
+            continue
+        entries = push(entries, {"exts": clean_exts, "handler": to_lower(key)})
+    if len(entries) == 0:
+        return none
+    return entries
+
+fn get_registry():
+    y = load_yaml_registry()
+    if y != none:
+        return y
+    return [ {"exts": ["png"], "handler": "png"}, {"exts": ["tga"], "handler": "tga"}, {"exts": ["ppm"], "handler": "ppm"} ]
+
+fn find_handler_for_ext(ext: Text) -> Text:
+    reg = get_registry()
+    lext = to_lower(ext)
+    for i in 0..<len(reg):
+        entry = at(reg, i)
+        exts = get(entry, "exts")
+        for j in 0..<len(exts):
+            if at(exts, j) == lext:
+                return get(entry, "handler")
+    return ""
+
+fn process_file(path: Text, outdir: Text):
+    print_line("process_file: " + path)
+    base = path_filename(path)
+    ext = to_lower(path_extension(base))
+    print_line(" ext: " + ext)
+    outname = change_ext(base, ".png")
+    outpath = path_join(outdir, outname)
+    handler = find_handler_for_ext(ext)
+    print_line(" handler: " + handler)
+    if handler == "png":
+        handle_png(path, outpath)
+    else:
+        if handler == "tga":
+            handle_tga(path, outpath)
+        else:
+            if handler == "ppm":
+                handle_ppm(path, outpath)
+            else:
+                # Fallback: try detect by magic bytes
+                buf = read_file_bytes(path)
+                if len(buf) >= 8 and byte_at(buf,0) == 137 and byte_at(buf,1) == 80:
+                    handle_png(path, outpath)
+                else:
+                    if len(buf) >= 3 and byte_at(buf,2) == 2:
+                        handle_tga(path, outpath)
+                    else:
+                        if len(buf) >= 2 and byte_at(buf,0) == 80 and byte_at(buf,1) == 54:
+                            handle_ppm(path, outpath)
+                        else:
+                            print_line("Unsupported format or failed to parse: " + path)
+
+fn try_process(input: Text, outdir: Text):
+    print_line("try_process: " + input + " -> " + outdir)
+    mkdir_all(outdir)
+    if is_dir(input):
+        entries = list_dir(input)
+        for i in 0..<len(entries):
+            name = at(entries, i)
+            child = path_join(input, name)
+            if is_dir(child):
+                child_out = path_join(outdir, name)
+                try_process(child, child_out)
+            else:
+                process_file(child, outdir)
+    else:
+        process_file(input, outdir)
+
+fn main(input: Text, outdir: Text):
+    print_line("main start")
+    inp = input
+    outd = if outdir == "" then "out_assets" else outdir
+    try_process(inp, outd)

@@ -1,0 +1,3 @@
+fn main() -> int:
+    print("hello native!")
+    42

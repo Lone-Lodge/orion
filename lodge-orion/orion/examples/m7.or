@@ -1,0 +1,15 @@
+# M7 (väg 1): this system compiles to a vectorised (SIMD, F64X2) native loop.
+# Try:
+#   cargo run --bin orion -- simd examples/m7.or integrate 5000000 0.016
+#   cargo run --bin orion -- aot  examples/m7.or fib
+
+data Position: x: f32, y: f32
+data Velocity: dx: f32, dy: f32
+
+# several FLOPs per element — where SIMD earns its keep
+system integrate(dt: f32):
+    for e with Position, Velocity:
+        e.Position.x += e.Velocity.dx * dt * dt + e.Velocity.dx * dt
+        e.Position.y += e.Velocity.dy * dt * dt + e.Velocity.dy * dt
+
+fn fib(n: int) -> int = if n < 2 then n else fib(n - 1) + fib(n - 2)

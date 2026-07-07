@@ -1,0 +1,7 @@
+name = "base64"
+version = "0.0.1"
+description = "orion stdlib orb: base64"
+license = "MIT"
+
+[orbs]
+bytes = { built-in = true }

@@ -1,0 +1,22 @@
+# A first taste of Orion — this file is fed to the M0 lexer.
+# (It does not "run" yet; M0 only turns it into tokens.)
+
+data Position: x: f32, y: f32
+data Velocity: dx: f32, dy: f32
+data Health:   hp: 0...1000, max: 0...1000
+
+# a system = a query + a body; the footprint is inferred by the compiler later
+system move(dt: f32):
+    for e with Position, Velocity:
+        e.Position.x += e.Velocity.dx * dt
+
+# a contract turns intent into tests + a runtime guarantee
+fn damage(target: Entity, amount: int):
+    require amount > 0
+    mut h = target.Health
+    h.hp = max(0, h.hp - amount)
+    ensure h.hp >= 0
+
+# a declarative query, planned like a database
+query wounded() -> [Entity] =
+    [e for e with Health where e.Health.hp < e.Health.max / 4]

@@ -1,0 +1,172 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Orion",
+  "scopeName": "source.orion",
+  "comment": "Grammar built from orion/src/token.rs — the authoritative Tok enum. Contextual keywords (`all`, `with`, `where`, `every`, `on`, `by`, `order`, …) are highlighted only as part of recognisable phrases so they remain usable as identifiers elsewhere.",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#fn-declaration" },
+    { "include": "#extern-declaration" },
+    { "include": "#type-declaration" },
+    { "include": "#use-declaration" },
+    { "include": "#mut-binding" },
+    { "include": "#for-loop-var" },
+    { "include": "#param-name" },
+    { "include": "#local-binding" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#booleans" },
+    { "include": "#logical" },
+    { "include": "#numbers-hex" },
+    { "include": "#numbers-oct" },
+    { "include": "#numbers-bin" },
+    { "include": "#numbers-float" },
+    { "include": "#numbers-int" },
+    { "include": "#property" },
+    { "include": "#fn-call" },
+    { "include": "#operators" },
+    { "include": "#bare-identifier" }
+  ],
+  "repository": {
+    "comments": {
+      "match": "#.*$",
+      "name": "comment.line.number-sign.orion"
+    },
+    "strings": {
+      "comment": "Plain double-quoted strings. Interpolation `{expr}` is parsed at runtime; we don't paint it specially yet.",
+      "name": "string.quoted.double.orion",
+      "begin": "\"",
+      "end": "\""
+    },
+    "fn-declaration": {
+      "comment": "`fn name(...)`, `pub fn name(...)` — name is the entity declaration.",
+      "match": "\\b(pub\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.modifier.orion" },
+        "2": { "name": "keyword.declaration.function.orion" },
+        "3": { "name": "entity.name.function.orion" }
+      }
+    },
+    "extern-declaration": {
+      "comment": "`extern fn name(...)` and `pub extern fn name(...)` — declares a host-provided function.",
+      "match": "\\b(pub\\s+)?(extern)\\s+(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.modifier.orion" },
+        "2": { "name": "keyword.declaration.extern.orion" },
+        "3": { "name": "keyword.declaration.function.orion" },
+        "4": { "name": "entity.name.function.orion" }
+      }
+    },
+    "type-declaration": {
+      "comment": "`data Name:` / `enum Name:` / `trait Name:` / `impl Name for ...` — name is a type.",
+      "match": "\\b(pub\\s+)?(data|enum|trait|impl|system|query|region)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.modifier.orion" },
+        "2": { "name": "keyword.declaration.orion" },
+        "3": { "name": "entity.name.type.orion" }
+      }
+    },
+    "use-declaration": {
+      "comment": "`use module` / `use a.b.c` — import another file or orb.",
+      "match": "\\b(use)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
+      "captures": {
+        "1": { "name": "keyword.control.import.orion" },
+        "2": { "name": "entity.name.namespace.orion" }
+      }
+    },
+    "mut-binding": {
+      "comment": "`mut name = …` — name is a mutable binding declaration.",
+      "match": "\\b(mut)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.modifier.mut.orion" },
+        "2": { "name": "variable.other.declaration.orion" }
+      }
+    },
+    "for-loop-var": {
+      "comment": "`for name in …` and `for name with Comp` — name is a loop binding.",
+      "match": "\\b(for)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(in|with)\\b",
+      "captures": {
+        "1": { "name": "keyword.control.orion" },
+        "2": { "name": "variable.parameter.loop.orion" },
+        "3": { "name": "keyword.control.orion" }
+      }
+    },
+    "param-name": {
+      "comment": "An identifier directly followed by `:` and a type is a function parameter (or a record field). Skips `take` / `mut` qualifiers between the comma and the name.",
+      "match": "([(,]\\s*(?:take\\s+|mut\\s+)?)([A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*(?=[A-Za-z_\\[])",
+      "captures": {
+        "1": { "name": "punctuation.separator.orion" },
+        "2": { "name": "variable.parameter.orion" }
+      }
+    },
+    "local-binding": {
+      "comment": "An identifier at the start of an indented line, followed by `=` (binding/reassignment), `+=`, or `-=`. Covers immutable lets and mut updates. Excludes `==` (comparison).",
+      "match": "^(\\s+)([A-Za-z_][A-Za-z0-9_]*)(?=\\s*(?:\\+=|-=|=(?!=)))",
+      "captures": {
+        "2": { "name": "variable.other.orion" }
+      }
+    },
+    "keywords": {
+      "comment": "Reserved keywords from Tok. Contextual ones (all/with/where/by/order/...) intentionally excluded so they stay usable as identifiers.",
+      "match": "\\b(if|then|else|match|for|loop|break|continue|in|return|require|ensure|spawn|destroy|mut|take|pub|extern|use|data|enum|fn|system|query|trait|impl|dyn|region|raw)\\b",
+      "name": "keyword.control.orion"
+    },
+    "types": {
+      "comment": "Built-in primitive type names. Type-position only really matters after `:` or `->`; this rule is permissive.",
+      "match": "\\b(int|f32|f64|Text|bool|Bytes|Map|List|Entity|Unit)\\b",
+      "name": "support.type.orion"
+    },
+    "booleans": {
+      "match": "\\b(true|false|none)\\b",
+      "name": "constant.language.orion"
+    },
+    "logical": {
+      "match": "\\b(not|and|or)\\b",
+      "name": "keyword.operator.logical.orion"
+    },
+    "numbers-hex": {
+      "match": "\\b0[xX][0-9a-fA-F][0-9a-fA-F_]*\\b",
+      "name": "constant.numeric.hex.orion"
+    },
+    "numbers-oct": {
+      "match": "\\b0[oO][0-7][0-7_]*\\b",
+      "name": "constant.numeric.oct.orion"
+    },
+    "numbers-bin": {
+      "match": "\\b0[bB][01][01_]*\\b",
+      "name": "constant.numeric.bin.orion"
+    },
+    "numbers-float": {
+      "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?\\b|\\b[0-9][0-9_]*[eE][+-]?[0-9]+\\b",
+      "name": "constant.numeric.float.orion"
+    },
+    "numbers-int": {
+      "match": "\\b[0-9][0-9_]*\\b",
+      "name": "constant.numeric.integer.orion"
+    },
+    "property": {
+      "comment": "Field access — `.x`, `.health`, `.name`.",
+      "match": "\\.([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "variable.other.property.orion" }
+      }
+    },
+    "fn-call": {
+      "comment": "Identifier followed directly by `(` — call site or constructor.",
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\()",
+      "captures": {
+        "1": { "name": "entity.name.function.call.orion" }
+      }
+    },
+    "operators": {
+      "match": "==|!=|<=|>=|<<|>>|->|=>|\\.\\.<|\\.\\.\\.|\\+=|-=|[+\\-*/%=<>&|^~?]",
+      "name": "keyword.operator.orion"
+    },
+    "bare-identifier": {
+      "comment": "Fallback. Any identifier that hasn't been consumed by an earlier rule (declaration, fn-call, keyword, type, …) is treated as a variable use. This is what colours `value` in `if value < 10` or `bytes` inside `byte_at(bytes, i)`.",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
+      "name": "variable.other.use.orion"
+    }
+  }
+}

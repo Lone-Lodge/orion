@@ -1,0 +1,33 @@
+# hash — fast 64-bit hashing for game logic, Map keys, save validation.
+# FNV-1a for text, SplitMix64 for ints, Boost-style combiner.
+#
+# All math is i64 with wrapping arithmetic + bit-ops — same bit pattern
+# as the original u64 Rust version since `*` wraps on overflow and bit-ops
+# don't care about signedness.
+
+pub fn hash_text(text: Text) -> int:
+    bytes = bytes_from_text(text)
+    byte_count = bytes_length(bytes)
+    mut hash_value = 0xCBF2_9CE4_8422_2325   # FNV-1a 64-bit offset basis
+    for byte_index in 0..<byte_count:
+        hash_value = hash_value ^ byte_at(bytes, byte_index)
+        hash_value = hash_value * 0x0000_0100_0000_01B3   # FNV-1a 64-bit prime
+    hash_value
+
+pub fn hash_int(value: int) -> int:
+    splitmix64(value)
+
+pub fn hash_combine(left: int, right: int) -> int:
+    # Boost-style order-sensitive combiner.
+    left ^ (right + 0x9E37_79B9_7F4A_7C15 + (left << 6) + (left >> 2))
+
+pub fn hash_two(left: int, right: int) -> int:
+    hash_combine(splitmix64(left), splitmix64(right))
+
+# SplitMix64 — high-quality avalanche on a single integer. Three rounds of
+# add-shift-xor-multiply with the SplitMix golden-ratio constants.
+fn splitmix64(seed: int) -> int:
+    state = seed + 0x9E37_79B9_7F4A_7C15
+    first_mix = (state ^ (state >> 30)) * 0xBF58_476D_1CE4_E5B9
+    second_mix = (first_mix ^ (first_mix >> 27)) * 0x94D0_49BB_1331_11EB
+    second_mix ^ (second_mix >> 31)

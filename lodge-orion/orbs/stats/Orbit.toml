@@ -1,0 +1,7 @@
+name = "stats"
+version = "0.0.1"
+description = "orion stdlib orb: stats"
+license = "MIT"
+
+[orbs]
+collections = { built-in = true }

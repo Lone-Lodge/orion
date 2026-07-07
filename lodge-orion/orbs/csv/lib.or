@@ -1,0 +1,109 @@
+# csv — RFC 4180-ish parser and serializer.
+# Pure Orion on top of `bytes`. Returns rows as `[[Text]]`.
+#
+# Parse handles: quoted fields, embedded commas/quotes/newlines, '""' →
+# literal '"', '\r' stripped. Serialize quotes cells only when needed.
+
+# True if `cell` contains a comma, double-quote, or newline — the three
+# characters that force quoting per RFC 4180.
+fn needs_quoting(cell: Text) -> bool:
+    bytes = bytes_from_text(cell)
+    byte_count = bytes_length(bytes)
+    mut needs = false
+    for byte_index in 0..<byte_count:
+        character = byte_at(bytes, byte_index)
+        if character == 44 or character == 34 or character == 10:
+            needs = true
+    needs
+
+# Wrap `cell` in '"…"' with embedded '"' doubled. Caller decides whether to
+# call this (via needs_quoting) — `escape_and_quote` always quotes.
+fn escape_and_quote(cell: Text) -> Text:
+    bytes = bytes_from_text(cell)
+    byte_count = bytes_length(bytes)
+    mut output = push(bytes_zeros(0), 34)   # opening "
+    for byte_index in 0..<byte_count:
+        character = byte_at(bytes, byte_index)
+        if character == 34:
+            output = push(output, 34)
+            output = push(output, 34)
+        else:
+            output = push(output, character)
+    output = push(output, 34)               # closing "
+    bytes_to_text(output)
+
+fn quote_cell(cell: Text) -> Text:
+    if needs_quoting(cell) then escape_and_quote(cell)
+    else cell
+
+pub fn csv_serialize(rows: [[Text]]) -> Text:
+    row_count = len(rows)
+    mut output = bytes_zeros(0)
+    for row_index in 0..<row_count:
+        row = at(rows, row_index)
+        cell_count = len(row)
+        for cell_index in 0..<cell_count:
+            if cell_index > 0:
+                output = push(output, 44)   # comma between cells
+            cell = at(row, cell_index)
+            quoted_bytes = bytes_from_text(quote_cell(cell))
+            output = bytes_concat(output, quoted_bytes)
+        output = push(output, 10)           # newline after each row
+    bytes_to_text(output)
+
+pub fn csv_parse(text: Text) -> [[Text]]:
+    bytes = bytes_from_text(text)
+    byte_count = bytes_length(bytes)
+    mut rows = []
+    mut current_row = []
+    mut current_cell = bytes_zeros(0)
+    mut in_quotes = false
+    mut byte_index = 0
+    loop:
+        if byte_index >= byte_count:
+            break
+        character = byte_at(bytes, byte_index)
+        if in_quotes:
+            # Inside a quoted field.
+            if character == 34:
+                # '""' is a literal '"'; a lone '"' closes the field.
+                if byte_index + 1 < byte_count and byte_at(bytes, byte_index + 1) == 34:
+                    current_cell = push(current_cell, 34)
+                    byte_index += 2
+                else:
+                    in_quotes = false
+                    byte_index += 1
+            else:
+                current_cell = push(current_cell, character)
+                byte_index += 1
+        else:
+            # Outside a quoted field.
+            if character == 34 and bytes_length(current_cell) == 0:
+                in_quotes = true
+                byte_index += 1
+            else:
+                if character == 44:
+                    # End of cell.
+                    current_row = push(current_row, bytes_to_text(current_cell))
+                    current_cell = bytes_zeros(0)
+                    byte_index += 1
+                else:
+                    if character == 10:
+                        # End of row.
+                        current_row = push(current_row, bytes_to_text(current_cell))
+                        current_cell = bytes_zeros(0)
+                        rows = push(rows, current_row)
+                        current_row = []
+                        byte_index += 1
+                    else:
+                        if character == 13:
+                            # Strip '\r' — handle CRLF line endings.
+                            byte_index += 1
+                        else:
+                            current_cell = push(current_cell, character)
+                            byte_index += 1
+    # Flush a trailing cell / row if the input didn't end with '\n'.
+    if bytes_length(current_cell) > 0 or len(current_row) > 0:
+        current_row = push(current_row, bytes_to_text(current_cell))
+        rows = push(rows, current_row)
+    rows

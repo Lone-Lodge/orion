@@ -1,0 +1,28 @@
+# A tiny running engine: init() builds the world, tick() advances it each frame.
+#   orion sim examples/engine.or 3
+
+data Position: x: f32, y: f32
+data Velocity: dx: f32, dy: f32
+
+# the movement system
+system move(dt: f32):
+    for e with Position, Velocity:
+        e.Position.x += e.Velocity.dx * dt
+        e.Position.y += e.Velocity.dy * dt
+
+# sum of all x positions — to watch the world change
+fn report() -> f64:
+    mut sx = 0.0
+    for e with Position:
+        sx += e.Position.x
+    sx
+
+# build the world once
+fn init():
+    spawn Position{x: 0.0, y: 0.0}, Velocity{dx: 1.0, dy: 2.0}
+    spawn Position{x: 0.0, y: 0.0}, Velocity{dx: 3.0, dy: 0.0}
+
+# one frame
+fn tick():
+    move(1.0)
+    print("sum of x = {report()}")

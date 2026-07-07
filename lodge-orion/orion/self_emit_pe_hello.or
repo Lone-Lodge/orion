@@ -1,0 +1,228 @@
+# self_emit_pe_hello — emit a Windows x64 PE that prints "hello from orion!\n"
+# to stdout and exits. Imports kernel32!GetStdHandle, WriteFile, ExitProcess.
+# No external linker, no C runtime.
+#
+# Layout (file offsets):
+#   0x000  DOS header
+#   0x040  PE\0\0 + COFF + opt header (240 B)
+#   0x148  2 section headers (.text + .rdata)
+#   0x200  .text — code at RVA 0x1000
+#   0x400  .rdata — imports + message at RVA 0x2000
+#   0x600  end (1536 bytes total)
+#
+# .rdata internal layout (offsets from RVA 0x2000):
+#   +0x00  Import Directory Table (1 entry + null term = 40 B)
+#   +0x28  ILT for kernel32 (3 entries + null = 32 B)
+#   +0x48  IAT for kernel32 (3 entries + null = 32 B)
+#   +0x68  Hint/Name "ExitProcess"
+#   +0x78  Hint/Name "GetStdHandle"
+#   +0x88  Hint/Name "WriteFile"
+#   +0x98  DLL name "kernel32.dll"
+#   +0xA8  Message "hello from orion!\n" (18 B)
+#   +0xC8  end
+#
+# IAT layout (RVAs the loader fixes up):
+#   IAT[0] (RVA 0x2048) → ExitProcess
+#   IAT[1] (RVA 0x2050) → GetStdHandle
+#   IAT[2] (RVA 0x2058) → WriteFile
+
+fn ph_buf_get():
+    slot_get("ph:buf")
+
+fn ph_buf_init(size: int):
+    slot_set("ph:buf", bytes_zeros(size))
+
+fn ph_buf_take():
+    slot_get("ph:buf")
+
+fn ph_u8(offset: int, value: int):
+    masked = value - (value / 256) * 256
+    slot_set("ph:buf", set(ph_buf_get(), offset, masked))
+
+fn ph_u16(offset: int, value: int):
+    ph_u8(offset, value)
+    ph_u8(offset + 1, value / 256)
+
+fn ph_u32(offset: int, value: int):
+    ph_u8(offset, value)
+    ph_u8(offset + 1, value / 256)
+    ph_u8(offset + 2, value / 65536)
+    ph_u8(offset + 3, value / 16777216)
+
+fn ph_u64(offset: int, low_u32: int, high_u32: int):
+    ph_u32(offset, low_u32)
+    ph_u32(offset + 4, high_u32)
+
+fn ph_string(offset: int, text: Text):
+    payload = bytes_from_text(text)
+    count = bytes_length(payload)
+    for index in 0..<count:
+        ph_u8(offset + index, byte_at(payload, index))
+
+pub fn ph_build():
+    ph_buf_init(1536)
+
+    # ---- DOS header ----
+    ph_u8(0, 77)                   # 'M'
+    ph_u8(1, 90)                   # 'Z'
+    ph_u32(60, 64)                 # e_lfanew
+
+    # ---- PE\0\0 ----
+    ph_u8(64, 80)                  # 'P'
+    ph_u8(65, 69)                  # 'E'
+
+    # ---- COFF header @ 0x44 ----
+    ph_u16(68, 34404)              # Machine: 0x8664
+    ph_u16(70, 2)                  # NumberOfSections
+    ph_u16(84, 240)                # SizeOfOptionalHeader
+    ph_u16(86, 34)                 # EXECUTABLE | LARGE_ADDR_AWARE
+
+    # ---- Optional header @ 0x58 ----
+    ph_u16(88, 523)                # PE32+ magic
+    ph_u8(90, 14)                  # MajorLinkerVersion
+    ph_u32(92, 512)                # SizeOfCode
+    ph_u32(96, 512)                # SizeOfInitializedData
+    ph_u32(104, 4096)              # AddressOfEntryPoint (RVA 0x1000)
+    ph_u32(108, 4096)              # BaseOfCode
+    ph_u64(112, 1073741824, 1)     # ImageBase = 0x140000000
+    ph_u32(120, 4096)              # SectionAlignment
+    ph_u32(124, 512)               # FileAlignment
+    ph_u16(128, 6)                 # MajorOSVersion
+    ph_u16(136, 6)                 # MajorSubsystemVersion
+    ph_u32(144, 12288)             # SizeOfImage (0x3000)
+    ph_u32(148, 512)               # SizeOfHeaders
+    ph_u16(156, 3)                 # CONSOLE
+    ph_u64(160, 1048576, 0)        # SizeOfStackReserve
+    ph_u64(168, 4096, 0)           # SizeOfStackCommit
+    ph_u64(176, 1048576, 0)        # SizeOfHeapReserve
+    ph_u64(184, 4096, 0)           # SizeOfHeapCommit
+    ph_u32(196, 16)                # NumberOfRvaAndSizes
+
+    # Data Directory[1] = Import Table @ RVA 0x2000, size 40
+    ph_u32(208, 8192)
+    ph_u32(212, 40)
+
+    # Data Directory[12] = IAT @ RVA 0x2048, size 32
+    ph_u32(296, 8264)
+    ph_u32(300, 32)
+
+    # ---- Section .text @ 0x148 ----
+    ph_string(328, ".text")
+    ph_u32(336, 59)                # VirtualSize (code is 59 bytes)
+    ph_u32(340, 4096)              # VirtualAddress
+    ph_u32(344, 512)               # SizeOfRawData
+    ph_u32(348, 512)               # PointerToRawData
+    ph_u32(364, 1610612768)        # CODE | EXECUTE | READ
+
+    # ---- Section .rdata @ 0x170 ----
+    ph_string(368, ".rdata")
+    ph_u32(376, 200)               # VirtualSize (0xC8)
+    ph_u32(380, 8192)              # VirtualAddress (RVA 0x2000)
+    ph_u32(384, 512)               # SizeOfRawData
+    ph_u32(388, 1024)              # PointerToRawData (0x400)
+    ph_u32(404, 1073741888)        # INITIALIZED_DATA | READ
+
+    # ---- .text @ 0x200 (RVA 0x1000) ----
+    #
+    # 0x1000: 48 83 EC 38            sub rsp, 0x38
+    # 0x1004: B9 F5 FF FF FF         mov ecx, -11 (STD_OUTPUT_HANDLE)
+    # 0x1009: FF 15 disp32           call [GetStdHandle_IAT @ 0x2050]
+    # 0x100F: 48 89 C1               mov rcx, rax
+    # 0x1012: 48 8D 15 disp32        lea rdx, [rip+msg @ 0x20A8]
+    # 0x1019: 41 B8 12 00 00 00      mov r8d, 18 (msg length)
+    # 0x101F: 4C 8D 4C 24 28         lea r9, [rsp+0x28]
+    # 0x1024: 48 C7 44 24 20 00 00 00 00  mov qword [rsp+0x20], 0
+    # 0x102D: FF 15 disp32           call [WriteFile_IAT @ 0x2058]
+    # 0x1033: 31 C9                  xor ecx, ecx
+    # 0x1035: FF 15 disp32           call [ExitProcess_IAT @ 0x2048]
+    ph_u8(512, 72)                 # 48
+    ph_u8(513, 131)                # 83
+    ph_u8(514, 236)                # EC
+    ph_u8(515, 56)                 # 38
+
+    ph_u8(516, 185)                # B9
+    ph_u8(517, 245)                # F5
+    ph_u8(518, 255)                # FF
+    ph_u8(519, 255)                # FF
+    ph_u8(520, 255)                # FF
+
+    ph_u8(521, 255)                # FF
+    ph_u8(522, 21)                 # 15
+    ph_u32(523, 4161)              # disp32 = 0x2050 - 0x100F = 0x1041
+
+    ph_u8(527, 72)                 # 48
+    ph_u8(528, 137)                # 89
+    ph_u8(529, 193)                # C1
+
+    ph_u8(530, 72)                 # 48
+    ph_u8(531, 141)                # 8D
+    ph_u8(532, 21)                 # 15
+    ph_u32(533, 4239)              # disp32 = 0x20A8 - 0x1019 = 0x108F
+
+    ph_u8(537, 65)                 # 41
+    ph_u8(538, 184)                # B8
+    ph_u32(539, 18)                # message length
+
+    ph_u8(543, 76)                 # 4C
+    ph_u8(544, 141)                # 8D
+    ph_u8(545, 76)                 # 4C
+    ph_u8(546, 36)                 # 24
+    ph_u8(547, 40)                 # 28
+
+    ph_u8(548, 72)                 # 48
+    ph_u8(549, 199)                # C7
+    ph_u8(550, 68)                 # 44
+    ph_u8(551, 36)                 # 24
+    ph_u8(552, 32)                 # 20
+    # 0 imm32 already zeros
+
+    ph_u8(557, 255)                # FF
+    ph_u8(558, 21)                 # 15
+    ph_u32(559, 4133)              # disp32 = 0x2058 - 0x1033 = 0x1025
+
+    ph_u8(563, 49)                 # 31
+    ph_u8(564, 201)                # C9
+
+    ph_u8(565, 255)                # FF
+    ph_u8(566, 21)                 # 15
+    ph_u32(567, 4109)              # disp32 = 0x2048 - 0x103B = 0x100D
+
+    # ---- .rdata @ 0x400 (RVA 0x2000) ----
+    rd = 1024                      # file offset
+    rva = 8192                     # 0x2000
+
+    # Import Directory Table @ +0x00
+    ph_u32(rd + 0, rva + 40)       # OriginalFirstThunk → ILT
+    ph_u32(rd + 12, rva + 152)     # Name → DLL name @ +0x98
+    ph_u32(rd + 16, rva + 72)      # FirstThunk → IAT @ +0x48
+
+    # ILT @ +0x28: 3 entries pointing to hint/name records
+    ph_u32(rd + 40, rva + 104)     # ExitProcess hint/name @ +0x68
+    ph_u32(rd + 48, rva + 120)     # GetStdHandle      @ +0x78
+    ph_u32(rd + 56, rva + 136)     # WriteFile         @ +0x88
+    # +64 = null terminator (already zero)
+
+    # IAT @ +0x48: identical to ILT initially
+    ph_u32(rd + 72, rva + 104)
+    ph_u32(rd + 80, rva + 120)
+    ph_u32(rd + 88, rva + 136)
+
+    # Hint/Name records (2-byte hint of 0 + name + null)
+    ph_string(rd + 104 + 2, "ExitProcess")
+    ph_string(rd + 120 + 2, "GetStdHandle")
+    ph_string(rd + 136 + 2, "WriteFile")
+
+    # DLL name
+    ph_string(rd + 152, "kernel32.dll")
+
+    # Message at +0xA8
+    ph_string(rd + 168, "hello from orion!\n")
+
+    ph_buf_take()
+
+pub fn ph_run():
+    pe_bytes = ph_build()
+    mkdir_all("build")
+    write_file_bytes("build/hello.exe", pe_bytes)
+    print("wrote build/hello.exe")
+    print(len(pe_bytes))

@@ -1,0 +1,7 @@
+name = "regex"
+version = "0.0.1"
+description = "orion stdlib orb: regex"
+license = "MIT"
+
+[orbs]
+bytes = { built-in = true }

@@ -1,0 +1,23 @@
+# What the M1 parser understands: data declarations and functions.
+# Run:  cargo run -- parse examples/m1.or
+
+data Position: x: f32, y: f32
+data Health: hp: 0...1000, max: 0...1000
+
+# expression-form function
+fn double(x: int) -> int = x * 2
+
+# nested if-expression, body on the next line
+fn clamp(v: int, lo: int, hi: int) -> int =
+    if v < lo then lo else if v > hi then hi else v
+
+# block-form function with contracts, a mutable binding, an assignment, a call
+fn damage(target: Entity, amount: int):
+    require amount > 0
+    mut h = target.Health
+    h.hp = max(0, h.hp - amount)
+    ensure h.hp >= 0
+
+# default argument, and `spawn` with component literals
+fn spawn_player(name: Text, gold: int = 0) -> Entity =
+    spawn Player{name: name, gold: gold}, Position{x: 0, y: 0}

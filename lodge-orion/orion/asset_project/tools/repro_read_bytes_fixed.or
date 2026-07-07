@@ -1,0 +1,19 @@
+use io
+use env
+use bytes
+
+fn main():
+    argc = env.arg_count()
+    if argc < 2:
+        print_line("Usage: orbit run tools/repro_read_bytes.or <path>")
+        env.exit_with(1)
+    p = env.arg(1)
+    buf = read_file_bytes(p)
+    print_line("len=" + str(len(buf)))
+    mut s = ""
+    n = if len(buf) < 16 then len(buf) else 16
+    for i in 0..<n:
+        s = s + (if i == 0 then "" else ",") + str(byte_at(buf, i))
+    print_line("first=" + s)
+    x = buf
+    print_line("assigned_ok")

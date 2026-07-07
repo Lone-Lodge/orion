@@ -1,0 +1,7 @@
+name = "string"
+version = "0.0.1"
+description = "orion stdlib orb: string"
+license = "MIT"
+
+[orbs]
+bytes = { built-in = true }

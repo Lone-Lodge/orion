@@ -1,0 +1,21 @@
+# orion_cli — standalone Orion CLI compiler.
+#
+# Usage: orion-cli.exe <source.or> [<output.exe>]
+#
+# Reads the .or file, lex/parse/emits x86-64 + PE, writes the native
+# binary. Zero external toolchain dependencies — uses the pure-Orion
+# self_lex/self_parse/self_emit_x64/self_pe_wrap pipeline.
+#
+# `orion-cli.exe` is itself bootstrapped via the Rust `orbit` binary
+# the FIRST time. After that, future versions can be built by an older
+# orion-cli compiling the newer source — i.e. Orion now hosts its own
+# toolchain. This is the moment Rust becomes optional.
+
+pub fn cli_compile(source_path: Text, output_path: Text):
+    if not file_exists(source_path):
+        eprint("orion-cli: missing source file " + source_path)
+        exit_with(1)
+    source = read_file(source_path)
+    print("orion-cli: compiling " + source_path)
+    orion_compile_to_exe(source, output_path)
+    print("orion-cli: wrote " + output_path)

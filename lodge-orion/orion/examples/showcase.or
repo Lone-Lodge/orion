@@ -1,0 +1,50 @@
+# showcase.or — a tour of Orion in one file.
+#
+#   orion run       examples/showcase.or demo     # spawn entities, query, print
+#   orion jit       examples/showcase.or fib 30    # compile to native, run
+#   orion footprint examples/showcase.or           # inferred parallelism
+#   orion select    examples/showcase.or move       # measured layout choice
+#   orbit test      examples/showcase.or            # run the contract tests
+
+# data is rows, not objects
+data Position: x: f32, y: f32
+data Velocity: dx: f32, dy: f32
+data Health:   hp: 0...100, max: 0...100
+
+# a system — the compiler infers it reads Velocity and writes Position,
+# so it knows what can run in parallel (try `orion footprint …`)
+system move(dt: f32):
+    for e with Position, Velocity:
+        e.Position.x += e.Velocity.dx * dt
+        e.Position.y += e.Velocity.dy * dt
+
+# a query — declarative selection, planned like a database
+query wounded() -> [Entity] =
+    [e for e with Health where e.Health.hp < e.Health.max / 4]
+
+# a contract turns intent into a guarantee *and* an auto-test
+fn safe_div(a: int, b: int) -> int:
+    require b != 0
+    a / b
+
+# recursion compiles to native machine code (try `orion jit … fib 30`)
+fn fib(n: int) -> int = if n < 2 then n else fib(n - 1) + fib(n - 2)
+
+# a little world you can actually run
+fn demo() -> int:
+    spawn Health{hp: 90, max: 100}
+    spawn Health{hp: 12, max: 100}
+    spawn Health{hp: 3, max: 100}
+    mut hurt = 0
+    for e with Health where e.Health.hp < 25:
+        hurt += 1
+    print("entities needing healing:")
+    print(hurt)
+    hurt
+
+# `orbit test` runs every test_* — each passes when its contracts hold
+fn test_safe_div():
+    require safe_div(10, 2) == 5
+
+fn test_fib():
+    require fib(10) == 55

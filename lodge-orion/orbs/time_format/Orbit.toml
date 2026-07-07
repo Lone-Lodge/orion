@@ -1,0 +1,9 @@
+name = "time_format"
+version = "0.0.1"
+description = "orion stdlib orb: time_format"
+license = "MIT"
+
+[orbs]
+bytes = { built-in = true }
+string = { built-in = true }
+format = { built-in = true }

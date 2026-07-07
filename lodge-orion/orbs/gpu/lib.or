@@ -1,0 +1,128 @@
+# gpu — WebGPU-shaped graphics API. Pure Orion surface; the Rust-side
+# broker routes to the right native backend (DX12 / Vulkan / Metal /
+# OpenGL) at runtime. Shaders are WGSL strings — the broker compiles
+# them to the active backend's IR.
+
+pub data Device: handle: int
+pub data Buffer: handle: int, size: int
+pub data Texture: handle: int, width: int, height: int
+pub data Shader: handle: int
+pub data Pipeline: handle: int
+pub data CommandBuffer: handle: int
+
+extern fn __os_gpu_ready() -> bool
+extern fn __os_gpu_backend() -> Text
+extern fn __os_gpu_init(window_handle: int) -> int
+extern fn __os_gpu_create_buffer(device: int, size: int, usage: Text) -> int
+extern fn __os_gpu_write_buffer(device: int, buffer: int, values: [f64])
+extern fn __os_gpu_create_shader(device: int, wgsl: Text) -> int
+extern fn __os_gpu_create_pipeline(device: int, shader: int, vertex_layout: Text) -> int
+extern fn __os_gpu_begin_frame(device: int) -> int
+extern fn __os_gpu_set_pipeline(cmd: int, pipeline: int)
+extern fn __os_gpu_set_vertex_buffer(cmd: int, buffer: int)
+extern fn __os_gpu_set_index_buffer(cmd: int, buffer: int)
+extern fn __os_gpu_set_uniform(cmd: int, slot: int, values: [f64])
+extern fn __os_gpu_draw(cmd: int, vertex_count: int)
+extern fn __os_gpu_draw_indexed(cmd: int, index_count: int)
+extern fn __os_gpu_submit(device: int, cmd: int)
+extern fn __os_gpu_present(device: int)
+extern fn __os_gpu_destroy(device: int)
+extern fn __os_gpu_create_texture(device: int, width: int, height: int, pixels: [f64]) -> int
+extern fn __os_gpu_set_texture(cmd: int, slot: int, texture: int)
+
+# Returns true once the native broker is wired up for the current
+# platform. Use to gracefully degrade in headless or unsupported runs.
+pub fn gpu_ready() -> bool:
+    __os_gpu_ready()
+
+# Names the active backend — `"opengl"`, `"d3d12"`, `"vulkan"`,
+# `"metal"`, or `"stub"` when no GPU is available.
+pub fn gpu_backend() -> Text:
+    __os_gpu_backend()
+
+# Initialise a GPU device bound to `window`. The window must already
+# be open (see `window` orb). Returns a `Device` handle used for every
+# subsequent gpu_* call.
+pub fn gpu_init(window_handle: int) -> Device:
+    handle = __os_gpu_init(window_handle)
+    Device{handle: handle}
+
+# Allocate `size` bytes of GPU memory tagged with `usage` —
+# `"vertex"`, `"index"`, `"uniform"`, or `"storage"`. WebGPU-style:
+# usage is fixed at creation, not changeable later.
+pub fn create_buffer(device: Device, size: int, usage: Text) -> Buffer:
+    handle = __os_gpu_create_buffer(device.handle, size, usage)
+    Buffer{handle: handle, size: size}
+
+# Upload data into an existing buffer. Floats only for now; bytes/u32
+# variants follow once the typed-buffer story lands.
+pub fn write_buffer(device: Device, buffer: Buffer, values: [f64]):
+    __os_gpu_write_buffer(device.handle, buffer.handle, values)
+
+# Compile a WGSL source string. The broker translates it to the
+# backend's native IR (HLSL for d3d12, SPIRV for vulkan, GLSL for
+# opengl, MSL for metal). Errors surface as run errors.
+pub fn create_shader(device: Device, wgsl_source: Text) -> Shader:
+    handle = __os_gpu_create_shader(device.handle, wgsl_source)
+    Shader{handle: handle}
+
+# Build a graphics pipeline that wires a shader to a vertex layout
+# description. `vertex_layout` is a short DSL — `"f32x3,f32x3"` means
+# two attributes: position (3 floats) + normal (3 floats).
+pub fn create_pipeline(device: Device, shader: Shader, vertex_layout: Text) -> Pipeline:
+    handle = __os_gpu_create_pipeline(device.handle, shader.handle, vertex_layout)
+    Pipeline{handle: handle}
+
+# Start recording a frame. Returns a CommandBuffer that builds up the
+# render commands; `submit` then sends them to the GPU.
+pub fn begin_frame(device: Device) -> CommandBuffer:
+    handle = __os_gpu_begin_frame(device.handle)
+    CommandBuffer{handle: handle}
+
+# Bind a pipeline for subsequent draws.
+pub fn set_pipeline(cmd: CommandBuffer, pipeline: Pipeline):
+    __os_gpu_set_pipeline(cmd.handle, pipeline.handle)
+
+# Bind a vertex buffer.
+pub fn set_vertex_buffer(cmd: CommandBuffer, buffer: Buffer):
+    __os_gpu_set_vertex_buffer(cmd.handle, buffer.handle)
+
+# Bind an index buffer for indexed draws.
+pub fn set_index_buffer(cmd: CommandBuffer, buffer: Buffer):
+    __os_gpu_set_index_buffer(cmd.handle, buffer.handle)
+
+# Upload a uniform block (eg. an MVP matrix) for the next draw. `slot`
+# is the constant-buffer index, matching the WGSL `@group(0) @binding(N)`.
+pub fn set_uniform(cmd: CommandBuffer, slot: int, values: [f64]):
+    __os_gpu_set_uniform(cmd.handle, slot, values)
+
+# Issue a non-indexed draw of `vertex_count` vertices.
+pub fn draw(cmd: CommandBuffer, vertex_count: int):
+    __os_gpu_draw(cmd.handle, vertex_count)
+
+# Issue an indexed draw of `index_count` indices.
+pub fn draw_indexed(cmd: CommandBuffer, index_count: int):
+    __os_gpu_draw_indexed(cmd.handle, index_count)
+
+# Flush the command buffer to the GPU.
+pub fn submit(device: Device, cmd: CommandBuffer):
+    __os_gpu_submit(device.handle, cmd.handle)
+
+# Show the rendered frame in the window.
+pub fn present(device: Device):
+    __os_gpu_present(device.handle)
+
+# Create a 2D texture from RGBA8 pixel data (4 floats per pixel, range
+# 0..1). The broker pads/packs as the backend needs.
+pub fn create_texture(device: Device, width: int, height: int, pixels: [f64]) -> Texture:
+    handle = __os_gpu_create_texture(device.handle, width, height, pixels)
+    Texture{handle: handle, width: width, height: height}
+
+# Bind a texture to a fragment-shader slot. WGSL `@group(0) @binding(N)`
+# with a `texture_2d<f32>` maps to the same `slot`.
+pub fn set_texture(cmd: CommandBuffer, slot: int, texture: Texture):
+    __os_gpu_set_texture(cmd.handle, slot, texture.handle)
+
+# Tear down all device resources. Call on shutdown.
+pub fn gpu_destroy(device: Device):
+    __os_gpu_destroy(device.handle)
