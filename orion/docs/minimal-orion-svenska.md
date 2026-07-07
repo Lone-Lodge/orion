@@ -153,10 +153,42 @@ fact reach = score > 100  in goal         # = gamla goal
 fact enemy = 3  in belief:Guard  conf 73  # = gamla belief + confidence
 ```
 
+### Korrekthet — en "måste hålla"-primitiv, tre triggers
+`require`, `ensure` och `test` är samma idé — *en boolean som måste vara sann,
+annars gäller* — bara vid olika tidpunkter:
+
+```orion
+fn div(a: int, b: int) -> int:
+    require b != 0          ## måste hålla vid INgång  (kontrakt, varje körning)
+    r = a / b
+    ensure r * b == a       ## måste hålla vid UTgång  (kontrakt, varje körning)
+    r
+
+test div:                   ## måste hålla OFFLINE     (test, en gång)
+    div(6, 2) == 3
+```
+
+Eftersom `test`-kroppen bara är booleans som måste hålla behövs **ingen separat
+`assert_eq`-vokabulär** — `div(6, 2) == 3` ÄR påståendet. `assert`-orben äts upp
+av `test`, precis som `map`/`filter` åts upp av `for`. En primitiv, tre triggers.
+
+### Kommentarer och docs — `#` mot `##`
+Ett tecken skiljer en anteckning till kod-läsaren från dokumentation:
+
+```orion
+# Internt: fixa hacken senare.          # vanlig kommentar — ALDRIG docs
+## Räknar antal bytes i en text.        ## doc — plockas av docgen till docs/
+pub fn byte_count(t: Text) -> int:
+    ...
+```
+
+Regeln en nykomling gissar: **`#` pratar med den som läser koden, `##` med den
+som läser docsen.** Löser luckan i den gamla positions-baserade konventionen (där
+varje `#` ovanför en `pub fn` läckte in i API-docsen).
+
 ### Övrigt i kärnan
 `x =` / `mut n =` / `+= -= *= /=` (bindningar), generics `fn id<T>(x: T)`,
-`"{x}"`-interpolation (`{}` = "klistra in värdet av"), `require`/`ensure`
-(kontrakt).
+`"{x}"`-interpolation (`{}` = "klistra in värdet av").
 
 ---
 
