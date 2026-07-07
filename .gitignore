@@ -23,6 +23,11 @@ veil/
 *.lib
 *.exp
 
+# Bootstrap seed — the ONE checked-in binary self-hosting needs (see
+# orion/tools/seed/README.md). Excepted from *.exe so a fresh clone can
+# bootstrap without lodge-orion.
+!orion/tools/seed/orion.exe
+
 # === IDE / OS ===
 .vscode/
 .idea/
