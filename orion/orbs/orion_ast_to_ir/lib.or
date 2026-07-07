@@ -793,7 +793,14 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if op == "or":
         # `x or default` — value-preserving fallback: the left value if it is
         # truthy/present, else the right (was `sc_int("1")` = boolean or).
-        return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "left"), get(node, "right")))
+        # Emit `left` ONCE and bind it to a temp, then branch on the temp —
+        # `sc_if(left, left, right)` would DUPLICATE the left AST and blow up
+        # exponentially on left-associative `a or b or c…` chains.
+        or_left_r = ast_expr_to_ir(fn_value, scope, get(node, "left"))
+        or_tmp = "__or_tmp_{len(or_left_r.function.instructions)}"
+        or_scope = scope_bind(or_left_r.scope, or_tmp, or_left_r.id)
+        or_ref = {"kind": "Ident", "name": or_tmp}
+        return ast_if_to_ir(or_left_r.function, or_scope, sc_if(or_ref, or_ref, get(node, "right")))
     left_result = ast_expr_to_ir(fn_value, scope, get(node, "left"))
     right_result = ast_expr_to_ir(left_result.function, left_result.scope, get(node, "right"))
     left_type = get_value_type(right_result.function, left_result.id)
