@@ -140,10 +140,17 @@ impl Interp<'_> {
                 Ok(Value::Bool(self.as_bool(self.eval(rhs, env)?)?))
             }
             BinOp::Or => {
-                if self.as_bool(self.eval(lhs, env)?)? {
-                    return Ok(Value::Bool(true));
+                // `x or default` — value-preserving fallback: the left value if
+                // it is present/truthy, else the right. Only `None` and
+                // `Bool(false)` count as absent; everything else is present. So
+                // boolean `or` still works (in an `if` the result is coerced by
+                // as_bool), and `hp or 100` yields hp when it is a real value,
+                // 100 when it is None.
+                let a = self.eval(lhs, env)?;
+                if !matches!(a, Value::None | Value::Bool(false)) {
+                    return Ok(a);
                 }
-                Ok(Value::Bool(self.as_bool(self.eval(rhs, env)?)?))
+                self.eval(rhs, env)
             }
             _ => {
                 let a = self.eval(lhs, env)?;

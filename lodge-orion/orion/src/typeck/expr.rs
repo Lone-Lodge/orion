@@ -79,10 +79,16 @@ impl Cx {
         let rt = self.infer(rhs, scope)?;
         use BinOp::*;
         match op {
-            And | Or => {
-                self.expect(&Ty::Bool, &lt, lhs, "`and`/`or` expects a bool")?;
-                self.expect(&Ty::Bool, &rt, rhs, "`and`/`or` expects a bool")?;
+            And => {
+                self.expect(&Ty::Bool, &lt, lhs, "`and` expects a bool")?;
+                self.expect(&Ty::Bool, &rt, rhs, "`and` expects a bool")?;
                 Ok(Ty::Bool)
+            }
+            Or => {
+                // `x or default` — value-preserving fallback, so no bool
+                // requirement. Result is the fallback's type (or the shared
+                // type when both operands agree).
+                Ok(if lt == rt { lt } else { rt })
             }
             Eq | Ne => Ok(Ty::Bool),
             Lt | Le | Gt | Ge => {
