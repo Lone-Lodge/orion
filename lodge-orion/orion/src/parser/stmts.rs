@@ -156,8 +156,13 @@ impl Parser<'_> {
             // (dangling-else). Parity with orion-self psr fix 2026-07-05.
             let otherwise = if self.check(&Tok::Else) && self.cur_col() == base {
                 self.bump();
-                self.eat(&Tok::Colon)?;
-                self.block(base)?
+                if self.check(&Tok::If) {
+                    // `else if …` — the chained if IS the else body.
+                    vec![self.if_stmt(base)?]
+                } else {
+                    self.eat(&Tok::Colon)?;
+                    self.block(base)?
+                }
             } else {
                 Vec::new()
             };

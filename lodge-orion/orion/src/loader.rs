@@ -76,11 +76,20 @@ fn resolve_use(u: &str, parent_dir: &PathBuf, extras: &[PathBuf]) -> Result<Path
     if candidate.exists() {
         return Ok(candidate);
     }
+    // Orb layout: `<dir>/<name>/lib.or` (how orion-self ships its orbs).
+    let lib = parent_dir.join(&rel).join("lib.or");
+    if lib.exists() {
+        return Ok(lib);
+    }
     for d in extras {
         let mut p = d.join(&rel);
         p.set_extension("or");
         if p.exists() {
             return Ok(p);
+        }
+        let lib = d.join(&rel).join("lib.or");
+        if lib.exists() {
+            return Ok(lib);
         }
     }
     // Caller will hit a clean "cannot read" diagnostic against parent_dir.

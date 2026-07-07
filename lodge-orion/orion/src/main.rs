@@ -76,7 +76,17 @@ fn main() {
     }
 
     // Everything else: load + resolve modules, then run every static check.
-    let loaded = orion::loader::load(path).unwrap_or_else(|e| cmd::die(&e));
+    // ORION_ORB_PATH (colon-separated) adds orb search roots, so a fresh
+    // checkout can resolve `use orion_lex` against `../../orbs` etc. — used
+    // to bootstrap orion.exe by interpreting the self-hosted compiler.
+    let orb_dirs: Vec<std::path::PathBuf> = std::env::var("ORION_ORB_PATH")
+        .unwrap_or_default()
+        .split(':')
+        .filter(|s| !s.is_empty())
+        .map(std::path::PathBuf::from)
+        .collect();
+    let loaded = orion::loader::load_with_search_paths(path, &orb_dirs)
+        .unwrap_or_else(|e| cmd::die(&e));
     let program = loaded.program;
     let files = loaded.files;
     let report = |span: Option<Span>, msg: &str| match span {
