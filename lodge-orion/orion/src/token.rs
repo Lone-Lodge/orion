@@ -45,6 +45,7 @@ pub enum Tok {
     // ---- contracts ----
     Require, // require amount > 0
     Ensure,  // ensure h.hp >= 0
+    Fact,    // fact alive = health > 0
 
     // ---- world mutation ----
     Spawn,   // spawn Position{..}, Velocity{..}

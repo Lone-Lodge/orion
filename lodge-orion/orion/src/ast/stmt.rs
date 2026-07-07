@@ -8,6 +8,11 @@ pub enum Stmt {
     Require(Expr),
     /// `ensure <cond>` — a postcondition contract.
     Ensure(Expr),
+    /// `fact <name> = <expr>` — a lazy derived binding. Reading `name`
+    /// re-evaluates `expr` in the current scope, so it always reflects the
+    /// latest inputs (the core's reactive bridge; the engine adds
+    /// recompute-only-on-change on top).
+    Fact { name: String, expr: Expr },
     /// `mut name = value` — a new mutable binding.
     Bind { name: String, value: Expr },
     /// `target = value` / `target += value` / `target -= value`. A bare

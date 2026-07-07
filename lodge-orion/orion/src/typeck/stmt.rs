@@ -40,6 +40,11 @@ impl Cx {
                 scope.insert(name.clone(), t);
                 Ok(())
             }
+            Stmt::Fact { name, expr } => {
+                let t = self.infer(expr, scope)?;
+                scope.insert(name.clone(), t);
+                Ok(())
+            }
             Stmt::Assign { target, value, .. } => self.assign(target, value, scope),
             Stmt::For { var, filter, body, .. } => self.for_world(var, filter.as_ref(), body, scope),
             Stmt::ForIn { var, iter, body, .. } => self.for_in(var, iter, body, scope),

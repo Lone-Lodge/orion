@@ -138,14 +138,20 @@ impl Interp<'_> {
         Ok(Value::List(Arc::new(out)))
     }
 
-    fn eval_var(&self, name: &str, env: &Env) -> Result<Value, RunError> {
+    fn eval_var(&self, name: &str, env: &mut Env) -> Result<Value, RunError> {
         // A nullary enum variant is a value when named bare. The same name
         // may be registered with multiple arities (cross-enum collision);
         // accept the bare form if any registration is nullary.
         if self.variants.get(name).map(|v| v.contains(&0)).unwrap_or(false) {
             return Ok(Value::Enum { variant: name.to_string(), payload: vec![] });
         }
-        env.get(name).cloned().ok_or_else(|| run_err(format!("unknown name `{name}`")))
+        match env.get(name).cloned() {
+            // A `fact` is lazy: re-evaluate its expr in the current scope so it
+            // always reflects the latest inputs (the reactive read).
+            Some(Value::Fact(expr)) => self.eval(&expr, env),
+            Some(v) => Ok(v),
+            None => Err(run_err(format!("unknown name `{name}`"))),
+        }
     }
 
     fn eval_unary(&self, op: UnOp, rhs: &Expr, env: &mut Env) -> Result<Value, RunError> {

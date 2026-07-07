@@ -537,6 +537,7 @@ fn map_values(args: &[Value]) -> Result<Value, RunError> {
 /// stringify to dispatch without a `match` on every primitive type.
 fn type_of(args: &[Value]) -> Result<Value, RunError> {
     let tag = match &args[0] {
+        Value::Fact(_) => "fact",
         Value::Int(_) => "int",
         Value::Float(_) => "float",
         Value::Bool(_) => "bool",

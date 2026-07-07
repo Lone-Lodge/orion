@@ -45,6 +45,9 @@ impl<'a, 'b> Fx<'a, 'b> {
     /// expression (its value becomes the block's tail), `None` otherwise.
     fn stmt(&mut self, s: &Stmt) -> Result<Option<(JTy, Value)>, String> {
         match s {
+            // A `fact` is a lazy interpreter binding; bail out of JIT so the
+            // function falls back to the tree-walker (which handles facts).
+            Stmt::Fact { .. } => Err("`fact` is interpreter-only, not JIT-compiled".to_string()),
             Stmt::Expr(e) => {
                 let ty = self.infer(e);
                 let v = self.expr(e)?;

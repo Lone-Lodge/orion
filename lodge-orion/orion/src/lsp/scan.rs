@@ -235,6 +235,7 @@ fn scan_stmt(s: &Stmt, name: &str, out: &mut Option<Span>) {
     match s {
         Stmt::Require(e) | Stmt::Ensure(e) | Stmt::Expr(e) | Stmt::Destroy(e) => scan_expr(e, name, out),
         Stmt::Bind { value, .. } => scan_expr(value, name, out),
+        Stmt::Fact { expr, .. } => scan_expr(expr, name, out),
         Stmt::Assign { target, value, .. } => {
             scan_expr(target, name, out);
             scan_expr(value, name, out);

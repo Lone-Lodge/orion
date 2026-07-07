@@ -82,6 +82,7 @@ fn collect_calls_in_stmts(stmts: &[crate::ast::Stmt], out: &mut Vec<String>) {
         match s {
             Stmt::Require(e) | Stmt::Ensure(e) | Stmt::Expr(e) | Stmt::Destroy(e) => collect_calls(e, out),
             Stmt::Bind { value, .. } => collect_calls(value, out),
+            Stmt::Fact { expr, .. } => collect_calls(expr, out),
             Stmt::Assign { target, value, .. } => {
                 collect_calls(target, out);
                 collect_calls(value, out);

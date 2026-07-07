@@ -10,6 +10,11 @@ impl Interp<'_> {
         match stmt {
             Stmt::Require(cond) => check_contract(self, cond, env, "require"),
             Stmt::Ensure(cond) => check_contract(self, cond, env, "ensure"),
+            Stmt::Fact { name, expr } => {
+                // Store the expr lazily; `eval_var` re-evaluates it on read.
+                env.insert(name.clone(), Value::Fact(std::sync::Arc::new(expr.clone())));
+                Ok(Flow::Normal(Value::Unit))
+            }
             Stmt::Bind { name, value } => {
                 let v = self.eval(value, env)?;
                 env.insert(name.clone(), v);

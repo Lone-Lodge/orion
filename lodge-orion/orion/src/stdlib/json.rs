@@ -36,7 +36,7 @@ fn json_to_orion(v: json::Value) -> Value {
 #[allow(dead_code)]
 fn orion_to_json(v: &Value) -> json::Value {
     match v {
-        Value::None | Value::Unit => json::Value::Null,
+        Value::Fact(_) | Value::None | Value::Unit => json::Value::Null,
         Value::Bool(b) => json::Value::Bool(*b),
         Value::Int(n) => json::Value::Int(*n),
         Value::Float(x) => json::Value::Float(*x),

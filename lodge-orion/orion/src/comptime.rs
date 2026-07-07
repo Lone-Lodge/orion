@@ -48,6 +48,7 @@ fn fold_stmts(stmts: &mut [Stmt]) {
 fn fold_stmt(s: &mut Stmt) {
     match s {
         Stmt::Bind { value, .. } => fold_expr(value),
+        Stmt::Fact { expr, .. } => fold_expr(expr),
         Stmt::Assign { target, value, .. } => {
             fold_expr(target);
             fold_expr(value);

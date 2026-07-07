@@ -131,6 +131,7 @@ fn walk_stmt(s: &Stmt, fp: &mut Footprint) {
     match s {
         Stmt::Require(e) | Stmt::Ensure(e) | Stmt::Expr(e) | Stmt::Destroy(e) => walk_expr(e, fp),
         Stmt::Bind { value, .. } => walk_expr(value, fp),
+        Stmt::Fact { expr, .. } => walk_expr(expr, fp),
         Stmt::Assign { target, op, value } => {
             walk_expr(value, fp);
             if let Some(comp) = component_of(target) {

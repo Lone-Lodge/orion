@@ -86,6 +86,7 @@ impl ParamScan<'_> {
             match s {
                 Stmt::Expr(e) | Stmt::Require(e) | Stmt::Ensure(e) | Stmt::Destroy(e) => self.expr(e),
                 Stmt::Bind { value, .. } => self.expr(value),
+                Stmt::Fact { expr, .. } => self.expr(expr),
                 Stmt::Assign { target, value, .. } => { self.expr(target); self.expr(value); }
                 Stmt::If { cond, then, otherwise } => {
                     self.expr(cond);

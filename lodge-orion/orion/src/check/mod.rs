@@ -108,6 +108,7 @@ fn check_deterministic_stmt(cx: &Checker, s: &crate::ast::Stmt) -> Result<(), Ch
     use crate::ast::Stmt;
     match s {
         Stmt::Bind { value, .. } => check_deterministic_expr(cx, value),
+        Stmt::Fact { expr, .. } => check_deterministic_expr(cx, expr),
         Stmt::Assign { target, value, .. } => {
             check_deterministic_expr(cx, target)?;
             check_deterministic_expr(cx, value)

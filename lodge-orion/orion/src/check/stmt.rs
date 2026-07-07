@@ -14,6 +14,11 @@ impl Checker<'_> {
     ) -> Result<(), CheckError> {
         match s {
             Stmt::Require(e) | Stmt::Ensure(e) | Stmt::Expr(e) | Stmt::Destroy(e) => self.check_expr(e, scope),
+            Stmt::Fact { name, expr } => {
+                self.check_expr(expr, scope)?;
+                scope.insert(name.clone(), true);
+                Ok(())
+            }
             Stmt::Bind { name, value } => {
                 self.check_expr(value, scope)?;
                 scope.insert(name.clone(), true);

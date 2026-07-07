@@ -104,6 +104,13 @@ impl Parser<'_> {
                 self.bump();
                 Ok(Stmt::Ensure(self.expr()?))
             }
+            Some(Tok::Fact) => {
+                self.bump();
+                let name = self.ident()?;
+                self.eat(&Tok::Assign)?;
+                let expr = self.expr()?;
+                Ok(Stmt::Fact { name, expr })
+            }
             Some(Tok::Mut) => {
                 self.bump();
                 let name = self.ident()?;

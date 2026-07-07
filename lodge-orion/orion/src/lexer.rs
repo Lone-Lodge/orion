@@ -220,6 +220,7 @@ fn keyword(w: &str) -> Tok {
         "take" => Tok::Take,
         "require" => Tok::Require,
         "ensure" => Tok::Ensure,
+        "fact" => Tok::Fact,
         "spawn" => Tok::Spawn,
         "destroy" => Tok::Destroy,
         "if" => Tok::If,

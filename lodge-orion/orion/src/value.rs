@@ -87,6 +87,10 @@ impl PackedInt {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
+    /// A lazy derived binding created by `fact name = expr`. Held in the env
+    /// under `name`; `eval_var` re-evaluates the expr in the current scope on
+    /// every read, so a fact never escapes into general computation.
+    Fact(Arc<crate::ast::Expr>),
     Int(i64),
     /// §8 packed-int storage — `Value::Packed(PackedInt::U8(200))` is
     /// stored as one byte but participates in arithmetic as `i64`.
@@ -144,6 +148,7 @@ pub enum Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Value::Fact(_) => write!(f, "<fact>"),
             Value::Int(n) => write!(f, "{n}"),
             Value::Packed(p) => write!(f, "{}", p.widen()),
             Value::Float(x) => write!(f, "{x}"),

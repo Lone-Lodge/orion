@@ -76,6 +76,11 @@ impl Mv {
                 moved.remove(name);
                 Ok(())
             }
+            Stmt::Fact { name, expr } => {
+                self.expr(expr, moved)?;
+                moved.remove(name);
+                Ok(())
+            }
             Stmt::Assign { target, value, .. } => self.stmt_assign(target, value, moved),
             Stmt::For { filter, body, .. } => {
                 if let Some(f) = filter {

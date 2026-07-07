@@ -218,6 +218,14 @@ fn emit_stmt(s: &Stmt, out: &mut String, indent: usize) {
             emit_expr(value, out, indent);
             out.push('\n');
         }
+        Stmt::Fact { name, expr } => {
+            out.push_str(&pad);
+            out.push_str("fact ");
+            out.push_str(name);
+            out.push_str(" = ");
+            emit_expr(expr, out, indent);
+            out.push('\n');
+        }
         Stmt::Assign { target, op, value } => {
             out.push_str(&pad);
             emit_expr(target, out, indent);
