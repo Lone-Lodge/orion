@@ -199,10 +199,55 @@ impl Parser<'_> {
     }
 
     fn atom_match(&mut self, base_col: u32) -> Result<Expr, ParseError> {
+        // Subjectless cond-form: `match:` with `cond -> body` arms, first true
+        // wins, `else -> body` as the catch-all. Desugars to a right-nested
+        // if/else chain — reuses Expr::If, so eval and typeck stay untouched.
+        if self.check(&Tok::Colon) {
+            self.eat(&Tok::Colon)?;
+            return self.cond_arms(base_col);
+        }
         let scrutinee = self.expr()?;
         self.eat(&Tok::Colon)?;
         let arms = self.match_arms(base_col)?;
         Ok(Expr::Match { scrutinee: Box::new(scrutinee), arms })
+    }
+
+    /// `match:` cond-form arms — `cond -> body` (first true wins) + a final
+    /// `else -> body`. Folded into a right-nested if/else chain.
+    fn cond_arms(&mut self, base: u32) -> Result<Expr, ParseError> {
+        let mut conds: Vec<(Expr, Expr)> = Vec::new();
+        let mut default: Option<Expr> = None;
+        loop {
+            self.skip_newlines();
+            if self.peek().is_none() || self.cur_col() <= base {
+                break;
+            }
+            if self.check(&Tok::Else) {
+                self.bump();
+                self.eat(&Tok::Colon)?;
+                default = Some(self.expr()?);
+                break;
+            }
+            let cond = self.expr()?;
+            self.eat(&Tok::Colon)?;
+            let body = self.expr()?;
+            conds.push((cond, body));
+        }
+        if conds.is_empty() {
+            return Err(self.err("a subjectless `match:` needs at least one `cond -> body` arm"));
+        }
+        let Some(default) = default else {
+            return Err(self.err("a subjectless `match:` needs an `else -> body` arm"));
+        };
+        let mut chain = default;
+        for (cond, body) in conds.into_iter().rev() {
+            chain = Expr::If {
+                cond: Box::new(cond),
+                then: Box::new(body),
+                otherwise: Box::new(chain),
+            };
+        }
+        Ok(chain)
     }
 
     fn match_arms(&mut self, base: u32) -> Result<Vec<MatchArm>, ParseError> {
