@@ -205,10 +205,12 @@ motor krävs.
 
 ### Namngivna argument (färre fel)
 ```orion
-spawn(enemy, x: 5, y: 3)       # ingen fråga om vilken 5, vilken 3
+spawn(enemy, x = 5, y = 3)     # ingen fråga om vilken 5, vilken 3
 ```
-Den enda biten som *växer* ytan lite — men fel arg-ordning är en av de vanligaste
-buggarna, och namn vid anropet dödar den klassen. Motiverad av "färre misstag".
+Fel arg-ordning är en av de vanligaste buggarna; namn vid anropet dödar den
+klassen. `=` (inte `:`) för att `:` redan betyder typannotering (`x: int`) —
+`x = 5` läses som "sätt x till 5". **Redan implementerat** i lodge-orion och
+verifierat: `sub(b = 3, a = 50)` → 47 trots omvänd ordning.
 
 ### Övrigt i kärnan
 `x =` / `mut n =` / `+= -= *= /=` (bindningar), generics `fn id<T>(x: T)`,
