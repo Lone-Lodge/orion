@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Fixed-point self-host proof:
-#   1. orion.exe (from AOT bootstrap) compiles bundle.or → orion-v2.exe
+#   1. orion.exe compiles bundle.or → orion-v2.exe
 #   2. orion-v2.exe compiles a tiny program → tiny.exe
 #   3. Run tiny.exe — if output matches, self-host is verified
 #
-# Prereq: orion.exe exists at dist/orion.exe (from aot_bootstrap.sh)
+# Prereq: orion.exe exists at dist/orion.exe (from tools/bootstrap_from_ll.sh
+# on a fresh clone, or tools/self_bootstrap.sh). See tools/self_bootstrap.sh
+# for the full fixpoint rebuild.
 
 set -e
 
