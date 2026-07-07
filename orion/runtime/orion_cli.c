@@ -100,8 +100,12 @@ const char *capture(const char *cmd) {
     char wbuf[65600];
     size_t w = 0, j = 0;
     wbuf[w++] = '"';
-    while (cmd[j] && w < sizeof(wbuf) - 2) wbuf[w++] = cmd[j++];
+    while (cmd[j] && w < sizeof(wbuf) - 8) wbuf[w++] = cmd[j++];
     wbuf[w++] = '"';
+    /* Swallow stderr: `where clang` (nb_clang's probe) prints
+     * "INFO: Could not find files..." to stderr on a miss, which _popen
+     * leaves leaking to the console. We only ever want the stdout here. */
+    { const char *r = " 2>nul"; while (*r) wbuf[w++] = *r++; }
     wbuf[w] = 0;
     FILE *p = _popen(wbuf, "r");
     if (!p) return orion_text_from_c(cbuf);

@@ -92,10 +92,6 @@ fn main() -> int:
             files = push(files, raw_name)
     total_tests = len(files)
 
-    print_line("=== Orion test runner (LLVM backend) ===")
-    print_line("")
-    print_line("--------------------------------------------------------------------")
-
     mut pass_count = 0
     mut fail_count = 0
     mut total_compile_ms = 0
@@ -105,8 +101,15 @@ fn main() -> int:
     esc = bytes_to_text([27])
     c_green = "{esc}[32m"
     c_red = "{esc}[31m"
+    c_cyan = "{esc}[36m"
+    c_bold = "{esc}[1m"
     c_dim = "{esc}[2m"
     c_off = "{esc}[0m"
+
+    print_line("")
+    print_line("  {c_bold}{c_cyan}◆ Orion{c_off} {c_dim}test runner · LLVM backend · {total_tests} tests{c_off}")
+    print_line("  {c_dim}──────────────────────────────────────────────{c_off}")
+    print_line("")
 
     for file_index in 0..<total_tests:
         filename = at(files, file_index)
