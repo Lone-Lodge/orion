@@ -263,6 +263,41 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
         cm_chain = {"kind": "If", "cond": at(cm_cond_list, cm_idx), "then": at(cm_body_list, cm_idx), "else": cm_chain}
     {"node": cm_chain, "next": cursor}
 
+# `for x in xs [where c]: body` in EXPRESSION position — collects each body
+# value into a list (map + filter). Desugars to a block that accumulates into
+# a fresh `__fc`, reusing MutLet/ForIn/IfBlock/push — no ast_to_ir changes.
+fn psr_parse_for_collect(tokens: [Map], position: int) -> Map:
+    fc_var = psr_peek_value(tokens, position + 1)
+    mut cursor = position + 2
+    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "in":
+        cursor = cursor + 1
+    fc_iter_r = psr_parse_expr(tokens, cursor)
+    fc_iter = get_map(fc_iter_r, "node")
+    cursor = get_int(fc_iter_r, "next")
+    fc_has_where = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "where"
+    mut fc_filter = {"kind": "Int", "value": "1"}
+    if fc_has_where:
+        cursor = cursor + 1
+        fc_where_r = psr_parse_expr(tokens, cursor)
+        fc_filter = get_map(fc_where_r, "node")
+        cursor = get_int(fc_where_r, "next")
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+        cursor = cursor + 1
+    fc_body_r = psr_parse_expr(tokens, cursor)
+    fc_body = get_map(fc_body_r, "node")
+    cursor = get_int(fc_body_r, "next")
+    # __fc = push(__fc, body)
+    fc_push = {"kind": "Call", "callee": "push", "args": [{"kind": "Ident", "name": "__fc"}, fc_body]}
+    fc_assign = {"kind": "LetOrAssign", "name": "__fc", "value": fc_push}
+    mut fc_inner = fc_assign
+    if fc_has_where:
+        fc_inner = {"kind": "IfBlock", "cond": fc_filter, "then": {"kind": "Block", "stmts": push([], fc_assign)}, "else": {"kind": "Block", "stmts": []}}
+    fc_forin = {"kind": "ForIn", "var": fc_var, "index_var": "", "iter": fc_iter, "body": {"kind": "Block", "stmts": push([], fc_inner)}}
+    fc_mutlet = {"kind": "MutLet", "name": "__fc", "value": {"kind": "ListLit", "items": []}}
+    fc_ret = {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": "__fc"}}
+    fc_stmts = push(push(push([], fc_mutlet), fc_forin), fc_ret)
+    {"node": {"kind": "Block", "stmts": fc_stmts}, "next": cursor}
+
 # --- expression parser ---
 #
 # Pratt-lite: handles literals, identifiers, calls, and left-associative
@@ -304,10 +339,13 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     is_if = is_ident and value == "if"
     is_match_expr = is_ident and value == "match"
     is_perform = is_ident and value == "perform"
-    is_call = is_ident and not is_if and not is_not and not is_match_expr and not is_perform and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
+    is_for = is_ident and value == "for"
+    is_call = is_ident and not is_if and not is_not and not is_match_expr and not is_perform and not is_for and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
     mut result = {"node": {"kind": "Error", "msg": "expected an expression"}, "next": position}
     if is_if:
         result = psr_parse_if(tokens, position)
+    if is_for:
+        result = psr_parse_for_collect(tokens, position)
     if is_match_expr:
         result = psr_parse_match_node(tokens, position)
     if is_perform:
@@ -341,7 +379,7 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         result = psr_parse_call(tokens, position, value)
     is_true = is_ident and value == "true"
     is_false = is_ident and value == "false"
-    if is_ident and not is_call and not is_if and not is_match_expr and not is_perform and not is_true and not is_false:
+    if is_ident and not is_call and not is_if and not is_match_expr and not is_perform and not is_for and not is_true and not is_false:
         next_kind = psr_peek_kind(tokens, position + 1)
         next_value = psr_peek_value(tokens, position + 1)
         value_bytes = bytes_from_text(value)
