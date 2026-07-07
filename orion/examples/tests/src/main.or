@@ -98,8 +98,15 @@ fn main() -> int:
 
     mut pass_count = 0
     mut fail_count = 0
-    mut total_compile_seconds = 0.0
+    mut total_compile_ms = 0
     mut total_bytes = 0
+
+    # ANSI colors (ESC = byte 27) — green PASS, red FAIL, dim detail.
+    esc = bytes_to_text([27])
+    c_green = "{esc}[32m"
+    c_red = "{esc}[31m"
+    c_dim = "{esc}[2m"
+    c_off = "{esc}[0m"
 
     for file_index in 0..<total_tests:
         filename = at(files, file_index)
@@ -110,8 +117,8 @@ fn main() -> int:
 
         compile_start = now()
         ok = compile_one(src_path, ll_path, exe_path)
-        compile_seconds = elapsed(compile_start)
-        total_compile_seconds = total_compile_seconds + compile_seconds
+        compile_ms = elapsed(compile_start)
+        total_compile_ms = total_compile_ms + compile_ms
 
         size_bytes = file_size(exe_path)
         total_bytes = total_bytes + size_bytes
@@ -119,24 +126,23 @@ fn main() -> int:
         actual = run_command(exe_path, [])
 
         passed = ok == 1 and actual == expected
-        status_txt = if passed then "PASS" else "FAIL"
+        status_txt = if passed then "{c_green}PASS{c_off}" else "{c_red}FAIL{c_off}"
         if passed:
             pass_count = pass_count + 1
         else:
             fail_count = fail_count + 1
 
-        time_txt = fmt_ms(compile_seconds)
         done_n = file_index + 1
-        print_line("[{done_n}/{total_tests}] {status_txt}  {filename}  expected={expected} actual={actual}  compile={time_txt}  size={size_bytes}b")
+        print_line("{c_dim}[{done_n}/{total_tests}]{c_off} {status_txt} {filename}  {c_dim}{compile_ms}ms  {size_bytes}b{c_off}")
 
     print_line("--------------------------------------------------------------------")
     print_line("")
-    print_line("Pass: {pass_count} / {total_tests}")
+    all_pass = fail_count == 0
+    summary_color = if all_pass then c_green else c_red
+    print_line("{summary_color}Pass: {pass_count} / {total_tests}{c_off}")
     if fail_count > 0:
-        print_line("Fail: {fail_count}")
-    avg_seconds = total_compile_seconds / to_float(total_tests)
-    print_line("Total compile time: {fmt_ms(total_compile_seconds)}")
-    print_line("Average per test:   {fmt_ms(avg_seconds)}")
-    print_line("Total binary size:  {total_bytes} bytes")
+        print_line("{c_red}Fail: {fail_count}{c_off}")
+    avg_ms = total_compile_ms / total_tests
+    print_line("{c_dim}Total compile: {total_compile_ms}ms   avg: {avg_ms}ms/test   binaries: {total_bytes}b{c_off}")
 
     fail_count
