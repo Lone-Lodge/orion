@@ -126,9 +126,8 @@ fn main() -> int:
             fail_count = fail_count + 1
 
         time_txt = fmt_ms(compile_seconds)
-        line_a = "  {filename} :  expected={expected} actual={actual}"
-        line_b = "  {status_txt}  compile={time_txt}  size={size_bytes}b"
-        print_line("{line_a}  {line_b}")
+        done_n = file_index + 1
+        print_line("[{done_n}/{total_tests}] {status_txt}  {filename}  expected={expected} actual={actual}  compile={time_txt}  size={size_bytes}b")
 
     print_line("--------------------------------------------------------------------")
     print_line("")

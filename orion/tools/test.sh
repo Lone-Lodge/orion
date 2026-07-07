@@ -16,4 +16,7 @@ if [ -n "$FILTER" ]; then
 fi
 
 rm -rf target dist build 2>/dev/null
-"$ORION_BIN" run src/main.or main 2>&1 | grep -E "Pass:|Fail:|FAIL"
+# Stream the runner's per-test rows live (no grep pipe — a pipe both filters
+# out the progress rows and block-buffers, so nothing showed until the end).
+# The runner prints one line per test as it finishes, then the Pass/Fail summary.
+"$ORION_BIN" run src/main.or main
