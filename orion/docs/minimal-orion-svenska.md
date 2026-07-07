@@ -186,6 +186,30 @@ Regeln en nykomling gissar: **`#` pratar med den som läser koden, `##` med den
 som läser docsen.** Löser luckan i den gamla positions-baserade konventionen (där
 varje `#` ovanför en `pub fn` läckte in i API-docsen).
 
+### `or` — hämta med fallback (äter `unwrap_or`)
+```orion
+hp = player.health or 100      # finns värdet → använd det; annars → 100
+```
+Läses som engelska. Option-orbens `unwrap_or(x, d)` försvinner in i ett
+nyckelord, precis som `map` åts av `for`. Netto mindre språk.
+
+### Härlett fält i `data` (samma `fact`, inuti en struct)
+```orion
+data Player:
+    hp: int
+    alive = hp > 0             # fält som följer hp — lat fact, ingen getter
+```
+Samma idé som `fact` på toppnivå, nu inuti `data`. Inget nytt nyckelord; du
+slipper skriva en trivial `fn alive()`. Lat form (räknas vid läsning), ingen
+motor krävs.
+
+### Namngivna argument (färre fel)
+```orion
+spawn(enemy, x: 5, y: 3)       # ingen fråga om vilken 5, vilken 3
+```
+Den enda biten som *växer* ytan lite — men fel arg-ordning är en av de vanligaste
+buggarna, och namn vid anropet dödar den klassen. Motiverad av "färre misstag".
+
 ### Övrigt i kärnan
 `x =` / `mut n =` / `+= -= *= /=` (bindningar), generics `fn id<T>(x: T)`,
 `"{x}"`-interpolation (`{}` = "klistra in värdet av").
