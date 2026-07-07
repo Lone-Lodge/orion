@@ -14,6 +14,17 @@ att den staplar ett fall per rad — inte för att den är kort. Kram inte ihop
 villkor, filter och kropp på samma rad; hellre några rader som var för sig är
 uppenbara. Enkelt slår tätt.
 
+## Var vi landar (beslut 2026-07-07)
+
+**Tunn kärna + `fact` som brygga.** Orion-språket är fristående och litet:
+`fn` `data` `enum` `fact` `match` `?` `for` `.metod()`. Det kan kompilera sig
+självt utan någon motor. `fact` är den enda next-gen-biten i kärnan — i lat form
+(räknas om vid läsning) nu, i reaktiv form (räknas om vid ändring) när motorn
+finns. `when` och `system` är INTE språket — de kräver en tick och bor i
+astra-lagret. Detta valdes framför en "fet kärna" (bygga in ticken i språket)
+för att hålla Orion litet och självständigt — auditens linje: nyheten är motorn,
+håll språket KISS.
+
 ---
 
 ## De åtta konstruktionerna
@@ -34,14 +45,6 @@ enum Tile: Empty, Wall, Loot
 fact alive = health > 0
 ```
 ```orion
-when health <= 0:
-    die()
-```
-```orion
-system move over Position, Velocity:
-    Position becomes Position + Velocity
-```
-```orion
 match:
     score > 100: win()
     else:        idle()
@@ -57,8 +60,12 @@ ys = for x in xs where x > 0:
 text.upper()
 ```
 
-Åtta konstruktioner. Ingen `if`, ingen `loop`, ingen `map`/`filter`/`each`,
-ingen ternär, ingen `|>`, ingen `defer`, ingen `move`.
+Sju kärn-konstruktioner (`fn` `data` `enum` `fact` `match` `?` `for`) plus
+`.metod()`. Ingen `if`, ingen `loop`, ingen `map`/`filter`/`each`, ingen ternär,
+ingen `|>`, ingen `defer`, ingen `move`.
+
+`when` och `system` finns INTE här — de kräver en motor som tickar och bor i
+astra-lagret (se nedan). Detta är den fristående kärnan.
 
 ---
 
@@ -128,6 +135,24 @@ for v in ys:
 `text.upper()` betyder `upper(text)`. Kedjar vänster-till-höger: `xs.a().b()`.
 Vi valde `.` framför `|>` — samma kraft, bekvämare att skriva. `|>` kapad.
 
+### `fact` — beskriv sanning, räkna inte ut den (bryggan)
+`fact` är den ENDA reaktiva biten som lever i kärnan, för den behöver ingen tick:
+
+```orion
+fact alive = health > 0        # alive följer health
+```
+
+- **I kärnan (lat form):** `alive` räknas om när du *läser* den — bara socker för
+  `fn alive(): health > 0`. Ingen motor krävs.
+- **Med motorn (reaktiv form):** `alive` räknas om bara när `health` *ändras*
+  (det reaktiva nätet). Samma syntax, snabbare motor under.
+
+Med motorn får `fact` också namespaces — och ersätter då fem nyckelord med ett:
+```orion
+fact reach = score > 100  in goal         # = gamla goal
+fact enemy = 3  in belief:Guard  conf 73  # = gamla belief + confidence
+```
+
 ### Övrigt i kärnan
 `x =` / `mut n =` / `+= -= *= /=` (bindningar), generics `fn id<T>(x: T)`,
 `"{x}"`-interpolation (`{}` = "klistra in värdet av"), `require`/`ensure`
@@ -135,22 +160,11 @@ Vi valde `.` framför `|>` — samma kraft, bekvämare att skriva. `|>` kapad.
 
 ---
 
-## Det reaktiva lagret (kräver en motor som tickar)
+## Astra-lagret (kräver en motor som tickar — INTE ren Orion)
 
-`fact`, `when` och `system` är det som gör Orion next-gen — men de behöver en
-värld med en tick-loop och ett fakta-lager. En ren kompilator (som Orion
-kompilerar sig själv med) använder dem inte; ett spel gör det. Ärligt märkt så
-att kärnan förblir fristående.
-
-### `fact` — beskriv sanning, räkna inte ut den
-```orion
-fact alive = health > 0                 # motorn håller alive sant/falskt, alltid
-fact reach = score > 100  in goal        # mål
-fact enemy = 3  in belief:Guard  conf 73 # tro + säkerhet i ett
-```
-Ersätter `derive`/`goal`/`constraint`/`belief`/`confidence` — fem nyckelord blir
-ett. **Innovation under huven:** en `fact` räknas bara om när en input den läser
-ändras (det reaktiva nätet), inte varje tick.
+`when` och `system` är det som gör *spel* next-gen — men de behöver en värld med
+en tick-loop och ett entitets-lager. En ren kompilator (som Orion kompilerar sig
+själv med) kan inte använda dem. De bor i astra/atlas, inte i språkkärnan.
 
 ### `when` — reaktiv regel
 ```orion
