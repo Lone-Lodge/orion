@@ -35,7 +35,9 @@ fn parse_expected(filename: Text) -> int:
 
 
 # Compile one source file. Returns 1 if ok, 0 if compilation failed.
-fn compile_one(src_path: Text, ll_path: Text, exe_path: Text) -> int:
+# rt_obj is the runtime PRE-COMPILED once (see main) — linking that object
+# is ~10x faster than re-compiling orion_rt.c (all of Windows.h) per test.
+fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text) -> int:
     src = read_file(src_path)
     tokens = self_lex(src)
     ast = self_parse(tokens)
@@ -56,8 +58,9 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text) -> int:
         return 0
     write_file(ll_path, llvm_text)
     clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
-    rt_c = "E:/lone-lodge/orion/runtime/orion_rt.c"
-    args = [ll_path, rt_c, "-Os", "-o", exe_path]
+    # Link the pre-built runtime object; -O0 skips the LLVM opt pipeline
+    # (tests only assert exit codes, so optimization buys nothing here).
+    args = [ll_path, rt_obj, "-O0", "-o", exe_path]
     exit_code = run_command(clang_path, args)
     if exit_code == 0 then 1 else 0
 
@@ -70,6 +73,13 @@ fn fmt_ms(seconds: f64) -> Text:
 
 fn main() -> int:
     mkdir_all("dist")
+    # Pre-compile the runtime ONCE to an object file. Every test then just
+    # links this object instead of re-compiling orion_rt.c (all of Windows.h)
+    # from scratch — the single biggest per-test cost.
+    clang_setup = "C:\\Program Files\\LLVM\\bin\\clang.exe"
+    rt_obj = "dist/orion_rt.o"
+    rt_c = "E:/lone-lodge/orion/runtime/orion_rt.c"
+    run_command(clang_setup, ["-c", "-Os", rt_c, "-o", rt_obj])
     raw_files = list_dir("tests")
     raw_total = len(raw_files)
     # Only run .or files. Without this filter, non-source files like
@@ -119,7 +129,7 @@ fn main() -> int:
         expected = parse_expected(filename)
 
         compile_start = now()
-        ok = compile_one(src_path, ll_path, exe_path)
+        ok = compile_one(src_path, ll_path, exe_path, rt_obj)
         compile_ms = elapsed(compile_start)
         total_compile_ms = total_compile_ms + compile_ms
 
