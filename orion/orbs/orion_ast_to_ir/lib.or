@@ -2280,13 +2280,237 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         body_result.function
 
 
+# ---- `fact` inlining (reactive derived bindings) ---------------------
+# `fact name = expr` re-evaluates `expr` on EVERY read. We lower it by
+# INLINING: each later reference to `name` is replaced by the defining
+# expression, so the value is recomputed at each use site — exactly the
+# re-evaluate-on-read semantics. The Fact stmt itself emits no code.
+#
+# Substituted subtrees are ALIASED, not deep-copied: lowering treats the
+# AST as read-only, and emitting the same subtree at N read sites is the
+# intended N-times re-evaluation (linear in read count). `fact` bodies are
+# "one thought per line", so nesting blow-up stays negligible in practice.
+#
+# The whole pass is gated behind fact_block_has() so it is a strict no-op
+# on fact-free code (the entire compiler bundle + existing tests) — the AST
+# comes through byte-identical, which keeps self-bootstrap safe.
+
+fn fact_find(names: [Text], target: Text) -> int:
+    mut found = 0 - 1
+    n = len(names)
+    for i in 0..<n:
+        if at(names, i) == target:
+            found = i
+    found
+
+# Rewrite a list of expression nodes (call args, list items, ...).
+fn fact_rw_list(items: [Map], names: [Text], exprs: [Map]) -> [Map]:
+    mut out = slice(items, 0, 0)
+    n = len(items)
+    for i in 0..<n:
+        out = push(out, fact_rw_expr(at(items, i), names, exprs))
+    out
+
+# Rewrite the `value` field of each entry (MapLit pairs, StructCons fields).
+fn fact_rw_pairs(pairs: [Map], names: [Text], exprs: [Map]) -> [Map]:
+    mut out = slice(pairs, 0, 0)
+    n = len(pairs)
+    for i in 0..<n:
+        p = at(pairs, i)
+        out = push(out, set(p, "value", fact_rw_expr(get(p, "value"), names, exprs)))
+    out
+
+# Rewrite the `body` expression of each match arm.
+fn fact_rw_arms(arms: [Map], names: [Text], exprs: [Map]) -> [Map]:
+    mut out = slice(arms, 0, 0)
+    n = len(arms)
+    for i in 0..<n:
+        a = at(arms, i)
+        out = push(out, set(a, "body", fact_rw_expr(get(a, "body"), names, exprs)))
+    out
+
+# Rewrite one expression node: substitute fact idents, recurse into children.
+fn fact_rw_expr(node: Map, names: [Text], exprs: [Map]) -> Map:
+    kind = get(node, "kind")
+    mut out = node
+    if kind == "Ident":
+        idx = fact_find(names, get(node, "name"))
+        if idx >= 0:
+            out = at(exprs, idx)
+    if kind == "Binary":
+        out = set(out, "left", fact_rw_expr(get(node, "left"), names, exprs))
+        out = set(out, "right", fact_rw_expr(get(node, "right"), names, exprs))
+    if kind == "Unary":
+        out = set(out, "operand", fact_rw_expr(get(node, "operand"), names, exprs))
+    if kind == "Call":
+        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+    if kind == "Perform":
+        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+    if kind == "MethodCall":
+        out = set(out, "receiver", fact_rw_expr(get(node, "receiver"), names, exprs))
+        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+    if kind == "Field":
+        out = set(out, "object", fact_rw_expr(get(node, "object"), names, exprs))
+    if kind == "Index":
+        out = set(out, "object", fact_rw_expr(get(node, "object"), names, exprs))
+        out = set(out, "index", fact_rw_expr(get(node, "index"), names, exprs))
+    if kind == "Question":
+        out = set(out, "inner", fact_rw_expr(get(node, "inner"), names, exprs))
+    if kind == "If":
+        out = set(out, "cond", fact_rw_expr(get(node, "cond"), names, exprs))
+        out = set(out, "then", fact_rw_expr(get(node, "then"), names, exprs))
+        out = set(out, "else", fact_rw_expr(get(node, "else"), names, exprs))
+    if kind == "ListLit":
+        out = set(out, "items", fact_rw_list(get_list(node, "items"), names, exprs))
+    if kind == "NamedArg":
+        out = set(out, "value", fact_rw_expr(get(node, "value"), names, exprs))
+    if kind == "MapLit":
+        out = set(out, "pairs", fact_rw_pairs(get_list(node, "pairs"), names, exprs))
+    if kind == "StructCons":
+        out = set(out, "fields", fact_rw_pairs(get_list(node, "fields"), names, exprs))
+    if kind == "Match":
+        out = set(out, "scrutinee", fact_rw_expr(get(node, "scrutinee"), names, exprs))
+        out = set(out, "arms", fact_rw_arms(get_list(node, "arms"), names, exprs))
+    out
+
+# An IfBlock's else is either a Block or a chained IfBlock (else-if ladder).
+fn fact_rw_else(node: Map, names: [Text], exprs: [Map]) -> Map:
+    kind = get(node, "kind")
+    mut out = node
+    if kind == "Block":
+        out = fact_rw_block(node, names, exprs)
+    if kind == "IfBlock":
+        out = fact_rw_stmt(node, names, exprs)
+    out
+
+# Rewrite one statement: fix up its expression fields + nested blocks.
+fn fact_rw_stmt(s: Map, names: [Text], exprs: [Map]) -> Map:
+    kind = get(s, "kind")
+    mut out = s
+    if kind == "MutLet":
+        out = set(out, "value", fact_rw_expr(get(s, "value"), names, exprs))
+    if kind == "LetOrAssign":
+        out = set(out, "value", fact_rw_expr(get(s, "value"), names, exprs))
+    if kind == "ExprStmt":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Return":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Require":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Ensure":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Defer":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Destroy":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Loop":
+        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+    if kind == "ForRange":
+        out = set(out, "low", fact_rw_expr(get(s, "low"), names, exprs))
+        out = set(out, "high", fact_rw_expr(get(s, "high"), names, exprs))
+        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+    if kind == "ForIn":
+        out = set(out, "iter", fact_rw_expr(get(s, "iter"), names, exprs))
+        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+    if kind == "ForWith":
+        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+    if kind == "IfBlock":
+        out = set(out, "cond", fact_rw_expr(get(s, "cond"), names, exprs))
+        out = set(out, "then", fact_rw_block(get(s, "then"), names, exprs))
+        out = set(out, "else", fact_rw_else(get(s, "else"), names, exprs))
+    if kind == "Match":
+        out = set(out, "scrutinee", fact_rw_expr(get(s, "scrutinee"), names, exprs))
+        out = set(out, "arms", fact_rw_arms(get(s, "arms"), names, exprs))
+    out
+
+# Rewrite a Block. Facts declared in it extend the binding env for the
+# statements that follow (and for nested blocks); the Fact stmt is dropped.
+fn fact_rw_block(block: Map, names: [Text], exprs: [Map]) -> Map:
+    stmts = get_list(block, "stmts")
+    n = len(stmts)
+    mut out = slice(stmts, 0, 0)
+    mut cur_names = names
+    mut cur_exprs = exprs
+    for i in 0..<n:
+        s = at(stmts, i)
+        if get(s, "kind") == "Fact":
+            rhs = fact_rw_expr(get(s, "value"), cur_names, cur_exprs)
+            cur_names = push(cur_names, get(s, "name"))
+            cur_exprs = push(cur_exprs, rhs)
+        else:
+            out = push(out, fact_rw_stmt(s, cur_names, cur_exprs))
+    set(block, "stmts", out)
+
+# Does this else-node (Block or ladder IfBlock) contain any `fact`?
+fn fact_else_has(node: Map) -> bool:
+    kind = get(node, "kind")
+    mut found = false
+    if kind == "Block":
+        if fact_block_has(node):
+            found = true
+    if kind == "IfBlock":
+        if fact_block_has(get(node, "then")):
+            found = true
+        if fact_else_has(get(node, "else")):
+            found = true
+    found
+
+# Recursively: does this block (or a nested block) declare any `fact`?
+# Gates the whole pass so fact-free programs are untouched.
+fn fact_block_has(block: Map) -> bool:
+    stmts = get_list(block, "stmts")
+    n = len(stmts)
+    mut found = false
+    for i in 0..<n:
+        s = at(stmts, i)
+        k = get(s, "kind")
+        if k == "Fact":
+            found = true
+        if k == "Loop" or k == "ForRange" or k == "ForIn" or k == "ForWith":
+            if fact_block_has(get(s, "body")):
+                found = true
+        if k == "IfBlock":
+            if fact_block_has(get(s, "then")):
+                found = true
+            if fact_else_has(get(s, "else")):
+                found = true
+    found
+
+
 pub fn ast_program_to_ir(program: Map) -> IRModule:
+    # Pass -1: `fact` inlining. Replace reads of reactive `fact` bindings
+    # with their defining expression so they recompute on each read. Gated
+    # by a prescan — no facts means the decls pass through untouched.
+    raw_decls_src = get_list(program, "decls")
+    rd_src_n = len(raw_decls_src)
+    mut any_fact = false
+    for fi in 0..<rd_src_n:
+        fd = at(raw_decls_src, fi)
+        fdk = get(fd, "kind")
+        if fdk == "Fn" or fdk == "System":
+            if fact_block_has(get(fd, "body")):
+                any_fact = true
+    mut fact_decls = raw_decls_src
+    if any_fact:
+        mut rewritten = slice(raw_decls_src, 0, 0)
+        for fi2 in 0..<rd_src_n:
+            mut fd2 = at(raw_decls_src, fi2)
+            fd2k = get(fd2, "kind")
+            if fd2k == "Fn" or fd2k == "System":
+                fb2 = get(fd2, "body")
+                e_names = slice([""], 0, 0)
+                e_exprs = slice(get_list(fb2, "stmts"), 0, 0)
+                fd2 = set(fd2, "body", fact_rw_block(fb2, e_names, e_exprs))
+            rewritten = push(rewritten, fd2)
+        fact_decls = rewritten
+    program_facted = set(program, "decls", fact_decls)
+
     # Pass 0: lambda lift. For each `name = |params| body` LetOrAssign at
     # top of a fn body, hoist as synthesized __lambda_N global fn. We
     # pre-scan for any Lambda — if none, take the early-return path that
     # leaves decls unmodified (avoids if/else type-mismatch on empty-list
     # initialization, which broke the bundle build before).
-    raw_decls = get_list(program, "decls")
+    raw_decls = get_list(program_facted, "decls")
     raw_total = len(raw_decls)
     mut has_any_lambda = false
     for sc_idx in 0..<raw_total:

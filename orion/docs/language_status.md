@@ -5,6 +5,8 @@
 ### Core language
 - `fn` / `pub fn` declarations, `extern fn` for FFI
 - `mut name = ...` (mutable bindings), `name = ...` (reassignment)
+- `fact name = expr` — reactive derived binding; reading `name` re-evaluates
+  `expr` against current state (lowered by inlining, so no runtime tick needed)
 - Type annotations on params, optional on locals
 - `return <expr>` keyword (early-exit)
 - `if cond:` block-form + `if c then a else b` expression-form
@@ -47,7 +49,7 @@
 - Self-hosting: `orion.exe` (294KB native PE) compiles its own bundle
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 82/82 tests passing
+- 93/93 tests passing
 
 ### Stdlib orbs (pure Orion)
 bytes, text, fs, io, time, math, random, log, hash, json, csv, xml, regex, url, base64, hex, color, crypto, easing, noise, format, collections, env, sysinfo, image, audio, gpu, wgsl, net, result, option, assert, plus orion compiler internals (lex/parse/ir/ast_to_ir/emit_llvm).

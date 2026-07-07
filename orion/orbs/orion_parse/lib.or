@@ -917,6 +917,12 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # slot's element type, which inference can't recover for `[]` (an empty
         # list has no element to peek). `mut`-led, so no keyword-clash risk.
         is_typed_mut_decl = kind_here == "ident" and value_here == "mut" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == ":"
+        # `fact name = expr` — a reactive derived binding. Reading `name`
+        # re-evaluates `expr` in the current scope, so it always reflects the
+        # latest values of whatever it reads. Lowered by inlining (see the
+        # fact pass in orion_ast_to_ir). Only the `fact NAME =` shape is a
+        # keyword; a bare `fact` elsewhere stays a plain identifier.
+        is_fact_decl = kind_here == "ident" and value_here == "fact" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
         # `name = expr` — either immutable let OR reassignment, decided
         # by the codegen scope tracker.
         is_let_or_assign = (not is_mut_decl) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
@@ -958,6 +964,11 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             tm_expr_result = psr_parse_expr(tokens, tm_after_type + 1)
             statements = push(statements, {"kind": "MutLet", "name": tm_name, "value": get_map(tm_expr_result, "node"), "decl_type": get_map(tm_type_result, "node")})
             cursor = get_int(tm_expr_result, "next")
+        if is_fact_decl:
+            fact_name = psr_peek_value(tokens, cursor + 1)
+            fact_expr_result = psr_parse_expr(tokens, cursor + 3)
+            statements = push(statements, {"kind": "Fact", "name": fact_name, "value": get_map(fact_expr_result, "node")})
+            cursor = get_int(fact_expr_result, "next")
         if is_let_or_assign:
             assign_name = value_here
             assign_tok = at(tokens, cursor)
@@ -1163,7 +1174,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                     ci = ci - 1
                 statements = push(statements, {"kind": "IfBlock", "cond": get_map(cond_probe, "node"), "then": get_map(then_body_result, "node"), "else": else_node})
                 cursor = if_cursor
-        is_plain_expr = not (is_mut_decl or is_typed_mut_decl or is_let_or_assign or is_break or is_continue or is_require or is_ensure or is_return or is_destroy or is_loop or is_for or is_match or actually_if_block)
+        is_plain_expr = not (is_mut_decl or is_typed_mut_decl or is_fact_decl or is_let_or_assign or is_break or is_continue or is_require or is_ensure or is_return or is_destroy or is_loop or is_for or is_match or actually_if_block)
         if is_plain_expr:
             expr_result = psr_parse_expr(tokens, cursor)
             expr_next = get_int(expr_result, "next")
