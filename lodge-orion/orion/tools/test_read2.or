@@ -1,4 +1,0 @@
-use io
-fn main():
-    txt = read_file("tools/test_assets/test.ppm")
-    print_line(txt)

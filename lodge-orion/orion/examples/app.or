@@ -1,6 +1,0 @@
-# A multi-file program: `use` pulls in another module from the same directory.
-#   orion run examples/app.or demo
-
-use geometry
-
-fn demo() -> int = area(3, 4) + perimeter(3, 4)

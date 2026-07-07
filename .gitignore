@@ -1,4 +1,4 @@
-# orion monorepo (lodge-orion + orion-self).
+# orion — the fully self-hosted Orion compiler (written in Orion).
 # Other lone-lodge projects live in sibling dirs with their own repos.
 
 # === Sibling projects (their own repos) ===
