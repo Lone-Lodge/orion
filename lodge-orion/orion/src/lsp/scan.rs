@@ -269,6 +269,11 @@ fn scan_expr(e: &Expr, name: &str, out: &mut Option<Span>) {
         Expr::Var(n, sp) if n == name => *out = Some(*sp),
         Expr::Var(_, _) | Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_) | Expr::None => {}
         Expr::Field { base, .. } => scan_expr(base, name, out),
+        Expr::ForCollect { iter, filter, body, .. } => {
+            scan_expr(iter, name, out);
+            if let Some(f) = filter { scan_expr(f, name, out); }
+            scan_expr(body, name, out);
+        }
         Expr::Call { callee, args } => {
             scan_expr(callee, name, out);
             args.iter().for_each(|a| scan_expr(a, name, out));

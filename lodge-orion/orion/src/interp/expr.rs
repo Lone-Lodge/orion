@@ -101,7 +101,41 @@ impl Interp<'_> {
                 body: Arc::new((**body).clone()),
                 captured: Arc::new(env.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
             }),
+            Expr::ForCollect { var, iter, filter, body } => {
+                self.eval_for_collect(var, iter, filter.as_deref(), body, env)
+            }
         }
+    }
+
+    /// `for x in xs [where c]: expr` in expression position — bind each element,
+    /// keep those passing the filter, collect the body value into a list.
+    fn eval_for_collect(
+        &self,
+        var: &str,
+        iter: &Expr,
+        filter: Option<&Expr>,
+        body: &Expr,
+        env: &mut Env,
+    ) -> Result<Value, RunError> {
+        let seq = match self.eval(iter, env)? {
+            Value::List(items) => items,
+            other => {
+                return Err(run_err(format!(
+                    "`for {var} in …` expects a list, got {other:?}"
+                )));
+            }
+        };
+        let mut out = Vec::new();
+        for item in seq.iter() {
+            env.insert(var.to_string(), item.clone());
+            if let Some(f) = filter {
+                if !self.as_bool(self.eval(f, env)?)? {
+                    continue;
+                }
+            }
+            out.push(self.eval(body, env)?);
+        }
+        Ok(Value::List(Arc::new(out)))
     }
 
     fn eval_var(&self, name: &str, env: &Env) -> Result<Value, RunError> {

@@ -91,6 +91,11 @@ fn walk_children<F: FnMut(&mut Expr)>(e: &mut Expr, mut f: F) {
         Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_)
         | Expr::None | Expr::Var(..) => {}
         Expr::Field { base, .. } => f(base),
+        Expr::ForCollect { iter, filter, body, .. } => {
+            f(iter);
+            if let Some(fl) = filter { f(fl); }
+            f(body);
+        }
         Expr::Call { callee, args } => {
             f(callee);
             for a in args { f(a); }

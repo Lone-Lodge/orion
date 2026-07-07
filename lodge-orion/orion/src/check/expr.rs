@@ -11,6 +11,15 @@ impl Checker<'_> {
             Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_) | Expr::None => Ok(()),
             Expr::Var(name, span) => self.check_var(name, *span, scope),
             Expr::Field { base, .. } => self.check_expr(base, scope),
+            Expr::ForCollect { var, iter, filter, body } => {
+                self.check_expr(iter, scope)?;
+                let mut inner = scope.clone();
+                inner.insert(var.clone(), true);
+                if let Some(f) = filter {
+                    self.check_expr(f, &inner)?;
+                }
+                self.check_expr(body, &inner)
+            }
             Expr::Call { callee, args } => self.check_call(callee, args, scope),
             Expr::Unary { rhs, .. } => self.check_expr(rhs, scope),
             Expr::Binary { lhs, rhs, .. } => {

@@ -33,6 +33,7 @@ impl Cx {
             Expr::Lambda { .. } => Ok(Ty::Unknown),
             Expr::Comptime(inner) => self.infer(inner, scope),
             Expr::NamedArg { value, .. } => self.infer(value, scope),
+            Expr::ForCollect { .. } => Ok(Ty::Unknown),
         }
     }
 

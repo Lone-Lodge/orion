@@ -51,6 +51,7 @@ impl Parser<'_> {
             Some(Tok::If) => self.atom_if(),
             Some(Tok::Spawn) => self.atom_spawn(),
             Some(Tok::Match) => self.atom_match(sp.col),
+            Some(Tok::For) => self.atom_for_collect(),
             // Anonymous fn — `fn(x, y) = expr`. Captures the surrounding
             // environment when evaluated, just like every modern lambda.
             Some(Tok::Fn) => self.atom_lambda(),
@@ -210,6 +211,29 @@ impl Parser<'_> {
         self.eat(&Tok::Colon)?;
         let arms = self.match_arms(base_col)?;
         Ok(Expr::Match { scrutinee: Box::new(scrutinee), arms })
+    }
+
+    /// `for <var> in <iter> [where <cond>]: <body>` in expression position —
+    /// collects each body value into a list (map + filter). Single-expression
+    /// body after `:` (statement-position `for` remains the side-effect loop).
+    fn atom_for_collect(&mut self) -> Result<Expr, ParseError> {
+        let var = self.ident()?;
+        self.eat(&Tok::In)?;
+        let iter = self.expr()?;
+        let filter = if self.is_kw("where") {
+            self.bump();
+            Some(Box::new(self.expr()?))
+        } else {
+            None
+        };
+        self.eat(&Tok::Colon)?;
+        let body = self.expr()?;
+        Ok(Expr::ForCollect {
+            var,
+            iter: Box::new(iter),
+            filter,
+            body: Box::new(body),
+        })
     }
 
     /// `match:` cond-form arms — `cond -> body` (first true wins) + a final

@@ -336,6 +336,18 @@ fn emit_expr(e: &Expr, out: &mut String, _indent: usize) {
     match e {
         Expr::Int(n) => out.push_str(&n.to_string()),
         Expr::Float(x) => out.push_str(&x.to_string()),
+        Expr::ForCollect { var, iter, filter, body } => {
+            out.push_str("for ");
+            out.push_str(var);
+            out.push_str(" in ");
+            emit_expr(iter, out, _indent);
+            if let Some(f) = filter {
+                out.push_str(" where ");
+                emit_expr(f, out, _indent);
+            }
+            out.push_str(": ");
+            emit_expr(body, out, _indent);
+        }
         Expr::Str(s) => {
             out.push('"');
             for ch in s.chars() {

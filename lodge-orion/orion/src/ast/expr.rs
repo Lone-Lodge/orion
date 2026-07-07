@@ -75,6 +75,15 @@ pub enum Expr {
     /// `spawn(x = 3, y = 4)` produces two of these; the interpreter
     /// matches them by name against the callee's declared param list.
     NamedArg { name: String, value: Box<Expr> },
+    /// `for <var> in <iter> [where <cond>]: <body>` in EXPRESSION position —
+    /// collects each body value into a list (map + filter in one). Statement-
+    /// position `for` stays a side-effect loop.
+    ForCollect {
+        var: String,
+        iter: Box<Expr>,
+        filter: Option<Box<Expr>>,
+        body: Box<Expr>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
