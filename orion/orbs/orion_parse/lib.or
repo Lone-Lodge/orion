@@ -693,9 +693,17 @@ fn psr_parse_call(tokens: [Map], position: int, callee_name: Text) -> Map:
             break
         if psr_peek_kind(tokens, cursor) == "eof":
             break
-        arg_result = psr_parse_expr(tokens, cursor)
-        args = push(args, get_map(arg_result, "node"))
-        cursor = get_int(arg_result, "next")
+        # Named argument: `IDENT = EXPR` binds by name (reordered at lowering).
+        is_named_arg = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
+        if is_named_arg:
+            na_name = psr_peek_value(tokens, cursor)
+            na_val = psr_parse_expr(tokens, cursor + 2)
+            args = push(args, {"kind": "NamedArg", "name": na_name, "value": get_map(na_val, "node")})
+            cursor = get_int(na_val, "next")
+        else:
+            arg_result = psr_parse_expr(tokens, cursor)
+            args = push(args, get_map(arg_result, "node"))
+            cursor = get_int(arg_result, "next")
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
             cursor += 1
     {"node": {"kind": "Call", "callee": callee_name, "args": args, "line": callee_line, "col": callee_col}, "next": cursor}

@@ -1060,7 +1060,29 @@ fn find_variant_enum(scope: Scope, callee: Text) -> Text:
 
 fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     callee = get(node, "callee")
-    args = get_list(node, "args")
+    mut args = get_list(node, "args")
+    # Named-argument reorder: `f(y = 3, x = 5)` → positional order via the
+    # `otir:param:<fn>:<name>` slots. Positional args fill in source order.
+    mut na_has = 0
+    for na_i in 0..<len(args):
+        if get(at(args, na_i), "kind") == "NamedArg":
+            na_has = 1
+    if na_has == 1:
+        na_total = len(args)
+        na_seed = []
+        mut na_pos = na_seed
+        for na_j in 0..<na_total:
+            na_pos = push(na_pos, {"kind": "Int", "value": "0"})
+        mut na_next = 0
+        for na_k in 0..<na_total:
+            na_a = at(args, na_k)
+            if get(na_a, "kind") == "NamedArg":
+                na_slot = slot_get_int("otir:param:" + callee + ":" + get(na_a, "name"))
+                na_pos = set(na_pos, na_slot, get_map(na_a, "value"))
+            else:
+                na_pos = set(na_pos, na_next, na_a)
+                na_next = na_next + 1
+        args = na_pos
     # Variant-as-callee → route through the EnumName.Variant(...) sugar
     # (same MethodCall lowering path). Checked BEFORE builtins/user fns —
     # a variant name shadows nothing else by construction.
@@ -2553,6 +2575,12 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             # argument count silently shifts every parameter — caught
             # here instead of as a runtime pointer crash.
             slot_set("otir:arity:" + fn_name, len(get_list(decl, "params")))
+            # Parameter-position registry: `otir:param:<fn>:<name>` -> index,
+            # so a named argument `f(x = 5)` can be reordered to its slot.
+            fn_params_list = get_list(decl, "params")
+            for fp_i in 0..<len(fn_params_list):
+                fp = at(fn_params_list, fp_i)
+                slot_set("otir:param:" + fn_name + ":" + get(fp, "name"), fp_i)
         if decl_kind_1b == "ExternFn":
             ext_name = get(decl, "name")
             ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
