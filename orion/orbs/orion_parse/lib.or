@@ -167,6 +167,10 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
 # `position` points at the `match` keyword. Returns {node, next}.
 fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
     mut match_cursor = position + 1
+    # Subjectless cond-form: `match:` (first token is `:`) — arms are
+    # `COND: body` (first true wins) + `else: body`, desugared to nested If.
+    if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == ":":
+        return psr_parse_cond_match(tokens, match_cursor + 1)
     scrutinee_result = psr_parse_expr(tokens, match_cursor)
     match_cursor = get_int(scrutinee_result, "next")
     if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == ":":
@@ -211,6 +215,53 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
         match_cursor = get_int(body_result, "next")
         match_cursor = psr_skip_newlines(tokens, match_cursor)
     {"node": {"kind": "Match", "scrutinee": get_map(scrutinee_result, "node"), "arms": arms_list}, "next": match_cursor}
+
+# `match:` cond-form arms — `COND: body` (first true wins) + `else: body`.
+# Desugars to a right-nested If chain, so eval/typeck/emit stay untouched.
+fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
+    mut cursor = psr_skip_newlines(tokens, position)
+    arm_col = psr_peek_col(tokens, cursor)
+    cm_conds = []
+    mut cm_cond_list = cm_conds
+    cm_bodies = []
+    mut cm_body_list = cm_bodies
+    mut cm_else = {"kind": "Int", "value": "0"}
+    loop:
+        k = psr_peek_kind(tokens, cursor)
+        c = psr_peek_col(tokens, cursor)
+        if k == "eof":
+            break
+        if c < arm_col:
+            break
+        is_else = k == "ident" and psr_peek_value(tokens, cursor) == "else"
+        if is_else:
+            cursor = cursor + 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+                cursor = cursor + 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
+                cursor = cursor + 1
+            eb = psr_parse_expr(tokens, cursor)
+            cm_else = get_map(eb, "node")
+            cursor = get_int(eb, "next")
+            cursor = psr_skip_newlines(tokens, cursor)
+            break
+        cr = psr_parse_expr(tokens, cursor)
+        cursor = get_int(cr, "next")
+        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+            cursor = cursor + 1
+        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
+            cursor = cursor + 1
+        br = psr_parse_expr(tokens, cursor)
+        cm_cond_list = push(cm_cond_list, get_map(cr, "node"))
+        cm_body_list = push(cm_body_list, get_map(br, "node"))
+        cursor = get_int(br, "next")
+        cursor = psr_skip_newlines(tokens, cursor)
+    cm_n = len(cm_cond_list)
+    mut cm_chain = cm_else
+    for cm_i in 0..<cm_n:
+        cm_idx = cm_n - 1 - cm_i
+        cm_chain = {"kind": "If", "cond": at(cm_cond_list, cm_idx), "then": at(cm_body_list, cm_idx), "else": cm_chain}
+    {"node": cm_chain, "next": cursor}
 
 # --- expression parser ---
 #

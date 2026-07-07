@@ -398,6 +398,14 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_fn = er.function
             current_scope = er.scope
             last_id = er.id
+        # A bare `If` node in statement position — produced by the `match:`
+        # cond-form desugar — is an if-EXPRESSION used as the block value.
+        # Route it through the expr path (the block-form `if` is `IfBlock`).
+        if already_done == 0 and stmt_kind == "If":
+            er = ast_expr_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
         if already_done == 0 and is_let:
             name = get(stmt, "name")
             # `x = push(x, v)` is a plain copying push like every push —
@@ -513,7 +521,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if already_done == 0 and is_defer:
             # Just stash the expression; we'll emit it at block end / before return.
             defer_exprs = push(defer_exprs, get(stmt, "expr"))
-        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt
+        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt or stmt_kind == "If"
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
