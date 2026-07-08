@@ -1953,6 +1953,12 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
 pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     kind = get(node, "kind")
+    # `xs[i]` is sugar for `at(xs, i)` — desugar here so the `at` builtin's
+    # element typing and bounds handling are reused verbatim. Nested indexing
+    # (`xss[0][1]`) falls out naturally: the inner Index lowers as `at`'s arg.
+    if kind == "Index":
+        at_call = {"kind": "Call", "callee": "at", "args": [get(node, "object"), get(node, "index")]}
+        return ast_expr_to_ir(fn_value, scope, at_call)
     is_block = kind == "Block"
     is_int = kind == "Int"
     is_float_lit = kind == "Float"
