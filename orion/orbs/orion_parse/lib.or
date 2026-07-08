@@ -608,48 +608,17 @@ fn psr_interpolate_str(raw_text: Text) -> Map:
                         break
                     scan_index2 = scan_index2 + 1
                 ident_text = bytes_to_text(bytes_slice(raw_bytes, ident_start, scan_index2))
-                # Detect a fn call `name(arg1, arg2, ...)`. We do a tiny
-                # in-line parser because re-lexing here would pull in the
-                # full pipeline. Single-level calls only — nested calls or
-                # arithmetic inside an interpolation needs a temp var.
-                expr_bytes = bytes_from_text(ident_text)
-                expr_len = bytes_length(expr_bytes)
-                mut paren_at = 0 - 1
-                mut dot_at = 0 - 1
-                for ei in 0..<expr_len:
-                    if byte_at(expr_bytes, ei) == 40 and paren_at == (0 - 1):
-                        paren_at = ei
-                    if byte_at(expr_bytes, ei) == 46 and dot_at == (0 - 1):
-                        dot_at = ei
+                # Parse the `{...}` content as a REAL expression: lex it, then
+                # run the expression parser. This handles arithmetic (`a + b`),
+                # indexing (`xs[0]`), nested calls — anything — instead of the
+                # old hand-rolled `name(...)` / `obj.field` special cases.
+                # (A nested string literal with `"` still can't appear, since
+                # the outer lexer ends the string at the first inner quote.)
                 mut raw_ident = {"kind": "Ident", "name": ident_text}
-                # Detect `obj.field` (no parens, has dot). Lower to Field AST.
-                has_dot_only = dot_at > 0 and paren_at == (0 - 1)
-                if has_dot_only:
-                    obj_name = psr_trim_ws(bytes_to_text(bytes_slice(expr_bytes, 0, dot_at)))
-                    field_name = psr_trim_ws(bytes_to_text(bytes_slice(expr_bytes, dot_at + 1, expr_len)))
-                    raw_ident = {"kind": "Field", "object": {"kind": "Ident", "name": obj_name}, "field": field_name}
-                if paren_at > 0:
-                    callee_name = psr_trim_ws(bytes_to_text(bytes_slice(expr_bytes, 0, paren_at)))
-                    args_text = bytes_to_text(bytes_slice(expr_bytes, paren_at + 1, expr_len - 1))
-                    args_bytes = bytes_from_text(args_text)
-                    args_len = bytes_length(args_bytes)
-                    mut call_args = []
-                    mut arg_start = 0
-                    mut paren_depth = 0
-                    for ai in 0..<args_len:
-                        bi = byte_at(args_bytes, ai)
-                        if bi == 40:
-                            paren_depth = paren_depth + 1
-                        if bi == 41:
-                            paren_depth = paren_depth - 1
-                        if bi == 44 and paren_depth == 0:
-                            arg_chunk = psr_trim_ws(bytes_to_text(bytes_slice(args_bytes, arg_start, ai)))
-                            call_args = push(call_args, psr_arg_to_node(arg_chunk))
-                            arg_start = ai + 1
-                    if args_len > 0:
-                        tail_chunk = psr_trim_ws(bytes_to_text(bytes_slice(args_bytes, arg_start, args_len)))
-                        call_args = push(call_args, psr_arg_to_node(tail_chunk))
-                    raw_ident = {"kind": "Call", "callee": callee_name, "args": call_args}
+                if bytes_length(bytes_from_text(ident_text)) > 0:
+                    interp_tokens = self_lex(ident_text)
+                    interp_parsed = psr_parse_expr(interp_tokens, 0)
+                    raw_ident = get_map(interp_parsed, "node")
                 # Wrap in to_text so ints get fmt'd and strings flow through.
                 ident_node = {"kind": "Call", "callee": "to_text", "args": [raw_ident]}
                 started_before_ident = node_started
