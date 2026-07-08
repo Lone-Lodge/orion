@@ -340,7 +340,11 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     is_match_expr = is_ident and value == "match"
     is_perform = is_ident and value == "perform"
     is_for = is_ident and value == "for"
-    is_call = is_ident and not is_if and not is_not and not is_match_expr and not is_perform and not is_for and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
+    # Anonymous fn / lambda in expression position: `fn(params): body`. Reuses
+    # the `fn` keyword (a newcomer who knows `fn name(n): ...` can read this),
+    # and lowers to the SAME Lambda node as the older `|n| body` form.
+    is_fn_lambda = is_ident and value == "fn" and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
+    is_call = is_ident and not is_if and not is_not and not is_match_expr and not is_perform and not is_for and not is_fn_lambda and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
     mut result = {"node": {"kind": "Error", "msg": "expected an expression"}, "next": position}
     if is_if:
         result = psr_parse_if(tokens, position)
@@ -375,11 +379,33 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
                 if psr_peek_kind(tokens, pc) == "symbol" and psr_peek_value(tokens, pc) == ",":
                     pc = pc + 1
         result = {"node": {"kind": "Perform", "effect": eff_name, "op": op_name, "args": perf_args_list}, "next": pc}
+    if is_fn_lambda:
+        # `fn(a, b): expr` — collect param idents up to `)`, skip `:`, parse body.
+        mut fl_cursor = position + 2
+        fl_params = []
+        mut fl_list = fl_params
+        loop:
+            fk = psr_peek_kind(tokens, fl_cursor)
+            fv = psr_peek_value(tokens, fl_cursor)
+            if fk == "symbol" and fv == ")":
+                fl_cursor = fl_cursor + 1
+                break
+            if fk == "eof":
+                break
+            if fk == "ident":
+                fl_list = push(fl_list, fv)
+                fl_cursor = fl_cursor + 1
+            if fk == "symbol" and fv == ",":
+                fl_cursor = fl_cursor + 1
+        if psr_peek_kind(tokens, fl_cursor) == "symbol" and psr_peek_value(tokens, fl_cursor) == ":":
+            fl_cursor = fl_cursor + 1
+        fl_body = psr_parse_expr(tokens, fl_cursor)
+        result = {"node": {"kind": "Lambda", "params": fl_list, "body": get_map(fl_body, "node")}, "next": get_int(fl_body, "next")}
     if is_call:
         result = psr_parse_call(tokens, position, value)
     is_true = is_ident and value == "true"
     is_false = is_ident and value == "false"
-    if is_ident and not is_call and not is_if and not is_match_expr and not is_perform and not is_for and not is_true and not is_false:
+    if is_ident and not is_call and not is_if and not is_match_expr and not is_perform and not is_for and not is_fn_lambda and not is_true and not is_false:
         next_kind = psr_peek_kind(tokens, position + 1)
         next_value = psr_peek_value(tokens, position + 1)
         value_bytes = bytes_from_text(value)
