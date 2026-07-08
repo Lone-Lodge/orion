@@ -2272,6 +2272,8 @@ fn ast_type_to_ir(type_node: Map) -> Text:
         else:
             if name == "Map" or name == "map":
                 "map"
+            else if name == "List" or name == "list":
+                "list"
             else:
                 if name == "fn" or name == "ptr":
                     # Function pointer / generic pointer — encode as "fn"
@@ -2315,6 +2317,8 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
         else:
             if name == "Map" or name == "map":
                 "map"
+            else if name == "List" or name == "list":
+                "list"
             else:
                 if name == "fn" or name == "ptr":
                     "fn"
