@@ -1656,839 +1656,841 @@ after:
 @.str_493 = private unnamed_addr constant [60 x i8] c"\F4\98\59\32\00\00\00\00\2B\00\00\00\00\00\00\00orion: WARNING \E2\80\94 lambda likely captures `\00", align 8
 @.str_494 = private unnamed_addr constant [84 x i8] c"\E1\79\B0\32\00\00\00\00\43\00\00\00\00\00\00\00` (env-struct closures not yet supported; capture acts as free var)\00", align 8
 @.str_495 = private unnamed_addr constant [26 x i8] c"\39\B9\3B\30\00\00\00\00\09\00\00\00\00\00\00\00__lambda_\00", align 8
-@.str_496 = private unnamed_addr constant [24 x i8] c"\9C\00\63\06\00\00\00\00\07\00\00\00\00\00\00\00tag:int\00", align 8
-@.str_497 = private unnamed_addr constant [19 x i8] c"\11\4C\81\05\00\00\00\00\02\00\00\00\00\00\00\00|p\00", align 8
-@.str_498 = private unnamed_addr constant [21 x i8] c"\D2\75\D8\31\00\00\00\00\04\00\00\00\00\00\00\00:int\00", align 8
-@.str_499 = private unnamed_addr constant [54 x i8] c"\B0\64\33\20\00\00\00\00\25\00\00\00\00\00\00\00orion: ERROR \E2\80\94 duplicate function `\00", align 8
-@.str_500 = private unnamed_addr constant [65 x i8] c"\D7\46\C1\20\00\00\00\00\30\00\00\00\00\00\00\00` (two orbs in this build define it; rename one)\00", align 8
-@.str_501 = private unnamed_addr constant [21 x i8] c"\D6\D0\AB\38\00\00\00\00\04\00\00\00\00\00\00\00main\00", align 8
-@.str_502 = private unnamed_addr constant [19 x i8] c"\92\1F\81\05\00\00\00\00\02\00\00\00\00\00\00\00%v\00", align 8
-@.str_503 = private unnamed_addr constant [18 x i8] c"\D0\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00A\00", align 8
-@.str_504 = private unnamed_addr constant [18 x i8] c"\D1\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00B\00", align 8
-@.str_505 = private unnamed_addr constant [18 x i8] c"\D2\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00C\00", align 8
-@.str_506 = private unnamed_addr constant [18 x i8] c"\D3\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00D\00", align 8
-@.str_507 = private unnamed_addr constant [18 x i8] c"\D4\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00E\00", align 8
-@.str_508 = private unnamed_addr constant [18 x i8] c"\D5\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00F\00", align 8
-@.str_509 = private unnamed_addr constant [21 x i8] c"\01\FC\17\39\00\00\00\00\04\00\00\00\00\00\00\00puts\00", align 8
-@.str_510 = private unnamed_addr constant [23 x i8] c"\8F\FF\1A\09\00\00\00\00\06\00\00\00\00\00\00\00printf\00", align 8
-@.str_511 = private unnamed_addr constant [23 x i8] c"\51\DF\B4\18\00\00\00\00\06\00\00\00\00\00\00\00malloc\00", align 8
-@.str_512 = private unnamed_addr constant [23 x i8] c"\1A\F0\D3\1D\00\00\00\00\06\00\00\00\00\00\00\00strlen\00", align 8
-@.str_513 = private unnamed_addr constant [23 x i8] c"\75\9A\D1\1D\00\00\00\00\06\00\00\00\00\00\00\00strcpy\00", align 8
-@.str_514 = private unnamed_addr constant [23 x i8] c"\C3\92\D1\1D\00\00\00\00\06\00\00\00\00\00\00\00strcat\00", align 8
-@.str_515 = private unnamed_addr constant [23 x i8] c"\E3\98\D1\1D\00\00\00\00\06\00\00\00\00\00\00\00strcmp\00", align 8
-@.str_516 = private unnamed_addr constant [25 x i8] c"\6E\15\73\3B\00\00\00\00\08\00\00\00\00\00\00\00snprintf\00", align 8
-@.str_517 = private unnamed_addr constant [23 x i8] c"\71\E1\70\23\00\00\00\00\06\00\00\00\00\00\00\00memcpy\00", align 8
-@.str_518 = private unnamed_addr constant [23 x i8] c"\0A\CD\D5\1D\00\00\00\00\06\00\00\00\00\00\00\00strstr\00", align 8
-@.str_519 = private unnamed_addr constant [22 x i8] c"\81\A9\29\1F\00\00\00\00\05\00\00\00\00\00\00\00fopen\00", align 8
-@.str_520 = private unnamed_addr constant [23 x i8] c"\59\1A\74\38\00\00\00\00\06\00\00\00\00\00\00\00fclose\00", align 8
-@.str_521 = private unnamed_addr constant [22 x i8] c"\D9\AE\8D\1F\00\00\00\00\05\00\00\00\00\00\00\00fread\00", align 8
-@.str_522 = private unnamed_addr constant [23 x i8] c"\72\DC\B1\32\00\00\00\00\06\00\00\00\00\00\00\00fwrite\00", align 8
-@.str_523 = private unnamed_addr constant [22 x i8] c"\B8\4F\D2\1F\00\00\00\00\05\00\00\00\00\00\00\00ftell\00", align 8
-@.str_524 = private unnamed_addr constant [22 x i8] c"\87\FE\AF\1F\00\00\00\00\05\00\00\00\00\00\00\00fseek\00", align 8
-@.str_525 = private unnamed_addr constant [30 x i8] c"\6C\12\AE\0F\00\00\00\00\0D\00\00\00\00\00\00\00declare i64 @\00", align 8
-@.str_526 = private unnamed_addr constant [19 x i8] c"\4D\40\81\05\00\00\00\00\02\00\00\00\00\00\00\00eq\00", align 8
-@.str_527 = private unnamed_addr constant [19 x i8] c"\DC\44\81\05\00\00\00\00\02\00\00\00\00\00\00\00ne\00", align 8
-@.str_528 = private unnamed_addr constant [20 x i8] c"\76\17\E6\05\00\00\00\00\03\00\00\00\00\00\00\00slt\00", align 8
-@.str_529 = private unnamed_addr constant [20 x i8] c"\67\17\E6\05\00\00\00\00\03\00\00\00\00\00\00\00sle\00", align 8
-@.str_530 = private unnamed_addr constant [20 x i8] c"\E7\14\E6\05\00\00\00\00\03\00\00\00\00\00\00\00sgt\00", align 8
-@.str_531 = private unnamed_addr constant [20 x i8] c"\D8\14\E6\05\00\00\00\00\03\00\00\00\00\00\00\00sge\00", align 8
-@.str_532 = private unnamed_addr constant [36 x i8] c"\38\98\E4\06\00\00\00\00\13\00\00\00\00\00\00\00__orion_perform_int\00", align 8
-@.str_533 = private unnamed_addr constant [35 x i8] c"\DE\7F\C3\35\00\00\00\00\12\00\00\00\00\00\00\00orion_persist_text\00", align 8
-@.str_534 = private unnamed_addr constant [53 x i8] c"\E8\3F\AC\38\00\00\00\00\24\00\00\00\00\00\00\00 = add i64 0, 0    ; UNSUPPORTED op=\00", align 8
-@.str_535 = private unnamed_addr constant [31 x i8] c"\58\2C\73\19\00\00\00\00\0E\00\00\00\00\00\00\00 = add i64 0, \00", align 8
-@.str_536 = private unnamed_addr constant [44 x i8] c"\9A\8F\8F\2D\00\00\00\00\1B\00\00\00\00\00\00\00 = getelementptr i8, ptr %p\00", align 8
-@.str_537 = private unnamed_addr constant [24 x i8] c"\FF\24\6D\10\00\00\00\00\07\00\00\00\00\00\00\00, i64 0\00", align 8
-@.str_538 = private unnamed_addr constant [23 x i8] c"\A7\FA\64\14\00\00\00\00\06\00\00\00\00\00\00\00double\00", align 8
-@.str_539 = private unnamed_addr constant [34 x i8] c"\A8\DF\94\29\00\00\00\00\11\00\00\00\00\00\00\00 = fadd double %p\00", align 8
-@.str_540 = private unnamed_addr constant [37 x i8] c"\F3\DB\3D\25\00\00\00\00\14\00\00\00\00\00\00\00, 0x0000000000000000\00", align 8
-@.str_541 = private unnamed_addr constant [33 x i8] c"\1E\6C\6B\16\00\00\00\00\10\00\00\00\00\00\00\00 = add i64 0, %p\00", align 8
-@.str_542 = private unnamed_addr constant [32 x i8] c"\8E\D2\91\19\00\00\00\00\0F\00\00\00\00\00\00\00    call void @\00", align 8
-@.str_543 = private unnamed_addr constant [23 x i8] c"\4D\48\D9\0C\00\00\00\00\06\00\00\00\00\00\00\00)\0A    \00", align 8
-@.str_544 = private unnamed_addr constant [32 x i8] c"\B7\49\AE\37\00\00\00\00\0F\00\00\00\00\00\00\00 = add i64 0, 0\00", align 8
-@.str_545 = private unnamed_addr constant [25 x i8] c"\1C\11\8C\0D\00\00\00\00\08\00\00\00\00\00\00\00 = call \00", align 8
-@.str_546 = private unnamed_addr constant [19 x i8] c"\CD\1C\81\05\00\00\00\00\02\00\00\00\00\00\00\00 @\00", align 8
-@.str_547 = private unnamed_addr constant [55 x i8] c"\5C\66\2D\32\00\00\00\00\26\00\00\00\00\00\00\00 = call i64 @__orion_perform_int(ptr @\00", align 8
-@.str_548 = private unnamed_addr constant [23 x i8] c"\7B\7C\9D\23\00\00\00\00\06\00\00\00\00\00\00\00, i64 \00", align 8
-@.str_549 = private unnamed_addr constant [56 x i8] c"\AB\DA\DB\36\00\00\00\00\27\00\00\00\00\00\00\00 = call ptr @__orion_perform_text(ptr @\00", align 8
-@.str_550 = private unnamed_addr constant [23 x i8] c"\A0\F7\9D\24\00\00\00\00\06\00\00\00\00\00\00\00, ptr \00", align 8
-@.str_551 = private unnamed_addr constant [43 x i8] c"\90\7C\64\2D\00\00\00\00\1A\00\00\00\00\00\00\00 = getelementptr i8, ptr @\00", align 8
-@.str_552 = private unnamed_addr constant [31 x i8] c"\C3\3A\AE\27\00\00\00\00\0E\00\00\00\00\00\00\00    br label %\00", align 8
-@.str_553 = private unnamed_addr constant [20 x i8] c"\5C\01\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.cb\00", align 8
-@.str_554 = private unnamed_addr constant [32 x i8] c"\B7\A8\B9\23\00\00\00\00\0F\00\00\00\00\00\00\00 = icmp ne i64 \00", align 8
-@.str_555 = private unnamed_addr constant [20 x i8] c"\CF\58\D3\05\00\00\00\00\03\00\00\00\00\00\00\00, 0\00", align 8
-@.str_556 = private unnamed_addr constant [27 x i8] c"\CA\D0\80\18\00\00\00\00\0A\00\00\00\00\00\00\00    br i1 \00", align 8
-@.str_557 = private unnamed_addr constant [26 x i8] c"\2C\22\A4\2B\00\00\00\00\09\00\00\00\00\00\00\00, label %\00", align 8
-@.str_558 = private unnamed_addr constant [24 x i8] c"\50\C6\13\2D\00\00\00\00\07\00\00\00\00\00\00\00 = phi \00", align 8
-@.str_559 = private unnamed_addr constant [20 x i8] c"\84\52\D0\05\00\00\00\00\03\00\00\00\00\00\00\00 [ \00", align 8
-@.str_560 = private unnamed_addr constant [20 x i8] c"\C4\58\D3\05\00\00\00\00\03\00\00\00\00\00\00\00, %\00", align 8
-@.str_561 = private unnamed_addr constant [23 x i8] c"\CF\65\0D\1C\00\00\00\00\06\00\00\00\00\00\00\00 ], [ \00", align 8
-@.str_562 = private unnamed_addr constant [19 x i8] c"\EA\1C\81\05\00\00\00\00\02\00\00\00\00\00\00\00 ]\00", align 8
-@.str_563 = private unnamed_addr constant [32 x i8] c"\0F\75\14\32\00\00\00\00\0F\00\00\00\00\00\00\00 = fadd double \00", align 8
-@.str_564 = private unnamed_addr constant [25 x i8] c"\63\04\EC\36\00\00\00\00\08\00\00\00\00\00\00\00 double \00", align 8
-@.str_565 = private unnamed_addr constant [19 x i8] c"\19\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.b\00", align 8
-@.str_566 = private unnamed_addr constant [25 x i8] c"\53\4A\DF\06\00\00\00\00\08\00\00\00\00\00\00\00 = fcmp \00", align 8
-@.str_567 = private unnamed_addr constant [28 x i8] c"\F7\B7\01\20\00\00\00\00\0B\00\00\00\00\00\00\00 = zext i1 \00", align 8
-@.str_568 = private unnamed_addr constant [24 x i8] c"\F1\62\8C\2A\00\00\00\00\07\00\00\00\00\00\00\00 to i64\00", align 8
-@.str_569 = private unnamed_addr constant [31 x i8] c"\F1\AC\25\0F\00\00\00\00\0E\00\00\00\00\00\00\00 = sitofp i64 \00", align 8
-@.str_570 = private unnamed_addr constant [27 x i8] c"\24\EB\6D\02\00\00\00\00\0A\00\00\00\00\00\00\00 to double\00", align 8
-@.str_571 = private unnamed_addr constant [34 x i8] c"\81\C6\83\08\00\00\00\00\11\00\00\00\00\00\00\00 = fptosi double \00", align 8
-@.str_572 = private unnamed_addr constant [28 x i8] c"\3D\37\A6\01\00\00\00\00\0B\00\00\00\00\00\00\00 = add i64 \00", align 8
-@.str_573 = private unnamed_addr constant [28 x i8] c"\6C\10\F1\1D\00\00\00\00\0B\00\00\00\00\00\00\00 = sub i64 \00", align 8
-@.str_574 = private unnamed_addr constant [28 x i8] c"\C2\1F\62\23\00\00\00\00\0B\00\00\00\00\00\00\00 = mul i64 \00", align 8
-@.str_575 = private unnamed_addr constant [29 x i8] c"\B3\C5\57\09\00\00\00\00\0C\00\00\00\00\00\00\00 = sdiv i64 \00", align 8
-@.str_576 = private unnamed_addr constant [29 x i8] c"\4F\62\78\37\00\00\00\00\0C\00\00\00\00\00\00\00 = srem i64 \00", align 8
-@.str_577 = private unnamed_addr constant [20 x i8] c"\0D\08\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.pl\00", align 8
-@.str_578 = private unnamed_addr constant [33 x i8] c"\EF\CC\67\0B\00\00\00\00\10\00\00\00\00\00\00\00 = ptrtoint ptr \00", align 8
-@.str_579 = private unnamed_addr constant [25 x i8] c"\D2\3C\9B\1E\00\00\00\00\08\00\00\00\00\00\00\00 to i64\0A\00", align 8
-@.str_580 = private unnamed_addr constant [20 x i8] c"\13\08\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.pr\00", align 8
-@.str_581 = private unnamed_addr constant [25 x i8] c"\46\6D\88\3B\00\00\00\00\08\00\00\00\00\00\00\00 = icmp \00", align 8
-@.str_582 = private unnamed_addr constant [19 x i8] c"\1A\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.c\00", align 8
-@.str_583 = private unnamed_addr constant [30 x i8] c"\0E\DD\31\2C\00\00\00\00\0D\00\00\00\00\00\00\00 = select i1 \00", align 8
-@.str_584 = private unnamed_addr constant [20 x i8] c"\F6\05\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.la\00", align 8
-@.str_585 = private unnamed_addr constant [20 x i8] c"\F7\05\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.lb\00", align 8
-@.str_586 = private unnamed_addr constant [20 x i8] c"\07\06\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.lr\00", align 8
-@.str_587 = private unnamed_addr constant [21 x i8] c"\89\74\5C\2E\00\00\00\00\04\00\00\00\00\00\00\00 i1 \00", align 8
-@.str_588 = private unnamed_addr constant [19 x i8] c"\25\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.n\00", align 8
-@.str_589 = private unnamed_addr constant [32 x i8] c"\8C\B2\FB\13\00\00\00\00\0F\00\00\00\00\00\00\00 = icmp eq i64 \00", align 8
-@.str_590 = private unnamed_addr constant [68 x i8] c"\71\41\4F\1D\00\00\00\00\33\00\00\00\00\00\00\00    call i32 (ptr, ...) @printf(ptr @.fmt_int, i64 \00", align 8
-@.str_591 = private unnamed_addr constant [73 x i8] c"\96\D3\8F\25\00\00\00\00\38\00\00\00\00\00\00\00    call i32 (ptr, ...) @printf(ptr @.fmt_float, double \00", align 8
-@.str_592 = private unnamed_addr constant [20 x i8] c"\14\08\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.ps\00", align 8
-@.str_593 = private unnamed_addr constant [48 x i8] c"\D3\6E\72\11\00\00\00\00\1F\00\00\00\00\00\00\00 = getelementptr i8, ptr @.str_\00", align 8
-@.str_594 = private unnamed_addr constant [25 x i8] c"\3A\86\15\06\00\00\00\00\08\00\00\00\00\00\00\00, i64 16\00", align 8
-@.str_595 = private unnamed_addr constant [40 x i8] c"\38\88\89\0C\00\00\00\00\17\00\00\00\00\00\00\00    call i32 @puts(ptr \00", align 8
-@.str_596 = private unnamed_addr constant [52 x i8] c"\6E\41\06\1F\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_text_concat(ptr \00", align 8
-@.str_597 = private unnamed_addr constant [52 x i8] c"\6F\F4\F5\29\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_int_to_text(i64 \00", align 8
-@.str_598 = private unnamed_addr constant [45 x i8] c"\75\8B\32\1B\00\00\00\00\1C\00\00\00\00\00\00\00 = call i64 @orion_tlen(ptr \00", align 8
-@.str_599 = private unnamed_addr constant [51 x i8] c"\54\3D\62\2E\00\00\00\00\22\00\00\00\00\00\00\00 = call ptr @orion_text_slice(ptr \00", align 8
-@.str_600 = private unnamed_addr constant [54 x i8] c"\83\90\1F\0E\00\00\00\00\25\00\00\00\00\00\00\00 = call i64 @orion_text_contains(ptr \00", align 8
-@.str_601 = private unnamed_addr constant [50 x i8] c"\36\93\96\15\00\00\00\00\21\00\00\00\00\00\00\00 = call ptr @orion_file_read(ptr \00", align 8
-@.str_602 = private unnamed_addr constant [51 x i8] c"\FD\C9\16\06\00\00\00\00\22\00\00\00\00\00\00\00 = call i64 @orion_file_write(ptr \00", align 8
-@.str_603 = private unnamed_addr constant [45 x i8] c"\4D\5C\3A\16\00\00\00\00\1C\00\00\00\00\00\00\00 = load i64, ptr @orion_argc\00", align 8
-@.str_604 = private unnamed_addr constant [22 x i8] c"\A5\97\5E\02\00\00\00\00\05\00\00\00\00\00\00\00.slot\00", align 8
-@.str_605 = private unnamed_addr constant [21 x i8] c"\50\BC\3A\30\00\00\00\00\04\00\00\00\00\00\00\00.arr\00", align 8
-@.str_606 = private unnamed_addr constant [45 x i8] c"\F9\14\83\0B\00\00\00\00\1C\00\00\00\00\00\00\00 = load ptr, ptr @orion_argv\00", align 8
-@.str_607 = private unnamed_addr constant [43 x i8] c"\88\EE\F2\07\00\00\00\00\1A\00\00\00\00\00\00\00 = getelementptr ptr, ptr \00", align 8
-@.str_608 = private unnamed_addr constant [21 x i8] c"\3B\27\3F\30\00\00\00\00\04\00\00\00\00\00\00\00.raw\00", align 8
-@.str_609 = private unnamed_addr constant [34 x i8] c"\C1\FE\77\2E\00\00\00\00\11\00\00\00\00\00\00\00 = load ptr, ptr \00", align 8
-@.str_610 = private unnamed_addr constant [52 x i8] c"\B5\DC\C8\1F\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_text_from_c(ptr \00", align 8
-@.str_611 = private unnamed_addr constant [56 x i8] c"\7B\FB\A3\38\00\00\00\00\27\00\00\00\00\00\00\00 = call ptr @orion_bytes_from_text(ptr \00", align 8
-@.str_612 = private unnamed_addr constant [21 x i8] c"\45\BC\3A\30\00\00\00\00\04\00\00\00\00\00\00\00.arg\00", align 8
-@.str_613 = private unnamed_addr constant [33 x i8] c"\48\D9\0A\02\00\00\00\00\10\00\00\00\00\00\00\00 = inttoptr i64 \00", align 8
-@.str_614 = private unnamed_addr constant [24 x i8] c"\28\58\8E\2A\00\00\00\00\07\00\00\00\00\00\00\00 to ptr\00", align 8
-@.str_615 = private unnamed_addr constant [54 x i8] c"\0D\2B\01\22\00\00\00\00\25\00\00\00\00\00\00\00 = call ptr @orion_bytes_to_text(ptr \00", align 8
-@.str_616 = private unnamed_addr constant [52 x i8] c"\85\28\88\0C\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_bytes_slice(ptr \00", align 8
-@.str_617 = private unnamed_addr constant [19 x i8] c"\18\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.a\00", align 8
-@.str_618 = private unnamed_addr constant [25 x i8] c"\F7\B7\9B\1F\00\00\00\00\08\00\00\00\00\00\00\00 to ptr\0A\00", align 8
-@.str_619 = private unnamed_addr constant [53 x i8] c"\87\01\2C\07\00\00\00\00\24\00\00\00\00\00\00\00 = call ptr @orion_bytes_concat(ptr \00", align 8
-@.str_620 = private unnamed_addr constant [52 x i8] c"\12\56\8A\08\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_bytes_zeros(i64 \00", align 8
-@.str_621 = private unnamed_addr constant [49 x i8] c"\70\0A\1D\36\00\00\00\00\20\00\00\00\00\00\00\00 = call ptr @orion_slot_get(ptr \00", align 8
-@.str_622 = private unnamed_addr constant [49 x i8] c"\2E\E1\1A\19\00\00\00\00\20\00\00\00\00\00\00\00 = call i64 @orion_slot_has(ptr \00", align 8
-@.str_623 = private unnamed_addr constant [53 x i8] c"\00\31\15\2D\00\00\00\00\24\00\00\00\00\00\00\00 = call i64 @orion_slot_get_int(ptr \00", align 8
-@.str_624 = private unnamed_addr constant [20 x i8] c"\76\02\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.ev\00", align 8
-@.str_625 = private unnamed_addr constant [20 x i8] c"\9A\09\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.sp\00", align 8
-@.str_626 = private unnamed_addr constant [50 x i8] c"\33\59\9B\13\00\00\00\00\21\00\00\00\00\00\00\00 = call ptr @orion_slot_evac(ptr \00", align 8
-@.str_627 = private unnamed_addr constant [49 x i8] c"\A5\5C\68\1A\00\00\00\00\20\00\00\00\00\00\00\00 = call i64 @orion_slot_set(ptr \00", align 8
-@.str_628 = private unnamed_addr constant [19 x i8] c"\1C\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.e\00", align 8
-@.str_629 = private unnamed_addr constant [48 x i8] c"\7D\9C\DB\03\00\00\00\00\1F\00\00\00\00\00\00\00 = call i64 @orion_text_eq(ptr \00", align 8
-@.str_630 = private unnamed_addr constant [28 x i8] c"\A4\82\C2\16\00\00\00\00\0B\00\00\00\00\00\00\00 = xor i64 \00", align 8
-@.str_631 = private unnamed_addr constant [20 x i8] c"\D0\58\D3\05\00\00\00\00\03\00\00\00\00\00\00\00, 1\00", align 8
-@.str_632 = private unnamed_addr constant [19 x i8] c"\2A\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.s\00", align 8
-@.str_633 = private unnamed_addr constant [41 x i8] c"\51\B5\E0\17\00\00\00\00\18\00\00\00\00\00\00\00 = call i32 @strcmp(ptr \00", align 8
-@.str_634 = private unnamed_addr constant [22 x i8] c"\C0\7C\3E\35\00\00\00\00\05\00\00\00\00\00\00\00 i32 \00", align 8
-@.str_635 = private unnamed_addr constant [67 x i8] c"\E0\E8\E0\24\00\00\00\00\32\00\00\00\00\00\00\00 = getelementptr i64, ptr @orion_empty_list, i64 0\00", align 8
-@.str_636 = private unnamed_addr constant [49 x i8] c"\55\DC\92\05\00\00\00\00\20\00\00\00\00\00\00\00 = call ptr @orion_list_new(i64 \00", align 8
-@.str_637 = private unnamed_addr constant [20 x i8] c"\05\06\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.lp\00", align 8
-@.str_638 = private unnamed_addr constant [22 x i8] c"\E0\69\E4\0E\00\00\00\00\05\00\00\00\00\00\00\00\0A    \00", align 8
-@.str_639 = private unnamed_addr constant [52 x i8] c"\A6\8A\D2\33\00\00\00\00\23\00\00\00\00\00\00\00\0A    call void @orion_list_set(ptr \00", align 8
-@.str_640 = private unnamed_addr constant [19 x i8] c"\24\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.m\00", align 8
-@.str_641 = private unnamed_addr constant [19 x i8] c"\20\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.i\00", align 8
-@.str_642 = private unnamed_addr constant [48 x i8] c"\EC\6C\A5\23\00\00\00\00\1F\00\00\00\00\00\00\00 = call i64 @orion_list_at(ptr \00", align 8
-@.str_643 = private unnamed_addr constant [29 x i8] c"\65\95\79\23\00\00\00\00\0C\00\00\00\00\00\00\00 to ptr\0A    \00", align 8
-@.str_644 = private unnamed_addr constant [49 x i8] c"\69\6B\FD\2E\00\00\00\00\20\00\00\00\00\00\00\00 = call i64 @orion_list_len(ptr \00", align 8
-@.str_645 = private unnamed_addr constant [33 x i8] c"\13\C6\8F\05\00\00\00\00\10\00\00\00\00\00\00\00 = call double @\00", align 8
-@.str_646 = private unnamed_addr constant [25 x i8] c"\88\F8\3B\33\00\00\00\00\08\00\00\00\00\00\00\00(double \00", align 8
-@.str_647 = private unnamed_addr constant [26 x i8] c"\C5\2A\AF\07\00\00\00\00\09\00\00\00\00\00\00\00, double \00", align 8
-@.str_648 = private unnamed_addr constant [51 x i8] c"\6D\F1\42\0E\00\00\00\00\22\00\00\00\00\00\00\00 = call ptr @orion_list_slice(ptr \00", align 8
-@.str_649 = private unnamed_addr constant [19 x i8] c"\27\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.p\00", align 8
-@.str_650 = private unnamed_addr constant [50 x i8] c"\C6\92\52\10\00\00\00\00\21\00\00\00\00\00\00\00 = call ptr @orion_list_push(ptr \00", align 8
-@.str_651 = private unnamed_addr constant [54 x i8] c"\A6\7E\FF\0D\00\00\00\00\25\00\00\00\00\00\00\00 = call ptr @orion_list_push_mut(ptr \00", align 8
-@.str_652 = private unnamed_addr constant [48 x i8] c"\BA\35\AD\37\00\00\00\00\1F\00\00\00\00\00\00\00 = call ptr @orion_vec_add(ptr \00", align 8
-@.str_653 = private unnamed_addr constant [48 x i8] c"\E2\44\5D\18\00\00\00\00\1F\00\00\00\00\00\00\00 = call ptr @orion_vec_sub(ptr \00", align 8
-@.str_654 = private unnamed_addr constant [48 x i8] c"\38\54\CE\1D\00\00\00\00\1F\00\00\00\00\00\00\00 = call ptr @orion_vec_mul(ptr \00", align 8
-@.str_655 = private unnamed_addr constant [48 x i8] c"\63\B3\5B\31\00\00\00\00\1F\00\00\00\00\00\00\00 = call i64 @orion_vec_dot(ptr \00", align 8
-@.str_656 = private unnamed_addr constant [51 x i8] c"\88\50\43\31\00\00\00\00\22\00\00\00\00\00\00\00 = call i64 @__orion_time_now_ms()\00", align 8
-@.str_657 = private unnamed_addr constant [52 x i8] c"\16\83\C4\29\00\00\00\00\23\00\00\00\00\00\00\00 = call i64 @__orion_monotonic_ms()\00", align 8
-@.str_658 = private unnamed_addr constant [53 x i8] c"\1A\BA\64\0D\00\00\00\00\24\00\00\00\00\00\00\00    call void @__orion_sleep_ms(i64 \00", align 8
-@.str_659 = private unnamed_addr constant [48 x i8] c"\B5\75\EB\32\00\00\00\00\1F\00\00\00\00\00\00\00 = call ptr @orion_map_new(i64 \00", align 8
-@.str_660 = private unnamed_addr constant [51 x i8] c"\61\89\28\18\00\00\00\00\22\00\00\00\00\00\00\00\0A    call void @orion_map_set(ptr \00", align 8
-@.str_661 = private unnamed_addr constant [33 x i8] c"\F6\5A\90\23\00\00\00\00\10\00\00\00\00\00\00\00orion_map_set_ik\00", align 8
-@.str_662 = private unnamed_addr constant [30 x i8] c"\D8\D7\1C\33\00\00\00\00\0D\00\00\00\00\00\00\00orion_map_set\00", align 8
-@.str_663 = private unnamed_addr constant [22 x i8] c"\79\16\DD\0F\00\00\00\00\05\00\00\00\00\00\00\00(ptr \00", align 8
-@.str_664 = private unnamed_addr constant [42 x i8] c"\59\46\D2\14\00\00\00\00\19\00\00\00\00\00\00\00 = getelementptr i8, ptr \00", align 8
-@.str_665 = private unnamed_addr constant [36 x i8] c"\4B\E6\8C\24\00\00\00\00\13\00\00\00\00\00\00\00orion_map_remove_ik\00", align 8
-@.str_666 = private unnamed_addr constant [33 x i8] c"\81\24\1A\00\00\00\00\00\10\00\00\00\00\00\00\00orion_map_remove\00", align 8
-@.str_667 = private unnamed_addr constant [51 x i8] c"\AB\2B\07\18\00\00\00\00\22\00\00\00\00\00\00\00    call void @orion_list_set(ptr \00", align 8
-@.str_668 = private unnamed_addr constant [48 x i8] c"\98\18\C8\08\00\00\00\00\1F\00\00\00\00\00\00\00 = call i64 @orion_map_len(ptr \00", align 8
-@.str_669 = private unnamed_addr constant [49 x i8] c"\EF\56\F8\23\00\00\00\00\20\00\00\00\00\00\00\00 = call ptr @orion_map_keys(ptr \00", align 8
-@.str_670 = private unnamed_addr constant [51 x i8] c"\E6\24\8A\1C\00\00\00\00\22\00\00\00\00\00\00\00 = call ptr @orion_map_values(ptr \00", align 8
-@.str_671 = private unnamed_addr constant [36 x i8] c"\2E\5F\1D\0D\00\00\00\00\13\00\00\00\00\00\00\00orion_map_get_or_ik\00", align 8
-@.str_672 = private unnamed_addr constant [33 x i8] c"\54\37\50\26\00\00\00\00\10\00\00\00\00\00\00\00orion_map_get_or\00", align 8
-@.str_673 = private unnamed_addr constant [19 x i8] c"\1B\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.d\00", align 8
-@.str_674 = private unnamed_addr constant [19 x i8] c"\29\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.r\00", align 8
-@.str_675 = private unnamed_addr constant [30 x i8] c"\73\FB\2F\08\00\00\00\00\0D\00\00\00\00\00\00\00 = call i64 @\00", align 8
-@.str_676 = private unnamed_addr constant [55 x i8] c"\68\7C\21\34\00\00\00\00\26\00\00\00\00\00\00\00 = call ptr @orion_f64_to_text(double \00", align 8
-@.str_677 = private unnamed_addr constant [33 x i8] c"\3B\34\50\26\00\00\00\00\10\00\00\00\00\00\00\00orion_map_get_ik\00", align 8
-@.str_678 = private unnamed_addr constant [30 x i8] c"\6C\B3\19\33\00\00\00\00\0D\00\00\00\00\00\00\00orion_map_get\00", align 8
-@.str_679 = private unnamed_addr constant [33 x i8] c"\C5\5B\81\02\00\00\00\00\10\00\00\00\00\00\00\00orion_map_has_ik\00", align 8
-@.str_680 = private unnamed_addr constant [30 x i8] c"\68\F4\19\33\00\00\00\00\0D\00\00\00\00\00\00\00orion_map_has\00", align 8
-@.str_681 = private unnamed_addr constant [46 x i8] c"\F3\A6\9B\09\00\00\00\00\1D\00\00\00\00\00\00\00 = call ptr @orion_alloc(i64 \00", align 8
-@.str_682 = private unnamed_addr constant [19 x i8] c"\1D\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.f\00", align 8
-@.str_683 = private unnamed_addr constant [43 x i8] c"\CC\91\EC\0C\00\00\00\00\1A\00\00\00\00\00\00\00 = getelementptr i64, ptr \00", align 8
-@.str_684 = private unnamed_addr constant [32 x i8] c"\34\7F\FA\26\00\00\00\00\0F\00\00\00\00\00\00\00\0A    store i64 \00", align 8
-@.str_685 = private unnamed_addr constant [35 x i8] c"\E9\B5\F3\24\00\00\00\00\12\00\00\00\00\00\00\00 = bitcast double \00", align 8
-@.str_686 = private unnamed_addr constant [34 x i8] c"\05\A2\71\33\00\00\00\00\11\00\00\00\00\00\00\00 = load i64, ptr \00", align 8
-@.str_687 = private unnamed_addr constant [32 x i8] c"\3D\23\DE\03\00\00\00\00\0F\00\00\00\00\00\00\00 = bitcast i64 \00", align 8
-@.str_688 = private unnamed_addr constant [27 x i8] c"\52\28\6E\39\00\00\00\00\0A\00\00\00\00\00\00\00 = alloca \00", align 8
-@.str_689 = private unnamed_addr constant [26 x i8] c"\CE\1B\A7\07\00\00\00\00\09\00\00\00\00\00\00\00, align 8\00", align 8
-@.str_690 = private unnamed_addr constant [25 x i8] c"\E6\3E\2F\36\00\00\00\00\08\00\00\00\00\00\00\00 = load \00", align 8
-@.str_691 = private unnamed_addr constant [27 x i8] c"\DA\2C\BD\01\00\00\00\00\0A\00\00\00\00\00\00\00    store \00", align 8
-@.str_692 = private unnamed_addr constant [33 x i8] c"\7D\8D\EC\1F\00\00\00\00\10\00\00\00\00\00\00\00    ret ptr null\00", align 8
-@.str_693 = private unnamed_addr constant [30 x i8] c"\4A\F5\BE\0C\00\00\00\00\0D\00\00\00\00\00\00\00    ret i64 0\00", align 8
-@.str_694 = private unnamed_addr constant [20 x i8] c"\0A\09\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.rc\00", align 8
-@.str_695 = private unnamed_addr constant [29 x i8] c"\01\19\EC\06\00\00\00\00\0C\00\00\00\00\00\00\00    ret i64 \00", align 8
-@.str_696 = private unnamed_addr constant [29 x i8] c"\26\94\EC\07\00\00\00\00\0C\00\00\00\00\00\00\00    ret ptr \00", align 8
-@.str_697 = private unnamed_addr constant [25 x i8] c"\99\D6\33\03\00\00\00\00\08\00\00\00\00\00\00\00    ret \00", align 8
-@.str_698 = private unnamed_addr constant [41 x i8] c"\C4\E1\91\09\00\00\00\00\18\00\00\00\00\00\00\00orion: ERROR \E2\80\94 IR op `\00", align 8
-@.str_699 = private unnamed_addr constant [45 x i8] c"\3B\3B\4E\14\00\00\00\00\1C\00\00\00\00\00\00\00` has no LLVM lowering (fn `\00", align 8
-@.str_700 = private unnamed_addr constant [19 x i8] c"\76\3D\81\05\00\00\00\00\02\00\00\00\00\00\00\00`)\00", align 8
-@.str_701 = private unnamed_addr constant [25 x i8] c"\E7\D9\D3\13\00\00\00\00\08\00\00\00\00\00\00\00list:f64\00", align 8
-@.str_702 = private unnamed_addr constant [20 x i8] c"\32\37\D0\05\00\00\00\00\03\00\00\00\00\00\00\00 %p\00", align 8
-@.str_703 = private unnamed_addr constant [27 x i8] c"\85\52\94\21\00\00\00\00\0A\00\00\00\00\00\00\00orion_main\00", align 8
-@.str_704 = private unnamed_addr constant [24 x i8] c"\1D\55\59\25\00\00\00\00\07\00\00\00\00\00\00\00define \00", align 8
-@.str_705 = private unnamed_addr constant [28 x i8] c"\67\3C\89\28\00\00\00\00\0B\00\00\00\00\00\00\00) {\0Aentry:\0A\00", align 8
-@.str_706 = private unnamed_addr constant [19 x i8] c"\2E\4C\81\05\00\00\00\00\02\00\00\00\00\00\00\00}\0A\00", align 8
-@.str_707 = private unnamed_addr constant [23 x i8] c"\E2\58\E6\13\00\00\00\00\06\00\00\00\00\00\00\00@.str_\00", align 8
-@.str_708 = private unnamed_addr constant [51 x i8] c"\6E\72\C9\11\00\00\00\00\22\00\00\00\00\00\00\00 = private unnamed_addr constant [\00", align 8
-@.str_709 = private unnamed_addr constant [26 x i8] c"\3F\9B\64\21\00\00\00\00\09\00\00\00\00\00\00\00 x i8] c\22\00", align 8
-@.str_710 = private unnamed_addr constant [30 x i8] c"\FE\DB\BB\1C\00\00\00\00\0D\00\00\00\00\00\00\00\5C00\22, align 8\00", align 8
-@.str_711 = private unnamed_addr constant [18 x i8] c"\EB\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00\5C\00", align 8
-@.str_712 = private unnamed_addr constant [119 x i8] c"\DF\7F\AA\1B\00\00\00\00\66\00\00\00\00\00\00\00target datalayout = \22e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\22\0A\00", align 8
-@.str_713 = private unnamed_addr constant [69 x i8] c"\A6\87\24\12\00\00\00\00\34\00\00\00\00\00\00\00target triple = \22x86_64-pc-windows-msvc19.44.35209\22\0A\00", align 8
-@.str_714 = private unnamed_addr constant [47 x i8] c"\65\1D\B3\0B\00\00\00\00\1E\00\00\00\00\00\00\00declare i32 @printf(ptr, ...)\0A\00", align 8
-@.str_715 = private unnamed_addr constant [40 x i8] c"\A0\39\5A\37\00\00\00\00\17\00\00\00\00\00\00\00declare i32 @puts(ptr)\0A\00", align 8
-@.str_716 = private unnamed_addr constant [42 x i8] c"\FE\79\7B\01\00\00\00\00\19\00\00\00\00\00\00\00declare ptr @malloc(i64)\0A\00", align 8
-@.str_717 = private unnamed_addr constant [57 x i8] c"\C9\DD\BB\24\00\00\00\00\28\00\00\00\00\00\00\00declare ptr @orion_f64_literal_hex(ptr)\0A\00", align 8
-@.str_718 = private unnamed_addr constant [47 x i8] c"\04\33\15\21\00\00\00\00\1E\00\00\00\00\00\00\00declare ptr @orion_alloc(i64)\0A\00", align 8
-@.str_719 = private unnamed_addr constant [52 x i8] c"\4F\1F\4B\0F\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_arena_init(i64)\0A\00", align 8
-@.str_720 = private unnamed_addr constant [47 x i8] c"\34\D3\37\21\00\00\00\00\1E\00\00\00\00\00\00\00declare i64 @orion_arena_on()\0A\00", align 8
-@.str_721 = private unnamed_addr constant [48 x i8] c"\92\BB\1E\2F\00\00\00\00\1F\00\00\00\00\00\00\00declare i64 @orion_arena_off()\0A\00", align 8
-@.str_722 = private unnamed_addr constant [51 x i8] c"\79\25\C8\21\00\00\00\00\22\00\00\00\00\00\00\00declare i64 @orion_arena_active()\0A\00", align 8
-@.str_723 = private unnamed_addr constant [52 x i8] c"\BB\77\04\03\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_frame_init(i64)\0A\00", align 8
-@.str_724 = private unnamed_addr constant [47 x i8] c"\51\E9\C9\01\00\00\00\00\1E\00\00\00\00\00\00\00declare i64 @orion_frame_on()\0A\00", align 8
-@.str_725 = private unnamed_addr constant [48 x i8] c"\4C\80\98\2A\00\00\00\00\1F\00\00\00\00\00\00\00declare i64 @orion_frame_off()\0A\00", align 8
-@.str_726 = private unnamed_addr constant [50 x i8] c"\69\E2\AB\1D\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_frame_reset()\0A\00", align 8
-@.str_727 = private unnamed_addr constant [49 x i8] c"\48\E0\01\1C\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_frame_used()\0A\00", align 8
-@.str_728 = private unnamed_addr constant [49 x i8] c"\DF\1E\B3\2D\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_persist_on()\0A\00", align 8
-@.str_729 = private unnamed_addr constant [50 x i8] c"\4F\5B\48\0D\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_persist_off()\0A\00", align 8
-@.str_730 = private unnamed_addr constant [49 x i8] c"\22\6A\C4\32\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_pool_alloc()\0A\00", align 8
-@.str_731 = private unnamed_addr constant [49 x i8] c"\B1\AF\C4\02\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_pool_on(i64)\0A\00", align 8
-@.str_732 = private unnamed_addr constant [47 x i8] c"\CF\F6\B6\26\00\00\00\00\1E\00\00\00\00\00\00\00declare i64 @orion_pool_off()\0A\00", align 8
-@.str_733 = private unnamed_addr constant [52 x i8] c"\7F\B2\D3\36\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_pool_reset(i64)\0A\00", align 8
-@.str_734 = private unnamed_addr constant [50 x i8] c"\3E\00\0D\07\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_arena_reset()\0A\00", align 8
-@.str_735 = private unnamed_addr constant [49 x i8] c"\D4\50\A6\18\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_arena_used()\0A\00", align 8
-@.str_736 = private unnamed_addr constant [54 x i8] c"\D6\A0\8A\2A\00\00\00\00\25\00\00\00\00\00\00\00declare i64 @orion_arena_rewind(i64)\0A\00", align 8
-@.str_737 = private unnamed_addr constant [49 x i8] c"\69\22\A3\14\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_arena_high()\0A\00", align 8
-@.str_738 = private unnamed_addr constant [50 x i8] c"\1F\78\A4\1C\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_alloc_total()\0A\00", align 8
-@.str_739 = private unnamed_addr constant [48 x i8] c"\57\D7\0B\17\00\00\00\00\1F\00\00\00\00\00\00\00declare i64 @orion_arena_cap()\0A\00", align 8
-@.str_740 = private unnamed_addr constant [49 x i8] c"\DD\B1\FE\17\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_frame_high()\0A\00", align 8
-@.str_741 = private unnamed_addr constant [48 x i8] c"\11\9C\85\12\00\00\00\00\1F\00\00\00\00\00\00\00declare i64 @orion_frame_cap()\0A\00", align 8
-@.str_742 = private unnamed_addr constant [51 x i8] c"\F1\60\2C\18\00\00\00\00\22\00\00\00\00\00\00\00declare i64 @orion_pool_used(i64)\0A\00", align 8
-@.str_743 = private unnamed_addr constant [55 x i8] c"\78\64\BC\38\00\00\00\00\26\00\00\00\00\00\00\00declare i64 @orion_pool_pressure(i64)\0A\00", align 8
-@.str_744 = private unnamed_addr constant [52 x i8] c"\B7\3F\37\21\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_ledger_tag(ptr)\0A\00", align 8
-@.str_745 = private unnamed_addr constant [49 x i8] c"\D1\DE\73\30\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_ledger_off()\0A\00", align 8
-@.str_746 = private unnamed_addr constant [50 x i8] c"\60\7C\8A\15\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_ledger_dump()\0A\00", align 8
-@.str_747 = private unnamed_addr constant [51 x i8] c"\40\D1\A8\33\00\00\00\00\22\00\00\00\00\00\00\00declare i64 @orion_pool_high(i64)\0A\00", align 8
-@.str_748 = private unnamed_addr constant [50 x i8] c"\72\5B\C5\30\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_pool_cap(i64)\0A\00", align 8
-@.str_749 = private unnamed_addr constant [52 x i8] c"\F8\E4\39\1C\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_os_private_kb()\0A\00", align 8
-@.str_750 = private unnamed_addr constant [52 x i8] c"\BC\48\73\30\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_console_color()\0A\00", align 8
-@.str_751 = private unnamed_addr constant [57 x i8] c"\7B\F9\EC\04\00\00\00\00\28\00\00\00\00\00\00\00declare i64 @orion_alloc_malloc_total()\0A\00", align 8
-@.str_752 = private unnamed_addr constant [54 x i8] c"\DE\0E\11\36\00\00\00\00\25\00\00\00\00\00\00\00declare i64 @orion_embedded_has(ptr)\0A\00", align 8
-@.str_753 = private unnamed_addr constant [55 x i8] c"\09\0C\87\38\00\00\00\00\26\00\00\00\00\00\00\00declare ptr @orion_embedded_text(ptr)\0A\00", align 8
-@.str_754 = private unnamed_addr constant [52 x i8] c"\8D\CF\9A\24\00\00\00\00\23\00\00\00\00\00\00\00declare ptr @orion_embedded_list()\0A\00", align 8
-@.str_755 = private unnamed_addr constant [50 x i8] c"\49\0D\C2\12\00\00\00\00\21\00\00\00\00\00\00\00declare ptr @orion_dir_list(ptr)\0A\00", align 8
-@.str_756 = private unnamed_addr constant [53 x i8] c"\02\D1\72\2B\00\00\00\00\24\00\00\00\00\00\00\00declare ptr @orion_dir_subdirs(ptr)\0A\00", align 8
-@.str_757 = private unnamed_addr constant [55 x i8] c"\00\70\F8\05\00\00\00\00\26\00\00\00\00\00\00\00declare ptr @orion_console_readline()\0A\00", align 8
-@.str_758 = private unnamed_addr constant [50 x i8] c"\32\6B\32\16\00\00\00\00\21\00\00\00\00\00\00\00declare ptr @orion_key_copy(ptr)\0A\00", align 8
-@.str_759 = private unnamed_addr constant [52 x i8] c"\45\C8\75\1E\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_file_stamp(ptr)\0A\00", align 8
-@.str_760 = private unnamed_addr constant [49 x i8] c"\AA\16\59\11\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_audio_init()\0A\00", align 8
-@.str_761 = private unnamed_addr constant [52 x i8] c"\0A\A2\C6\2A\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_audio_load(ptr)\0A\00", align 8
-@.str_762 = private unnamed_addr constant [72 x i8] c"\ED\B5\F8\05\00\00\00\00\37\00\00\00\00\00\00\00declare i64 @orion_audio_play(i64, i64, i64, i64, i64)\0A\00", align 8
-@.str_763 = private unnamed_addr constant [77 x i8] c"\F7\57\92\0B\00\00\00\00\3C\00\00\00\00\00\00\00declare i64 @orion_audio_loop(i64, i64, i64, i64, i64, i64)\0A\00", align 8
-@.str_764 = private unnamed_addr constant [68 x i8] c"\2F\1E\70\18\00\00\00\00\33\00\00\00\00\00\00\00declare i64 @orion_audio_voice_gain(i64, i64, i64)\0A\00", align 8
-@.str_765 = private unnamed_addr constant [63 x i8] c"\CC\F3\5C\3A\00\00\00\00\2E\00\00\00\00\00\00\00declare i64 @orion_audio_stop_voice(i64, i64)\0A\00", align 8
-@.str_766 = private unnamed_addr constant [63 x i8] c"\C9\03\BF\00\00\00\00\00\2E\00\00\00\00\00\00\00declare i64 @orion_audio_music(i64, i64, i64)\0A\00", align 8
-@.str_767 = private unnamed_addr constant [63 x i8] c"\7F\02\DD\1A\00\00\00\00\2E\00\00\00\00\00\00\00declare i64 @orion_audio_layer(i64, i64, i64)\0A\00", align 8
-@.str_768 = private unnamed_addr constant [58 x i8] c"\7A\9E\8A\12\00\00\00\00\29\00\00\00\00\00\00\00declare i64 @orion_audio_stop_music(i64)\0A\00", align 8
-@.str_769 = private unnamed_addr constant [66 x i8] c"\58\DA\3D\26\00\00\00\00\31\00\00\00\00\00\00\00declare i64 @orion_audio_bus_gain(i64, i64, i64)\0A\00", align 8
-@.str_770 = private unnamed_addr constant [52 x i8] c"\12\82\DB\3A\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_audio_playing()\0A\00", align 8
-@.str_771 = private unnamed_addr constant [56 x i8] c"\25\9E\AB\20\00\00\00\00\27\00\00\00\00\00\00\00declare i64 @orion_audio_debug_plays()\0A\00", align 8
-@.str_772 = private unnamed_addr constant [54 x i8] c"\0A\8B\42\2D\00\00\00\00\25\00\00\00\00\00\00\00declare void @orion_audio_shutdown()\0A\00", align 8
-@.str_773 = private unnamed_addr constant [63 x i8] c"\04\34\D3\2D\00\00\00\00\2E\00\00\00\00\00\00\00declare void @orion_arena_ptr_guard(ptr, ptr)\0A\00", align 8
-@.str_774 = private unnamed_addr constant [61 x i8] c"\56\F9\C4\05\00\00\00\00\2C\00\00\00\00\00\00\00declare ptr @orion_slot_evac(ptr, ptr, i64)\0A\00", align 8
-@.str_775 = private unnamed_addr constant [58 x i8] c"\3C\5E\3F\2B\00\00\00\00\29\00\00\00\00\00\00\00declare void @orion_crumb(ptr, ptr, i64)\0A\00", align 8
-@.str_776 = private unnamed_addr constant [53 x i8] c"\E4\FA\16\2C\00\00\00\00\24\00\00\00\00\00\00\00declare void @orion_crumb_rule(ptr)\0A\00", align 8
-@.str_777 = private unnamed_addr constant [46 x i8] c"\41\16\CD\35\00\00\00\00\1D\00\00\00\00\00\00\00declare double @sqrt(double)\0A\00", align 8
-@.str_778 = private unnamed_addr constant [45 x i8] c"\1E\AE\6E\00\00\00\00\00\1C\00\00\00\00\00\00\00declare double @sin(double)\0A\00", align 8
-@.str_779 = private unnamed_addr constant [45 x i8] c"\F3\62\0A\22\00\00\00\00\1C\00\00\00\00\00\00\00declare double @cos(double)\0A\00", align 8
-@.str_780 = private unnamed_addr constant [45 x i8] c"\59\5E\CA\0A\00\00\00\00\1C\00\00\00\00\00\00\00declare double @tan(double)\0A\00", align 8
-@.str_781 = private unnamed_addr constant [45 x i8] c"\6D\DE\ED\24\00\00\00\00\1C\00\00\00\00\00\00\00declare double @exp(double)\0A\00", align 8
-@.str_782 = private unnamed_addr constant [45 x i8] c"\17\37\B2\22\00\00\00\00\1C\00\00\00\00\00\00\00declare double @log(double)\0A\00", align 8
-@.str_783 = private unnamed_addr constant [46 x i8] c"\7A\7F\17\1A\00\00\00\00\1D\00\00\00\00\00\00\00declare double @log2(double)\0A\00", align 8
-@.str_784 = private unnamed_addr constant [47 x i8] c"\AB\93\7B\29\00\00\00\00\1E\00\00\00\00\00\00\00declare double @floor(double)\0A\00", align 8
-@.str_785 = private unnamed_addr constant [46 x i8] c"\9A\9B\3B\00\00\00\00\00\1D\00\00\00\00\00\00\00declare double @ceil(double)\0A\00", align 8
-@.str_786 = private unnamed_addr constant [47 x i8] c"\F0\BB\02\32\00\00\00\00\1E\00\00\00\00\00\00\00declare double @round(double)\0A\00", align 8
-@.str_787 = private unnamed_addr constant [55 x i8] c"\06\0F\04\2A\00\00\00\00\26\00\00\00\00\00\00\00declare double @atan2(double, double)\0A\00", align 8
-@.str_788 = private unnamed_addr constant [53 x i8] c"\18\74\4B\33\00\00\00\00\24\00\00\00\00\00\00\00declare double @pow(double, double)\0A\00", align 8
-@.str_789 = private unnamed_addr constant [49 x i8] c"\76\D2\D8\11\00\00\00\00\20\00\00\00\00\00\00\00@orion_err_count = global i64 0\0A\00", align 8
-@.str_790 = private unnamed_addr constant [48 x i8] c"\0E\D5\29\09\00\00\00\00\1F\00\00\00\00\00\00\00define i64 @orion_err_bump() {\0A\00", align 8
-@.str_791 = private unnamed_addr constant [24 x i8] c"\63\A0\8E\35\00\00\00\00\07\00\00\00\00\00\00\00entry:\0A\00", align 8
-@.str_792 = private unnamed_addr constant [55 x i8] c"\FA\AC\4F\17\00\00\00\00\26\00\00\00\00\00\00\00  %n = load i64, ptr @orion_err_count\0A\00", align 8
-@.str_793 = private unnamed_addr constant [39 x i8] c"\47\94\72\18\00\00\00\00\16\00\00\00\00\00\00\00  %n1 = add i64 %n, 1\0A\00", align 8
-@.str_794 = private unnamed_addr constant [55 x i8] c"\64\E1\84\03\00\00\00\00\26\00\00\00\00\00\00\00  store i64 %n1, ptr @orion_err_count\0A\00", align 8
-@.str_795 = private unnamed_addr constant [31 x i8] c"\65\A4\75\01\00\00\00\00\0E\00\00\00\00\00\00\00  ret i64 %n1\0A\00", align 8
-@.str_796 = private unnamed_addr constant [47 x i8] c"\DA\7B\05\35\00\00\00\00\1E\00\00\00\00\00\00\00define i64 @orion_err_get() {\0A\00", align 8
-@.str_797 = private unnamed_addr constant [30 x i8] c"\2D\E0\79\0A\00\00\00\00\0D\00\00\00\00\00\00\00  ret i64 %n\0A\00", align 8
-@.str_798 = private unnamed_addr constant [20 x i8] c"\40\83\E8\05\00\00\00\00\03\00\00\00\00\00\00\00}\0A\0A\00", align 8
-@.str_799 = private unnamed_addr constant [59 x i8] c"\9C\45\7D\1B\00\00\00\00\2A\00\00\00\00\00\00\00define ptr @orion_text_join(ptr %parts) {\0A\00", align 8
-@.str_800 = private unnamed_addr constant [61 x i8] c"\CC\DD\39\03\00\00\00\00\2C\00\00\00\00\00\00\00  %n = call i64 @orion_list_len(ptr %parts)\0A\00", align 8
-@.str_801 = private unnamed_addr constant [37 x i8] c"\6E\04\42\35\00\00\00\00\14\00\00\00\00\00\00\00  br label %sum_hdr\0A\00", align 8
-@.str_802 = private unnamed_addr constant [26 x i8] c"\C1\71\70\36\00\00\00\00\09\00\00\00\00\00\00\00sum_hdr:\0A\00", align 8
-@.str_803 = private unnamed_addr constant [69 x i8] c"\AD\B6\67\13\00\00\00\00\34\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %i_next, %sum_bdy ]\0A\00", align 8
-@.str_804 = private unnamed_addr constant [77 x i8] c"\BF\C0\CA\0C\00\00\00\00\3C\00\00\00\00\00\00\00  %total = phi i64 [ 0, %entry ], [ %total_next, %sum_bdy ]\0A\00", align 8
-@.str_805 = private unnamed_addr constant [47 x i8] c"\A7\6D\65\0A\00\00\00\00\1E\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %n\0A\00", align 8
-@.str_806 = private unnamed_addr constant [61 x i8] c"\3B\95\A0\16\00\00\00\00\2C\00\00\00\00\00\00\00  br i1 %done, label %alloc, label %sum_bdy\0A\00", align 8
-@.str_807 = private unnamed_addr constant [26 x i8] c"\21\CB\BA\08\00\00\00\00\09\00\00\00\00\00\00\00sum_bdy:\0A\00", align 8
-@.str_808 = private unnamed_addr constant [72 x i8] c"\5F\99\96\28\00\00\00\00\37\00\00\00\00\00\00\00  %p_int = call i64 @orion_list_at(ptr %parts, i64 %i)\0A\00", align 8
-@.str_809 = private unnamed_addr constant [51 x i8] c"\F8\33\9F\1A\00\00\00\00\22\00\00\00\00\00\00\00  %p = inttoptr i64 %p_int to ptr\0A\00", align 8
-@.str_810 = private unnamed_addr constant [53 x i8] c"\AF\EA\22\36\00\00\00\00\24\00\00\00\00\00\00\00  %l = call i64 @orion_tlen(ptr %p)\0A\00", align 8
-@.str_811 = private unnamed_addr constant [52 x i8] c"\56\36\39\03\00\00\00\00\23\00\00\00\00\00\00\00  %total_next = add i64 %total, %l\0A\00", align 8
-@.str_812 = private unnamed_addr constant [43 x i8] c"\9C\57\DC\1E\00\00\00\00\1A\00\00\00\00\00\00\00  %i_next = add i64 %i, 1\0A\00", align 8
-@.str_813 = private unnamed_addr constant [24 x i8] c"\EB\6C\27\2B\00\00\00\00\07\00\00\00\00\00\00\00alloc:\0A\00", align 8
-@.str_814 = private unnamed_addr constant [46 x i8] c"\EB\91\A9\19\00\00\00\00\1D\00\00\00\00\00\00\00  %bufsz = add i64 %total, 1\0A\00", align 8
-@.str_815 = private unnamed_addr constant [65 x i8] c"\3D\EC\45\22\00\00\00\00\30\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %total)\0A\00", align 8
-@.str_816 = private unnamed_addr constant [36 x i8] c"\DB\9A\EF\23\00\00\00\00\13\00\00\00\00\00\00\00  br label %cp_hdr\0A\00", align 8
-@.str_817 = private unnamed_addr constant [25 x i8] c"\B6\06\56\08\00\00\00\00\08\00\00\00\00\00\00\00cp_hdr:\0A\00", align 8
-@.str_818 = private unnamed_addr constant [68 x i8] c"\7F\7E\34\29\00\00\00\00\33\00\00\00\00\00\00\00  %j = phi i64 [ 0, %alloc ], [ %j_next, %cp_bdy ]\0A\00", align 8
-@.str_819 = private unnamed_addr constant [72 x i8] c"\1E\0F\93\25\00\00\00\00\37\00\00\00\00\00\00\00  %off = phi i64 [ 0, %alloc ], [ %off_next, %cp_bdy ]\0A\00", align 8
-@.str_820 = private unnamed_addr constant [50 x i8] c"\30\70\D9\36\00\00\00\00\21\00\00\00\00\00\00\00  %cp_done = icmp sge i64 %j, %n\0A\00", align 8
-@.str_821 = private unnamed_addr constant [61 x i8] c"\B3\CD\C7\27\00\00\00\00\2C\00\00\00\00\00\00\00  br i1 %cp_done, label %fin, label %cp_bdy\0A\00", align 8
-@.str_822 = private unnamed_addr constant [25 x i8] c"\1D\2A\3B\16\00\00\00\00\08\00\00\00\00\00\00\00cp_bdy:\0A\00", align 8
-@.str_823 = private unnamed_addr constant [72 x i8] c"\36\25\37\07\00\00\00\00\37\00\00\00\00\00\00\00  %q_int = call i64 @orion_list_at(ptr %parts, i64 %j)\0A\00", align 8
-@.str_824 = private unnamed_addr constant [51 x i8] c"\89\22\38\30\00\00\00\00\22\00\00\00\00\00\00\00  %q = inttoptr i64 %q_int to ptr\0A\00", align 8
-@.str_825 = private unnamed_addr constant [54 x i8] c"\31\D8\3D\26\00\00\00\00\25\00\00\00\00\00\00\00  %ql = call i64 @orion_tlen(ptr %q)\0A\00", align 8
-@.str_826 = private unnamed_addr constant [63 x i8] c"\BF\8E\03\15\00\00\00\00\2E\00\00\00\00\00\00\00  %dst = getelementptr i8, ptr %buf, i64 %off\0A\00", align 8
-@.str_827 = private unnamed_addr constant [69 x i8] c"\27\3C\C0\1F\00\00\00\00\34\00\00\00\00\00\00\00  %_c = call ptr @memcpy(ptr %dst, ptr %q, i64 %ql)\0A\00", align 8
-@.str_828 = private unnamed_addr constant [49 x i8] c"\30\D8\88\07\00\00\00\00\20\00\00\00\00\00\00\00  %off_next = add i64 %off, %ql\0A\00", align 8
-@.str_829 = private unnamed_addr constant [43 x i8] c"\A9\D5\31\26\00\00\00\00\1A\00\00\00\00\00\00\00  %j_next = add i64 %j, 1\0A\00", align 8
-@.str_830 = private unnamed_addr constant [22 x i8] c"\68\3B\5B\1E\00\00\00\00\05\00\00\00\00\00\00\00fin:\0A\00", align 8
-@.str_831 = private unnamed_addr constant [66 x i8] c"\01\02\14\32\00\00\00\00\31\00\00\00\00\00\00\00  %term = getelementptr i8, ptr %buf, i64 %total\0A\00", align 8
-@.str_832 = private unnamed_addr constant [41 x i8] c"\E1\8E\CD\08\00\00\00\00\18\00\00\00\00\00\00\00  store i8 0, ptr %term\0A\00", align 8
-@.str_833 = private unnamed_addr constant [32 x i8] c"\94\78\DF\05\00\00\00\00\0F\00\00\00\00\00\00\00  ret ptr %buf\0A\00", align 8
-@.str_834 = private unnamed_addr constant [42 x i8] c"\A7\65\EF\2B\00\00\00\00\19\00\00\00\00\00\00\00declare i64 @strlen(ptr)\0A\00", align 8
-@.str_835 = private unnamed_addr constant [52 x i8] c"\D9\68\82\2A\00\00\00\00\23\00\00\00\00\00\00\00declare ptr @orion_text_alloc(i64)\0A\00", align 8
-@.str_836 = private unnamed_addr constant [51 x i8] c"\18\DE\ED\04\00\00\00\00\22\00\00\00\00\00\00\00declare ptr @orion_text_seal(ptr)\0A\00", align 8
-@.str_837 = private unnamed_addr constant [53 x i8] c"\DF\EC\2D\0C\00\00\00\00\24\00\00\00\00\00\00\00declare ptr @orion_text_from_c(ptr)\0A\00", align 8
-@.str_838 = private unnamed_addr constant [51 x i8] c"\22\96\99\13\00\00\00\00\22\00\00\00\00\00\00\00declare i64 @orion_text_hash(ptr)\0A\00", align 8
-@.str_839 = private unnamed_addr constant [50 x i8] c"\89\3C\38\0D\00\00\00\00\21\00\00\00\00\00\00\00define i64 @orion_tlen(ptr %p) {\0A\00", align 8
-@.str_840 = private unnamed_addr constant [58 x i8] c"\F7\BF\E0\24\00\00\00\00\29\00\00\00\00\00\00\00  %hp = getelementptr i8, ptr %p, i64 -8\0A\00", align 8
-@.str_841 = private unnamed_addr constant [42 x i8] c"\2C\A7\94\2B\00\00\00\00\19\00\00\00\00\00\00\00  %l = load i64, ptr %hp\0A\00", align 8
-@.str_842 = private unnamed_addr constant [30 x i8] c"\27\DF\79\0A\00\00\00\00\0D\00\00\00\00\00\00\00  ret i64 %l\0A\00", align 8
-@.str_843 = private unnamed_addr constant [52 x i8] c"\14\85\C0\13\00\00\00\00\23\00\00\00\00\00\00\00declare i32 @memcmp(ptr, ptr, i64)\0A\00", align 8
-@.str_844 = private unnamed_addr constant [61 x i8] c"\B7\79\8A\04\00\00\00\00\2C\00\00\00\00\00\00\00define i64 @orion_text_eq(ptr %a, ptr %b) {\0A\00", align 8
-@.str_845 = private unnamed_addr constant [46 x i8] c"\EB\57\32\26\00\00\00\00\1D\00\00\00\00\00\00\00  %same = icmp eq ptr %a, %b\0A\00", align 8
-@.str_846 = private unnamed_addr constant [59 x i8] c"\A7\51\56\0F\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %same, label %yes, label %len_chk\0A\00", align 8
-@.str_847 = private unnamed_addr constant [26 x i8] c"\3A\BA\04\1B\00\00\00\00\09\00\00\00\00\00\00\00len_chk:\0A\00", align 8
-@.str_848 = private unnamed_addr constant [60 x i8] c"\1B\29\7F\05\00\00\00\00\2B\00\00\00\00\00\00\00  %la_p = getelementptr i8, ptr %a, i64 -8\0A\00", align 8
-@.str_849 = private unnamed_addr constant [60 x i8] c"\6A\A2\56\16\00\00\00\00\2B\00\00\00\00\00\00\00  %lb_p = getelementptr i8, ptr %b, i64 -8\0A\00", align 8
-@.str_850 = private unnamed_addr constant [45 x i8] c"\56\20\82\1D\00\00\00\00\1C\00\00\00\00\00\00\00  %la = load i64, ptr %la_p\0A\00", align 8
-@.str_851 = private unnamed_addr constant [45 x i8] c"\BF\FF\2C\02\00\00\00\00\1C\00\00\00\00\00\00\00  %lb = load i64, ptr %lb_p\0A\00", align 8
-@.str_852 = private unnamed_addr constant [50 x i8] c"\77\9B\3B\15\00\00\00\00\21\00\00\00\00\00\00\00  %len_ne = icmp ne i64 %la, %lb\0A\00", align 8
-@.str_853 = private unnamed_addr constant [59 x i8] c"\B5\00\74\18\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %len_ne, label %no, label %ha_chk\0A\00", align 8
-@.str_854 = private unnamed_addr constant [25 x i8] c"\5D\F5\ED\03\00\00\00\00\08\00\00\00\00\00\00\00ha_chk:\0A\00", align 8
-@.str_855 = private unnamed_addr constant [61 x i8] c"\38\1C\D1\0C\00\00\00\00\2C\00\00\00\00\00\00\00  %ha_p = getelementptr i8, ptr %a, i64 -16\0A\00", align 8
-@.str_856 = private unnamed_addr constant [46 x i8] c"\C0\93\74\3B\00\00\00\00\1D\00\00\00\00\00\00\00  %ha0 = load i64, ptr %ha_p\0A\00", align 8
-@.str_857 = private unnamed_addr constant [50 x i8] c"\88\AA\6C\28\00\00\00\00\21\00\00\00\00\00\00\00  %ha_miss = icmp eq i64 %ha0, 0\0A\00", align 8
-@.str_858 = private unnamed_addr constant [65 x i8] c"\3F\C8\11\16\00\00\00\00\30\00\00\00\00\00\00\00  br i1 %ha_miss, label %ha_fill, label %hb_chk\0A\00", align 8
-@.str_859 = private unnamed_addr constant [26 x i8] c"\D4\C9\14\28\00\00\00\00\09\00\00\00\00\00\00\00ha_fill:\0A\00", align 8
-@.str_860 = private unnamed_addr constant [60 x i8] c"\C3\95\87\15\00\00\00\00\2B\00\00\00\00\00\00\00  %ha1 = call i64 @orion_text_hash(ptr %a)\0A\00", align 8
-@.str_861 = private unnamed_addr constant [36 x i8] c"\20\E2\A5\02\00\00\00\00\13\00\00\00\00\00\00\00  br label %hb_chk\0A\00", align 8
-@.str_862 = private unnamed_addr constant [25 x i8] c"\0B\E5\5A\3A\00\00\00\00\08\00\00\00\00\00\00\00hb_chk:\0A\00", align 8
-@.str_863 = private unnamed_addr constant [71 x i8] c"\10\5A\08\37\00\00\00\00\36\00\00\00\00\00\00\00  %ha = phi i64 [ %ha0, %ha_chk ], [ %ha1, %ha_fill ]\0A\00", align 8
-@.str_864 = private unnamed_addr constant [61 x i8] c"\A2\FC\B4\0D\00\00\00\00\2C\00\00\00\00\00\00\00  %hb_p = getelementptr i8, ptr %b, i64 -16\0A\00", align 8
-@.str_865 = private unnamed_addr constant [46 x i8] c"\69\D7\C0\25\00\00\00\00\1D\00\00\00\00\00\00\00  %hb0 = load i64, ptr %hb_p\0A\00", align 8
-@.str_866 = private unnamed_addr constant [50 x i8] c"\00\CA\75\1C\00\00\00\00\21\00\00\00\00\00\00\00  %hb_miss = icmp eq i64 %hb0, 0\0A\00", align 8
-@.str_867 = private unnamed_addr constant [64 x i8] c"\84\4D\6F\22\00\00\00\00\2F\00\00\00\00\00\00\00  br i1 %hb_miss, label %hb_fill, label %h_cmp\0A\00", align 8
-@.str_868 = private unnamed_addr constant [26 x i8] c"\96\BC\44\11\00\00\00\00\09\00\00\00\00\00\00\00hb_fill:\0A\00", align 8
-@.str_869 = private unnamed_addr constant [60 x i8] c"\B1\BF\D7\2B\00\00\00\00\2B\00\00\00\00\00\00\00  %hb1 = call i64 @orion_text_hash(ptr %b)\0A\00", align 8
-@.str_870 = private unnamed_addr constant [35 x i8] c"\45\24\2E\29\00\00\00\00\12\00\00\00\00\00\00\00  br label %h_cmp\0A\00", align 8
-@.str_871 = private unnamed_addr constant [24 x i8] c"\DA\8A\4A\37\00\00\00\00\07\00\00\00\00\00\00\00h_cmp:\0A\00", align 8
-@.str_872 = private unnamed_addr constant [71 x i8] c"\85\85\F5\0F\00\00\00\00\36\00\00\00\00\00\00\00  %hb = phi i64 [ %hb0, %hb_chk ], [ %hb1, %hb_fill ]\0A\00", align 8
-@.str_873 = private unnamed_addr constant [48 x i8] c"\3F\36\FD\0F\00\00\00\00\1F\00\00\00\00\00\00\00  %h_ne = icmp ne i64 %ha, %hb\0A\00", align 8
-@.str_874 = private unnamed_addr constant [56 x i8] c"\09\12\D0\30\00\00\00\00\27\00\00\00\00\00\00\00  br i1 %h_ne, label %no, label %bytes\0A\00", align 8
-@.str_875 = private unnamed_addr constant [24 x i8] c"\AB\84\0E\1E\00\00\00\00\07\00\00\00\00\00\00\00bytes:\0A\00", align 8
-@.str_876 = private unnamed_addr constant [67 x i8] c"\ED\7F\A2\0D\00\00\00\00\32\00\00\00\00\00\00\00  %mc = call i32 @memcmp(ptr %a, ptr %b, i64 %la)\0A\00", align 8
-@.str_877 = private unnamed_addr constant [45 x i8] c"\91\9C\BB\34\00\00\00\00\1C\00\00\00\00\00\00\00  %beq = icmp eq i32 %mc, 0\0A\00", align 8
-@.str_878 = private unnamed_addr constant [44 x i8] c"\21\ED\1E\1F\00\00\00\00\1B\00\00\00\00\00\00\00  %r = zext i1 %beq to i64\0A\00", align 8
-@.str_879 = private unnamed_addr constant [30 x i8] c"\39\E2\79\0A\00\00\00\00\0D\00\00\00\00\00\00\00  ret i64 %r\0A\00", align 8
-@.str_880 = private unnamed_addr constant [22 x i8] c"\02\20\B7\05\00\00\00\00\05\00\00\00\00\00\00\00yes:\0A\00", align 8
-@.str_881 = private unnamed_addr constant [29 x i8] c"\F5\BF\75\10\00\00\00\00\0C\00\00\00\00\00\00\00  ret i64 1\0A\00", align 8
-@.str_882 = private unnamed_addr constant [21 x i8] c"\7E\B0\D1\38\00\00\00\00\04\00\00\00\00\00\00\00no:\0A\00", align 8
-@.str_883 = private unnamed_addr constant [29 x i8] c"\72\BF\75\10\00\00\00\00\0C\00\00\00\00\00\00\00  ret i64 0\0A\00", align 8
-@.str_884 = private unnamed_addr constant [47 x i8] c"\ED\0A\AD\32\00\00\00\00\1E\00\00\00\00\00\00\00declare ptr @strcpy(ptr, ptr)\0A\00", align 8
-@.str_885 = private unnamed_addr constant [47 x i8] c"\3B\C0\43\25\00\00\00\00\1E\00\00\00\00\00\00\00declare ptr @strcat(ptr, ptr)\0A\00", align 8
-@.str_886 = private unnamed_addr constant [47 x i8] c"\70\2C\72\0A\00\00\00\00\1E\00\00\00\00\00\00\00declare i32 @strcmp(ptr, ptr)\0A\00", align 8
-@.str_887 = private unnamed_addr constant [59 x i8] c"\6B\AA\58\07\00\00\00\00\2A\00\00\00\00\00\00\00declare i32 @snprintf(ptr, i64, ptr, ...)\0A\00", align 8
-@.str_888 = private unnamed_addr constant [60 x i8] c"\8C\F8\0C\15\00\00\00\00\2B\00\00\00\00\00\00\00declare i64 @__orion_perform_int(ptr, i64)\0A\00", align 8
-@.str_889 = private unnamed_addr constant [55 x i8] c"\57\6B\60\36\00\00\00\00\26\00\00\00\00\00\00\00declare void @__orion_resume_int(i64)\0A\00", align 8
-@.str_890 = private unnamed_addr constant [61 x i8] c"\15\E2\C6\2D\00\00\00\00\2C\00\00\00\00\00\00\00declare ptr @__orion_perform_text(ptr, ptr)\0A\00", align 8
-@.str_891 = private unnamed_addr constant [56 x i8] c"\57\36\01\0A\00\00\00\00\27\00\00\00\00\00\00\00declare void @__orion_resume_text(ptr)\0A\00", align 8
-@.str_892 = private unnamed_addr constant [52 x i8] c"\FC\E9\81\27\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @__orion_time_now_ms()\0A\00", align 8
-@.str_893 = private unnamed_addr constant [53 x i8] c"\4D\AF\A6\08\00\00\00\00\24\00\00\00\00\00\00\00declare i64 @__orion_monotonic_ms()\0A\00", align 8
-@.str_894 = private unnamed_addr constant [53 x i8] c"\A8\14\38\14\00\00\00\00\24\00\00\00\00\00\00\00declare void @__orion_sleep_ms(i64)\0A\00", align 8
-@.str_895 = private unnamed_addr constant [82 x i8] c"\F6\4A\19\24\00\00\00\00\41\00\00\00\00\00\00\00@.fmt_int = private unnamed_addr constant [6 x i8] c\22%lld\5C0A\5C00\22\0A\00", align 8
-@.str_896 = private unnamed_addr constant [82 x i8] c"\A4\E4\4B\01\00\00\00\00\41\00\00\00\00\00\00\00@.fmt_float = private unnamed_addr constant [4 x i8] c\22%g\5C0A\5C00\22\0A\00", align 8
-@.str_897 = private unnamed_addr constant [75 x i8] c"\4E\C7\88\20\00\00\00\00\3A\00\00\00\00\00\00\00@.fmt_g = private unnamed_addr constant [3 x i8] c\22%g\5C00\22\0A\00", align 8
-@.str_898 = private unnamed_addr constant [83 x i8] c"\26\AD\6C\33\00\00\00\00\42\00\00\00\00\00\00\00@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\22%lld\5C00\22\0A\00", align 8
-@.str_899 = private unnamed_addr constant [65 x i8] c"\8D\D4\CA\24\00\00\00\00\30\00\00\00\00\00\00\00define ptr @orion_text_concat(ptr %a, ptr %b) {\0A\00", align 8
-@.str_900 = private unnamed_addr constant [54 x i8] c"\BD\D6\8F\13\00\00\00\00\25\00\00\00\00\00\00\00  %la = call i64 @orion_tlen(ptr %a)\0A\00", align 8
-@.str_901 = private unnamed_addr constant [54 x i8] c"\DF\4C\70\00\00\00\00\00\25\00\00\00\00\00\00\00  %lb = call i64 @orion_tlen(ptr %b)\0A\00", align 8
-@.str_902 = private unnamed_addr constant [43 x i8] c"\44\AE\D4\28\00\00\00\00\1A\00\00\00\00\00\00\00  %sum = add i64 %la, %lb\0A\00", align 8
-@.str_903 = private unnamed_addr constant [63 x i8] c"\51\43\EA\06\00\00\00\00\2E\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %sum)\0A\00", align 8
-@.str_904 = private unnamed_addr constant [60 x i8] c"\C5\CF\4A\37\00\00\00\00\2B\00\00\00\00\00\00\00  %_1 = call ptr @strcpy(ptr %buf, ptr %a)\0A\00", align 8
-@.str_905 = private unnamed_addr constant [60 x i8] c"\33\3D\6F\00\00\00\00\00\2B\00\00\00\00\00\00\00  %_2 = call ptr @strcat(ptr %buf, ptr %b)\0A\00", align 8
-@.str_906 = private unnamed_addr constant [57 x i8] c"\78\06\24\06\00\00\00\00\28\00\00\00\00\00\00\00define ptr @orion_int_to_text(i64 %n) {\0A\00", align 8
-@.str_907 = private unnamed_addr constant [61 x i8] c"\FC\FC\43\21\00\00\00\00\2C\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 31)\0A\00", align 8
-@.str_908 = private unnamed_addr constant [109 x i8] c"\26\09\20\0D\00\00\00\00\5C\00\00\00\00\00\00\00  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)\0A\00", align 8
-@.str_909 = private unnamed_addr constant [65 x i8] c"\0F\BB\73\37\00\00\00\00\30\00\00\00\00\00\00\00  %sealed = call ptr @orion_text_seal(ptr %buf)\0A\00", align 8
-@.str_910 = private unnamed_addr constant [35 x i8] c"\26\DC\1E\2B\00\00\00\00\12\00\00\00\00\00\00\00  ret ptr %sealed\0A\00", align 8
-@.str_911 = private unnamed_addr constant [53 x i8] c"\AA\EB\5D\38\00\00\00\00\24\00\00\00\00\00\00\00declare ptr @memcpy(ptr, ptr, i64)\0A\0A\00", align 8
-@.str_912 = private unnamed_addr constant [76 x i8] c"\A4\4A\43\00\00\00\00\00\3B\00\00\00\00\00\00\00define ptr @orion_text_slice(ptr %src, i64 %lo, i64 %hi) {\0A\00", align 8
-@.str_913 = private unnamed_addr constant [61 x i8] c"\EF\EC\8A\1A\00\00\00\00\2C\00\00\00\00\00\00\00  %src_len = call i64 @orion_tlen(ptr %src)\0A\00", align 8
-@.str_914 = private unnamed_addr constant [49 x i8] c"\00\05\98\0D\00\00\00\00\20\00\00\00\00\00\00\00  %lo_neg = icmp slt i64 %lo, 0\0A\00", align 8
-@.str_915 = private unnamed_addr constant [64 x i8] c"\E9\17\ED\2E\00\00\00\00\2F\00\00\00\00\00\00\00  %lo_safe = select i1 %lo_neg, i64 0, i64 %lo\0A\00", align 8
-@.str_916 = private unnamed_addr constant [56 x i8] c"\FF\54\3F\17\00\00\00\00\27\00\00\00\00\00\00\00  %hi_big = icmp sgt i64 %hi, %src_len\0A\00", align 8
-@.str_917 = private unnamed_addr constant [71 x i8] c"\D7\37\87\0B\00\00\00\00\36\00\00\00\00\00\00\00  %hi_safe = select i1 %hi_big, i64 %src_len, i64 %hi\0A\00", align 8
-@.str_918 = private unnamed_addr constant [63 x i8] c"\9D\F6\1E\21\00\00\00\00\2E\00\00\00\00\00\00\00  %hi_lt_lo = icmp slt i64 %hi_safe, %lo_safe\0A\00", align 8
-@.str_919 = private unnamed_addr constant [79 x i8] c"\B7\25\CD\15\00\00\00\00\3E\00\00\00\00\00\00\00  %hi_final = select i1 %hi_lt_lo, i64 %lo_safe, i64 %hi_safe\0A\00", align 8
-@.str_920 = private unnamed_addr constant [60 x i8] c"\7A\35\48\27\00\00\00\00\2B\00\00\00\00\00\00\00  %slice_len = sub i64 %hi_final, %lo_safe\0A\00", align 8
-@.str_921 = private unnamed_addr constant [69 x i8] c"\0C\C7\3E\00\00\00\00\00\34\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %slice_len)\0A\00", align 8
-@.str_922 = private unnamed_addr constant [71 x i8] c"\54\E3\97\0A\00\00\00\00\36\00\00\00\00\00\00\00  %src_off = getelementptr i8, ptr %src, i64 %lo_safe\0A\00", align 8
-@.str_923 = private unnamed_addr constant [81 x i8] c"\2E\9F\A0\3A\00\00\00\00\40\00\00\00\00\00\00\00  %_ = call ptr @memcpy(ptr %buf, ptr %src_off, i64 %slice_len)\0A\00", align 8
-@.str_924 = private unnamed_addr constant [70 x i8] c"\33\90\67\16\00\00\00\00\35\00\00\00\00\00\00\00  %term = getelementptr i8, ptr %buf, i64 %slice_len\0A\00", align 8
-@.str_925 = private unnamed_addr constant [48 x i8] c"\AD\D5\B4\26\00\00\00\00\1F\00\00\00\00\00\00\00declare ptr @strstr(ptr, ptr)\0A\0A\00", align 8
-@.str_926 = private unnamed_addr constant [74 x i8] c"\84\49\D8\1F\00\00\00\00\39\00\00\00\00\00\00\00define i64 @orion_text_contains(ptr %hay, ptr %needle) {\0A\00", align 8
-@.str_927 = private unnamed_addr constant [66 x i8] c"\5D\A1\30\28\00\00\00\00\31\00\00\00\00\00\00\00  %hit = call ptr @strstr(ptr %hay, ptr %needle)\0A\00", align 8
-@.str_928 = private unnamed_addr constant [53 x i8] c"\4D\98\3B\2B\00\00\00\00\24\00\00\00\00\00\00\00  %is_null = icmp eq ptr %hit, null\0A\00", align 8
-@.str_929 = private unnamed_addr constant [62 x i8] c"\25\33\EA\08\00\00\00\00\2D\00\00\00\00\00\00\00  %result = select i1 %is_null, i64 0, i64 1\0A\00", align 8
-@.str_930 = private unnamed_addr constant [35 x i8] c"\23\3B\E2\12\00\00\00\00\12\00\00\00\00\00\00\00  ret i64 %result\0A\00", align 8
-@.str_931 = private unnamed_addr constant [63 x i8] c"\92\50\3D\09\00\00\00\00\2E\00\00\00\00\00\00\00define ptr @orion_bytes_from_text(ptr %src) {\0A\00", align 8
-@.str_932 = private unnamed_addr constant [66 x i8] c"\29\FD\EF\2D\00\00\00\00\31\00\00\00\00\00\00\00  %list = call ptr @orion_list_new(i64 %src_len)\0A\00", align 8
-@.str_933 = private unnamed_addr constant [33 x i8] c"\F4\4C\C2\1B\00\00\00\00\10\00\00\00\00\00\00\00  br label %hdr\0A\00", align 8
-@.str_934 = private unnamed_addr constant [22 x i8] c"\20\66\31\05\00\00\00\00\05\00\00\00\00\00\00\00hdr:\0A\00", align 8
-@.str_935 = private unnamed_addr constant [65 x i8] c"\CF\EC\78\3B\00\00\00\00\30\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\0A\00", align 8
-@.str_936 = private unnamed_addr constant [53 x i8] c"\6A\4D\64\24\00\00\00\00\24\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %src_len\0A\00", align 8
-@.str_937 = private unnamed_addr constant [57 x i8] c"\95\47\49\36\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %done, label %after, label %bdy\0A\00", align 8
-@.str_938 = private unnamed_addr constant [22 x i8] c"\87\89\16\13\00\00\00\00\05\00\00\00\00\00\00\00bdy:\0A\00", align 8
-@.str_939 = private unnamed_addr constant [66 x i8] c"\89\D1\C1\18\00\00\00\00\31\00\00\00\00\00\00\00  %byte_ptr = getelementptr i8, ptr %src, i64 %i\0A\00", align 8
-@.str_940 = private unnamed_addr constant [50 x i8] c"\E9\64\5D\2D\00\00\00\00\21\00\00\00\00\00\00\00  %byte = load i8, ptr %byte_ptr\0A\00", align 8
-@.str_941 = private unnamed_addr constant [50 x i8] c"\19\83\24\04\00\00\00\00\21\00\00\00\00\00\00\00  %byte64 = zext i8 %byte to i64\0A\00", align 8
-@.str_942 = private unnamed_addr constant [77 x i8] c"\2C\F7\3A\37\00\00\00\00\3C\00\00\00\00\00\00\00  call void @orion_list_set(ptr %list, i64 %i, i64 %byte64)\0A\00", align 8
-@.str_943 = private unnamed_addr constant [24 x i8] c"\7D\F8\9E\22\00\00\00\00\07\00\00\00\00\00\00\00after:\0A\00", align 8
-@.str_944 = private unnamed_addr constant [33 x i8] c"\F6\F6\39\31\00\00\00\00\10\00\00\00\00\00\00\00  ret ptr %list\0A\00", align 8
-@.str_945 = private unnamed_addr constant [62 x i8] c"\2E\17\EA\06\00\00\00\00\2D\00\00\00\00\00\00\00define ptr @orion_bytes_to_text(ptr %list) {\0A\00", align 8
-@.str_946 = private unnamed_addr constant [67 x i8] c"\AC\0E\DA\22\00\00\00\00\32\00\00\00\00\00\00\00  %list_len = call i64 @orion_list_len(ptr %list)\0A\00", align 8
-@.str_947 = private unnamed_addr constant [68 x i8] c"\7E\CD\78\21\00\00\00\00\33\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %list_len)\0A\00", align 8
-@.str_948 = private unnamed_addr constant [54 x i8] c"\85\FB\73\15\00\00\00\00\25\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %list_len\0A\00", align 8
-@.str_949 = private unnamed_addr constant [69 x i8] c"\79\12\1D\23\00\00\00\00\34\00\00\00\00\00\00\00  %v64 = call i64 @orion_list_at(ptr %list, i64 %i)\0A\00", align 8
-@.str_950 = private unnamed_addr constant [46 x i8] c"\6C\8D\2A\2E\00\00\00\00\1D\00\00\00\00\00\00\00  %v8 = trunc i64 %v64 to i8\0A\00", align 8
-@.str_951 = private unnamed_addr constant [61 x i8] c"\F2\32\6F\14\00\00\00\00\2C\00\00\00\00\00\00\00  %dst = getelementptr i8, ptr %buf, i64 %i\0A\00", align 8
-@.str_952 = private unnamed_addr constant [42 x i8] c"\0E\BC\5D\32\00\00\00\00\19\00\00\00\00\00\00\00  store i8 %v8, ptr %dst\0A\00", align 8
-@.str_953 = private unnamed_addr constant [69 x i8] c"\77\E5\D9\03\00\00\00\00\34\00\00\00\00\00\00\00  %term = getelementptr i8, ptr %buf, i64 %list_len\0A\00", align 8
-@.str_954 = private unnamed_addr constant [57 x i8] c"\53\D1\B7\21\00\00\00\00\28\00\00\00\00\00\00\00define ptr @orion_bytes_zeros(i64 %n) {\0A\00", align 8
-@.str_955 = private unnamed_addr constant [60 x i8] c"\8E\CE\48\01\00\00\00\00\2B\00\00\00\00\00\00\00  %list = call ptr @orion_list_new(i64 %n)\0A\00", align 8
-@.str_956 = private unnamed_addr constant [71 x i8] c"\28\FB\78\10\00\00\00\00\36\00\00\00\00\00\00\00  call void @orion_list_set(ptr %list, i64 %i, i64 0)\0A\00", align 8
-@.str_957 = private unnamed_addr constant [77 x i8] c"\45\12\E2\17\00\00\00\00\3C\00\00\00\00\00\00\00define ptr @orion_bytes_slice(ptr %src, i64 %lo, i64 %hi) {\0A\00", align 8
-@.str_958 = private unnamed_addr constant [65 x i8] c"\7C\14\0B\03\00\00\00\00\30\00\00\00\00\00\00\00  %src_len = call i64 @orion_list_len(ptr %src)\0A\00", align 8
-@.str_959 = private unnamed_addr constant [60 x i8] c"\09\83\BE\19\00\00\00\00\2B\00\00\00\00\00\00\00  %hi_lt = icmp slt i64 %hi_safe, %lo_safe\0A\00", align 8
-@.str_960 = private unnamed_addr constant [76 x i8] c"\A9\48\75\27\00\00\00\00\3B\00\00\00\00\00\00\00  %hi_final = select i1 %hi_lt, i64 %lo_safe, i64 %hi_safe\0A\00", align 8
-@.str_961 = private unnamed_addr constant [58 x i8] c"\CC\A0\A3\30\00\00\00\00\29\00\00\00\00\00\00\00  %new_len = sub i64 %hi_final, %lo_safe\0A\00", align 8
-@.str_962 = private unnamed_addr constant [65 x i8] c"\0B\02\82\1D\00\00\00\00\30\00\00\00\00\00\00\00  %dst = call ptr @orion_list_new(i64 %new_len)\0A\00", align 8
-@.str_963 = private unnamed_addr constant [53 x i8] c"\F0\EF\84\0E\00\00\00\00\24\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %new_len\0A\00", align 8
-@.str_964 = private unnamed_addr constant [51 x i8] c"\40\AD\29\23\00\00\00\00\22\00\00\00\00\00\00\00  %src_idx = add i64 %lo_safe, %i\0A\00", align 8
-@.str_965 = private unnamed_addr constant [75 x i8] c"\66\F0\21\2E\00\00\00\00\3A\00\00\00\00\00\00\00  %item = call i64 @orion_list_at(ptr %src, i64 %src_idx)\0A\00", align 8
-@.str_966 = private unnamed_addr constant [74 x i8] c"\18\4E\96\32\00\00\00\00\39\00\00\00\00\00\00\00  call void @orion_list_set(ptr %dst, i64 %i, i64 %item)\0A\00", align 8
-@.str_967 = private unnamed_addr constant [32 x i8] c"\E2\94\23\06\00\00\00\00\0F\00\00\00\00\00\00\00  ret ptr %dst\0A\00", align 8
-@.str_968 = private unnamed_addr constant [66 x i8] c"\E5\4F\33\0C\00\00\00\00\31\00\00\00\00\00\00\00define ptr @orion_bytes_concat(ptr %a, ptr %b) {\0A\00", align 8
-@.str_969 = private unnamed_addr constant [61 x i8] c"\76\A6\57\02\00\00\00\00\2C\00\00\00\00\00\00\00  %a_len = call i64 @orion_list_len(ptr %a)\0A\00", align 8
-@.str_970 = private unnamed_addr constant [61 x i8] c"\E4\56\57\00\00\00\00\00\2C\00\00\00\00\00\00\00  %b_len = call i64 @orion_list_len(ptr %b)\0A\00", align 8
-@.str_971 = private unnamed_addr constant [51 x i8] c"\27\72\5C\25\00\00\00\00\22\00\00\00\00\00\00\00  %total = add i64 %a_len, %b_len\0A\00", align 8
-@.str_972 = private unnamed_addr constant [63 x i8] c"\97\97\5D\30\00\00\00\00\2E\00\00\00\00\00\00\00  %dst = call ptr @orion_list_new(i64 %total)\0A\00", align 8
-@.str_973 = private unnamed_addr constant [67 x i8] c"\35\D8\3E\17\00\00\00\00\32\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %i_next, %store ]\0A\00", align 8
-@.str_974 = private unnamed_addr constant [51 x i8] c"\DF\2A\3C\37\00\00\00\00\22\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %total\0A\00", align 8
-@.str_975 = private unnamed_addr constant [53 x i8] c"\01\C2\1B\03\00\00\00\00\24\00\00\00\00\00\00\00  %from_a = icmp slt i64 %i, %a_len\0A\00", align 8
-@.str_976 = private unnamed_addr constant [55 x i8] c"\DE\CA\46\12\00\00\00\00\26\00\00\00\00\00\00\00  br i1 %from_a, label %ba, label %bb\0A\00", align 8
-@.str_977 = private unnamed_addr constant [21 x i8] c"\BC\62\32\37\00\00\00\00\04\00\00\00\00\00\00\00ba:\0A\00", align 8
-@.str_978 = private unnamed_addr constant [69 x i8] c"\6E\F3\B9\33\00\00\00\00\34\00\00\00\00\00\00\00  %item_a = call i64 @orion_list_at(ptr %a, i64 %i)\0A\00", align 8
-@.str_979 = private unnamed_addr constant [35 x i8] c"\E2\21\80\10\00\00\00\00\12\00\00\00\00\00\00\00  br label %store\0A\00", align 8
-@.str_980 = private unnamed_addr constant [21 x i8] c"\C5\A5\32\37\00\00\00\00\04\00\00\00\00\00\00\00bb:\0A\00", align 8
-@.str_981 = private unnamed_addr constant [47 x i8] c"\C9\59\94\25\00\00\00\00\1E\00\00\00\00\00\00\00  %b_idx = sub i64 %i, %a_len\0A\00", align 8
-@.str_982 = private unnamed_addr constant [73 x i8] c"\7C\71\8A\23\00\00\00\00\38\00\00\00\00\00\00\00  %item_b = call i64 @orion_list_at(ptr %b, i64 %b_idx)\0A\00", align 8
-@.str_983 = private unnamed_addr constant [24 x i8] c"\AB\EF\E5\28\00\00\00\00\07\00\00\00\00\00\00\00store:\0A\00", align 8
-@.str_984 = private unnamed_addr constant [70 x i8] c"\F3\9B\C9\05\00\00\00\00\35\00\00\00\00\00\00\00  %item = phi i64 [ %item_a, %ba ], [ %item_b, %bb ]\0A\00", align 8
-@.str_985 = private unnamed_addr constant [49 x i8] c"\27\86\F7\3A\00\00\00\00\20\00\00\00\00\00\00\00@orion_slots = global ptr null\0A\0A\00", align 8
-@.str_986 = private unnamed_addr constant [73 x i8] c"\0E\75\68\08\00\00\00\00\38\00\00\00\00\00\00\00@orion_empty_list = constant [2 x i64] zeroinitializer\0A\0A\00", align 8
-@.str_987 = private unnamed_addr constant [58 x i8] c"\B2\3D\6A\09\00\00\00\00\29\00\00\00\00\00\00\00define ptr @orion_persist_text(ptr %s) {\0A\00", align 8
-@.str_988 = private unnamed_addr constant [51 x i8] c"\39\F1\EB\19\00\00\00\00\22\00\00\00\00\00\00\00  %is_null = icmp eq ptr %s, null\0A\00", align 8
-@.str_989 = private unnamed_addr constant [68 x i8] c"\84\2D\CD\0A\00\00\00\00\33\00\00\00\00\00\00\00  br i1 %is_null, label %ret_empty, label %copy_it\0A\00", align 8
-@.str_990 = private unnamed_addr constant [28 x i8] c"\31\03\F2\14\00\00\00\00\0B\00\00\00\00\00\00\00ret_empty:\0A\00", align 8
-@.str_991 = private unnamed_addr constant [67 x i8] c"\17\AC\4A\27\00\00\00\00\32\00\00\00\00\00\00\00  %eo = getelementptr i8, ptr @.empty_str, i64 16\0A\00", align 8
-@.str_992 = private unnamed_addr constant [31 x i8] c"\3F\D9\D3\34\00\00\00\00\0E\00\00\00\00\00\00\00  ret ptr %eo\0A\00", align 8
-@.str_993 = private unnamed_addr constant [26 x i8] c"\5D\75\F1\22\00\00\00\00\09\00\00\00\00\00\00\00copy_it:\0A\00", align 8
-@.str_994 = private unnamed_addr constant [53 x i8] c"\FC\19\E4\0F\00\00\00\00\24\00\00\00\00\00\00\00  %n = call i64 @orion_tlen(ptr %s)\0A\00", align 8
-@.str_995 = private unnamed_addr constant [41 x i8] c"\88\BA\B0\22\00\00\00\00\18\00\00\00\00\00\00\00  %tot = add i64 %n, 17\0A\00", align 8
-@.str_996 = private unnamed_addr constant [65 x i8] c"\8B\AE\CD\11\00\00\00\00\30\00\00\00\00\00\00\00  %src_base = getelementptr i8, ptr %s, i64 -16\0A\00", align 8
-@.str_997 = private unnamed_addr constant [54 x i8] c"\CD\01\4D\20\00\00\00\00\25\00\00\00\00\00\00\00  %copy = call ptr @malloc(i64 %tot)\0A\00", align 8
-@.str_998 = private unnamed_addr constant [77 x i8] c"\8E\95\DB\09\00\00\00\00\3C\00\00\00\00\00\00\00  %_ = call ptr @memcpy(ptr %copy, ptr %src_base, i64 %tot)\0A\00", align 8
-@.str_999 = private unnamed_addr constant [62 x i8] c"\C2\2A\21\2E\00\00\00\00\2D\00\00\00\00\00\00\00  %out = getelementptr i8, ptr %copy, i64 16\0A\00", align 8
-@.str_1000 = private unnamed_addr constant [32 x i8] c"\9D\70\9D\07\00\00\00\00\0F\00\00\00\00\00\00\00  ret ptr %out\0A\00", align 8
-@.str_1001 = private unnamed_addr constant [55 x i8] c"\FD\64\75\2F\00\00\00\00\26\00\00\00\00\00\00\00define ptr @orion_map_new_persist() {\0A\00", align 8
-@.str_1002 = private unnamed_addr constant [54 x i8] c"\AB\6C\66\1A\00\00\00\00\25\00\00\00\00\00\00\00  %handle = call ptr @malloc(i64 24)\0A\00", align 8
-@.str_1003 = private unnamed_addr constant [56 x i8] c"\8A\A7\AB\14\00\00\00\00\27\00\00\00\00\00\00\00  %entries = call ptr @malloc(i64 256)\0A\00", align 8
-@.str_1004 = private unnamed_addr constant [51 x i8] c"\73\08\28\23\00\00\00\00\22\00\00\00\00\00\00\00  store ptr %entries, ptr %handle\0A\00", align 8
-@.str_1005 = private unnamed_addr constant [69 x i8] c"\32\4B\DC\33\00\00\00\00\34\00\00\00\00\00\00\00  %cap_slot = getelementptr i64, ptr %handle, i64 1\0A\00", align 8
-@.str_1006 = private unnamed_addr constant [47 x i8] c"\52\7C\D1\27\00\00\00\00\1E\00\00\00\00\00\00\00  store i64 16, ptr %cap_slot\0A\00", align 8
-@.str_1007 = private unnamed_addr constant [69 x i8] c"\EE\76\9B\32\00\00\00\00\34\00\00\00\00\00\00\00  %len_slot = getelementptr i64, ptr %handle, i64 2\0A\00", align 8
-@.str_1008 = private unnamed_addr constant [46 x i8] c"\38\EC\AB\30\00\00\00\00\1D\00\00\00\00\00\00\00  store i64 0, ptr %len_slot\0A\00", align 8
-@.str_1009 = private unnamed_addr constant [35 x i8] c"\47\51\3F\0A\00\00\00\00\12\00\00\00\00\00\00\00  ret ptr %handle\0A\00", align 8
-@.str_1010 = private unnamed_addr constant [84 x i8] c"\67\2D\D0\33\00\00\00\00\43\00\00\00\00\00\00\00define void @orion_map_set_persist(ptr %map, ptr %key, i64 %val) {\0A\00", align 8
-@.str_1011 = private unnamed_addr constant [49 x i8] c"\7D\8E\0F\27\00\00\00\00\20\00\00\00\00\00\00\00  %entries = load ptr, ptr %map\0A\00", align 8
-@.str_1012 = private unnamed_addr constant [66 x i8] c"\68\CC\5E\3A\00\00\00\00\31\00\00\00\00\00\00\00  %cap_slot = getelementptr i64, ptr %map, i64 1\0A\00", align 8
-@.str_1013 = private unnamed_addr constant [66 x i8] c"\60\D7\72\1A\00\00\00\00\31\00\00\00\00\00\00\00  %len_slot = getelementptr i64, ptr %map, i64 2\0A\00", align 8
-@.str_1014 = private unnamed_addr constant [50 x i8] c"\94\87\F0\1F\00\00\00\00\21\00\00\00\00\00\00\00  %cap = load i64, ptr %cap_slot\0A\00", align 8
-@.str_1015 = private unnamed_addr constant [50 x i8] c"\EC\D5\51\2C\00\00\00\00\21\00\00\00\00\00\00\00  %len = load i64, ptr %len_slot\0A\00", align 8
-@.str_1016 = private unnamed_addr constant [66 x i8] c"\72\9C\40\2F\00\00\00\00\31\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\0A\00", align 8
-@.str_1017 = private unnamed_addr constant [49 x i8] c"\59\05\63\0C\00\00\00\00\20\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %len\0A\00", align 8
-@.str_1018 = private unnamed_addr constant [64 x i8] c"\37\8C\2E\34\00\00\00\00\2F\00\00\00\00\00\00\00  br i1 %done, label %maybe_grow, label %check\0A\00", align 8
-@.str_1019 = private unnamed_addr constant [24 x i8] c"\7E\1F\94\08\00\00\00\00\07\00\00\00\00\00\00\00check:\0A\00", align 8
-@.str_1020 = private unnamed_addr constant [41 x i8] c"\62\1A\0F\20\00\00\00\00\18\00\00\00\00\00\00\00  %idx2 = mul i64 %i, 2\0A\00", align 8
-@.str_1021 = private unnamed_addr constant [72 x i8] c"\C6\75\0E\0A\00\00\00\00\37\00\00\00\00\00\00\00  %k_slot = getelementptr i64, ptr %entries, i64 %idx2\0A\00", align 8
-@.str_1022 = private unnamed_addr constant [50 x i8] c"\43\99\4E\2B\00\00\00\00\21\00\00\00\00\00\00\00  %k_int = load i64, ptr %k_slot\0A\00", align 8
-@.str_1023 = private unnamed_addr constant [55 x i8] c"\EE\B1\78\0B\00\00\00\00\26\00\00\00\00\00\00\00  %k_ptr = inttoptr i64 %k_int to ptr\0A\00", align 8
-@.str_1024 = private unnamed_addr constant [72 x i8] c"\BD\78\8A\2C\00\00\00\00\37\00\00\00\00\00\00\00  %cmp = call i64 @orion_text_eq(ptr %k_ptr, ptr %key)\0A\00", align 8
-@.str_1025 = private unnamed_addr constant [45 x i8] c"\18\6B\0D\04\00\00\00\00\1C\00\00\00\00\00\00\00  %eq = icmp ne i64 %cmp, 0\0A\00", align 8
-@.str_1026 = private unnamed_addr constant [57 x i8] c"\D5\14\E3\0C\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %eq, label %update, label %step\0A\00", align 8
-@.str_1027 = private unnamed_addr constant [23 x i8] c"\FA\F4\16\1C\00\00\00\00\06\00\00\00\00\00\00\00step:\0A\00", align 8
-@.str_1028 = private unnamed_addr constant [25 x i8] c"\95\D2\4A\07\00\00\00\00\08\00\00\00\00\00\00\00update:\0A\00", align 8
-@.str_1029 = private unnamed_addr constant [42 x i8] c"\B7\9C\1C\1F\00\00\00\00\19\00\00\00\00\00\00\00  %vi = add i64 %idx2, 1\0A\00", align 8
-@.str_1030 = private unnamed_addr constant [70 x i8] c"\61\BF\20\17\00\00\00\00\35\00\00\00\00\00\00\00  %v_slot = getelementptr i64, ptr %entries, i64 %vi\0A\00", align 8
-@.str_1031 = private unnamed_addr constant [47 x i8] c"\AD\7E\58\24\00\00\00\00\1E\00\00\00\00\00\00\00  store i64 %val, ptr %v_slot\0A\00", align 8
-@.str_1032 = private unnamed_addr constant [28 x i8] c"\2A\EC\9E\16\00\00\00\00\0B\00\00\00\00\00\00\00  ret void\0A\00", align 8
-@.str_1033 = private unnamed_addr constant [29 x i8] c"\F6\0A\57\29\00\00\00\00\0C\00\00\00\00\00\00\00maybe_grow:\0A\00", align 8
-@.str_1034 = private unnamed_addr constant [51 x i8] c"\D8\17\EB\26\00\00\00\00\22\00\00\00\00\00\00\00  %full = icmp sge i64 %len, %cap\0A\00", align 8
-@.str_1035 = private unnamed_addr constant [59 x i8] c"\9F\FE\12\0F\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %full, label %grow, label %append\0A\00", align 8
-@.str_1036 = private unnamed_addr constant [23 x i8] c"\F1\08\AF\38\00\00\00\00\06\00\00\00\00\00\00\00grow:\0A\00", align 8
-@.str_1037 = private unnamed_addr constant [46 x i8] c"\85\70\19\2C\00\00\00\00\1D\00\00\00\00\00\00\00  %new_cap = mul i64 %cap, 2\0A\00", align 8
-@.str_1038 = private unnamed_addr constant [53 x i8] c"\3C\AD\6E\2F\00\00\00\00\24\00\00\00\00\00\00\00  %new_bytes = mul i64 %new_cap, 16\0A\00", align 8
-@.str_1039 = private unnamed_addr constant [67 x i8] c"\D2\16\FE\1A\00\00\00\00\32\00\00\00\00\00\00\00  %new_entries = call ptr @malloc(i64 %new_bytes)\0A\00", align 8
-@.str_1040 = private unnamed_addr constant [49 x i8] c"\65\7C\E2\0C\00\00\00\00\20\00\00\00\00\00\00\00  %old_bytes = mul i64 %len, 16\0A\00", align 8
-@.str_1041 = private unnamed_addr constant [91 x i8] c"\0F\36\26\2A\00\00\00\00\4A\00\00\00\00\00\00\00  %_cp = call ptr @memcpy(ptr %new_entries, ptr %entries, i64 %old_bytes)\0A\00", align 8
-@.str_1042 = private unnamed_addr constant [52 x i8] c"\64\A2\F9\04\00\00\00\00\23\00\00\00\00\00\00\00  store ptr %new_entries, ptr %map\0A\00", align 8
-@.str_1043 = private unnamed_addr constant [53 x i8] c"\67\97\F4\0C\00\00\00\00\24\00\00\00\00\00\00\00  store i64 %new_cap, ptr %cap_slot\0A\00", align 8
-@.str_1044 = private unnamed_addr constant [36 x i8] c"\2A\27\4A\2E\00\00\00\00\13\00\00\00\00\00\00\00  br label %append\0A\00", align 8
-@.str_1045 = private unnamed_addr constant [25 x i8] c"\89\76\5E\35\00\00\00\00\08\00\00\00\00\00\00\00append:\0A\00", align 8
-@.str_1046 = private unnamed_addr constant [50 x i8] c"\FC\24\07\34\00\00\00\00\21\00\00\00\00\00\00\00  %entries2 = load ptr, ptr %map\0A\00", align 8
-@.str_1047 = private unnamed_addr constant [70 x i8] c"\76\0A\F4\0E\00\00\00\00\35\00\00\00\00\00\00\00  %key_copy = call ptr @orion_persist_text(ptr %key)\0A\00", align 8
-@.str_1048 = private unnamed_addr constant [47 x i8] c"\84\05\32\3A\00\00\00\00\1E\00\00\00\00\00\00\00  %app_idx2 = mul i64 %len, 2\0A\00", align 8
-@.str_1049 = private unnamed_addr constant [81 x i8] c"\A3\A0\CE\10\00\00\00\00\40\00\00\00\00\00\00\00  %app_k_slot = getelementptr i64, ptr %entries2, i64 %app_idx2\0A\00", align 8
-@.str_1050 = private unnamed_addr constant [50 x i8] c"\30\9F\E9\15\00\00\00\00\21\00\00\00\00\00\00\00  %app_vi = add i64 %app_idx2, 1\0A\00", align 8
-@.str_1051 = private unnamed_addr constant [79 x i8] c"\42\4C\AF\19\00\00\00\00\3E\00\00\00\00\00\00\00  %app_v_slot = getelementptr i64, ptr %entries2, i64 %app_vi\0A\00", align 8
-@.str_1052 = private unnamed_addr constant [60 x i8] c"\41\D6\97\21\00\00\00\00\2B\00\00\00\00\00\00\00  %key_int = ptrtoint ptr %key_copy to i64\0A\00", align 8
-@.str_1053 = private unnamed_addr constant [55 x i8] c"\E2\58\BC\31\00\00\00\00\26\00\00\00\00\00\00\00  store i64 %key_int, ptr %app_k_slot\0A\00", align 8
-@.str_1054 = private unnamed_addr constant [51 x i8] c"\53\33\FF\24\00\00\00\00\22\00\00\00\00\00\00\00  store i64 %val, ptr %app_v_slot\0A\00", align 8
-@.str_1055 = private unnamed_addr constant [46 x i8] c"\39\6D\7D\01\00\00\00\00\1D\00\00\00\00\00\00\00  %new_len = add i64 %len, 1\0A\00", align 8
-@.str_1056 = private unnamed_addr constant [53 x i8] c"\DD\8D\E8\2A\00\00\00\00\24\00\00\00\00\00\00\00  store i64 %new_len, ptr %len_slot\0A\00", align 8
-@.str_1057 = private unnamed_addr constant [56 x i8] c"\54\16\59\23\00\00\00\00\27\00\00\00\00\00\00\00define ptr @orion_slot_get(ptr %key) {\0A\00", align 8
-@.str_1058 = private unnamed_addr constant [51 x i8] c"\C4\A9\47\2D\00\00\00\00\22\00\00\00\00\00\00\00  %m = load ptr, ptr @orion_slots\0A\00", align 8
-@.str_1059 = private unnamed_addr constant [51 x i8] c"\9F\AC\96\2B\00\00\00\00\22\00\00\00\00\00\00\00  %is_null = icmp eq ptr %m, null\0A\00", align 8
-@.str_1060 = private unnamed_addr constant [59 x i8] c"\2C\95\6C\17\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %is_null, label %init, label %get\0A\00", align 8
-@.str_1061 = private unnamed_addr constant [23 x i8] c"\C2\31\BE\36\00\00\00\00\06\00\00\00\00\00\00\00init:\0A\00", align 8
-@.str_1062 = private unnamed_addr constant [60 x i8] c"\D7\B9\28\32\00\00\00\00\2B\00\00\00\00\00\00\00  %new = call ptr @orion_map_new_persist()\0A\00", align 8
-@.str_1063 = private unnamed_addr constant [52 x i8] c"\D6\0A\4C\30\00\00\00\00\23\00\00\00\00\00\00\00  store ptr %new, ptr @orion_slots\0A\00", align 8
-@.str_1064 = private unnamed_addr constant [33 x i8] c"\68\43\A0\1B\00\00\00\00\10\00\00\00\00\00\00\00  br label %get\0A\00", align 8
-@.str_1065 = private unnamed_addr constant [22 x i8] c"\83\4D\61\2F\00\00\00\00\05\00\00\00\00\00\00\00get:\0A\00", align 8
-@.str_1066 = private unnamed_addr constant [52 x i8] c"\EC\4B\FC\1A\00\00\00\00\23\00\00\00\00\00\00\00  %m2 = load ptr, ptr @orion_slots\0A\00", align 8
-@.str_1067 = private unnamed_addr constant [69 x i8] c"\80\09\86\00\00\00\00\00\34\00\00\00\00\00\00\00  %has = call i64 @orion_map_has(ptr %m2, ptr %key)\0A\00", align 8
-@.str_1068 = private unnamed_addr constant [47 x i8] c"\EA\73\BF\22\00\00\00\00\1E\00\00\00\00\00\00\00  %miss = icmp eq i64 %has, 0\0A\00", align 8
-@.str_1069 = private unnamed_addr constant [59 x i8] c"\34\E2\08\03\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %miss, label %empty, label %fetch\0A\00", align 8
-@.str_1070 = private unnamed_addr constant [24 x i8] c"\F3\DD\AC\08\00\00\00\00\07\00\00\00\00\00\00\00empty:\0A\00", align 8
-@.str_1071 = private unnamed_addr constant [24 x i8] c"\CE\F6\82\21\00\00\00\00\07\00\00\00\00\00\00\00fetch:\0A\00", align 8
-@.str_1072 = private unnamed_addr constant [69 x i8] c"\E1\1A\9B\2C\00\00\00\00\34\00\00\00\00\00\00\00  %raw = call i64 @orion_map_get(ptr %m2, ptr %key)\0A\00", align 8
-@.str_1073 = private unnamed_addr constant [49 x i8] c"\F8\90\D9\1F\00\00\00\00\20\00\00\00\00\00\00\00  %p = inttoptr i64 %raw to ptr\0A\00", align 8
-@.str_1074 = private unnamed_addr constant [30 x i8] c"\5D\3A\FE\2C\00\00\00\00\0D\00\00\00\00\00\00\00  ret ptr %p\0A\00", align 8
-@.str_1075 = private unnamed_addr constant [66 x i8] c"\9C\B4\8A\2B\00\00\00\00\31\00\00\00\00\00\00\00define i64 @orion_slot_set(ptr %key, i64 %val) {\0A\00", align 8
-@.str_1076 = private unnamed_addr constant [61 x i8] c"\DC\32\B4\1D\00\00\00\00\2C\00\00\00\00\00\00\00  br i1 %is_null, label %init, label %store\0A\00", align 8
-@.str_1077 = private unnamed_addr constant [81 x i8] c"\84\E4\DD\24\00\00\00\00\40\00\00\00\00\00\00\00  call void @orion_map_set_persist(ptr %m2, ptr %key, i64 %val)\0A\00", align 8
-@.str_1078 = private unnamed_addr constant [56 x i8] c"\65\1E\8C\08\00\00\00\00\27\00\00\00\00\00\00\00define i64 @orion_slot_has(ptr %key) {\0A\00", align 8
-@.str_1079 = private unnamed_addr constant [57 x i8] c"\B9\BA\ED\11\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %is_null, label %no, label %chk\0A\00", align 8
-@.str_1080 = private unnamed_addr constant [22 x i8] c"\C6\CB\29\25\00\00\00\00\05\00\00\00\00\00\00\00chk:\0A\00", align 8
-@.str_1081 = private unnamed_addr constant [68 x i8] c"\70\50\13\27\00\00\00\00\33\00\00\00\00\00\00\00  %has = call i64 @orion_map_has(ptr %m, ptr %key)\0A\00", align 8
-@.str_1082 = private unnamed_addr constant [32 x i8] c"\6D\B7\A1\0B\00\00\00\00\0F\00\00\00\00\00\00\00  ret i64 %has\0A\00", align 8
-@.str_1083 = private unnamed_addr constant [60 x i8] c"\3F\DA\DC\38\00\00\00\00\2B\00\00\00\00\00\00\00define i64 @orion_slot_get_int(ptr %key) {\0A\00", align 8
-@.str_1084 = private unnamed_addr constant [59 x i8] c"\EF\D0\C3\0B\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %is_null, label %zero, label %get\0A\00", align 8
-@.str_1085 = private unnamed_addr constant [23 x i8] c"\F0\18\4F\08\00\00\00\00\06\00\00\00\00\00\00\00zero:\0A\00", align 8
-@.str_1086 = private unnamed_addr constant [66 x i8] c"\10\7D\F5\07\00\00\00\00\31\00\00\00\00\00\00\00  %v = call i64 @orion_map_get(ptr %m, ptr %key)\0A\00", align 8
-@.str_1087 = private unnamed_addr constant [30 x i8] c"\45\E4\79\0A\00\00\00\00\0D\00\00\00\00\00\00\00  ret i64 %v\0A\00", align 8
-@.str_1088 = private unnamed_addr constant [46 x i8] c"\46\DE\1C\1D\00\00\00\00\1D\00\00\00\00\00\00\00declare ptr @fopen(ptr, ptr)\0A\00", align 8
-@.str_1089 = private unnamed_addr constant [42 x i8] c"\A9\1A\49\13\00\00\00\00\19\00\00\00\00\00\00\00declare i32 @fclose(ptr)\0A\00", align 8
-@.str_1090 = private unnamed_addr constant [56 x i8] c"\EB\24\C1\0C\00\00\00\00\27\00\00\00\00\00\00\00declare i64 @fread(ptr, i64, i64, ptr)\0A\00", align 8
-@.str_1091 = private unnamed_addr constant [57 x i8] c"\62\E4\2A\0C\00\00\00\00\28\00\00\00\00\00\00\00declare i64 @fwrite(ptr, i64, i64, ptr)\0A\00", align 8
-@.str_1092 = private unnamed_addr constant [51 x i8] c"\89\CF\54\26\00\00\00\00\22\00\00\00\00\00\00\00declare i32 @fseek(ptr, i64, i32)\0A\00", align 8
-@.str_1093 = private unnamed_addr constant [41 x i8] c"\90\62\C3\36\00\00\00\00\18\00\00\00\00\00\00\00declare i64 @ftell(ptr)\0A\00", align 8
-@.str_1094 = private unnamed_addr constant [77 x i8] c"\D5\36\E4\0D\00\00\00\00\3C\00\00\00\00\00\00\00@.fmode_r = private unnamed_addr constant [3 x i8] c\22rb\5C00\22\0A\00", align 8
-@.str_1095 = private unnamed_addr constant [77 x i8] c"\3A\87\8B\3B\00\00\00\00\3C\00\00\00\00\00\00\00@.fmode_w = private unnamed_addr constant [3 x i8] c\22wb\5C00\22\0A\00", align 8
-@.str_1096 = private unnamed_addr constant [136 x i8] c"\8A\01\E4\0B\00\00\00\00\77\00\00\00\00\00\00\00@.empty_str = private unnamed_addr constant [17 x i8] c\22\5C05\5C15\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\22, align 8\0A\0A\00", align 8
-@.str_1097 = private unnamed_addr constant [58 x i8] c"\C8\D4\2C\15\00\00\00\00\29\00\00\00\00\00\00\00define ptr @orion_file_read(ptr %path) {\0A\00", align 8
-@.str_1098 = private unnamed_addr constant [67 x i8] c"\2D\70\B3\12\00\00\00\00\32\00\00\00\00\00\00\00  %fp = call ptr @fopen(ptr %path, ptr @.fmode_r)\0A\00", align 8
-@.str_1099 = private unnamed_addr constant [52 x i8] c"\11\7E\33\1B\00\00\00\00\23\00\00\00\00\00\00\00  %is_null = icmp eq ptr %fp, null\0A\00", align 8
-@.str_1100 = private unnamed_addr constant [57 x i8] c"\F8\C6\B2\31\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %is_null, label %err, label %ok\0A\00", align 8
-@.str_1101 = private unnamed_addr constant [22 x i8] c"\AE\4B\03\0E\00\00\00\00\05\00\00\00\00\00\00\00err:\0A\00", align 8
-@.str_1102 = private unnamed_addr constant [21 x i8] c"\F5\F1\F2\38\00\00\00\00\04\00\00\00\00\00\00\00ok:\0A\00", align 8
-@.str_1103 = private unnamed_addr constant [67 x i8] c"\0B\B1\E6\31\00\00\00\00\32\00\00\00\00\00\00\00  %_seek = call i32 @fseek(ptr %fp, i64 0, i32 2)\0A\00", align 8
-@.str_1104 = private unnamed_addr constant [52 x i8] c"\B0\0D\14\2D\00\00\00\00\23\00\00\00\00\00\00\00  %size = call i64 @ftell(ptr %fp)\0A\00", align 8
-@.str_1105 = private unnamed_addr constant [66 x i8] c"\03\F6\62\24\00\00\00\00\31\00\00\00\00\00\00\00  %_rew = call i32 @fseek(ptr %fp, i64 0, i32 0)\0A\00", align 8
-@.str_1106 = private unnamed_addr constant [64 x i8] c"\3C\EF\62\29\00\00\00\00\2F\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %size)\0A\00", align 8
-@.str_1107 = private unnamed_addr constant [81 x i8] c"\49\A8\A9\35\00\00\00\00\40\00\00\00\00\00\00\00  %_read = call i64 @fread(ptr %buf, i64 1, i64 %size, ptr %fp)\0A\00", align 8
-@.str_1108 = private unnamed_addr constant [65 x i8] c"\F9\84\98\01\00\00\00\00\30\00\00\00\00\00\00\00  %term = getelementptr i8, ptr %buf, i64 %size\0A\00", align 8
-@.str_1109 = private unnamed_addr constant [55 x i8] c"\91\65\DD\2B\00\00\00\00\26\00\00\00\00\00\00\00  %_close = call i32 @fclose(ptr %fp)\0A\00", align 8
-@.str_1110 = private unnamed_addr constant [73 x i8] c"\CA\69\7A\36\00\00\00\00\38\00\00\00\00\00\00\00define i64 @orion_file_write(ptr %path, ptr %content) {\0A\00", align 8
-@.str_1111 = private unnamed_addr constant [67 x i8] c"\5A\BF\B4\12\00\00\00\00\32\00\00\00\00\00\00\00  %fp = call ptr @fopen(ptr %path, ptr @.fmode_w)\0A\00", align 8
-@.str_1112 = private unnamed_addr constant [61 x i8] c"\85\F1\1F\37\00\00\00\00\2C\00\00\00\00\00\00\00  %len = call i64 @orion_tlen(ptr %content)\0A\00", align 8
-@.str_1113 = private unnamed_addr constant [86 x i8] c"\09\F4\41\22\00\00\00\00\45\00\00\00\00\00\00\00  %_wrote = call i64 @fwrite(ptr %content, i64 1, i64 %len, ptr %fp)\0A\00", align 8
-@.str_1114 = private unnamed_addr constant [56 x i8] c"\B4\32\53\13\00\00\00\00\27\00\00\00\00\00\00\00define ptr @orion_list_new(i64 %cap) {\0A\00", align 8
-@.str_1115 = private unnamed_addr constant [44 x i8] c"\E6\2C\76\31\00\00\00\00\1B\00\00\00\00\00\00\00  %bytes = mul i64 %cap, 8\0A\00", align 8
-@.str_1116 = private unnamed_addr constant [47 x i8] c"\CB\78\40\1D\00\00\00\00\1E\00\00\00\00\00\00\00  %total = add i64 %bytes, 16\0A\00", align 8
-@.str_1117 = private unnamed_addr constant [60 x i8] c"\B9\B6\EE\35\00\00\00\00\2B\00\00\00\00\00\00\00  %buf = call ptr @orion_alloc(i64 %total)\0A\00", align 8
-@.str_1118 = private unnamed_addr constant [44 x i8] c"\B0\F3\A5\20\00\00\00\00\1B\00\00\00\00\00\00\00  store i64 %cap, ptr %buf\0A\00", align 8
-@.str_1119 = private unnamed_addr constant [66 x i8] c"\77\22\6C\0E\00\00\00\00\31\00\00\00\00\00\00\00  %len_slot = getelementptr i64, ptr %buf, i64 1\0A\00", align 8
-@.str_1120 = private unnamed_addr constant [49 x i8] c"\21\F4\57\16\00\00\00\00\20\00\00\00\00\00\00\00  store i64 %cap, ptr %len_slot\0A\00", align 8
-@.str_1121 = private unnamed_addr constant [70 x i8] c"\87\F0\22\0E\00\00\00\00\35\00\00\00\00\00\00\00define i64 @orion_struct_field_int(ptr %s, i64 %i) {\0A\00", align 8
-@.str_1122 = private unnamed_addr constant [61 x i8] c"\C2\D2\B7\32\00\00\00\00\2C\00\00\00\00\00\00\00  %slot = getelementptr i64, ptr %s, i64 %i\0A\00", align 8
-@.str_1123 = private unnamed_addr constant [44 x i8] c"\8C\78\17\06\00\00\00\00\1B\00\00\00\00\00\00\00  %v = load i64, ptr %slot\0A\00", align 8
-@.str_1124 = private unnamed_addr constant [71 x i8] c"\75\D1\96\1F\00\00\00\00\36\00\00\00\00\00\00\00define ptr @orion_struct_field_text(ptr %s, i64 %i) {\0A\00", align 8
-@.str_1125 = private unnamed_addr constant [47 x i8] c"\01\33\6C\34\00\00\00\00\1E\00\00\00\00\00\00\00  %p = inttoptr i64 %v to ptr\0A\00", align 8
-@.str_1126 = private unnamed_addr constant [57 x i8] c"\BD\44\62\06\00\00\00\00\28\00\00\00\00\00\00\00define i64 @orion_list_len(ptr %list) {\0A\00", align 8
-@.str_1127 = private unnamed_addr constant [67 x i8] c"\99\20\31\28\00\00\00\00\32\00\00\00\00\00\00\00  %len_slot = getelementptr i64, ptr %list, i64 1\0A\00", align 8
-@.str_1128 = private unnamed_addr constant [32 x i8] c"\6E\F7\2B\0C\00\00\00\00\0F\00\00\00\00\00\00\00  ret i64 %len\0A\00", align 8
-@.str_1129 = private unnamed_addr constant [66 x i8] c"\E3\44\74\31\00\00\00\00\31\00\00\00\00\00\00\00define i64 @orion_list_at(ptr %list, i64 %idx) {\0A\00", align 8
-@.str_1130 = private unnamed_addr constant [45 x i8] c"\E4\3F\FC\2D\00\00\00\00\1C\00\00\00\00\00\00\00  %offset = add i64 %idx, 2\0A\00", align 8
-@.str_1131 = private unnamed_addr constant [69 x i8] c"\72\13\DC\12\00\00\00\00\34\00\00\00\00\00\00\00  %slot = getelementptr i64, ptr %list, i64 %offset\0A\00", align 8
-@.str_1132 = private unnamed_addr constant [46 x i8] c"\1C\21\7D\2B\00\00\00\00\1D\00\00\00\00\00\00\00  %val = load i64, ptr %slot\0A\00", align 8
-@.str_1133 = private unnamed_addr constant [32 x i8] c"\52\F2\81\0D\00\00\00\00\0F\00\00\00\00\00\00\00  ret i64 %val\0A\00", align 8
-@.str_1134 = private unnamed_addr constant [77 x i8] c"\9F\11\C0\06\00\00\00\00\3C\00\00\00\00\00\00\00define ptr @orion_list_slice(ptr %list, i64 %lo, i64 %hi) {\0A\00", align 8
-@.str_1135 = private unnamed_addr constant [60 x i8] c"\03\F8\91\38\00\00\00\00\2B\00\00\00\00\00\00\00  %n = call i64 @orion_list_len(ptr %list)\0A\00", align 8
-@.str_1136 = private unnamed_addr constant [49 x i8] c"\ED\48\9D\28\00\00\00\00\20\00\00\00\00\00\00\00  %hi_neg = icmp slt i64 %hi, 0\0A\00", align 8
-@.str_1137 = private unnamed_addr constant [60 x i8] c"\5E\FF\37\0C\00\00\00\00\2B\00\00\00\00\00\00\00  %hi0 = select i1 %hi_neg, i64 0, i64 %hi\0A\00", align 8
-@.str_1138 = private unnamed_addr constant [51 x i8] c"\D9\69\A6\3A\00\00\00\00\22\00\00\00\00\00\00\00  %hi_big = icmp sgt i64 %hi0, %n\0A\00", align 8
-@.str_1139 = private unnamed_addr constant [62 x i8] c"\95\4D\75\13\00\00\00\00\2D\00\00\00\00\00\00\00  %hi1 = select i1 %hi_big, i64 %n, i64 %hi0\0A\00", align 8
-@.str_1140 = private unnamed_addr constant [60 x i8] c"\13\92\9F\27\00\00\00\00\2B\00\00\00\00\00\00\00  %lo0 = select i1 %lo_neg, i64 0, i64 %lo\0A\00", align 8
-@.str_1141 = private unnamed_addr constant [53 x i8] c"\01\34\08\03\00\00\00\00\24\00\00\00\00\00\00\00  %lo_big = icmp sgt i64 %lo0, %hi1\0A\00", align 8
-@.str_1142 = private unnamed_addr constant [64 x i8] c"\FD\AB\B1\27\00\00\00\00\2F\00\00\00\00\00\00\00  %lo1 = select i1 %lo_big, i64 %hi1, i64 %lo0\0A\00", align 8
-@.str_1143 = private unnamed_addr constant [45 x i8] c"\A5\5E\D1\39\00\00\00\00\1C\00\00\00\00\00\00\00  %cnt = sub i64 %hi1, %lo1\0A\00", align 8
-@.str_1144 = private unnamed_addr constant [61 x i8] c"\9D\9C\84\12\00\00\00\00\2C\00\00\00\00\00\00\00  %out = call ptr @orion_list_new(i64 %cnt)\0A\00", align 8
-@.str_1145 = private unnamed_addr constant [65 x i8] c"\3B\41\FE\15\00\00\00\00\30\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %inext, %body ]\0A\00", align 8
-@.str_1146 = private unnamed_addr constant [49 x i8] c"\49\A9\30\0B\00\00\00\00\20\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %cnt\0A\00", align 8
-@.str_1147 = private unnamed_addr constant [57 x i8] c"\DB\FF\8F\15\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %done, label %exit, label %body\0A\00", align 8
-@.str_1148 = private unnamed_addr constant [23 x i8] c"\6F\EC\A9\08\00\00\00\00\06\00\00\00\00\00\00\00body:\0A\00", align 8
-@.str_1149 = private unnamed_addr constant [45 x i8] c"\8E\82\10\1C\00\00\00\00\1C\00\00\00\00\00\00\00  %src_i = add i64 %lo1, %i\0A\00", align 8
-@.str_1150 = private unnamed_addr constant [71 x i8] c"\BD\2B\15\1D\00\00\00\00\36\00\00\00\00\00\00\00  %v = call i64 @orion_list_at(ptr %list, i64 %src_i)\0A\00", align 8
-@.str_1151 = private unnamed_addr constant [71 x i8] c"\00\72\13\23\00\00\00\00\36\00\00\00\00\00\00\00  call void @orion_list_set(ptr %out, i64 %i, i64 %v)\0A\00", align 8
-@.str_1152 = private unnamed_addr constant [42 x i8] c"\F5\FD\26\30\00\00\00\00\19\00\00\00\00\00\00\00  %inext = add i64 %i, 1\0A\00", align 8
-@.str_1153 = private unnamed_addr constant [23 x i8] c"\41\4D\83\20\00\00\00\00\06\00\00\00\00\00\00\00exit:\0A\00", align 8
-@.str_1154 = private unnamed_addr constant [78 x i8] c"\9B\DE\51\29\00\00\00\00\3D\00\00\00\00\00\00\00define void @orion_list_set(ptr %list, i64 %idx, i64 %val) {\0A\00", align 8
-@.str_1155 = private unnamed_addr constant [47 x i8] c"\3B\26\19\06\00\00\00\00\1E\00\00\00\00\00\00\00  %neg = icmp slt i64 %idx, 0\0A\00", align 8
-@.str_1156 = private unnamed_addr constant [50 x i8] c"\11\A7\B7\0F\00\00\00\00\21\00\00\00\00\00\00\00  %oob = icmp sge i64 %idx, %len\0A\00", align 8
-@.str_1157 = private unnamed_addr constant [43 x i8] c"\AC\21\48\0B\00\00\00\00\1A\00\00\00\00\00\00\00  %bad = or i1 %neg, %oob\0A\00", align 8
-@.str_1158 = private unnamed_addr constant [57 x i8] c"\13\6F\7D\20\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %bad, label %skip, label %write\0A\00", align 8
-@.str_1159 = private unnamed_addr constant [24 x i8] c"\DA\9C\DC\18\00\00\00\00\07\00\00\00\00\00\00\00write:\0A\00", align 8
-@.str_1160 = private unnamed_addr constant [45 x i8] c"\24\D4\75\26\00\00\00\00\1C\00\00\00\00\00\00\00  store i64 %val, ptr %slot\0A\00", align 8
-@.str_1161 = private unnamed_addr constant [23 x i8] c"\A2\20\75\31\00\00\00\00\06\00\00\00\00\00\00\00skip:\0A\00", align 8
-@.str_1162 = private unnamed_addr constant [68 x i8] c"\6C\B7\52\1F\00\00\00\00\33\00\00\00\00\00\00\00define ptr @orion_list_push(ptr %list, i64 %val) {\0A\00", align 8
-@.str_1163 = private unnamed_addr constant [43 x i8] c"\7D\25\B3\23\00\00\00\00\1A\00\00\00\00\00\00\00  %need = add i64 %len, 1\0A\00", align 8
-@.str_1164 = private unnamed_addr constant [44 x i8] c"\92\6C\60\00\00\00\00\00\1B\00\00\00\00\00\00\00  %cap2 = mul i64 %need, 2\0A\00", align 8
-@.str_1165 = private unnamed_addr constant [54 x i8] c"\78\0E\60\20\00\00\00\00\25\00\00\00\00\00\00\00  %too_small = icmp slt i64 %cap2, 4\0A\00", align 8
-@.str_1166 = private unnamed_addr constant [69 x i8] c"\13\95\72\29\00\00\00\00\34\00\00\00\00\00\00\00  %new_cap = select i1 %too_small, i64 4, i64 %cap2\0A\00", align 8
-@.str_1167 = private unnamed_addr constant [48 x i8] c"\21\DE\4C\2A\00\00\00\00\1F\00\00\00\00\00\00\00  %bytes = mul i64 %new_cap, 8\0A\00", align 8
-@.str_1168 = private unnamed_addr constant [65 x i8] c"\0D\E8\76\01\00\00\00\00\30\00\00\00\00\00\00\00  %new_list = call ptr @orion_alloc(i64 %total)\0A\00", align 8
-@.str_1169 = private unnamed_addr constant [53 x i8] c"\52\CE\41\1D\00\00\00\00\24\00\00\00\00\00\00\00  store i64 %new_cap, ptr %new_list\0A\00", align 8
-@.str_1170 = private unnamed_addr constant [75 x i8] c"\77\63\EE\32\00\00\00\00\3A\00\00\00\00\00\00\00  %new_len_slot = getelementptr i64, ptr %new_list, i64 1\0A\00", align 8
-@.str_1171 = private unnamed_addr constant [54 x i8] c"\D1\44\DA\05\00\00\00\00\25\00\00\00\00\00\00\00  store i64 %need, ptr %new_len_slot\0A\00", align 8
-@.str_1172 = private unnamed_addr constant [72 x i8] c"\5B\E0\8A\3B\00\00\00\00\37\00\00\00\00\00\00\00  %dst_items = getelementptr i64, ptr %new_list, i64 2\0A\00", align 8
-@.str_1173 = private unnamed_addr constant [68 x i8] c"\A6\D8\42\31\00\00\00\00\33\00\00\00\00\00\00\00  %src_items = getelementptr i64, ptr %list, i64 2\0A\00", align 8
-@.str_1174 = private unnamed_addr constant [49 x i8] c"\45\DF\EF\0D\00\00\00\00\20\00\00\00\00\00\00\00  %copy_bytes = mul i64 %len, 8\0A\00", align 8
-@.str_1175 = private unnamed_addr constant [92 x i8] c"\C5\D7\17\2D\00\00\00\00\4B\00\00\00\00\00\00\00  %_cp = call ptr @memcpy(ptr %dst_items, ptr %src_items, i64 %copy_bytes)\0A\00", align 8
-@.str_1176 = private unnamed_addr constant [46 x i8] c"\4D\BF\F0\38\00\00\00\00\1D\00\00\00\00\00\00\00  %app_idx = add i64 %len, 2\0A\00", align 8
-@.str_1177 = private unnamed_addr constant [78 x i8] c"\C3\E7\0F\23\00\00\00\00\3D\00\00\00\00\00\00\00  %app_slot = getelementptr i64, ptr %new_list, i64 %app_idx\0A\00", align 8
-@.str_1178 = private unnamed_addr constant [49 x i8] c"\BE\3A\1D\2A\00\00\00\00\20\00\00\00\00\00\00\00  store i64 %val, ptr %app_slot\0A\00", align 8
-@.str_1179 = private unnamed_addr constant [37 x i8] c"\34\BE\1C\13\00\00\00\00\14\00\00\00\00\00\00\00  ret ptr %new_list\0A\00", align 8
-@.str_1180 = private unnamed_addr constant [72 x i8] c"\79\85\D2\01\00\00\00\00\37\00\00\00\00\00\00\00define ptr @orion_list_push_mut(ptr %list, i64 %val) {\0A\00", align 8
-@.str_1181 = private unnamed_addr constant [46 x i8] c"\7E\B0\5B\27\00\00\00\00\1D\00\00\00\00\00\00\00  %cap = load i64, ptr %list\0A\00", align 8
-@.str_1182 = private unnamed_addr constant [55 x i8] c"\F1\A3\E9\15\00\00\00\00\26\00\00\00\00\00\00\00  %has_room = icmp slt i64 %len, %cap\0A\00", align 8
-@.str_1183 = private unnamed_addr constant [64 x i8] c"\A4\43\F7\0A\00\00\00\00\2F\00\00\00\00\00\00\00  br i1 %has_room, label %inplace, label %grow\0A\00", align 8
-@.str_1184 = private unnamed_addr constant [26 x i8] c"\C8\D2\DC\0A\00\00\00\00\09\00\00\00\00\00\00\00inplace:\0A\00", align 8
-@.str_1185 = private unnamed_addr constant [47 x i8] c"\92\6D\E0\30\00\00\00\00\1E\00\00\00\00\00\00\00  %slot_idx = add i64 %len, 2\0A\00", align 8
-@.str_1186 = private unnamed_addr constant [71 x i8] c"\1C\86\0C\07\00\00\00\00\36\00\00\00\00\00\00\00  %slot = getelementptr i64, ptr %list, i64 %slot_idx\0A\00", align 8
-@.str_1187 = private unnamed_addr constant [78 x i8] c"\B6\26\41\3B\00\00\00\00\3D\00\00\00\00\00\00\00  %fallback = call ptr @orion_list_push(ptr %list, i64 %val)\0A\00", align 8
-@.str_1188 = private unnamed_addr constant [37 x i8] c"\CF\C9\BF\1C\00\00\00\00\14\00\00\00\00\00\00\00  ret ptr %fallback\0A\00", align 8
-@.str_1189 = private unnamed_addr constant [55 x i8] c"\F1\E3\FF\01\00\00\00\00\26\00\00\00\00\00\00\00define ptr @orion_map_new(i64 %cap) {\0A\00", align 8
-@.str_1190 = private unnamed_addr constant [53 x i8] c"\29\B5\74\18\00\00\00\00\24\00\00\00\00\00\00\00  %too_small = icmp slt i64 %cap, 4\0A\00", align 8
-@.str_1191 = private unnamed_addr constant [65 x i8] c"\C3\CF\1B\29\00\00\00\00\30\00\00\00\00\00\00\00  %cap2 = select i1 %too_small, i64 4, i64 %cap\0A\00", align 8
-@.str_1192 = private unnamed_addr constant [59 x i8] c"\12\66\72\1A\00\00\00\00\2A\00\00\00\00\00\00\00  %handle = call ptr @orion_alloc(i64 24)\0A\00", align 8
-@.str_1193 = private unnamed_addr constant [52 x i8] c"\E7\DC\01\34\00\00\00\00\23\00\00\00\00\00\00\00  %entry_bytes = mul i64 %cap2, 16\0A\00", align 8
-@.str_1194 = private unnamed_addr constant [70 x i8] c"\0E\7B\8E\3A\00\00\00\00\35\00\00\00\00\00\00\00  %entries = call ptr @orion_alloc(i64 %entry_bytes)\0A\00", align 8
-@.str_1195 = private unnamed_addr constant [50 x i8] c"\01\30\85\20\00\00\00\00\21\00\00\00\00\00\00\00  store i64 %cap2, ptr %cap_slot\0A\00", align 8
-@.str_1196 = private unnamed_addr constant [76 x i8] c"\30\BD\7A\2D\00\00\00\00\3B\00\00\00\00\00\00\00define void @orion_map_set(ptr %map, ptr %key, i64 %val) {\0A\00", align 8
-@.str_1197 = private unnamed_addr constant [72 x i8] c"\9C\6E\D9\15\00\00\00\00\37\00\00\00\00\00\00\00  %new_entries = call ptr @orion_alloc(i64 %new_bytes)\0A\00", align 8
-@.str_1198 = private unnamed_addr constant [67 x i8] c"\CC\F5\8D\02\00\00\00\00\32\00\00\00\00\00\00\00  %key_owned = call ptr @orion_key_copy(ptr %key)\0A\00", align 8
-@.str_1199 = private unnamed_addr constant [61 x i8] c"\C9\D6\22\22\00\00\00\00\2C\00\00\00\00\00\00\00  %key_int = ptrtoint ptr %key_owned to i64\0A\00", align 8
-@.str_1200 = private unnamed_addr constant [65 x i8] c"\FA\A8\6E\18\00\00\00\00\30\00\00\00\00\00\00\00define i64 @orion_map_get(ptr %map, ptr %key) {\0A\00", align 8
-@.str_1201 = private unnamed_addr constant [57 x i8] c"\6B\18\CF\0C\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %done, label %miss, label %body\0A\00", align 8
-@.str_1202 = private unnamed_addr constant [39 x i8] c"\FB\A5\5D\26\00\00\00\00\16\00\00\00\00\00\00\00  %ki = mul i64 %i, 2\0A\00", align 8
-@.str_1203 = private unnamed_addr constant [40 x i8] c"\C8\CA\0C\33\00\00\00\00\17\00\00\00\00\00\00\00  %vi = add i64 %ki, 1\0A\00", align 8
-@.str_1204 = private unnamed_addr constant [70 x i8] c"\1D\0E\BA\34\00\00\00\00\35\00\00\00\00\00\00\00  %k_slot = getelementptr i64, ptr %entries, i64 %ki\0A\00", align 8
-@.str_1205 = private unnamed_addr constant [54 x i8] c"\C6\7A\DE\18\00\00\00\00\25\00\00\00\00\00\00\00  br i1 %eq, label %hit, label %step\0A\00", align 8
-@.str_1206 = private unnamed_addr constant [22 x i8] c"\39\70\DD\05\00\00\00\00\05\00\00\00\00\00\00\00hit:\0A\00", align 8
-@.str_1207 = private unnamed_addr constant [46 x i8] c"\26\C3\BE\0E\00\00\00\00\1D\00\00\00\00\00\00\00  %v = load i64, ptr %v_slot\0A\00", align 8
-@.str_1208 = private unnamed_addr constant [23 x i8] c"\CF\D6\DE\2E\00\00\00\00\06\00\00\00\00\00\00\00miss:\0A\00", align 8
-@.str_1209 = private unnamed_addr constant [65 x i8] c"\60\75\87\14\00\00\00\00\30\00\00\00\00\00\00\00define i64 @orion_map_has(ptr %map, ptr %key) {\0A\00", align 8
-@.str_1210 = private unnamed_addr constant [79 x i8] c"\AC\BD\78\37\00\00\00\00\3E\00\00\00\00\00\00\00define void @orion_map_set_ik(ptr %map, i64 %key, i64 %val) {\0A\00", align 8
-@.str_1211 = private unnamed_addr constant [50 x i8] c"\56\31\E2\1B\00\00\00\00\21\00\00\00\00\00\00\00  %eq = icmp eq i64 %k_int, %key\0A\00", align 8
-@.str_1212 = private unnamed_addr constant [51 x i8] c"\8B\90\A0\0B\00\00\00\00\22\00\00\00\00\00\00\00  store i64 %key, ptr %app_k_slot\0A\00", align 8
-@.str_1213 = private unnamed_addr constant [69 x i8] c"\9E\04\D8\39\00\00\00\00\34\00\00\00\00\00\00\00define void @orion_map_remove(ptr %map, ptr %key) {\0A\00", align 8
-@.str_1214 = private unnamed_addr constant [58 x i8] c"\BF\08\08\28\00\00\00\00\29\00\00\00\00\00\00\00  br i1 %done, label %miss, label %check\0A\00", align 8
-@.str_1215 = private unnamed_addr constant [56 x i8] c"\FD\A6\4A\2B\00\00\00\00\27\00\00\00\00\00\00\00  br i1 %eq, label %found, label %step\0A\00", align 8
-@.str_1216 = private unnamed_addr constant [24 x i8] c"\94\4A\4F\28\00\00\00\00\07\00\00\00\00\00\00\00found:\0A\00", align 8
-@.str_1217 = private unnamed_addr constant [44 x i8] c"\51\8F\11\3A\00\00\00\00\1B\00\00\00\00\00\00\00  %last = add i64 %len, -1\0A\00", align 8
-@.str_1218 = private unnamed_addr constant [45 x i8] c"\CF\76\CC\04\00\00\00\00\1C\00\00\00\00\00\00\00  %last2 = mul i64 %last, 2\0A\00", align 8
-@.str_1219 = private unnamed_addr constant [74 x i8] c"\AE\10\B5\23\00\00\00\00\39\00\00\00\00\00\00\00  %lk_slot = getelementptr i64, ptr %entries, i64 %last2\0A\00", align 8
-@.str_1220 = private unnamed_addr constant [45 x i8] c"\91\55\25\25\00\00\00\00\1C\00\00\00\00\00\00\00  %lv_i = add i64 %last2, 1\0A\00", align 8
-@.str_1221 = private unnamed_addr constant [73 x i8] c"\D7\3D\B7\25\00\00\00\00\38\00\00\00\00\00\00\00  %lv_slot = getelementptr i64, ptr %entries, i64 %lv_i\0A\00", align 8
-@.str_1222 = private unnamed_addr constant [48 x i8] c"\C9\C4\B7\10\00\00\00\00\1F\00\00\00\00\00\00\00  %lk = load i64, ptr %lk_slot\0A\00", align 8
-@.str_1223 = private unnamed_addr constant [48 x i8] c"\63\6D\CA\11\00\00\00\00\1F\00\00\00\00\00\00\00  %lv = load i64, ptr %lv_slot\0A\00", align 8
-@.str_1224 = private unnamed_addr constant [46 x i8] c"\BF\0F\FB\16\00\00\00\00\1D\00\00\00\00\00\00\00  store i64 %lk, ptr %k_slot\0A\00", align 8
-@.str_1225 = private unnamed_addr constant [46 x i8] c"\87\A2\C8\00\00\00\00\00\1D\00\00\00\00\00\00\00  store i64 %lv, ptr %v_slot\0A\00", align 8
-@.str_1226 = private unnamed_addr constant [50 x i8] c"\28\7B\19\1C\00\00\00\00\21\00\00\00\00\00\00\00  store i64 %last, ptr %len_slot\0A\00", align 8
-@.str_1227 = private unnamed_addr constant [72 x i8] c"\4B\FE\A6\04\00\00\00\00\37\00\00\00\00\00\00\00define void @orion_map_remove_ik(ptr %map, i64 %key) {\0A\00", align 8
-@.str_1228 = private unnamed_addr constant [68 x i8] c"\E1\D3\AA\0D\00\00\00\00\33\00\00\00\00\00\00\00define i64 @orion_map_get_ik(ptr %map, i64 %key) {\0A\00", align 8
-@.str_1229 = private unnamed_addr constant [68 x i8] c"\05\09\F2\39\00\00\00\00\33\00\00\00\00\00\00\00define i64 @orion_map_has_ik(ptr %map, i64 %key) {\0A\00", align 8
-@.str_1230 = private unnamed_addr constant [82 x i8] c"\A1\93\53\24\00\00\00\00\41\00\00\00\00\00\00\00define i64 @orion_map_get_or_ik(ptr %map, i64 %key, i64 %dflt) {\0A\00", align 8
-@.str_1231 = private unnamed_addr constant [73 x i8] c"\39\06\D1\02\00\00\00\00\38\00\00\00\00\00\00\00  %has = call i64 @orion_map_has_ik(ptr %map, i64 %key)\0A\00", align 8
-@.str_1232 = private unnamed_addr constant [62 x i8] c"\D5\49\AA\02\00\00\00\00\2D\00\00\00\00\00\00\00  br i1 %miss, label %use_dflt, label %fetch\0A\00", align 8
-@.str_1233 = private unnamed_addr constant [27 x i8] c"\F0\93\9A\03\00\00\00\00\0A\00\00\00\00\00\00\00use_dflt:\0A\00", align 8
-@.str_1234 = private unnamed_addr constant [33 x i8] c"\EB\F7\B0\17\00\00\00\00\10\00\00\00\00\00\00\00  ret i64 %dflt\0A\00", align 8
-@.str_1235 = private unnamed_addr constant [71 x i8] c"\7C\CD\29\2B\00\00\00\00\36\00\00\00\00\00\00\00  %v = call i64 @orion_map_get_ik(ptr %map, i64 %key)\0A\00", align 8
-@.str_1236 = private unnamed_addr constant [55 x i8] c"\D3\16\37\37\00\00\00\00\26\00\00\00\00\00\00\00define i64 @orion_map_len(ptr %map) {\0A\00", align 8
-@.str_1237 = private unnamed_addr constant [56 x i8] c"\2D\67\72\14\00\00\00\00\27\00\00\00\00\00\00\00define ptr @orion_map_keys(ptr %map) {\0A\00", align 8
-@.str_1238 = private unnamed_addr constant [61 x i8] c"\BF\24\14\38\00\00\00\00\2C\00\00\00\00\00\00\00  %out = call ptr @orion_list_new(i64 %len)\0A\00", align 8
-@.str_1239 = private unnamed_addr constant [75 x i8] c"\FF\6A\10\04\00\00\00\00\3A\00\00\00\00\00\00\00  call void @orion_list_set(ptr %out, i64 %i, i64 %k_int)\0A\00", align 8
-@.str_1240 = private unnamed_addr constant [58 x i8] c"\47\4D\AB\29\00\00\00\00\29\00\00\00\00\00\00\00define ptr @orion_map_values(ptr %map) {\0A\00", align 8
-@.str_1241 = private unnamed_addr constant [50 x i8] c"\A2\CD\66\1C\00\00\00\00\21\00\00\00\00\00\00\00  %v_int = load i64, ptr %v_slot\0A\00", align 8
-@.str_1242 = private unnamed_addr constant [75 x i8] c"\33\D3\B2\06\00\00\00\00\3A\00\00\00\00\00\00\00  call void @orion_list_set(ptr %out, i64 %i, i64 %v_int)\0A\00", align 8
-@.str_1243 = private unnamed_addr constant [79 x i8] c"\F2\F5\79\37\00\00\00\00\3E\00\00\00\00\00\00\00define i64 @orion_map_get_or(ptr %map, ptr %key, i64 %dflt) {\0A\00", align 8
-@.str_1244 = private unnamed_addr constant [70 x i8] c"\8C\7F\53\16\00\00\00\00\35\00\00\00\00\00\00\00  %has = call i64 @orion_map_has(ptr %map, ptr %key)\0A\00", align 8
-@.str_1245 = private unnamed_addr constant [68 x i8] c"\25\1C\F9\1D\00\00\00\00\33\00\00\00\00\00\00\00  %v = call i64 @orion_map_get(ptr %map, ptr %key)\0A\00", align 8
-@.str_1246 = private unnamed_addr constant [60 x i8] c"\DD\E6\B0\07\00\00\00\00\2B\00\00\00\00\00\00\00define ptr @orion_f64_to_text(double %v) {\0A\00", align 8
-@.str_1247 = private unnamed_addr constant [107 x i8] c"\70\EA\B3\26\00\00\00\00\5A\00\00\00\00\00\00\00  %_n = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_g, double %v)\0A\00", align 8
-@.str_1248 = private unnamed_addr constant [61 x i8] c"\7A\C9\0D\29\00\00\00\00\2C\00\00\00\00\00\00\00define ptr @orion_vec_add(ptr %a, ptr %b) {\0A\00", align 8
-@.str_1249 = private unnamed_addr constant [124 x i8] c"\D2\7B\A9\00\00\00\00\00\6B\00\00\00\00\00\00\00entry:\0A  %la = call i64 @orion_list_len(ptr %a)\0A  %out = call ptr @orion_list_new(i64 %la)\0A  br label %hdr\0A\00", align 8
-@.str_1250 = private unnamed_addr constant [141 x i8] c"\CF\E1\97\29\00\00\00\00\7C\00\00\00\00\00\00\00hdr:\0A  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\0A  %done = icmp sge i64 %i, %la\0A  br i1 %done, label %after, label %bdy\0A\00", align 8
-@.str_1251 = private unnamed_addr constant [238 x i8] c"\66\E6\DD\13\00\00\00\00\DD\00\00\00\00\00\00\00bdy:\0A  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\0A  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\0A  %s = add i64 %xa, %xb\0A  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\0A  %i_next = add i64 %i, 1\0A  br label %hdr\0A\00", align 8
-@.str_1252 = private unnamed_addr constant [42 x i8] c"\51\80\1A\1D\00\00\00\00\19\00\00\00\00\00\00\00after:\0A  ret ptr %out\0A}\0A\0A\00", align 8
-@.str_1253 = private unnamed_addr constant [61 x i8] c"\22\7D\15\36\00\00\00\00\2C\00\00\00\00\00\00\00define ptr @orion_vec_sub(ptr %a, ptr %b) {\0A\00", align 8
-@.str_1254 = private unnamed_addr constant [238 x i8] c"\36\17\92\10\00\00\00\00\DD\00\00\00\00\00\00\00bdy:\0A  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\0A  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\0A  %s = sub i64 %xa, %xb\0A  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\0A  %i_next = add i64 %i, 1\0A  br label %hdr\0A\00", align 8
-@.str_1255 = private unnamed_addr constant [61 x i8] c"\C8\46\47\13\00\00\00\00\2C\00\00\00\00\00\00\00define ptr @orion_vec_mul(ptr %a, ptr %b) {\0A\00", align 8
-@.str_1256 = private unnamed_addr constant [238 x i8] c"\9D\87\15\0F\00\00\00\00\DD\00\00\00\00\00\00\00bdy:\0A  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\0A  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\0A  %s = mul i64 %xa, %xb\0A  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\0A  %i_next = add i64 %i, 1\0A  br label %hdr\0A\00", align 8
-@.str_1257 = private unnamed_addr constant [61 x i8] c"\CF\B6\B7\36\00\00\00\00\2C\00\00\00\00\00\00\00define i64 @orion_vec_dot(ptr %a, ptr %b) {\0A\00", align 8
-@.str_1258 = private unnamed_addr constant [81 x i8] c"\0D\BA\34\33\00\00\00\00\40\00\00\00\00\00\00\00entry:\0A  %la = call i64 @orion_list_len(ptr %a)\0A  br label %hdr\0A\00", align 8
-@.str_1259 = private unnamed_addr constant [193 x i8] c"\8F\81\18\31\00\00\00\00\B0\00\00\00\00\00\00\00hdr:\0A  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\0A  %acc = phi i64 [ 0, %entry ], [ %acc_next, %bdy ]\0A  %done = icmp sge i64 %i, %la\0A  br i1 %done, label %after, label %bdy\0A\00", align 8
-@.str_1260 = private unnamed_addr constant [215 x i8] c"\46\DA\5C\11\00\00\00\00\C6\00\00\00\00\00\00\00bdy:\0A  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\0A  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\0A  %m = mul i64 %xa, %xb\0A  %acc_next = add i64 %acc, %m\0A  %i_next = add i64 %i, 1\0A  br label %hdr\0A\00", align 8
-@.str_1261 = private unnamed_addr constant [42 x i8] c"\08\B6\F9\1A\00\00\00\00\19\00\00\00\00\00\00\00after:\0A  ret i64 %acc\0A}\0A\0A\00", align 8
-@.str_1262 = private unnamed_addr constant [42 x i8] c"\50\FE\65\0C\00\00\00\00\19\00\00\00\00\00\00\00; orion_emit_llvm output\0A\00", align 8
-@.str_1263 = private unnamed_addr constant [25 x i8] c"\5D\73\0C\0C\00\00\00\00\08\00\00\00\00\00\00\00declare \00", align 8
-@.str_1264 = private unnamed_addr constant [20 x i8] c"\4C\84\D2\05\00\00\00\00\03\00\00\00\00\00\00\00)\0A\0A\00", align 8
-@.str_1265 = private unnamed_addr constant [44 x i8] c"\40\3C\D1\23\00\00\00\00\1B\00\00\00\00\00\00\00@orion_argc = global i64 0\0A\00", align 8
-@.str_1266 = private unnamed_addr constant [48 x i8] c"\07\6D\B5\17\00\00\00\00\1F\00\00\00\00\00\00\00@orion_argv = global ptr null\0A\0A\00", align 8
-@.str_1267 = private unnamed_addr constant [58 x i8] c"\B9\68\BB\06\00\00\00\00\29\00\00\00\00\00\00\00define i32 @main(i32 %argc, ptr %argv) {\0A\00", align 8
-@.str_1268 = private unnamed_addr constant [51 x i8] c"\65\AE\4F\25\00\00\00\00\22\00\00\00\00\00\00\00  %argc64 = sext i32 %argc to i64\0A\00", align 8
-@.str_1269 = private unnamed_addr constant [54 x i8] c"\A8\D7\8A\03\00\00\00\00\25\00\00\00\00\00\00\00  store i64 %argc64, ptr @orion_argc\0A\00", align 8
-@.str_1270 = private unnamed_addr constant [52 x i8] c"\31\3E\CD\1F\00\00\00\00\23\00\00\00\00\00\00\00  store ptr %argv, ptr @orion_argv\0A\00", align 8
-@.str_1271 = private unnamed_addr constant [49 x i8] c"\26\56\B5\1B\00\00\00\00\20\00\00\00\00\00\00\00  %ret = call i64 @orion_main()\0A\00", align 8
-@.str_1272 = private unnamed_addr constant [50 x i8] c"\36\EC\B5\22\00\00\00\00\21\00\00\00\00\00\00\00  %ret32 = trunc i64 %ret to i32\0A\00", align 8
-@.str_1273 = private unnamed_addr constant [34 x i8] c"\95\7E\2B\1B\00\00\00\00\11\00\00\00\00\00\00\00  ret i32 %ret32\0A\00", align 8
-@.str_1274 = private unnamed_addr constant [24 x i8] c"\09\11\3C\09\00\00\00\00\07\00\00\00\00\00\00\00/lib.or\00", align 8
-@.str_1275 = private unnamed_addr constant [18 x i8] c"\FC\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00m\00", align 8
-@.str_1276 = private unnamed_addr constant [20 x i8] c"\E3\AF\DF\05\00\00\00\00\03\00\00\00\00\00\00\00[0m\00", align 8
-@.str_1277 = private unnamed_addr constant [21 x i8] c"\41\92\D9\30\00\00\00\00\04\00\00\00\00\00\00\0031;1\00", align 8
-@.str_1278 = private unnamed_addr constant [24 x i8] c"\57\AF\2B\0D\00\00\00\00\07\00\00\00\00\00\00\00  orbs \00", align 8
-@.str_1279 = private unnamed_addr constant [19 x i8] c"\B5\1C\81\05\00\00\00\00\02\00\00\00\00\00\00\00 (\00", align 8
-@.str_1280 = private unnamed_addr constant [21 x i8] c"\37\A2\54\2E\00\00\00\00\04\00\00\00\00\00\00\00 KB)\00", align 8
-@.str_1281 = private unnamed_addr constant [28 x i8] c"\28\2F\9B\12\00\00\00\00\0B\00\00\00\00\00\00\00orion_audio\00", align 8
-@.str_1282 = private unnamed_addr constant [21 x i8] c"\AC\F3\04\3A\00\00\00\00\04\00\00\00\00\00\00\00win_\00", align 8
-@.str_1283 = private unnamed_addr constant [20 x i8] c"\AE\08\E5\05\00\00\00\00\03\00\00\00\00\00\00\00og_\00", align 8
-@.str_1284 = private unnamed_addr constant [22 x i8] c"\8E\4F\42\09\00\00\00\00\05\00\00\00\00\00\00\00ogpu_\00", align 8
-@.str_1285 = private unnamed_addr constant [28 x i8] c"\E1\8B\34\12\00\00\00\00\0B\00\00\00\00\00\00\00orion_arena\00", align 8
-@.str_1286 = private unnamed_addr constant [30 x i8] c"\EA\09\B3\20\00\00\00\00\0D\00\00\00\00\00\00\00orion_persist\00", align 8
-@.str_1287 = private unnamed_addr constant [27 x i8] c"\E4\E8\FE\21\00\00\00\00\0A\00\00\00\00\00\00\00orion_pool\00", align 8
-@.str_1288 = private unnamed_addr constant [28 x i8] c"\CC\44\5D\2E\00\00\00\00\0B\00\00\00\00\00\00\00orion_frame\00", align 8
-@.str_1289 = private unnamed_addr constant [29 x i8] c"\07\6B\19\21\00\00\00\00\0C\00\00\00\00\00\00\00orion_ledger\00", align 8
-@.str_1290 = private unnamed_addr constant [28 x i8] c"\03\90\68\11\00\00\00\00\0B\00\00\00\00\00\00\00orion_alloc\00", align 8
-@.str_1291 = private unnamed_addr constant [27 x i8] c"\A2\08\65\22\00\00\00\00\0A\00\00\00\00\00\00\00orion_slot\00", align 8
-@.str_1292 = private unnamed_addr constant [34 x i8] c"\55\C1\97\19\00\00\00\00\11\00\00\00\00\00\00\00__orion_monotonic\00", align 8
-@.str_1293 = private unnamed_addr constant [29 x i8] c"\48\79\47\08\00\00\00\00\0C\00\00\00\00\00\00\00__orion_time\00", align 8
-@.str_1294 = private unnamed_addr constant [30 x i8] c"\09\C0\22\36\00\00\00\00\0D\00\00\00\00\00\00\00__orion_sleep\00", align 8
-@.str_1295 = private unnamed_addr constant [30 x i8] c"\AD\29\98\11\00\00\00\00\0D\00\00\00\00\00\00\00orion_console\00", align 8
-@.str_1296 = private unnamed_addr constant [26 x i8] c"\5A\1C\F1\3A\00\00\00\00\09\00\00\00\00\00\00\00orion_dir\00", align 8
-@.str_1297 = private unnamed_addr constant [27 x i8] c"\10\4D\A6\20\00\00\00\00\0A\00\00\00\00\00\00\00orion_file\00", align 8
-@.str_1298 = private unnamed_addr constant [31 x i8] c"\20\56\29\3A\00\00\00\00\0E\00\00\00\00\00\00\00orion_embedded\00", align 8
-@.str_1299 = private unnamed_addr constant [21 x i8] c"\ED\FA\17\39\00\00\00\00\04\00\00\00\00\00\00\00pure\00", align 8
-@.str_1300 = private unnamed_addr constant [22 x i8] c"\5A\91\A4\36\00\00\00\00\05\00\00\00\00\00\00\00 slot\00", align 8
-@.str_1301 = private unnamed_addr constant [20 x i8] c"\FD\59\D0\05\00\00\00\00\03\00\00\00\00\00\00\00 io\00", align 8
-@.str_1302 = private unnamed_addr constant [26 x i8] c"\63\08\6A\04\00\00\00\00\09\00\00\00\00\00\00\00 platform\00", align 8
-@.str_1303 = private unnamed_addr constant [23 x i8] c"\1C\6C\83\30\00\00\00\00\06\00\00\00\00\00\00\00 audio\00", align 8
-@.str_1304 = private unnamed_addr constant [24 x i8] c"\73\79\4E\33\00\00\00\00\07\00\00\00\00\00\00\00 extern\00", align 8
-@.str_1305 = private unnamed_addr constant [21 x i8] c"\96\9B\5D\2E\00\00\00\00\04\00\00\00\00\00\00\00 mem\00", align 8
-@.str_1306 = private unnamed_addr constant [22 x i8] c"\C5\14\C6\36\00\00\00\00\05\00\00\00\00\00\00\00 time\00", align 8
-@.str_1307 = private unnamed_addr constant [24 x i8] c"\BE\30\76\10\00\00\00\00\07\00\00\00\00\00\00\00facts: \00", align 8
-@.str_1308 = private unnamed_addr constant [25 x i8] c"\51\D0\83\1F\00\00\00\00\08\00\00\00\00\00\00\00 fn(s), \00", align 8
-@.str_1309 = private unnamed_addr constant [24 x i8] c"\67\33\B1\14\00\00\00\00\07\00\00\00\00\00\00\00 pure (\00", align 8
-@.str_1310 = private unnamed_addr constant [33 x i8] c"\CA\30\7D\1D\00\00\00\00\10\00\00\00\00\00\00\00 closure passes)\00", align 8
-@.str_1311 = private unnamed_addr constant [71 x i8] c"\2A\5D\05\1C\00\00\00\00\36\00\00\00\00\00\00\00usage: orion_self <input.or> [output.ll] [orb-root...]\00", align 8
-@.str_1312 = private unnamed_addr constant [23 x i8] c"\70\63\A2\1C\00\00\00\00\06\00\00\00\00\00\00\00out.ll\00", align 8
-@.str_1313 = private unnamed_addr constant [37 x i8] c"\BF\6D\29\33\00\00\00\00\14\00\00\00\00\00\00\00orion: cannot read `\00", align 8
-@.str_1314 = private unnamed_addr constant [23 x i8] c"\51\50\1A\25\00\00\00\00\06\00\00\00\00\00\00\00/orbs/\00", align 8
-@.str_1315 = private unnamed_addr constant [26 x i8] c"\94\7F\B4\0D\00\00\00\00\09\00\00\00\00\00\00\00/../orbs/\00", align 8
-@.str_1316 = private unnamed_addr constant [29 x i8] c"\98\58\7C\17\00\00\00\00\0C\00\00\00\00\00\00\00/../../orbs/\00", align 8
-@.str_1317 = private unnamed_addr constant [22 x i8] c"\83\F9\B7\0A\00\00\00\00\05\00\00\00\00\00\00\00orbs/\00", align 8
-@.str_1318 = private unnamed_addr constant [25 x i8] c"\3F\83\08\1A\00\00\00\00\08\00\00\00\00\00\00\00../orbs/\00", align 8
-@.str_1319 = private unnamed_addr constant [22 x i8] c"\44\0B\46\1D\00\00\00\00\05\00\00\00\00\00\00\00facts\00", align 8
-@.str_1320 = private unnamed_addr constant [28 x i8] c"\46\13\0D\2D\00\00\00\00\0B\00\00\00\00\00\00\00  compiled \00", align 8
-@.str_1321 = private unnamed_addr constant [26 x i8] c"\AA\BE\7B\22\00\00\00\00\09\00\00\00\00\00\00\00 ms (lex \00", align 8
-@.str_1322 = private unnamed_addr constant [26 x i8] c"\5C\02\73\0C\00\00\00\00\09\00\00\00\00\00\00\00 | parse \00", align 8
-@.str_1323 = private unnamed_addr constant [23 x i8] c"\71\E5\3C\22\00\00\00\00\06\00\00\00\00\00\00\00 | ir \00", align 8
-@.str_1324 = private unnamed_addr constant [25 x i8] c"\3B\92\FF\15\00\00\00\00\08\00\00\00\00\00\00\00 | emit \00", align 8
-@.str_1325 = private unnamed_addr constant [48 x i8] c"\BC\46\53\09\00\00\00\00\1F\00\00\00\00\00\00\00orion: compilation FAILED with \00", align 8
-@.str_1326 = private unnamed_addr constant [48 x i8] c"\4B\C1\0D\30\00\00\00\00\1F\00\00\00\00\00\00\00 error(s) \E2\80\94 no output written\00", align 8
-@.str_1327 = private unnamed_addr constant [19 x i8] c"\AD\1C\81\05\00\00\00\00\02\00\00\00\00\00\00\00  \00", align 8
-@.str_1328 = private unnamed_addr constant [29 x i8] c"\F8\A8\8D\03\00\00\00\00\0C\00\00\00\00\00\00\00write failed\00", align 8
+@.str_496 = private unnamed_addr constant [52 x i8] c"\6B\2D\56\21\00\00\00\00\23\00\00\00\00\00\00\00orion: ERROR \E2\80\94 capturing lambda `\00", align 8
+@.str_497 = private unnamed_addr constant [175 x i8] c"\E2\72\10\10\00\00\00\00\9E\00\00\00\00\00\00\00` is used as a value (passed, returned, or assigned); escaping closures aren't supported yet \E2\80\94 call it directly in its defining scope, or inline the capture\00", align 8
+@.str_498 = private unnamed_addr constant [24 x i8] c"\9C\00\63\06\00\00\00\00\07\00\00\00\00\00\00\00tag:int\00", align 8
+@.str_499 = private unnamed_addr constant [19 x i8] c"\11\4C\81\05\00\00\00\00\02\00\00\00\00\00\00\00|p\00", align 8
+@.str_500 = private unnamed_addr constant [21 x i8] c"\D2\75\D8\31\00\00\00\00\04\00\00\00\00\00\00\00:int\00", align 8
+@.str_501 = private unnamed_addr constant [54 x i8] c"\B0\64\33\20\00\00\00\00\25\00\00\00\00\00\00\00orion: ERROR \E2\80\94 duplicate function `\00", align 8
+@.str_502 = private unnamed_addr constant [65 x i8] c"\D7\46\C1\20\00\00\00\00\30\00\00\00\00\00\00\00` (two orbs in this build define it; rename one)\00", align 8
+@.str_503 = private unnamed_addr constant [21 x i8] c"\D6\D0\AB\38\00\00\00\00\04\00\00\00\00\00\00\00main\00", align 8
+@.str_504 = private unnamed_addr constant [19 x i8] c"\92\1F\81\05\00\00\00\00\02\00\00\00\00\00\00\00%v\00", align 8
+@.str_505 = private unnamed_addr constant [18 x i8] c"\D0\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00A\00", align 8
+@.str_506 = private unnamed_addr constant [18 x i8] c"\D1\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00B\00", align 8
+@.str_507 = private unnamed_addr constant [18 x i8] c"\D2\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00C\00", align 8
+@.str_508 = private unnamed_addr constant [18 x i8] c"\D3\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00D\00", align 8
+@.str_509 = private unnamed_addr constant [18 x i8] c"\D4\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00E\00", align 8
+@.str_510 = private unnamed_addr constant [18 x i8] c"\D5\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00F\00", align 8
+@.str_511 = private unnamed_addr constant [21 x i8] c"\01\FC\17\39\00\00\00\00\04\00\00\00\00\00\00\00puts\00", align 8
+@.str_512 = private unnamed_addr constant [23 x i8] c"\8F\FF\1A\09\00\00\00\00\06\00\00\00\00\00\00\00printf\00", align 8
+@.str_513 = private unnamed_addr constant [23 x i8] c"\51\DF\B4\18\00\00\00\00\06\00\00\00\00\00\00\00malloc\00", align 8
+@.str_514 = private unnamed_addr constant [23 x i8] c"\1A\F0\D3\1D\00\00\00\00\06\00\00\00\00\00\00\00strlen\00", align 8
+@.str_515 = private unnamed_addr constant [23 x i8] c"\75\9A\D1\1D\00\00\00\00\06\00\00\00\00\00\00\00strcpy\00", align 8
+@.str_516 = private unnamed_addr constant [23 x i8] c"\C3\92\D1\1D\00\00\00\00\06\00\00\00\00\00\00\00strcat\00", align 8
+@.str_517 = private unnamed_addr constant [23 x i8] c"\E3\98\D1\1D\00\00\00\00\06\00\00\00\00\00\00\00strcmp\00", align 8
+@.str_518 = private unnamed_addr constant [25 x i8] c"\6E\15\73\3B\00\00\00\00\08\00\00\00\00\00\00\00snprintf\00", align 8
+@.str_519 = private unnamed_addr constant [23 x i8] c"\71\E1\70\23\00\00\00\00\06\00\00\00\00\00\00\00memcpy\00", align 8
+@.str_520 = private unnamed_addr constant [23 x i8] c"\0A\CD\D5\1D\00\00\00\00\06\00\00\00\00\00\00\00strstr\00", align 8
+@.str_521 = private unnamed_addr constant [22 x i8] c"\81\A9\29\1F\00\00\00\00\05\00\00\00\00\00\00\00fopen\00", align 8
+@.str_522 = private unnamed_addr constant [23 x i8] c"\59\1A\74\38\00\00\00\00\06\00\00\00\00\00\00\00fclose\00", align 8
+@.str_523 = private unnamed_addr constant [22 x i8] c"\D9\AE\8D\1F\00\00\00\00\05\00\00\00\00\00\00\00fread\00", align 8
+@.str_524 = private unnamed_addr constant [23 x i8] c"\72\DC\B1\32\00\00\00\00\06\00\00\00\00\00\00\00fwrite\00", align 8
+@.str_525 = private unnamed_addr constant [22 x i8] c"\B8\4F\D2\1F\00\00\00\00\05\00\00\00\00\00\00\00ftell\00", align 8
+@.str_526 = private unnamed_addr constant [22 x i8] c"\87\FE\AF\1F\00\00\00\00\05\00\00\00\00\00\00\00fseek\00", align 8
+@.str_527 = private unnamed_addr constant [30 x i8] c"\6C\12\AE\0F\00\00\00\00\0D\00\00\00\00\00\00\00declare i64 @\00", align 8
+@.str_528 = private unnamed_addr constant [19 x i8] c"\4D\40\81\05\00\00\00\00\02\00\00\00\00\00\00\00eq\00", align 8
+@.str_529 = private unnamed_addr constant [19 x i8] c"\DC\44\81\05\00\00\00\00\02\00\00\00\00\00\00\00ne\00", align 8
+@.str_530 = private unnamed_addr constant [20 x i8] c"\76\17\E6\05\00\00\00\00\03\00\00\00\00\00\00\00slt\00", align 8
+@.str_531 = private unnamed_addr constant [20 x i8] c"\67\17\E6\05\00\00\00\00\03\00\00\00\00\00\00\00sle\00", align 8
+@.str_532 = private unnamed_addr constant [20 x i8] c"\E7\14\E6\05\00\00\00\00\03\00\00\00\00\00\00\00sgt\00", align 8
+@.str_533 = private unnamed_addr constant [20 x i8] c"\D8\14\E6\05\00\00\00\00\03\00\00\00\00\00\00\00sge\00", align 8
+@.str_534 = private unnamed_addr constant [36 x i8] c"\38\98\E4\06\00\00\00\00\13\00\00\00\00\00\00\00__orion_perform_int\00", align 8
+@.str_535 = private unnamed_addr constant [35 x i8] c"\DE\7F\C3\35\00\00\00\00\12\00\00\00\00\00\00\00orion_persist_text\00", align 8
+@.str_536 = private unnamed_addr constant [53 x i8] c"\E8\3F\AC\38\00\00\00\00\24\00\00\00\00\00\00\00 = add i64 0, 0    ; UNSUPPORTED op=\00", align 8
+@.str_537 = private unnamed_addr constant [31 x i8] c"\58\2C\73\19\00\00\00\00\0E\00\00\00\00\00\00\00 = add i64 0, \00", align 8
+@.str_538 = private unnamed_addr constant [44 x i8] c"\9A\8F\8F\2D\00\00\00\00\1B\00\00\00\00\00\00\00 = getelementptr i8, ptr %p\00", align 8
+@.str_539 = private unnamed_addr constant [24 x i8] c"\FF\24\6D\10\00\00\00\00\07\00\00\00\00\00\00\00, i64 0\00", align 8
+@.str_540 = private unnamed_addr constant [23 x i8] c"\A7\FA\64\14\00\00\00\00\06\00\00\00\00\00\00\00double\00", align 8
+@.str_541 = private unnamed_addr constant [34 x i8] c"\A8\DF\94\29\00\00\00\00\11\00\00\00\00\00\00\00 = fadd double %p\00", align 8
+@.str_542 = private unnamed_addr constant [37 x i8] c"\F3\DB\3D\25\00\00\00\00\14\00\00\00\00\00\00\00, 0x0000000000000000\00", align 8
+@.str_543 = private unnamed_addr constant [33 x i8] c"\1E\6C\6B\16\00\00\00\00\10\00\00\00\00\00\00\00 = add i64 0, %p\00", align 8
+@.str_544 = private unnamed_addr constant [32 x i8] c"\8E\D2\91\19\00\00\00\00\0F\00\00\00\00\00\00\00    call void @\00", align 8
+@.str_545 = private unnamed_addr constant [23 x i8] c"\4D\48\D9\0C\00\00\00\00\06\00\00\00\00\00\00\00)\0A    \00", align 8
+@.str_546 = private unnamed_addr constant [32 x i8] c"\B7\49\AE\37\00\00\00\00\0F\00\00\00\00\00\00\00 = add i64 0, 0\00", align 8
+@.str_547 = private unnamed_addr constant [25 x i8] c"\1C\11\8C\0D\00\00\00\00\08\00\00\00\00\00\00\00 = call \00", align 8
+@.str_548 = private unnamed_addr constant [19 x i8] c"\CD\1C\81\05\00\00\00\00\02\00\00\00\00\00\00\00 @\00", align 8
+@.str_549 = private unnamed_addr constant [55 x i8] c"\5C\66\2D\32\00\00\00\00\26\00\00\00\00\00\00\00 = call i64 @__orion_perform_int(ptr @\00", align 8
+@.str_550 = private unnamed_addr constant [23 x i8] c"\7B\7C\9D\23\00\00\00\00\06\00\00\00\00\00\00\00, i64 \00", align 8
+@.str_551 = private unnamed_addr constant [56 x i8] c"\AB\DA\DB\36\00\00\00\00\27\00\00\00\00\00\00\00 = call ptr @__orion_perform_text(ptr @\00", align 8
+@.str_552 = private unnamed_addr constant [23 x i8] c"\A0\F7\9D\24\00\00\00\00\06\00\00\00\00\00\00\00, ptr \00", align 8
+@.str_553 = private unnamed_addr constant [43 x i8] c"\90\7C\64\2D\00\00\00\00\1A\00\00\00\00\00\00\00 = getelementptr i8, ptr @\00", align 8
+@.str_554 = private unnamed_addr constant [31 x i8] c"\C3\3A\AE\27\00\00\00\00\0E\00\00\00\00\00\00\00    br label %\00", align 8
+@.str_555 = private unnamed_addr constant [20 x i8] c"\5C\01\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.cb\00", align 8
+@.str_556 = private unnamed_addr constant [32 x i8] c"\B7\A8\B9\23\00\00\00\00\0F\00\00\00\00\00\00\00 = icmp ne i64 \00", align 8
+@.str_557 = private unnamed_addr constant [20 x i8] c"\CF\58\D3\05\00\00\00\00\03\00\00\00\00\00\00\00, 0\00", align 8
+@.str_558 = private unnamed_addr constant [27 x i8] c"\CA\D0\80\18\00\00\00\00\0A\00\00\00\00\00\00\00    br i1 \00", align 8
+@.str_559 = private unnamed_addr constant [26 x i8] c"\2C\22\A4\2B\00\00\00\00\09\00\00\00\00\00\00\00, label %\00", align 8
+@.str_560 = private unnamed_addr constant [24 x i8] c"\50\C6\13\2D\00\00\00\00\07\00\00\00\00\00\00\00 = phi \00", align 8
+@.str_561 = private unnamed_addr constant [20 x i8] c"\84\52\D0\05\00\00\00\00\03\00\00\00\00\00\00\00 [ \00", align 8
+@.str_562 = private unnamed_addr constant [20 x i8] c"\C4\58\D3\05\00\00\00\00\03\00\00\00\00\00\00\00, %\00", align 8
+@.str_563 = private unnamed_addr constant [23 x i8] c"\CF\65\0D\1C\00\00\00\00\06\00\00\00\00\00\00\00 ], [ \00", align 8
+@.str_564 = private unnamed_addr constant [19 x i8] c"\EA\1C\81\05\00\00\00\00\02\00\00\00\00\00\00\00 ]\00", align 8
+@.str_565 = private unnamed_addr constant [32 x i8] c"\0F\75\14\32\00\00\00\00\0F\00\00\00\00\00\00\00 = fadd double \00", align 8
+@.str_566 = private unnamed_addr constant [25 x i8] c"\63\04\EC\36\00\00\00\00\08\00\00\00\00\00\00\00 double \00", align 8
+@.str_567 = private unnamed_addr constant [19 x i8] c"\19\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.b\00", align 8
+@.str_568 = private unnamed_addr constant [25 x i8] c"\53\4A\DF\06\00\00\00\00\08\00\00\00\00\00\00\00 = fcmp \00", align 8
+@.str_569 = private unnamed_addr constant [28 x i8] c"\F7\B7\01\20\00\00\00\00\0B\00\00\00\00\00\00\00 = zext i1 \00", align 8
+@.str_570 = private unnamed_addr constant [24 x i8] c"\F1\62\8C\2A\00\00\00\00\07\00\00\00\00\00\00\00 to i64\00", align 8
+@.str_571 = private unnamed_addr constant [31 x i8] c"\F1\AC\25\0F\00\00\00\00\0E\00\00\00\00\00\00\00 = sitofp i64 \00", align 8
+@.str_572 = private unnamed_addr constant [27 x i8] c"\24\EB\6D\02\00\00\00\00\0A\00\00\00\00\00\00\00 to double\00", align 8
+@.str_573 = private unnamed_addr constant [34 x i8] c"\81\C6\83\08\00\00\00\00\11\00\00\00\00\00\00\00 = fptosi double \00", align 8
+@.str_574 = private unnamed_addr constant [28 x i8] c"\3D\37\A6\01\00\00\00\00\0B\00\00\00\00\00\00\00 = add i64 \00", align 8
+@.str_575 = private unnamed_addr constant [28 x i8] c"\6C\10\F1\1D\00\00\00\00\0B\00\00\00\00\00\00\00 = sub i64 \00", align 8
+@.str_576 = private unnamed_addr constant [28 x i8] c"\C2\1F\62\23\00\00\00\00\0B\00\00\00\00\00\00\00 = mul i64 \00", align 8
+@.str_577 = private unnamed_addr constant [29 x i8] c"\B3\C5\57\09\00\00\00\00\0C\00\00\00\00\00\00\00 = sdiv i64 \00", align 8
+@.str_578 = private unnamed_addr constant [29 x i8] c"\4F\62\78\37\00\00\00\00\0C\00\00\00\00\00\00\00 = srem i64 \00", align 8
+@.str_579 = private unnamed_addr constant [20 x i8] c"\0D\08\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.pl\00", align 8
+@.str_580 = private unnamed_addr constant [33 x i8] c"\EF\CC\67\0B\00\00\00\00\10\00\00\00\00\00\00\00 = ptrtoint ptr \00", align 8
+@.str_581 = private unnamed_addr constant [25 x i8] c"\D2\3C\9B\1E\00\00\00\00\08\00\00\00\00\00\00\00 to i64\0A\00", align 8
+@.str_582 = private unnamed_addr constant [20 x i8] c"\13\08\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.pr\00", align 8
+@.str_583 = private unnamed_addr constant [25 x i8] c"\46\6D\88\3B\00\00\00\00\08\00\00\00\00\00\00\00 = icmp \00", align 8
+@.str_584 = private unnamed_addr constant [19 x i8] c"\1A\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.c\00", align 8
+@.str_585 = private unnamed_addr constant [30 x i8] c"\0E\DD\31\2C\00\00\00\00\0D\00\00\00\00\00\00\00 = select i1 \00", align 8
+@.str_586 = private unnamed_addr constant [20 x i8] c"\F6\05\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.la\00", align 8
+@.str_587 = private unnamed_addr constant [20 x i8] c"\F7\05\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.lb\00", align 8
+@.str_588 = private unnamed_addr constant [20 x i8] c"\07\06\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.lr\00", align 8
+@.str_589 = private unnamed_addr constant [21 x i8] c"\89\74\5C\2E\00\00\00\00\04\00\00\00\00\00\00\00 i1 \00", align 8
+@.str_590 = private unnamed_addr constant [19 x i8] c"\25\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.n\00", align 8
+@.str_591 = private unnamed_addr constant [32 x i8] c"\8C\B2\FB\13\00\00\00\00\0F\00\00\00\00\00\00\00 = icmp eq i64 \00", align 8
+@.str_592 = private unnamed_addr constant [68 x i8] c"\71\41\4F\1D\00\00\00\00\33\00\00\00\00\00\00\00    call i32 (ptr, ...) @printf(ptr @.fmt_int, i64 \00", align 8
+@.str_593 = private unnamed_addr constant [73 x i8] c"\96\D3\8F\25\00\00\00\00\38\00\00\00\00\00\00\00    call i32 (ptr, ...) @printf(ptr @.fmt_float, double \00", align 8
+@.str_594 = private unnamed_addr constant [20 x i8] c"\14\08\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.ps\00", align 8
+@.str_595 = private unnamed_addr constant [48 x i8] c"\D3\6E\72\11\00\00\00\00\1F\00\00\00\00\00\00\00 = getelementptr i8, ptr @.str_\00", align 8
+@.str_596 = private unnamed_addr constant [25 x i8] c"\3A\86\15\06\00\00\00\00\08\00\00\00\00\00\00\00, i64 16\00", align 8
+@.str_597 = private unnamed_addr constant [40 x i8] c"\38\88\89\0C\00\00\00\00\17\00\00\00\00\00\00\00    call i32 @puts(ptr \00", align 8
+@.str_598 = private unnamed_addr constant [52 x i8] c"\6E\41\06\1F\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_text_concat(ptr \00", align 8
+@.str_599 = private unnamed_addr constant [52 x i8] c"\6F\F4\F5\29\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_int_to_text(i64 \00", align 8
+@.str_600 = private unnamed_addr constant [45 x i8] c"\75\8B\32\1B\00\00\00\00\1C\00\00\00\00\00\00\00 = call i64 @orion_tlen(ptr \00", align 8
+@.str_601 = private unnamed_addr constant [51 x i8] c"\54\3D\62\2E\00\00\00\00\22\00\00\00\00\00\00\00 = call ptr @orion_text_slice(ptr \00", align 8
+@.str_602 = private unnamed_addr constant [54 x i8] c"\83\90\1F\0E\00\00\00\00\25\00\00\00\00\00\00\00 = call i64 @orion_text_contains(ptr \00", align 8
+@.str_603 = private unnamed_addr constant [50 x i8] c"\36\93\96\15\00\00\00\00\21\00\00\00\00\00\00\00 = call ptr @orion_file_read(ptr \00", align 8
+@.str_604 = private unnamed_addr constant [51 x i8] c"\FD\C9\16\06\00\00\00\00\22\00\00\00\00\00\00\00 = call i64 @orion_file_write(ptr \00", align 8
+@.str_605 = private unnamed_addr constant [45 x i8] c"\4D\5C\3A\16\00\00\00\00\1C\00\00\00\00\00\00\00 = load i64, ptr @orion_argc\00", align 8
+@.str_606 = private unnamed_addr constant [22 x i8] c"\A5\97\5E\02\00\00\00\00\05\00\00\00\00\00\00\00.slot\00", align 8
+@.str_607 = private unnamed_addr constant [21 x i8] c"\50\BC\3A\30\00\00\00\00\04\00\00\00\00\00\00\00.arr\00", align 8
+@.str_608 = private unnamed_addr constant [45 x i8] c"\F9\14\83\0B\00\00\00\00\1C\00\00\00\00\00\00\00 = load ptr, ptr @orion_argv\00", align 8
+@.str_609 = private unnamed_addr constant [43 x i8] c"\88\EE\F2\07\00\00\00\00\1A\00\00\00\00\00\00\00 = getelementptr ptr, ptr \00", align 8
+@.str_610 = private unnamed_addr constant [21 x i8] c"\3B\27\3F\30\00\00\00\00\04\00\00\00\00\00\00\00.raw\00", align 8
+@.str_611 = private unnamed_addr constant [34 x i8] c"\C1\FE\77\2E\00\00\00\00\11\00\00\00\00\00\00\00 = load ptr, ptr \00", align 8
+@.str_612 = private unnamed_addr constant [52 x i8] c"\B5\DC\C8\1F\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_text_from_c(ptr \00", align 8
+@.str_613 = private unnamed_addr constant [56 x i8] c"\7B\FB\A3\38\00\00\00\00\27\00\00\00\00\00\00\00 = call ptr @orion_bytes_from_text(ptr \00", align 8
+@.str_614 = private unnamed_addr constant [21 x i8] c"\45\BC\3A\30\00\00\00\00\04\00\00\00\00\00\00\00.arg\00", align 8
+@.str_615 = private unnamed_addr constant [33 x i8] c"\48\D9\0A\02\00\00\00\00\10\00\00\00\00\00\00\00 = inttoptr i64 \00", align 8
+@.str_616 = private unnamed_addr constant [24 x i8] c"\28\58\8E\2A\00\00\00\00\07\00\00\00\00\00\00\00 to ptr\00", align 8
+@.str_617 = private unnamed_addr constant [54 x i8] c"\0D\2B\01\22\00\00\00\00\25\00\00\00\00\00\00\00 = call ptr @orion_bytes_to_text(ptr \00", align 8
+@.str_618 = private unnamed_addr constant [52 x i8] c"\85\28\88\0C\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_bytes_slice(ptr \00", align 8
+@.str_619 = private unnamed_addr constant [19 x i8] c"\18\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.a\00", align 8
+@.str_620 = private unnamed_addr constant [25 x i8] c"\F7\B7\9B\1F\00\00\00\00\08\00\00\00\00\00\00\00 to ptr\0A\00", align 8
+@.str_621 = private unnamed_addr constant [53 x i8] c"\87\01\2C\07\00\00\00\00\24\00\00\00\00\00\00\00 = call ptr @orion_bytes_concat(ptr \00", align 8
+@.str_622 = private unnamed_addr constant [52 x i8] c"\12\56\8A\08\00\00\00\00\23\00\00\00\00\00\00\00 = call ptr @orion_bytes_zeros(i64 \00", align 8
+@.str_623 = private unnamed_addr constant [49 x i8] c"\70\0A\1D\36\00\00\00\00\20\00\00\00\00\00\00\00 = call ptr @orion_slot_get(ptr \00", align 8
+@.str_624 = private unnamed_addr constant [49 x i8] c"\2E\E1\1A\19\00\00\00\00\20\00\00\00\00\00\00\00 = call i64 @orion_slot_has(ptr \00", align 8
+@.str_625 = private unnamed_addr constant [53 x i8] c"\00\31\15\2D\00\00\00\00\24\00\00\00\00\00\00\00 = call i64 @orion_slot_get_int(ptr \00", align 8
+@.str_626 = private unnamed_addr constant [20 x i8] c"\76\02\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.ev\00", align 8
+@.str_627 = private unnamed_addr constant [20 x i8] c"\9A\09\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.sp\00", align 8
+@.str_628 = private unnamed_addr constant [50 x i8] c"\33\59\9B\13\00\00\00\00\21\00\00\00\00\00\00\00 = call ptr @orion_slot_evac(ptr \00", align 8
+@.str_629 = private unnamed_addr constant [49 x i8] c"\A5\5C\68\1A\00\00\00\00\20\00\00\00\00\00\00\00 = call i64 @orion_slot_set(ptr \00", align 8
+@.str_630 = private unnamed_addr constant [19 x i8] c"\1C\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.e\00", align 8
+@.str_631 = private unnamed_addr constant [48 x i8] c"\7D\9C\DB\03\00\00\00\00\1F\00\00\00\00\00\00\00 = call i64 @orion_text_eq(ptr \00", align 8
+@.str_632 = private unnamed_addr constant [28 x i8] c"\A4\82\C2\16\00\00\00\00\0B\00\00\00\00\00\00\00 = xor i64 \00", align 8
+@.str_633 = private unnamed_addr constant [20 x i8] c"\D0\58\D3\05\00\00\00\00\03\00\00\00\00\00\00\00, 1\00", align 8
+@.str_634 = private unnamed_addr constant [19 x i8] c"\2A\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.s\00", align 8
+@.str_635 = private unnamed_addr constant [41 x i8] c"\51\B5\E0\17\00\00\00\00\18\00\00\00\00\00\00\00 = call i32 @strcmp(ptr \00", align 8
+@.str_636 = private unnamed_addr constant [22 x i8] c"\C0\7C\3E\35\00\00\00\00\05\00\00\00\00\00\00\00 i32 \00", align 8
+@.str_637 = private unnamed_addr constant [67 x i8] c"\E0\E8\E0\24\00\00\00\00\32\00\00\00\00\00\00\00 = getelementptr i64, ptr @orion_empty_list, i64 0\00", align 8
+@.str_638 = private unnamed_addr constant [49 x i8] c"\55\DC\92\05\00\00\00\00\20\00\00\00\00\00\00\00 = call ptr @orion_list_new(i64 \00", align 8
+@.str_639 = private unnamed_addr constant [20 x i8] c"\05\06\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.lp\00", align 8
+@.str_640 = private unnamed_addr constant [22 x i8] c"\E0\69\E4\0E\00\00\00\00\05\00\00\00\00\00\00\00\0A    \00", align 8
+@.str_641 = private unnamed_addr constant [52 x i8] c"\A6\8A\D2\33\00\00\00\00\23\00\00\00\00\00\00\00\0A    call void @orion_list_set(ptr \00", align 8
+@.str_642 = private unnamed_addr constant [19 x i8] c"\24\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.m\00", align 8
+@.str_643 = private unnamed_addr constant [19 x i8] c"\20\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.i\00", align 8
+@.str_644 = private unnamed_addr constant [48 x i8] c"\EC\6C\A5\23\00\00\00\00\1F\00\00\00\00\00\00\00 = call i64 @orion_list_at(ptr \00", align 8
+@.str_645 = private unnamed_addr constant [29 x i8] c"\65\95\79\23\00\00\00\00\0C\00\00\00\00\00\00\00 to ptr\0A    \00", align 8
+@.str_646 = private unnamed_addr constant [49 x i8] c"\69\6B\FD\2E\00\00\00\00\20\00\00\00\00\00\00\00 = call i64 @orion_list_len(ptr \00", align 8
+@.str_647 = private unnamed_addr constant [33 x i8] c"\13\C6\8F\05\00\00\00\00\10\00\00\00\00\00\00\00 = call double @\00", align 8
+@.str_648 = private unnamed_addr constant [25 x i8] c"\88\F8\3B\33\00\00\00\00\08\00\00\00\00\00\00\00(double \00", align 8
+@.str_649 = private unnamed_addr constant [26 x i8] c"\C5\2A\AF\07\00\00\00\00\09\00\00\00\00\00\00\00, double \00", align 8
+@.str_650 = private unnamed_addr constant [51 x i8] c"\6D\F1\42\0E\00\00\00\00\22\00\00\00\00\00\00\00 = call ptr @orion_list_slice(ptr \00", align 8
+@.str_651 = private unnamed_addr constant [19 x i8] c"\27\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.p\00", align 8
+@.str_652 = private unnamed_addr constant [50 x i8] c"\C6\92\52\10\00\00\00\00\21\00\00\00\00\00\00\00 = call ptr @orion_list_push(ptr \00", align 8
+@.str_653 = private unnamed_addr constant [54 x i8] c"\A6\7E\FF\0D\00\00\00\00\25\00\00\00\00\00\00\00 = call ptr @orion_list_push_mut(ptr \00", align 8
+@.str_654 = private unnamed_addr constant [48 x i8] c"\BA\35\AD\37\00\00\00\00\1F\00\00\00\00\00\00\00 = call ptr @orion_vec_add(ptr \00", align 8
+@.str_655 = private unnamed_addr constant [48 x i8] c"\E2\44\5D\18\00\00\00\00\1F\00\00\00\00\00\00\00 = call ptr @orion_vec_sub(ptr \00", align 8
+@.str_656 = private unnamed_addr constant [48 x i8] c"\38\54\CE\1D\00\00\00\00\1F\00\00\00\00\00\00\00 = call ptr @orion_vec_mul(ptr \00", align 8
+@.str_657 = private unnamed_addr constant [48 x i8] c"\63\B3\5B\31\00\00\00\00\1F\00\00\00\00\00\00\00 = call i64 @orion_vec_dot(ptr \00", align 8
+@.str_658 = private unnamed_addr constant [51 x i8] c"\88\50\43\31\00\00\00\00\22\00\00\00\00\00\00\00 = call i64 @__orion_time_now_ms()\00", align 8
+@.str_659 = private unnamed_addr constant [52 x i8] c"\16\83\C4\29\00\00\00\00\23\00\00\00\00\00\00\00 = call i64 @__orion_monotonic_ms()\00", align 8
+@.str_660 = private unnamed_addr constant [53 x i8] c"\1A\BA\64\0D\00\00\00\00\24\00\00\00\00\00\00\00    call void @__orion_sleep_ms(i64 \00", align 8
+@.str_661 = private unnamed_addr constant [48 x i8] c"\B5\75\EB\32\00\00\00\00\1F\00\00\00\00\00\00\00 = call ptr @orion_map_new(i64 \00", align 8
+@.str_662 = private unnamed_addr constant [51 x i8] c"\61\89\28\18\00\00\00\00\22\00\00\00\00\00\00\00\0A    call void @orion_map_set(ptr \00", align 8
+@.str_663 = private unnamed_addr constant [33 x i8] c"\F6\5A\90\23\00\00\00\00\10\00\00\00\00\00\00\00orion_map_set_ik\00", align 8
+@.str_664 = private unnamed_addr constant [30 x i8] c"\D8\D7\1C\33\00\00\00\00\0D\00\00\00\00\00\00\00orion_map_set\00", align 8
+@.str_665 = private unnamed_addr constant [22 x i8] c"\79\16\DD\0F\00\00\00\00\05\00\00\00\00\00\00\00(ptr \00", align 8
+@.str_666 = private unnamed_addr constant [42 x i8] c"\59\46\D2\14\00\00\00\00\19\00\00\00\00\00\00\00 = getelementptr i8, ptr \00", align 8
+@.str_667 = private unnamed_addr constant [36 x i8] c"\4B\E6\8C\24\00\00\00\00\13\00\00\00\00\00\00\00orion_map_remove_ik\00", align 8
+@.str_668 = private unnamed_addr constant [33 x i8] c"\81\24\1A\00\00\00\00\00\10\00\00\00\00\00\00\00orion_map_remove\00", align 8
+@.str_669 = private unnamed_addr constant [51 x i8] c"\AB\2B\07\18\00\00\00\00\22\00\00\00\00\00\00\00    call void @orion_list_set(ptr \00", align 8
+@.str_670 = private unnamed_addr constant [48 x i8] c"\98\18\C8\08\00\00\00\00\1F\00\00\00\00\00\00\00 = call i64 @orion_map_len(ptr \00", align 8
+@.str_671 = private unnamed_addr constant [49 x i8] c"\EF\56\F8\23\00\00\00\00\20\00\00\00\00\00\00\00 = call ptr @orion_map_keys(ptr \00", align 8
+@.str_672 = private unnamed_addr constant [51 x i8] c"\E6\24\8A\1C\00\00\00\00\22\00\00\00\00\00\00\00 = call ptr @orion_map_values(ptr \00", align 8
+@.str_673 = private unnamed_addr constant [36 x i8] c"\2E\5F\1D\0D\00\00\00\00\13\00\00\00\00\00\00\00orion_map_get_or_ik\00", align 8
+@.str_674 = private unnamed_addr constant [33 x i8] c"\54\37\50\26\00\00\00\00\10\00\00\00\00\00\00\00orion_map_get_or\00", align 8
+@.str_675 = private unnamed_addr constant [19 x i8] c"\1B\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.d\00", align 8
+@.str_676 = private unnamed_addr constant [19 x i8] c"\29\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.r\00", align 8
+@.str_677 = private unnamed_addr constant [30 x i8] c"\73\FB\2F\08\00\00\00\00\0D\00\00\00\00\00\00\00 = call i64 @\00", align 8
+@.str_678 = private unnamed_addr constant [55 x i8] c"\68\7C\21\34\00\00\00\00\26\00\00\00\00\00\00\00 = call ptr @orion_f64_to_text(double \00", align 8
+@.str_679 = private unnamed_addr constant [33 x i8] c"\3B\34\50\26\00\00\00\00\10\00\00\00\00\00\00\00orion_map_get_ik\00", align 8
+@.str_680 = private unnamed_addr constant [30 x i8] c"\6C\B3\19\33\00\00\00\00\0D\00\00\00\00\00\00\00orion_map_get\00", align 8
+@.str_681 = private unnamed_addr constant [33 x i8] c"\C5\5B\81\02\00\00\00\00\10\00\00\00\00\00\00\00orion_map_has_ik\00", align 8
+@.str_682 = private unnamed_addr constant [30 x i8] c"\68\F4\19\33\00\00\00\00\0D\00\00\00\00\00\00\00orion_map_has\00", align 8
+@.str_683 = private unnamed_addr constant [46 x i8] c"\F3\A6\9B\09\00\00\00\00\1D\00\00\00\00\00\00\00 = call ptr @orion_alloc(i64 \00", align 8
+@.str_684 = private unnamed_addr constant [19 x i8] c"\1D\24\81\05\00\00\00\00\02\00\00\00\00\00\00\00.f\00", align 8
+@.str_685 = private unnamed_addr constant [43 x i8] c"\CC\91\EC\0C\00\00\00\00\1A\00\00\00\00\00\00\00 = getelementptr i64, ptr \00", align 8
+@.str_686 = private unnamed_addr constant [32 x i8] c"\34\7F\FA\26\00\00\00\00\0F\00\00\00\00\00\00\00\0A    store i64 \00", align 8
+@.str_687 = private unnamed_addr constant [35 x i8] c"\E9\B5\F3\24\00\00\00\00\12\00\00\00\00\00\00\00 = bitcast double \00", align 8
+@.str_688 = private unnamed_addr constant [34 x i8] c"\05\A2\71\33\00\00\00\00\11\00\00\00\00\00\00\00 = load i64, ptr \00", align 8
+@.str_689 = private unnamed_addr constant [32 x i8] c"\3D\23\DE\03\00\00\00\00\0F\00\00\00\00\00\00\00 = bitcast i64 \00", align 8
+@.str_690 = private unnamed_addr constant [27 x i8] c"\52\28\6E\39\00\00\00\00\0A\00\00\00\00\00\00\00 = alloca \00", align 8
+@.str_691 = private unnamed_addr constant [26 x i8] c"\CE\1B\A7\07\00\00\00\00\09\00\00\00\00\00\00\00, align 8\00", align 8
+@.str_692 = private unnamed_addr constant [25 x i8] c"\E6\3E\2F\36\00\00\00\00\08\00\00\00\00\00\00\00 = load \00", align 8
+@.str_693 = private unnamed_addr constant [27 x i8] c"\DA\2C\BD\01\00\00\00\00\0A\00\00\00\00\00\00\00    store \00", align 8
+@.str_694 = private unnamed_addr constant [33 x i8] c"\7D\8D\EC\1F\00\00\00\00\10\00\00\00\00\00\00\00    ret ptr null\00", align 8
+@.str_695 = private unnamed_addr constant [30 x i8] c"\4A\F5\BE\0C\00\00\00\00\0D\00\00\00\00\00\00\00    ret i64 0\00", align 8
+@.str_696 = private unnamed_addr constant [20 x i8] c"\0A\09\D4\05\00\00\00\00\03\00\00\00\00\00\00\00.rc\00", align 8
+@.str_697 = private unnamed_addr constant [29 x i8] c"\01\19\EC\06\00\00\00\00\0C\00\00\00\00\00\00\00    ret i64 \00", align 8
+@.str_698 = private unnamed_addr constant [29 x i8] c"\26\94\EC\07\00\00\00\00\0C\00\00\00\00\00\00\00    ret ptr \00", align 8
+@.str_699 = private unnamed_addr constant [25 x i8] c"\99\D6\33\03\00\00\00\00\08\00\00\00\00\00\00\00    ret \00", align 8
+@.str_700 = private unnamed_addr constant [41 x i8] c"\C4\E1\91\09\00\00\00\00\18\00\00\00\00\00\00\00orion: ERROR \E2\80\94 IR op `\00", align 8
+@.str_701 = private unnamed_addr constant [45 x i8] c"\3B\3B\4E\14\00\00\00\00\1C\00\00\00\00\00\00\00` has no LLVM lowering (fn `\00", align 8
+@.str_702 = private unnamed_addr constant [19 x i8] c"\76\3D\81\05\00\00\00\00\02\00\00\00\00\00\00\00`)\00", align 8
+@.str_703 = private unnamed_addr constant [25 x i8] c"\E7\D9\D3\13\00\00\00\00\08\00\00\00\00\00\00\00list:f64\00", align 8
+@.str_704 = private unnamed_addr constant [20 x i8] c"\32\37\D0\05\00\00\00\00\03\00\00\00\00\00\00\00 %p\00", align 8
+@.str_705 = private unnamed_addr constant [27 x i8] c"\85\52\94\21\00\00\00\00\0A\00\00\00\00\00\00\00orion_main\00", align 8
+@.str_706 = private unnamed_addr constant [24 x i8] c"\1D\55\59\25\00\00\00\00\07\00\00\00\00\00\00\00define \00", align 8
+@.str_707 = private unnamed_addr constant [28 x i8] c"\67\3C\89\28\00\00\00\00\0B\00\00\00\00\00\00\00) {\0Aentry:\0A\00", align 8
+@.str_708 = private unnamed_addr constant [19 x i8] c"\2E\4C\81\05\00\00\00\00\02\00\00\00\00\00\00\00}\0A\00", align 8
+@.str_709 = private unnamed_addr constant [23 x i8] c"\E2\58\E6\13\00\00\00\00\06\00\00\00\00\00\00\00@.str_\00", align 8
+@.str_710 = private unnamed_addr constant [51 x i8] c"\6E\72\C9\11\00\00\00\00\22\00\00\00\00\00\00\00 = private unnamed_addr constant [\00", align 8
+@.str_711 = private unnamed_addr constant [26 x i8] c"\3F\9B\64\21\00\00\00\00\09\00\00\00\00\00\00\00 x i8] c\22\00", align 8
+@.str_712 = private unnamed_addr constant [30 x i8] c"\FE\DB\BB\1C\00\00\00\00\0D\00\00\00\00\00\00\00\5C00\22, align 8\00", align 8
+@.str_713 = private unnamed_addr constant [18 x i8] c"\EB\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00\5C\00", align 8
+@.str_714 = private unnamed_addr constant [119 x i8] c"\DF\7F\AA\1B\00\00\00\00\66\00\00\00\00\00\00\00target datalayout = \22e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\22\0A\00", align 8
+@.str_715 = private unnamed_addr constant [69 x i8] c"\A6\87\24\12\00\00\00\00\34\00\00\00\00\00\00\00target triple = \22x86_64-pc-windows-msvc19.44.35209\22\0A\00", align 8
+@.str_716 = private unnamed_addr constant [47 x i8] c"\65\1D\B3\0B\00\00\00\00\1E\00\00\00\00\00\00\00declare i32 @printf(ptr, ...)\0A\00", align 8
+@.str_717 = private unnamed_addr constant [40 x i8] c"\A0\39\5A\37\00\00\00\00\17\00\00\00\00\00\00\00declare i32 @puts(ptr)\0A\00", align 8
+@.str_718 = private unnamed_addr constant [42 x i8] c"\FE\79\7B\01\00\00\00\00\19\00\00\00\00\00\00\00declare ptr @malloc(i64)\0A\00", align 8
+@.str_719 = private unnamed_addr constant [57 x i8] c"\C9\DD\BB\24\00\00\00\00\28\00\00\00\00\00\00\00declare ptr @orion_f64_literal_hex(ptr)\0A\00", align 8
+@.str_720 = private unnamed_addr constant [47 x i8] c"\04\33\15\21\00\00\00\00\1E\00\00\00\00\00\00\00declare ptr @orion_alloc(i64)\0A\00", align 8
+@.str_721 = private unnamed_addr constant [52 x i8] c"\4F\1F\4B\0F\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_arena_init(i64)\0A\00", align 8
+@.str_722 = private unnamed_addr constant [47 x i8] c"\34\D3\37\21\00\00\00\00\1E\00\00\00\00\00\00\00declare i64 @orion_arena_on()\0A\00", align 8
+@.str_723 = private unnamed_addr constant [48 x i8] c"\92\BB\1E\2F\00\00\00\00\1F\00\00\00\00\00\00\00declare i64 @orion_arena_off()\0A\00", align 8
+@.str_724 = private unnamed_addr constant [51 x i8] c"\79\25\C8\21\00\00\00\00\22\00\00\00\00\00\00\00declare i64 @orion_arena_active()\0A\00", align 8
+@.str_725 = private unnamed_addr constant [52 x i8] c"\BB\77\04\03\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_frame_init(i64)\0A\00", align 8
+@.str_726 = private unnamed_addr constant [47 x i8] c"\51\E9\C9\01\00\00\00\00\1E\00\00\00\00\00\00\00declare i64 @orion_frame_on()\0A\00", align 8
+@.str_727 = private unnamed_addr constant [48 x i8] c"\4C\80\98\2A\00\00\00\00\1F\00\00\00\00\00\00\00declare i64 @orion_frame_off()\0A\00", align 8
+@.str_728 = private unnamed_addr constant [50 x i8] c"\69\E2\AB\1D\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_frame_reset()\0A\00", align 8
+@.str_729 = private unnamed_addr constant [49 x i8] c"\48\E0\01\1C\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_frame_used()\0A\00", align 8
+@.str_730 = private unnamed_addr constant [49 x i8] c"\DF\1E\B3\2D\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_persist_on()\0A\00", align 8
+@.str_731 = private unnamed_addr constant [50 x i8] c"\4F\5B\48\0D\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_persist_off()\0A\00", align 8
+@.str_732 = private unnamed_addr constant [49 x i8] c"\22\6A\C4\32\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_pool_alloc()\0A\00", align 8
+@.str_733 = private unnamed_addr constant [49 x i8] c"\B1\AF\C4\02\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_pool_on(i64)\0A\00", align 8
+@.str_734 = private unnamed_addr constant [47 x i8] c"\CF\F6\B6\26\00\00\00\00\1E\00\00\00\00\00\00\00declare i64 @orion_pool_off()\0A\00", align 8
+@.str_735 = private unnamed_addr constant [52 x i8] c"\7F\B2\D3\36\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_pool_reset(i64)\0A\00", align 8
+@.str_736 = private unnamed_addr constant [50 x i8] c"\3E\00\0D\07\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_arena_reset()\0A\00", align 8
+@.str_737 = private unnamed_addr constant [49 x i8] c"\D4\50\A6\18\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_arena_used()\0A\00", align 8
+@.str_738 = private unnamed_addr constant [54 x i8] c"\D6\A0\8A\2A\00\00\00\00\25\00\00\00\00\00\00\00declare i64 @orion_arena_rewind(i64)\0A\00", align 8
+@.str_739 = private unnamed_addr constant [49 x i8] c"\69\22\A3\14\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_arena_high()\0A\00", align 8
+@.str_740 = private unnamed_addr constant [50 x i8] c"\1F\78\A4\1C\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_alloc_total()\0A\00", align 8
+@.str_741 = private unnamed_addr constant [48 x i8] c"\57\D7\0B\17\00\00\00\00\1F\00\00\00\00\00\00\00declare i64 @orion_arena_cap()\0A\00", align 8
+@.str_742 = private unnamed_addr constant [49 x i8] c"\DD\B1\FE\17\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_frame_high()\0A\00", align 8
+@.str_743 = private unnamed_addr constant [48 x i8] c"\11\9C\85\12\00\00\00\00\1F\00\00\00\00\00\00\00declare i64 @orion_frame_cap()\0A\00", align 8
+@.str_744 = private unnamed_addr constant [51 x i8] c"\F1\60\2C\18\00\00\00\00\22\00\00\00\00\00\00\00declare i64 @orion_pool_used(i64)\0A\00", align 8
+@.str_745 = private unnamed_addr constant [55 x i8] c"\78\64\BC\38\00\00\00\00\26\00\00\00\00\00\00\00declare i64 @orion_pool_pressure(i64)\0A\00", align 8
+@.str_746 = private unnamed_addr constant [52 x i8] c"\B7\3F\37\21\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_ledger_tag(ptr)\0A\00", align 8
+@.str_747 = private unnamed_addr constant [49 x i8] c"\D1\DE\73\30\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_ledger_off()\0A\00", align 8
+@.str_748 = private unnamed_addr constant [50 x i8] c"\60\7C\8A\15\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_ledger_dump()\0A\00", align 8
+@.str_749 = private unnamed_addr constant [51 x i8] c"\40\D1\A8\33\00\00\00\00\22\00\00\00\00\00\00\00declare i64 @orion_pool_high(i64)\0A\00", align 8
+@.str_750 = private unnamed_addr constant [50 x i8] c"\72\5B\C5\30\00\00\00\00\21\00\00\00\00\00\00\00declare i64 @orion_pool_cap(i64)\0A\00", align 8
+@.str_751 = private unnamed_addr constant [52 x i8] c"\F8\E4\39\1C\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_os_private_kb()\0A\00", align 8
+@.str_752 = private unnamed_addr constant [52 x i8] c"\BC\48\73\30\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_console_color()\0A\00", align 8
+@.str_753 = private unnamed_addr constant [57 x i8] c"\7B\F9\EC\04\00\00\00\00\28\00\00\00\00\00\00\00declare i64 @orion_alloc_malloc_total()\0A\00", align 8
+@.str_754 = private unnamed_addr constant [54 x i8] c"\DE\0E\11\36\00\00\00\00\25\00\00\00\00\00\00\00declare i64 @orion_embedded_has(ptr)\0A\00", align 8
+@.str_755 = private unnamed_addr constant [55 x i8] c"\09\0C\87\38\00\00\00\00\26\00\00\00\00\00\00\00declare ptr @orion_embedded_text(ptr)\0A\00", align 8
+@.str_756 = private unnamed_addr constant [52 x i8] c"\8D\CF\9A\24\00\00\00\00\23\00\00\00\00\00\00\00declare ptr @orion_embedded_list()\0A\00", align 8
+@.str_757 = private unnamed_addr constant [50 x i8] c"\49\0D\C2\12\00\00\00\00\21\00\00\00\00\00\00\00declare ptr @orion_dir_list(ptr)\0A\00", align 8
+@.str_758 = private unnamed_addr constant [53 x i8] c"\02\D1\72\2B\00\00\00\00\24\00\00\00\00\00\00\00declare ptr @orion_dir_subdirs(ptr)\0A\00", align 8
+@.str_759 = private unnamed_addr constant [55 x i8] c"\00\70\F8\05\00\00\00\00\26\00\00\00\00\00\00\00declare ptr @orion_console_readline()\0A\00", align 8
+@.str_760 = private unnamed_addr constant [50 x i8] c"\32\6B\32\16\00\00\00\00\21\00\00\00\00\00\00\00declare ptr @orion_key_copy(ptr)\0A\00", align 8
+@.str_761 = private unnamed_addr constant [52 x i8] c"\45\C8\75\1E\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_file_stamp(ptr)\0A\00", align 8
+@.str_762 = private unnamed_addr constant [49 x i8] c"\AA\16\59\11\00\00\00\00\20\00\00\00\00\00\00\00declare i64 @orion_audio_init()\0A\00", align 8
+@.str_763 = private unnamed_addr constant [52 x i8] c"\0A\A2\C6\2A\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_audio_load(ptr)\0A\00", align 8
+@.str_764 = private unnamed_addr constant [72 x i8] c"\ED\B5\F8\05\00\00\00\00\37\00\00\00\00\00\00\00declare i64 @orion_audio_play(i64, i64, i64, i64, i64)\0A\00", align 8
+@.str_765 = private unnamed_addr constant [77 x i8] c"\F7\57\92\0B\00\00\00\00\3C\00\00\00\00\00\00\00declare i64 @orion_audio_loop(i64, i64, i64, i64, i64, i64)\0A\00", align 8
+@.str_766 = private unnamed_addr constant [68 x i8] c"\2F\1E\70\18\00\00\00\00\33\00\00\00\00\00\00\00declare i64 @orion_audio_voice_gain(i64, i64, i64)\0A\00", align 8
+@.str_767 = private unnamed_addr constant [63 x i8] c"\CC\F3\5C\3A\00\00\00\00\2E\00\00\00\00\00\00\00declare i64 @orion_audio_stop_voice(i64, i64)\0A\00", align 8
+@.str_768 = private unnamed_addr constant [63 x i8] c"\C9\03\BF\00\00\00\00\00\2E\00\00\00\00\00\00\00declare i64 @orion_audio_music(i64, i64, i64)\0A\00", align 8
+@.str_769 = private unnamed_addr constant [63 x i8] c"\7F\02\DD\1A\00\00\00\00\2E\00\00\00\00\00\00\00declare i64 @orion_audio_layer(i64, i64, i64)\0A\00", align 8
+@.str_770 = private unnamed_addr constant [58 x i8] c"\7A\9E\8A\12\00\00\00\00\29\00\00\00\00\00\00\00declare i64 @orion_audio_stop_music(i64)\0A\00", align 8
+@.str_771 = private unnamed_addr constant [66 x i8] c"\58\DA\3D\26\00\00\00\00\31\00\00\00\00\00\00\00declare i64 @orion_audio_bus_gain(i64, i64, i64)\0A\00", align 8
+@.str_772 = private unnamed_addr constant [52 x i8] c"\12\82\DB\3A\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @orion_audio_playing()\0A\00", align 8
+@.str_773 = private unnamed_addr constant [56 x i8] c"\25\9E\AB\20\00\00\00\00\27\00\00\00\00\00\00\00declare i64 @orion_audio_debug_plays()\0A\00", align 8
+@.str_774 = private unnamed_addr constant [54 x i8] c"\0A\8B\42\2D\00\00\00\00\25\00\00\00\00\00\00\00declare void @orion_audio_shutdown()\0A\00", align 8
+@.str_775 = private unnamed_addr constant [63 x i8] c"\04\34\D3\2D\00\00\00\00\2E\00\00\00\00\00\00\00declare void @orion_arena_ptr_guard(ptr, ptr)\0A\00", align 8
+@.str_776 = private unnamed_addr constant [61 x i8] c"\56\F9\C4\05\00\00\00\00\2C\00\00\00\00\00\00\00declare ptr @orion_slot_evac(ptr, ptr, i64)\0A\00", align 8
+@.str_777 = private unnamed_addr constant [58 x i8] c"\3C\5E\3F\2B\00\00\00\00\29\00\00\00\00\00\00\00declare void @orion_crumb(ptr, ptr, i64)\0A\00", align 8
+@.str_778 = private unnamed_addr constant [53 x i8] c"\E4\FA\16\2C\00\00\00\00\24\00\00\00\00\00\00\00declare void @orion_crumb_rule(ptr)\0A\00", align 8
+@.str_779 = private unnamed_addr constant [46 x i8] c"\41\16\CD\35\00\00\00\00\1D\00\00\00\00\00\00\00declare double @sqrt(double)\0A\00", align 8
+@.str_780 = private unnamed_addr constant [45 x i8] c"\1E\AE\6E\00\00\00\00\00\1C\00\00\00\00\00\00\00declare double @sin(double)\0A\00", align 8
+@.str_781 = private unnamed_addr constant [45 x i8] c"\F3\62\0A\22\00\00\00\00\1C\00\00\00\00\00\00\00declare double @cos(double)\0A\00", align 8
+@.str_782 = private unnamed_addr constant [45 x i8] c"\59\5E\CA\0A\00\00\00\00\1C\00\00\00\00\00\00\00declare double @tan(double)\0A\00", align 8
+@.str_783 = private unnamed_addr constant [45 x i8] c"\6D\DE\ED\24\00\00\00\00\1C\00\00\00\00\00\00\00declare double @exp(double)\0A\00", align 8
+@.str_784 = private unnamed_addr constant [45 x i8] c"\17\37\B2\22\00\00\00\00\1C\00\00\00\00\00\00\00declare double @log(double)\0A\00", align 8
+@.str_785 = private unnamed_addr constant [46 x i8] c"\7A\7F\17\1A\00\00\00\00\1D\00\00\00\00\00\00\00declare double @log2(double)\0A\00", align 8
+@.str_786 = private unnamed_addr constant [47 x i8] c"\AB\93\7B\29\00\00\00\00\1E\00\00\00\00\00\00\00declare double @floor(double)\0A\00", align 8
+@.str_787 = private unnamed_addr constant [46 x i8] c"\9A\9B\3B\00\00\00\00\00\1D\00\00\00\00\00\00\00declare double @ceil(double)\0A\00", align 8
+@.str_788 = private unnamed_addr constant [47 x i8] c"\F0\BB\02\32\00\00\00\00\1E\00\00\00\00\00\00\00declare double @round(double)\0A\00", align 8
+@.str_789 = private unnamed_addr constant [55 x i8] c"\06\0F\04\2A\00\00\00\00\26\00\00\00\00\00\00\00declare double @atan2(double, double)\0A\00", align 8
+@.str_790 = private unnamed_addr constant [53 x i8] c"\18\74\4B\33\00\00\00\00\24\00\00\00\00\00\00\00declare double @pow(double, double)\0A\00", align 8
+@.str_791 = private unnamed_addr constant [49 x i8] c"\76\D2\D8\11\00\00\00\00\20\00\00\00\00\00\00\00@orion_err_count = global i64 0\0A\00", align 8
+@.str_792 = private unnamed_addr constant [48 x i8] c"\0E\D5\29\09\00\00\00\00\1F\00\00\00\00\00\00\00define i64 @orion_err_bump() {\0A\00", align 8
+@.str_793 = private unnamed_addr constant [24 x i8] c"\63\A0\8E\35\00\00\00\00\07\00\00\00\00\00\00\00entry:\0A\00", align 8
+@.str_794 = private unnamed_addr constant [55 x i8] c"\FA\AC\4F\17\00\00\00\00\26\00\00\00\00\00\00\00  %n = load i64, ptr @orion_err_count\0A\00", align 8
+@.str_795 = private unnamed_addr constant [39 x i8] c"\47\94\72\18\00\00\00\00\16\00\00\00\00\00\00\00  %n1 = add i64 %n, 1\0A\00", align 8
+@.str_796 = private unnamed_addr constant [55 x i8] c"\64\E1\84\03\00\00\00\00\26\00\00\00\00\00\00\00  store i64 %n1, ptr @orion_err_count\0A\00", align 8
+@.str_797 = private unnamed_addr constant [31 x i8] c"\65\A4\75\01\00\00\00\00\0E\00\00\00\00\00\00\00  ret i64 %n1\0A\00", align 8
+@.str_798 = private unnamed_addr constant [47 x i8] c"\DA\7B\05\35\00\00\00\00\1E\00\00\00\00\00\00\00define i64 @orion_err_get() {\0A\00", align 8
+@.str_799 = private unnamed_addr constant [30 x i8] c"\2D\E0\79\0A\00\00\00\00\0D\00\00\00\00\00\00\00  ret i64 %n\0A\00", align 8
+@.str_800 = private unnamed_addr constant [20 x i8] c"\40\83\E8\05\00\00\00\00\03\00\00\00\00\00\00\00}\0A\0A\00", align 8
+@.str_801 = private unnamed_addr constant [59 x i8] c"\9C\45\7D\1B\00\00\00\00\2A\00\00\00\00\00\00\00define ptr @orion_text_join(ptr %parts) {\0A\00", align 8
+@.str_802 = private unnamed_addr constant [61 x i8] c"\CC\DD\39\03\00\00\00\00\2C\00\00\00\00\00\00\00  %n = call i64 @orion_list_len(ptr %parts)\0A\00", align 8
+@.str_803 = private unnamed_addr constant [37 x i8] c"\6E\04\42\35\00\00\00\00\14\00\00\00\00\00\00\00  br label %sum_hdr\0A\00", align 8
+@.str_804 = private unnamed_addr constant [26 x i8] c"\C1\71\70\36\00\00\00\00\09\00\00\00\00\00\00\00sum_hdr:\0A\00", align 8
+@.str_805 = private unnamed_addr constant [69 x i8] c"\AD\B6\67\13\00\00\00\00\34\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %i_next, %sum_bdy ]\0A\00", align 8
+@.str_806 = private unnamed_addr constant [77 x i8] c"\BF\C0\CA\0C\00\00\00\00\3C\00\00\00\00\00\00\00  %total = phi i64 [ 0, %entry ], [ %total_next, %sum_bdy ]\0A\00", align 8
+@.str_807 = private unnamed_addr constant [47 x i8] c"\A7\6D\65\0A\00\00\00\00\1E\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %n\0A\00", align 8
+@.str_808 = private unnamed_addr constant [61 x i8] c"\3B\95\A0\16\00\00\00\00\2C\00\00\00\00\00\00\00  br i1 %done, label %alloc, label %sum_bdy\0A\00", align 8
+@.str_809 = private unnamed_addr constant [26 x i8] c"\21\CB\BA\08\00\00\00\00\09\00\00\00\00\00\00\00sum_bdy:\0A\00", align 8
+@.str_810 = private unnamed_addr constant [72 x i8] c"\5F\99\96\28\00\00\00\00\37\00\00\00\00\00\00\00  %p_int = call i64 @orion_list_at(ptr %parts, i64 %i)\0A\00", align 8
+@.str_811 = private unnamed_addr constant [51 x i8] c"\F8\33\9F\1A\00\00\00\00\22\00\00\00\00\00\00\00  %p = inttoptr i64 %p_int to ptr\0A\00", align 8
+@.str_812 = private unnamed_addr constant [53 x i8] c"\AF\EA\22\36\00\00\00\00\24\00\00\00\00\00\00\00  %l = call i64 @orion_tlen(ptr %p)\0A\00", align 8
+@.str_813 = private unnamed_addr constant [52 x i8] c"\56\36\39\03\00\00\00\00\23\00\00\00\00\00\00\00  %total_next = add i64 %total, %l\0A\00", align 8
+@.str_814 = private unnamed_addr constant [43 x i8] c"\9C\57\DC\1E\00\00\00\00\1A\00\00\00\00\00\00\00  %i_next = add i64 %i, 1\0A\00", align 8
+@.str_815 = private unnamed_addr constant [24 x i8] c"\EB\6C\27\2B\00\00\00\00\07\00\00\00\00\00\00\00alloc:\0A\00", align 8
+@.str_816 = private unnamed_addr constant [46 x i8] c"\EB\91\A9\19\00\00\00\00\1D\00\00\00\00\00\00\00  %bufsz = add i64 %total, 1\0A\00", align 8
+@.str_817 = private unnamed_addr constant [65 x i8] c"\3D\EC\45\22\00\00\00\00\30\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %total)\0A\00", align 8
+@.str_818 = private unnamed_addr constant [36 x i8] c"\DB\9A\EF\23\00\00\00\00\13\00\00\00\00\00\00\00  br label %cp_hdr\0A\00", align 8
+@.str_819 = private unnamed_addr constant [25 x i8] c"\B6\06\56\08\00\00\00\00\08\00\00\00\00\00\00\00cp_hdr:\0A\00", align 8
+@.str_820 = private unnamed_addr constant [68 x i8] c"\7F\7E\34\29\00\00\00\00\33\00\00\00\00\00\00\00  %j = phi i64 [ 0, %alloc ], [ %j_next, %cp_bdy ]\0A\00", align 8
+@.str_821 = private unnamed_addr constant [72 x i8] c"\1E\0F\93\25\00\00\00\00\37\00\00\00\00\00\00\00  %off = phi i64 [ 0, %alloc ], [ %off_next, %cp_bdy ]\0A\00", align 8
+@.str_822 = private unnamed_addr constant [50 x i8] c"\30\70\D9\36\00\00\00\00\21\00\00\00\00\00\00\00  %cp_done = icmp sge i64 %j, %n\0A\00", align 8
+@.str_823 = private unnamed_addr constant [61 x i8] c"\B3\CD\C7\27\00\00\00\00\2C\00\00\00\00\00\00\00  br i1 %cp_done, label %fin, label %cp_bdy\0A\00", align 8
+@.str_824 = private unnamed_addr constant [25 x i8] c"\1D\2A\3B\16\00\00\00\00\08\00\00\00\00\00\00\00cp_bdy:\0A\00", align 8
+@.str_825 = private unnamed_addr constant [72 x i8] c"\36\25\37\07\00\00\00\00\37\00\00\00\00\00\00\00  %q_int = call i64 @orion_list_at(ptr %parts, i64 %j)\0A\00", align 8
+@.str_826 = private unnamed_addr constant [51 x i8] c"\89\22\38\30\00\00\00\00\22\00\00\00\00\00\00\00  %q = inttoptr i64 %q_int to ptr\0A\00", align 8
+@.str_827 = private unnamed_addr constant [54 x i8] c"\31\D8\3D\26\00\00\00\00\25\00\00\00\00\00\00\00  %ql = call i64 @orion_tlen(ptr %q)\0A\00", align 8
+@.str_828 = private unnamed_addr constant [63 x i8] c"\BF\8E\03\15\00\00\00\00\2E\00\00\00\00\00\00\00  %dst = getelementptr i8, ptr %buf, i64 %off\0A\00", align 8
+@.str_829 = private unnamed_addr constant [69 x i8] c"\27\3C\C0\1F\00\00\00\00\34\00\00\00\00\00\00\00  %_c = call ptr @memcpy(ptr %dst, ptr %q, i64 %ql)\0A\00", align 8
+@.str_830 = private unnamed_addr constant [49 x i8] c"\30\D8\88\07\00\00\00\00\20\00\00\00\00\00\00\00  %off_next = add i64 %off, %ql\0A\00", align 8
+@.str_831 = private unnamed_addr constant [43 x i8] c"\A9\D5\31\26\00\00\00\00\1A\00\00\00\00\00\00\00  %j_next = add i64 %j, 1\0A\00", align 8
+@.str_832 = private unnamed_addr constant [22 x i8] c"\68\3B\5B\1E\00\00\00\00\05\00\00\00\00\00\00\00fin:\0A\00", align 8
+@.str_833 = private unnamed_addr constant [66 x i8] c"\01\02\14\32\00\00\00\00\31\00\00\00\00\00\00\00  %term = getelementptr i8, ptr %buf, i64 %total\0A\00", align 8
+@.str_834 = private unnamed_addr constant [41 x i8] c"\E1\8E\CD\08\00\00\00\00\18\00\00\00\00\00\00\00  store i8 0, ptr %term\0A\00", align 8
+@.str_835 = private unnamed_addr constant [32 x i8] c"\94\78\DF\05\00\00\00\00\0F\00\00\00\00\00\00\00  ret ptr %buf\0A\00", align 8
+@.str_836 = private unnamed_addr constant [42 x i8] c"\A7\65\EF\2B\00\00\00\00\19\00\00\00\00\00\00\00declare i64 @strlen(ptr)\0A\00", align 8
+@.str_837 = private unnamed_addr constant [52 x i8] c"\D9\68\82\2A\00\00\00\00\23\00\00\00\00\00\00\00declare ptr @orion_text_alloc(i64)\0A\00", align 8
+@.str_838 = private unnamed_addr constant [51 x i8] c"\18\DE\ED\04\00\00\00\00\22\00\00\00\00\00\00\00declare ptr @orion_text_seal(ptr)\0A\00", align 8
+@.str_839 = private unnamed_addr constant [53 x i8] c"\DF\EC\2D\0C\00\00\00\00\24\00\00\00\00\00\00\00declare ptr @orion_text_from_c(ptr)\0A\00", align 8
+@.str_840 = private unnamed_addr constant [51 x i8] c"\22\96\99\13\00\00\00\00\22\00\00\00\00\00\00\00declare i64 @orion_text_hash(ptr)\0A\00", align 8
+@.str_841 = private unnamed_addr constant [50 x i8] c"\89\3C\38\0D\00\00\00\00\21\00\00\00\00\00\00\00define i64 @orion_tlen(ptr %p) {\0A\00", align 8
+@.str_842 = private unnamed_addr constant [58 x i8] c"\F7\BF\E0\24\00\00\00\00\29\00\00\00\00\00\00\00  %hp = getelementptr i8, ptr %p, i64 -8\0A\00", align 8
+@.str_843 = private unnamed_addr constant [42 x i8] c"\2C\A7\94\2B\00\00\00\00\19\00\00\00\00\00\00\00  %l = load i64, ptr %hp\0A\00", align 8
+@.str_844 = private unnamed_addr constant [30 x i8] c"\27\DF\79\0A\00\00\00\00\0D\00\00\00\00\00\00\00  ret i64 %l\0A\00", align 8
+@.str_845 = private unnamed_addr constant [52 x i8] c"\14\85\C0\13\00\00\00\00\23\00\00\00\00\00\00\00declare i32 @memcmp(ptr, ptr, i64)\0A\00", align 8
+@.str_846 = private unnamed_addr constant [61 x i8] c"\B7\79\8A\04\00\00\00\00\2C\00\00\00\00\00\00\00define i64 @orion_text_eq(ptr %a, ptr %b) {\0A\00", align 8
+@.str_847 = private unnamed_addr constant [46 x i8] c"\EB\57\32\26\00\00\00\00\1D\00\00\00\00\00\00\00  %same = icmp eq ptr %a, %b\0A\00", align 8
+@.str_848 = private unnamed_addr constant [59 x i8] c"\A7\51\56\0F\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %same, label %yes, label %len_chk\0A\00", align 8
+@.str_849 = private unnamed_addr constant [26 x i8] c"\3A\BA\04\1B\00\00\00\00\09\00\00\00\00\00\00\00len_chk:\0A\00", align 8
+@.str_850 = private unnamed_addr constant [60 x i8] c"\1B\29\7F\05\00\00\00\00\2B\00\00\00\00\00\00\00  %la_p = getelementptr i8, ptr %a, i64 -8\0A\00", align 8
+@.str_851 = private unnamed_addr constant [60 x i8] c"\6A\A2\56\16\00\00\00\00\2B\00\00\00\00\00\00\00  %lb_p = getelementptr i8, ptr %b, i64 -8\0A\00", align 8
+@.str_852 = private unnamed_addr constant [45 x i8] c"\56\20\82\1D\00\00\00\00\1C\00\00\00\00\00\00\00  %la = load i64, ptr %la_p\0A\00", align 8
+@.str_853 = private unnamed_addr constant [45 x i8] c"\BF\FF\2C\02\00\00\00\00\1C\00\00\00\00\00\00\00  %lb = load i64, ptr %lb_p\0A\00", align 8
+@.str_854 = private unnamed_addr constant [50 x i8] c"\77\9B\3B\15\00\00\00\00\21\00\00\00\00\00\00\00  %len_ne = icmp ne i64 %la, %lb\0A\00", align 8
+@.str_855 = private unnamed_addr constant [59 x i8] c"\B5\00\74\18\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %len_ne, label %no, label %ha_chk\0A\00", align 8
+@.str_856 = private unnamed_addr constant [25 x i8] c"\5D\F5\ED\03\00\00\00\00\08\00\00\00\00\00\00\00ha_chk:\0A\00", align 8
+@.str_857 = private unnamed_addr constant [61 x i8] c"\38\1C\D1\0C\00\00\00\00\2C\00\00\00\00\00\00\00  %ha_p = getelementptr i8, ptr %a, i64 -16\0A\00", align 8
+@.str_858 = private unnamed_addr constant [46 x i8] c"\C0\93\74\3B\00\00\00\00\1D\00\00\00\00\00\00\00  %ha0 = load i64, ptr %ha_p\0A\00", align 8
+@.str_859 = private unnamed_addr constant [50 x i8] c"\88\AA\6C\28\00\00\00\00\21\00\00\00\00\00\00\00  %ha_miss = icmp eq i64 %ha0, 0\0A\00", align 8
+@.str_860 = private unnamed_addr constant [65 x i8] c"\3F\C8\11\16\00\00\00\00\30\00\00\00\00\00\00\00  br i1 %ha_miss, label %ha_fill, label %hb_chk\0A\00", align 8
+@.str_861 = private unnamed_addr constant [26 x i8] c"\D4\C9\14\28\00\00\00\00\09\00\00\00\00\00\00\00ha_fill:\0A\00", align 8
+@.str_862 = private unnamed_addr constant [60 x i8] c"\C3\95\87\15\00\00\00\00\2B\00\00\00\00\00\00\00  %ha1 = call i64 @orion_text_hash(ptr %a)\0A\00", align 8
+@.str_863 = private unnamed_addr constant [36 x i8] c"\20\E2\A5\02\00\00\00\00\13\00\00\00\00\00\00\00  br label %hb_chk\0A\00", align 8
+@.str_864 = private unnamed_addr constant [25 x i8] c"\0B\E5\5A\3A\00\00\00\00\08\00\00\00\00\00\00\00hb_chk:\0A\00", align 8
+@.str_865 = private unnamed_addr constant [71 x i8] c"\10\5A\08\37\00\00\00\00\36\00\00\00\00\00\00\00  %ha = phi i64 [ %ha0, %ha_chk ], [ %ha1, %ha_fill ]\0A\00", align 8
+@.str_866 = private unnamed_addr constant [61 x i8] c"\A2\FC\B4\0D\00\00\00\00\2C\00\00\00\00\00\00\00  %hb_p = getelementptr i8, ptr %b, i64 -16\0A\00", align 8
+@.str_867 = private unnamed_addr constant [46 x i8] c"\69\D7\C0\25\00\00\00\00\1D\00\00\00\00\00\00\00  %hb0 = load i64, ptr %hb_p\0A\00", align 8
+@.str_868 = private unnamed_addr constant [50 x i8] c"\00\CA\75\1C\00\00\00\00\21\00\00\00\00\00\00\00  %hb_miss = icmp eq i64 %hb0, 0\0A\00", align 8
+@.str_869 = private unnamed_addr constant [64 x i8] c"\84\4D\6F\22\00\00\00\00\2F\00\00\00\00\00\00\00  br i1 %hb_miss, label %hb_fill, label %h_cmp\0A\00", align 8
+@.str_870 = private unnamed_addr constant [26 x i8] c"\96\BC\44\11\00\00\00\00\09\00\00\00\00\00\00\00hb_fill:\0A\00", align 8
+@.str_871 = private unnamed_addr constant [60 x i8] c"\B1\BF\D7\2B\00\00\00\00\2B\00\00\00\00\00\00\00  %hb1 = call i64 @orion_text_hash(ptr %b)\0A\00", align 8
+@.str_872 = private unnamed_addr constant [35 x i8] c"\45\24\2E\29\00\00\00\00\12\00\00\00\00\00\00\00  br label %h_cmp\0A\00", align 8
+@.str_873 = private unnamed_addr constant [24 x i8] c"\DA\8A\4A\37\00\00\00\00\07\00\00\00\00\00\00\00h_cmp:\0A\00", align 8
+@.str_874 = private unnamed_addr constant [71 x i8] c"\85\85\F5\0F\00\00\00\00\36\00\00\00\00\00\00\00  %hb = phi i64 [ %hb0, %hb_chk ], [ %hb1, %hb_fill ]\0A\00", align 8
+@.str_875 = private unnamed_addr constant [48 x i8] c"\3F\36\FD\0F\00\00\00\00\1F\00\00\00\00\00\00\00  %h_ne = icmp ne i64 %ha, %hb\0A\00", align 8
+@.str_876 = private unnamed_addr constant [56 x i8] c"\09\12\D0\30\00\00\00\00\27\00\00\00\00\00\00\00  br i1 %h_ne, label %no, label %bytes\0A\00", align 8
+@.str_877 = private unnamed_addr constant [24 x i8] c"\AB\84\0E\1E\00\00\00\00\07\00\00\00\00\00\00\00bytes:\0A\00", align 8
+@.str_878 = private unnamed_addr constant [67 x i8] c"\ED\7F\A2\0D\00\00\00\00\32\00\00\00\00\00\00\00  %mc = call i32 @memcmp(ptr %a, ptr %b, i64 %la)\0A\00", align 8
+@.str_879 = private unnamed_addr constant [45 x i8] c"\91\9C\BB\34\00\00\00\00\1C\00\00\00\00\00\00\00  %beq = icmp eq i32 %mc, 0\0A\00", align 8
+@.str_880 = private unnamed_addr constant [44 x i8] c"\21\ED\1E\1F\00\00\00\00\1B\00\00\00\00\00\00\00  %r = zext i1 %beq to i64\0A\00", align 8
+@.str_881 = private unnamed_addr constant [30 x i8] c"\39\E2\79\0A\00\00\00\00\0D\00\00\00\00\00\00\00  ret i64 %r\0A\00", align 8
+@.str_882 = private unnamed_addr constant [22 x i8] c"\02\20\B7\05\00\00\00\00\05\00\00\00\00\00\00\00yes:\0A\00", align 8
+@.str_883 = private unnamed_addr constant [29 x i8] c"\F5\BF\75\10\00\00\00\00\0C\00\00\00\00\00\00\00  ret i64 1\0A\00", align 8
+@.str_884 = private unnamed_addr constant [21 x i8] c"\7E\B0\D1\38\00\00\00\00\04\00\00\00\00\00\00\00no:\0A\00", align 8
+@.str_885 = private unnamed_addr constant [29 x i8] c"\72\BF\75\10\00\00\00\00\0C\00\00\00\00\00\00\00  ret i64 0\0A\00", align 8
+@.str_886 = private unnamed_addr constant [47 x i8] c"\ED\0A\AD\32\00\00\00\00\1E\00\00\00\00\00\00\00declare ptr @strcpy(ptr, ptr)\0A\00", align 8
+@.str_887 = private unnamed_addr constant [47 x i8] c"\3B\C0\43\25\00\00\00\00\1E\00\00\00\00\00\00\00declare ptr @strcat(ptr, ptr)\0A\00", align 8
+@.str_888 = private unnamed_addr constant [47 x i8] c"\70\2C\72\0A\00\00\00\00\1E\00\00\00\00\00\00\00declare i32 @strcmp(ptr, ptr)\0A\00", align 8
+@.str_889 = private unnamed_addr constant [59 x i8] c"\6B\AA\58\07\00\00\00\00\2A\00\00\00\00\00\00\00declare i32 @snprintf(ptr, i64, ptr, ...)\0A\00", align 8
+@.str_890 = private unnamed_addr constant [60 x i8] c"\8C\F8\0C\15\00\00\00\00\2B\00\00\00\00\00\00\00declare i64 @__orion_perform_int(ptr, i64)\0A\00", align 8
+@.str_891 = private unnamed_addr constant [55 x i8] c"\57\6B\60\36\00\00\00\00\26\00\00\00\00\00\00\00declare void @__orion_resume_int(i64)\0A\00", align 8
+@.str_892 = private unnamed_addr constant [61 x i8] c"\15\E2\C6\2D\00\00\00\00\2C\00\00\00\00\00\00\00declare ptr @__orion_perform_text(ptr, ptr)\0A\00", align 8
+@.str_893 = private unnamed_addr constant [56 x i8] c"\57\36\01\0A\00\00\00\00\27\00\00\00\00\00\00\00declare void @__orion_resume_text(ptr)\0A\00", align 8
+@.str_894 = private unnamed_addr constant [52 x i8] c"\FC\E9\81\27\00\00\00\00\23\00\00\00\00\00\00\00declare i64 @__orion_time_now_ms()\0A\00", align 8
+@.str_895 = private unnamed_addr constant [53 x i8] c"\4D\AF\A6\08\00\00\00\00\24\00\00\00\00\00\00\00declare i64 @__orion_monotonic_ms()\0A\00", align 8
+@.str_896 = private unnamed_addr constant [53 x i8] c"\A8\14\38\14\00\00\00\00\24\00\00\00\00\00\00\00declare void @__orion_sleep_ms(i64)\0A\00", align 8
+@.str_897 = private unnamed_addr constant [82 x i8] c"\F6\4A\19\24\00\00\00\00\41\00\00\00\00\00\00\00@.fmt_int = private unnamed_addr constant [6 x i8] c\22%lld\5C0A\5C00\22\0A\00", align 8
+@.str_898 = private unnamed_addr constant [82 x i8] c"\A4\E4\4B\01\00\00\00\00\41\00\00\00\00\00\00\00@.fmt_float = private unnamed_addr constant [4 x i8] c\22%g\5C0A\5C00\22\0A\00", align 8
+@.str_899 = private unnamed_addr constant [75 x i8] c"\4E\C7\88\20\00\00\00\00\3A\00\00\00\00\00\00\00@.fmt_g = private unnamed_addr constant [3 x i8] c\22%g\5C00\22\0A\00", align 8
+@.str_900 = private unnamed_addr constant [83 x i8] c"\26\AD\6C\33\00\00\00\00\42\00\00\00\00\00\00\00@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\22%lld\5C00\22\0A\00", align 8
+@.str_901 = private unnamed_addr constant [65 x i8] c"\8D\D4\CA\24\00\00\00\00\30\00\00\00\00\00\00\00define ptr @orion_text_concat(ptr %a, ptr %b) {\0A\00", align 8
+@.str_902 = private unnamed_addr constant [54 x i8] c"\BD\D6\8F\13\00\00\00\00\25\00\00\00\00\00\00\00  %la = call i64 @orion_tlen(ptr %a)\0A\00", align 8
+@.str_903 = private unnamed_addr constant [54 x i8] c"\DF\4C\70\00\00\00\00\00\25\00\00\00\00\00\00\00  %lb = call i64 @orion_tlen(ptr %b)\0A\00", align 8
+@.str_904 = private unnamed_addr constant [43 x i8] c"\44\AE\D4\28\00\00\00\00\1A\00\00\00\00\00\00\00  %sum = add i64 %la, %lb\0A\00", align 8
+@.str_905 = private unnamed_addr constant [63 x i8] c"\51\43\EA\06\00\00\00\00\2E\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %sum)\0A\00", align 8
+@.str_906 = private unnamed_addr constant [60 x i8] c"\C5\CF\4A\37\00\00\00\00\2B\00\00\00\00\00\00\00  %_1 = call ptr @strcpy(ptr %buf, ptr %a)\0A\00", align 8
+@.str_907 = private unnamed_addr constant [60 x i8] c"\33\3D\6F\00\00\00\00\00\2B\00\00\00\00\00\00\00  %_2 = call ptr @strcat(ptr %buf, ptr %b)\0A\00", align 8
+@.str_908 = private unnamed_addr constant [57 x i8] c"\78\06\24\06\00\00\00\00\28\00\00\00\00\00\00\00define ptr @orion_int_to_text(i64 %n) {\0A\00", align 8
+@.str_909 = private unnamed_addr constant [61 x i8] c"\FC\FC\43\21\00\00\00\00\2C\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 31)\0A\00", align 8
+@.str_910 = private unnamed_addr constant [109 x i8] c"\26\09\20\0D\00\00\00\00\5C\00\00\00\00\00\00\00  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)\0A\00", align 8
+@.str_911 = private unnamed_addr constant [65 x i8] c"\0F\BB\73\37\00\00\00\00\30\00\00\00\00\00\00\00  %sealed = call ptr @orion_text_seal(ptr %buf)\0A\00", align 8
+@.str_912 = private unnamed_addr constant [35 x i8] c"\26\DC\1E\2B\00\00\00\00\12\00\00\00\00\00\00\00  ret ptr %sealed\0A\00", align 8
+@.str_913 = private unnamed_addr constant [53 x i8] c"\AA\EB\5D\38\00\00\00\00\24\00\00\00\00\00\00\00declare ptr @memcpy(ptr, ptr, i64)\0A\0A\00", align 8
+@.str_914 = private unnamed_addr constant [76 x i8] c"\A4\4A\43\00\00\00\00\00\3B\00\00\00\00\00\00\00define ptr @orion_text_slice(ptr %src, i64 %lo, i64 %hi) {\0A\00", align 8
+@.str_915 = private unnamed_addr constant [61 x i8] c"\EF\EC\8A\1A\00\00\00\00\2C\00\00\00\00\00\00\00  %src_len = call i64 @orion_tlen(ptr %src)\0A\00", align 8
+@.str_916 = private unnamed_addr constant [49 x i8] c"\00\05\98\0D\00\00\00\00\20\00\00\00\00\00\00\00  %lo_neg = icmp slt i64 %lo, 0\0A\00", align 8
+@.str_917 = private unnamed_addr constant [64 x i8] c"\E9\17\ED\2E\00\00\00\00\2F\00\00\00\00\00\00\00  %lo_safe = select i1 %lo_neg, i64 0, i64 %lo\0A\00", align 8
+@.str_918 = private unnamed_addr constant [56 x i8] c"\FF\54\3F\17\00\00\00\00\27\00\00\00\00\00\00\00  %hi_big = icmp sgt i64 %hi, %src_len\0A\00", align 8
+@.str_919 = private unnamed_addr constant [71 x i8] c"\D7\37\87\0B\00\00\00\00\36\00\00\00\00\00\00\00  %hi_safe = select i1 %hi_big, i64 %src_len, i64 %hi\0A\00", align 8
+@.str_920 = private unnamed_addr constant [63 x i8] c"\9D\F6\1E\21\00\00\00\00\2E\00\00\00\00\00\00\00  %hi_lt_lo = icmp slt i64 %hi_safe, %lo_safe\0A\00", align 8
+@.str_921 = private unnamed_addr constant [79 x i8] c"\B7\25\CD\15\00\00\00\00\3E\00\00\00\00\00\00\00  %hi_final = select i1 %hi_lt_lo, i64 %lo_safe, i64 %hi_safe\0A\00", align 8
+@.str_922 = private unnamed_addr constant [60 x i8] c"\7A\35\48\27\00\00\00\00\2B\00\00\00\00\00\00\00  %slice_len = sub i64 %hi_final, %lo_safe\0A\00", align 8
+@.str_923 = private unnamed_addr constant [69 x i8] c"\0C\C7\3E\00\00\00\00\00\34\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %slice_len)\0A\00", align 8
+@.str_924 = private unnamed_addr constant [71 x i8] c"\54\E3\97\0A\00\00\00\00\36\00\00\00\00\00\00\00  %src_off = getelementptr i8, ptr %src, i64 %lo_safe\0A\00", align 8
+@.str_925 = private unnamed_addr constant [81 x i8] c"\2E\9F\A0\3A\00\00\00\00\40\00\00\00\00\00\00\00  %_ = call ptr @memcpy(ptr %buf, ptr %src_off, i64 %slice_len)\0A\00", align 8
+@.str_926 = private unnamed_addr constant [70 x i8] c"\33\90\67\16\00\00\00\00\35\00\00\00\00\00\00\00  %term = getelementptr i8, ptr %buf, i64 %slice_len\0A\00", align 8
+@.str_927 = private unnamed_addr constant [48 x i8] c"\AD\D5\B4\26\00\00\00\00\1F\00\00\00\00\00\00\00declare ptr @strstr(ptr, ptr)\0A\0A\00", align 8
+@.str_928 = private unnamed_addr constant [74 x i8] c"\84\49\D8\1F\00\00\00\00\39\00\00\00\00\00\00\00define i64 @orion_text_contains(ptr %hay, ptr %needle) {\0A\00", align 8
+@.str_929 = private unnamed_addr constant [66 x i8] c"\5D\A1\30\28\00\00\00\00\31\00\00\00\00\00\00\00  %hit = call ptr @strstr(ptr %hay, ptr %needle)\0A\00", align 8
+@.str_930 = private unnamed_addr constant [53 x i8] c"\4D\98\3B\2B\00\00\00\00\24\00\00\00\00\00\00\00  %is_null = icmp eq ptr %hit, null\0A\00", align 8
+@.str_931 = private unnamed_addr constant [62 x i8] c"\25\33\EA\08\00\00\00\00\2D\00\00\00\00\00\00\00  %result = select i1 %is_null, i64 0, i64 1\0A\00", align 8
+@.str_932 = private unnamed_addr constant [35 x i8] c"\23\3B\E2\12\00\00\00\00\12\00\00\00\00\00\00\00  ret i64 %result\0A\00", align 8
+@.str_933 = private unnamed_addr constant [63 x i8] c"\92\50\3D\09\00\00\00\00\2E\00\00\00\00\00\00\00define ptr @orion_bytes_from_text(ptr %src) {\0A\00", align 8
+@.str_934 = private unnamed_addr constant [66 x i8] c"\29\FD\EF\2D\00\00\00\00\31\00\00\00\00\00\00\00  %list = call ptr @orion_list_new(i64 %src_len)\0A\00", align 8
+@.str_935 = private unnamed_addr constant [33 x i8] c"\F4\4C\C2\1B\00\00\00\00\10\00\00\00\00\00\00\00  br label %hdr\0A\00", align 8
+@.str_936 = private unnamed_addr constant [22 x i8] c"\20\66\31\05\00\00\00\00\05\00\00\00\00\00\00\00hdr:\0A\00", align 8
+@.str_937 = private unnamed_addr constant [65 x i8] c"\CF\EC\78\3B\00\00\00\00\30\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\0A\00", align 8
+@.str_938 = private unnamed_addr constant [53 x i8] c"\6A\4D\64\24\00\00\00\00\24\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %src_len\0A\00", align 8
+@.str_939 = private unnamed_addr constant [57 x i8] c"\95\47\49\36\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %done, label %after, label %bdy\0A\00", align 8
+@.str_940 = private unnamed_addr constant [22 x i8] c"\87\89\16\13\00\00\00\00\05\00\00\00\00\00\00\00bdy:\0A\00", align 8
+@.str_941 = private unnamed_addr constant [66 x i8] c"\89\D1\C1\18\00\00\00\00\31\00\00\00\00\00\00\00  %byte_ptr = getelementptr i8, ptr %src, i64 %i\0A\00", align 8
+@.str_942 = private unnamed_addr constant [50 x i8] c"\E9\64\5D\2D\00\00\00\00\21\00\00\00\00\00\00\00  %byte = load i8, ptr %byte_ptr\0A\00", align 8
+@.str_943 = private unnamed_addr constant [50 x i8] c"\19\83\24\04\00\00\00\00\21\00\00\00\00\00\00\00  %byte64 = zext i8 %byte to i64\0A\00", align 8
+@.str_944 = private unnamed_addr constant [77 x i8] c"\2C\F7\3A\37\00\00\00\00\3C\00\00\00\00\00\00\00  call void @orion_list_set(ptr %list, i64 %i, i64 %byte64)\0A\00", align 8
+@.str_945 = private unnamed_addr constant [24 x i8] c"\7D\F8\9E\22\00\00\00\00\07\00\00\00\00\00\00\00after:\0A\00", align 8
+@.str_946 = private unnamed_addr constant [33 x i8] c"\F6\F6\39\31\00\00\00\00\10\00\00\00\00\00\00\00  ret ptr %list\0A\00", align 8
+@.str_947 = private unnamed_addr constant [62 x i8] c"\2E\17\EA\06\00\00\00\00\2D\00\00\00\00\00\00\00define ptr @orion_bytes_to_text(ptr %list) {\0A\00", align 8
+@.str_948 = private unnamed_addr constant [67 x i8] c"\AC\0E\DA\22\00\00\00\00\32\00\00\00\00\00\00\00  %list_len = call i64 @orion_list_len(ptr %list)\0A\00", align 8
+@.str_949 = private unnamed_addr constant [68 x i8] c"\7E\CD\78\21\00\00\00\00\33\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %list_len)\0A\00", align 8
+@.str_950 = private unnamed_addr constant [54 x i8] c"\85\FB\73\15\00\00\00\00\25\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %list_len\0A\00", align 8
+@.str_951 = private unnamed_addr constant [69 x i8] c"\79\12\1D\23\00\00\00\00\34\00\00\00\00\00\00\00  %v64 = call i64 @orion_list_at(ptr %list, i64 %i)\0A\00", align 8
+@.str_952 = private unnamed_addr constant [46 x i8] c"\6C\8D\2A\2E\00\00\00\00\1D\00\00\00\00\00\00\00  %v8 = trunc i64 %v64 to i8\0A\00", align 8
+@.str_953 = private unnamed_addr constant [61 x i8] c"\F2\32\6F\14\00\00\00\00\2C\00\00\00\00\00\00\00  %dst = getelementptr i8, ptr %buf, i64 %i\0A\00", align 8
+@.str_954 = private unnamed_addr constant [42 x i8] c"\0E\BC\5D\32\00\00\00\00\19\00\00\00\00\00\00\00  store i8 %v8, ptr %dst\0A\00", align 8
+@.str_955 = private unnamed_addr constant [69 x i8] c"\77\E5\D9\03\00\00\00\00\34\00\00\00\00\00\00\00  %term = getelementptr i8, ptr %buf, i64 %list_len\0A\00", align 8
+@.str_956 = private unnamed_addr constant [57 x i8] c"\53\D1\B7\21\00\00\00\00\28\00\00\00\00\00\00\00define ptr @orion_bytes_zeros(i64 %n) {\0A\00", align 8
+@.str_957 = private unnamed_addr constant [60 x i8] c"\8E\CE\48\01\00\00\00\00\2B\00\00\00\00\00\00\00  %list = call ptr @orion_list_new(i64 %n)\0A\00", align 8
+@.str_958 = private unnamed_addr constant [71 x i8] c"\28\FB\78\10\00\00\00\00\36\00\00\00\00\00\00\00  call void @orion_list_set(ptr %list, i64 %i, i64 0)\0A\00", align 8
+@.str_959 = private unnamed_addr constant [77 x i8] c"\45\12\E2\17\00\00\00\00\3C\00\00\00\00\00\00\00define ptr @orion_bytes_slice(ptr %src, i64 %lo, i64 %hi) {\0A\00", align 8
+@.str_960 = private unnamed_addr constant [65 x i8] c"\7C\14\0B\03\00\00\00\00\30\00\00\00\00\00\00\00  %src_len = call i64 @orion_list_len(ptr %src)\0A\00", align 8
+@.str_961 = private unnamed_addr constant [60 x i8] c"\09\83\BE\19\00\00\00\00\2B\00\00\00\00\00\00\00  %hi_lt = icmp slt i64 %hi_safe, %lo_safe\0A\00", align 8
+@.str_962 = private unnamed_addr constant [76 x i8] c"\A9\48\75\27\00\00\00\00\3B\00\00\00\00\00\00\00  %hi_final = select i1 %hi_lt, i64 %lo_safe, i64 %hi_safe\0A\00", align 8
+@.str_963 = private unnamed_addr constant [58 x i8] c"\CC\A0\A3\30\00\00\00\00\29\00\00\00\00\00\00\00  %new_len = sub i64 %hi_final, %lo_safe\0A\00", align 8
+@.str_964 = private unnamed_addr constant [65 x i8] c"\0B\02\82\1D\00\00\00\00\30\00\00\00\00\00\00\00  %dst = call ptr @orion_list_new(i64 %new_len)\0A\00", align 8
+@.str_965 = private unnamed_addr constant [53 x i8] c"\F0\EF\84\0E\00\00\00\00\24\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %new_len\0A\00", align 8
+@.str_966 = private unnamed_addr constant [51 x i8] c"\40\AD\29\23\00\00\00\00\22\00\00\00\00\00\00\00  %src_idx = add i64 %lo_safe, %i\0A\00", align 8
+@.str_967 = private unnamed_addr constant [75 x i8] c"\66\F0\21\2E\00\00\00\00\3A\00\00\00\00\00\00\00  %item = call i64 @orion_list_at(ptr %src, i64 %src_idx)\0A\00", align 8
+@.str_968 = private unnamed_addr constant [74 x i8] c"\18\4E\96\32\00\00\00\00\39\00\00\00\00\00\00\00  call void @orion_list_set(ptr %dst, i64 %i, i64 %item)\0A\00", align 8
+@.str_969 = private unnamed_addr constant [32 x i8] c"\E2\94\23\06\00\00\00\00\0F\00\00\00\00\00\00\00  ret ptr %dst\0A\00", align 8
+@.str_970 = private unnamed_addr constant [66 x i8] c"\E5\4F\33\0C\00\00\00\00\31\00\00\00\00\00\00\00define ptr @orion_bytes_concat(ptr %a, ptr %b) {\0A\00", align 8
+@.str_971 = private unnamed_addr constant [61 x i8] c"\76\A6\57\02\00\00\00\00\2C\00\00\00\00\00\00\00  %a_len = call i64 @orion_list_len(ptr %a)\0A\00", align 8
+@.str_972 = private unnamed_addr constant [61 x i8] c"\E4\56\57\00\00\00\00\00\2C\00\00\00\00\00\00\00  %b_len = call i64 @orion_list_len(ptr %b)\0A\00", align 8
+@.str_973 = private unnamed_addr constant [51 x i8] c"\27\72\5C\25\00\00\00\00\22\00\00\00\00\00\00\00  %total = add i64 %a_len, %b_len\0A\00", align 8
+@.str_974 = private unnamed_addr constant [63 x i8] c"\97\97\5D\30\00\00\00\00\2E\00\00\00\00\00\00\00  %dst = call ptr @orion_list_new(i64 %total)\0A\00", align 8
+@.str_975 = private unnamed_addr constant [67 x i8] c"\35\D8\3E\17\00\00\00\00\32\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %i_next, %store ]\0A\00", align 8
+@.str_976 = private unnamed_addr constant [51 x i8] c"\DF\2A\3C\37\00\00\00\00\22\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %total\0A\00", align 8
+@.str_977 = private unnamed_addr constant [53 x i8] c"\01\C2\1B\03\00\00\00\00\24\00\00\00\00\00\00\00  %from_a = icmp slt i64 %i, %a_len\0A\00", align 8
+@.str_978 = private unnamed_addr constant [55 x i8] c"\DE\CA\46\12\00\00\00\00\26\00\00\00\00\00\00\00  br i1 %from_a, label %ba, label %bb\0A\00", align 8
+@.str_979 = private unnamed_addr constant [21 x i8] c"\BC\62\32\37\00\00\00\00\04\00\00\00\00\00\00\00ba:\0A\00", align 8
+@.str_980 = private unnamed_addr constant [69 x i8] c"\6E\F3\B9\33\00\00\00\00\34\00\00\00\00\00\00\00  %item_a = call i64 @orion_list_at(ptr %a, i64 %i)\0A\00", align 8
+@.str_981 = private unnamed_addr constant [35 x i8] c"\E2\21\80\10\00\00\00\00\12\00\00\00\00\00\00\00  br label %store\0A\00", align 8
+@.str_982 = private unnamed_addr constant [21 x i8] c"\C5\A5\32\37\00\00\00\00\04\00\00\00\00\00\00\00bb:\0A\00", align 8
+@.str_983 = private unnamed_addr constant [47 x i8] c"\C9\59\94\25\00\00\00\00\1E\00\00\00\00\00\00\00  %b_idx = sub i64 %i, %a_len\0A\00", align 8
+@.str_984 = private unnamed_addr constant [73 x i8] c"\7C\71\8A\23\00\00\00\00\38\00\00\00\00\00\00\00  %item_b = call i64 @orion_list_at(ptr %b, i64 %b_idx)\0A\00", align 8
+@.str_985 = private unnamed_addr constant [24 x i8] c"\AB\EF\E5\28\00\00\00\00\07\00\00\00\00\00\00\00store:\0A\00", align 8
+@.str_986 = private unnamed_addr constant [70 x i8] c"\F3\9B\C9\05\00\00\00\00\35\00\00\00\00\00\00\00  %item = phi i64 [ %item_a, %ba ], [ %item_b, %bb ]\0A\00", align 8
+@.str_987 = private unnamed_addr constant [49 x i8] c"\27\86\F7\3A\00\00\00\00\20\00\00\00\00\00\00\00@orion_slots = global ptr null\0A\0A\00", align 8
+@.str_988 = private unnamed_addr constant [73 x i8] c"\0E\75\68\08\00\00\00\00\38\00\00\00\00\00\00\00@orion_empty_list = constant [2 x i64] zeroinitializer\0A\0A\00", align 8
+@.str_989 = private unnamed_addr constant [58 x i8] c"\B2\3D\6A\09\00\00\00\00\29\00\00\00\00\00\00\00define ptr @orion_persist_text(ptr %s) {\0A\00", align 8
+@.str_990 = private unnamed_addr constant [51 x i8] c"\39\F1\EB\19\00\00\00\00\22\00\00\00\00\00\00\00  %is_null = icmp eq ptr %s, null\0A\00", align 8
+@.str_991 = private unnamed_addr constant [68 x i8] c"\84\2D\CD\0A\00\00\00\00\33\00\00\00\00\00\00\00  br i1 %is_null, label %ret_empty, label %copy_it\0A\00", align 8
+@.str_992 = private unnamed_addr constant [28 x i8] c"\31\03\F2\14\00\00\00\00\0B\00\00\00\00\00\00\00ret_empty:\0A\00", align 8
+@.str_993 = private unnamed_addr constant [67 x i8] c"\17\AC\4A\27\00\00\00\00\32\00\00\00\00\00\00\00  %eo = getelementptr i8, ptr @.empty_str, i64 16\0A\00", align 8
+@.str_994 = private unnamed_addr constant [31 x i8] c"\3F\D9\D3\34\00\00\00\00\0E\00\00\00\00\00\00\00  ret ptr %eo\0A\00", align 8
+@.str_995 = private unnamed_addr constant [26 x i8] c"\5D\75\F1\22\00\00\00\00\09\00\00\00\00\00\00\00copy_it:\0A\00", align 8
+@.str_996 = private unnamed_addr constant [53 x i8] c"\FC\19\E4\0F\00\00\00\00\24\00\00\00\00\00\00\00  %n = call i64 @orion_tlen(ptr %s)\0A\00", align 8
+@.str_997 = private unnamed_addr constant [41 x i8] c"\88\BA\B0\22\00\00\00\00\18\00\00\00\00\00\00\00  %tot = add i64 %n, 17\0A\00", align 8
+@.str_998 = private unnamed_addr constant [65 x i8] c"\8B\AE\CD\11\00\00\00\00\30\00\00\00\00\00\00\00  %src_base = getelementptr i8, ptr %s, i64 -16\0A\00", align 8
+@.str_999 = private unnamed_addr constant [54 x i8] c"\CD\01\4D\20\00\00\00\00\25\00\00\00\00\00\00\00  %copy = call ptr @malloc(i64 %tot)\0A\00", align 8
+@.str_1000 = private unnamed_addr constant [77 x i8] c"\8E\95\DB\09\00\00\00\00\3C\00\00\00\00\00\00\00  %_ = call ptr @memcpy(ptr %copy, ptr %src_base, i64 %tot)\0A\00", align 8
+@.str_1001 = private unnamed_addr constant [62 x i8] c"\C2\2A\21\2E\00\00\00\00\2D\00\00\00\00\00\00\00  %out = getelementptr i8, ptr %copy, i64 16\0A\00", align 8
+@.str_1002 = private unnamed_addr constant [32 x i8] c"\9D\70\9D\07\00\00\00\00\0F\00\00\00\00\00\00\00  ret ptr %out\0A\00", align 8
+@.str_1003 = private unnamed_addr constant [55 x i8] c"\FD\64\75\2F\00\00\00\00\26\00\00\00\00\00\00\00define ptr @orion_map_new_persist() {\0A\00", align 8
+@.str_1004 = private unnamed_addr constant [54 x i8] c"\AB\6C\66\1A\00\00\00\00\25\00\00\00\00\00\00\00  %handle = call ptr @malloc(i64 24)\0A\00", align 8
+@.str_1005 = private unnamed_addr constant [56 x i8] c"\8A\A7\AB\14\00\00\00\00\27\00\00\00\00\00\00\00  %entries = call ptr @malloc(i64 256)\0A\00", align 8
+@.str_1006 = private unnamed_addr constant [51 x i8] c"\73\08\28\23\00\00\00\00\22\00\00\00\00\00\00\00  store ptr %entries, ptr %handle\0A\00", align 8
+@.str_1007 = private unnamed_addr constant [69 x i8] c"\32\4B\DC\33\00\00\00\00\34\00\00\00\00\00\00\00  %cap_slot = getelementptr i64, ptr %handle, i64 1\0A\00", align 8
+@.str_1008 = private unnamed_addr constant [47 x i8] c"\52\7C\D1\27\00\00\00\00\1E\00\00\00\00\00\00\00  store i64 16, ptr %cap_slot\0A\00", align 8
+@.str_1009 = private unnamed_addr constant [69 x i8] c"\EE\76\9B\32\00\00\00\00\34\00\00\00\00\00\00\00  %len_slot = getelementptr i64, ptr %handle, i64 2\0A\00", align 8
+@.str_1010 = private unnamed_addr constant [46 x i8] c"\38\EC\AB\30\00\00\00\00\1D\00\00\00\00\00\00\00  store i64 0, ptr %len_slot\0A\00", align 8
+@.str_1011 = private unnamed_addr constant [35 x i8] c"\47\51\3F\0A\00\00\00\00\12\00\00\00\00\00\00\00  ret ptr %handle\0A\00", align 8
+@.str_1012 = private unnamed_addr constant [84 x i8] c"\67\2D\D0\33\00\00\00\00\43\00\00\00\00\00\00\00define void @orion_map_set_persist(ptr %map, ptr %key, i64 %val) {\0A\00", align 8
+@.str_1013 = private unnamed_addr constant [49 x i8] c"\7D\8E\0F\27\00\00\00\00\20\00\00\00\00\00\00\00  %entries = load ptr, ptr %map\0A\00", align 8
+@.str_1014 = private unnamed_addr constant [66 x i8] c"\68\CC\5E\3A\00\00\00\00\31\00\00\00\00\00\00\00  %cap_slot = getelementptr i64, ptr %map, i64 1\0A\00", align 8
+@.str_1015 = private unnamed_addr constant [66 x i8] c"\60\D7\72\1A\00\00\00\00\31\00\00\00\00\00\00\00  %len_slot = getelementptr i64, ptr %map, i64 2\0A\00", align 8
+@.str_1016 = private unnamed_addr constant [50 x i8] c"\94\87\F0\1F\00\00\00\00\21\00\00\00\00\00\00\00  %cap = load i64, ptr %cap_slot\0A\00", align 8
+@.str_1017 = private unnamed_addr constant [50 x i8] c"\EC\D5\51\2C\00\00\00\00\21\00\00\00\00\00\00\00  %len = load i64, ptr %len_slot\0A\00", align 8
+@.str_1018 = private unnamed_addr constant [66 x i8] c"\72\9C\40\2F\00\00\00\00\31\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]\0A\00", align 8
+@.str_1019 = private unnamed_addr constant [49 x i8] c"\59\05\63\0C\00\00\00\00\20\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %len\0A\00", align 8
+@.str_1020 = private unnamed_addr constant [64 x i8] c"\37\8C\2E\34\00\00\00\00\2F\00\00\00\00\00\00\00  br i1 %done, label %maybe_grow, label %check\0A\00", align 8
+@.str_1021 = private unnamed_addr constant [24 x i8] c"\7E\1F\94\08\00\00\00\00\07\00\00\00\00\00\00\00check:\0A\00", align 8
+@.str_1022 = private unnamed_addr constant [41 x i8] c"\62\1A\0F\20\00\00\00\00\18\00\00\00\00\00\00\00  %idx2 = mul i64 %i, 2\0A\00", align 8
+@.str_1023 = private unnamed_addr constant [72 x i8] c"\C6\75\0E\0A\00\00\00\00\37\00\00\00\00\00\00\00  %k_slot = getelementptr i64, ptr %entries, i64 %idx2\0A\00", align 8
+@.str_1024 = private unnamed_addr constant [50 x i8] c"\43\99\4E\2B\00\00\00\00\21\00\00\00\00\00\00\00  %k_int = load i64, ptr %k_slot\0A\00", align 8
+@.str_1025 = private unnamed_addr constant [55 x i8] c"\EE\B1\78\0B\00\00\00\00\26\00\00\00\00\00\00\00  %k_ptr = inttoptr i64 %k_int to ptr\0A\00", align 8
+@.str_1026 = private unnamed_addr constant [72 x i8] c"\BD\78\8A\2C\00\00\00\00\37\00\00\00\00\00\00\00  %cmp = call i64 @orion_text_eq(ptr %k_ptr, ptr %key)\0A\00", align 8
+@.str_1027 = private unnamed_addr constant [45 x i8] c"\18\6B\0D\04\00\00\00\00\1C\00\00\00\00\00\00\00  %eq = icmp ne i64 %cmp, 0\0A\00", align 8
+@.str_1028 = private unnamed_addr constant [57 x i8] c"\D5\14\E3\0C\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %eq, label %update, label %step\0A\00", align 8
+@.str_1029 = private unnamed_addr constant [23 x i8] c"\FA\F4\16\1C\00\00\00\00\06\00\00\00\00\00\00\00step:\0A\00", align 8
+@.str_1030 = private unnamed_addr constant [25 x i8] c"\95\D2\4A\07\00\00\00\00\08\00\00\00\00\00\00\00update:\0A\00", align 8
+@.str_1031 = private unnamed_addr constant [42 x i8] c"\B7\9C\1C\1F\00\00\00\00\19\00\00\00\00\00\00\00  %vi = add i64 %idx2, 1\0A\00", align 8
+@.str_1032 = private unnamed_addr constant [70 x i8] c"\61\BF\20\17\00\00\00\00\35\00\00\00\00\00\00\00  %v_slot = getelementptr i64, ptr %entries, i64 %vi\0A\00", align 8
+@.str_1033 = private unnamed_addr constant [47 x i8] c"\AD\7E\58\24\00\00\00\00\1E\00\00\00\00\00\00\00  store i64 %val, ptr %v_slot\0A\00", align 8
+@.str_1034 = private unnamed_addr constant [28 x i8] c"\2A\EC\9E\16\00\00\00\00\0B\00\00\00\00\00\00\00  ret void\0A\00", align 8
+@.str_1035 = private unnamed_addr constant [29 x i8] c"\F6\0A\57\29\00\00\00\00\0C\00\00\00\00\00\00\00maybe_grow:\0A\00", align 8
+@.str_1036 = private unnamed_addr constant [51 x i8] c"\D8\17\EB\26\00\00\00\00\22\00\00\00\00\00\00\00  %full = icmp sge i64 %len, %cap\0A\00", align 8
+@.str_1037 = private unnamed_addr constant [59 x i8] c"\9F\FE\12\0F\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %full, label %grow, label %append\0A\00", align 8
+@.str_1038 = private unnamed_addr constant [23 x i8] c"\F1\08\AF\38\00\00\00\00\06\00\00\00\00\00\00\00grow:\0A\00", align 8
+@.str_1039 = private unnamed_addr constant [46 x i8] c"\85\70\19\2C\00\00\00\00\1D\00\00\00\00\00\00\00  %new_cap = mul i64 %cap, 2\0A\00", align 8
+@.str_1040 = private unnamed_addr constant [53 x i8] c"\3C\AD\6E\2F\00\00\00\00\24\00\00\00\00\00\00\00  %new_bytes = mul i64 %new_cap, 16\0A\00", align 8
+@.str_1041 = private unnamed_addr constant [67 x i8] c"\D2\16\FE\1A\00\00\00\00\32\00\00\00\00\00\00\00  %new_entries = call ptr @malloc(i64 %new_bytes)\0A\00", align 8
+@.str_1042 = private unnamed_addr constant [49 x i8] c"\65\7C\E2\0C\00\00\00\00\20\00\00\00\00\00\00\00  %old_bytes = mul i64 %len, 16\0A\00", align 8
+@.str_1043 = private unnamed_addr constant [91 x i8] c"\0F\36\26\2A\00\00\00\00\4A\00\00\00\00\00\00\00  %_cp = call ptr @memcpy(ptr %new_entries, ptr %entries, i64 %old_bytes)\0A\00", align 8
+@.str_1044 = private unnamed_addr constant [52 x i8] c"\64\A2\F9\04\00\00\00\00\23\00\00\00\00\00\00\00  store ptr %new_entries, ptr %map\0A\00", align 8
+@.str_1045 = private unnamed_addr constant [53 x i8] c"\67\97\F4\0C\00\00\00\00\24\00\00\00\00\00\00\00  store i64 %new_cap, ptr %cap_slot\0A\00", align 8
+@.str_1046 = private unnamed_addr constant [36 x i8] c"\2A\27\4A\2E\00\00\00\00\13\00\00\00\00\00\00\00  br label %append\0A\00", align 8
+@.str_1047 = private unnamed_addr constant [25 x i8] c"\89\76\5E\35\00\00\00\00\08\00\00\00\00\00\00\00append:\0A\00", align 8
+@.str_1048 = private unnamed_addr constant [50 x i8] c"\FC\24\07\34\00\00\00\00\21\00\00\00\00\00\00\00  %entries2 = load ptr, ptr %map\0A\00", align 8
+@.str_1049 = private unnamed_addr constant [70 x i8] c"\76\0A\F4\0E\00\00\00\00\35\00\00\00\00\00\00\00  %key_copy = call ptr @orion_persist_text(ptr %key)\0A\00", align 8
+@.str_1050 = private unnamed_addr constant [47 x i8] c"\84\05\32\3A\00\00\00\00\1E\00\00\00\00\00\00\00  %app_idx2 = mul i64 %len, 2\0A\00", align 8
+@.str_1051 = private unnamed_addr constant [81 x i8] c"\A3\A0\CE\10\00\00\00\00\40\00\00\00\00\00\00\00  %app_k_slot = getelementptr i64, ptr %entries2, i64 %app_idx2\0A\00", align 8
+@.str_1052 = private unnamed_addr constant [50 x i8] c"\30\9F\E9\15\00\00\00\00\21\00\00\00\00\00\00\00  %app_vi = add i64 %app_idx2, 1\0A\00", align 8
+@.str_1053 = private unnamed_addr constant [79 x i8] c"\42\4C\AF\19\00\00\00\00\3E\00\00\00\00\00\00\00  %app_v_slot = getelementptr i64, ptr %entries2, i64 %app_vi\0A\00", align 8
+@.str_1054 = private unnamed_addr constant [60 x i8] c"\41\D6\97\21\00\00\00\00\2B\00\00\00\00\00\00\00  %key_int = ptrtoint ptr %key_copy to i64\0A\00", align 8
+@.str_1055 = private unnamed_addr constant [55 x i8] c"\E2\58\BC\31\00\00\00\00\26\00\00\00\00\00\00\00  store i64 %key_int, ptr %app_k_slot\0A\00", align 8
+@.str_1056 = private unnamed_addr constant [51 x i8] c"\53\33\FF\24\00\00\00\00\22\00\00\00\00\00\00\00  store i64 %val, ptr %app_v_slot\0A\00", align 8
+@.str_1057 = private unnamed_addr constant [46 x i8] c"\39\6D\7D\01\00\00\00\00\1D\00\00\00\00\00\00\00  %new_len = add i64 %len, 1\0A\00", align 8
+@.str_1058 = private unnamed_addr constant [53 x i8] c"\DD\8D\E8\2A\00\00\00\00\24\00\00\00\00\00\00\00  store i64 %new_len, ptr %len_slot\0A\00", align 8
+@.str_1059 = private unnamed_addr constant [56 x i8] c"\54\16\59\23\00\00\00\00\27\00\00\00\00\00\00\00define ptr @orion_slot_get(ptr %key) {\0A\00", align 8
+@.str_1060 = private unnamed_addr constant [51 x i8] c"\C4\A9\47\2D\00\00\00\00\22\00\00\00\00\00\00\00  %m = load ptr, ptr @orion_slots\0A\00", align 8
+@.str_1061 = private unnamed_addr constant [51 x i8] c"\9F\AC\96\2B\00\00\00\00\22\00\00\00\00\00\00\00  %is_null = icmp eq ptr %m, null\0A\00", align 8
+@.str_1062 = private unnamed_addr constant [59 x i8] c"\2C\95\6C\17\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %is_null, label %init, label %get\0A\00", align 8
+@.str_1063 = private unnamed_addr constant [23 x i8] c"\C2\31\BE\36\00\00\00\00\06\00\00\00\00\00\00\00init:\0A\00", align 8
+@.str_1064 = private unnamed_addr constant [60 x i8] c"\D7\B9\28\32\00\00\00\00\2B\00\00\00\00\00\00\00  %new = call ptr @orion_map_new_persist()\0A\00", align 8
+@.str_1065 = private unnamed_addr constant [52 x i8] c"\D6\0A\4C\30\00\00\00\00\23\00\00\00\00\00\00\00  store ptr %new, ptr @orion_slots\0A\00", align 8
+@.str_1066 = private unnamed_addr constant [33 x i8] c"\68\43\A0\1B\00\00\00\00\10\00\00\00\00\00\00\00  br label %get\0A\00", align 8
+@.str_1067 = private unnamed_addr constant [22 x i8] c"\83\4D\61\2F\00\00\00\00\05\00\00\00\00\00\00\00get:\0A\00", align 8
+@.str_1068 = private unnamed_addr constant [52 x i8] c"\EC\4B\FC\1A\00\00\00\00\23\00\00\00\00\00\00\00  %m2 = load ptr, ptr @orion_slots\0A\00", align 8
+@.str_1069 = private unnamed_addr constant [69 x i8] c"\80\09\86\00\00\00\00\00\34\00\00\00\00\00\00\00  %has = call i64 @orion_map_has(ptr %m2, ptr %key)\0A\00", align 8
+@.str_1070 = private unnamed_addr constant [47 x i8] c"\EA\73\BF\22\00\00\00\00\1E\00\00\00\00\00\00\00  %miss = icmp eq i64 %has, 0\0A\00", align 8
+@.str_1071 = private unnamed_addr constant [59 x i8] c"\34\E2\08\03\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %miss, label %empty, label %fetch\0A\00", align 8
+@.str_1072 = private unnamed_addr constant [24 x i8] c"\F3\DD\AC\08\00\00\00\00\07\00\00\00\00\00\00\00empty:\0A\00", align 8
+@.str_1073 = private unnamed_addr constant [24 x i8] c"\CE\F6\82\21\00\00\00\00\07\00\00\00\00\00\00\00fetch:\0A\00", align 8
+@.str_1074 = private unnamed_addr constant [69 x i8] c"\E1\1A\9B\2C\00\00\00\00\34\00\00\00\00\00\00\00  %raw = call i64 @orion_map_get(ptr %m2, ptr %key)\0A\00", align 8
+@.str_1075 = private unnamed_addr constant [49 x i8] c"\F8\90\D9\1F\00\00\00\00\20\00\00\00\00\00\00\00  %p = inttoptr i64 %raw to ptr\0A\00", align 8
+@.str_1076 = private unnamed_addr constant [30 x i8] c"\5D\3A\FE\2C\00\00\00\00\0D\00\00\00\00\00\00\00  ret ptr %p\0A\00", align 8
+@.str_1077 = private unnamed_addr constant [66 x i8] c"\9C\B4\8A\2B\00\00\00\00\31\00\00\00\00\00\00\00define i64 @orion_slot_set(ptr %key, i64 %val) {\0A\00", align 8
+@.str_1078 = private unnamed_addr constant [61 x i8] c"\DC\32\B4\1D\00\00\00\00\2C\00\00\00\00\00\00\00  br i1 %is_null, label %init, label %store\0A\00", align 8
+@.str_1079 = private unnamed_addr constant [81 x i8] c"\84\E4\DD\24\00\00\00\00\40\00\00\00\00\00\00\00  call void @orion_map_set_persist(ptr %m2, ptr %key, i64 %val)\0A\00", align 8
+@.str_1080 = private unnamed_addr constant [56 x i8] c"\65\1E\8C\08\00\00\00\00\27\00\00\00\00\00\00\00define i64 @orion_slot_has(ptr %key) {\0A\00", align 8
+@.str_1081 = private unnamed_addr constant [57 x i8] c"\B9\BA\ED\11\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %is_null, label %no, label %chk\0A\00", align 8
+@.str_1082 = private unnamed_addr constant [22 x i8] c"\C6\CB\29\25\00\00\00\00\05\00\00\00\00\00\00\00chk:\0A\00", align 8
+@.str_1083 = private unnamed_addr constant [68 x i8] c"\70\50\13\27\00\00\00\00\33\00\00\00\00\00\00\00  %has = call i64 @orion_map_has(ptr %m, ptr %key)\0A\00", align 8
+@.str_1084 = private unnamed_addr constant [32 x i8] c"\6D\B7\A1\0B\00\00\00\00\0F\00\00\00\00\00\00\00  ret i64 %has\0A\00", align 8
+@.str_1085 = private unnamed_addr constant [60 x i8] c"\3F\DA\DC\38\00\00\00\00\2B\00\00\00\00\00\00\00define i64 @orion_slot_get_int(ptr %key) {\0A\00", align 8
+@.str_1086 = private unnamed_addr constant [59 x i8] c"\EF\D0\C3\0B\00\00\00\00\2A\00\00\00\00\00\00\00  br i1 %is_null, label %zero, label %get\0A\00", align 8
+@.str_1087 = private unnamed_addr constant [23 x i8] c"\F0\18\4F\08\00\00\00\00\06\00\00\00\00\00\00\00zero:\0A\00", align 8
+@.str_1088 = private unnamed_addr constant [66 x i8] c"\10\7D\F5\07\00\00\00\00\31\00\00\00\00\00\00\00  %v = call i64 @orion_map_get(ptr %m, ptr %key)\0A\00", align 8
+@.str_1089 = private unnamed_addr constant [30 x i8] c"\45\E4\79\0A\00\00\00\00\0D\00\00\00\00\00\00\00  ret i64 %v\0A\00", align 8
+@.str_1090 = private unnamed_addr constant [46 x i8] c"\46\DE\1C\1D\00\00\00\00\1D\00\00\00\00\00\00\00declare ptr @fopen(ptr, ptr)\0A\00", align 8
+@.str_1091 = private unnamed_addr constant [42 x i8] c"\A9\1A\49\13\00\00\00\00\19\00\00\00\00\00\00\00declare i32 @fclose(ptr)\0A\00", align 8
+@.str_1092 = private unnamed_addr constant [56 x i8] c"\EB\24\C1\0C\00\00\00\00\27\00\00\00\00\00\00\00declare i64 @fread(ptr, i64, i64, ptr)\0A\00", align 8
+@.str_1093 = private unnamed_addr constant [57 x i8] c"\62\E4\2A\0C\00\00\00\00\28\00\00\00\00\00\00\00declare i64 @fwrite(ptr, i64, i64, ptr)\0A\00", align 8
+@.str_1094 = private unnamed_addr constant [51 x i8] c"\89\CF\54\26\00\00\00\00\22\00\00\00\00\00\00\00declare i32 @fseek(ptr, i64, i32)\0A\00", align 8
+@.str_1095 = private unnamed_addr constant [41 x i8] c"\90\62\C3\36\00\00\00\00\18\00\00\00\00\00\00\00declare i64 @ftell(ptr)\0A\00", align 8
+@.str_1096 = private unnamed_addr constant [77 x i8] c"\D5\36\E4\0D\00\00\00\00\3C\00\00\00\00\00\00\00@.fmode_r = private unnamed_addr constant [3 x i8] c\22rb\5C00\22\0A\00", align 8
+@.str_1097 = private unnamed_addr constant [77 x i8] c"\3A\87\8B\3B\00\00\00\00\3C\00\00\00\00\00\00\00@.fmode_w = private unnamed_addr constant [3 x i8] c\22wb\5C00\22\0A\00", align 8
+@.str_1098 = private unnamed_addr constant [136 x i8] c"\8A\01\E4\0B\00\00\00\00\77\00\00\00\00\00\00\00@.empty_str = private unnamed_addr constant [17 x i8] c\22\5C05\5C15\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\5C00\22, align 8\0A\0A\00", align 8
+@.str_1099 = private unnamed_addr constant [58 x i8] c"\C8\D4\2C\15\00\00\00\00\29\00\00\00\00\00\00\00define ptr @orion_file_read(ptr %path) {\0A\00", align 8
+@.str_1100 = private unnamed_addr constant [67 x i8] c"\2D\70\B3\12\00\00\00\00\32\00\00\00\00\00\00\00  %fp = call ptr @fopen(ptr %path, ptr @.fmode_r)\0A\00", align 8
+@.str_1101 = private unnamed_addr constant [52 x i8] c"\11\7E\33\1B\00\00\00\00\23\00\00\00\00\00\00\00  %is_null = icmp eq ptr %fp, null\0A\00", align 8
+@.str_1102 = private unnamed_addr constant [57 x i8] c"\F8\C6\B2\31\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %is_null, label %err, label %ok\0A\00", align 8
+@.str_1103 = private unnamed_addr constant [22 x i8] c"\AE\4B\03\0E\00\00\00\00\05\00\00\00\00\00\00\00err:\0A\00", align 8
+@.str_1104 = private unnamed_addr constant [21 x i8] c"\F5\F1\F2\38\00\00\00\00\04\00\00\00\00\00\00\00ok:\0A\00", align 8
+@.str_1105 = private unnamed_addr constant [67 x i8] c"\0B\B1\E6\31\00\00\00\00\32\00\00\00\00\00\00\00  %_seek = call i32 @fseek(ptr %fp, i64 0, i32 2)\0A\00", align 8
+@.str_1106 = private unnamed_addr constant [52 x i8] c"\B0\0D\14\2D\00\00\00\00\23\00\00\00\00\00\00\00  %size = call i64 @ftell(ptr %fp)\0A\00", align 8
+@.str_1107 = private unnamed_addr constant [66 x i8] c"\03\F6\62\24\00\00\00\00\31\00\00\00\00\00\00\00  %_rew = call i32 @fseek(ptr %fp, i64 0, i32 0)\0A\00", align 8
+@.str_1108 = private unnamed_addr constant [64 x i8] c"\3C\EF\62\29\00\00\00\00\2F\00\00\00\00\00\00\00  %buf = call ptr @orion_text_alloc(i64 %size)\0A\00", align 8
+@.str_1109 = private unnamed_addr constant [81 x i8] c"\49\A8\A9\35\00\00\00\00\40\00\00\00\00\00\00\00  %_read = call i64 @fread(ptr %buf, i64 1, i64 %size, ptr %fp)\0A\00", align 8
+@.str_1110 = private unnamed_addr constant [65 x i8] c"\F9\84\98\01\00\00\00\00\30\00\00\00\00\00\00\00  %term = getelementptr i8, ptr %buf, i64 %size\0A\00", align 8
+@.str_1111 = private unnamed_addr constant [55 x i8] c"\91\65\DD\2B\00\00\00\00\26\00\00\00\00\00\00\00  %_close = call i32 @fclose(ptr %fp)\0A\00", align 8
+@.str_1112 = private unnamed_addr constant [73 x i8] c"\CA\69\7A\36\00\00\00\00\38\00\00\00\00\00\00\00define i64 @orion_file_write(ptr %path, ptr %content) {\0A\00", align 8
+@.str_1113 = private unnamed_addr constant [67 x i8] c"\5A\BF\B4\12\00\00\00\00\32\00\00\00\00\00\00\00  %fp = call ptr @fopen(ptr %path, ptr @.fmode_w)\0A\00", align 8
+@.str_1114 = private unnamed_addr constant [61 x i8] c"\85\F1\1F\37\00\00\00\00\2C\00\00\00\00\00\00\00  %len = call i64 @orion_tlen(ptr %content)\0A\00", align 8
+@.str_1115 = private unnamed_addr constant [86 x i8] c"\09\F4\41\22\00\00\00\00\45\00\00\00\00\00\00\00  %_wrote = call i64 @fwrite(ptr %content, i64 1, i64 %len, ptr %fp)\0A\00", align 8
+@.str_1116 = private unnamed_addr constant [56 x i8] c"\B4\32\53\13\00\00\00\00\27\00\00\00\00\00\00\00define ptr @orion_list_new(i64 %cap) {\0A\00", align 8
+@.str_1117 = private unnamed_addr constant [44 x i8] c"\E6\2C\76\31\00\00\00\00\1B\00\00\00\00\00\00\00  %bytes = mul i64 %cap, 8\0A\00", align 8
+@.str_1118 = private unnamed_addr constant [47 x i8] c"\CB\78\40\1D\00\00\00\00\1E\00\00\00\00\00\00\00  %total = add i64 %bytes, 16\0A\00", align 8
+@.str_1119 = private unnamed_addr constant [60 x i8] c"\B9\B6\EE\35\00\00\00\00\2B\00\00\00\00\00\00\00  %buf = call ptr @orion_alloc(i64 %total)\0A\00", align 8
+@.str_1120 = private unnamed_addr constant [44 x i8] c"\B0\F3\A5\20\00\00\00\00\1B\00\00\00\00\00\00\00  store i64 %cap, ptr %buf\0A\00", align 8
+@.str_1121 = private unnamed_addr constant [66 x i8] c"\77\22\6C\0E\00\00\00\00\31\00\00\00\00\00\00\00  %len_slot = getelementptr i64, ptr %buf, i64 1\0A\00", align 8
+@.str_1122 = private unnamed_addr constant [49 x i8] c"\21\F4\57\16\00\00\00\00\20\00\00\00\00\00\00\00  store i64 %cap, ptr %len_slot\0A\00", align 8
+@.str_1123 = private unnamed_addr constant [70 x i8] c"\87\F0\22\0E\00\00\00\00\35\00\00\00\00\00\00\00define i64 @orion_struct_field_int(ptr %s, i64 %i) {\0A\00", align 8
+@.str_1124 = private unnamed_addr constant [61 x i8] c"\C2\D2\B7\32\00\00\00\00\2C\00\00\00\00\00\00\00  %slot = getelementptr i64, ptr %s, i64 %i\0A\00", align 8
+@.str_1125 = private unnamed_addr constant [44 x i8] c"\8C\78\17\06\00\00\00\00\1B\00\00\00\00\00\00\00  %v = load i64, ptr %slot\0A\00", align 8
+@.str_1126 = private unnamed_addr constant [71 x i8] c"\75\D1\96\1F\00\00\00\00\36\00\00\00\00\00\00\00define ptr @orion_struct_field_text(ptr %s, i64 %i) {\0A\00", align 8
+@.str_1127 = private unnamed_addr constant [47 x i8] c"\01\33\6C\34\00\00\00\00\1E\00\00\00\00\00\00\00  %p = inttoptr i64 %v to ptr\0A\00", align 8
+@.str_1128 = private unnamed_addr constant [57 x i8] c"\BD\44\62\06\00\00\00\00\28\00\00\00\00\00\00\00define i64 @orion_list_len(ptr %list) {\0A\00", align 8
+@.str_1129 = private unnamed_addr constant [67 x i8] c"\99\20\31\28\00\00\00\00\32\00\00\00\00\00\00\00  %len_slot = getelementptr i64, ptr %list, i64 1\0A\00", align 8
+@.str_1130 = private unnamed_addr constant [32 x i8] c"\6E\F7\2B\0C\00\00\00\00\0F\00\00\00\00\00\00\00  ret i64 %len\0A\00", align 8
+@.str_1131 = private unnamed_addr constant [66 x i8] c"\E3\44\74\31\00\00\00\00\31\00\00\00\00\00\00\00define i64 @orion_list_at(ptr %list, i64 %idx) {\0A\00", align 8
+@.str_1132 = private unnamed_addr constant [45 x i8] c"\E4\3F\FC\2D\00\00\00\00\1C\00\00\00\00\00\00\00  %offset = add i64 %idx, 2\0A\00", align 8
+@.str_1133 = private unnamed_addr constant [69 x i8] c"\72\13\DC\12\00\00\00\00\34\00\00\00\00\00\00\00  %slot = getelementptr i64, ptr %list, i64 %offset\0A\00", align 8
+@.str_1134 = private unnamed_addr constant [46 x i8] c"\1C\21\7D\2B\00\00\00\00\1D\00\00\00\00\00\00\00  %val = load i64, ptr %slot\0A\00", align 8
+@.str_1135 = private unnamed_addr constant [32 x i8] c"\52\F2\81\0D\00\00\00\00\0F\00\00\00\00\00\00\00  ret i64 %val\0A\00", align 8
+@.str_1136 = private unnamed_addr constant [77 x i8] c"\9F\11\C0\06\00\00\00\00\3C\00\00\00\00\00\00\00define ptr @orion_list_slice(ptr %list, i64 %lo, i64 %hi) {\0A\00", align 8
+@.str_1137 = private unnamed_addr constant [60 x i8] c"\03\F8\91\38\00\00\00\00\2B\00\00\00\00\00\00\00  %n = call i64 @orion_list_len(ptr %list)\0A\00", align 8
+@.str_1138 = private unnamed_addr constant [49 x i8] c"\ED\48\9D\28\00\00\00\00\20\00\00\00\00\00\00\00  %hi_neg = icmp slt i64 %hi, 0\0A\00", align 8
+@.str_1139 = private unnamed_addr constant [60 x i8] c"\5E\FF\37\0C\00\00\00\00\2B\00\00\00\00\00\00\00  %hi0 = select i1 %hi_neg, i64 0, i64 %hi\0A\00", align 8
+@.str_1140 = private unnamed_addr constant [51 x i8] c"\D9\69\A6\3A\00\00\00\00\22\00\00\00\00\00\00\00  %hi_big = icmp sgt i64 %hi0, %n\0A\00", align 8
+@.str_1141 = private unnamed_addr constant [62 x i8] c"\95\4D\75\13\00\00\00\00\2D\00\00\00\00\00\00\00  %hi1 = select i1 %hi_big, i64 %n, i64 %hi0\0A\00", align 8
+@.str_1142 = private unnamed_addr constant [60 x i8] c"\13\92\9F\27\00\00\00\00\2B\00\00\00\00\00\00\00  %lo0 = select i1 %lo_neg, i64 0, i64 %lo\0A\00", align 8
+@.str_1143 = private unnamed_addr constant [53 x i8] c"\01\34\08\03\00\00\00\00\24\00\00\00\00\00\00\00  %lo_big = icmp sgt i64 %lo0, %hi1\0A\00", align 8
+@.str_1144 = private unnamed_addr constant [64 x i8] c"\FD\AB\B1\27\00\00\00\00\2F\00\00\00\00\00\00\00  %lo1 = select i1 %lo_big, i64 %hi1, i64 %lo0\0A\00", align 8
+@.str_1145 = private unnamed_addr constant [45 x i8] c"\A5\5E\D1\39\00\00\00\00\1C\00\00\00\00\00\00\00  %cnt = sub i64 %hi1, %lo1\0A\00", align 8
+@.str_1146 = private unnamed_addr constant [61 x i8] c"\9D\9C\84\12\00\00\00\00\2C\00\00\00\00\00\00\00  %out = call ptr @orion_list_new(i64 %cnt)\0A\00", align 8
+@.str_1147 = private unnamed_addr constant [65 x i8] c"\3B\41\FE\15\00\00\00\00\30\00\00\00\00\00\00\00  %i = phi i64 [ 0, %entry ], [ %inext, %body ]\0A\00", align 8
+@.str_1148 = private unnamed_addr constant [49 x i8] c"\49\A9\30\0B\00\00\00\00\20\00\00\00\00\00\00\00  %done = icmp sge i64 %i, %cnt\0A\00", align 8
+@.str_1149 = private unnamed_addr constant [57 x i8] c"\DB\FF\8F\15\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %done, label %exit, label %body\0A\00", align 8
+@.str_1150 = private unnamed_addr constant [23 x i8] c"\6F\EC\A9\08\00\00\00\00\06\00\00\00\00\00\00\00body:\0A\00", align 8
+@.str_1151 = private unnamed_addr constant [45 x i8] c"\8E\82\10\1C\00\00\00\00\1C\00\00\00\00\00\00\00  %src_i = add i64 %lo1, %i\0A\00", align 8
+@.str_1152 = private unnamed_addr constant [71 x i8] c"\BD\2B\15\1D\00\00\00\00\36\00\00\00\00\00\00\00  %v = call i64 @orion_list_at(ptr %list, i64 %src_i)\0A\00", align 8
+@.str_1153 = private unnamed_addr constant [71 x i8] c"\00\72\13\23\00\00\00\00\36\00\00\00\00\00\00\00  call void @orion_list_set(ptr %out, i64 %i, i64 %v)\0A\00", align 8
+@.str_1154 = private unnamed_addr constant [42 x i8] c"\F5\FD\26\30\00\00\00\00\19\00\00\00\00\00\00\00  %inext = add i64 %i, 1\0A\00", align 8
+@.str_1155 = private unnamed_addr constant [23 x i8] c"\41\4D\83\20\00\00\00\00\06\00\00\00\00\00\00\00exit:\0A\00", align 8
+@.str_1156 = private unnamed_addr constant [78 x i8] c"\9B\DE\51\29\00\00\00\00\3D\00\00\00\00\00\00\00define void @orion_list_set(ptr %list, i64 %idx, i64 %val) {\0A\00", align 8
+@.str_1157 = private unnamed_addr constant [47 x i8] c"\3B\26\19\06\00\00\00\00\1E\00\00\00\00\00\00\00  %neg = icmp slt i64 %idx, 0\0A\00", align 8
+@.str_1158 = private unnamed_addr constant [50 x i8] c"\11\A7\B7\0F\00\00\00\00\21\00\00\00\00\00\00\00  %oob = icmp sge i64 %idx, %len\0A\00", align 8
+@.str_1159 = private unnamed_addr constant [43 x i8] c"\AC\21\48\0B\00\00\00\00\1A\00\00\00\00\00\00\00  %bad = or i1 %neg, %oob\0A\00", align 8
+@.str_1160 = private unnamed_addr constant [57 x i8] c"\13\6F\7D\20\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %bad, label %skip, label %write\0A\00", align 8
+@.str_1161 = private unnamed_addr constant [24 x i8] c"\DA\9C\DC\18\00\00\00\00\07\00\00\00\00\00\00\00write:\0A\00", align 8
+@.str_1162 = private unnamed_addr constant [45 x i8] c"\24\D4\75\26\00\00\00\00\1C\00\00\00\00\00\00\00  store i64 %val, ptr %slot\0A\00", align 8
+@.str_1163 = private unnamed_addr constant [23 x i8] c"\A2\20\75\31\00\00\00\00\06\00\00\00\00\00\00\00skip:\0A\00", align 8
+@.str_1164 = private unnamed_addr constant [68 x i8] c"\6C\B7\52\1F\00\00\00\00\33\00\00\00\00\00\00\00define ptr @orion_list_push(ptr %list, i64 %val) {\0A\00", align 8
+@.str_1165 = private unnamed_addr constant [43 x i8] c"\7D\25\B3\23\00\00\00\00\1A\00\00\00\00\00\00\00  %need = add i64 %len, 1\0A\00", align 8
+@.str_1166 = private unnamed_addr constant [44 x i8] c"\92\6C\60\00\00\00\00\00\1B\00\00\00\00\00\00\00  %cap2 = mul i64 %need, 2\0A\00", align 8
+@.str_1167 = private unnamed_addr constant [54 x i8] c"\78\0E\60\20\00\00\00\00\25\00\00\00\00\00\00\00  %too_small = icmp slt i64 %cap2, 4\0A\00", align 8
+@.str_1168 = private unnamed_addr constant [69 x i8] c"\13\95\72\29\00\00\00\00\34\00\00\00\00\00\00\00  %new_cap = select i1 %too_small, i64 4, i64 %cap2\0A\00", align 8
+@.str_1169 = private unnamed_addr constant [48 x i8] c"\21\DE\4C\2A\00\00\00\00\1F\00\00\00\00\00\00\00  %bytes = mul i64 %new_cap, 8\0A\00", align 8
+@.str_1170 = private unnamed_addr constant [65 x i8] c"\0D\E8\76\01\00\00\00\00\30\00\00\00\00\00\00\00  %new_list = call ptr @orion_alloc(i64 %total)\0A\00", align 8
+@.str_1171 = private unnamed_addr constant [53 x i8] c"\52\CE\41\1D\00\00\00\00\24\00\00\00\00\00\00\00  store i64 %new_cap, ptr %new_list\0A\00", align 8
+@.str_1172 = private unnamed_addr constant [75 x i8] c"\77\63\EE\32\00\00\00\00\3A\00\00\00\00\00\00\00  %new_len_slot = getelementptr i64, ptr %new_list, i64 1\0A\00", align 8
+@.str_1173 = private unnamed_addr constant [54 x i8] c"\D1\44\DA\05\00\00\00\00\25\00\00\00\00\00\00\00  store i64 %need, ptr %new_len_slot\0A\00", align 8
+@.str_1174 = private unnamed_addr constant [72 x i8] c"\5B\E0\8A\3B\00\00\00\00\37\00\00\00\00\00\00\00  %dst_items = getelementptr i64, ptr %new_list, i64 2\0A\00", align 8
+@.str_1175 = private unnamed_addr constant [68 x i8] c"\A6\D8\42\31\00\00\00\00\33\00\00\00\00\00\00\00  %src_items = getelementptr i64, ptr %list, i64 2\0A\00", align 8
+@.str_1176 = private unnamed_addr constant [49 x i8] c"\45\DF\EF\0D\00\00\00\00\20\00\00\00\00\00\00\00  %copy_bytes = mul i64 %len, 8\0A\00", align 8
+@.str_1177 = private unnamed_addr constant [92 x i8] c"\C5\D7\17\2D\00\00\00\00\4B\00\00\00\00\00\00\00  %_cp = call ptr @memcpy(ptr %dst_items, ptr %src_items, i64 %copy_bytes)\0A\00", align 8
+@.str_1178 = private unnamed_addr constant [46 x i8] c"\4D\BF\F0\38\00\00\00\00\1D\00\00\00\00\00\00\00  %app_idx = add i64 %len, 2\0A\00", align 8
+@.str_1179 = private unnamed_addr constant [78 x i8] c"\C3\E7\0F\23\00\00\00\00\3D\00\00\00\00\00\00\00  %app_slot = getelementptr i64, ptr %new_list, i64 %app_idx\0A\00", align 8
+@.str_1180 = private unnamed_addr constant [49 x i8] c"\BE\3A\1D\2A\00\00\00\00\20\00\00\00\00\00\00\00  store i64 %val, ptr %app_slot\0A\00", align 8
+@.str_1181 = private unnamed_addr constant [37 x i8] c"\34\BE\1C\13\00\00\00\00\14\00\00\00\00\00\00\00  ret ptr %new_list\0A\00", align 8
+@.str_1182 = private unnamed_addr constant [72 x i8] c"\79\85\D2\01\00\00\00\00\37\00\00\00\00\00\00\00define ptr @orion_list_push_mut(ptr %list, i64 %val) {\0A\00", align 8
+@.str_1183 = private unnamed_addr constant [46 x i8] c"\7E\B0\5B\27\00\00\00\00\1D\00\00\00\00\00\00\00  %cap = load i64, ptr %list\0A\00", align 8
+@.str_1184 = private unnamed_addr constant [55 x i8] c"\F1\A3\E9\15\00\00\00\00\26\00\00\00\00\00\00\00  %has_room = icmp slt i64 %len, %cap\0A\00", align 8
+@.str_1185 = private unnamed_addr constant [64 x i8] c"\A4\43\F7\0A\00\00\00\00\2F\00\00\00\00\00\00\00  br i1 %has_room, label %inplace, label %grow\0A\00", align 8
+@.str_1186 = private unnamed_addr constant [26 x i8] c"\C8\D2\DC\0A\00\00\00\00\09\00\00\00\00\00\00\00inplace:\0A\00", align 8
+@.str_1187 = private unnamed_addr constant [47 x i8] c"\92\6D\E0\30\00\00\00\00\1E\00\00\00\00\00\00\00  %slot_idx = add i64 %len, 2\0A\00", align 8
+@.str_1188 = private unnamed_addr constant [71 x i8] c"\1C\86\0C\07\00\00\00\00\36\00\00\00\00\00\00\00  %slot = getelementptr i64, ptr %list, i64 %slot_idx\0A\00", align 8
+@.str_1189 = private unnamed_addr constant [78 x i8] c"\B6\26\41\3B\00\00\00\00\3D\00\00\00\00\00\00\00  %fallback = call ptr @orion_list_push(ptr %list, i64 %val)\0A\00", align 8
+@.str_1190 = private unnamed_addr constant [37 x i8] c"\CF\C9\BF\1C\00\00\00\00\14\00\00\00\00\00\00\00  ret ptr %fallback\0A\00", align 8
+@.str_1191 = private unnamed_addr constant [55 x i8] c"\F1\E3\FF\01\00\00\00\00\26\00\00\00\00\00\00\00define ptr @orion_map_new(i64 %cap) {\0A\00", align 8
+@.str_1192 = private unnamed_addr constant [53 x i8] c"\29\B5\74\18\00\00\00\00\24\00\00\00\00\00\00\00  %too_small = icmp slt i64 %cap, 4\0A\00", align 8
+@.str_1193 = private unnamed_addr constant [65 x i8] c"\C3\CF\1B\29\00\00\00\00\30\00\00\00\00\00\00\00  %cap2 = select i1 %too_small, i64 4, i64 %cap\0A\00", align 8
+@.str_1194 = private unnamed_addr constant [59 x i8] c"\12\66\72\1A\00\00\00\00\2A\00\00\00\00\00\00\00  %handle = call ptr @orion_alloc(i64 24)\0A\00", align 8
+@.str_1195 = private unnamed_addr constant [52 x i8] c"\E7\DC\01\34\00\00\00\00\23\00\00\00\00\00\00\00  %entry_bytes = mul i64 %cap2, 16\0A\00", align 8
+@.str_1196 = private unnamed_addr constant [70 x i8] c"\0E\7B\8E\3A\00\00\00\00\35\00\00\00\00\00\00\00  %entries = call ptr @orion_alloc(i64 %entry_bytes)\0A\00", align 8
+@.str_1197 = private unnamed_addr constant [50 x i8] c"\01\30\85\20\00\00\00\00\21\00\00\00\00\00\00\00  store i64 %cap2, ptr %cap_slot\0A\00", align 8
+@.str_1198 = private unnamed_addr constant [76 x i8] c"\30\BD\7A\2D\00\00\00\00\3B\00\00\00\00\00\00\00define void @orion_map_set(ptr %map, ptr %key, i64 %val) {\0A\00", align 8
+@.str_1199 = private unnamed_addr constant [72 x i8] c"\9C\6E\D9\15\00\00\00\00\37\00\00\00\00\00\00\00  %new_entries = call ptr @orion_alloc(i64 %new_bytes)\0A\00", align 8
+@.str_1200 = private unnamed_addr constant [67 x i8] c"\CC\F5\8D\02\00\00\00\00\32\00\00\00\00\00\00\00  %key_owned = call ptr @orion_key_copy(ptr %key)\0A\00", align 8
+@.str_1201 = private unnamed_addr constant [61 x i8] c"\C9\D6\22\22\00\00\00\00\2C\00\00\00\00\00\00\00  %key_int = ptrtoint ptr %key_owned to i64\0A\00", align 8
+@.str_1202 = private unnamed_addr constant [65 x i8] c"\FA\A8\6E\18\00\00\00\00\30\00\00\00\00\00\00\00define i64 @orion_map_get(ptr %map, ptr %key) {\0A\00", align 8
+@.str_1203 = private unnamed_addr constant [57 x i8] c"\6B\18\CF\0C\00\00\00\00\28\00\00\00\00\00\00\00  br i1 %done, label %miss, label %body\0A\00", align 8
+@.str_1204 = private unnamed_addr constant [39 x i8] c"\FB\A5\5D\26\00\00\00\00\16\00\00\00\00\00\00\00  %ki = mul i64 %i, 2\0A\00", align 8
+@.str_1205 = private unnamed_addr constant [40 x i8] c"\C8\CA\0C\33\00\00\00\00\17\00\00\00\00\00\00\00  %vi = add i64 %ki, 1\0A\00", align 8
+@.str_1206 = private unnamed_addr constant [70 x i8] c"\1D\0E\BA\34\00\00\00\00\35\00\00\00\00\00\00\00  %k_slot = getelementptr i64, ptr %entries, i64 %ki\0A\00", align 8
+@.str_1207 = private unnamed_addr constant [54 x i8] c"\C6\7A\DE\18\00\00\00\00\25\00\00\00\00\00\00\00  br i1 %eq, label %hit, label %step\0A\00", align 8
+@.str_1208 = private unnamed_addr constant [22 x i8] c"\39\70\DD\05\00\00\00\00\05\00\00\00\00\00\00\00hit:\0A\00", align 8
+@.str_1209 = private unnamed_addr constant [46 x i8] c"\26\C3\BE\0E\00\00\00\00\1D\00\00\00\00\00\00\00  %v = load i64, ptr %v_slot\0A\00", align 8
+@.str_1210 = private unnamed_addr constant [23 x i8] c"\CF\D6\DE\2E\00\00\00\00\06\00\00\00\00\00\00\00miss:\0A\00", align 8
+@.str_1211 = private unnamed_addr constant [65 x i8] c"\60\75\87\14\00\00\00\00\30\00\00\00\00\00\00\00define i64 @orion_map_has(ptr %map, ptr %key) {\0A\00", align 8
+@.str_1212 = private unnamed_addr constant [79 x i8] c"\AC\BD\78\37\00\00\00\00\3E\00\00\00\00\00\00\00define void @orion_map_set_ik(ptr %map, i64 %key, i64 %val) {\0A\00", align 8
+@.str_1213 = private unnamed_addr constant [50 x i8] c"\56\31\E2\1B\00\00\00\00\21\00\00\00\00\00\00\00  %eq = icmp eq i64 %k_int, %key\0A\00", align 8
+@.str_1214 = private unnamed_addr constant [51 x i8] c"\8B\90\A0\0B\00\00\00\00\22\00\00\00\00\00\00\00  store i64 %key, ptr %app_k_slot\0A\00", align 8
+@.str_1215 = private unnamed_addr constant [69 x i8] c"\9E\04\D8\39\00\00\00\00\34\00\00\00\00\00\00\00define void @orion_map_remove(ptr %map, ptr %key) {\0A\00", align 8
+@.str_1216 = private unnamed_addr constant [58 x i8] c"\BF\08\08\28\00\00\00\00\29\00\00\00\00\00\00\00  br i1 %done, label %miss, label %check\0A\00", align 8
+@.str_1217 = private unnamed_addr constant [56 x i8] c"\FD\A6\4A\2B\00\00\00\00\27\00\00\00\00\00\00\00  br i1 %eq, label %found, label %step\0A\00", align 8
+@.str_1218 = private unnamed_addr constant [24 x i8] c"\94\4A\4F\28\00\00\00\00\07\00\00\00\00\00\00\00found:\0A\00", align 8
+@.str_1219 = private unnamed_addr constant [44 x i8] c"\51\8F\11\3A\00\00\00\00\1B\00\00\00\00\00\00\00  %last = add i64 %len, -1\0A\00", align 8
+@.str_1220 = private unnamed_addr constant [45 x i8] c"\CF\76\CC\04\00\00\00\00\1C\00\00\00\00\00\00\00  %last2 = mul i64 %last, 2\0A\00", align 8
+@.str_1221 = private unnamed_addr constant [74 x i8] c"\AE\10\B5\23\00\00\00\00\39\00\00\00\00\00\00\00  %lk_slot = getelementptr i64, ptr %entries, i64 %last2\0A\00", align 8
+@.str_1222 = private unnamed_addr constant [45 x i8] c"\91\55\25\25\00\00\00\00\1C\00\00\00\00\00\00\00  %lv_i = add i64 %last2, 1\0A\00", align 8
+@.str_1223 = private unnamed_addr constant [73 x i8] c"\D7\3D\B7\25\00\00\00\00\38\00\00\00\00\00\00\00  %lv_slot = getelementptr i64, ptr %entries, i64 %lv_i\0A\00", align 8
+@.str_1224 = private unnamed_addr constant [48 x i8] c"\C9\C4\B7\10\00\00\00\00\1F\00\00\00\00\00\00\00  %lk = load i64, ptr %lk_slot\0A\00", align 8
+@.str_1225 = private unnamed_addr constant [48 x i8] c"\63\6D\CA\11\00\00\00\00\1F\00\00\00\00\00\00\00  %lv = load i64, ptr %lv_slot\0A\00", align 8
+@.str_1226 = private unnamed_addr constant [46 x i8] c"\BF\0F\FB\16\00\00\00\00\1D\00\00\00\00\00\00\00  store i64 %lk, ptr %k_slot\0A\00", align 8
+@.str_1227 = private unnamed_addr constant [46 x i8] c"\87\A2\C8\00\00\00\00\00\1D\00\00\00\00\00\00\00  store i64 %lv, ptr %v_slot\0A\00", align 8
+@.str_1228 = private unnamed_addr constant [50 x i8] c"\28\7B\19\1C\00\00\00\00\21\00\00\00\00\00\00\00  store i64 %last, ptr %len_slot\0A\00", align 8
+@.str_1229 = private unnamed_addr constant [72 x i8] c"\4B\FE\A6\04\00\00\00\00\37\00\00\00\00\00\00\00define void @orion_map_remove_ik(ptr %map, i64 %key) {\0A\00", align 8
+@.str_1230 = private unnamed_addr constant [68 x i8] c"\E1\D3\AA\0D\00\00\00\00\33\00\00\00\00\00\00\00define i64 @orion_map_get_ik(ptr %map, i64 %key) {\0A\00", align 8
+@.str_1231 = private unnamed_addr constant [68 x i8] c"\05\09\F2\39\00\00\00\00\33\00\00\00\00\00\00\00define i64 @orion_map_has_ik(ptr %map, i64 %key) {\0A\00", align 8
+@.str_1232 = private unnamed_addr constant [82 x i8] c"\A1\93\53\24\00\00\00\00\41\00\00\00\00\00\00\00define i64 @orion_map_get_or_ik(ptr %map, i64 %key, i64 %dflt) {\0A\00", align 8
+@.str_1233 = private unnamed_addr constant [73 x i8] c"\39\06\D1\02\00\00\00\00\38\00\00\00\00\00\00\00  %has = call i64 @orion_map_has_ik(ptr %map, i64 %key)\0A\00", align 8
+@.str_1234 = private unnamed_addr constant [62 x i8] c"\D5\49\AA\02\00\00\00\00\2D\00\00\00\00\00\00\00  br i1 %miss, label %use_dflt, label %fetch\0A\00", align 8
+@.str_1235 = private unnamed_addr constant [27 x i8] c"\F0\93\9A\03\00\00\00\00\0A\00\00\00\00\00\00\00use_dflt:\0A\00", align 8
+@.str_1236 = private unnamed_addr constant [33 x i8] c"\EB\F7\B0\17\00\00\00\00\10\00\00\00\00\00\00\00  ret i64 %dflt\0A\00", align 8
+@.str_1237 = private unnamed_addr constant [71 x i8] c"\7C\CD\29\2B\00\00\00\00\36\00\00\00\00\00\00\00  %v = call i64 @orion_map_get_ik(ptr %map, i64 %key)\0A\00", align 8
+@.str_1238 = private unnamed_addr constant [55 x i8] c"\D3\16\37\37\00\00\00\00\26\00\00\00\00\00\00\00define i64 @orion_map_len(ptr %map) {\0A\00", align 8
+@.str_1239 = private unnamed_addr constant [56 x i8] c"\2D\67\72\14\00\00\00\00\27\00\00\00\00\00\00\00define ptr @orion_map_keys(ptr %map) {\0A\00", align 8
+@.str_1240 = private unnamed_addr constant [61 x i8] c"\BF\24\14\38\00\00\00\00\2C\00\00\00\00\00\00\00  %out = call ptr @orion_list_new(i64 %len)\0A\00", align 8
+@.str_1241 = private unnamed_addr constant [75 x i8] c"\FF\6A\10\04\00\00\00\00\3A\00\00\00\00\00\00\00  call void @orion_list_set(ptr %out, i64 %i, i64 %k_int)\0A\00", align 8
+@.str_1242 = private unnamed_addr constant [58 x i8] c"\47\4D\AB\29\00\00\00\00\29\00\00\00\00\00\00\00define ptr @orion_map_values(ptr %map) {\0A\00", align 8
+@.str_1243 = private unnamed_addr constant [50 x i8] c"\A2\CD\66\1C\00\00\00\00\21\00\00\00\00\00\00\00  %v_int = load i64, ptr %v_slot\0A\00", align 8
+@.str_1244 = private unnamed_addr constant [75 x i8] c"\33\D3\B2\06\00\00\00\00\3A\00\00\00\00\00\00\00  call void @orion_list_set(ptr %out, i64 %i, i64 %v_int)\0A\00", align 8
+@.str_1245 = private unnamed_addr constant [79 x i8] c"\F2\F5\79\37\00\00\00\00\3E\00\00\00\00\00\00\00define i64 @orion_map_get_or(ptr %map, ptr %key, i64 %dflt) {\0A\00", align 8
+@.str_1246 = private unnamed_addr constant [70 x i8] c"\8C\7F\53\16\00\00\00\00\35\00\00\00\00\00\00\00  %has = call i64 @orion_map_has(ptr %map, ptr %key)\0A\00", align 8
+@.str_1247 = private unnamed_addr constant [68 x i8] c"\25\1C\F9\1D\00\00\00\00\33\00\00\00\00\00\00\00  %v = call i64 @orion_map_get(ptr %map, ptr %key)\0A\00", align 8
+@.str_1248 = private unnamed_addr constant [60 x i8] c"\DD\E6\B0\07\00\00\00\00\2B\00\00\00\00\00\00\00define ptr @orion_f64_to_text(double %v) {\0A\00", align 8
+@.str_1249 = private unnamed_addr constant [107 x i8] c"\70\EA\B3\26\00\00\00\00\5A\00\00\00\00\00\00\00  %_n = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_g, double %v)\0A\00", align 8
+@.str_1250 = private unnamed_addr constant [61 x i8] c"\7A\C9\0D\29\00\00\00\00\2C\00\00\00\00\00\00\00define ptr @orion_vec_add(ptr %a, ptr %b) {\0A\00", align 8
+@.str_1251 = private unnamed_addr constant [124 x i8] c"\D2\7B\A9\00\00\00\00\00\6B\00\00\00\00\00\00\00entry:\0A  %la = call i64 @orion_list_len(ptr %a)\0A  %out = call ptr @orion_list_new(i64 %la)\0A  br label %hdr\0A\00", align 8
+@.str_1252 = private unnamed_addr constant [141 x i8] c"\CF\E1\97\29\00\00\00\00\7C\00\00\00\00\00\00\00hdr:\0A  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\0A  %done = icmp sge i64 %i, %la\0A  br i1 %done, label %after, label %bdy\0A\00", align 8
+@.str_1253 = private unnamed_addr constant [238 x i8] c"\66\E6\DD\13\00\00\00\00\DD\00\00\00\00\00\00\00bdy:\0A  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\0A  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\0A  %s = add i64 %xa, %xb\0A  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\0A  %i_next = add i64 %i, 1\0A  br label %hdr\0A\00", align 8
+@.str_1254 = private unnamed_addr constant [42 x i8] c"\51\80\1A\1D\00\00\00\00\19\00\00\00\00\00\00\00after:\0A  ret ptr %out\0A}\0A\0A\00", align 8
+@.str_1255 = private unnamed_addr constant [61 x i8] c"\22\7D\15\36\00\00\00\00\2C\00\00\00\00\00\00\00define ptr @orion_vec_sub(ptr %a, ptr %b) {\0A\00", align 8
+@.str_1256 = private unnamed_addr constant [238 x i8] c"\36\17\92\10\00\00\00\00\DD\00\00\00\00\00\00\00bdy:\0A  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\0A  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\0A  %s = sub i64 %xa, %xb\0A  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\0A  %i_next = add i64 %i, 1\0A  br label %hdr\0A\00", align 8
+@.str_1257 = private unnamed_addr constant [61 x i8] c"\C8\46\47\13\00\00\00\00\2C\00\00\00\00\00\00\00define ptr @orion_vec_mul(ptr %a, ptr %b) {\0A\00", align 8
+@.str_1258 = private unnamed_addr constant [238 x i8] c"\9D\87\15\0F\00\00\00\00\DD\00\00\00\00\00\00\00bdy:\0A  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\0A  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\0A  %s = mul i64 %xa, %xb\0A  call void @orion_list_set(ptr %out, i64 %i, i64 %s)\0A  %i_next = add i64 %i, 1\0A  br label %hdr\0A\00", align 8
+@.str_1259 = private unnamed_addr constant [61 x i8] c"\CF\B6\B7\36\00\00\00\00\2C\00\00\00\00\00\00\00define i64 @orion_vec_dot(ptr %a, ptr %b) {\0A\00", align 8
+@.str_1260 = private unnamed_addr constant [81 x i8] c"\0D\BA\34\33\00\00\00\00\40\00\00\00\00\00\00\00entry:\0A  %la = call i64 @orion_list_len(ptr %a)\0A  br label %hdr\0A\00", align 8
+@.str_1261 = private unnamed_addr constant [193 x i8] c"\8F\81\18\31\00\00\00\00\B0\00\00\00\00\00\00\00hdr:\0A  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\0A  %acc = phi i64 [ 0, %entry ], [ %acc_next, %bdy ]\0A  %done = icmp sge i64 %i, %la\0A  br i1 %done, label %after, label %bdy\0A\00", align 8
+@.str_1262 = private unnamed_addr constant [215 x i8] c"\46\DA\5C\11\00\00\00\00\C6\00\00\00\00\00\00\00bdy:\0A  %xa = call i64 @orion_list_at(ptr %a, i64 %i)\0A  %xb = call i64 @orion_list_at(ptr %b, i64 %i)\0A  %m = mul i64 %xa, %xb\0A  %acc_next = add i64 %acc, %m\0A  %i_next = add i64 %i, 1\0A  br label %hdr\0A\00", align 8
+@.str_1263 = private unnamed_addr constant [42 x i8] c"\08\B6\F9\1A\00\00\00\00\19\00\00\00\00\00\00\00after:\0A  ret i64 %acc\0A}\0A\0A\00", align 8
+@.str_1264 = private unnamed_addr constant [42 x i8] c"\50\FE\65\0C\00\00\00\00\19\00\00\00\00\00\00\00; orion_emit_llvm output\0A\00", align 8
+@.str_1265 = private unnamed_addr constant [25 x i8] c"\5D\73\0C\0C\00\00\00\00\08\00\00\00\00\00\00\00declare \00", align 8
+@.str_1266 = private unnamed_addr constant [20 x i8] c"\4C\84\D2\05\00\00\00\00\03\00\00\00\00\00\00\00)\0A\0A\00", align 8
+@.str_1267 = private unnamed_addr constant [44 x i8] c"\40\3C\D1\23\00\00\00\00\1B\00\00\00\00\00\00\00@orion_argc = global i64 0\0A\00", align 8
+@.str_1268 = private unnamed_addr constant [48 x i8] c"\07\6D\B5\17\00\00\00\00\1F\00\00\00\00\00\00\00@orion_argv = global ptr null\0A\0A\00", align 8
+@.str_1269 = private unnamed_addr constant [58 x i8] c"\B9\68\BB\06\00\00\00\00\29\00\00\00\00\00\00\00define i32 @main(i32 %argc, ptr %argv) {\0A\00", align 8
+@.str_1270 = private unnamed_addr constant [51 x i8] c"\65\AE\4F\25\00\00\00\00\22\00\00\00\00\00\00\00  %argc64 = sext i32 %argc to i64\0A\00", align 8
+@.str_1271 = private unnamed_addr constant [54 x i8] c"\A8\D7\8A\03\00\00\00\00\25\00\00\00\00\00\00\00  store i64 %argc64, ptr @orion_argc\0A\00", align 8
+@.str_1272 = private unnamed_addr constant [52 x i8] c"\31\3E\CD\1F\00\00\00\00\23\00\00\00\00\00\00\00  store ptr %argv, ptr @orion_argv\0A\00", align 8
+@.str_1273 = private unnamed_addr constant [49 x i8] c"\26\56\B5\1B\00\00\00\00\20\00\00\00\00\00\00\00  %ret = call i64 @orion_main()\0A\00", align 8
+@.str_1274 = private unnamed_addr constant [50 x i8] c"\36\EC\B5\22\00\00\00\00\21\00\00\00\00\00\00\00  %ret32 = trunc i64 %ret to i32\0A\00", align 8
+@.str_1275 = private unnamed_addr constant [34 x i8] c"\95\7E\2B\1B\00\00\00\00\11\00\00\00\00\00\00\00  ret i32 %ret32\0A\00", align 8
+@.str_1276 = private unnamed_addr constant [24 x i8] c"\09\11\3C\09\00\00\00\00\07\00\00\00\00\00\00\00/lib.or\00", align 8
+@.str_1277 = private unnamed_addr constant [18 x i8] c"\FC\C1\0A\00\00\00\00\00\01\00\00\00\00\00\00\00m\00", align 8
+@.str_1278 = private unnamed_addr constant [20 x i8] c"\E3\AF\DF\05\00\00\00\00\03\00\00\00\00\00\00\00[0m\00", align 8
+@.str_1279 = private unnamed_addr constant [21 x i8] c"\41\92\D9\30\00\00\00\00\04\00\00\00\00\00\00\0031;1\00", align 8
+@.str_1280 = private unnamed_addr constant [24 x i8] c"\57\AF\2B\0D\00\00\00\00\07\00\00\00\00\00\00\00  orbs \00", align 8
+@.str_1281 = private unnamed_addr constant [19 x i8] c"\B5\1C\81\05\00\00\00\00\02\00\00\00\00\00\00\00 (\00", align 8
+@.str_1282 = private unnamed_addr constant [21 x i8] c"\37\A2\54\2E\00\00\00\00\04\00\00\00\00\00\00\00 KB)\00", align 8
+@.str_1283 = private unnamed_addr constant [28 x i8] c"\28\2F\9B\12\00\00\00\00\0B\00\00\00\00\00\00\00orion_audio\00", align 8
+@.str_1284 = private unnamed_addr constant [21 x i8] c"\AC\F3\04\3A\00\00\00\00\04\00\00\00\00\00\00\00win_\00", align 8
+@.str_1285 = private unnamed_addr constant [20 x i8] c"\AE\08\E5\05\00\00\00\00\03\00\00\00\00\00\00\00og_\00", align 8
+@.str_1286 = private unnamed_addr constant [22 x i8] c"\8E\4F\42\09\00\00\00\00\05\00\00\00\00\00\00\00ogpu_\00", align 8
+@.str_1287 = private unnamed_addr constant [28 x i8] c"\E1\8B\34\12\00\00\00\00\0B\00\00\00\00\00\00\00orion_arena\00", align 8
+@.str_1288 = private unnamed_addr constant [30 x i8] c"\EA\09\B3\20\00\00\00\00\0D\00\00\00\00\00\00\00orion_persist\00", align 8
+@.str_1289 = private unnamed_addr constant [27 x i8] c"\E4\E8\FE\21\00\00\00\00\0A\00\00\00\00\00\00\00orion_pool\00", align 8
+@.str_1290 = private unnamed_addr constant [28 x i8] c"\CC\44\5D\2E\00\00\00\00\0B\00\00\00\00\00\00\00orion_frame\00", align 8
+@.str_1291 = private unnamed_addr constant [29 x i8] c"\07\6B\19\21\00\00\00\00\0C\00\00\00\00\00\00\00orion_ledger\00", align 8
+@.str_1292 = private unnamed_addr constant [28 x i8] c"\03\90\68\11\00\00\00\00\0B\00\00\00\00\00\00\00orion_alloc\00", align 8
+@.str_1293 = private unnamed_addr constant [27 x i8] c"\A2\08\65\22\00\00\00\00\0A\00\00\00\00\00\00\00orion_slot\00", align 8
+@.str_1294 = private unnamed_addr constant [34 x i8] c"\55\C1\97\19\00\00\00\00\11\00\00\00\00\00\00\00__orion_monotonic\00", align 8
+@.str_1295 = private unnamed_addr constant [29 x i8] c"\48\79\47\08\00\00\00\00\0C\00\00\00\00\00\00\00__orion_time\00", align 8
+@.str_1296 = private unnamed_addr constant [30 x i8] c"\09\C0\22\36\00\00\00\00\0D\00\00\00\00\00\00\00__orion_sleep\00", align 8
+@.str_1297 = private unnamed_addr constant [30 x i8] c"\AD\29\98\11\00\00\00\00\0D\00\00\00\00\00\00\00orion_console\00", align 8
+@.str_1298 = private unnamed_addr constant [26 x i8] c"\5A\1C\F1\3A\00\00\00\00\09\00\00\00\00\00\00\00orion_dir\00", align 8
+@.str_1299 = private unnamed_addr constant [27 x i8] c"\10\4D\A6\20\00\00\00\00\0A\00\00\00\00\00\00\00orion_file\00", align 8
+@.str_1300 = private unnamed_addr constant [31 x i8] c"\20\56\29\3A\00\00\00\00\0E\00\00\00\00\00\00\00orion_embedded\00", align 8
+@.str_1301 = private unnamed_addr constant [21 x i8] c"\ED\FA\17\39\00\00\00\00\04\00\00\00\00\00\00\00pure\00", align 8
+@.str_1302 = private unnamed_addr constant [22 x i8] c"\5A\91\A4\36\00\00\00\00\05\00\00\00\00\00\00\00 slot\00", align 8
+@.str_1303 = private unnamed_addr constant [20 x i8] c"\FD\59\D0\05\00\00\00\00\03\00\00\00\00\00\00\00 io\00", align 8
+@.str_1304 = private unnamed_addr constant [26 x i8] c"\63\08\6A\04\00\00\00\00\09\00\00\00\00\00\00\00 platform\00", align 8
+@.str_1305 = private unnamed_addr constant [23 x i8] c"\1C\6C\83\30\00\00\00\00\06\00\00\00\00\00\00\00 audio\00", align 8
+@.str_1306 = private unnamed_addr constant [24 x i8] c"\73\79\4E\33\00\00\00\00\07\00\00\00\00\00\00\00 extern\00", align 8
+@.str_1307 = private unnamed_addr constant [21 x i8] c"\96\9B\5D\2E\00\00\00\00\04\00\00\00\00\00\00\00 mem\00", align 8
+@.str_1308 = private unnamed_addr constant [22 x i8] c"\C5\14\C6\36\00\00\00\00\05\00\00\00\00\00\00\00 time\00", align 8
+@.str_1309 = private unnamed_addr constant [24 x i8] c"\BE\30\76\10\00\00\00\00\07\00\00\00\00\00\00\00facts: \00", align 8
+@.str_1310 = private unnamed_addr constant [25 x i8] c"\51\D0\83\1F\00\00\00\00\08\00\00\00\00\00\00\00 fn(s), \00", align 8
+@.str_1311 = private unnamed_addr constant [24 x i8] c"\67\33\B1\14\00\00\00\00\07\00\00\00\00\00\00\00 pure (\00", align 8
+@.str_1312 = private unnamed_addr constant [33 x i8] c"\CA\30\7D\1D\00\00\00\00\10\00\00\00\00\00\00\00 closure passes)\00", align 8
+@.str_1313 = private unnamed_addr constant [71 x i8] c"\2A\5D\05\1C\00\00\00\00\36\00\00\00\00\00\00\00usage: orion_self <input.or> [output.ll] [orb-root...]\00", align 8
+@.str_1314 = private unnamed_addr constant [23 x i8] c"\70\63\A2\1C\00\00\00\00\06\00\00\00\00\00\00\00out.ll\00", align 8
+@.str_1315 = private unnamed_addr constant [37 x i8] c"\BF\6D\29\33\00\00\00\00\14\00\00\00\00\00\00\00orion: cannot read `\00", align 8
+@.str_1316 = private unnamed_addr constant [23 x i8] c"\51\50\1A\25\00\00\00\00\06\00\00\00\00\00\00\00/orbs/\00", align 8
+@.str_1317 = private unnamed_addr constant [26 x i8] c"\94\7F\B4\0D\00\00\00\00\09\00\00\00\00\00\00\00/../orbs/\00", align 8
+@.str_1318 = private unnamed_addr constant [29 x i8] c"\98\58\7C\17\00\00\00\00\0C\00\00\00\00\00\00\00/../../orbs/\00", align 8
+@.str_1319 = private unnamed_addr constant [22 x i8] c"\83\F9\B7\0A\00\00\00\00\05\00\00\00\00\00\00\00orbs/\00", align 8
+@.str_1320 = private unnamed_addr constant [25 x i8] c"\3F\83\08\1A\00\00\00\00\08\00\00\00\00\00\00\00../orbs/\00", align 8
+@.str_1321 = private unnamed_addr constant [22 x i8] c"\44\0B\46\1D\00\00\00\00\05\00\00\00\00\00\00\00facts\00", align 8
+@.str_1322 = private unnamed_addr constant [28 x i8] c"\46\13\0D\2D\00\00\00\00\0B\00\00\00\00\00\00\00  compiled \00", align 8
+@.str_1323 = private unnamed_addr constant [26 x i8] c"\AA\BE\7B\22\00\00\00\00\09\00\00\00\00\00\00\00 ms (lex \00", align 8
+@.str_1324 = private unnamed_addr constant [26 x i8] c"\5C\02\73\0C\00\00\00\00\09\00\00\00\00\00\00\00 | parse \00", align 8
+@.str_1325 = private unnamed_addr constant [23 x i8] c"\71\E5\3C\22\00\00\00\00\06\00\00\00\00\00\00\00 | ir \00", align 8
+@.str_1326 = private unnamed_addr constant [25 x i8] c"\3B\92\FF\15\00\00\00\00\08\00\00\00\00\00\00\00 | emit \00", align 8
+@.str_1327 = private unnamed_addr constant [48 x i8] c"\BC\46\53\09\00\00\00\00\1F\00\00\00\00\00\00\00orion: compilation FAILED with \00", align 8
+@.str_1328 = private unnamed_addr constant [48 x i8] c"\4B\C1\0D\30\00\00\00\00\1F\00\00\00\00\00\00\00 error(s) \E2\80\94 no output written\00", align 8
+@.str_1329 = private unnamed_addr constant [19 x i8] c"\AD\1C\81\05\00\00\00\00\02\00\00\00\00\00\00\00  \00", align 8
+@.str_1330 = private unnamed_addr constant [29 x i8] c"\F8\A8\8D\03\00\00\00\00\0C\00\00\00\00\00\00\00write failed\00", align 8
 
 define ptr @ir_type_i64() {
 entry:
@@ -34264,6 +34266,551 @@ for_7_end:
     ret i64 %v112
 }
 
+define i64 @lam_name_in(ptr %p0, ptr %p1) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = add i64 0, 0
+    %v3 = alloca i64, align 8
+    store i64 %v2, ptr %v3
+    %v4 = add i64 0, 0
+    %v5 = add i64 0, 0
+    %v6 = call i64 @orion_list_len(ptr %v0)
+    %v7 = alloca i64, align 8
+    store i64 %v5, ptr %v7
+    %v8 = add i64 0, 0
+    br label %for_5_header
+for_5_header:
+    %v11 = load i64, ptr %v7
+    %v12.b = icmp slt i64 %v11, %v6
+    %v12 = zext i1 %v12.b to i64
+    %v13.cb = icmp ne i64 %v12, 0
+    br i1 %v13.cb, label %for_5_body, label %for_5_end
+for_5_body:
+    %v15.i = call i64 @orion_list_at(ptr %v0, i64 %v11)
+    %v15 = inttoptr i64 %v15.i to ptr
+    %v16.e = call i64 @orion_text_eq(ptr %v15, ptr %v1)
+    %v16 = add i64 %v16.e, 0
+    %v17.cb = icmp ne i64 %v16, 0
+    br i1 %v17.cb, label %if_17_then, label %if_17_else
+if_17_then:
+    %v19 = add i64 0, 1
+    store i64 %v19, ptr %v3
+    %v20 = add i64 0, 0
+    br label %if_17_merge
+if_17_else:
+    br label %if_17_merge
+if_17_merge:
+    br label %for_5_step
+for_5_step:
+    %v27 = add i64 0, 1
+    %v28 = add i64 %v11, %v27
+    store i64 %v28, ptr %v7
+    %v29 = add i64 0, 0
+    br label %for_5_header
+for_5_end:
+    %v32 = load i64, ptr %v3
+    ret i64 %v32
+}
+
+define ptr @lam_list_escapes(ptr %p0, ptr %p1) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = getelementptr i8, ptr @.str_5, i64 16
+    %v3 = alloca ptr, align 8
+    store ptr %v2, ptr %v3
+    %v4 = add i64 0, 0
+    %v5 = add i64 0, 0
+    %v6 = call i64 @orion_list_len(ptr %v0)
+    %v7 = alloca i64, align 8
+    store i64 %v5, ptr %v7
+    %v8 = add i64 0, 0
+    br label %for_5_header
+for_5_header:
+    %v11 = load i64, ptr %v7
+    %v12.b = icmp slt i64 %v11, %v6
+    %v12 = zext i1 %v12.b to i64
+    %v13.cb = icmp ne i64 %v12, 0
+    br i1 %v13.cb, label %for_5_body, label %for_5_end
+for_5_body:
+    %v15 = load ptr, ptr %v3
+    %v16 = getelementptr i8, ptr @.str_5, i64 16
+    %v17.e = call i64 @orion_text_eq(ptr %v15, ptr %v16)
+    %v17 = add i64 %v17.e, 0
+    %v18.cb = icmp ne i64 %v17, 0
+    br i1 %v18.cb, label %if_18_then, label %if_18_else
+if_18_then:
+    %v20.i = call i64 @orion_list_at(ptr %v0, i64 %v11)
+    %v20 = inttoptr i64 %v20.i to ptr
+    %v21 = call ptr @lam_expr_escapes(ptr %v20, ptr %v1)
+    store ptr %v21, ptr %v3
+    %v22 = add i64 0, 0
+    br label %if_18_merge
+if_18_else:
+    br label %if_18_merge
+if_18_merge:
+    br label %for_5_step
+for_5_step:
+    %v29 = add i64 0, 1
+    %v30 = add i64 %v11, %v29
+    store i64 %v30, ptr %v7
+    %v31 = add i64 0, 0
+    br label %for_5_header
+for_5_end:
+    %v34 = load ptr, ptr %v3
+    ret ptr %v34
+}
+
+define ptr @lam_expr_escapes(ptr %p0, ptr %p1) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = getelementptr i8, ptr @.str_111, i64 16
+    %v3.i = call i64 @orion_map_get(ptr %v0, ptr %v2)
+    %v3 = inttoptr i64 %v3.i to ptr
+    %v4 = getelementptr i8, ptr @.str_5, i64 16
+    %v5 = alloca ptr, align 8
+    store ptr %v4, ptr %v5
+    %v6 = add i64 0, 0
+    %v7 = getelementptr i8, ptr @.str_250, i64 16
+    %v8.e = call i64 @orion_text_eq(ptr %v3, ptr %v7)
+    %v8 = add i64 %v8.e, 0
+    %v9.cb = icmp ne i64 %v8, 0
+    br i1 %v9.cb, label %if_9_then, label %if_9_else
+if_9_then:
+    %v11 = getelementptr i8, ptr @.str_251, i64 16
+    %v12.i = call i64 @orion_map_get(ptr %v0, ptr %v11)
+    %v12 = inttoptr i64 %v12.i to ptr
+    %v13 = call i64 @lam_name_in(ptr %v1, ptr %v12)
+    %v14.cb = icmp ne i64 %v13, 0
+    br i1 %v14.cb, label %if_14_then, label %if_14_else
+if_14_then:
+    %v16 = getelementptr i8, ptr @.str_251, i64 16
+    %v17.i = call i64 @orion_map_get(ptr %v0, ptr %v16)
+    %v17 = inttoptr i64 %v17.i to ptr
+    store ptr %v17, ptr %v5
+    %v18 = add i64 0, 0
+    br label %if_14_merge
+if_14_else:
+    br label %if_14_merge
+if_14_merge:
+    br label %if_9_merge
+if_9_else:
+    br label %if_9_merge
+if_9_merge:
+    %v27 = getelementptr i8, ptr @.str_245, i64 16
+    %v28.e = call i64 @orion_text_eq(ptr %v3, ptr %v27)
+    %v28 = add i64 %v28.e, 0
+    %v29.cb = icmp ne i64 %v28, 0
+    br i1 %v29.cb, label %if_29_then, label %if_29_else
+if_29_then:
+    %v31 = getelementptr i8, ptr @.str_247, i64 16
+    %v32.i = call i64 @orion_map_get(ptr %v0, ptr %v31)
+    %v32 = inttoptr i64 %v32.i to ptr
+    %v33 = call ptr @lam_list_escapes(ptr %v32, ptr %v1)
+    store ptr %v33, ptr %v5
+    %v34 = add i64 0, 0
+    br label %if_29_merge
+if_29_else:
+    br label %if_29_merge
+if_29_merge:
+    %v39 = getelementptr i8, ptr @.str_298, i64 16
+    %v40.e = call i64 @orion_text_eq(ptr %v3, ptr %v39)
+    %v40 = add i64 %v40.e, 0
+    %v41.cb = icmp ne i64 %v40, 0
+    br i1 %v41.cb, label %if_41_then, label %if_41_else
+if_41_then:
+    %v43 = getelementptr i8, ptr @.str_247, i64 16
+    %v44.i = call i64 @orion_map_get(ptr %v0, ptr %v43)
+    %v44 = inttoptr i64 %v44.i to ptr
+    %v45 = call ptr @lam_list_escapes(ptr %v44, ptr %v1)
+    store ptr %v45, ptr %v5
+    %v46 = add i64 0, 0
+    br label %if_41_merge
+if_41_else:
+    br label %if_41_merge
+if_41_merge:
+    %v51 = getelementptr i8, ptr @.str_306, i64 16
+    %v52.e = call i64 @orion_text_eq(ptr %v3, ptr %v51)
+    %v52 = add i64 %v52.e, 0
+    %v53.cb = icmp ne i64 %v52, 0
+    br i1 %v53.cb, label %if_53_then, label %if_53_else
+if_53_then:
+    %v55 = getelementptr i8, ptr @.str_307, i64 16
+    %v56.i = call i64 @orion_map_get(ptr %v0, ptr %v55)
+    %v56 = inttoptr i64 %v56.i to ptr
+    %v57 = call ptr @lam_expr_escapes(ptr %v56, ptr %v1)
+    store ptr %v57, ptr %v5
+    %v58 = add i64 0, 0
+    %v59 = load ptr, ptr %v5
+    %v60 = getelementptr i8, ptr @.str_5, i64 16
+    %v61.e = call i64 @orion_text_eq(ptr %v59, ptr %v60)
+    %v61 = add i64 %v61.e, 0
+    %v62.cb = icmp ne i64 %v61, 0
+    br i1 %v62.cb, label %if_62_then, label %if_62_else
+if_62_then:
+    %v64 = getelementptr i8, ptr @.str_308, i64 16
+    %v65.i = call i64 @orion_map_get(ptr %v0, ptr %v64)
+    %v65 = inttoptr i64 %v65.i to ptr
+    %v66 = call ptr @lam_expr_escapes(ptr %v65, ptr %v1)
+    store ptr %v66, ptr %v5
+    %v67 = add i64 0, 0
+    br label %if_62_merge
+if_62_else:
+    br label %if_62_merge
+if_62_merge:
+    br label %if_53_merge
+if_53_else:
+    br label %if_53_merge
+if_53_merge:
+    %v76 = getelementptr i8, ptr @.str_292, i64 16
+    %v77.e = call i64 @orion_text_eq(ptr %v3, ptr %v76)
+    %v77 = add i64 %v77.e, 0
+    %v78.cb = icmp ne i64 %v77, 0
+    br i1 %v78.cb, label %if_78_then, label %if_78_else
+if_78_then:
+    %v80 = getelementptr i8, ptr @.str_294, i64 16
+    %v81.i = call i64 @orion_map_get(ptr %v0, ptr %v80)
+    %v81 = inttoptr i64 %v81.i to ptr
+    %v82 = call ptr @lam_expr_escapes(ptr %v81, ptr %v1)
+    store ptr %v82, ptr %v5
+    %v83 = add i64 0, 0
+    br label %if_78_merge
+if_78_else:
+    br label %if_78_merge
+if_78_merge:
+    %v88 = getelementptr i8, ptr @.str_314, i64 16
+    %v89.e = call i64 @orion_text_eq(ptr %v3, ptr %v88)
+    %v89 = add i64 %v89.e, 0
+    %v90.cb = icmp ne i64 %v89, 0
+    br i1 %v90.cb, label %if_90_then, label %if_90_else
+if_90_then:
+    %v92 = getelementptr i8, ptr @.str_315, i64 16
+    %v93.i = call i64 @orion_map_get(ptr %v0, ptr %v92)
+    %v93 = inttoptr i64 %v93.i to ptr
+    %v94 = call ptr @lam_expr_escapes(ptr %v93, ptr %v1)
+    store ptr %v94, ptr %v5
+    %v95 = add i64 0, 0
+    %v96 = load ptr, ptr %v5
+    %v97 = getelementptr i8, ptr @.str_5, i64 16
+    %v98.e = call i64 @orion_text_eq(ptr %v96, ptr %v97)
+    %v98 = add i64 %v98.e, 0
+    %v99.cb = icmp ne i64 %v98, 0
+    br i1 %v99.cb, label %if_99_then, label %if_99_else
+if_99_then:
+    %v101 = getelementptr i8, ptr @.str_247, i64 16
+    %v102.i = call i64 @orion_map_get(ptr %v0, ptr %v101)
+    %v102 = inttoptr i64 %v102.i to ptr
+    %v103 = call ptr @lam_list_escapes(ptr %v102, ptr %v1)
+    store ptr %v103, ptr %v5
+    %v104 = add i64 0, 0
+    br label %if_99_merge
+if_99_else:
+    br label %if_99_merge
+if_99_merge:
+    br label %if_90_merge
+if_90_else:
+    br label %if_90_merge
+if_90_merge:
+    %v113 = getelementptr i8, ptr @.str_248, i64 16
+    %v114.e = call i64 @orion_text_eq(ptr %v3, ptr %v113)
+    %v114 = add i64 %v114.e, 0
+    %v115.cb = icmp ne i64 %v114, 0
+    br i1 %v115.cb, label %if_115_then, label %if_115_else
+if_115_then:
+    %v117 = getelementptr i8, ptr @.str_249, i64 16
+    %v118.i = call i64 @orion_map_get(ptr %v0, ptr %v117)
+    %v118 = inttoptr i64 %v118.i to ptr
+    %v119 = call ptr @lam_expr_escapes(ptr %v118, ptr %v1)
+    store ptr %v119, ptr %v5
+    %v120 = add i64 0, 0
+    br label %if_115_merge
+if_115_else:
+    br label %if_115_merge
+if_115_merge:
+    %v125 = getelementptr i8, ptr @.str_317, i64 16
+    %v126.e = call i64 @orion_text_eq(ptr %v3, ptr %v125)
+    %v126 = add i64 %v126.e, 0
+    %v127.cb = icmp ne i64 %v126, 0
+    br i1 %v127.cb, label %if_127_then, label %if_127_else
+if_127_then:
+    %v129 = getelementptr i8, ptr @.str_249, i64 16
+    %v130.i = call i64 @orion_map_get(ptr %v0, ptr %v129)
+    %v130 = inttoptr i64 %v130.i to ptr
+    %v131 = call ptr @lam_expr_escapes(ptr %v130, ptr %v1)
+    store ptr %v131, ptr %v5
+    %v132 = add i64 0, 0
+    %v133 = load ptr, ptr %v5
+    %v134 = getelementptr i8, ptr @.str_5, i64 16
+    %v135.e = call i64 @orion_text_eq(ptr %v133, ptr %v134)
+    %v135 = add i64 %v135.e, 0
+    %v136.cb = icmp ne i64 %v135, 0
+    br i1 %v136.cb, label %if_136_then, label %if_136_else
+if_136_then:
+    %v138 = getelementptr i8, ptr @.str_318, i64 16
+    %v139.i = call i64 @orion_map_get(ptr %v0, ptr %v138)
+    %v139 = inttoptr i64 %v139.i to ptr
+    %v140 = call ptr @lam_expr_escapes(ptr %v139, ptr %v1)
+    store ptr %v140, ptr %v5
+    %v141 = add i64 0, 0
+    br label %if_136_merge
+if_136_else:
+    br label %if_136_merge
+if_136_merge:
+    br label %if_127_merge
+if_127_else:
+    br label %if_127_merge
+if_127_merge:
+    %v150 = getelementptr i8, ptr @.str_319, i64 16
+    %v151.e = call i64 @orion_text_eq(ptr %v3, ptr %v150)
+    %v151 = add i64 %v151.e, 0
+    %v152.cb = icmp ne i64 %v151, 0
+    br i1 %v152.cb, label %if_152_then, label %if_152_else
+if_152_then:
+    %v154 = getelementptr i8, ptr @.str_320, i64 16
+    %v155.i = call i64 @orion_map_get(ptr %v0, ptr %v154)
+    %v155 = inttoptr i64 %v155.i to ptr
+    %v156 = call ptr @lam_expr_escapes(ptr %v155, ptr %v1)
+    store ptr %v156, ptr %v5
+    %v157 = add i64 0, 0
+    br label %if_152_merge
+if_152_else:
+    br label %if_152_merge
+if_152_merge:
+    %v162 = getelementptr i8, ptr @.str_273, i64 16
+    %v163.e = call i64 @orion_text_eq(ptr %v3, ptr %v162)
+    %v163 = add i64 %v163.e, 0
+    %v164.cb = icmp ne i64 %v163, 0
+    br i1 %v164.cb, label %if_164_then, label %if_164_else
+if_164_then:
+    %v166 = getelementptr i8, ptr @.str_274, i64 16
+    %v167.i = call i64 @orion_map_get(ptr %v0, ptr %v166)
+    %v167 = inttoptr i64 %v167.i to ptr
+    %v168 = call ptr @lam_expr_escapes(ptr %v167, ptr %v1)
+    store ptr %v168, ptr %v5
+    %v169 = add i64 0, 0
+    %v170 = load ptr, ptr %v5
+    %v171 = getelementptr i8, ptr @.str_5, i64 16
+    %v172.e = call i64 @orion_text_eq(ptr %v170, ptr %v171)
+    %v172 = add i64 %v172.e, 0
+    %v173.cb = icmp ne i64 %v172, 0
+    br i1 %v173.cb, label %if_173_then, label %if_173_else
+if_173_then:
+    %v175 = getelementptr i8, ptr @.str_275, i64 16
+    %v176.i = call i64 @orion_map_get(ptr %v0, ptr %v175)
+    %v176 = inttoptr i64 %v176.i to ptr
+    %v177 = call ptr @lam_expr_escapes(ptr %v176, ptr %v1)
+    store ptr %v177, ptr %v5
+    %v178 = add i64 0, 0
+    br label %if_173_merge
+if_173_else:
+    br label %if_173_merge
+if_173_merge:
+    %v183 = load ptr, ptr %v5
+    %v184 = getelementptr i8, ptr @.str_5, i64 16
+    %v185.e = call i64 @orion_text_eq(ptr %v183, ptr %v184)
+    %v185 = add i64 %v185.e, 0
+    %v186.cb = icmp ne i64 %v185, 0
+    br i1 %v186.cb, label %if_186_then, label %if_186_else
+if_186_then:
+    %v188 = getelementptr i8, ptr @.str_138, i64 16
+    %v189.i = call i64 @orion_map_get(ptr %v0, ptr %v188)
+    %v189 = inttoptr i64 %v189.i to ptr
+    %v190 = call ptr @lam_expr_escapes(ptr %v189, ptr %v1)
+    store ptr %v190, ptr %v5
+    %v191 = add i64 0, 0
+    br label %if_186_merge
+if_186_else:
+    br label %if_186_merge
+if_186_merge:
+    br label %if_164_merge
+if_164_else:
+    br label %if_164_merge
+if_164_merge:
+    %v200 = getelementptr i8, ptr @.str_288, i64 16
+    %v201.e = call i64 @orion_text_eq(ptr %v3, ptr %v200)
+    %v201 = add i64 %v201.e, 0
+    %v202.cb = icmp ne i64 %v201, 0
+    br i1 %v202.cb, label %if_202_then, label %if_202_else
+if_202_then:
+    %v204 = getelementptr i8, ptr @.str_289, i64 16
+    %v205.i = call i64 @orion_map_get(ptr %v0, ptr %v204)
+    %v205 = inttoptr i64 %v205.i to ptr
+    %v206 = call ptr @lam_list_escapes(ptr %v205, ptr %v1)
+    store ptr %v206, ptr %v5
+    %v207 = add i64 0, 0
+    br label %if_202_merge
+if_202_else:
+    br label %if_202_merge
+if_202_merge:
+    %v212 = getelementptr i8, ptr @.str_313, i64 16
+    %v213.e = call i64 @orion_text_eq(ptr %v3, ptr %v212)
+    %v213 = add i64 %v213.e, 0
+    %v214.cb = icmp ne i64 %v213, 0
+    br i1 %v214.cb, label %if_214_then, label %if_214_else
+if_214_then:
+    %v216 = getelementptr i8, ptr @.str_112, i64 16
+    %v217.i = call i64 @orion_map_get(ptr %v0, ptr %v216)
+    %v217 = inttoptr i64 %v217.i to ptr
+    %v218 = call ptr @lam_expr_escapes(ptr %v217, ptr %v1)
+    store ptr %v218, ptr %v5
+    %v219 = add i64 0, 0
+    br label %if_214_merge
+if_214_else:
+    br label %if_214_merge
+if_214_merge:
+    %v224 = load ptr, ptr %v5
+    ret ptr %v224
+}
+
+define ptr @lam_stmts_escapes(ptr %p0, ptr %p1) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = getelementptr i8, ptr @.str_5, i64 16
+    %v3 = alloca ptr, align 8
+    store ptr %v2, ptr %v3
+    %v4 = add i64 0, 0
+    %v5 = add i64 0, 0
+    %v6 = call i64 @orion_list_len(ptr %v0)
+    %v7 = alloca i64, align 8
+    store i64 %v5, ptr %v7
+    %v8 = add i64 0, 0
+    br label %for_5_header
+for_5_header:
+    %v11 = load i64, ptr %v7
+    %v12.b = icmp slt i64 %v11, %v6
+    %v12 = zext i1 %v12.b to i64
+    %v13.cb = icmp ne i64 %v12, 0
+    br i1 %v13.cb, label %for_5_body, label %for_5_end
+for_5_body:
+    %v15 = load ptr, ptr %v3
+    %v16 = getelementptr i8, ptr @.str_5, i64 16
+    %v17.e = call i64 @orion_text_eq(ptr %v15, ptr %v16)
+    %v17 = add i64 %v17.e, 0
+    %v18.cb = icmp ne i64 %v17, 0
+    br i1 %v18.cb, label %if_18_then, label %if_18_else
+if_18_then:
+    %v20.i = call i64 @orion_list_at(ptr %v0, i64 %v11)
+    %v20 = inttoptr i64 %v20.i to ptr
+    %v21 = getelementptr i8, ptr @.str_111, i64 16
+    %v22.i = call i64 @orion_map_get(ptr %v20, ptr %v21)
+    %v22 = inttoptr i64 %v22.i to ptr
+    %v23 = getelementptr i8, ptr @.str_287, i64 16
+    %v24.e = call i64 @orion_text_eq(ptr %v22, ptr %v23)
+    %v24 = add i64 %v24.e, 0
+    %v25.cb = icmp ne i64 %v24, 0
+    br i1 %v25.cb, label %if_25_then, label %if_25_else
+if_25_then:
+    br label %if_25_merge
+if_25_else:
+    %v29 = getelementptr i8, ptr @.str_279, i64 16
+    %v30.e = call i64 @orion_text_eq(ptr %v22, ptr %v29)
+    %v30 = add i64 %v30.e, 0
+    br label %if_25_merge
+if_25_merge:
+    %v33 = phi i64 [ %v24, %if_25_then ], [ %v30, %if_25_else ]
+    %v34.cb = icmp ne i64 %v33, 0
+    br i1 %v34.cb, label %if_34_then, label %if_34_else
+if_34_then:
+    %v36 = getelementptr i8, ptr @.str_112, i64 16
+    %v37.i = call i64 @orion_map_get(ptr %v20, ptr %v36)
+    %v37 = inttoptr i64 %v37.i to ptr
+    %v38 = call ptr @lam_expr_escapes(ptr %v37, ptr %v1)
+    store ptr %v38, ptr %v3
+    %v39 = add i64 0, 0
+    br label %if_34_merge
+if_34_else:
+    br label %if_34_merge
+if_34_merge:
+    %v44 = getelementptr i8, ptr @.str_290, i64 16
+    %v45.e = call i64 @orion_text_eq(ptr %v22, ptr %v44)
+    %v45 = add i64 %v45.e, 0
+    %v46.cb = icmp ne i64 %v45, 0
+    br i1 %v46.cb, label %if_46_then, label %if_46_else
+if_46_then:
+    br label %if_46_merge
+if_46_else:
+    %v50 = getelementptr i8, ptr @.str_333, i64 16
+    %v51.e = call i64 @orion_text_eq(ptr %v22, ptr %v50)
+    %v51 = add i64 %v51.e, 0
+    br label %if_46_merge
+if_46_merge:
+    %v54 = phi i64 [ %v45, %if_46_then ], [ %v51, %if_46_else ]
+    %v55.cb = icmp ne i64 %v54, 0
+    br i1 %v55.cb, label %if_55_then, label %if_55_else
+if_55_then:
+    br label %if_55_merge
+if_55_else:
+    %v59 = getelementptr i8, ptr @.str_331, i64 16
+    %v60.e = call i64 @orion_text_eq(ptr %v22, ptr %v59)
+    %v60 = add i64 %v60.e, 0
+    br label %if_55_merge
+if_55_merge:
+    %v63 = phi i64 [ %v54, %if_55_then ], [ %v60, %if_55_else ]
+    %v64.cb = icmp ne i64 %v63, 0
+    br i1 %v64.cb, label %if_64_then, label %if_64_else
+if_64_then:
+    br label %if_64_merge
+if_64_else:
+    %v68 = getelementptr i8, ptr @.str_332, i64 16
+    %v69.e = call i64 @orion_text_eq(ptr %v22, ptr %v68)
+    %v69 = add i64 %v69.e, 0
+    br label %if_64_merge
+if_64_merge:
+    %v72 = phi i64 [ %v63, %if_64_then ], [ %v69, %if_64_else ]
+    %v73.cb = icmp ne i64 %v72, 0
+    br i1 %v73.cb, label %if_73_then, label %if_73_else
+if_73_then:
+    br label %if_73_merge
+if_73_else:
+    %v77 = getelementptr i8, ptr @.str_330, i64 16
+    %v78.e = call i64 @orion_text_eq(ptr %v22, ptr %v77)
+    %v78 = add i64 %v78.e, 0
+    br label %if_73_merge
+if_73_merge:
+    %v81 = phi i64 [ %v72, %if_73_then ], [ %v78, %if_73_else ]
+    %v82.cb = icmp ne i64 %v81, 0
+    br i1 %v82.cb, label %if_82_then, label %if_82_else
+if_82_then:
+    br label %if_82_merge
+if_82_else:
+    %v86 = getelementptr i8, ptr @.str_334, i64 16
+    %v87.e = call i64 @orion_text_eq(ptr %v22, ptr %v86)
+    %v87 = add i64 %v87.e, 0
+    br label %if_82_merge
+if_82_merge:
+    %v90 = phi i64 [ %v81, %if_82_then ], [ %v87, %if_82_else ]
+    %v91.cb = icmp ne i64 %v90, 0
+    br i1 %v91.cb, label %if_91_then, label %if_91_else
+if_91_then:
+    %v93 = getelementptr i8, ptr @.str_291, i64 16
+    %v94.i = call i64 @orion_map_get(ptr %v20, ptr %v93)
+    %v94 = inttoptr i64 %v94.i to ptr
+    %v95 = call ptr @lam_expr_escapes(ptr %v94, ptr %v1)
+    store ptr %v95, ptr %v3
+    %v96 = add i64 0, 0
+    br label %if_91_merge
+if_91_else:
+    br label %if_91_merge
+if_91_merge:
+    br label %if_18_merge
+if_18_else:
+    br label %if_18_merge
+if_18_merge:
+    br label %for_5_step
+for_5_step:
+    %v107 = add i64 0, 1
+    %v108 = add i64 %v11, %v107
+    store i64 %v108, ptr %v7
+    %v109 = add i64 0, 0
+    br label %for_5_header
+for_5_end:
+    %v112 = load ptr, ptr %v3
+    ret ptr %v112
+}
+
 define ptr @ast_program_to_ir(ptr %p0) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
@@ -35849,745 +36396,828 @@ for_484_end:
     call void @orion_map_set(ptr %v1161, ptr %v1157, i64 %v1161.p0)
     %v1161.p1 = ptrtoint ptr %v1160 to i64
     call void @orion_map_set(ptr %v1161, ptr %v1159, i64 %v1161.p1)
-    %v1162 = getelementptr i8, ptr @.str_111, i64 16
-    %v1163 = getelementptr i8, ptr @.str_352, i64 16
-    %v1164 = getelementptr i8, ptr @.str_251, i64 16
-    %v1165 = getelementptr i8, ptr @.str_251, i64 16
-    %v1166.i = call i64 @orion_map_get(ptr %v445, ptr %v1165)
-    %v1166 = inttoptr i64 %v1166.i to ptr
-    %v1167 = getelementptr i8, ptr @.str_302, i64 16
-    %v1168 = getelementptr i8, ptr @.str_302, i64 16
-    %v1169.i = call i64 @orion_map_get(ptr %v445, ptr %v1168)
-    %v1169 = inttoptr i64 %v1169.i to ptr
-    %v1170 = getelementptr i8, ptr @.str_344, i64 16
-    %v1171 = getelementptr i8, ptr @.str_344, i64 16
-    %v1172.i = call i64 @orion_map_get(ptr %v445, ptr %v1171)
-    %v1172 = inttoptr i64 %v1172.i to ptr
-    %v1173 = getelementptr i8, ptr @.str_268, i64 16
-    %v1174 = call ptr @orion_map_new(i64 5)
-    %v1174.p0 = ptrtoint ptr %v1163 to i64
-    call void @orion_map_set(ptr %v1174, ptr %v1162, i64 %v1174.p0)
-    %v1174.p1 = ptrtoint ptr %v1166 to i64
-    call void @orion_map_set(ptr %v1174, ptr %v1164, i64 %v1174.p1)
-    %v1174.p2 = ptrtoint ptr %v1169 to i64
-    call void @orion_map_set(ptr %v1174, ptr %v1167, i64 %v1174.p2)
-    %v1174.p3 = ptrtoint ptr %v1172 to i64
-    call void @orion_map_set(ptr %v1174, ptr %v1170, i64 %v1174.p3)
-    %v1174.p4 = ptrtoint ptr %v1161 to i64
-    call void @orion_map_set(ptr %v1174, ptr %v1173, i64 %v1174.p4)
-    %v1175 = load ptr, ptr %v418
-    %v1176.p = ptrtoint ptr %v1174 to i64
-    %v1176 = call ptr @orion_list_push(ptr %v1175, i64 %v1176.p)
-    store ptr %v1176, ptr %v418
-    %v1177 = add i64 0, 0
-    br label %if_458_merge
-if_458_else:
-    br label %if_458_merge
-if_458_merge:
-    %v1182 = getelementptr i8, ptr @.str_281, i64 16
-    %v1183.e = call i64 @orion_text_eq(ptr %v455, ptr %v1182)
+    %v1162 = getelementptr i8, ptr @.str_5, i64 16
+    %v1163 = call ptr @orion_list_new(i64 1)
+    %v1163.lp0 = ptrtoint ptr %v1162 to i64
+    call void @orion_list_set(ptr %v1163, i64 0, i64 %v1163.lp0)
+    %v1164 = add i64 0, 0
+    %v1165 = add i64 0, 0
+    %v1166 = call ptr @orion_list_slice(ptr %v1163, i64 %v1164, i64 %v1165)
+    %v1167 = alloca ptr, align 8
+    store ptr %v1166, ptr %v1167
+    %v1168 = add i64 0, 0
+    %v1169 = add i64 0, 0
+    %v1170 = load ptr, ptr %v475
+    %v1171 = call i64 @orion_list_len(ptr %v1170)
+    %v1172 = alloca i64, align 8
+    store i64 %v1169, ptr %v1172
+    %v1173 = add i64 0, 0
+    br label %for_1169_header
+for_1169_header:
+    %v1176 = load i64, ptr %v1172
+    %v1177.b = icmp slt i64 %v1176, %v1171
+    %v1177 = zext i1 %v1177.b to i64
+    %v1178.cb = icmp ne i64 %v1177, 0
+    br i1 %v1178.cb, label %for_1169_body, label %for_1169_end
+for_1169_body:
+    %v1180 = load ptr, ptr %v482
+    %v1181.i = call i64 @orion_list_at(ptr %v1180, i64 %v1176)
+    %v1181 = inttoptr i64 %v1181.i to ptr
+    %v1182 = getelementptr i8, ptr @.str_5, i64 16
+    %v1183.e = call i64 @orion_text_eq(ptr %v1181, ptr %v1182)
     %v1183 = xor i64 %v1183.e, 1
     %v1184.cb = icmp ne i64 %v1183, 0
     br i1 %v1184.cb, label %if_1184_then, label %if_1184_else
 if_1184_then:
-    %v1186 = load ptr, ptr %v418
-    %v1187.p = ptrtoint ptr %v445 to i64
-    %v1187 = call ptr @orion_list_push(ptr %v1186, i64 %v1187.p)
-    store ptr %v1187, ptr %v418
-    %v1188 = add i64 0, 0
+    %v1186 = load ptr, ptr %v1167
+    %v1187 = load ptr, ptr %v475
+    %v1188.i = call i64 @orion_list_at(ptr %v1187, i64 %v1176)
+    %v1188 = inttoptr i64 %v1188.i to ptr
+    %v1189.p = ptrtoint ptr %v1188 to i64
+    %v1189 = call ptr @orion_list_push(ptr %v1186, i64 %v1189.p)
+    store ptr %v1189, ptr %v1167
+    %v1190 = add i64 0, 0
     br label %if_1184_merge
 if_1184_else:
     br label %if_1184_merge
 if_1184_merge:
+    br label %for_1169_step
+for_1169_step:
+    %v1197 = add i64 0, 1
+    %v1198 = add i64 %v1176, %v1197
+    store i64 %v1198, ptr %v1172
+    %v1199 = add i64 0, 0
+    br label %for_1169_header
+for_1169_end:
+    %v1202 = load ptr, ptr %v1167
+    %v1203 = call i64 @orion_list_len(ptr %v1202)
+    %v1204 = add i64 0, 0
+    %v1205.b = icmp sgt i64 %v1203, %v1204
+    %v1205 = zext i1 %v1205.b to i64
+    %v1206.cb = icmp ne i64 %v1205, 0
+    br i1 %v1206.cb, label %if_1206_then, label %if_1206_else
+if_1206_then:
+    %v1208 = load ptr, ptr %v463
+    %v1209 = load ptr, ptr %v1167
+    %v1210 = call ptr @lam_stmts_escapes(ptr %v1208, ptr %v1209)
+    %v1211 = getelementptr i8, ptr @.str_5, i64 16
+    %v1212.e = call i64 @orion_text_eq(ptr %v1210, ptr %v1211)
+    %v1212 = xor i64 %v1212.e, 1
+    %v1213.cb = icmp ne i64 %v1212, 0
+    br i1 %v1213.cb, label %if_1213_then, label %if_1213_else
+if_1213_then:
+    %v1215 = getelementptr i8, ptr @.str_496, i64 16
+    %v1216 = call ptr @orion_text_concat(ptr %v1215, ptr %v1210)
+    %v1217 = getelementptr i8, ptr @.str_497, i64 16
+    %v1218 = call ptr @orion_text_concat(ptr %v1216, ptr %v1217)
+    %v1219 = call i64 @compile_error(ptr %v1218)
+    br label %if_1213_merge
+if_1213_else:
+    br label %if_1213_merge
+if_1213_merge:
+    br label %if_1206_merge
+if_1206_else:
+    br label %if_1206_merge
+if_1206_merge:
+    %v1228 = getelementptr i8, ptr @.str_111, i64 16
+    %v1229 = getelementptr i8, ptr @.str_352, i64 16
+    %v1230 = getelementptr i8, ptr @.str_251, i64 16
+    %v1231 = getelementptr i8, ptr @.str_251, i64 16
+    %v1232.i = call i64 @orion_map_get(ptr %v445, ptr %v1231)
+    %v1232 = inttoptr i64 %v1232.i to ptr
+    %v1233 = getelementptr i8, ptr @.str_302, i64 16
+    %v1234 = getelementptr i8, ptr @.str_302, i64 16
+    %v1235.i = call i64 @orion_map_get(ptr %v445, ptr %v1234)
+    %v1235 = inttoptr i64 %v1235.i to ptr
+    %v1236 = getelementptr i8, ptr @.str_344, i64 16
+    %v1237 = getelementptr i8, ptr @.str_344, i64 16
+    %v1238.i = call i64 @orion_map_get(ptr %v445, ptr %v1237)
+    %v1238 = inttoptr i64 %v1238.i to ptr
+    %v1239 = getelementptr i8, ptr @.str_268, i64 16
+    %v1240 = call ptr @orion_map_new(i64 5)
+    %v1240.p0 = ptrtoint ptr %v1229 to i64
+    call void @orion_map_set(ptr %v1240, ptr %v1228, i64 %v1240.p0)
+    %v1240.p1 = ptrtoint ptr %v1232 to i64
+    call void @orion_map_set(ptr %v1240, ptr %v1230, i64 %v1240.p1)
+    %v1240.p2 = ptrtoint ptr %v1235 to i64
+    call void @orion_map_set(ptr %v1240, ptr %v1233, i64 %v1240.p2)
+    %v1240.p3 = ptrtoint ptr %v1238 to i64
+    call void @orion_map_set(ptr %v1240, ptr %v1236, i64 %v1240.p3)
+    %v1240.p4 = ptrtoint ptr %v1161 to i64
+    call void @orion_map_set(ptr %v1240, ptr %v1239, i64 %v1240.p4)
+    %v1241 = load ptr, ptr %v418
+    %v1242.p = ptrtoint ptr %v1240 to i64
+    %v1242 = call ptr @orion_list_push(ptr %v1241, i64 %v1242.p)
+    store ptr %v1242, ptr %v418
+    %v1243 = add i64 0, 0
+    br label %if_458_merge
+if_458_else:
+    br label %if_458_merge
+if_458_merge:
+    %v1248 = getelementptr i8, ptr @.str_281, i64 16
+    %v1249.e = call i64 @orion_text_eq(ptr %v455, ptr %v1248)
+    %v1249 = xor i64 %v1249.e, 1
+    %v1250.cb = icmp ne i64 %v1249, 0
+    br i1 %v1250.cb, label %if_1250_then, label %if_1250_else
+if_1250_then:
+    %v1252 = load ptr, ptr %v418
+    %v1253.p = ptrtoint ptr %v445 to i64
+    %v1253 = call ptr @orion_list_push(ptr %v1252, i64 %v1253.p)
+    store ptr %v1253, ptr %v418
+    %v1254 = add i64 0, 0
+    br label %if_1250_merge
+if_1250_else:
+    br label %if_1250_merge
+if_1250_merge:
     br label %if_450_merge
 if_450_else:
     br label %if_450_merge
 if_450_merge:
-    %v1197 = getelementptr i8, ptr @.str_111, i64 16
-    %v1198.i = call i64 @orion_map_get(ptr %v445, ptr %v1197)
-    %v1198 = inttoptr i64 %v1198.i to ptr
-    %v1199 = getelementptr i8, ptr @.str_352, i64 16
-    %v1200.e = call i64 @orion_text_eq(ptr %v1198, ptr %v1199)
-    %v1200 = xor i64 %v1200.e, 1
-    %v1201.cb = icmp ne i64 %v1200, 0
-    br i1 %v1201.cb, label %if_1201_then, label %if_1201_else
-if_1201_then:
-    %v1203 = load ptr, ptr %v418
-    %v1204.p = ptrtoint ptr %v445 to i64
-    %v1204 = call ptr @orion_list_push(ptr %v1203, i64 %v1204.p)
-    store ptr %v1204, ptr %v418
-    %v1205 = add i64 0, 0
-    br label %if_1201_merge
-if_1201_else:
-    br label %if_1201_merge
-if_1201_merge:
+    %v1263 = getelementptr i8, ptr @.str_111, i64 16
+    %v1264.i = call i64 @orion_map_get(ptr %v445, ptr %v1263)
+    %v1264 = inttoptr i64 %v1264.i to ptr
+    %v1265 = getelementptr i8, ptr @.str_352, i64 16
+    %v1266.e = call i64 @orion_text_eq(ptr %v1264, ptr %v1265)
+    %v1266 = xor i64 %v1266.e, 1
+    %v1267.cb = icmp ne i64 %v1266, 0
+    br i1 %v1267.cb, label %if_1267_then, label %if_1267_else
+if_1267_then:
+    %v1269 = load ptr, ptr %v418
+    %v1270.p = ptrtoint ptr %v445 to i64
+    %v1270 = call ptr @orion_list_push(ptr %v1269, i64 %v1270.p)
+    store ptr %v1270, ptr %v418
+    %v1271 = add i64 0, 0
+    br label %if_1267_merge
+if_1267_else:
+    br label %if_1267_merge
+if_1267_merge:
     br label %for_436_step
 for_436_step:
-    %v1212 = add i64 0, 1
-    %v1213 = add i64 %v441, %v1212
-    store i64 %v1213, ptr %v437
-    %v1214 = add i64 0, 0
+    %v1278 = add i64 0, 1
+    %v1279 = add i64 %v441, %v1278
+    store i64 %v1279, ptr %v437
+    %v1280 = add i64 0, 0
     br label %for_436_header
 for_436_end:
-    %v1217 = load ptr, ptr %v429
-    %v1218 = call i64 @orion_list_len(ptr %v1217)
-    %v1219 = add i64 0, 0
-    %v1220 = alloca i64, align 8
-    store i64 %v1219, ptr %v1220
-    %v1221 = add i64 0, 0
-    br label %for_1219_header
-for_1219_header:
-    %v1224 = load i64, ptr %v1220
-    %v1225.b = icmp slt i64 %v1224, %v1218
-    %v1225 = zext i1 %v1225.b to i64
-    %v1226.cb = icmp ne i64 %v1225, 0
-    br i1 %v1226.cb, label %for_1219_body, label %for_1219_end
-for_1219_body:
-    %v1228 = load ptr, ptr %v418
-    %v1229 = load ptr, ptr %v429
-    %v1230.i = call i64 @orion_list_at(ptr %v1229, i64 %v1224)
-    %v1230 = inttoptr i64 %v1230.i to ptr
-    %v1231.p = ptrtoint ptr %v1230 to i64
-    %v1231 = call ptr @orion_list_push(ptr %v1228, i64 %v1231.p)
-    store ptr %v1231, ptr %v418
-    %v1232 = add i64 0, 0
-    br label %for_1219_step
-for_1219_step:
-    %v1235 = add i64 0, 1
-    %v1236 = add i64 %v1224, %v1235
-    store i64 %v1236, ptr %v1220
-    %v1237 = add i64 0, 0
-    br label %for_1219_header
-for_1219_end:
-    %v1240 = load ptr, ptr %v418
-    store ptr %v1240, ptr %v410
-    %v1241 = add i64 0, 0
+    %v1283 = load ptr, ptr %v429
+    %v1284 = call i64 @orion_list_len(ptr %v1283)
+    %v1285 = add i64 0, 0
+    %v1286 = alloca i64, align 8
+    store i64 %v1285, ptr %v1286
+    %v1287 = add i64 0, 0
+    br label %for_1285_header
+for_1285_header:
+    %v1290 = load i64, ptr %v1286
+    %v1291.b = icmp slt i64 %v1290, %v1284
+    %v1291 = zext i1 %v1291.b to i64
+    %v1292.cb = icmp ne i64 %v1291, 0
+    br i1 %v1292.cb, label %for_1285_body, label %for_1285_end
+for_1285_body:
+    %v1294 = load ptr, ptr %v418
+    %v1295 = load ptr, ptr %v429
+    %v1296.i = call i64 @orion_list_at(ptr %v1295, i64 %v1290)
+    %v1296 = inttoptr i64 %v1296.i to ptr
+    %v1297.p = ptrtoint ptr %v1296 to i64
+    %v1297 = call ptr @orion_list_push(ptr %v1294, i64 %v1297.p)
+    store ptr %v1297, ptr %v418
+    %v1298 = add i64 0, 0
+    br label %for_1285_step
+for_1285_step:
+    %v1301 = add i64 0, 1
+    %v1302 = add i64 %v1290, %v1301
+    store i64 %v1302, ptr %v1286
+    %v1303 = add i64 0, 0
+    br label %for_1285_header
+for_1285_end:
+    %v1306 = load ptr, ptr %v418
+    store ptr %v1306, ptr %v410
+    %v1307 = add i64 0, 0
     br label %if_413_merge
 if_413_else:
     br label %if_413_merge
 if_413_merge:
-    %v1246 = load ptr, ptr %v410
-    %v1247 = call i64 @orion_list_len(ptr %v1246)
-    %v1248 = call ptr @scope_empty()
-    %v1249 = alloca ptr, align 8
-    store ptr %v1248, ptr %v1249
-    %v1250 = add i64 0, 0
-    %v1251 = add i64 0, 0
-    %v1252 = alloca i64, align 8
-    store i64 %v1251, ptr %v1252
-    %v1253 = add i64 0, 0
-    br label %for_1251_header
-for_1251_header:
-    %v1256 = load i64, ptr %v1252
-    %v1257.b = icmp slt i64 %v1256, %v1247
-    %v1257 = zext i1 %v1257.b to i64
-    %v1258.cb = icmp ne i64 %v1257, 0
-    br i1 %v1258.cb, label %for_1251_body, label %for_1251_end
-for_1251_body:
-    %v1260 = load ptr, ptr %v410
-    %v1261.i = call i64 @orion_list_at(ptr %v1260, i64 %v1256)
-    %v1261 = inttoptr i64 %v1261.i to ptr
-    %v1262 = getelementptr i8, ptr @.str_111, i64 16
-    %v1263.i = call i64 @orion_map_get(ptr %v1261, ptr %v1262)
-    %v1263 = inttoptr i64 %v1263.i to ptr
-    %v1264 = getelementptr i8, ptr @.str_346, i64 16
-    %v1265.e = call i64 @orion_text_eq(ptr %v1263, ptr %v1264)
-    %v1265 = add i64 %v1265.e, 0
-    %v1266.cb = icmp ne i64 %v1265, 0
-    br i1 %v1266.cb, label %if_1266_then, label %if_1266_else
-if_1266_then:
-    %v1268 = getelementptr i8, ptr @.str_251, i64 16
-    %v1269.i = call i64 @orion_map_get(ptr %v1261, ptr %v1268)
-    %v1269 = inttoptr i64 %v1269.i to ptr
-    %v1270 = getelementptr i8, ptr @.str_304, i64 16
-    %v1271.i = call i64 @orion_map_get(ptr %v1261, ptr %v1270)
-    %v1271 = inttoptr i64 %v1271.i to ptr
-    %v1272 = call i64 @orion_list_len(ptr %v1271)
-    %v1273 = getelementptr i8, ptr @.str_5, i64 16
-    %v1274 = alloca ptr, align 8
-    store ptr %v1273, ptr %v1274
-    %v1275 = add i64 0, 0
-    %v1276 = add i64 0, 0
-    %v1277 = alloca i64, align 8
-    store i64 %v1276, ptr %v1277
-    %v1278 = add i64 0, 0
-    br label %for_1276_header
-for_1276_header:
-    %v1281 = load i64, ptr %v1277
-    %v1282.b = icmp slt i64 %v1281, %v1272
-    %v1282 = zext i1 %v1282.b to i64
-    %v1283.cb = icmp ne i64 %v1282, 0
-    br i1 %v1283.cb, label %for_1276_body, label %for_1276_end
-for_1276_body:
-    %v1285.i = call i64 @orion_list_at(ptr %v1271, i64 %v1281)
-    %v1285 = inttoptr i64 %v1285.i to ptr
-    %v1286 = getelementptr i8, ptr @.str_251, i64 16
-    %v1287.i = call i64 @orion_map_get(ptr %v1285, ptr %v1286)
-    %v1287 = inttoptr i64 %v1287.i to ptr
-    %v1288 = getelementptr i8, ptr @.str_321, i64 16
-    %v1289.i = call i64 @orion_map_get(ptr %v1285, ptr %v1288)
-    %v1289 = inttoptr i64 %v1289.i to ptr
-    %v1290 = call ptr @ast_type_to_ir(ptr %v1289)
-    %v1291 = add i64 0, 0
-    %v1292.b = icmp eq i64 %v1281, %v1291
-    %v1292 = zext i1 %v1292.b to i64
-    %v1293.cb = icmp ne i64 %v1292, 0
-    br i1 %v1293.cb, label %if_1293_then, label %if_1293_else
-if_1293_then:
-    %v1295 = getelementptr i8, ptr @.str_5, i64 16
-    br label %if_1293_merge
-if_1293_else:
-    %v1298 = getelementptr i8, ptr @.str_91, i64 16
-    br label %if_1293_merge
-if_1293_merge:
-    %v1301 = phi ptr [ %v1295, %if_1293_then ], [ %v1298, %if_1293_else ]
-    %v1302 = load ptr, ptr %v1274
-    %v1303 = call ptr @orion_text_concat(ptr %v1302, ptr %v1301)
-    %v1304 = call ptr @orion_text_concat(ptr %v1303, ptr %v1287)
-    %v1305 = getelementptr i8, ptr @.str_229, i64 16
-    %v1306 = call ptr @orion_text_concat(ptr %v1304, ptr %v1305)
-    %v1307 = call ptr @orion_text_concat(ptr %v1306, ptr %v1290)
-    store ptr %v1307, ptr %v1274
-    %v1308 = add i64 0, 0
-    br label %for_1276_step
-for_1276_step:
-    %v1311 = add i64 0, 1
-    %v1312 = add i64 %v1281, %v1311
-    store i64 %v1312, ptr %v1277
-    %v1313 = add i64 0, 0
-    br label %for_1276_header
-for_1276_end:
-    %v1316 = load ptr, ptr %v1249
-    %v1317 = load ptr, ptr %v1274
-    %v1318 = call ptr @scope_add_data_decl(ptr %v1316, ptr %v1269, ptr %v1317)
-    store ptr %v1318, ptr %v1249
+    %v1312 = load ptr, ptr %v410
+    %v1313 = call i64 @orion_list_len(ptr %v1312)
+    %v1314 = call ptr @scope_empty()
+    %v1315 = alloca ptr, align 8
+    store ptr %v1314, ptr %v1315
+    %v1316 = add i64 0, 0
+    %v1317 = add i64 0, 0
+    %v1318 = alloca i64, align 8
+    store i64 %v1317, ptr %v1318
     %v1319 = add i64 0, 0
-    br label %if_1266_merge
-if_1266_else:
-    br label %if_1266_merge
-if_1266_merge:
-    %v1324 = getelementptr i8, ptr @.str_111, i64 16
-    %v1325.i = call i64 @orion_map_get(ptr %v1261, ptr %v1324)
-    %v1325 = inttoptr i64 %v1325.i to ptr
-    %v1326 = getelementptr i8, ptr @.str_350, i64 16
-    %v1327.e = call i64 @orion_text_eq(ptr %v1325, ptr %v1326)
-    %v1327 = add i64 %v1327.e, 0
-    %v1328.cb = icmp ne i64 %v1327, 0
-    br i1 %v1328.cb, label %if_1328_then, label %if_1328_else
-if_1328_then:
-    %v1330 = getelementptr i8, ptr @.str_251, i64 16
-    %v1331.i = call i64 @orion_map_get(ptr %v1261, ptr %v1330)
-    %v1331 = inttoptr i64 %v1331.i to ptr
-    %v1332 = getelementptr i8, ptr @.str_351, i64 16
-    %v1333.i = call i64 @orion_map_get(ptr %v1261, ptr %v1332)
-    %v1333 = inttoptr i64 %v1333.i to ptr
-    %v1334 = call i64 @orion_list_len(ptr %v1333)
-    %v1335 = getelementptr i8, ptr @.str_5, i64 16
-    %v1336 = alloca ptr, align 8
-    store ptr %v1335, ptr %v1336
-    %v1337 = add i64 0, 0
-    %v1338 = add i64 0, 0
-    %v1339 = alloca i64, align 8
-    store i64 %v1338, ptr %v1339
-    %v1340 = add i64 0, 0
+    br label %for_1317_header
+for_1317_header:
+    %v1322 = load i64, ptr %v1318
+    %v1323.b = icmp slt i64 %v1322, %v1313
+    %v1323 = zext i1 %v1323.b to i64
+    %v1324.cb = icmp ne i64 %v1323, 0
+    br i1 %v1324.cb, label %for_1317_body, label %for_1317_end
+for_1317_body:
+    %v1326 = load ptr, ptr %v410
+    %v1327.i = call i64 @orion_list_at(ptr %v1326, i64 %v1322)
+    %v1327 = inttoptr i64 %v1327.i to ptr
+    %v1328 = getelementptr i8, ptr @.str_111, i64 16
+    %v1329.i = call i64 @orion_map_get(ptr %v1327, ptr %v1328)
+    %v1329 = inttoptr i64 %v1329.i to ptr
+    %v1330 = getelementptr i8, ptr @.str_346, i64 16
+    %v1331.e = call i64 @orion_text_eq(ptr %v1329, ptr %v1330)
+    %v1331 = add i64 %v1331.e, 0
+    %v1332.cb = icmp ne i64 %v1331, 0
+    br i1 %v1332.cb, label %if_1332_then, label %if_1332_else
+if_1332_then:
+    %v1334 = getelementptr i8, ptr @.str_251, i64 16
+    %v1335.i = call i64 @orion_map_get(ptr %v1327, ptr %v1334)
+    %v1335 = inttoptr i64 %v1335.i to ptr
+    %v1336 = getelementptr i8, ptr @.str_304, i64 16
+    %v1337.i = call i64 @orion_map_get(ptr %v1327, ptr %v1336)
+    %v1337 = inttoptr i64 %v1337.i to ptr
+    %v1338 = call i64 @orion_list_len(ptr %v1337)
+    %v1339 = getelementptr i8, ptr @.str_5, i64 16
+    %v1340 = alloca ptr, align 8
+    store ptr %v1339, ptr %v1340
     %v1341 = add i64 0, 0
-    %v1342 = alloca i64, align 8
-    store i64 %v1341, ptr %v1342
-    %v1343 = add i64 0, 0
-    br label %for_1341_header
-for_1341_header:
-    %v1346 = load i64, ptr %v1342
-    %v1347.b = icmp slt i64 %v1346, %v1334
-    %v1347 = zext i1 %v1347.b to i64
-    %v1348.cb = icmp ne i64 %v1347, 0
-    br i1 %v1348.cb, label %for_1341_body, label %for_1341_end
-for_1341_body:
-    %v1350.i = call i64 @orion_list_at(ptr %v1333, i64 %v1346)
-    %v1350 = inttoptr i64 %v1350.i to ptr
-    %v1351 = getelementptr i8, ptr @.str_251, i64 16
-    %v1352.i = call i64 @orion_map_get(ptr %v1350, ptr %v1351)
-    %v1352 = inttoptr i64 %v1352.i to ptr
-    %v1353 = add i64 0, 0
-    %v1354.b = icmp eq i64 %v1346, %v1353
-    %v1354 = zext i1 %v1354.b to i64
-    %v1355.cb = icmp ne i64 %v1354, 0
-    br i1 %v1355.cb, label %if_1355_then, label %if_1355_else
-if_1355_then:
-    %v1357 = getelementptr i8, ptr @.str_5, i64 16
-    br label %if_1355_merge
-if_1355_else:
-    %v1360 = getelementptr i8, ptr @.str_228, i64 16
-    br label %if_1355_merge
-if_1355_merge:
-    %v1363 = phi ptr [ %v1357, %if_1355_then ], [ %v1360, %if_1355_else ]
-    %v1364 = load ptr, ptr %v1336
-    %v1365 = call ptr @orion_text_concat(ptr %v1364, ptr %v1363)
-    %v1366 = call ptr @orion_text_concat(ptr %v1365, ptr %v1352)
-    store ptr %v1366, ptr %v1336
-    %v1367 = add i64 0, 0
-    %v1368 = getelementptr i8, ptr @.str_349, i64 16
-    %v1369.i = call i64 @orion_map_get(ptr %v1350, ptr %v1368)
-    %v1369 = inttoptr i64 %v1369.i to ptr
-    %v1370 = call i64 @orion_list_len(ptr %v1369)
-    %v1371 = load i64, ptr %v1339
-    %v1372.b = icmp sgt i64 %v1370, %v1371
-    %v1372 = zext i1 %v1372.b to i64
-    %v1373.cb = icmp ne i64 %v1372, 0
-    br i1 %v1373.cb, label %if_1373_then, label %if_1373_else
-if_1373_then:
-    store i64 %v1370, ptr %v1339
-    %v1375 = add i64 0, 0
-    br label %if_1373_merge
-if_1373_else:
-    br label %if_1373_merge
-if_1373_merge:
-    %v1380 = getelementptr i8, ptr @.str_5, i64 16
-    %v1381 = alloca ptr, align 8
-    store ptr %v1380, ptr %v1381
-    %v1382 = add i64 0, 0
-    %v1383 = add i64 0, 0
-    %v1384 = alloca i64, align 8
-    store i64 %v1383, ptr %v1384
+    %v1342 = add i64 0, 0
+    %v1343 = alloca i64, align 8
+    store i64 %v1342, ptr %v1343
+    %v1344 = add i64 0, 0
+    br label %for_1342_header
+for_1342_header:
+    %v1347 = load i64, ptr %v1343
+    %v1348.b = icmp slt i64 %v1347, %v1338
+    %v1348 = zext i1 %v1348.b to i64
+    %v1349.cb = icmp ne i64 %v1348, 0
+    br i1 %v1349.cb, label %for_1342_body, label %for_1342_end
+for_1342_body:
+    %v1351.i = call i64 @orion_list_at(ptr %v1337, i64 %v1347)
+    %v1351 = inttoptr i64 %v1351.i to ptr
+    %v1352 = getelementptr i8, ptr @.str_251, i64 16
+    %v1353.i = call i64 @orion_map_get(ptr %v1351, ptr %v1352)
+    %v1353 = inttoptr i64 %v1353.i to ptr
+    %v1354 = getelementptr i8, ptr @.str_321, i64 16
+    %v1355.i = call i64 @orion_map_get(ptr %v1351, ptr %v1354)
+    %v1355 = inttoptr i64 %v1355.i to ptr
+    %v1356 = call ptr @ast_type_to_ir(ptr %v1355)
+    %v1357 = add i64 0, 0
+    %v1358.b = icmp eq i64 %v1347, %v1357
+    %v1358 = zext i1 %v1358.b to i64
+    %v1359.cb = icmp ne i64 %v1358, 0
+    br i1 %v1359.cb, label %if_1359_then, label %if_1359_else
+if_1359_then:
+    %v1361 = getelementptr i8, ptr @.str_5, i64 16
+    br label %if_1359_merge
+if_1359_else:
+    %v1364 = getelementptr i8, ptr @.str_91, i64 16
+    br label %if_1359_merge
+if_1359_merge:
+    %v1367 = phi ptr [ %v1361, %if_1359_then ], [ %v1364, %if_1359_else ]
+    %v1368 = load ptr, ptr %v1340
+    %v1369 = call ptr @orion_text_concat(ptr %v1368, ptr %v1367)
+    %v1370 = call ptr @orion_text_concat(ptr %v1369, ptr %v1353)
+    %v1371 = getelementptr i8, ptr @.str_229, i64 16
+    %v1372 = call ptr @orion_text_concat(ptr %v1370, ptr %v1371)
+    %v1373 = call ptr @orion_text_concat(ptr %v1372, ptr %v1356)
+    store ptr %v1373, ptr %v1340
+    %v1374 = add i64 0, 0
+    br label %for_1342_step
+for_1342_step:
+    %v1377 = add i64 0, 1
+    %v1378 = add i64 %v1347, %v1377
+    store i64 %v1378, ptr %v1343
+    %v1379 = add i64 0, 0
+    br label %for_1342_header
+for_1342_end:
+    %v1382 = load ptr, ptr %v1315
+    %v1383 = load ptr, ptr %v1340
+    %v1384 = call ptr @scope_add_data_decl(ptr %v1382, ptr %v1335, ptr %v1383)
+    store ptr %v1384, ptr %v1315
     %v1385 = add i64 0, 0
-    br label %for_1383_header
-for_1383_header:
-    %v1388 = load i64, ptr %v1384
-    %v1389.b = icmp slt i64 %v1388, %v1370
-    %v1389 = zext i1 %v1389.b to i64
-    %v1390.cb = icmp ne i64 %v1389, 0
-    br i1 %v1390.cb, label %for_1383_body, label %for_1383_end
-for_1383_body:
-    %v1392 = add i64 0, 0
-    %v1393.b = icmp eq i64 %v1388, %v1392
-    %v1393 = zext i1 %v1393.b to i64
+    br label %if_1332_merge
+if_1332_else:
+    br label %if_1332_merge
+if_1332_merge:
+    %v1390 = getelementptr i8, ptr @.str_111, i64 16
+    %v1391.i = call i64 @orion_map_get(ptr %v1327, ptr %v1390)
+    %v1391 = inttoptr i64 %v1391.i to ptr
+    %v1392 = getelementptr i8, ptr @.str_350, i64 16
+    %v1393.e = call i64 @orion_text_eq(ptr %v1391, ptr %v1392)
+    %v1393 = add i64 %v1393.e, 0
     %v1394.cb = icmp ne i64 %v1393, 0
     br i1 %v1394.cb, label %if_1394_then, label %if_1394_else
 if_1394_then:
-    %v1396 = getelementptr i8, ptr @.str_5, i64 16
-    br label %if_1394_merge
-if_1394_else:
-    %v1399 = getelementptr i8, ptr @.str_228, i64 16
-    br label %if_1394_merge
-if_1394_merge:
-    %v1402 = phi ptr [ %v1396, %if_1394_then ], [ %v1399, %if_1394_else ]
-    %v1403.i = call i64 @orion_list_at(ptr %v1369, i64 %v1388)
-    %v1403 = inttoptr i64 %v1403.i to ptr
-    %v1404 = call ptr @ast_type_to_ir(ptr %v1403)
-    %v1405 = load ptr, ptr %v1381
-    %v1406 = call ptr @orion_text_concat(ptr %v1405, ptr %v1402)
-    %v1407 = call ptr @orion_text_concat(ptr %v1406, ptr %v1404)
-    store ptr %v1407, ptr %v1381
-    %v1408 = add i64 0, 0
-    br label %for_1383_step
-for_1383_step:
-    %v1411 = add i64 0, 1
-    %v1412 = add i64 %v1388, %v1411
-    store i64 %v1412, ptr %v1384
-    %v1413 = add i64 0, 0
-    br label %for_1383_header
-for_1383_end:
-    %v1416 = load ptr, ptr %v1249
-    %v1417 = getelementptr i8, ptr @.str_356, i64 16
-    %v1418 = call ptr @orion_text_concat(ptr %v1331, ptr %v1417)
-    %v1419 = call ptr @orion_text_concat(ptr %v1418, ptr %v1352)
-    %v1420 = load ptr, ptr %v1381
-    %v1421 = call ptr @scope_add_enum_decl(ptr %v1416, ptr %v1419, ptr %v1420)
-    store ptr %v1421, ptr %v1249
-    %v1422 = add i64 0, 0
-    br label %for_1341_step
-for_1341_step:
-    %v1425 = add i64 0, 1
-    %v1426 = add i64 %v1346, %v1425
-    store i64 %v1426, ptr %v1342
-    %v1427 = add i64 0, 0
-    br label %for_1341_header
-for_1341_end:
-    %v1430 = load ptr, ptr %v1249
-    %v1431 = load ptr, ptr %v1336
-    %v1432 = call ptr @scope_add_enum_decl(ptr %v1430, ptr %v1331, ptr %v1431)
-    store ptr %v1432, ptr %v1249
+    %v1396 = getelementptr i8, ptr @.str_251, i64 16
+    %v1397.i = call i64 @orion_map_get(ptr %v1327, ptr %v1396)
+    %v1397 = inttoptr i64 %v1397.i to ptr
+    %v1398 = getelementptr i8, ptr @.str_351, i64 16
+    %v1399.i = call i64 @orion_map_get(ptr %v1327, ptr %v1398)
+    %v1399 = inttoptr i64 %v1399.i to ptr
+    %v1400 = call i64 @orion_list_len(ptr %v1399)
+    %v1401 = getelementptr i8, ptr @.str_5, i64 16
+    %v1402 = alloca ptr, align 8
+    store ptr %v1401, ptr %v1402
+    %v1403 = add i64 0, 0
+    %v1404 = add i64 0, 0
+    %v1405 = alloca i64, align 8
+    store i64 %v1404, ptr %v1405
+    %v1406 = add i64 0, 0
+    %v1407 = add i64 0, 0
+    %v1408 = alloca i64, align 8
+    store i64 %v1407, ptr %v1408
+    %v1409 = add i64 0, 0
+    br label %for_1407_header
+for_1407_header:
+    %v1412 = load i64, ptr %v1408
+    %v1413.b = icmp slt i64 %v1412, %v1400
+    %v1413 = zext i1 %v1413.b to i64
+    %v1414.cb = icmp ne i64 %v1413, 0
+    br i1 %v1414.cb, label %for_1407_body, label %for_1407_end
+for_1407_body:
+    %v1416.i = call i64 @orion_list_at(ptr %v1399, i64 %v1412)
+    %v1416 = inttoptr i64 %v1416.i to ptr
+    %v1417 = getelementptr i8, ptr @.str_251, i64 16
+    %v1418.i = call i64 @orion_map_get(ptr %v1416, ptr %v1417)
+    %v1418 = inttoptr i64 %v1418.i to ptr
+    %v1419 = add i64 0, 0
+    %v1420.b = icmp eq i64 %v1412, %v1419
+    %v1420 = zext i1 %v1420.b to i64
+    %v1421.cb = icmp ne i64 %v1420, 0
+    br i1 %v1421.cb, label %if_1421_then, label %if_1421_else
+if_1421_then:
+    %v1423 = getelementptr i8, ptr @.str_5, i64 16
+    br label %if_1421_merge
+if_1421_else:
+    %v1426 = getelementptr i8, ptr @.str_228, i64 16
+    br label %if_1421_merge
+if_1421_merge:
+    %v1429 = phi ptr [ %v1423, %if_1421_then ], [ %v1426, %if_1421_else ]
+    %v1430 = load ptr, ptr %v1402
+    %v1431 = call ptr @orion_text_concat(ptr %v1430, ptr %v1429)
+    %v1432 = call ptr @orion_text_concat(ptr %v1431, ptr %v1418)
+    store ptr %v1432, ptr %v1402
     %v1433 = add i64 0, 0
-    %v1434 = load i64, ptr %v1339
-    %v1435 = add i64 0, 2
-    %v1436.b = icmp slt i64 %v1434, %v1435
-    %v1436 = zext i1 %v1436.b to i64
-    %v1437.cb = icmp ne i64 %v1436, 0
-    br i1 %v1437.cb, label %if_1437_then, label %if_1437_else
-if_1437_then:
-    %v1439 = add i64 0, 2
-    store i64 %v1439, ptr %v1339
-    %v1440 = add i64 0, 0
-    br label %if_1437_merge
-if_1437_else:
-    br label %if_1437_merge
-if_1437_merge:
-    %v1445 = getelementptr i8, ptr @.str_496, i64 16
-    %v1446 = alloca ptr, align 8
-    store ptr %v1445, ptr %v1446
-    %v1447 = add i64 0, 0
+    %v1434 = getelementptr i8, ptr @.str_349, i64 16
+    %v1435.i = call i64 @orion_map_get(ptr %v1416, ptr %v1434)
+    %v1435 = inttoptr i64 %v1435.i to ptr
+    %v1436 = call i64 @orion_list_len(ptr %v1435)
+    %v1437 = load i64, ptr %v1405
+    %v1438.b = icmp sgt i64 %v1436, %v1437
+    %v1438 = zext i1 %v1438.b to i64
+    %v1439.cb = icmp ne i64 %v1438, 0
+    br i1 %v1439.cb, label %if_1439_then, label %if_1439_else
+if_1439_then:
+    store i64 %v1436, ptr %v1405
+    %v1441 = add i64 0, 0
+    br label %if_1439_merge
+if_1439_else:
+    br label %if_1439_merge
+if_1439_merge:
+    %v1446 = getelementptr i8, ptr @.str_5, i64 16
+    %v1447 = alloca ptr, align 8
+    store ptr %v1446, ptr %v1447
     %v1448 = add i64 0, 0
-    %v1449 = load i64, ptr %v1339
+    %v1449 = add i64 0, 0
     %v1450 = alloca i64, align 8
-    store i64 %v1448, ptr %v1450
+    store i64 %v1449, ptr %v1450
     %v1451 = add i64 0, 0
-    br label %for_1448_header
-for_1448_header:
+    br label %for_1449_header
+for_1449_header:
     %v1454 = load i64, ptr %v1450
-    %v1455.b = icmp slt i64 %v1454, %v1449
+    %v1455.b = icmp slt i64 %v1454, %v1436
     %v1455 = zext i1 %v1455.b to i64
     %v1456.cb = icmp ne i64 %v1455, 0
-    br i1 %v1456.cb, label %for_1448_body, label %for_1448_end
-for_1448_body:
-    %v1458 = load ptr, ptr %v1446
-    %v1459 = getelementptr i8, ptr @.str_497, i64 16
-    %v1460 = call ptr @orion_text_concat(ptr %v1458, ptr %v1459)
-    %v1461 = call ptr @orion_int_to_text(i64 %v1454)
-    %v1462 = call ptr @orion_text_concat(ptr %v1460, ptr %v1461)
-    %v1463 = getelementptr i8, ptr @.str_498, i64 16
-    %v1464 = call ptr @orion_text_concat(ptr %v1462, ptr %v1463)
-    store ptr %v1464, ptr %v1446
-    %v1465 = add i64 0, 0
-    br label %for_1448_step
-for_1448_step:
-    %v1468 = add i64 0, 1
-    %v1469 = add i64 %v1454, %v1468
-    store i64 %v1469, ptr %v1450
-    %v1470 = add i64 0, 0
-    br label %for_1448_header
-for_1448_end:
-    %v1473 = load ptr, ptr %v1249
-    %v1474 = load ptr, ptr %v1446
-    %v1475 = call ptr @scope_add_data_decl(ptr %v1473, ptr %v1331, ptr %v1474)
-    store ptr %v1475, ptr %v1249
-    %v1476 = add i64 0, 0
-    br label %if_1328_merge
-if_1328_else:
-    br label %if_1328_merge
-if_1328_merge:
-    br label %for_1251_step
-for_1251_step:
-    %v1483 = add i64 0, 1
-    %v1484 = add i64 %v1256, %v1483
-    store i64 %v1484, ptr %v1252
-    %v1485 = add i64 0, 0
-    br label %for_1251_header
-for_1251_end:
-    %v1488 = getelementptr i64, ptr @orion_empty_list, i64 0
-    %v1489 = alloca ptr, align 8
-    store ptr %v1488, ptr %v1489
-    %v1490 = add i64 0, 0
-    %v1491 = add i64 0, 0
-    %v1492 = alloca i64, align 8
-    store i64 %v1491, ptr %v1492
+    br i1 %v1456.cb, label %for_1449_body, label %for_1449_end
+for_1449_body:
+    %v1458 = add i64 0, 0
+    %v1459.b = icmp eq i64 %v1454, %v1458
+    %v1459 = zext i1 %v1459.b to i64
+    %v1460.cb = icmp ne i64 %v1459, 0
+    br i1 %v1460.cb, label %if_1460_then, label %if_1460_else
+if_1460_then:
+    %v1462 = getelementptr i8, ptr @.str_5, i64 16
+    br label %if_1460_merge
+if_1460_else:
+    %v1465 = getelementptr i8, ptr @.str_228, i64 16
+    br label %if_1460_merge
+if_1460_merge:
+    %v1468 = phi ptr [ %v1462, %if_1460_then ], [ %v1465, %if_1460_else ]
+    %v1469.i = call i64 @orion_list_at(ptr %v1435, i64 %v1454)
+    %v1469 = inttoptr i64 %v1469.i to ptr
+    %v1470 = call ptr @ast_type_to_ir(ptr %v1469)
+    %v1471 = load ptr, ptr %v1447
+    %v1472 = call ptr @orion_text_concat(ptr %v1471, ptr %v1468)
+    %v1473 = call ptr @orion_text_concat(ptr %v1472, ptr %v1470)
+    store ptr %v1473, ptr %v1447
+    %v1474 = add i64 0, 0
+    br label %for_1449_step
+for_1449_step:
+    %v1477 = add i64 0, 1
+    %v1478 = add i64 %v1454, %v1477
+    store i64 %v1478, ptr %v1450
+    %v1479 = add i64 0, 0
+    br label %for_1449_header
+for_1449_end:
+    %v1482 = load ptr, ptr %v1315
+    %v1483 = getelementptr i8, ptr @.str_356, i64 16
+    %v1484 = call ptr @orion_text_concat(ptr %v1397, ptr %v1483)
+    %v1485 = call ptr @orion_text_concat(ptr %v1484, ptr %v1418)
+    %v1486 = load ptr, ptr %v1447
+    %v1487 = call ptr @scope_add_enum_decl(ptr %v1482, ptr %v1485, ptr %v1486)
+    store ptr %v1487, ptr %v1315
+    %v1488 = add i64 0, 0
+    br label %for_1407_step
+for_1407_step:
+    %v1491 = add i64 0, 1
+    %v1492 = add i64 %v1412, %v1491
+    store i64 %v1492, ptr %v1408
     %v1493 = add i64 0, 0
-    br label %for_1491_header
-for_1491_header:
-    %v1496 = load i64, ptr %v1492
-    %v1497.b = icmp slt i64 %v1496, %v1247
-    %v1497 = zext i1 %v1497.b to i64
-    %v1498.cb = icmp ne i64 %v1497, 0
-    br i1 %v1498.cb, label %for_1491_body, label %for_1491_end
-for_1491_body:
-    %v1500 = load ptr, ptr %v410
-    %v1501.i = call i64 @orion_list_at(ptr %v1500, i64 %v1496)
-    %v1501 = inttoptr i64 %v1501.i to ptr
-    %v1502 = getelementptr i8, ptr @.str_111, i64 16
-    %v1503.i = call i64 @orion_map_get(ptr %v1501, ptr %v1502)
-    %v1503 = inttoptr i64 %v1503.i to ptr
-    %v1504 = getelementptr i8, ptr @.str_352, i64 16
-    %v1505.e = call i64 @orion_text_eq(ptr %v1503, ptr %v1504)
-    %v1505 = add i64 %v1505.e, 0
-    %v1506.cb = icmp ne i64 %v1505, 0
-    br i1 %v1506.cb, label %if_1506_then, label %if_1506_else
-if_1506_then:
-    %v1508 = getelementptr i8, ptr @.str_251, i64 16
-    %v1509.i = call i64 @orion_map_get(ptr %v1501, ptr %v1508)
-    %v1509 = inttoptr i64 %v1509.i to ptr
-    %v1510 = load ptr, ptr %v1489
-    %v1511 = call i64 @text_list_has(ptr %v1510, ptr %v1509)
-    %v1512.cb = icmp ne i64 %v1511, 0
-    br i1 %v1512.cb, label %if_1512_then, label %if_1512_else
-if_1512_then:
-    %v1514 = getelementptr i8, ptr @.str_499, i64 16
-    %v1515 = call ptr @orion_text_concat(ptr %v1514, ptr %v1509)
-    %v1516 = getelementptr i8, ptr @.str_500, i64 16
-    %v1517 = call ptr @orion_text_concat(ptr %v1515, ptr %v1516)
-    %v1518 = call i64 @compile_error(ptr %v1517)
-    br label %if_1512_merge
-if_1512_else:
-    br label %if_1512_merge
-if_1512_merge:
-    %v1523 = load ptr, ptr %v1489
-    %v1524.p = ptrtoint ptr %v1509 to i64
-    %v1524 = call ptr @orion_list_push_mut(ptr %v1523, i64 %v1524.p)
-    store ptr %v1524, ptr %v1489
-    %v1525 = add i64 0, 0
-    %v1526 = getelementptr i8, ptr @.str_344, i64 16
-    %v1527.i = call i64 @orion_map_get(ptr %v1501, ptr %v1526)
-    %v1527 = inttoptr i64 %v1527.i to ptr
-    %v1528 = load ptr, ptr %v1249
-    %v1529 = call ptr @ast_type_to_ir_with_scope(ptr %v1527, ptr %v1528)
-    %v1530 = load ptr, ptr %v1249
-    %v1531 = call ptr @scope_add_fn_sig(ptr %v1530, ptr %v1509, ptr %v1529)
-    store ptr %v1531, ptr %v1249
-    %v1532 = add i64 0, 0
-    %v1533 = getelementptr i8, ptr @.str_467, i64 16
-    %v1534 = call ptr @orion_text_concat(ptr %v1533, ptr %v1509)
-    %v1535 = getelementptr i8, ptr @.str_302, i64 16
-    %v1536.i = call i64 @orion_map_get(ptr %v1501, ptr %v1535)
-    %v1536 = inttoptr i64 %v1536.i to ptr
-    %v1537 = call i64 @orion_list_len(ptr %v1536)
-    %v1538 = call i64 @orion_slot_set(ptr %v1534, i64 %v1537)
-    %v1539 = getelementptr i8, ptr @.str_302, i64 16
-    %v1540.i = call i64 @orion_map_get(ptr %v1501, ptr %v1539)
-    %v1540 = inttoptr i64 %v1540.i to ptr
-    %v1541 = add i64 0, 0
-    %v1542 = call i64 @orion_list_len(ptr %v1540)
-    %v1543 = alloca i64, align 8
-    store i64 %v1541, ptr %v1543
-    %v1544 = add i64 0, 0
-    br label %for_1541_header
-for_1541_header:
-    %v1547 = load i64, ptr %v1543
-    %v1548.b = icmp slt i64 %v1547, %v1542
-    %v1548 = zext i1 %v1548.b to i64
-    %v1549.cb = icmp ne i64 %v1548, 0
-    br i1 %v1549.cb, label %for_1541_body, label %for_1541_end
-for_1541_body:
-    %v1551.i = call i64 @orion_list_at(ptr %v1540, i64 %v1547)
-    %v1551 = inttoptr i64 %v1551.i to ptr
-    %v1552 = getelementptr i8, ptr @.str_431, i64 16
-    %v1553 = call ptr @orion_text_concat(ptr %v1552, ptr %v1509)
-    %v1554 = getelementptr i8, ptr @.str_229, i64 16
-    %v1555 = call ptr @orion_text_concat(ptr %v1553, ptr %v1554)
-    %v1556 = getelementptr i8, ptr @.str_251, i64 16
-    %v1557.i = call i64 @orion_map_get(ptr %v1551, ptr %v1556)
-    %v1557 = inttoptr i64 %v1557.i to ptr
-    %v1558 = call ptr @orion_text_concat(ptr %v1555, ptr %v1557)
-    %v1559 = call i64 @orion_slot_set(ptr %v1558, i64 %v1547)
-    br label %for_1541_step
-for_1541_step:
-    %v1562 = add i64 0, 1
-    %v1563 = add i64 %v1547, %v1562
-    store i64 %v1563, ptr %v1543
-    %v1564 = add i64 0, 0
-    br label %for_1541_header
-for_1541_end:
-    br label %if_1506_merge
-if_1506_else:
-    br label %if_1506_merge
-if_1506_merge:
-    %v1571 = getelementptr i8, ptr @.str_353, i64 16
-    %v1572.e = call i64 @orion_text_eq(ptr %v1503, ptr %v1571)
-    %v1572 = add i64 %v1572.e, 0
-    %v1573.cb = icmp ne i64 %v1572, 0
-    br i1 %v1573.cb, label %if_1573_then, label %if_1573_else
-if_1573_then:
-    %v1575 = getelementptr i8, ptr @.str_251, i64 16
-    %v1576.i = call i64 @orion_map_get(ptr %v1501, ptr %v1575)
-    %v1576 = inttoptr i64 %v1576.i to ptr
-    %v1577 = getelementptr i8, ptr @.str_344, i64 16
-    %v1578.i = call i64 @orion_map_get(ptr %v1501, ptr %v1577)
-    %v1578 = inttoptr i64 %v1578.i to ptr
-    %v1579 = load ptr, ptr %v1249
-    %v1580 = call ptr @ast_type_to_ir_with_scope(ptr %v1578, ptr %v1579)
-    %v1581 = load ptr, ptr %v1249
-    %v1582 = call ptr @scope_add_fn_sig(ptr %v1581, ptr %v1576, ptr %v1580)
-    store ptr %v1582, ptr %v1249
-    %v1583 = add i64 0, 0
-    %v1584 = getelementptr i8, ptr @.str_467, i64 16
-    %v1585 = call ptr @orion_text_concat(ptr %v1584, ptr %v1576)
-    %v1586 = getelementptr i8, ptr @.str_302, i64 16
-    %v1587.i = call i64 @orion_map_get(ptr %v1501, ptr %v1586)
-    %v1587 = inttoptr i64 %v1587.i to ptr
-    %v1588 = call i64 @orion_list_len(ptr %v1587)
-    %v1589 = call i64 @orion_slot_set(ptr %v1585, i64 %v1588)
-    br label %if_1573_merge
-if_1573_else:
-    br label %if_1573_merge
-if_1573_merge:
-    br label %for_1491_step
-for_1491_step:
-    %v1596 = add i64 0, 1
-    %v1597 = add i64 %v1496, %v1596
-    store i64 %v1597, ptr %v1492
+    br label %for_1407_header
+for_1407_end:
+    %v1496 = load ptr, ptr %v1315
+    %v1497 = load ptr, ptr %v1402
+    %v1498 = call ptr @scope_add_enum_decl(ptr %v1496, ptr %v1397, ptr %v1497)
+    store ptr %v1498, ptr %v1315
+    %v1499 = add i64 0, 0
+    %v1500 = load i64, ptr %v1405
+    %v1501 = add i64 0, 2
+    %v1502.b = icmp slt i64 %v1500, %v1501
+    %v1502 = zext i1 %v1502.b to i64
+    %v1503.cb = icmp ne i64 %v1502, 0
+    br i1 %v1503.cb, label %if_1503_then, label %if_1503_else
+if_1503_then:
+    %v1505 = add i64 0, 2
+    store i64 %v1505, ptr %v1405
+    %v1506 = add i64 0, 0
+    br label %if_1503_merge
+if_1503_else:
+    br label %if_1503_merge
+if_1503_merge:
+    %v1511 = getelementptr i8, ptr @.str_498, i64 16
+    %v1512 = alloca ptr, align 8
+    store ptr %v1511, ptr %v1512
+    %v1513 = add i64 0, 0
+    %v1514 = add i64 0, 0
+    %v1515 = load i64, ptr %v1405
+    %v1516 = alloca i64, align 8
+    store i64 %v1514, ptr %v1516
+    %v1517 = add i64 0, 0
+    br label %for_1514_header
+for_1514_header:
+    %v1520 = load i64, ptr %v1516
+    %v1521.b = icmp slt i64 %v1520, %v1515
+    %v1521 = zext i1 %v1521.b to i64
+    %v1522.cb = icmp ne i64 %v1521, 0
+    br i1 %v1522.cb, label %for_1514_body, label %for_1514_end
+for_1514_body:
+    %v1524 = load ptr, ptr %v1512
+    %v1525 = getelementptr i8, ptr @.str_499, i64 16
+    %v1526 = call ptr @orion_text_concat(ptr %v1524, ptr %v1525)
+    %v1527 = call ptr @orion_int_to_text(i64 %v1520)
+    %v1528 = call ptr @orion_text_concat(ptr %v1526, ptr %v1527)
+    %v1529 = getelementptr i8, ptr @.str_500, i64 16
+    %v1530 = call ptr @orion_text_concat(ptr %v1528, ptr %v1529)
+    store ptr %v1530, ptr %v1512
+    %v1531 = add i64 0, 0
+    br label %for_1514_step
+for_1514_step:
+    %v1534 = add i64 0, 1
+    %v1535 = add i64 %v1520, %v1534
+    store i64 %v1535, ptr %v1516
+    %v1536 = add i64 0, 0
+    br label %for_1514_header
+for_1514_end:
+    %v1539 = load ptr, ptr %v1315
+    %v1540 = load ptr, ptr %v1512
+    %v1541 = call ptr @scope_add_data_decl(ptr %v1539, ptr %v1397, ptr %v1540)
+    store ptr %v1541, ptr %v1315
+    %v1542 = add i64 0, 0
+    br label %if_1394_merge
+if_1394_else:
+    br label %if_1394_merge
+if_1394_merge:
+    br label %for_1317_step
+for_1317_step:
+    %v1549 = add i64 0, 1
+    %v1550 = add i64 %v1322, %v1549
+    store i64 %v1550, ptr %v1318
+    %v1551 = add i64 0, 0
+    br label %for_1317_header
+for_1317_end:
+    %v1554 = getelementptr i64, ptr @orion_empty_list, i64 0
+    %v1555 = alloca ptr, align 8
+    store ptr %v1554, ptr %v1555
+    %v1556 = add i64 0, 0
+    %v1557 = add i64 0, 0
+    %v1558 = alloca i64, align 8
+    store i64 %v1557, ptr %v1558
+    %v1559 = add i64 0, 0
+    br label %for_1557_header
+for_1557_header:
+    %v1562 = load i64, ptr %v1558
+    %v1563.b = icmp slt i64 %v1562, %v1313
+    %v1563 = zext i1 %v1563.b to i64
+    %v1564.cb = icmp ne i64 %v1563, 0
+    br i1 %v1564.cb, label %for_1557_body, label %for_1557_end
+for_1557_body:
+    %v1566 = load ptr, ptr %v410
+    %v1567.i = call i64 @orion_list_at(ptr %v1566, i64 %v1562)
+    %v1567 = inttoptr i64 %v1567.i to ptr
+    %v1568 = getelementptr i8, ptr @.str_111, i64 16
+    %v1569.i = call i64 @orion_map_get(ptr %v1567, ptr %v1568)
+    %v1569 = inttoptr i64 %v1569.i to ptr
+    %v1570 = getelementptr i8, ptr @.str_352, i64 16
+    %v1571.e = call i64 @orion_text_eq(ptr %v1569, ptr %v1570)
+    %v1571 = add i64 %v1571.e, 0
+    %v1572.cb = icmp ne i64 %v1571, 0
+    br i1 %v1572.cb, label %if_1572_then, label %if_1572_else
+if_1572_then:
+    %v1574 = getelementptr i8, ptr @.str_251, i64 16
+    %v1575.i = call i64 @orion_map_get(ptr %v1567, ptr %v1574)
+    %v1575 = inttoptr i64 %v1575.i to ptr
+    %v1576 = load ptr, ptr %v1555
+    %v1577 = call i64 @text_list_has(ptr %v1576, ptr %v1575)
+    %v1578.cb = icmp ne i64 %v1577, 0
+    br i1 %v1578.cb, label %if_1578_then, label %if_1578_else
+if_1578_then:
+    %v1580 = getelementptr i8, ptr @.str_501, i64 16
+    %v1581 = call ptr @orion_text_concat(ptr %v1580, ptr %v1575)
+    %v1582 = getelementptr i8, ptr @.str_502, i64 16
+    %v1583 = call ptr @orion_text_concat(ptr %v1581, ptr %v1582)
+    %v1584 = call i64 @compile_error(ptr %v1583)
+    br label %if_1578_merge
+if_1578_else:
+    br label %if_1578_merge
+if_1578_merge:
+    %v1589 = load ptr, ptr %v1555
+    %v1590.p = ptrtoint ptr %v1575 to i64
+    %v1590 = call ptr @orion_list_push_mut(ptr %v1589, i64 %v1590.p)
+    store ptr %v1590, ptr %v1555
+    %v1591 = add i64 0, 0
+    %v1592 = getelementptr i8, ptr @.str_344, i64 16
+    %v1593.i = call i64 @orion_map_get(ptr %v1567, ptr %v1592)
+    %v1593 = inttoptr i64 %v1593.i to ptr
+    %v1594 = load ptr, ptr %v1315
+    %v1595 = call ptr @ast_type_to_ir_with_scope(ptr %v1593, ptr %v1594)
+    %v1596 = load ptr, ptr %v1315
+    %v1597 = call ptr @scope_add_fn_sig(ptr %v1596, ptr %v1575, ptr %v1595)
+    store ptr %v1597, ptr %v1315
     %v1598 = add i64 0, 0
-    br label %for_1491_header
-for_1491_end:
-    %v1601 = call ptr @ir_module_new()
-    %v1602 = alloca ptr, align 8
-    store ptr %v1601, ptr %v1602
-    %v1603 = add i64 0, 0
-    %v1604 = add i64 0, 0
-    %v1605 = alloca i64, align 8
-    store i64 %v1604, ptr %v1605
-    %v1606 = add i64 0, 0
+    %v1599 = getelementptr i8, ptr @.str_467, i64 16
+    %v1600 = call ptr @orion_text_concat(ptr %v1599, ptr %v1575)
+    %v1601 = getelementptr i8, ptr @.str_302, i64 16
+    %v1602.i = call i64 @orion_map_get(ptr %v1567, ptr %v1601)
+    %v1602 = inttoptr i64 %v1602.i to ptr
+    %v1603 = call i64 @orion_list_len(ptr %v1602)
+    %v1604 = call i64 @orion_slot_set(ptr %v1600, i64 %v1603)
+    %v1605 = getelementptr i8, ptr @.str_302, i64 16
+    %v1606.i = call i64 @orion_map_get(ptr %v1567, ptr %v1605)
+    %v1606 = inttoptr i64 %v1606.i to ptr
     %v1607 = add i64 0, 0
-    %v1608 = alloca i64, align 8
-    store i64 %v1607, ptr %v1608
-    %v1609 = add i64 0, 0
+    %v1608 = call i64 @orion_list_len(ptr %v1606)
+    %v1609 = alloca i64, align 8
+    store i64 %v1607, ptr %v1609
+    %v1610 = add i64 0, 0
     br label %for_1607_header
 for_1607_header:
-    %v1612 = load i64, ptr %v1608
-    %v1613.b = icmp slt i64 %v1612, %v1247
-    %v1613 = zext i1 %v1613.b to i64
-    %v1614.cb = icmp ne i64 %v1613, 0
-    br i1 %v1614.cb, label %for_1607_body, label %for_1607_end
+    %v1613 = load i64, ptr %v1609
+    %v1614.b = icmp slt i64 %v1613, %v1608
+    %v1614 = zext i1 %v1614.b to i64
+    %v1615.cb = icmp ne i64 %v1614, 0
+    br i1 %v1615.cb, label %for_1607_body, label %for_1607_end
 for_1607_body:
-    %v1616 = load ptr, ptr %v410
-    %v1617.i = call i64 @orion_list_at(ptr %v1616, i64 %v1612)
+    %v1617.i = call i64 @orion_list_at(ptr %v1606, i64 %v1613)
     %v1617 = inttoptr i64 %v1617.i to ptr
-    %v1618 = getelementptr i8, ptr @.str_111, i64 16
-    %v1619.i = call i64 @orion_map_get(ptr %v1617, ptr %v1618)
-    %v1619 = inttoptr i64 %v1619.i to ptr
-    %v1620 = getelementptr i8, ptr @.str_352, i64 16
-    %v1621.e = call i64 @orion_text_eq(ptr %v1619, ptr %v1620)
-    %v1621 = add i64 %v1621.e, 0
-    %v1622.cb = icmp ne i64 %v1621, 0
-    br i1 %v1622.cb, label %if_1622_then, label %if_1622_else
-if_1622_then:
-    %v1624 = load ptr, ptr %v1249
-    %v1625 = call ptr @ast_fn_to_ir(ptr %v1617, ptr %v1624)
-    %v1626 = load ptr, ptr %v1602
-    %v1627 = call ptr @ir_module_add_fn(ptr %v1626, ptr %v1625)
-    store ptr %v1627, ptr %v1602
-    %v1628 = add i64 0, 0
-    %v1629.slot = getelementptr i64, ptr %v1625, i64 0
-    %v1629.i = load i64, ptr %v1629.slot
-    %v1629 = inttoptr i64 %v1629.i to ptr
-    %v1630 = getelementptr i8, ptr @.str_501, i64 16
-    %v1631.e = call i64 @orion_text_eq(ptr %v1629, ptr %v1630)
-    %v1631 = add i64 %v1631.e, 0
-    %v1632.cb = icmp ne i64 %v1631, 0
-    br i1 %v1632.cb, label %if_1632_then, label %if_1632_else
-if_1632_then:
-    %v1634 = add i64 0, 1
-    store i64 %v1634, ptr %v1605
-    %v1635 = add i64 0, 0
-    br label %if_1632_merge
-if_1632_else:
-    br label %if_1632_merge
-if_1632_merge:
-    br label %if_1622_merge
-if_1622_else:
-    br label %if_1622_merge
-if_1622_merge:
-    %v1644 = getelementptr i8, ptr @.str_353, i64 16
-    %v1645.e = call i64 @orion_text_eq(ptr %v1619, ptr %v1644)
-    %v1645 = add i64 %v1645.e, 0
-    %v1646.cb = icmp ne i64 %v1645, 0
-    br i1 %v1646.cb, label %if_1646_then, label %if_1646_else
-if_1646_then:
-    %v1648 = getelementptr i8, ptr @.str_344, i64 16
-    %v1649.i = call i64 @orion_map_get(ptr %v1617, ptr %v1648)
-    %v1649 = inttoptr i64 %v1649.i to ptr
-    %v1650 = load ptr, ptr %v1249
-    %v1651 = call ptr @ast_type_to_ir_with_scope(ptr %v1649, ptr %v1650)
-    %v1652 = getelementptr i8, ptr @.str_251, i64 16
-    %v1653.i = call i64 @orion_map_get(ptr %v1617, ptr %v1652)
-    %v1653 = inttoptr i64 %v1653.i to ptr
-    %v1654 = call ptr @ir_fn_new(ptr %v1653, ptr %v1651)
-    %v1655 = alloca ptr, align 8
-    store ptr %v1654, ptr %v1655
-    %v1656 = add i64 0, 0
-    %v1657 = getelementptr i8, ptr @.str_302, i64 16
-    %v1658.i = call i64 @orion_map_get(ptr %v1617, ptr %v1657)
-    %v1658 = inttoptr i64 %v1658.i to ptr
-    %v1659 = call i64 @orion_list_len(ptr %v1658)
-    %v1660 = add i64 0, 0
-    %v1661 = alloca i64, align 8
-    store i64 %v1660, ptr %v1661
-    %v1662 = add i64 0, 0
-    br label %for_1660_header
-for_1660_header:
-    %v1665 = load i64, ptr %v1661
-    %v1666.b = icmp slt i64 %v1665, %v1659
-    %v1666 = zext i1 %v1666.b to i64
-    %v1667.cb = icmp ne i64 %v1666, 0
-    br i1 %v1667.cb, label %for_1660_body, label %for_1660_end
-for_1660_body:
-    %v1669.i = call i64 @orion_list_at(ptr %v1658, i64 %v1665)
-    %v1669 = inttoptr i64 %v1669.i to ptr
-    %v1670 = getelementptr i8, ptr @.str_321, i64 16
-    %v1671.i = call i64 @orion_map_get(ptr %v1669, ptr %v1670)
-    %v1671 = inttoptr i64 %v1671.i to ptr
-    %v1672 = load ptr, ptr %v1249
-    %v1673 = call ptr @ast_type_to_ir_with_scope(ptr %v1671, ptr %v1672)
-    %v1674 = load ptr, ptr %v1655
-    %v1675 = getelementptr i8, ptr @.str_251, i64 16
-    %v1676.i = call i64 @orion_map_get(ptr %v1669, ptr %v1675)
-    %v1676 = inttoptr i64 %v1676.i to ptr
-    %v1677 = call ptr @ir_fn_add_param(ptr %v1674, ptr %v1676, ptr %v1673)
-    store ptr %v1677, ptr %v1655
-    %v1678 = add i64 0, 0
-    br label %for_1660_step
-for_1660_step:
-    %v1681 = add i64 0, 1
-    %v1682 = add i64 %v1665, %v1681
-    store i64 %v1682, ptr %v1661
-    %v1683 = add i64 0, 0
-    br label %for_1660_header
-for_1660_end:
-    %v1686 = load ptr, ptr %v1602
-    %v1687 = load ptr, ptr %v1655
-    %v1688 = call ptr @ir_module_add_fn(ptr %v1686, ptr %v1687)
-    store ptr %v1688, ptr %v1602
-    %v1689 = add i64 0, 0
-    br label %if_1646_merge
-if_1646_else:
-    br label %if_1646_merge
-if_1646_merge:
+    %v1618 = getelementptr i8, ptr @.str_431, i64 16
+    %v1619 = call ptr @orion_text_concat(ptr %v1618, ptr %v1575)
+    %v1620 = getelementptr i8, ptr @.str_229, i64 16
+    %v1621 = call ptr @orion_text_concat(ptr %v1619, ptr %v1620)
+    %v1622 = getelementptr i8, ptr @.str_251, i64 16
+    %v1623.i = call i64 @orion_map_get(ptr %v1617, ptr %v1622)
+    %v1623 = inttoptr i64 %v1623.i to ptr
+    %v1624 = call ptr @orion_text_concat(ptr %v1621, ptr %v1623)
+    %v1625 = call i64 @orion_slot_set(ptr %v1624, i64 %v1613)
     br label %for_1607_step
 for_1607_step:
-    %v1696 = add i64 0, 1
-    %v1697 = add i64 %v1612, %v1696
-    store i64 %v1697, ptr %v1608
-    %v1698 = add i64 0, 0
+    %v1628 = add i64 0, 1
+    %v1629 = add i64 %v1613, %v1628
+    store i64 %v1629, ptr %v1609
+    %v1630 = add i64 0, 0
     br label %for_1607_header
 for_1607_end:
-    %v1701 = load i64, ptr %v1605
-    %v1702 = add i64 0, 0
-    %v1703.b = icmp eq i64 %v1701, %v1702
-    %v1703 = zext i1 %v1703.b to i64
-    %v1704.cb = icmp ne i64 %v1703, 0
-    br i1 %v1704.cb, label %if_1704_then, label %if_1704_else
-if_1704_then:
-    %v1706 = getelementptr i8, ptr @.str_501, i64 16
-    %v1707 = getelementptr i8, ptr @.str_0, i64 16
-    %v1708 = call ptr @ir_fn_new(ptr %v1706, ptr %v1707)
-    %v1709 = alloca ptr, align 8
-    store ptr %v1708, ptr %v1709
-    %v1710 = add i64 0, 0
-    %v1711 = load ptr, ptr %v1709
-    %v1712 = add i64 0, 0
-    %v1713 = call ptr @ir_iconst(i64 %v1712)
-    %v1714 = call ptr @ir_fn_push(ptr %v1711, ptr %v1713)
-    %v1715.slot = getelementptr i64, ptr %v1714, i64 0
-    %v1715.i = load i64, ptr %v1715.slot
+    br label %if_1572_merge
+if_1572_else:
+    br label %if_1572_merge
+if_1572_merge:
+    %v1637 = getelementptr i8, ptr @.str_353, i64 16
+    %v1638.e = call i64 @orion_text_eq(ptr %v1569, ptr %v1637)
+    %v1638 = add i64 %v1638.e, 0
+    %v1639.cb = icmp ne i64 %v1638, 0
+    br i1 %v1639.cb, label %if_1639_then, label %if_1639_else
+if_1639_then:
+    %v1641 = getelementptr i8, ptr @.str_251, i64 16
+    %v1642.i = call i64 @orion_map_get(ptr %v1567, ptr %v1641)
+    %v1642 = inttoptr i64 %v1642.i to ptr
+    %v1643 = getelementptr i8, ptr @.str_344, i64 16
+    %v1644.i = call i64 @orion_map_get(ptr %v1567, ptr %v1643)
+    %v1644 = inttoptr i64 %v1644.i to ptr
+    %v1645 = load ptr, ptr %v1315
+    %v1646 = call ptr @ast_type_to_ir_with_scope(ptr %v1644, ptr %v1645)
+    %v1647 = load ptr, ptr %v1315
+    %v1648 = call ptr @scope_add_fn_sig(ptr %v1647, ptr %v1642, ptr %v1646)
+    store ptr %v1648, ptr %v1315
+    %v1649 = add i64 0, 0
+    %v1650 = getelementptr i8, ptr @.str_467, i64 16
+    %v1651 = call ptr @orion_text_concat(ptr %v1650, ptr %v1642)
+    %v1652 = getelementptr i8, ptr @.str_302, i64 16
+    %v1653.i = call i64 @orion_map_get(ptr %v1567, ptr %v1652)
+    %v1653 = inttoptr i64 %v1653.i to ptr
+    %v1654 = call i64 @orion_list_len(ptr %v1653)
+    %v1655 = call i64 @orion_slot_set(ptr %v1651, i64 %v1654)
+    br label %if_1639_merge
+if_1639_else:
+    br label %if_1639_merge
+if_1639_merge:
+    br label %for_1557_step
+for_1557_step:
+    %v1662 = add i64 0, 1
+    %v1663 = add i64 %v1562, %v1662
+    store i64 %v1663, ptr %v1558
+    %v1664 = add i64 0, 0
+    br label %for_1557_header
+for_1557_end:
+    %v1667 = call ptr @ir_module_new()
+    %v1668 = alloca ptr, align 8
+    store ptr %v1667, ptr %v1668
+    %v1669 = add i64 0, 0
+    %v1670 = add i64 0, 0
+    %v1671 = alloca i64, align 8
+    store i64 %v1670, ptr %v1671
+    %v1672 = add i64 0, 0
+    %v1673 = add i64 0, 0
+    %v1674 = alloca i64, align 8
+    store i64 %v1673, ptr %v1674
+    %v1675 = add i64 0, 0
+    br label %for_1673_header
+for_1673_header:
+    %v1678 = load i64, ptr %v1674
+    %v1679.b = icmp slt i64 %v1678, %v1313
+    %v1679 = zext i1 %v1679.b to i64
+    %v1680.cb = icmp ne i64 %v1679, 0
+    br i1 %v1680.cb, label %for_1673_body, label %for_1673_end
+for_1673_body:
+    %v1682 = load ptr, ptr %v410
+    %v1683.i = call i64 @orion_list_at(ptr %v1682, i64 %v1678)
+    %v1683 = inttoptr i64 %v1683.i to ptr
+    %v1684 = getelementptr i8, ptr @.str_111, i64 16
+    %v1685.i = call i64 @orion_map_get(ptr %v1683, ptr %v1684)
+    %v1685 = inttoptr i64 %v1685.i to ptr
+    %v1686 = getelementptr i8, ptr @.str_352, i64 16
+    %v1687.e = call i64 @orion_text_eq(ptr %v1685, ptr %v1686)
+    %v1687 = add i64 %v1687.e, 0
+    %v1688.cb = icmp ne i64 %v1687, 0
+    br i1 %v1688.cb, label %if_1688_then, label %if_1688_else
+if_1688_then:
+    %v1690 = load ptr, ptr %v1315
+    %v1691 = call ptr @ast_fn_to_ir(ptr %v1683, ptr %v1690)
+    %v1692 = load ptr, ptr %v1668
+    %v1693 = call ptr @ir_module_add_fn(ptr %v1692, ptr %v1691)
+    store ptr %v1693, ptr %v1668
+    %v1694 = add i64 0, 0
+    %v1695.slot = getelementptr i64, ptr %v1691, i64 0
+    %v1695.i = load i64, ptr %v1695.slot
+    %v1695 = inttoptr i64 %v1695.i to ptr
+    %v1696 = getelementptr i8, ptr @.str_503, i64 16
+    %v1697.e = call i64 @orion_text_eq(ptr %v1695, ptr %v1696)
+    %v1697 = add i64 %v1697.e, 0
+    %v1698.cb = icmp ne i64 %v1697, 0
+    br i1 %v1698.cb, label %if_1698_then, label %if_1698_else
+if_1698_then:
+    %v1700 = add i64 0, 1
+    store i64 %v1700, ptr %v1671
+    %v1701 = add i64 0, 0
+    br label %if_1698_merge
+if_1698_else:
+    br label %if_1698_merge
+if_1698_merge:
+    br label %if_1688_merge
+if_1688_else:
+    br label %if_1688_merge
+if_1688_merge:
+    %v1710 = getelementptr i8, ptr @.str_353, i64 16
+    %v1711.e = call i64 @orion_text_eq(ptr %v1685, ptr %v1710)
+    %v1711 = add i64 %v1711.e, 0
+    %v1712.cb = icmp ne i64 %v1711, 0
+    br i1 %v1712.cb, label %if_1712_then, label %if_1712_else
+if_1712_then:
+    %v1714 = getelementptr i8, ptr @.str_344, i64 16
+    %v1715.i = call i64 @orion_map_get(ptr %v1683, ptr %v1714)
     %v1715 = inttoptr i64 %v1715.i to ptr
-    %v1716.slot = getelementptr i64, ptr %v1714, i64 1
-    %v1716 = load i64, ptr %v1716.slot
-    %v1717 = call ptr @ir_return(i64 %v1716)
-    %v1718 = call ptr @ir_fn_push(ptr %v1715, ptr %v1717)
-    %v1719 = load ptr, ptr %v1602
-    %v1720.slot = getelementptr i64, ptr %v1718, i64 0
-    %v1720.i = load i64, ptr %v1720.slot
-    %v1720 = inttoptr i64 %v1720.i to ptr
-    %v1721 = call ptr @ir_module_add_fn(ptr %v1719, ptr %v1720)
-    store ptr %v1721, ptr %v1602
+    %v1716 = load ptr, ptr %v1315
+    %v1717 = call ptr @ast_type_to_ir_with_scope(ptr %v1715, ptr %v1716)
+    %v1718 = getelementptr i8, ptr @.str_251, i64 16
+    %v1719.i = call i64 @orion_map_get(ptr %v1683, ptr %v1718)
+    %v1719 = inttoptr i64 %v1719.i to ptr
+    %v1720 = call ptr @ir_fn_new(ptr %v1719, ptr %v1717)
+    %v1721 = alloca ptr, align 8
+    store ptr %v1720, ptr %v1721
     %v1722 = add i64 0, 0
-    br label %if_1704_merge
-if_1704_else:
-    br label %if_1704_merge
-if_1704_merge:
-    %v1727 = load ptr, ptr %v1602
-    ret ptr %v1727
+    %v1723 = getelementptr i8, ptr @.str_302, i64 16
+    %v1724.i = call i64 @orion_map_get(ptr %v1683, ptr %v1723)
+    %v1724 = inttoptr i64 %v1724.i to ptr
+    %v1725 = call i64 @orion_list_len(ptr %v1724)
+    %v1726 = add i64 0, 0
+    %v1727 = alloca i64, align 8
+    store i64 %v1726, ptr %v1727
+    %v1728 = add i64 0, 0
+    br label %for_1726_header
+for_1726_header:
+    %v1731 = load i64, ptr %v1727
+    %v1732.b = icmp slt i64 %v1731, %v1725
+    %v1732 = zext i1 %v1732.b to i64
+    %v1733.cb = icmp ne i64 %v1732, 0
+    br i1 %v1733.cb, label %for_1726_body, label %for_1726_end
+for_1726_body:
+    %v1735.i = call i64 @orion_list_at(ptr %v1724, i64 %v1731)
+    %v1735 = inttoptr i64 %v1735.i to ptr
+    %v1736 = getelementptr i8, ptr @.str_321, i64 16
+    %v1737.i = call i64 @orion_map_get(ptr %v1735, ptr %v1736)
+    %v1737 = inttoptr i64 %v1737.i to ptr
+    %v1738 = load ptr, ptr %v1315
+    %v1739 = call ptr @ast_type_to_ir_with_scope(ptr %v1737, ptr %v1738)
+    %v1740 = load ptr, ptr %v1721
+    %v1741 = getelementptr i8, ptr @.str_251, i64 16
+    %v1742.i = call i64 @orion_map_get(ptr %v1735, ptr %v1741)
+    %v1742 = inttoptr i64 %v1742.i to ptr
+    %v1743 = call ptr @ir_fn_add_param(ptr %v1740, ptr %v1742, ptr %v1739)
+    store ptr %v1743, ptr %v1721
+    %v1744 = add i64 0, 0
+    br label %for_1726_step
+for_1726_step:
+    %v1747 = add i64 0, 1
+    %v1748 = add i64 %v1731, %v1747
+    store i64 %v1748, ptr %v1727
+    %v1749 = add i64 0, 0
+    br label %for_1726_header
+for_1726_end:
+    %v1752 = load ptr, ptr %v1668
+    %v1753 = load ptr, ptr %v1721
+    %v1754 = call ptr @ir_module_add_fn(ptr %v1752, ptr %v1753)
+    store ptr %v1754, ptr %v1668
+    %v1755 = add i64 0, 0
+    br label %if_1712_merge
+if_1712_else:
+    br label %if_1712_merge
+if_1712_merge:
+    br label %for_1673_step
+for_1673_step:
+    %v1762 = add i64 0, 1
+    %v1763 = add i64 %v1678, %v1762
+    store i64 %v1763, ptr %v1674
+    %v1764 = add i64 0, 0
+    br label %for_1673_header
+for_1673_end:
+    %v1767 = load i64, ptr %v1671
+    %v1768 = add i64 0, 0
+    %v1769.b = icmp eq i64 %v1767, %v1768
+    %v1769 = zext i1 %v1769.b to i64
+    %v1770.cb = icmp ne i64 %v1769, 0
+    br i1 %v1770.cb, label %if_1770_then, label %if_1770_else
+if_1770_then:
+    %v1772 = getelementptr i8, ptr @.str_503, i64 16
+    %v1773 = getelementptr i8, ptr @.str_0, i64 16
+    %v1774 = call ptr @ir_fn_new(ptr %v1772, ptr %v1773)
+    %v1775 = alloca ptr, align 8
+    store ptr %v1774, ptr %v1775
+    %v1776 = add i64 0, 0
+    %v1777 = load ptr, ptr %v1775
+    %v1778 = add i64 0, 0
+    %v1779 = call ptr @ir_iconst(i64 %v1778)
+    %v1780 = call ptr @ir_fn_push(ptr %v1777, ptr %v1779)
+    %v1781.slot = getelementptr i64, ptr %v1780, i64 0
+    %v1781.i = load i64, ptr %v1781.slot
+    %v1781 = inttoptr i64 %v1781.i to ptr
+    %v1782.slot = getelementptr i64, ptr %v1780, i64 1
+    %v1782 = load i64, ptr %v1782.slot
+    %v1783 = call ptr @ir_return(i64 %v1782)
+    %v1784 = call ptr @ir_fn_push(ptr %v1781, ptr %v1783)
+    %v1785 = load ptr, ptr %v1668
+    %v1786.slot = getelementptr i64, ptr %v1784, i64 0
+    %v1786.i = load i64, ptr %v1786.slot
+    %v1786 = inttoptr i64 %v1786.i to ptr
+    %v1787 = call ptr @ir_module_add_fn(ptr %v1785, ptr %v1786)
+    store ptr %v1787, ptr %v1668
+    %v1788 = add i64 0, 0
+    br label %if_1770_merge
+if_1770_else:
+    br label %if_1770_merge
+if_1770_merge:
+    %v1793 = load ptr, ptr %v1668
+    ret ptr %v1793
 }
 
 define ptr @value_ref(i64 %p0) {
 entry:
     %v0 = add i64 0, %p0
-    %v1 = getelementptr i8, ptr @.str_502, i64 16
+    %v1 = getelementptr i8, ptr @.str_504, i64 16
     %v2 = call ptr @orion_int_to_text(i64 %v0)
     %v3 = call ptr @orion_text_concat(ptr %v1, ptr %v2)
     ret ptr %v3
@@ -36606,12 +37236,12 @@ entry:
     %v8 = getelementptr i8, ptr @.str_362, i64 16
     %v9 = getelementptr i8, ptr @.str_363, i64 16
     %v10 = getelementptr i8, ptr @.str_364, i64 16
-    %v11 = getelementptr i8, ptr @.str_503, i64 16
-    %v12 = getelementptr i8, ptr @.str_504, i64 16
-    %v13 = getelementptr i8, ptr @.str_505, i64 16
-    %v14 = getelementptr i8, ptr @.str_506, i64 16
-    %v15 = getelementptr i8, ptr @.str_507, i64 16
-    %v16 = getelementptr i8, ptr @.str_508, i64 16
+    %v11 = getelementptr i8, ptr @.str_505, i64 16
+    %v12 = getelementptr i8, ptr @.str_506, i64 16
+    %v13 = getelementptr i8, ptr @.str_507, i64 16
+    %v14 = getelementptr i8, ptr @.str_508, i64 16
+    %v15 = getelementptr i8, ptr @.str_509, i64 16
+    %v16 = getelementptr i8, ptr @.str_510, i64 16
     %v17 = call ptr @orion_list_new(i64 16)
     %v17.lp0 = ptrtoint ptr %v1 to i64
     call void @orion_list_set(ptr %v17, i64 0, i64 %v17.lp0)
@@ -37021,7 +37651,7 @@ if_163_else:
     br label %if_163_merge
 if_163_merge:
     %v174 = phi i64 [ %v168, %if_163_then ], [ %v171, %if_163_else ]
-    %v175 = getelementptr i8, ptr @.str_509, i64 16
+    %v175 = getelementptr i8, ptr @.str_511, i64 16
     %v176.e = call i64 @orion_text_eq(ptr %v0, ptr %v175)
     %v176 = add i64 %v176.e, 0
     %v177.cb = icmp ne i64 %v176, 0
@@ -37029,7 +37659,7 @@ if_163_merge:
 if_177_then:
     br label %if_177_merge
 if_177_else:
-    %v181 = getelementptr i8, ptr @.str_510, i64 16
+    %v181 = getelementptr i8, ptr @.str_512, i64 16
     %v182.e = call i64 @orion_text_eq(ptr %v0, ptr %v181)
     %v182 = add i64 %v182.e, 0
     br label %if_177_merge
@@ -37040,7 +37670,7 @@ if_177_merge:
 if_186_then:
     br label %if_186_merge
 if_186_else:
-    %v190 = getelementptr i8, ptr @.str_511, i64 16
+    %v190 = getelementptr i8, ptr @.str_513, i64 16
     %v191.e = call i64 @orion_text_eq(ptr %v0, ptr %v190)
     %v191 = add i64 %v191.e, 0
     br label %if_186_merge
@@ -37051,7 +37681,7 @@ if_186_merge:
 if_195_then:
     br label %if_195_merge
 if_195_else:
-    %v199 = getelementptr i8, ptr @.str_512, i64 16
+    %v199 = getelementptr i8, ptr @.str_514, i64 16
     %v200.e = call i64 @orion_text_eq(ptr %v0, ptr %v199)
     %v200 = add i64 %v200.e, 0
     br label %if_195_merge
@@ -37062,7 +37692,7 @@ if_195_merge:
 if_204_then:
     br label %if_204_merge
 if_204_else:
-    %v208 = getelementptr i8, ptr @.str_513, i64 16
+    %v208 = getelementptr i8, ptr @.str_515, i64 16
     %v209.e = call i64 @orion_text_eq(ptr %v0, ptr %v208)
     %v209 = add i64 %v209.e, 0
     br label %if_204_merge
@@ -37073,7 +37703,7 @@ if_204_merge:
 if_213_then:
     br label %if_213_merge
 if_213_else:
-    %v217 = getelementptr i8, ptr @.str_514, i64 16
+    %v217 = getelementptr i8, ptr @.str_516, i64 16
     %v218.e = call i64 @orion_text_eq(ptr %v0, ptr %v217)
     %v218 = add i64 %v218.e, 0
     br label %if_213_merge
@@ -37084,7 +37714,7 @@ if_213_merge:
 if_222_then:
     br label %if_222_merge
 if_222_else:
-    %v226 = getelementptr i8, ptr @.str_515, i64 16
+    %v226 = getelementptr i8, ptr @.str_517, i64 16
     %v227.e = call i64 @orion_text_eq(ptr %v0, ptr %v226)
     %v227 = add i64 %v227.e, 0
     br label %if_222_merge
@@ -37095,7 +37725,7 @@ if_222_merge:
 if_231_then:
     br label %if_231_merge
 if_231_else:
-    %v235 = getelementptr i8, ptr @.str_516, i64 16
+    %v235 = getelementptr i8, ptr @.str_518, i64 16
     %v236.e = call i64 @orion_text_eq(ptr %v0, ptr %v235)
     %v236 = add i64 %v236.e, 0
     br label %if_231_merge
@@ -37106,7 +37736,7 @@ if_231_merge:
 if_240_then:
     br label %if_240_merge
 if_240_else:
-    %v244 = getelementptr i8, ptr @.str_517, i64 16
+    %v244 = getelementptr i8, ptr @.str_519, i64 16
     %v245.e = call i64 @orion_text_eq(ptr %v0, ptr %v244)
     %v245 = add i64 %v245.e, 0
     br label %if_240_merge
@@ -37117,7 +37747,7 @@ if_240_merge:
 if_249_then:
     br label %if_249_merge
 if_249_else:
-    %v253 = getelementptr i8, ptr @.str_518, i64 16
+    %v253 = getelementptr i8, ptr @.str_520, i64 16
     %v254.e = call i64 @orion_text_eq(ptr %v0, ptr %v253)
     %v254 = add i64 %v254.e, 0
     br label %if_249_merge
@@ -37128,7 +37758,7 @@ if_249_merge:
 if_258_then:
     br label %if_258_merge
 if_258_else:
-    %v262 = getelementptr i8, ptr @.str_519, i64 16
+    %v262 = getelementptr i8, ptr @.str_521, i64 16
     %v263.e = call i64 @orion_text_eq(ptr %v0, ptr %v262)
     %v263 = add i64 %v263.e, 0
     br label %if_258_merge
@@ -37139,7 +37769,7 @@ if_258_merge:
 if_267_then:
     br label %if_267_merge
 if_267_else:
-    %v271 = getelementptr i8, ptr @.str_520, i64 16
+    %v271 = getelementptr i8, ptr @.str_522, i64 16
     %v272.e = call i64 @orion_text_eq(ptr %v0, ptr %v271)
     %v272 = add i64 %v272.e, 0
     br label %if_267_merge
@@ -37150,7 +37780,7 @@ if_267_merge:
 if_276_then:
     br label %if_276_merge
 if_276_else:
-    %v280 = getelementptr i8, ptr @.str_521, i64 16
+    %v280 = getelementptr i8, ptr @.str_523, i64 16
     %v281.e = call i64 @orion_text_eq(ptr %v0, ptr %v280)
     %v281 = add i64 %v281.e, 0
     br label %if_276_merge
@@ -37161,7 +37791,7 @@ if_276_merge:
 if_285_then:
     br label %if_285_merge
 if_285_else:
-    %v289 = getelementptr i8, ptr @.str_522, i64 16
+    %v289 = getelementptr i8, ptr @.str_524, i64 16
     %v290.e = call i64 @orion_text_eq(ptr %v0, ptr %v289)
     %v290 = add i64 %v290.e, 0
     br label %if_285_merge
@@ -37172,7 +37802,7 @@ if_285_merge:
 if_294_then:
     br label %if_294_merge
 if_294_else:
-    %v298 = getelementptr i8, ptr @.str_523, i64 16
+    %v298 = getelementptr i8, ptr @.str_525, i64 16
     %v299.e = call i64 @orion_text_eq(ptr %v0, ptr %v298)
     %v299 = add i64 %v299.e, 0
     br label %if_294_merge
@@ -37183,7 +37813,7 @@ if_294_merge:
 if_303_then:
     br label %if_303_merge
 if_303_else:
-    %v307 = getelementptr i8, ptr @.str_524, i64 16
+    %v307 = getelementptr i8, ptr @.str_526, i64 16
     %v308.e = call i64 @orion_text_eq(ptr %v0, ptr %v307)
     %v308 = add i64 %v308.e, 0
     br label %if_303_merge
@@ -37407,7 +38037,7 @@ for_61_step:
     br label %for_61_header
 for_61_end:
     %v96 = load ptr, ptr %v7
-    %v97 = getelementptr i8, ptr @.str_525, i64 16
+    %v97 = getelementptr i8, ptr @.str_527, i64 16
     %v98 = call ptr @orion_text_concat(ptr %v97, ptr %v38)
     %v99 = getelementptr i8, ptr @.str_226, i64 16
     %v100 = call ptr @orion_text_concat(ptr %v98, ptr %v99)
@@ -37648,7 +38278,7 @@ for_9_end:
 define ptr @icmp_cc(ptr %p0) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
-    %v1 = getelementptr i8, ptr @.str_526, i64 16
+    %v1 = getelementptr i8, ptr @.str_528, i64 16
     %v2 = alloca ptr, align 8
     store ptr %v1, ptr %v2
     %v3 = add i64 0, 0
@@ -37658,7 +38288,7 @@ entry:
     %v6.cb = icmp ne i64 %v5, 0
     br i1 %v6.cb, label %if_6_then, label %if_6_else
 if_6_then:
-    %v8 = getelementptr i8, ptr @.str_527, i64 16
+    %v8 = getelementptr i8, ptr @.str_529, i64 16
     store ptr %v8, ptr %v2
     %v9 = add i64 0, 0
     br label %if_6_merge
@@ -37671,7 +38301,7 @@ if_6_merge:
     %v16.cb = icmp ne i64 %v15, 0
     br i1 %v16.cb, label %if_16_then, label %if_16_else
 if_16_then:
-    %v18 = getelementptr i8, ptr @.str_528, i64 16
+    %v18 = getelementptr i8, ptr @.str_530, i64 16
     store ptr %v18, ptr %v2
     %v19 = add i64 0, 0
     br label %if_16_merge
@@ -37684,7 +38314,7 @@ if_16_merge:
     %v26.cb = icmp ne i64 %v25, 0
     br i1 %v26.cb, label %if_26_then, label %if_26_else
 if_26_then:
-    %v28 = getelementptr i8, ptr @.str_529, i64 16
+    %v28 = getelementptr i8, ptr @.str_531, i64 16
     store ptr %v28, ptr %v2
     %v29 = add i64 0, 0
     br label %if_26_merge
@@ -37697,7 +38327,7 @@ if_26_merge:
     %v36.cb = icmp ne i64 %v35, 0
     br i1 %v36.cb, label %if_36_then, label %if_36_else
 if_36_then:
-    %v38 = getelementptr i8, ptr @.str_530, i64 16
+    %v38 = getelementptr i8, ptr @.str_532, i64 16
     store ptr %v38, ptr %v2
     %v39 = add i64 0, 0
     br label %if_36_merge
@@ -37710,7 +38340,7 @@ if_36_merge:
     %v46.cb = icmp ne i64 %v45, 0
     br i1 %v46.cb, label %if_46_then, label %if_46_else
 if_46_then:
-    %v48 = getelementptr i8, ptr @.str_531, i64 16
+    %v48 = getelementptr i8, ptr @.str_533, i64 16
     store ptr %v48, ptr %v2
     %v49 = add i64 0, 0
     br label %if_46_merge
@@ -37746,7 +38376,7 @@ if_9_then:
 if_9_else:
     br label %if_9_merge
 if_9_merge:
-    %v17 = getelementptr i8, ptr @.str_532, i64 16
+    %v17 = getelementptr i8, ptr @.str_534, i64 16
     %v18.e = call i64 @orion_text_eq(ptr %v1, ptr %v17)
     %v18 = add i64 %v18.e, 0
     %v19.cb = icmp ne i64 %v18, 0
@@ -37785,7 +38415,7 @@ if_39_then:
 if_39_else:
     br label %if_39_merge
 if_39_merge:
-    %v47 = getelementptr i8, ptr @.str_533, i64 16
+    %v47 = getelementptr i8, ptr @.str_535, i64 16
     %v48.e = call i64 @orion_text_eq(ptr %v1, ptr %v47)
     %v48 = add i64 %v48.e, 0
     %v49.cb = icmp ne i64 %v48, 0
@@ -37975,7 +38605,7 @@ if_55_merge:
     %v64 = getelementptr i8, ptr @.str_108, i64 16
     %v65 = call ptr @value_ref(i64 %v1)
     %v66 = call ptr @orion_text_concat(ptr %v64, ptr %v65)
-    %v67 = getelementptr i8, ptr @.str_534, i64 16
+    %v67 = getelementptr i8, ptr @.str_536, i64 16
     %v68 = call ptr @orion_text_concat(ptr %v66, ptr %v67)
     %v69 = call ptr @orion_text_concat(ptr %v68, ptr %v5)
     %v70 = alloca ptr, align 8
@@ -37990,7 +38620,7 @@ if_74_then:
     %v76 = getelementptr i8, ptr @.str_108, i64 16
     %v77 = call ptr @value_ref(i64 %v1)
     %v78 = call ptr @orion_text_concat(ptr %v76, ptr %v77)
-    %v79 = getelementptr i8, ptr @.str_535, i64 16
+    %v79 = getelementptr i8, ptr @.str_537, i64 16
     %v80 = call ptr @orion_text_concat(ptr %v78, ptr %v79)
     %v81.slot = getelementptr i64, ptr %v0, i64 2
     %v81 = load i64, ptr %v81.slot
@@ -38021,19 +38651,19 @@ if_97_then:
     %v99 = getelementptr i8, ptr @.str_108, i64 16
     %v100 = call ptr @value_ref(i64 %v1)
     %v101 = call ptr @orion_text_concat(ptr %v99, ptr %v100)
-    %v102 = getelementptr i8, ptr @.str_536, i64 16
+    %v102 = getelementptr i8, ptr @.str_538, i64 16
     %v103 = call ptr @orion_text_concat(ptr %v101, ptr %v102)
     %v104.slot = getelementptr i64, ptr %v0, i64 2
     %v104 = load i64, ptr %v104.slot
     %v105 = call ptr @orion_int_to_text(i64 %v104)
     %v106 = call ptr @orion_text_concat(ptr %v103, ptr %v105)
-    %v107 = getelementptr i8, ptr @.str_537, i64 16
+    %v107 = getelementptr i8, ptr @.str_539, i64 16
     %v108 = call ptr @orion_text_concat(ptr %v106, ptr %v107)
     store ptr %v108, ptr %v70
     %v109 = add i64 0, 0
     br label %if_97_merge
 if_97_else:
-    %v112 = getelementptr i8, ptr @.str_538, i64 16
+    %v112 = getelementptr i8, ptr @.str_540, i64 16
     %v113.e = call i64 @orion_text_eq(ptr %v94, ptr %v112)
     %v113 = add i64 %v113.e, 0
     %v114.cb = icmp ne i64 %v113, 0
@@ -38042,13 +38672,13 @@ if_114_then:
     %v116 = getelementptr i8, ptr @.str_108, i64 16
     %v117 = call ptr @value_ref(i64 %v1)
     %v118 = call ptr @orion_text_concat(ptr %v116, ptr %v117)
-    %v119 = getelementptr i8, ptr @.str_539, i64 16
+    %v119 = getelementptr i8, ptr @.str_541, i64 16
     %v120 = call ptr @orion_text_concat(ptr %v118, ptr %v119)
     %v121.slot = getelementptr i64, ptr %v0, i64 2
     %v121 = load i64, ptr %v121.slot
     %v122 = call ptr @orion_int_to_text(i64 %v121)
     %v123 = call ptr @orion_text_concat(ptr %v120, ptr %v122)
-    %v124 = getelementptr i8, ptr @.str_540, i64 16
+    %v124 = getelementptr i8, ptr @.str_542, i64 16
     %v125 = call ptr @orion_text_concat(ptr %v123, ptr %v124)
     store ptr %v125, ptr %v70
     %v126 = add i64 0, 0
@@ -38057,7 +38687,7 @@ if_114_else:
     %v129 = getelementptr i8, ptr @.str_108, i64 16
     %v130 = call ptr @value_ref(i64 %v1)
     %v131 = call ptr @orion_text_concat(ptr %v129, ptr %v130)
-    %v132 = getelementptr i8, ptr @.str_541, i64 16
+    %v132 = getelementptr i8, ptr @.str_543, i64 16
     %v133 = call ptr @orion_text_concat(ptr %v131, ptr %v132)
     %v134.slot = getelementptr i64, ptr %v0, i64 2
     %v134 = load i64, ptr %v134.slot
@@ -38160,7 +38790,7 @@ if_199_merge:
     %v209.cb = icmp ne i64 %v208, 0
     br i1 %v209.cb, label %if_209_then, label %if_209_else
 if_209_then:
-    %v211 = getelementptr i8, ptr @.str_542, i64 16
+    %v211 = getelementptr i8, ptr @.str_544, i64 16
     %v212.slot = getelementptr i64, ptr %v0, i64 5
     %v212.i = load i64, ptr %v212.slot
     %v212 = inttoptr i64 %v212.i to ptr
@@ -38169,11 +38799,11 @@ if_209_then:
     %v215 = call ptr @orion_text_concat(ptr %v213, ptr %v214)
     %v216 = load ptr, ptr %v155
     %v217 = call ptr @orion_text_concat(ptr %v215, ptr %v216)
-    %v218 = getelementptr i8, ptr @.str_543, i64 16
+    %v218 = getelementptr i8, ptr @.str_545, i64 16
     %v219 = call ptr @orion_text_concat(ptr %v217, ptr %v218)
     %v220 = call ptr @value_ref(i64 %v1)
     %v221 = call ptr @orion_text_concat(ptr %v219, ptr %v220)
-    %v222 = getelementptr i8, ptr @.str_544, i64 16
+    %v222 = getelementptr i8, ptr @.str_546, i64 16
     %v223 = call ptr @orion_text_concat(ptr %v221, ptr %v222)
     store ptr %v223, ptr %v70
     %v224 = add i64 0, 0
@@ -38187,10 +38817,10 @@ if_209_else:
     %v230 = getelementptr i8, ptr @.str_108, i64 16
     %v231 = call ptr @value_ref(i64 %v1)
     %v232 = call ptr @orion_text_concat(ptr %v230, ptr %v231)
-    %v233 = getelementptr i8, ptr @.str_545, i64 16
+    %v233 = getelementptr i8, ptr @.str_547, i64 16
     %v234 = call ptr @orion_text_concat(ptr %v232, ptr %v233)
     %v235 = call ptr @orion_text_concat(ptr %v234, ptr %v229)
-    %v236 = getelementptr i8, ptr @.str_546, i64 16
+    %v236 = getelementptr i8, ptr @.str_548, i64 16
     %v237 = call ptr @orion_text_concat(ptr %v235, ptr %v236)
     %v238.slot = getelementptr i64, ptr %v0, i64 5
     %v238.i = load i64, ptr %v238.slot
@@ -38223,13 +38853,13 @@ if_256_then:
     %v260 = getelementptr i8, ptr @.str_108, i64 16
     %v261 = call ptr @value_ref(i64 %v1)
     %v262 = call ptr @orion_text_concat(ptr %v260, ptr %v261)
-    %v263 = getelementptr i8, ptr @.str_547, i64 16
+    %v263 = getelementptr i8, ptr @.str_549, i64 16
     %v264 = call ptr @orion_text_concat(ptr %v262, ptr %v263)
     %v265.slot = getelementptr i64, ptr %v0, i64 5
     %v265.i = load i64, ptr %v265.slot
     %v265 = inttoptr i64 %v265.i to ptr
     %v266 = call ptr @orion_text_concat(ptr %v264, ptr %v265)
-    %v267 = getelementptr i8, ptr @.str_548, i64 16
+    %v267 = getelementptr i8, ptr @.str_550, i64 16
     %v268 = call ptr @orion_text_concat(ptr %v266, ptr %v267)
     %v269 = call ptr @orion_text_concat(ptr %v268, ptr %v259)
     %v270 = getelementptr i8, ptr @.str_227, i64 16
@@ -38252,13 +38882,13 @@ if_279_then:
     %v283 = getelementptr i8, ptr @.str_108, i64 16
     %v284 = call ptr @value_ref(i64 %v1)
     %v285 = call ptr @orion_text_concat(ptr %v283, ptr %v284)
-    %v286 = getelementptr i8, ptr @.str_549, i64 16
+    %v286 = getelementptr i8, ptr @.str_551, i64 16
     %v287 = call ptr @orion_text_concat(ptr %v285, ptr %v286)
     %v288.slot = getelementptr i64, ptr %v0, i64 5
     %v288.i = load i64, ptr %v288.slot
     %v288 = inttoptr i64 %v288.i to ptr
     %v289 = call ptr @orion_text_concat(ptr %v287, ptr %v288)
-    %v290 = getelementptr i8, ptr @.str_550, i64 16
+    %v290 = getelementptr i8, ptr @.str_552, i64 16
     %v291 = call ptr @orion_text_concat(ptr %v289, ptr %v290)
     %v292 = call ptr @orion_text_concat(ptr %v291, ptr %v282)
     %v293 = getelementptr i8, ptr @.str_227, i64 16
@@ -38278,13 +38908,13 @@ if_302_then:
     %v304 = getelementptr i8, ptr @.str_108, i64 16
     %v305 = call ptr @value_ref(i64 %v1)
     %v306 = call ptr @orion_text_concat(ptr %v304, ptr %v305)
-    %v307 = getelementptr i8, ptr @.str_551, i64 16
+    %v307 = getelementptr i8, ptr @.str_553, i64 16
     %v308 = call ptr @orion_text_concat(ptr %v306, ptr %v307)
     %v309.slot = getelementptr i64, ptr %v0, i64 5
     %v309.i = load i64, ptr %v309.slot
     %v309 = inttoptr i64 %v309.i to ptr
     %v310 = call ptr @orion_text_concat(ptr %v308, ptr %v309)
-    %v311 = getelementptr i8, ptr @.str_537, i64 16
+    %v311 = getelementptr i8, ptr @.str_539, i64 16
     %v312 = call ptr @orion_text_concat(ptr %v310, ptr %v311)
     store ptr %v312, ptr %v70
     %v313 = add i64 0, 0
@@ -38364,7 +38994,7 @@ for_327_end:
     %v370 = getelementptr i8, ptr @.str_108, i64 16
     %v371 = call ptr @value_ref(i64 %v1)
     %v372 = call ptr @orion_text_concat(ptr %v370, ptr %v371)
-    %v373 = getelementptr i8, ptr @.str_545, i64 16
+    %v373 = getelementptr i8, ptr @.str_547, i64 16
     %v374 = call ptr @orion_text_concat(ptr %v372, ptr %v373)
     %v375 = call ptr @orion_text_concat(ptr %v374, ptr %v367)
     %v376 = getelementptr i8, ptr @.str_97, i64 16
@@ -38405,7 +39035,7 @@ if_392_merge:
     %v404.cb = icmp ne i64 %v403, 0
     br i1 %v404.cb, label %if_404_then, label %if_404_else
 if_404_then:
-    %v406 = getelementptr i8, ptr @.str_552, i64 16
+    %v406 = getelementptr i8, ptr @.str_554, i64 16
     %v407.slot = getelementptr i64, ptr %v0, i64 5
     %v407.i = load i64, ptr %v407.slot
     %v407 = inttoptr i64 %v407.i to ptr
@@ -38432,27 +39062,27 @@ if_416_then:
     %v422 = add i64 0, 1
     %v423.i = call i64 @orion_list_at(ptr %v419, i64 %v422)
     %v423 = inttoptr i64 %v423.i to ptr
-    %v424 = getelementptr i8, ptr @.str_502, i64 16
+    %v424 = getelementptr i8, ptr @.str_504, i64 16
     %v425 = call ptr @orion_int_to_text(i64 %v1)
     %v426 = call ptr @orion_text_concat(ptr %v424, ptr %v425)
-    %v427 = getelementptr i8, ptr @.str_553, i64 16
+    %v427 = getelementptr i8, ptr @.str_555, i64 16
     %v428 = call ptr @orion_text_concat(ptr %v426, ptr %v427)
     %v429 = getelementptr i8, ptr @.str_108, i64 16
     %v430 = call ptr @orion_text_concat(ptr %v429, ptr %v428)
-    %v431 = getelementptr i8, ptr @.str_554, i64 16
+    %v431 = getelementptr i8, ptr @.str_556, i64 16
     %v432 = call ptr @orion_text_concat(ptr %v430, ptr %v431)
     %v433.slot = getelementptr i64, ptr %v0, i64 2
     %v433 = load i64, ptr %v433.slot
     %v434 = call ptr @value_ref(i64 %v433)
     %v435 = call ptr @orion_text_concat(ptr %v432, ptr %v434)
-    %v436 = getelementptr i8, ptr @.str_555, i64 16
+    %v436 = getelementptr i8, ptr @.str_557, i64 16
     %v437 = call ptr @orion_text_concat(ptr %v435, ptr %v436)
-    %v438 = getelementptr i8, ptr @.str_556, i64 16
+    %v438 = getelementptr i8, ptr @.str_558, i64 16
     %v439 = call ptr @orion_text_concat(ptr %v438, ptr %v428)
-    %v440 = getelementptr i8, ptr @.str_557, i64 16
+    %v440 = getelementptr i8, ptr @.str_559, i64 16
     %v441 = call ptr @orion_text_concat(ptr %v439, ptr %v440)
     %v442 = call ptr @orion_text_concat(ptr %v441, ptr %v421)
-    %v443 = getelementptr i8, ptr @.str_557, i64 16
+    %v443 = getelementptr i8, ptr @.str_559, i64 16
     %v444 = call ptr @orion_text_concat(ptr %v442, ptr %v443)
     %v445 = call ptr @orion_text_concat(ptr %v444, ptr %v423)
     %v446 = getelementptr i8, ptr @.str_109, i64 16
@@ -38494,28 +39124,28 @@ if_456_then:
     %v469 = getelementptr i8, ptr @.str_108, i64 16
     %v470 = call ptr @value_ref(i64 %v1)
     %v471 = call ptr @orion_text_concat(ptr %v469, ptr %v470)
-    %v472 = getelementptr i8, ptr @.str_558, i64 16
+    %v472 = getelementptr i8, ptr @.str_560, i64 16
     %v473 = call ptr @orion_text_concat(ptr %v471, ptr %v472)
     %v474 = call ptr @orion_text_concat(ptr %v473, ptr %v468)
-    %v475 = getelementptr i8, ptr @.str_559, i64 16
+    %v475 = getelementptr i8, ptr @.str_561, i64 16
     %v476 = call ptr @orion_text_concat(ptr %v474, ptr %v475)
     %v477.slot = getelementptr i64, ptr %v0, i64 3
     %v477 = load i64, ptr %v477.slot
     %v478 = call ptr @value_ref(i64 %v477)
     %v479 = call ptr @orion_text_concat(ptr %v476, ptr %v478)
-    %v480 = getelementptr i8, ptr @.str_560, i64 16
+    %v480 = getelementptr i8, ptr @.str_562, i64 16
     %v481 = call ptr @orion_text_concat(ptr %v479, ptr %v480)
     %v482 = call ptr @orion_text_concat(ptr %v481, ptr %v461)
-    %v483 = getelementptr i8, ptr @.str_561, i64 16
+    %v483 = getelementptr i8, ptr @.str_563, i64 16
     %v484 = call ptr @orion_text_concat(ptr %v482, ptr %v483)
     %v485.slot = getelementptr i64, ptr %v0, i64 4
     %v485 = load i64, ptr %v485.slot
     %v486 = call ptr @value_ref(i64 %v485)
     %v487 = call ptr @orion_text_concat(ptr %v484, ptr %v486)
-    %v488 = getelementptr i8, ptr @.str_560, i64 16
+    %v488 = getelementptr i8, ptr @.str_562, i64 16
     %v489 = call ptr @orion_text_concat(ptr %v487, ptr %v488)
     %v490 = call ptr @orion_text_concat(ptr %v489, ptr %v463)
-    %v491 = getelementptr i8, ptr @.str_562, i64 16
+    %v491 = getelementptr i8, ptr @.str_564, i64 16
     %v492 = call ptr @orion_text_concat(ptr %v490, ptr %v491)
     store ptr %v492, ptr %v70
     %v493 = add i64 0, 0
@@ -38536,10 +39166,10 @@ if_500_then:
     %v504 = getelementptr i8, ptr @.str_108, i64 16
     %v505 = call ptr @value_ref(i64 %v1)
     %v506 = call ptr @orion_text_concat(ptr %v504, ptr %v505)
-    %v507 = getelementptr i8, ptr @.str_563, i64 16
+    %v507 = getelementptr i8, ptr @.str_565, i64 16
     %v508 = call ptr @orion_text_concat(ptr %v506, ptr %v507)
     %v509 = call ptr @orion_text_concat(ptr %v508, ptr %v503)
-    %v510 = getelementptr i8, ptr @.str_540, i64 16
+    %v510 = getelementptr i8, ptr @.str_542, i64 16
     %v511 = call ptr @orion_text_concat(ptr %v509, ptr %v510)
     store ptr %v511, ptr %v70
     %v512 = add i64 0, 0
@@ -38592,7 +39222,7 @@ if_546_then:
     %v551 = getelementptr i8, ptr @.str_95, i64 16
     %v552 = call ptr @orion_text_concat(ptr %v550, ptr %v551)
     %v553 = call ptr @orion_text_concat(ptr %v552, ptr %v5)
-    %v554 = getelementptr i8, ptr @.str_564, i64 16
+    %v554 = getelementptr i8, ptr @.str_566, i64 16
     %v555 = call ptr @orion_text_concat(ptr %v553, ptr %v554)
     %v556.slot = getelementptr i64, ptr %v0, i64 3
     %v556 = load i64, ptr %v556.slot
@@ -38616,20 +39246,20 @@ if_546_merge:
     %v571.cb = icmp ne i64 %v570, 0
     br i1 %v571.cb, label %if_571_then, label %if_571_else
 if_571_then:
-    %v573 = getelementptr i8, ptr @.str_502, i64 16
+    %v573 = getelementptr i8, ptr @.str_504, i64 16
     %v574 = call ptr @orion_int_to_text(i64 %v1)
     %v575 = call ptr @orion_text_concat(ptr %v573, ptr %v574)
-    %v576 = getelementptr i8, ptr @.str_565, i64 16
+    %v576 = getelementptr i8, ptr @.str_567, i64 16
     %v577 = call ptr @orion_text_concat(ptr %v575, ptr %v576)
     %v578 = getelementptr i8, ptr @.str_108, i64 16
     %v579 = call ptr @orion_text_concat(ptr %v578, ptr %v577)
-    %v580 = getelementptr i8, ptr @.str_566, i64 16
+    %v580 = getelementptr i8, ptr @.str_568, i64 16
     %v581 = call ptr @orion_text_concat(ptr %v579, ptr %v580)
     %v582.slot = getelementptr i64, ptr %v0, i64 5
     %v582.i = load i64, ptr %v582.slot
     %v582 = inttoptr i64 %v582.i to ptr
     %v583 = call ptr @orion_text_concat(ptr %v581, ptr %v582)
-    %v584 = getelementptr i8, ptr @.str_564, i64 16
+    %v584 = getelementptr i8, ptr @.str_566, i64 16
     %v585 = call ptr @orion_text_concat(ptr %v583, ptr %v584)
     %v586.slot = getelementptr i64, ptr %v0, i64 3
     %v586 = load i64, ptr %v586.slot
@@ -38644,10 +39274,10 @@ if_571_then:
     %v594 = getelementptr i8, ptr @.str_108, i64 16
     %v595 = call ptr @value_ref(i64 %v1)
     %v596 = call ptr @orion_text_concat(ptr %v594, ptr %v595)
-    %v597 = getelementptr i8, ptr @.str_567, i64 16
+    %v597 = getelementptr i8, ptr @.str_569, i64 16
     %v598 = call ptr @orion_text_concat(ptr %v596, ptr %v597)
     %v599 = call ptr @orion_text_concat(ptr %v598, ptr %v577)
-    %v600 = getelementptr i8, ptr @.str_568, i64 16
+    %v600 = getelementptr i8, ptr @.str_570, i64 16
     %v601 = call ptr @orion_text_concat(ptr %v599, ptr %v600)
     %v602 = getelementptr i8, ptr @.str_109, i64 16
     %v603 = call ptr @orion_text_concat(ptr %v593, ptr %v602)
@@ -38667,13 +39297,13 @@ if_612_then:
     %v614 = getelementptr i8, ptr @.str_108, i64 16
     %v615 = call ptr @value_ref(i64 %v1)
     %v616 = call ptr @orion_text_concat(ptr %v614, ptr %v615)
-    %v617 = getelementptr i8, ptr @.str_569, i64 16
+    %v617 = getelementptr i8, ptr @.str_571, i64 16
     %v618 = call ptr @orion_text_concat(ptr %v616, ptr %v617)
     %v619.slot = getelementptr i64, ptr %v0, i64 2
     %v619 = load i64, ptr %v619.slot
     %v620 = call ptr @value_ref(i64 %v619)
     %v621 = call ptr @orion_text_concat(ptr %v618, ptr %v620)
-    %v622 = getelementptr i8, ptr @.str_570, i64 16
+    %v622 = getelementptr i8, ptr @.str_572, i64 16
     %v623 = call ptr @orion_text_concat(ptr %v621, ptr %v622)
     store ptr %v623, ptr %v70
     %v624 = add i64 0, 0
@@ -38690,13 +39320,13 @@ if_631_then:
     %v633 = getelementptr i8, ptr @.str_108, i64 16
     %v634 = call ptr @value_ref(i64 %v1)
     %v635 = call ptr @orion_text_concat(ptr %v633, ptr %v634)
-    %v636 = getelementptr i8, ptr @.str_571, i64 16
+    %v636 = getelementptr i8, ptr @.str_573, i64 16
     %v637 = call ptr @orion_text_concat(ptr %v635, ptr %v636)
     %v638.slot = getelementptr i64, ptr %v0, i64 2
     %v638 = load i64, ptr %v638.slot
     %v639 = call ptr @value_ref(i64 %v638)
     %v640 = call ptr @orion_text_concat(ptr %v637, ptr %v639)
-    %v641 = getelementptr i8, ptr @.str_568, i64 16
+    %v641 = getelementptr i8, ptr @.str_570, i64 16
     %v642 = call ptr @orion_text_concat(ptr %v640, ptr %v641)
     store ptr %v642, ptr %v70
     %v643 = add i64 0, 0
@@ -38713,7 +39343,7 @@ if_650_then:
     %v652 = getelementptr i8, ptr @.str_108, i64 16
     %v653 = call ptr @value_ref(i64 %v1)
     %v654 = call ptr @orion_text_concat(ptr %v652, ptr %v653)
-    %v655 = getelementptr i8, ptr @.str_572, i64 16
+    %v655 = getelementptr i8, ptr @.str_574, i64 16
     %v656 = call ptr @orion_text_concat(ptr %v654, ptr %v655)
     %v657.slot = getelementptr i64, ptr %v0, i64 3
     %v657 = load i64, ptr %v657.slot
@@ -38740,7 +39370,7 @@ if_672_then:
     %v674 = getelementptr i8, ptr @.str_108, i64 16
     %v675 = call ptr @value_ref(i64 %v1)
     %v676 = call ptr @orion_text_concat(ptr %v674, ptr %v675)
-    %v677 = getelementptr i8, ptr @.str_573, i64 16
+    %v677 = getelementptr i8, ptr @.str_575, i64 16
     %v678 = call ptr @orion_text_concat(ptr %v676, ptr %v677)
     %v679.slot = getelementptr i64, ptr %v0, i64 3
     %v679 = load i64, ptr %v679.slot
@@ -38767,7 +39397,7 @@ if_694_then:
     %v696 = getelementptr i8, ptr @.str_108, i64 16
     %v697 = call ptr @value_ref(i64 %v1)
     %v698 = call ptr @orion_text_concat(ptr %v696, ptr %v697)
-    %v699 = getelementptr i8, ptr @.str_574, i64 16
+    %v699 = getelementptr i8, ptr @.str_576, i64 16
     %v700 = call ptr @orion_text_concat(ptr %v698, ptr %v699)
     %v701.slot = getelementptr i64, ptr %v0, i64 3
     %v701 = load i64, ptr %v701.slot
@@ -38794,7 +39424,7 @@ if_716_then:
     %v718 = getelementptr i8, ptr @.str_108, i64 16
     %v719 = call ptr @value_ref(i64 %v1)
     %v720 = call ptr @orion_text_concat(ptr %v718, ptr %v719)
-    %v721 = getelementptr i8, ptr @.str_575, i64 16
+    %v721 = getelementptr i8, ptr @.str_577, i64 16
     %v722 = call ptr @orion_text_concat(ptr %v720, ptr %v721)
     %v723.slot = getelementptr i64, ptr %v0, i64 3
     %v723 = load i64, ptr %v723.slot
@@ -38821,7 +39451,7 @@ if_738_then:
     %v740 = getelementptr i8, ptr @.str_108, i64 16
     %v741 = call ptr @value_ref(i64 %v1)
     %v742 = call ptr @orion_text_concat(ptr %v740, ptr %v741)
-    %v743 = getelementptr i8, ptr @.str_576, i64 16
+    %v743 = getelementptr i8, ptr @.str_578, i64 16
     %v744 = call ptr @orion_text_concat(ptr %v742, ptr %v743)
     %v745.slot = getelementptr i64, ptr %v0, i64 3
     %v745 = load i64, ptr %v745.slot
@@ -38843,10 +39473,10 @@ if_738_merge:
     br i1 %v758.cb, label %if_758_then, label %if_758_else
 if_758_then:
     %v760 = call ptr @icmp_cc(ptr %v5)
-    %v761 = getelementptr i8, ptr @.str_502, i64 16
+    %v761 = getelementptr i8, ptr @.str_504, i64 16
     %v762 = call ptr @orion_int_to_text(i64 %v1)
     %v763 = call ptr @orion_text_concat(ptr %v761, ptr %v762)
-    %v764 = getelementptr i8, ptr @.str_565, i64 16
+    %v764 = getelementptr i8, ptr @.str_567, i64 16
     %v765 = call ptr @orion_text_concat(ptr %v763, ptr %v764)
     %v766.slot = getelementptr i64, ptr %v0, i64 3
     %v766 = load i64, ptr %v766.slot
@@ -38924,23 +39554,23 @@ if_818_then:
     %v822.cb = icmp ne i64 %v821, 0
     br i1 %v822.cb, label %if_822_then, label %if_822_else
 if_822_then:
-    %v824 = getelementptr i8, ptr @.str_502, i64 16
+    %v824 = getelementptr i8, ptr @.str_504, i64 16
     %v825 = call ptr @orion_int_to_text(i64 %v1)
     %v826 = call ptr @orion_text_concat(ptr %v824, ptr %v825)
-    %v827 = getelementptr i8, ptr @.str_577, i64 16
+    %v827 = getelementptr i8, ptr @.str_579, i64 16
     %v828 = call ptr @orion_text_concat(ptr %v826, ptr %v827)
     store ptr %v828, ptr %v801
     %v829 = add i64 0, 0
     %v830 = getelementptr i8, ptr @.str_108, i64 16
     %v831 = load ptr, ptr %v801
     %v832 = call ptr @orion_text_concat(ptr %v830, ptr %v831)
-    %v833 = getelementptr i8, ptr @.str_578, i64 16
+    %v833 = getelementptr i8, ptr @.str_580, i64 16
     %v834 = call ptr @orion_text_concat(ptr %v832, ptr %v833)
     %v835.slot = getelementptr i64, ptr %v0, i64 3
     %v835 = load i64, ptr %v835.slot
     %v836 = call ptr @value_ref(i64 %v835)
     %v837 = call ptr @orion_text_concat(ptr %v834, ptr %v836)
-    %v838 = getelementptr i8, ptr @.str_579, i64 16
+    %v838 = getelementptr i8, ptr @.str_581, i64 16
     %v839 = call ptr @orion_text_concat(ptr %v837, ptr %v838)
     store ptr %v839, ptr %v797
     %v840 = add i64 0, 0
@@ -38954,10 +39584,10 @@ if_822_merge:
     %v847.cb = icmp ne i64 %v846, 0
     br i1 %v847.cb, label %if_847_then, label %if_847_else
 if_847_then:
-    %v849 = getelementptr i8, ptr @.str_502, i64 16
+    %v849 = getelementptr i8, ptr @.str_504, i64 16
     %v850 = call ptr @orion_int_to_text(i64 %v1)
     %v851 = call ptr @orion_text_concat(ptr %v849, ptr %v850)
-    %v852 = getelementptr i8, ptr @.str_580, i64 16
+    %v852 = getelementptr i8, ptr @.str_582, i64 16
     %v853 = call ptr @orion_text_concat(ptr %v851, ptr %v852)
     store ptr %v853, ptr %v805
     %v854 = add i64 0, 0
@@ -38966,13 +39596,13 @@ if_847_then:
     %v857 = call ptr @orion_text_concat(ptr %v855, ptr %v856)
     %v858 = load ptr, ptr %v805
     %v859 = call ptr @orion_text_concat(ptr %v857, ptr %v858)
-    %v860 = getelementptr i8, ptr @.str_578, i64 16
+    %v860 = getelementptr i8, ptr @.str_580, i64 16
     %v861 = call ptr @orion_text_concat(ptr %v859, ptr %v860)
     %v862.slot = getelementptr i64, ptr %v0, i64 4
     %v862 = load i64, ptr %v862.slot
     %v863 = call ptr @value_ref(i64 %v862)
     %v864 = call ptr @orion_text_concat(ptr %v861, ptr %v863)
-    %v865 = getelementptr i8, ptr @.str_579, i64 16
+    %v865 = getelementptr i8, ptr @.str_581, i64 16
     %v866 = call ptr @orion_text_concat(ptr %v864, ptr %v865)
     store ptr %v866, ptr %v797
     %v867 = add i64 0, 0
@@ -38988,7 +39618,7 @@ if_818_merge:
     %v877 = getelementptr i8, ptr @.str_108, i64 16
     %v878 = call ptr @orion_text_concat(ptr %v876, ptr %v877)
     %v879 = call ptr @orion_text_concat(ptr %v878, ptr %v765)
-    %v880 = getelementptr i8, ptr @.str_581, i64 16
+    %v880 = getelementptr i8, ptr @.str_583, i64 16
     %v881 = call ptr @orion_text_concat(ptr %v879, ptr %v880)
     %v882 = call ptr @orion_text_concat(ptr %v881, ptr %v760)
     %v883 = getelementptr i8, ptr @.str_97, i64 16
@@ -39005,10 +39635,10 @@ if_818_merge:
     %v894 = getelementptr i8, ptr @.str_108, i64 16
     %v895 = call ptr @value_ref(i64 %v1)
     %v896 = call ptr @orion_text_concat(ptr %v894, ptr %v895)
-    %v897 = getelementptr i8, ptr @.str_567, i64 16
+    %v897 = getelementptr i8, ptr @.str_569, i64 16
     %v898 = call ptr @orion_text_concat(ptr %v896, ptr %v897)
     %v899 = call ptr @orion_text_concat(ptr %v898, ptr %v765)
-    %v900 = getelementptr i8, ptr @.str_568, i64 16
+    %v900 = getelementptr i8, ptr @.str_570, i64 16
     %v901 = call ptr @orion_text_concat(ptr %v899, ptr %v900)
     %v902 = getelementptr i8, ptr @.str_109, i64 16
     %v903 = call ptr @orion_text_concat(ptr %v893, ptr %v902)
@@ -39025,34 +39655,34 @@ if_758_merge:
     %v912.cb = icmp ne i64 %v911, 0
     br i1 %v912.cb, label %if_912_then, label %if_912_else
 if_912_then:
-    %v914 = getelementptr i8, ptr @.str_502, i64 16
+    %v914 = getelementptr i8, ptr @.str_504, i64 16
     %v915 = call ptr @orion_int_to_text(i64 %v1)
     %v916 = call ptr @orion_text_concat(ptr %v914, ptr %v915)
-    %v917 = getelementptr i8, ptr @.str_582, i64 16
+    %v917 = getelementptr i8, ptr @.str_584, i64 16
     %v918 = call ptr @orion_text_concat(ptr %v916, ptr %v917)
     %v919 = getelementptr i8, ptr @.str_108, i64 16
     %v920 = call ptr @orion_text_concat(ptr %v919, ptr %v918)
-    %v921 = getelementptr i8, ptr @.str_554, i64 16
+    %v921 = getelementptr i8, ptr @.str_556, i64 16
     %v922 = call ptr @orion_text_concat(ptr %v920, ptr %v921)
     %v923.slot = getelementptr i64, ptr %v0, i64 2
     %v923 = load i64, ptr %v923.slot
     %v924 = call ptr @value_ref(i64 %v923)
     %v925 = call ptr @orion_text_concat(ptr %v922, ptr %v924)
-    %v926 = getelementptr i8, ptr @.str_555, i64 16
+    %v926 = getelementptr i8, ptr @.str_557, i64 16
     %v927 = call ptr @orion_text_concat(ptr %v925, ptr %v926)
     %v928 = getelementptr i8, ptr @.str_108, i64 16
     %v929 = call ptr @value_ref(i64 %v1)
     %v930 = call ptr @orion_text_concat(ptr %v928, ptr %v929)
-    %v931 = getelementptr i8, ptr @.str_583, i64 16
+    %v931 = getelementptr i8, ptr @.str_585, i64 16
     %v932 = call ptr @orion_text_concat(ptr %v930, ptr %v931)
     %v933 = call ptr @orion_text_concat(ptr %v932, ptr %v918)
-    %v934 = getelementptr i8, ptr @.str_548, i64 16
+    %v934 = getelementptr i8, ptr @.str_550, i64 16
     %v935 = call ptr @orion_text_concat(ptr %v933, ptr %v934)
     %v936.slot = getelementptr i64, ptr %v0, i64 3
     %v936 = load i64, ptr %v936.slot
     %v937 = call ptr @value_ref(i64 %v936)
     %v938 = call ptr @orion_text_concat(ptr %v935, ptr %v937)
-    %v939 = getelementptr i8, ptr @.str_548, i64 16
+    %v939 = getelementptr i8, ptr @.str_550, i64 16
     %v940 = call ptr @orion_text_concat(ptr %v938, ptr %v939)
     %v941.slot = getelementptr i64, ptr %v0, i64 4
     %v941 = load i64, ptr %v941.slot
@@ -39083,47 +39713,47 @@ if_956_else:
     br label %if_956_merge
 if_956_merge:
     %v964 = phi ptr [ %v958, %if_956_then ], [ %v961, %if_956_else ]
-    %v965 = getelementptr i8, ptr @.str_502, i64 16
+    %v965 = getelementptr i8, ptr @.str_504, i64 16
     %v966 = call ptr @orion_int_to_text(i64 %v1)
     %v967 = call ptr @orion_text_concat(ptr %v965, ptr %v966)
-    %v968 = getelementptr i8, ptr @.str_584, i64 16
+    %v968 = getelementptr i8, ptr @.str_586, i64 16
     %v969 = call ptr @orion_text_concat(ptr %v967, ptr %v968)
-    %v970 = getelementptr i8, ptr @.str_502, i64 16
+    %v970 = getelementptr i8, ptr @.str_504, i64 16
     %v971 = call ptr @orion_int_to_text(i64 %v1)
     %v972 = call ptr @orion_text_concat(ptr %v970, ptr %v971)
-    %v973 = getelementptr i8, ptr @.str_585, i64 16
+    %v973 = getelementptr i8, ptr @.str_587, i64 16
     %v974 = call ptr @orion_text_concat(ptr %v972, ptr %v973)
-    %v975 = getelementptr i8, ptr @.str_502, i64 16
+    %v975 = getelementptr i8, ptr @.str_504, i64 16
     %v976 = call ptr @orion_int_to_text(i64 %v1)
     %v977 = call ptr @orion_text_concat(ptr %v975, ptr %v976)
-    %v978 = getelementptr i8, ptr @.str_586, i64 16
+    %v978 = getelementptr i8, ptr @.str_588, i64 16
     %v979 = call ptr @orion_text_concat(ptr %v977, ptr %v978)
     %v980 = getelementptr i8, ptr @.str_108, i64 16
     %v981 = call ptr @orion_text_concat(ptr %v980, ptr %v969)
-    %v982 = getelementptr i8, ptr @.str_554, i64 16
+    %v982 = getelementptr i8, ptr @.str_556, i64 16
     %v983 = call ptr @orion_text_concat(ptr %v981, ptr %v982)
     %v984.slot = getelementptr i64, ptr %v0, i64 3
     %v984 = load i64, ptr %v984.slot
     %v985 = call ptr @value_ref(i64 %v984)
     %v986 = call ptr @orion_text_concat(ptr %v983, ptr %v985)
-    %v987 = getelementptr i8, ptr @.str_555, i64 16
+    %v987 = getelementptr i8, ptr @.str_557, i64 16
     %v988 = call ptr @orion_text_concat(ptr %v986, ptr %v987)
     %v989 = getelementptr i8, ptr @.str_108, i64 16
     %v990 = call ptr @orion_text_concat(ptr %v989, ptr %v974)
-    %v991 = getelementptr i8, ptr @.str_554, i64 16
+    %v991 = getelementptr i8, ptr @.str_556, i64 16
     %v992 = call ptr @orion_text_concat(ptr %v990, ptr %v991)
     %v993.slot = getelementptr i64, ptr %v0, i64 4
     %v993 = load i64, ptr %v993.slot
     %v994 = call ptr @value_ref(i64 %v993)
     %v995 = call ptr @orion_text_concat(ptr %v992, ptr %v994)
-    %v996 = getelementptr i8, ptr @.str_555, i64 16
+    %v996 = getelementptr i8, ptr @.str_557, i64 16
     %v997 = call ptr @orion_text_concat(ptr %v995, ptr %v996)
     %v998 = getelementptr i8, ptr @.str_108, i64 16
     %v999 = call ptr @orion_text_concat(ptr %v998, ptr %v979)
     %v1000 = getelementptr i8, ptr @.str_95, i64 16
     %v1001 = call ptr @orion_text_concat(ptr %v999, ptr %v1000)
     %v1002 = call ptr @orion_text_concat(ptr %v1001, ptr %v964)
-    %v1003 = getelementptr i8, ptr @.str_587, i64 16
+    %v1003 = getelementptr i8, ptr @.str_589, i64 16
     %v1004 = call ptr @orion_text_concat(ptr %v1002, ptr %v1003)
     %v1005 = call ptr @orion_text_concat(ptr %v1004, ptr %v969)
     %v1006 = getelementptr i8, ptr @.str_100, i64 16
@@ -39132,10 +39762,10 @@ if_956_merge:
     %v1009 = getelementptr i8, ptr @.str_108, i64 16
     %v1010 = call ptr @value_ref(i64 %v1)
     %v1011 = call ptr @orion_text_concat(ptr %v1009, ptr %v1010)
-    %v1012 = getelementptr i8, ptr @.str_567, i64 16
+    %v1012 = getelementptr i8, ptr @.str_569, i64 16
     %v1013 = call ptr @orion_text_concat(ptr %v1011, ptr %v1012)
     %v1014 = call ptr @orion_text_concat(ptr %v1013, ptr %v979)
-    %v1015 = getelementptr i8, ptr @.str_568, i64 16
+    %v1015 = getelementptr i8, ptr @.str_570, i64 16
     %v1016 = call ptr @orion_text_concat(ptr %v1014, ptr %v1015)
     %v1017 = getelementptr i8, ptr @.str_109, i64 16
     %v1018 = call ptr @orion_text_concat(ptr %v988, ptr %v1017)
@@ -39158,28 +39788,28 @@ if_952_merge:
     %v1033.cb = icmp ne i64 %v1032, 0
     br i1 %v1033.cb, label %if_1033_then, label %if_1033_else
 if_1033_then:
-    %v1035 = getelementptr i8, ptr @.str_502, i64 16
+    %v1035 = getelementptr i8, ptr @.str_504, i64 16
     %v1036 = call ptr @orion_int_to_text(i64 %v1)
     %v1037 = call ptr @orion_text_concat(ptr %v1035, ptr %v1036)
-    %v1038 = getelementptr i8, ptr @.str_588, i64 16
+    %v1038 = getelementptr i8, ptr @.str_590, i64 16
     %v1039 = call ptr @orion_text_concat(ptr %v1037, ptr %v1038)
     %v1040 = getelementptr i8, ptr @.str_108, i64 16
     %v1041 = call ptr @orion_text_concat(ptr %v1040, ptr %v1039)
-    %v1042 = getelementptr i8, ptr @.str_589, i64 16
+    %v1042 = getelementptr i8, ptr @.str_591, i64 16
     %v1043 = call ptr @orion_text_concat(ptr %v1041, ptr %v1042)
     %v1044.slot = getelementptr i64, ptr %v0, i64 2
     %v1044 = load i64, ptr %v1044.slot
     %v1045 = call ptr @value_ref(i64 %v1044)
     %v1046 = call ptr @orion_text_concat(ptr %v1043, ptr %v1045)
-    %v1047 = getelementptr i8, ptr @.str_555, i64 16
+    %v1047 = getelementptr i8, ptr @.str_557, i64 16
     %v1048 = call ptr @orion_text_concat(ptr %v1046, ptr %v1047)
     %v1049 = getelementptr i8, ptr @.str_108, i64 16
     %v1050 = call ptr @value_ref(i64 %v1)
     %v1051 = call ptr @orion_text_concat(ptr %v1049, ptr %v1050)
-    %v1052 = getelementptr i8, ptr @.str_567, i64 16
+    %v1052 = getelementptr i8, ptr @.str_569, i64 16
     %v1053 = call ptr @orion_text_concat(ptr %v1051, ptr %v1052)
     %v1054 = call ptr @orion_text_concat(ptr %v1053, ptr %v1039)
-    %v1055 = getelementptr i8, ptr @.str_568, i64 16
+    %v1055 = getelementptr i8, ptr @.str_570, i64 16
     %v1056 = call ptr @orion_text_concat(ptr %v1054, ptr %v1055)
     %v1057 = getelementptr i8, ptr @.str_109, i64 16
     %v1058 = call ptr @orion_text_concat(ptr %v1048, ptr %v1057)
@@ -39196,7 +39826,7 @@ if_1033_merge:
     %v1067.cb = icmp ne i64 %v1066, 0
     br i1 %v1067.cb, label %if_1067_then, label %if_1067_else
 if_1067_then:
-    %v1069 = getelementptr i8, ptr @.str_590, i64 16
+    %v1069 = getelementptr i8, ptr @.str_592, i64 16
     %v1070.slot = getelementptr i64, ptr %v0, i64 2
     %v1070 = load i64, ptr %v1070.slot
     %v1071 = call ptr @value_ref(i64 %v1070)
@@ -39206,7 +39836,7 @@ if_1067_then:
     %v1075 = getelementptr i8, ptr @.str_108, i64 16
     %v1076 = call ptr @value_ref(i64 %v1)
     %v1077 = call ptr @orion_text_concat(ptr %v1075, ptr %v1076)
-    %v1078 = getelementptr i8, ptr @.str_544, i64 16
+    %v1078 = getelementptr i8, ptr @.str_546, i64 16
     %v1079 = call ptr @orion_text_concat(ptr %v1077, ptr %v1078)
     %v1080 = getelementptr i8, ptr @.str_109, i64 16
     %v1081 = call ptr @orion_text_concat(ptr %v1074, ptr %v1080)
@@ -39223,7 +39853,7 @@ if_1067_merge:
     %v1090.cb = icmp ne i64 %v1089, 0
     br i1 %v1090.cb, label %if_1090_then, label %if_1090_else
 if_1090_then:
-    %v1092 = getelementptr i8, ptr @.str_591, i64 16
+    %v1092 = getelementptr i8, ptr @.str_593, i64 16
     %v1093.slot = getelementptr i64, ptr %v0, i64 2
     %v1093 = load i64, ptr %v1093.slot
     %v1094 = call ptr @value_ref(i64 %v1093)
@@ -39233,7 +39863,7 @@ if_1090_then:
     %v1098 = getelementptr i8, ptr @.str_108, i64 16
     %v1099 = call ptr @value_ref(i64 %v1)
     %v1100 = call ptr @orion_text_concat(ptr %v1098, ptr %v1099)
-    %v1101 = getelementptr i8, ptr @.str_544, i64 16
+    %v1101 = getelementptr i8, ptr @.str_546, i64 16
     %v1102 = call ptr @orion_text_concat(ptr %v1100, ptr %v1101)
     %v1103 = getelementptr i8, ptr @.str_109, i64 16
     %v1104 = call ptr @orion_text_concat(ptr %v1097, ptr %v1103)
@@ -39254,27 +39884,27 @@ if_1113_then:
     %v1115.i = load i64, ptr %v1115.slot
     %v1115 = inttoptr i64 %v1115.i to ptr
     %v1116 = call i64 @string_list_index(ptr %v2, ptr %v1115)
-    %v1117 = getelementptr i8, ptr @.str_502, i64 16
+    %v1117 = getelementptr i8, ptr @.str_504, i64 16
     %v1118 = call ptr @orion_int_to_text(i64 %v1)
     %v1119 = call ptr @orion_text_concat(ptr %v1117, ptr %v1118)
-    %v1120 = getelementptr i8, ptr @.str_592, i64 16
+    %v1120 = getelementptr i8, ptr @.str_594, i64 16
     %v1121 = call ptr @orion_text_concat(ptr %v1119, ptr %v1120)
     %v1122 = getelementptr i8, ptr @.str_108, i64 16
     %v1123 = call ptr @orion_text_concat(ptr %v1122, ptr %v1121)
-    %v1124 = getelementptr i8, ptr @.str_593, i64 16
+    %v1124 = getelementptr i8, ptr @.str_595, i64 16
     %v1125 = call ptr @orion_text_concat(ptr %v1123, ptr %v1124)
     %v1126 = call ptr @orion_int_to_text(i64 %v1116)
     %v1127 = call ptr @orion_text_concat(ptr %v1125, ptr %v1126)
-    %v1128 = getelementptr i8, ptr @.str_594, i64 16
+    %v1128 = getelementptr i8, ptr @.str_596, i64 16
     %v1129 = call ptr @orion_text_concat(ptr %v1127, ptr %v1128)
-    %v1130 = getelementptr i8, ptr @.str_595, i64 16
+    %v1130 = getelementptr i8, ptr @.str_597, i64 16
     %v1131 = call ptr @orion_text_concat(ptr %v1130, ptr %v1121)
     %v1132 = getelementptr i8, ptr @.str_227, i64 16
     %v1133 = call ptr @orion_text_concat(ptr %v1131, ptr %v1132)
     %v1134 = getelementptr i8, ptr @.str_108, i64 16
     %v1135 = call ptr @value_ref(i64 %v1)
     %v1136 = call ptr @orion_text_concat(ptr %v1134, ptr %v1135)
-    %v1137 = getelementptr i8, ptr @.str_544, i64 16
+    %v1137 = getelementptr i8, ptr @.str_546, i64 16
     %v1138 = call ptr @orion_text_concat(ptr %v1136, ptr %v1137)
     %v1139 = getelementptr i8, ptr @.str_109, i64 16
     %v1140 = call ptr @orion_text_concat(ptr %v1129, ptr %v1139)
@@ -39301,11 +39931,11 @@ if_1152_then:
     %v1156 = getelementptr i8, ptr @.str_108, i64 16
     %v1157 = call ptr @value_ref(i64 %v1)
     %v1158 = call ptr @orion_text_concat(ptr %v1156, ptr %v1157)
-    %v1159 = getelementptr i8, ptr @.str_593, i64 16
+    %v1159 = getelementptr i8, ptr @.str_595, i64 16
     %v1160 = call ptr @orion_text_concat(ptr %v1158, ptr %v1159)
     %v1161 = call ptr @orion_int_to_text(i64 %v1155)
     %v1162 = call ptr @orion_text_concat(ptr %v1160, ptr %v1161)
-    %v1163 = getelementptr i8, ptr @.str_594, i64 16
+    %v1163 = getelementptr i8, ptr @.str_596, i64 16
     %v1164 = call ptr @orion_text_concat(ptr %v1162, ptr %v1163)
     store ptr %v1164, ptr %v70
     %v1165 = add i64 0, 0
@@ -39322,13 +39952,13 @@ if_1172_then:
     %v1174 = getelementptr i8, ptr @.str_108, i64 16
     %v1175 = call ptr @value_ref(i64 %v1)
     %v1176 = call ptr @orion_text_concat(ptr %v1174, ptr %v1175)
-    %v1177 = getelementptr i8, ptr @.str_596, i64 16
+    %v1177 = getelementptr i8, ptr @.str_598, i64 16
     %v1178 = call ptr @orion_text_concat(ptr %v1176, ptr %v1177)
     %v1179.slot = getelementptr i64, ptr %v0, i64 3
     %v1179 = load i64, ptr %v1179.slot
     %v1180 = call ptr @value_ref(i64 %v1179)
     %v1181 = call ptr @orion_text_concat(ptr %v1178, ptr %v1180)
-    %v1182 = getelementptr i8, ptr @.str_550, i64 16
+    %v1182 = getelementptr i8, ptr @.str_552, i64 16
     %v1183 = call ptr @orion_text_concat(ptr %v1181, ptr %v1182)
     %v1184.slot = getelementptr i64, ptr %v0, i64 4
     %v1184 = load i64, ptr %v1184.slot
@@ -39351,7 +39981,7 @@ if_1196_then:
     %v1198 = getelementptr i8, ptr @.str_108, i64 16
     %v1199 = call ptr @value_ref(i64 %v1)
     %v1200 = call ptr @orion_text_concat(ptr %v1198, ptr %v1199)
-    %v1201 = getelementptr i8, ptr @.str_597, i64 16
+    %v1201 = getelementptr i8, ptr @.str_599, i64 16
     %v1202 = call ptr @orion_text_concat(ptr %v1200, ptr %v1201)
     %v1203.slot = getelementptr i64, ptr %v0, i64 2
     %v1203 = load i64, ptr %v1203.slot
@@ -39374,7 +40004,7 @@ if_1215_then:
     %v1217 = getelementptr i8, ptr @.str_108, i64 16
     %v1218 = call ptr @value_ref(i64 %v1)
     %v1219 = call ptr @orion_text_concat(ptr %v1217, ptr %v1218)
-    %v1220 = getelementptr i8, ptr @.str_598, i64 16
+    %v1220 = getelementptr i8, ptr @.str_600, i64 16
     %v1221 = call ptr @orion_text_concat(ptr %v1219, ptr %v1220)
     %v1222.slot = getelementptr i64, ptr %v0, i64 2
     %v1222 = load i64, ptr %v1222.slot
@@ -39397,19 +40027,19 @@ if_1234_then:
     %v1236 = getelementptr i8, ptr @.str_108, i64 16
     %v1237 = call ptr @value_ref(i64 %v1)
     %v1238 = call ptr @orion_text_concat(ptr %v1236, ptr %v1237)
-    %v1239 = getelementptr i8, ptr @.str_599, i64 16
+    %v1239 = getelementptr i8, ptr @.str_601, i64 16
     %v1240 = call ptr @orion_text_concat(ptr %v1238, ptr %v1239)
     %v1241.slot = getelementptr i64, ptr %v0, i64 2
     %v1241 = load i64, ptr %v1241.slot
     %v1242 = call ptr @value_ref(i64 %v1241)
     %v1243 = call ptr @orion_text_concat(ptr %v1240, ptr %v1242)
-    %v1244 = getelementptr i8, ptr @.str_548, i64 16
+    %v1244 = getelementptr i8, ptr @.str_550, i64 16
     %v1245 = call ptr @orion_text_concat(ptr %v1243, ptr %v1244)
     %v1246.slot = getelementptr i64, ptr %v0, i64 3
     %v1246 = load i64, ptr %v1246.slot
     %v1247 = call ptr @value_ref(i64 %v1246)
     %v1248 = call ptr @orion_text_concat(ptr %v1245, ptr %v1247)
-    %v1249 = getelementptr i8, ptr @.str_548, i64 16
+    %v1249 = getelementptr i8, ptr @.str_550, i64 16
     %v1250 = call ptr @orion_text_concat(ptr %v1248, ptr %v1249)
     %v1251.slot = getelementptr i64, ptr %v0, i64 4
     %v1251 = load i64, ptr %v1251.slot
@@ -39432,13 +40062,13 @@ if_1263_then:
     %v1265 = getelementptr i8, ptr @.str_108, i64 16
     %v1266 = call ptr @value_ref(i64 %v1)
     %v1267 = call ptr @orion_text_concat(ptr %v1265, ptr %v1266)
-    %v1268 = getelementptr i8, ptr @.str_600, i64 16
+    %v1268 = getelementptr i8, ptr @.str_602, i64 16
     %v1269 = call ptr @orion_text_concat(ptr %v1267, ptr %v1268)
     %v1270.slot = getelementptr i64, ptr %v0, i64 2
     %v1270 = load i64, ptr %v1270.slot
     %v1271 = call ptr @value_ref(i64 %v1270)
     %v1272 = call ptr @orion_text_concat(ptr %v1269, ptr %v1271)
-    %v1273 = getelementptr i8, ptr @.str_550, i64 16
+    %v1273 = getelementptr i8, ptr @.str_552, i64 16
     %v1274 = call ptr @orion_text_concat(ptr %v1272, ptr %v1273)
     %v1275.slot = getelementptr i64, ptr %v0, i64 3
     %v1275 = load i64, ptr %v1275.slot
@@ -39461,7 +40091,7 @@ if_1287_then:
     %v1289 = getelementptr i8, ptr @.str_108, i64 16
     %v1290 = call ptr @value_ref(i64 %v1)
     %v1291 = call ptr @orion_text_concat(ptr %v1289, ptr %v1290)
-    %v1292 = getelementptr i8, ptr @.str_601, i64 16
+    %v1292 = getelementptr i8, ptr @.str_603, i64 16
     %v1293 = call ptr @orion_text_concat(ptr %v1291, ptr %v1292)
     %v1294.slot = getelementptr i64, ptr %v0, i64 2
     %v1294 = load i64, ptr %v1294.slot
@@ -39484,13 +40114,13 @@ if_1306_then:
     %v1308 = getelementptr i8, ptr @.str_108, i64 16
     %v1309 = call ptr @value_ref(i64 %v1)
     %v1310 = call ptr @orion_text_concat(ptr %v1308, ptr %v1309)
-    %v1311 = getelementptr i8, ptr @.str_602, i64 16
+    %v1311 = getelementptr i8, ptr @.str_604, i64 16
     %v1312 = call ptr @orion_text_concat(ptr %v1310, ptr %v1311)
     %v1313.slot = getelementptr i64, ptr %v0, i64 2
     %v1313 = load i64, ptr %v1313.slot
     %v1314 = call ptr @value_ref(i64 %v1313)
     %v1315 = call ptr @orion_text_concat(ptr %v1312, ptr %v1314)
-    %v1316 = getelementptr i8, ptr @.str_550, i64 16
+    %v1316 = getelementptr i8, ptr @.str_552, i64 16
     %v1317 = call ptr @orion_text_concat(ptr %v1315, ptr %v1316)
     %v1318.slot = getelementptr i64, ptr %v0, i64 3
     %v1318 = load i64, ptr %v1318.slot
@@ -39513,7 +40143,7 @@ if_1330_then:
     %v1332 = getelementptr i8, ptr @.str_108, i64 16
     %v1333 = call ptr @value_ref(i64 %v1)
     %v1334 = call ptr @orion_text_concat(ptr %v1332, ptr %v1333)
-    %v1335 = getelementptr i8, ptr @.str_603, i64 16
+    %v1335 = getelementptr i8, ptr @.str_605, i64 16
     %v1336 = call ptr @orion_text_concat(ptr %v1334, ptr %v1335)
     store ptr %v1336, ptr %v70
     %v1337 = add i64 0, 0
@@ -39527,45 +40157,45 @@ if_1330_merge:
     %v1344.cb = icmp ne i64 %v1343, 0
     br i1 %v1344.cb, label %if_1344_then, label %if_1344_else
 if_1344_then:
-    %v1346 = getelementptr i8, ptr @.str_502, i64 16
+    %v1346 = getelementptr i8, ptr @.str_504, i64 16
     %v1347 = call ptr @orion_int_to_text(i64 %v1)
     %v1348 = call ptr @orion_text_concat(ptr %v1346, ptr %v1347)
-    %v1349 = getelementptr i8, ptr @.str_604, i64 16
+    %v1349 = getelementptr i8, ptr @.str_606, i64 16
     %v1350 = call ptr @orion_text_concat(ptr %v1348, ptr %v1349)
-    %v1351 = getelementptr i8, ptr @.str_502, i64 16
+    %v1351 = getelementptr i8, ptr @.str_504, i64 16
     %v1352 = call ptr @orion_int_to_text(i64 %v1)
     %v1353 = call ptr @orion_text_concat(ptr %v1351, ptr %v1352)
-    %v1354 = getelementptr i8, ptr @.str_605, i64 16
+    %v1354 = getelementptr i8, ptr @.str_607, i64 16
     %v1355 = call ptr @orion_text_concat(ptr %v1353, ptr %v1354)
     %v1356 = getelementptr i8, ptr @.str_108, i64 16
     %v1357 = call ptr @orion_text_concat(ptr %v1356, ptr %v1355)
-    %v1358 = getelementptr i8, ptr @.str_606, i64 16
+    %v1358 = getelementptr i8, ptr @.str_608, i64 16
     %v1359 = call ptr @orion_text_concat(ptr %v1357, ptr %v1358)
     %v1360 = getelementptr i8, ptr @.str_108, i64 16
     %v1361 = call ptr @orion_text_concat(ptr %v1360, ptr %v1350)
-    %v1362 = getelementptr i8, ptr @.str_607, i64 16
+    %v1362 = getelementptr i8, ptr @.str_609, i64 16
     %v1363 = call ptr @orion_text_concat(ptr %v1361, ptr %v1362)
     %v1364 = call ptr @orion_text_concat(ptr %v1363, ptr %v1355)
-    %v1365 = getelementptr i8, ptr @.str_548, i64 16
+    %v1365 = getelementptr i8, ptr @.str_550, i64 16
     %v1366 = call ptr @orion_text_concat(ptr %v1364, ptr %v1365)
     %v1367.slot = getelementptr i64, ptr %v0, i64 2
     %v1367 = load i64, ptr %v1367.slot
     %v1368 = call ptr @value_ref(i64 %v1367)
     %v1369 = call ptr @orion_text_concat(ptr %v1366, ptr %v1368)
-    %v1370 = getelementptr i8, ptr @.str_502, i64 16
+    %v1370 = getelementptr i8, ptr @.str_504, i64 16
     %v1371 = call ptr @orion_int_to_text(i64 %v1)
     %v1372 = call ptr @orion_text_concat(ptr %v1370, ptr %v1371)
-    %v1373 = getelementptr i8, ptr @.str_608, i64 16
+    %v1373 = getelementptr i8, ptr @.str_610, i64 16
     %v1374 = call ptr @orion_text_concat(ptr %v1372, ptr %v1373)
     %v1375 = getelementptr i8, ptr @.str_108, i64 16
     %v1376 = call ptr @orion_text_concat(ptr %v1375, ptr %v1374)
-    %v1377 = getelementptr i8, ptr @.str_609, i64 16
+    %v1377 = getelementptr i8, ptr @.str_611, i64 16
     %v1378 = call ptr @orion_text_concat(ptr %v1376, ptr %v1377)
     %v1379 = call ptr @orion_text_concat(ptr %v1378, ptr %v1350)
     %v1380 = getelementptr i8, ptr @.str_108, i64 16
     %v1381 = call ptr @value_ref(i64 %v1)
     %v1382 = call ptr @orion_text_concat(ptr %v1380, ptr %v1381)
-    %v1383 = getelementptr i8, ptr @.str_610, i64 16
+    %v1383 = getelementptr i8, ptr @.str_612, i64 16
     %v1384 = call ptr @orion_text_concat(ptr %v1382, ptr %v1383)
     %v1385 = call ptr @orion_text_concat(ptr %v1384, ptr %v1374)
     %v1386 = getelementptr i8, ptr @.str_227, i64 16
@@ -39604,7 +40234,7 @@ if_1411_then:
     %v1413 = getelementptr i8, ptr @.str_108, i64 16
     %v1414 = call ptr @value_ref(i64 %v1)
     %v1415 = call ptr @orion_text_concat(ptr %v1413, ptr %v1414)
-    %v1416 = getelementptr i8, ptr @.str_611, i64 16
+    %v1416 = getelementptr i8, ptr @.str_613, i64 16
     %v1417 = call ptr @orion_text_concat(ptr %v1415, ptr %v1416)
     %v1418.slot = getelementptr i64, ptr %v0, i64 2
     %v1418 = load i64, ptr %v1418.slot
@@ -39616,25 +40246,25 @@ if_1411_then:
     %v1423 = add i64 0, 0
     br label %if_1411_merge
 if_1411_else:
-    %v1426 = getelementptr i8, ptr @.str_502, i64 16
+    %v1426 = getelementptr i8, ptr @.str_504, i64 16
     %v1427 = call ptr @orion_int_to_text(i64 %v1)
     %v1428 = call ptr @orion_text_concat(ptr %v1426, ptr %v1427)
-    %v1429 = getelementptr i8, ptr @.str_612, i64 16
+    %v1429 = getelementptr i8, ptr @.str_614, i64 16
     %v1430 = call ptr @orion_text_concat(ptr %v1428, ptr %v1429)
     %v1431 = getelementptr i8, ptr @.str_108, i64 16
     %v1432 = call ptr @orion_text_concat(ptr %v1431, ptr %v1430)
-    %v1433 = getelementptr i8, ptr @.str_613, i64 16
+    %v1433 = getelementptr i8, ptr @.str_615, i64 16
     %v1434 = call ptr @orion_text_concat(ptr %v1432, ptr %v1433)
     %v1435.slot = getelementptr i64, ptr %v0, i64 2
     %v1435 = load i64, ptr %v1435.slot
     %v1436 = call ptr @value_ref(i64 %v1435)
     %v1437 = call ptr @orion_text_concat(ptr %v1434, ptr %v1436)
-    %v1438 = getelementptr i8, ptr @.str_614, i64 16
+    %v1438 = getelementptr i8, ptr @.str_616, i64 16
     %v1439 = call ptr @orion_text_concat(ptr %v1437, ptr %v1438)
     %v1440 = getelementptr i8, ptr @.str_108, i64 16
     %v1441 = call ptr @value_ref(i64 %v1)
     %v1442 = call ptr @orion_text_concat(ptr %v1440, ptr %v1441)
-    %v1443 = getelementptr i8, ptr @.str_611, i64 16
+    %v1443 = getelementptr i8, ptr @.str_613, i64 16
     %v1444 = call ptr @orion_text_concat(ptr %v1442, ptr %v1443)
     %v1445 = call ptr @orion_text_concat(ptr %v1444, ptr %v1430)
     %v1446 = getelementptr i8, ptr @.str_227, i64 16
@@ -39670,7 +40300,7 @@ if_1468_then:
     %v1470 = getelementptr i8, ptr @.str_108, i64 16
     %v1471 = call ptr @value_ref(i64 %v1)
     %v1472 = call ptr @orion_text_concat(ptr %v1470, ptr %v1471)
-    %v1473 = getelementptr i8, ptr @.str_615, i64 16
+    %v1473 = getelementptr i8, ptr @.str_617, i64 16
     %v1474 = call ptr @orion_text_concat(ptr %v1472, ptr %v1473)
     %v1475.slot = getelementptr i64, ptr %v0, i64 2
     %v1475 = load i64, ptr %v1475.slot
@@ -39682,25 +40312,25 @@ if_1468_then:
     %v1480 = add i64 0, 0
     br label %if_1468_merge
 if_1468_else:
-    %v1483 = getelementptr i8, ptr @.str_502, i64 16
+    %v1483 = getelementptr i8, ptr @.str_504, i64 16
     %v1484 = call ptr @orion_int_to_text(i64 %v1)
     %v1485 = call ptr @orion_text_concat(ptr %v1483, ptr %v1484)
-    %v1486 = getelementptr i8, ptr @.str_612, i64 16
+    %v1486 = getelementptr i8, ptr @.str_614, i64 16
     %v1487 = call ptr @orion_text_concat(ptr %v1485, ptr %v1486)
     %v1488 = getelementptr i8, ptr @.str_108, i64 16
     %v1489 = call ptr @orion_text_concat(ptr %v1488, ptr %v1487)
-    %v1490 = getelementptr i8, ptr @.str_613, i64 16
+    %v1490 = getelementptr i8, ptr @.str_615, i64 16
     %v1491 = call ptr @orion_text_concat(ptr %v1489, ptr %v1490)
     %v1492.slot = getelementptr i64, ptr %v0, i64 2
     %v1492 = load i64, ptr %v1492.slot
     %v1493 = call ptr @value_ref(i64 %v1492)
     %v1494 = call ptr @orion_text_concat(ptr %v1491, ptr %v1493)
-    %v1495 = getelementptr i8, ptr @.str_614, i64 16
+    %v1495 = getelementptr i8, ptr @.str_616, i64 16
     %v1496 = call ptr @orion_text_concat(ptr %v1494, ptr %v1495)
     %v1497 = getelementptr i8, ptr @.str_108, i64 16
     %v1498 = call ptr @value_ref(i64 %v1)
     %v1499 = call ptr @orion_text_concat(ptr %v1497, ptr %v1498)
-    %v1500 = getelementptr i8, ptr @.str_615, i64 16
+    %v1500 = getelementptr i8, ptr @.str_617, i64 16
     %v1501 = call ptr @orion_text_concat(ptr %v1499, ptr %v1500)
     %v1502 = call ptr @orion_text_concat(ptr %v1501, ptr %v1487)
     %v1503 = getelementptr i8, ptr @.str_227, i64 16
@@ -39736,19 +40366,19 @@ if_1525_then:
     %v1527 = getelementptr i8, ptr @.str_108, i64 16
     %v1528 = call ptr @value_ref(i64 %v1)
     %v1529 = call ptr @orion_text_concat(ptr %v1527, ptr %v1528)
-    %v1530 = getelementptr i8, ptr @.str_616, i64 16
+    %v1530 = getelementptr i8, ptr @.str_618, i64 16
     %v1531 = call ptr @orion_text_concat(ptr %v1529, ptr %v1530)
     %v1532.slot = getelementptr i64, ptr %v0, i64 2
     %v1532 = load i64, ptr %v1532.slot
     %v1533 = call ptr @value_ref(i64 %v1532)
     %v1534 = call ptr @orion_text_concat(ptr %v1531, ptr %v1533)
-    %v1535 = getelementptr i8, ptr @.str_548, i64 16
+    %v1535 = getelementptr i8, ptr @.str_550, i64 16
     %v1536 = call ptr @orion_text_concat(ptr %v1534, ptr %v1535)
     %v1537.slot = getelementptr i64, ptr %v0, i64 3
     %v1537 = load i64, ptr %v1537.slot
     %v1538 = call ptr @value_ref(i64 %v1537)
     %v1539 = call ptr @orion_text_concat(ptr %v1536, ptr %v1538)
-    %v1540 = getelementptr i8, ptr @.str_548, i64 16
+    %v1540 = getelementptr i8, ptr @.str_550, i64 16
     %v1541 = call ptr @orion_text_concat(ptr %v1539, ptr %v1540)
     %v1542.slot = getelementptr i64, ptr %v0, i64 4
     %v1542 = load i64, ptr %v1542.slot
@@ -39760,34 +40390,34 @@ if_1525_then:
     %v1547 = add i64 0, 0
     br label %if_1525_merge
 if_1525_else:
-    %v1550 = getelementptr i8, ptr @.str_502, i64 16
+    %v1550 = getelementptr i8, ptr @.str_504, i64 16
     %v1551 = call ptr @orion_int_to_text(i64 %v1)
     %v1552 = call ptr @orion_text_concat(ptr %v1550, ptr %v1551)
-    %v1553 = getelementptr i8, ptr @.str_612, i64 16
+    %v1553 = getelementptr i8, ptr @.str_614, i64 16
     %v1554 = call ptr @orion_text_concat(ptr %v1552, ptr %v1553)
     %v1555 = getelementptr i8, ptr @.str_108, i64 16
     %v1556 = call ptr @orion_text_concat(ptr %v1555, ptr %v1554)
-    %v1557 = getelementptr i8, ptr @.str_613, i64 16
+    %v1557 = getelementptr i8, ptr @.str_615, i64 16
     %v1558 = call ptr @orion_text_concat(ptr %v1556, ptr %v1557)
     %v1559.slot = getelementptr i64, ptr %v0, i64 2
     %v1559 = load i64, ptr %v1559.slot
     %v1560 = call ptr @value_ref(i64 %v1559)
     %v1561 = call ptr @orion_text_concat(ptr %v1558, ptr %v1560)
-    %v1562 = getelementptr i8, ptr @.str_614, i64 16
+    %v1562 = getelementptr i8, ptr @.str_616, i64 16
     %v1563 = call ptr @orion_text_concat(ptr %v1561, ptr %v1562)
     %v1564 = getelementptr i8, ptr @.str_108, i64 16
     %v1565 = call ptr @value_ref(i64 %v1)
     %v1566 = call ptr @orion_text_concat(ptr %v1564, ptr %v1565)
-    %v1567 = getelementptr i8, ptr @.str_616, i64 16
+    %v1567 = getelementptr i8, ptr @.str_618, i64 16
     %v1568 = call ptr @orion_text_concat(ptr %v1566, ptr %v1567)
     %v1569 = call ptr @orion_text_concat(ptr %v1568, ptr %v1554)
-    %v1570 = getelementptr i8, ptr @.str_548, i64 16
+    %v1570 = getelementptr i8, ptr @.str_550, i64 16
     %v1571 = call ptr @orion_text_concat(ptr %v1569, ptr %v1570)
     %v1572.slot = getelementptr i64, ptr %v0, i64 3
     %v1572 = load i64, ptr %v1572.slot
     %v1573 = call ptr @value_ref(i64 %v1572)
     %v1574 = call ptr @orion_text_concat(ptr %v1571, ptr %v1573)
-    %v1575 = getelementptr i8, ptr @.str_548, i64 16
+    %v1575 = getelementptr i8, ptr @.str_550, i64 16
     %v1576 = call ptr @orion_text_concat(ptr %v1574, ptr %v1575)
     %v1577.slot = getelementptr i64, ptr %v0, i64 4
     %v1577 = load i64, ptr %v1577.slot
@@ -39832,10 +40462,10 @@ if_1605_then:
     %v1608 = call ptr @value_ref(i64 %v1607)
     br label %if_1605_merge
 if_1605_else:
-    %v1611 = getelementptr i8, ptr @.str_502, i64 16
+    %v1611 = getelementptr i8, ptr @.str_504, i64 16
     %v1612 = call ptr @orion_int_to_text(i64 %v1)
     %v1613 = call ptr @orion_text_concat(ptr %v1611, ptr %v1612)
-    %v1614 = getelementptr i8, ptr @.str_617, i64 16
+    %v1614 = getelementptr i8, ptr @.str_619, i64 16
     %v1615 = call ptr @orion_text_concat(ptr %v1613, ptr %v1614)
     br label %if_1605_merge
 if_1605_merge:
@@ -39851,10 +40481,10 @@ if_1621_then:
     %v1624 = call ptr @value_ref(i64 %v1623)
     br label %if_1621_merge
 if_1621_else:
-    %v1627 = getelementptr i8, ptr @.str_502, i64 16
+    %v1627 = getelementptr i8, ptr @.str_504, i64 16
     %v1628 = call ptr @orion_int_to_text(i64 %v1)
     %v1629 = call ptr @orion_text_concat(ptr %v1627, ptr %v1628)
-    %v1630 = getelementptr i8, ptr @.str_565, i64 16
+    %v1630 = getelementptr i8, ptr @.str_567, i64 16
     %v1631 = call ptr @orion_text_concat(ptr %v1629, ptr %v1630)
     br label %if_1621_merge
 if_1621_merge:
@@ -39871,13 +40501,13 @@ if_1621_merge:
 if_1640_then:
     %v1642 = getelementptr i8, ptr @.str_108, i64 16
     %v1643 = call ptr @orion_text_concat(ptr %v1642, ptr %v1618)
-    %v1644 = getelementptr i8, ptr @.str_613, i64 16
+    %v1644 = getelementptr i8, ptr @.str_615, i64 16
     %v1645 = call ptr @orion_text_concat(ptr %v1643, ptr %v1644)
     %v1646.slot = getelementptr i64, ptr %v0, i64 2
     %v1646 = load i64, ptr %v1646.slot
     %v1647 = call ptr @value_ref(i64 %v1646)
     %v1648 = call ptr @orion_text_concat(ptr %v1645, ptr %v1647)
-    %v1649 = getelementptr i8, ptr @.str_618, i64 16
+    %v1649 = getelementptr i8, ptr @.str_620, i64 16
     %v1650 = call ptr @orion_text_concat(ptr %v1648, ptr %v1649)
     store ptr %v1650, ptr %v1636
     %v1651 = add i64 0, 0
@@ -39895,13 +40525,13 @@ if_1658_then:
     %v1661 = getelementptr i8, ptr @.str_108, i64 16
     %v1662 = call ptr @orion_text_concat(ptr %v1660, ptr %v1661)
     %v1663 = call ptr @orion_text_concat(ptr %v1662, ptr %v1634)
-    %v1664 = getelementptr i8, ptr @.str_613, i64 16
+    %v1664 = getelementptr i8, ptr @.str_615, i64 16
     %v1665 = call ptr @orion_text_concat(ptr %v1663, ptr %v1664)
     %v1666.slot = getelementptr i64, ptr %v0, i64 3
     %v1666 = load i64, ptr %v1666.slot
     %v1667 = call ptr @value_ref(i64 %v1666)
     %v1668 = call ptr @orion_text_concat(ptr %v1665, ptr %v1667)
-    %v1669 = getelementptr i8, ptr @.str_618, i64 16
+    %v1669 = getelementptr i8, ptr @.str_620, i64 16
     %v1670 = call ptr @orion_text_concat(ptr %v1668, ptr %v1669)
     store ptr %v1670, ptr %v1636
     %v1671 = add i64 0, 0
@@ -39914,10 +40544,10 @@ if_1658_merge:
     %v1678 = call ptr @orion_text_concat(ptr %v1676, ptr %v1677)
     %v1679 = call ptr @value_ref(i64 %v1)
     %v1680 = call ptr @orion_text_concat(ptr %v1678, ptr %v1679)
-    %v1681 = getelementptr i8, ptr @.str_619, i64 16
+    %v1681 = getelementptr i8, ptr @.str_621, i64 16
     %v1682 = call ptr @orion_text_concat(ptr %v1680, ptr %v1681)
     %v1683 = call ptr @orion_text_concat(ptr %v1682, ptr %v1618)
-    %v1684 = getelementptr i8, ptr @.str_550, i64 16
+    %v1684 = getelementptr i8, ptr @.str_552, i64 16
     %v1685 = call ptr @orion_text_concat(ptr %v1683, ptr %v1684)
     %v1686 = call ptr @orion_text_concat(ptr %v1685, ptr %v1634)
     %v1687 = getelementptr i8, ptr @.str_227, i64 16
@@ -39937,7 +40567,7 @@ if_1696_then:
     %v1698 = getelementptr i8, ptr @.str_108, i64 16
     %v1699 = call ptr @value_ref(i64 %v1)
     %v1700 = call ptr @orion_text_concat(ptr %v1698, ptr %v1699)
-    %v1701 = getelementptr i8, ptr @.str_620, i64 16
+    %v1701 = getelementptr i8, ptr @.str_622, i64 16
     %v1702 = call ptr @orion_text_concat(ptr %v1700, ptr %v1701)
     %v1703.slot = getelementptr i64, ptr %v0, i64 2
     %v1703 = load i64, ptr %v1703.slot
@@ -39960,7 +40590,7 @@ if_1715_then:
     %v1717 = getelementptr i8, ptr @.str_108, i64 16
     %v1718 = call ptr @value_ref(i64 %v1)
     %v1719 = call ptr @orion_text_concat(ptr %v1717, ptr %v1718)
-    %v1720 = getelementptr i8, ptr @.str_621, i64 16
+    %v1720 = getelementptr i8, ptr @.str_623, i64 16
     %v1721 = call ptr @orion_text_concat(ptr %v1719, ptr %v1720)
     %v1722.slot = getelementptr i64, ptr %v0, i64 2
     %v1722 = load i64, ptr %v1722.slot
@@ -39983,7 +40613,7 @@ if_1734_then:
     %v1736 = getelementptr i8, ptr @.str_108, i64 16
     %v1737 = call ptr @value_ref(i64 %v1)
     %v1738 = call ptr @orion_text_concat(ptr %v1736, ptr %v1737)
-    %v1739 = getelementptr i8, ptr @.str_622, i64 16
+    %v1739 = getelementptr i8, ptr @.str_624, i64 16
     %v1740 = call ptr @orion_text_concat(ptr %v1738, ptr %v1739)
     %v1741.slot = getelementptr i64, ptr %v0, i64 2
     %v1741 = load i64, ptr %v1741.slot
@@ -40006,7 +40636,7 @@ if_1753_then:
     %v1755 = getelementptr i8, ptr @.str_108, i64 16
     %v1756 = call ptr @value_ref(i64 %v1)
     %v1757 = call ptr @orion_text_concat(ptr %v1755, ptr %v1756)
-    %v1758 = getelementptr i8, ptr @.str_623, i64 16
+    %v1758 = getelementptr i8, ptr @.str_625, i64 16
     %v1759 = call ptr @orion_text_concat(ptr %v1757, ptr %v1758)
     %v1760.slot = getelementptr i64, ptr %v0, i64 2
     %v1760 = load i64, ptr %v1760.slot
@@ -40047,31 +40677,31 @@ if_1781_then:
     %v1783.i = load i64, ptr %v1783.slot
     %v1783 = inttoptr i64 %v1783.i to ptr
     %v1784 = call i64 @evac_code(ptr %v1783)
-    %v1785 = getelementptr i8, ptr @.str_502, i64 16
+    %v1785 = getelementptr i8, ptr @.str_504, i64 16
     %v1786 = call ptr @orion_int_to_text(i64 %v1)
     %v1787 = call ptr @orion_text_concat(ptr %v1785, ptr %v1786)
-    %v1788 = getelementptr i8, ptr @.str_624, i64 16
+    %v1788 = getelementptr i8, ptr @.str_626, i64 16
     %v1789 = call ptr @orion_text_concat(ptr %v1787, ptr %v1788)
-    %v1790 = getelementptr i8, ptr @.str_502, i64 16
+    %v1790 = getelementptr i8, ptr @.str_504, i64 16
     %v1791 = call ptr @orion_int_to_text(i64 %v1)
     %v1792 = call ptr @orion_text_concat(ptr %v1790, ptr %v1791)
-    %v1793 = getelementptr i8, ptr @.str_625, i64 16
+    %v1793 = getelementptr i8, ptr @.str_627, i64 16
     %v1794 = call ptr @orion_text_concat(ptr %v1792, ptr %v1793)
     %v1795 = getelementptr i8, ptr @.str_108, i64 16
     %v1796 = call ptr @orion_text_concat(ptr %v1795, ptr %v1789)
-    %v1797 = getelementptr i8, ptr @.str_626, i64 16
+    %v1797 = getelementptr i8, ptr @.str_628, i64 16
     %v1798 = call ptr @orion_text_concat(ptr %v1796, ptr %v1797)
     %v1799.slot = getelementptr i64, ptr %v0, i64 3
     %v1799 = load i64, ptr %v1799.slot
     %v1800 = call ptr @value_ref(i64 %v1799)
     %v1801 = call ptr @orion_text_concat(ptr %v1798, ptr %v1800)
-    %v1802 = getelementptr i8, ptr @.str_550, i64 16
+    %v1802 = getelementptr i8, ptr @.str_552, i64 16
     %v1803 = call ptr @orion_text_concat(ptr %v1801, ptr %v1802)
     %v1804.slot = getelementptr i64, ptr %v0, i64 2
     %v1804 = load i64, ptr %v1804.slot
     %v1805 = call ptr @value_ref(i64 %v1804)
     %v1806 = call ptr @orion_text_concat(ptr %v1803, ptr %v1805)
-    %v1807 = getelementptr i8, ptr @.str_548, i64 16
+    %v1807 = getelementptr i8, ptr @.str_550, i64 16
     %v1808 = call ptr @orion_text_concat(ptr %v1806, ptr %v1807)
     %v1809 = call ptr @orion_int_to_text(i64 %v1784)
     %v1810 = call ptr @orion_text_concat(ptr %v1808, ptr %v1809)
@@ -40079,21 +40709,21 @@ if_1781_then:
     %v1812 = call ptr @orion_text_concat(ptr %v1810, ptr %v1811)
     %v1813 = getelementptr i8, ptr @.str_108, i64 16
     %v1814 = call ptr @orion_text_concat(ptr %v1813, ptr %v1794)
-    %v1815 = getelementptr i8, ptr @.str_578, i64 16
+    %v1815 = getelementptr i8, ptr @.str_580, i64 16
     %v1816 = call ptr @orion_text_concat(ptr %v1814, ptr %v1815)
     %v1817 = call ptr @orion_text_concat(ptr %v1816, ptr %v1789)
-    %v1818 = getelementptr i8, ptr @.str_568, i64 16
+    %v1818 = getelementptr i8, ptr @.str_570, i64 16
     %v1819 = call ptr @orion_text_concat(ptr %v1817, ptr %v1818)
     %v1820 = getelementptr i8, ptr @.str_108, i64 16
     %v1821 = call ptr @value_ref(i64 %v1)
     %v1822 = call ptr @orion_text_concat(ptr %v1820, ptr %v1821)
-    %v1823 = getelementptr i8, ptr @.str_627, i64 16
+    %v1823 = getelementptr i8, ptr @.str_629, i64 16
     %v1824 = call ptr @orion_text_concat(ptr %v1822, ptr %v1823)
     %v1825.slot = getelementptr i64, ptr %v0, i64 2
     %v1825 = load i64, ptr %v1825.slot
     %v1826 = call ptr @value_ref(i64 %v1825)
     %v1827 = call ptr @orion_text_concat(ptr %v1824, ptr %v1826)
-    %v1828 = getelementptr i8, ptr @.str_548, i64 16
+    %v1828 = getelementptr i8, ptr @.str_550, i64 16
     %v1829 = call ptr @orion_text_concat(ptr %v1827, ptr %v1828)
     %v1830 = call ptr @orion_text_concat(ptr %v1829, ptr %v1794)
     %v1831 = getelementptr i8, ptr @.str_227, i64 16
@@ -40111,13 +40741,13 @@ if_1781_else:
     %v1842 = getelementptr i8, ptr @.str_108, i64 16
     %v1843 = call ptr @value_ref(i64 %v1)
     %v1844 = call ptr @orion_text_concat(ptr %v1842, ptr %v1843)
-    %v1845 = getelementptr i8, ptr @.str_627, i64 16
+    %v1845 = getelementptr i8, ptr @.str_629, i64 16
     %v1846 = call ptr @orion_text_concat(ptr %v1844, ptr %v1845)
     %v1847.slot = getelementptr i64, ptr %v0, i64 2
     %v1847 = load i64, ptr %v1847.slot
     %v1848 = call ptr @value_ref(i64 %v1847)
     %v1849 = call ptr @orion_text_concat(ptr %v1846, ptr %v1848)
-    %v1850 = getelementptr i8, ptr @.str_548, i64 16
+    %v1850 = getelementptr i8, ptr @.str_550, i64 16
     %v1851 = call ptr @orion_text_concat(ptr %v1849, ptr %v1850)
     %v1852.slot = getelementptr i64, ptr %v0, i64 3
     %v1852 = load i64, ptr %v1852.slot
@@ -40212,20 +40842,20 @@ if_1916_merge:
     %v1925.cb = icmp ne i64 %v1924, 0
     br i1 %v1925.cb, label %if_1925_then, label %if_1925_else
 if_1925_then:
-    %v1927 = getelementptr i8, ptr @.str_502, i64 16
+    %v1927 = getelementptr i8, ptr @.str_504, i64 16
     %v1928 = call ptr @orion_int_to_text(i64 %v1)
     %v1929 = call ptr @orion_text_concat(ptr %v1927, ptr %v1928)
-    %v1930 = getelementptr i8, ptr @.str_628, i64 16
+    %v1930 = getelementptr i8, ptr @.str_630, i64 16
     %v1931 = call ptr @orion_text_concat(ptr %v1929, ptr %v1930)
     %v1932 = getelementptr i8, ptr @.str_108, i64 16
     %v1933 = call ptr @orion_text_concat(ptr %v1932, ptr %v1931)
-    %v1934 = getelementptr i8, ptr @.str_629, i64 16
+    %v1934 = getelementptr i8, ptr @.str_631, i64 16
     %v1935 = call ptr @orion_text_concat(ptr %v1933, ptr %v1934)
     %v1936.slot = getelementptr i64, ptr %v0, i64 3
     %v1936 = load i64, ptr %v1936.slot
     %v1937 = call ptr @value_ref(i64 %v1936)
     %v1938 = call ptr @orion_text_concat(ptr %v1935, ptr %v1937)
-    %v1939 = getelementptr i8, ptr @.str_550, i64 16
+    %v1939 = getelementptr i8, ptr @.str_552, i64 16
     %v1940 = call ptr @orion_text_concat(ptr %v1938, ptr %v1939)
     %v1941.slot = getelementptr i64, ptr %v0, i64 4
     %v1941 = load i64, ptr %v1941.slot
@@ -40242,20 +40872,20 @@ if_1948_then:
     %v1950 = getelementptr i8, ptr @.str_108, i64 16
     %v1951 = call ptr @value_ref(i64 %v1)
     %v1952 = call ptr @orion_text_concat(ptr %v1950, ptr %v1951)
-    %v1953 = getelementptr i8, ptr @.str_572, i64 16
+    %v1953 = getelementptr i8, ptr @.str_574, i64 16
     %v1954 = call ptr @orion_text_concat(ptr %v1952, ptr %v1953)
     %v1955 = call ptr @orion_text_concat(ptr %v1954, ptr %v1931)
-    %v1956 = getelementptr i8, ptr @.str_555, i64 16
+    %v1956 = getelementptr i8, ptr @.str_557, i64 16
     %v1957 = call ptr @orion_text_concat(ptr %v1955, ptr %v1956)
     br label %if_1948_merge
 if_1948_else:
     %v1960 = getelementptr i8, ptr @.str_108, i64 16
     %v1961 = call ptr @value_ref(i64 %v1)
     %v1962 = call ptr @orion_text_concat(ptr %v1960, ptr %v1961)
-    %v1963 = getelementptr i8, ptr @.str_630, i64 16
+    %v1963 = getelementptr i8, ptr @.str_632, i64 16
     %v1964 = call ptr @orion_text_concat(ptr %v1962, ptr %v1963)
     %v1965 = call ptr @orion_text_concat(ptr %v1964, ptr %v1931)
-    %v1966 = getelementptr i8, ptr @.str_631, i64 16
+    %v1966 = getelementptr i8, ptr @.str_633, i64 16
     %v1967 = call ptr @orion_text_concat(ptr %v1965, ptr %v1966)
     br label %if_1948_merge
 if_1948_merge:
@@ -40267,7 +40897,7 @@ if_1948_merge:
     %v1974 = add i64 0, 0
     br label %if_1925_merge
 if_1925_else:
-    %v1977 = getelementptr i8, ptr @.str_528, i64 16
+    %v1977 = getelementptr i8, ptr @.str_530, i64 16
     %v1978 = alloca ptr, align 8
     store ptr %v1977, ptr %v1978
     %v1979 = add i64 0, 0
@@ -40277,7 +40907,7 @@ if_1925_else:
     %v1982.cb = icmp ne i64 %v1981, 0
     br i1 %v1982.cb, label %if_1982_then, label %if_1982_else
 if_1982_then:
-    %v1984 = getelementptr i8, ptr @.str_529, i64 16
+    %v1984 = getelementptr i8, ptr @.str_531, i64 16
     store ptr %v1984, ptr %v1978
     %v1985 = add i64 0, 0
     br label %if_1982_merge
@@ -40290,7 +40920,7 @@ if_1982_merge:
     %v1992.cb = icmp ne i64 %v1991, 0
     br i1 %v1992.cb, label %if_1992_then, label %if_1992_else
 if_1992_then:
-    %v1994 = getelementptr i8, ptr @.str_530, i64 16
+    %v1994 = getelementptr i8, ptr @.str_532, i64 16
     store ptr %v1994, ptr %v1978
     %v1995 = add i64 0, 0
     br label %if_1992_merge
@@ -40303,32 +40933,32 @@ if_1992_merge:
     %v2002.cb = icmp ne i64 %v2001, 0
     br i1 %v2002.cb, label %if_2002_then, label %if_2002_else
 if_2002_then:
-    %v2004 = getelementptr i8, ptr @.str_531, i64 16
+    %v2004 = getelementptr i8, ptr @.str_533, i64 16
     store ptr %v2004, ptr %v1978
     %v2005 = add i64 0, 0
     br label %if_2002_merge
 if_2002_else:
     br label %if_2002_merge
 if_2002_merge:
-    %v2010 = getelementptr i8, ptr @.str_502, i64 16
+    %v2010 = getelementptr i8, ptr @.str_504, i64 16
     %v2011 = call ptr @orion_int_to_text(i64 %v1)
     %v2012 = call ptr @orion_text_concat(ptr %v2010, ptr %v2011)
-    %v2013 = getelementptr i8, ptr @.str_632, i64 16
+    %v2013 = getelementptr i8, ptr @.str_634, i64 16
     %v2014 = call ptr @orion_text_concat(ptr %v2012, ptr %v2013)
-    %v2015 = getelementptr i8, ptr @.str_502, i64 16
+    %v2015 = getelementptr i8, ptr @.str_504, i64 16
     %v2016 = call ptr @orion_int_to_text(i64 %v1)
     %v2017 = call ptr @orion_text_concat(ptr %v2015, ptr %v2016)
-    %v2018 = getelementptr i8, ptr @.str_565, i64 16
+    %v2018 = getelementptr i8, ptr @.str_567, i64 16
     %v2019 = call ptr @orion_text_concat(ptr %v2017, ptr %v2018)
     %v2020 = getelementptr i8, ptr @.str_108, i64 16
     %v2021 = call ptr @orion_text_concat(ptr %v2020, ptr %v2014)
-    %v2022 = getelementptr i8, ptr @.str_633, i64 16
+    %v2022 = getelementptr i8, ptr @.str_635, i64 16
     %v2023 = call ptr @orion_text_concat(ptr %v2021, ptr %v2022)
     %v2024.slot = getelementptr i64, ptr %v0, i64 3
     %v2024 = load i64, ptr %v2024.slot
     %v2025 = call ptr @value_ref(i64 %v2024)
     %v2026 = call ptr @orion_text_concat(ptr %v2023, ptr %v2025)
-    %v2027 = getelementptr i8, ptr @.str_550, i64 16
+    %v2027 = getelementptr i8, ptr @.str_552, i64 16
     %v2028 = call ptr @orion_text_concat(ptr %v2026, ptr %v2027)
     %v2029.slot = getelementptr i64, ptr %v0, i64 4
     %v2029 = load i64, ptr %v2029.slot
@@ -40338,22 +40968,22 @@ if_2002_merge:
     %v2033 = call ptr @orion_text_concat(ptr %v2031, ptr %v2032)
     %v2034 = getelementptr i8, ptr @.str_108, i64 16
     %v2035 = call ptr @orion_text_concat(ptr %v2034, ptr %v2019)
-    %v2036 = getelementptr i8, ptr @.str_581, i64 16
+    %v2036 = getelementptr i8, ptr @.str_583, i64 16
     %v2037 = call ptr @orion_text_concat(ptr %v2035, ptr %v2036)
     %v2038 = load ptr, ptr %v1978
     %v2039 = call ptr @orion_text_concat(ptr %v2037, ptr %v2038)
-    %v2040 = getelementptr i8, ptr @.str_634, i64 16
+    %v2040 = getelementptr i8, ptr @.str_636, i64 16
     %v2041 = call ptr @orion_text_concat(ptr %v2039, ptr %v2040)
     %v2042 = call ptr @orion_text_concat(ptr %v2041, ptr %v2014)
-    %v2043 = getelementptr i8, ptr @.str_555, i64 16
+    %v2043 = getelementptr i8, ptr @.str_557, i64 16
     %v2044 = call ptr @orion_text_concat(ptr %v2042, ptr %v2043)
     %v2045 = getelementptr i8, ptr @.str_108, i64 16
     %v2046 = call ptr @value_ref(i64 %v1)
     %v2047 = call ptr @orion_text_concat(ptr %v2045, ptr %v2046)
-    %v2048 = getelementptr i8, ptr @.str_567, i64 16
+    %v2048 = getelementptr i8, ptr @.str_569, i64 16
     %v2049 = call ptr @orion_text_concat(ptr %v2047, ptr %v2048)
     %v2050 = call ptr @orion_text_concat(ptr %v2049, ptr %v2019)
-    %v2051 = getelementptr i8, ptr @.str_568, i64 16
+    %v2051 = getelementptr i8, ptr @.str_570, i64 16
     %v2052 = call ptr @orion_text_concat(ptr %v2050, ptr %v2051)
     %v2053 = getelementptr i8, ptr @.str_109, i64 16
     %v2054 = call ptr @orion_text_concat(ptr %v2033, ptr %v2053)
@@ -40376,7 +41006,7 @@ if_1912_merge:
     %v2069.cb = icmp ne i64 %v2068, 0
     br i1 %v2069.cb, label %if_2069_then, label %if_2069_else
 if_2069_then:
-    %v2071 = getelementptr i8, ptr @.str_595, i64 16
+    %v2071 = getelementptr i8, ptr @.str_597, i64 16
     %v2072.slot = getelementptr i64, ptr %v0, i64 2
     %v2072 = load i64, ptr %v2072.slot
     %v2073 = call ptr @value_ref(i64 %v2072)
@@ -40386,7 +41016,7 @@ if_2069_then:
     %v2077 = getelementptr i8, ptr @.str_108, i64 16
     %v2078 = call ptr @value_ref(i64 %v1)
     %v2079 = call ptr @orion_text_concat(ptr %v2077, ptr %v2078)
-    %v2080 = getelementptr i8, ptr @.str_544, i64 16
+    %v2080 = getelementptr i8, ptr @.str_546, i64 16
     %v2081 = call ptr @orion_text_concat(ptr %v2079, ptr %v2080)
     %v2082 = getelementptr i8, ptr @.str_109, i64 16
     %v2083 = call ptr @orion_text_concat(ptr %v2076, ptr %v2082)
@@ -40416,7 +41046,7 @@ if_2098_then:
     %v2100 = getelementptr i8, ptr @.str_108, i64 16
     %v2101 = call ptr @value_ref(i64 %v1)
     %v2102 = call ptr @orion_text_concat(ptr %v2100, ptr %v2101)
-    %v2103 = getelementptr i8, ptr @.str_635, i64 16
+    %v2103 = getelementptr i8, ptr @.str_637, i64 16
     %v2104 = call ptr @orion_text_concat(ptr %v2102, ptr %v2103)
     ret ptr %v2104
 if_2098_else:
@@ -40425,7 +41055,7 @@ if_2098_merge:
     %v2109 = getelementptr i8, ptr @.str_108, i64 16
     %v2110 = call ptr @value_ref(i64 %v1)
     %v2111 = call ptr @orion_text_concat(ptr %v2109, ptr %v2110)
-    %v2112 = getelementptr i8, ptr @.str_636, i64 16
+    %v2112 = getelementptr i8, ptr @.str_638, i64 16
     %v2113 = call ptr @orion_text_concat(ptr %v2111, ptr %v2112)
     %v2114 = call ptr @orion_int_to_text(i64 %v2095)
     %v2115 = call ptr @orion_text_concat(ptr %v2113, ptr %v2114)
@@ -40465,35 +41095,35 @@ for_2120_body:
     %v2137.cb = icmp ne i64 %v2136, 0
     br i1 %v2137.cb, label %if_2137_then, label %if_2137_else
 if_2137_then:
-    %v2139 = getelementptr i8, ptr @.str_502, i64 16
+    %v2139 = getelementptr i8, ptr @.str_504, i64 16
     %v2140 = call ptr @orion_int_to_text(i64 %v1)
     %v2141 = call ptr @orion_text_concat(ptr %v2139, ptr %v2140)
-    %v2142 = getelementptr i8, ptr @.str_637, i64 16
+    %v2142 = getelementptr i8, ptr @.str_639, i64 16
     %v2143 = call ptr @orion_text_concat(ptr %v2141, ptr %v2142)
     %v2144 = call ptr @orion_int_to_text(i64 %v2125)
     %v2145 = call ptr @orion_text_concat(ptr %v2143, ptr %v2144)
     %v2146 = load ptr, ptr %v2118
-    %v2147 = getelementptr i8, ptr @.str_638, i64 16
+    %v2147 = getelementptr i8, ptr @.str_640, i64 16
     %v2148 = call ptr @orion_text_concat(ptr %v2146, ptr %v2147)
     %v2149 = call ptr @orion_text_concat(ptr %v2148, ptr %v2145)
-    %v2150 = getelementptr i8, ptr @.str_578, i64 16
+    %v2150 = getelementptr i8, ptr @.str_580, i64 16
     %v2151 = call ptr @orion_text_concat(ptr %v2149, ptr %v2150)
     %v2152 = call ptr @value_ref(i64 %v2130)
     %v2153 = call ptr @orion_text_concat(ptr %v2151, ptr %v2152)
-    %v2154 = getelementptr i8, ptr @.str_568, i64 16
+    %v2154 = getelementptr i8, ptr @.str_570, i64 16
     %v2155 = call ptr @orion_text_concat(ptr %v2153, ptr %v2154)
     store ptr %v2155, ptr %v2118
     %v2156 = add i64 0, 0
     %v2157 = load ptr, ptr %v2118
-    %v2158 = getelementptr i8, ptr @.str_639, i64 16
+    %v2158 = getelementptr i8, ptr @.str_641, i64 16
     %v2159 = call ptr @orion_text_concat(ptr %v2157, ptr %v2158)
     %v2160 = call ptr @value_ref(i64 %v1)
     %v2161 = call ptr @orion_text_concat(ptr %v2159, ptr %v2160)
-    %v2162 = getelementptr i8, ptr @.str_548, i64 16
+    %v2162 = getelementptr i8, ptr @.str_550, i64 16
     %v2163 = call ptr @orion_text_concat(ptr %v2161, ptr %v2162)
     %v2164 = call ptr @orion_int_to_text(i64 %v2125)
     %v2165 = call ptr @orion_text_concat(ptr %v2163, ptr %v2164)
-    %v2166 = getelementptr i8, ptr @.str_548, i64 16
+    %v2166 = getelementptr i8, ptr @.str_550, i64 16
     %v2167 = call ptr @orion_text_concat(ptr %v2165, ptr %v2166)
     %v2168 = call ptr @orion_text_concat(ptr %v2167, ptr %v2145)
     %v2169 = getelementptr i8, ptr @.str_227, i64 16
@@ -40503,15 +41133,15 @@ if_2137_then:
     br label %if_2137_merge
 if_2137_else:
     %v2174 = load ptr, ptr %v2118
-    %v2175 = getelementptr i8, ptr @.str_639, i64 16
+    %v2175 = getelementptr i8, ptr @.str_641, i64 16
     %v2176 = call ptr @orion_text_concat(ptr %v2174, ptr %v2175)
     %v2177 = call ptr @value_ref(i64 %v1)
     %v2178 = call ptr @orion_text_concat(ptr %v2176, ptr %v2177)
-    %v2179 = getelementptr i8, ptr @.str_548, i64 16
+    %v2179 = getelementptr i8, ptr @.str_550, i64 16
     %v2180 = call ptr @orion_text_concat(ptr %v2178, ptr %v2179)
     %v2181 = call ptr @orion_int_to_text(i64 %v2125)
     %v2182 = call ptr @orion_text_concat(ptr %v2180, ptr %v2181)
-    %v2183 = getelementptr i8, ptr @.str_548, i64 16
+    %v2183 = getelementptr i8, ptr @.str_550, i64 16
     %v2184 = call ptr @orion_text_concat(ptr %v2182, ptr %v2183)
     %v2185 = call ptr @value_ref(i64 %v2130)
     %v2186 = call ptr @orion_text_concat(ptr %v2184, ptr %v2185)
@@ -40565,10 +41195,10 @@ if_2208_then:
     %v2221.cb = icmp ne i64 %v2220, 0
     br i1 %v2221.cb, label %if_2221_then, label %if_2221_else
 if_2221_then:
-    %v2223 = getelementptr i8, ptr @.str_502, i64 16
+    %v2223 = getelementptr i8, ptr @.str_504, i64 16
     %v2224 = call ptr @orion_int_to_text(i64 %v1)
     %v2225 = call ptr @orion_text_concat(ptr %v2223, ptr %v2224)
-    %v2226 = getelementptr i8, ptr @.str_640, i64 16
+    %v2226 = getelementptr i8, ptr @.str_642, i64 16
     %v2227 = call ptr @orion_text_concat(ptr %v2225, ptr %v2226)
     br label %if_2221_merge
 if_2221_else:
@@ -40583,13 +41213,13 @@ if_2221_merge:
 if_2235_then:
     %v2237 = getelementptr i8, ptr @.str_108, i64 16
     %v2238 = call ptr @orion_text_concat(ptr %v2237, ptr %v2234)
-    %v2239 = getelementptr i8, ptr @.str_613, i64 16
+    %v2239 = getelementptr i8, ptr @.str_615, i64 16
     %v2240 = call ptr @orion_text_concat(ptr %v2238, ptr %v2239)
     %v2241.slot = getelementptr i64, ptr %v0, i64 2
     %v2241 = load i64, ptr %v2241.slot
     %v2242 = call ptr @value_ref(i64 %v2241)
     %v2243 = call ptr @orion_text_concat(ptr %v2240, ptr %v2242)
-    %v2244 = getelementptr i8, ptr @.str_618, i64 16
+    %v2244 = getelementptr i8, ptr @.str_620, i64 16
     %v2245 = call ptr @orion_text_concat(ptr %v2243, ptr %v2244)
     br label %if_2235_merge
 if_2235_else:
@@ -40603,17 +41233,17 @@ if_2235_merge:
     %v2254.cb = icmp ne i64 %v2253, 0
     br i1 %v2254.cb, label %if_2254_then, label %if_2254_else
 if_2254_then:
-    %v2256 = getelementptr i8, ptr @.str_502, i64 16
+    %v2256 = getelementptr i8, ptr @.str_504, i64 16
     %v2257 = call ptr @orion_int_to_text(i64 %v1)
     %v2258 = call ptr @orion_text_concat(ptr %v2256, ptr %v2257)
-    %v2259 = getelementptr i8, ptr @.str_641, i64 16
+    %v2259 = getelementptr i8, ptr @.str_643, i64 16
     %v2260 = call ptr @orion_text_concat(ptr %v2258, ptr %v2259)
     %v2261 = getelementptr i8, ptr @.str_108, i64 16
     %v2262 = call ptr @orion_text_concat(ptr %v2261, ptr %v2260)
-    %v2263 = getelementptr i8, ptr @.str_642, i64 16
+    %v2263 = getelementptr i8, ptr @.str_644, i64 16
     %v2264 = call ptr @orion_text_concat(ptr %v2262, ptr %v2263)
     %v2265 = call ptr @orion_text_concat(ptr %v2264, ptr %v2234)
-    %v2266 = getelementptr i8, ptr @.str_548, i64 16
+    %v2266 = getelementptr i8, ptr @.str_550, i64 16
     %v2267 = call ptr @orion_text_concat(ptr %v2265, ptr %v2266)
     %v2268.slot = getelementptr i64, ptr %v0, i64 3
     %v2268 = load i64, ptr %v2268.slot
@@ -40624,10 +41254,10 @@ if_2254_then:
     %v2273 = getelementptr i8, ptr @.str_108, i64 16
     %v2274 = call ptr @value_ref(i64 %v1)
     %v2275 = call ptr @orion_text_concat(ptr %v2273, ptr %v2274)
-    %v2276 = getelementptr i8, ptr @.str_613, i64 16
+    %v2276 = getelementptr i8, ptr @.str_615, i64 16
     %v2277 = call ptr @orion_text_concat(ptr %v2275, ptr %v2276)
     %v2278 = call ptr @orion_text_concat(ptr %v2277, ptr %v2260)
-    %v2279 = getelementptr i8, ptr @.str_614, i64 16
+    %v2279 = getelementptr i8, ptr @.str_616, i64 16
     %v2280 = call ptr @orion_text_concat(ptr %v2278, ptr %v2279)
     %v2281 = call ptr @orion_text_concat(ptr %v2251, ptr %v2272)
     %v2282 = getelementptr i8, ptr @.str_109, i64 16
@@ -40641,10 +41271,10 @@ if_2254_else:
     %v2289 = call ptr @orion_text_concat(ptr %v2251, ptr %v2288)
     %v2290 = call ptr @value_ref(i64 %v1)
     %v2291 = call ptr @orion_text_concat(ptr %v2289, ptr %v2290)
-    %v2292 = getelementptr i8, ptr @.str_642, i64 16
+    %v2292 = getelementptr i8, ptr @.str_644, i64 16
     %v2293 = call ptr @orion_text_concat(ptr %v2291, ptr %v2292)
     %v2294 = call ptr @orion_text_concat(ptr %v2293, ptr %v2234)
-    %v2295 = getelementptr i8, ptr @.str_548, i64 16
+    %v2295 = getelementptr i8, ptr @.str_550, i64 16
     %v2296 = call ptr @orion_text_concat(ptr %v2294, ptr %v2295)
     %v2297.slot = getelementptr i64, ptr %v0, i64 3
     %v2297 = load i64, ptr %v2297.slot
@@ -40677,24 +41307,24 @@ if_2312_then:
     %v2319.cb = icmp ne i64 %v2318, 0
     br i1 %v2319.cb, label %if_2319_then, label %if_2319_else
 if_2319_then:
-    %v2321 = getelementptr i8, ptr @.str_502, i64 16
+    %v2321 = getelementptr i8, ptr @.str_504, i64 16
     %v2322 = call ptr @orion_int_to_text(i64 %v1)
     %v2323 = call ptr @orion_text_concat(ptr %v2321, ptr %v2322)
-    %v2324 = getelementptr i8, ptr @.str_640, i64 16
+    %v2324 = getelementptr i8, ptr @.str_642, i64 16
     %v2325 = call ptr @orion_text_concat(ptr %v2323, ptr %v2324)
     %v2326 = getelementptr i8, ptr @.str_108, i64 16
     %v2327 = call ptr @orion_text_concat(ptr %v2326, ptr %v2325)
-    %v2328 = getelementptr i8, ptr @.str_613, i64 16
+    %v2328 = getelementptr i8, ptr @.str_615, i64 16
     %v2329 = call ptr @orion_text_concat(ptr %v2327, ptr %v2328)
     %v2330.slot = getelementptr i64, ptr %v0, i64 2
     %v2330 = load i64, ptr %v2330.slot
     %v2331 = call ptr @value_ref(i64 %v2330)
     %v2332 = call ptr @orion_text_concat(ptr %v2329, ptr %v2331)
-    %v2333 = getelementptr i8, ptr @.str_643, i64 16
+    %v2333 = getelementptr i8, ptr @.str_645, i64 16
     %v2334 = call ptr @orion_text_concat(ptr %v2332, ptr %v2333)
     %v2335 = call ptr @value_ref(i64 %v1)
     %v2336 = call ptr @orion_text_concat(ptr %v2334, ptr %v2335)
-    %v2337 = getelementptr i8, ptr @.str_644, i64 16
+    %v2337 = getelementptr i8, ptr @.str_646, i64 16
     %v2338 = call ptr @orion_text_concat(ptr %v2336, ptr %v2337)
     %v2339 = call ptr @orion_text_concat(ptr %v2338, ptr %v2325)
     %v2340 = getelementptr i8, ptr @.str_227, i64 16
@@ -40706,7 +41336,7 @@ if_2319_else:
     %v2345 = getelementptr i8, ptr @.str_108, i64 16
     %v2346 = call ptr @value_ref(i64 %v1)
     %v2347 = call ptr @orion_text_concat(ptr %v2345, ptr %v2346)
-    %v2348 = getelementptr i8, ptr @.str_644, i64 16
+    %v2348 = getelementptr i8, ptr @.str_646, i64 16
     %v2349 = call ptr @orion_text_concat(ptr %v2347, ptr %v2348)
     %v2350.slot = getelementptr i64, ptr %v0, i64 2
     %v2350 = load i64, ptr %v2350.slot
@@ -40732,13 +41362,13 @@ if_2365_then:
     %v2367 = getelementptr i8, ptr @.str_108, i64 16
     %v2368 = call ptr @value_ref(i64 %v1)
     %v2369 = call ptr @orion_text_concat(ptr %v2367, ptr %v2368)
-    %v2370 = getelementptr i8, ptr @.str_645, i64 16
+    %v2370 = getelementptr i8, ptr @.str_647, i64 16
     %v2371 = call ptr @orion_text_concat(ptr %v2369, ptr %v2370)
     %v2372.slot = getelementptr i64, ptr %v0, i64 5
     %v2372.i = load i64, ptr %v2372.slot
     %v2372 = inttoptr i64 %v2372.i to ptr
     %v2373 = call ptr @orion_text_concat(ptr %v2371, ptr %v2372)
-    %v2374 = getelementptr i8, ptr @.str_646, i64 16
+    %v2374 = getelementptr i8, ptr @.str_648, i64 16
     %v2375 = call ptr @orion_text_concat(ptr %v2373, ptr %v2374)
     %v2376.slot = getelementptr i64, ptr %v0, i64 2
     %v2376 = load i64, ptr %v2376.slot
@@ -40761,19 +41391,19 @@ if_2388_then:
     %v2390 = getelementptr i8, ptr @.str_108, i64 16
     %v2391 = call ptr @value_ref(i64 %v1)
     %v2392 = call ptr @orion_text_concat(ptr %v2390, ptr %v2391)
-    %v2393 = getelementptr i8, ptr @.str_645, i64 16
+    %v2393 = getelementptr i8, ptr @.str_647, i64 16
     %v2394 = call ptr @orion_text_concat(ptr %v2392, ptr %v2393)
     %v2395.slot = getelementptr i64, ptr %v0, i64 5
     %v2395.i = load i64, ptr %v2395.slot
     %v2395 = inttoptr i64 %v2395.i to ptr
     %v2396 = call ptr @orion_text_concat(ptr %v2394, ptr %v2395)
-    %v2397 = getelementptr i8, ptr @.str_646, i64 16
+    %v2397 = getelementptr i8, ptr @.str_648, i64 16
     %v2398 = call ptr @orion_text_concat(ptr %v2396, ptr %v2397)
     %v2399.slot = getelementptr i64, ptr %v0, i64 2
     %v2399 = load i64, ptr %v2399.slot
     %v2400 = call ptr @value_ref(i64 %v2399)
     %v2401 = call ptr @orion_text_concat(ptr %v2398, ptr %v2400)
-    %v2402 = getelementptr i8, ptr @.str_647, i64 16
+    %v2402 = getelementptr i8, ptr @.str_649, i64 16
     %v2403 = call ptr @orion_text_concat(ptr %v2401, ptr %v2402)
     %v2404.slot = getelementptr i64, ptr %v0, i64 3
     %v2404 = load i64, ptr %v2404.slot
@@ -40803,33 +41433,33 @@ if_2416_then:
     %v2423.cb = icmp ne i64 %v2422, 0
     br i1 %v2423.cb, label %if_2423_then, label %if_2423_else
 if_2423_then:
-    %v2425 = getelementptr i8, ptr @.str_502, i64 16
+    %v2425 = getelementptr i8, ptr @.str_504, i64 16
     %v2426 = call ptr @orion_int_to_text(i64 %v1)
     %v2427 = call ptr @orion_text_concat(ptr %v2425, ptr %v2426)
-    %v2428 = getelementptr i8, ptr @.str_640, i64 16
+    %v2428 = getelementptr i8, ptr @.str_642, i64 16
     %v2429 = call ptr @orion_text_concat(ptr %v2427, ptr %v2428)
     %v2430 = getelementptr i8, ptr @.str_108, i64 16
     %v2431 = call ptr @orion_text_concat(ptr %v2430, ptr %v2429)
-    %v2432 = getelementptr i8, ptr @.str_613, i64 16
+    %v2432 = getelementptr i8, ptr @.str_615, i64 16
     %v2433 = call ptr @orion_text_concat(ptr %v2431, ptr %v2432)
     %v2434.slot = getelementptr i64, ptr %v0, i64 2
     %v2434 = load i64, ptr %v2434.slot
     %v2435 = call ptr @value_ref(i64 %v2434)
     %v2436 = call ptr @orion_text_concat(ptr %v2433, ptr %v2435)
-    %v2437 = getelementptr i8, ptr @.str_643, i64 16
+    %v2437 = getelementptr i8, ptr @.str_645, i64 16
     %v2438 = call ptr @orion_text_concat(ptr %v2436, ptr %v2437)
     %v2439 = call ptr @value_ref(i64 %v1)
     %v2440 = call ptr @orion_text_concat(ptr %v2438, ptr %v2439)
-    %v2441 = getelementptr i8, ptr @.str_648, i64 16
+    %v2441 = getelementptr i8, ptr @.str_650, i64 16
     %v2442 = call ptr @orion_text_concat(ptr %v2440, ptr %v2441)
     %v2443 = call ptr @orion_text_concat(ptr %v2442, ptr %v2429)
-    %v2444 = getelementptr i8, ptr @.str_548, i64 16
+    %v2444 = getelementptr i8, ptr @.str_550, i64 16
     %v2445 = call ptr @orion_text_concat(ptr %v2443, ptr %v2444)
     %v2446.slot = getelementptr i64, ptr %v0, i64 3
     %v2446 = load i64, ptr %v2446.slot
     %v2447 = call ptr @value_ref(i64 %v2446)
     %v2448 = call ptr @orion_text_concat(ptr %v2445, ptr %v2447)
-    %v2449 = getelementptr i8, ptr @.str_548, i64 16
+    %v2449 = getelementptr i8, ptr @.str_550, i64 16
     %v2450 = call ptr @orion_text_concat(ptr %v2448, ptr %v2449)
     %v2451.slot = getelementptr i64, ptr %v0, i64 4
     %v2451 = load i64, ptr %v2451.slot
@@ -40844,19 +41474,19 @@ if_2423_else:
     %v2459 = getelementptr i8, ptr @.str_108, i64 16
     %v2460 = call ptr @value_ref(i64 %v1)
     %v2461 = call ptr @orion_text_concat(ptr %v2459, ptr %v2460)
-    %v2462 = getelementptr i8, ptr @.str_648, i64 16
+    %v2462 = getelementptr i8, ptr @.str_650, i64 16
     %v2463 = call ptr @orion_text_concat(ptr %v2461, ptr %v2462)
     %v2464.slot = getelementptr i64, ptr %v0, i64 2
     %v2464 = load i64, ptr %v2464.slot
     %v2465 = call ptr @value_ref(i64 %v2464)
     %v2466 = call ptr @orion_text_concat(ptr %v2463, ptr %v2465)
-    %v2467 = getelementptr i8, ptr @.str_548, i64 16
+    %v2467 = getelementptr i8, ptr @.str_550, i64 16
     %v2468 = call ptr @orion_text_concat(ptr %v2466, ptr %v2467)
     %v2469.slot = getelementptr i64, ptr %v0, i64 3
     %v2469 = load i64, ptr %v2469.slot
     %v2470 = call ptr @value_ref(i64 %v2469)
     %v2471 = call ptr @orion_text_concat(ptr %v2468, ptr %v2470)
-    %v2472 = getelementptr i8, ptr @.str_548, i64 16
+    %v2472 = getelementptr i8, ptr @.str_550, i64 16
     %v2473 = call ptr @orion_text_concat(ptr %v2471, ptr %v2472)
     %v2474.slot = getelementptr i64, ptr %v0, i64 4
     %v2474 = load i64, ptr %v2474.slot
@@ -40896,31 +41526,31 @@ if_2489_then:
     %v2498.cb = icmp ne i64 %v2497, 0
     br i1 %v2498.cb, label %if_2498_then, label %if_2498_else
 if_2498_then:
-    %v2500 = getelementptr i8, ptr @.str_502, i64 16
+    %v2500 = getelementptr i8, ptr @.str_504, i64 16
     %v2501 = call ptr @orion_int_to_text(i64 %v1)
     %v2502 = call ptr @orion_text_concat(ptr %v2500, ptr %v2501)
-    %v2503 = getelementptr i8, ptr @.str_649, i64 16
+    %v2503 = getelementptr i8, ptr @.str_651, i64 16
     %v2504 = call ptr @orion_text_concat(ptr %v2502, ptr %v2503)
     %v2505 = getelementptr i8, ptr @.str_108, i64 16
     %v2506 = call ptr @orion_text_concat(ptr %v2505, ptr %v2504)
-    %v2507 = getelementptr i8, ptr @.str_578, i64 16
+    %v2507 = getelementptr i8, ptr @.str_580, i64 16
     %v2508 = call ptr @orion_text_concat(ptr %v2506, ptr %v2507)
     %v2509.slot = getelementptr i64, ptr %v0, i64 3
     %v2509 = load i64, ptr %v2509.slot
     %v2510 = call ptr @value_ref(i64 %v2509)
     %v2511 = call ptr @orion_text_concat(ptr %v2508, ptr %v2510)
-    %v2512 = getelementptr i8, ptr @.str_568, i64 16
+    %v2512 = getelementptr i8, ptr @.str_570, i64 16
     %v2513 = call ptr @orion_text_concat(ptr %v2511, ptr %v2512)
     %v2514 = getelementptr i8, ptr @.str_108, i64 16
     %v2515 = call ptr @value_ref(i64 %v1)
     %v2516 = call ptr @orion_text_concat(ptr %v2514, ptr %v2515)
-    %v2517 = getelementptr i8, ptr @.str_650, i64 16
+    %v2517 = getelementptr i8, ptr @.str_652, i64 16
     %v2518 = call ptr @orion_text_concat(ptr %v2516, ptr %v2517)
     %v2519.slot = getelementptr i64, ptr %v0, i64 2
     %v2519 = load i64, ptr %v2519.slot
     %v2520 = call ptr @value_ref(i64 %v2519)
     %v2521 = call ptr @orion_text_concat(ptr %v2518, ptr %v2520)
-    %v2522 = getelementptr i8, ptr @.str_548, i64 16
+    %v2522 = getelementptr i8, ptr @.str_550, i64 16
     %v2523 = call ptr @orion_text_concat(ptr %v2521, ptr %v2522)
     %v2524 = call ptr @orion_text_concat(ptr %v2523, ptr %v2504)
     %v2525 = getelementptr i8, ptr @.str_227, i64 16
@@ -40935,13 +41565,13 @@ if_2498_else:
     %v2533 = getelementptr i8, ptr @.str_108, i64 16
     %v2534 = call ptr @value_ref(i64 %v1)
     %v2535 = call ptr @orion_text_concat(ptr %v2533, ptr %v2534)
-    %v2536 = getelementptr i8, ptr @.str_650, i64 16
+    %v2536 = getelementptr i8, ptr @.str_652, i64 16
     %v2537 = call ptr @orion_text_concat(ptr %v2535, ptr %v2536)
     %v2538.slot = getelementptr i64, ptr %v0, i64 2
     %v2538 = load i64, ptr %v2538.slot
     %v2539 = call ptr @value_ref(i64 %v2538)
     %v2540 = call ptr @orion_text_concat(ptr %v2537, ptr %v2539)
-    %v2541 = getelementptr i8, ptr @.str_548, i64 16
+    %v2541 = getelementptr i8, ptr @.str_550, i64 16
     %v2542 = call ptr @orion_text_concat(ptr %v2540, ptr %v2541)
     %v2543.slot = getelementptr i64, ptr %v0, i64 3
     %v2543 = load i64, ptr %v2543.slot
@@ -40981,31 +41611,31 @@ if_2558_then:
     %v2567.cb = icmp ne i64 %v2566, 0
     br i1 %v2567.cb, label %if_2567_then, label %if_2567_else
 if_2567_then:
-    %v2569 = getelementptr i8, ptr @.str_502, i64 16
+    %v2569 = getelementptr i8, ptr @.str_504, i64 16
     %v2570 = call ptr @orion_int_to_text(i64 %v1)
     %v2571 = call ptr @orion_text_concat(ptr %v2569, ptr %v2570)
-    %v2572 = getelementptr i8, ptr @.str_649, i64 16
+    %v2572 = getelementptr i8, ptr @.str_651, i64 16
     %v2573 = call ptr @orion_text_concat(ptr %v2571, ptr %v2572)
     %v2574 = getelementptr i8, ptr @.str_108, i64 16
     %v2575 = call ptr @orion_text_concat(ptr %v2574, ptr %v2573)
-    %v2576 = getelementptr i8, ptr @.str_578, i64 16
+    %v2576 = getelementptr i8, ptr @.str_580, i64 16
     %v2577 = call ptr @orion_text_concat(ptr %v2575, ptr %v2576)
     %v2578.slot = getelementptr i64, ptr %v0, i64 3
     %v2578 = load i64, ptr %v2578.slot
     %v2579 = call ptr @value_ref(i64 %v2578)
     %v2580 = call ptr @orion_text_concat(ptr %v2577, ptr %v2579)
-    %v2581 = getelementptr i8, ptr @.str_568, i64 16
+    %v2581 = getelementptr i8, ptr @.str_570, i64 16
     %v2582 = call ptr @orion_text_concat(ptr %v2580, ptr %v2581)
     %v2583 = getelementptr i8, ptr @.str_108, i64 16
     %v2584 = call ptr @value_ref(i64 %v1)
     %v2585 = call ptr @orion_text_concat(ptr %v2583, ptr %v2584)
-    %v2586 = getelementptr i8, ptr @.str_651, i64 16
+    %v2586 = getelementptr i8, ptr @.str_653, i64 16
     %v2587 = call ptr @orion_text_concat(ptr %v2585, ptr %v2586)
     %v2588.slot = getelementptr i64, ptr %v0, i64 2
     %v2588 = load i64, ptr %v2588.slot
     %v2589 = call ptr @value_ref(i64 %v2588)
     %v2590 = call ptr @orion_text_concat(ptr %v2587, ptr %v2589)
-    %v2591 = getelementptr i8, ptr @.str_548, i64 16
+    %v2591 = getelementptr i8, ptr @.str_550, i64 16
     %v2592 = call ptr @orion_text_concat(ptr %v2590, ptr %v2591)
     %v2593 = call ptr @orion_text_concat(ptr %v2592, ptr %v2573)
     %v2594 = getelementptr i8, ptr @.str_227, i64 16
@@ -41020,13 +41650,13 @@ if_2567_else:
     %v2602 = getelementptr i8, ptr @.str_108, i64 16
     %v2603 = call ptr @value_ref(i64 %v1)
     %v2604 = call ptr @orion_text_concat(ptr %v2602, ptr %v2603)
-    %v2605 = getelementptr i8, ptr @.str_651, i64 16
+    %v2605 = getelementptr i8, ptr @.str_653, i64 16
     %v2606 = call ptr @orion_text_concat(ptr %v2604, ptr %v2605)
     %v2607.slot = getelementptr i64, ptr %v0, i64 2
     %v2607 = load i64, ptr %v2607.slot
     %v2608 = call ptr @value_ref(i64 %v2607)
     %v2609 = call ptr @orion_text_concat(ptr %v2606, ptr %v2608)
-    %v2610 = getelementptr i8, ptr @.str_548, i64 16
+    %v2610 = getelementptr i8, ptr @.str_550, i64 16
     %v2611 = call ptr @orion_text_concat(ptr %v2609, ptr %v2610)
     %v2612.slot = getelementptr i64, ptr %v0, i64 3
     %v2612 = load i64, ptr %v2612.slot
@@ -41052,13 +41682,13 @@ if_2627_then:
     %v2629 = getelementptr i8, ptr @.str_108, i64 16
     %v2630 = call ptr @value_ref(i64 %v1)
     %v2631 = call ptr @orion_text_concat(ptr %v2629, ptr %v2630)
-    %v2632 = getelementptr i8, ptr @.str_652, i64 16
+    %v2632 = getelementptr i8, ptr @.str_654, i64 16
     %v2633 = call ptr @orion_text_concat(ptr %v2631, ptr %v2632)
     %v2634.slot = getelementptr i64, ptr %v0, i64 2
     %v2634 = load i64, ptr %v2634.slot
     %v2635 = call ptr @value_ref(i64 %v2634)
     %v2636 = call ptr @orion_text_concat(ptr %v2633, ptr %v2635)
-    %v2637 = getelementptr i8, ptr @.str_550, i64 16
+    %v2637 = getelementptr i8, ptr @.str_552, i64 16
     %v2638 = call ptr @orion_text_concat(ptr %v2636, ptr %v2637)
     %v2639.slot = getelementptr i64, ptr %v0, i64 3
     %v2639 = load i64, ptr %v2639.slot
@@ -41081,13 +41711,13 @@ if_2651_then:
     %v2653 = getelementptr i8, ptr @.str_108, i64 16
     %v2654 = call ptr @value_ref(i64 %v1)
     %v2655 = call ptr @orion_text_concat(ptr %v2653, ptr %v2654)
-    %v2656 = getelementptr i8, ptr @.str_653, i64 16
+    %v2656 = getelementptr i8, ptr @.str_655, i64 16
     %v2657 = call ptr @orion_text_concat(ptr %v2655, ptr %v2656)
     %v2658.slot = getelementptr i64, ptr %v0, i64 2
     %v2658 = load i64, ptr %v2658.slot
     %v2659 = call ptr @value_ref(i64 %v2658)
     %v2660 = call ptr @orion_text_concat(ptr %v2657, ptr %v2659)
-    %v2661 = getelementptr i8, ptr @.str_550, i64 16
+    %v2661 = getelementptr i8, ptr @.str_552, i64 16
     %v2662 = call ptr @orion_text_concat(ptr %v2660, ptr %v2661)
     %v2663.slot = getelementptr i64, ptr %v0, i64 3
     %v2663 = load i64, ptr %v2663.slot
@@ -41110,13 +41740,13 @@ if_2675_then:
     %v2677 = getelementptr i8, ptr @.str_108, i64 16
     %v2678 = call ptr @value_ref(i64 %v1)
     %v2679 = call ptr @orion_text_concat(ptr %v2677, ptr %v2678)
-    %v2680 = getelementptr i8, ptr @.str_654, i64 16
+    %v2680 = getelementptr i8, ptr @.str_656, i64 16
     %v2681 = call ptr @orion_text_concat(ptr %v2679, ptr %v2680)
     %v2682.slot = getelementptr i64, ptr %v0, i64 2
     %v2682 = load i64, ptr %v2682.slot
     %v2683 = call ptr @value_ref(i64 %v2682)
     %v2684 = call ptr @orion_text_concat(ptr %v2681, ptr %v2683)
-    %v2685 = getelementptr i8, ptr @.str_550, i64 16
+    %v2685 = getelementptr i8, ptr @.str_552, i64 16
     %v2686 = call ptr @orion_text_concat(ptr %v2684, ptr %v2685)
     %v2687.slot = getelementptr i64, ptr %v0, i64 3
     %v2687 = load i64, ptr %v2687.slot
@@ -41139,13 +41769,13 @@ if_2699_then:
     %v2701 = getelementptr i8, ptr @.str_108, i64 16
     %v2702 = call ptr @value_ref(i64 %v1)
     %v2703 = call ptr @orion_text_concat(ptr %v2701, ptr %v2702)
-    %v2704 = getelementptr i8, ptr @.str_655, i64 16
+    %v2704 = getelementptr i8, ptr @.str_657, i64 16
     %v2705 = call ptr @orion_text_concat(ptr %v2703, ptr %v2704)
     %v2706.slot = getelementptr i64, ptr %v0, i64 2
     %v2706 = load i64, ptr %v2706.slot
     %v2707 = call ptr @value_ref(i64 %v2706)
     %v2708 = call ptr @orion_text_concat(ptr %v2705, ptr %v2707)
-    %v2709 = getelementptr i8, ptr @.str_550, i64 16
+    %v2709 = getelementptr i8, ptr @.str_552, i64 16
     %v2710 = call ptr @orion_text_concat(ptr %v2708, ptr %v2709)
     %v2711.slot = getelementptr i64, ptr %v0, i64 3
     %v2711 = load i64, ptr %v2711.slot
@@ -41168,7 +41798,7 @@ if_2723_then:
     %v2725 = getelementptr i8, ptr @.str_108, i64 16
     %v2726 = call ptr @value_ref(i64 %v1)
     %v2727 = call ptr @orion_text_concat(ptr %v2725, ptr %v2726)
-    %v2728 = getelementptr i8, ptr @.str_656, i64 16
+    %v2728 = getelementptr i8, ptr @.str_658, i64 16
     %v2729 = call ptr @orion_text_concat(ptr %v2727, ptr %v2728)
     store ptr %v2729, ptr %v70
     %v2730 = add i64 0, 0
@@ -41185,7 +41815,7 @@ if_2737_then:
     %v2739 = getelementptr i8, ptr @.str_108, i64 16
     %v2740 = call ptr @value_ref(i64 %v1)
     %v2741 = call ptr @orion_text_concat(ptr %v2739, ptr %v2740)
-    %v2742 = getelementptr i8, ptr @.str_657, i64 16
+    %v2742 = getelementptr i8, ptr @.str_659, i64 16
     %v2743 = call ptr @orion_text_concat(ptr %v2741, ptr %v2742)
     store ptr %v2743, ptr %v70
     %v2744 = add i64 0, 0
@@ -41199,7 +41829,7 @@ if_2737_merge:
     %v2751.cb = icmp ne i64 %v2750, 0
     br i1 %v2751.cb, label %if_2751_then, label %if_2751_else
 if_2751_then:
-    %v2753 = getelementptr i8, ptr @.str_658, i64 16
+    %v2753 = getelementptr i8, ptr @.str_660, i64 16
     %v2754.slot = getelementptr i64, ptr %v0, i64 2
     %v2754 = load i64, ptr %v2754.slot
     %v2755 = call ptr @value_ref(i64 %v2754)
@@ -41209,7 +41839,7 @@ if_2751_then:
     %v2759 = getelementptr i8, ptr @.str_108, i64 16
     %v2760 = call ptr @value_ref(i64 %v1)
     %v2761 = call ptr @orion_text_concat(ptr %v2759, ptr %v2760)
-    %v2762 = getelementptr i8, ptr @.str_544, i64 16
+    %v2762 = getelementptr i8, ptr @.str_546, i64 16
     %v2763 = call ptr @orion_text_concat(ptr %v2761, ptr %v2762)
     %v2764 = getelementptr i8, ptr @.str_109, i64 16
     %v2765 = call ptr @orion_text_concat(ptr %v2758, ptr %v2764)
@@ -41235,7 +41865,7 @@ if_2774_then:
     %v2780 = getelementptr i8, ptr @.str_108, i64 16
     %v2781 = call ptr @value_ref(i64 %v1)
     %v2782 = call ptr @orion_text_concat(ptr %v2780, ptr %v2781)
-    %v2783 = getelementptr i8, ptr @.str_659, i64 16
+    %v2783 = getelementptr i8, ptr @.str_661, i64 16
     %v2784 = call ptr @orion_text_concat(ptr %v2782, ptr %v2783)
     %v2785 = call ptr @orion_int_to_text(i64 %v2779)
     %v2786 = call ptr @orion_text_concat(ptr %v2784, ptr %v2785)
@@ -41285,35 +41915,35 @@ for_2791_body:
     %v2816.cb = icmp ne i64 %v2815, 0
     br i1 %v2816.cb, label %if_2816_then, label %if_2816_else
 if_2816_then:
-    %v2818 = getelementptr i8, ptr @.str_502, i64 16
+    %v2818 = getelementptr i8, ptr @.str_504, i64 16
     %v2819 = call ptr @orion_int_to_text(i64 %v1)
     %v2820 = call ptr @orion_text_concat(ptr %v2818, ptr %v2819)
-    %v2821 = getelementptr i8, ptr @.str_649, i64 16
+    %v2821 = getelementptr i8, ptr @.str_651, i64 16
     %v2822 = call ptr @orion_text_concat(ptr %v2820, ptr %v2821)
     %v2823 = call ptr @orion_int_to_text(i64 %v2796)
     %v2824 = call ptr @orion_text_concat(ptr %v2822, ptr %v2823)
     %v2825 = load ptr, ptr %v2789
-    %v2826 = getelementptr i8, ptr @.str_638, i64 16
+    %v2826 = getelementptr i8, ptr @.str_640, i64 16
     %v2827 = call ptr @orion_text_concat(ptr %v2825, ptr %v2826)
     %v2828 = call ptr @orion_text_concat(ptr %v2827, ptr %v2824)
-    %v2829 = getelementptr i8, ptr @.str_578, i64 16
+    %v2829 = getelementptr i8, ptr @.str_580, i64 16
     %v2830 = call ptr @orion_text_concat(ptr %v2828, ptr %v2829)
     %v2831 = call ptr @value_ref(i64 %v2809)
     %v2832 = call ptr @orion_text_concat(ptr %v2830, ptr %v2831)
-    %v2833 = getelementptr i8, ptr @.str_568, i64 16
+    %v2833 = getelementptr i8, ptr @.str_570, i64 16
     %v2834 = call ptr @orion_text_concat(ptr %v2832, ptr %v2833)
     store ptr %v2834, ptr %v2789
     %v2835 = add i64 0, 0
     %v2836 = load ptr, ptr %v2789
-    %v2837 = getelementptr i8, ptr @.str_660, i64 16
+    %v2837 = getelementptr i8, ptr @.str_662, i64 16
     %v2838 = call ptr @orion_text_concat(ptr %v2836, ptr %v2837)
     %v2839 = call ptr @value_ref(i64 %v1)
     %v2840 = call ptr @orion_text_concat(ptr %v2838, ptr %v2839)
-    %v2841 = getelementptr i8, ptr @.str_550, i64 16
+    %v2841 = getelementptr i8, ptr @.str_552, i64 16
     %v2842 = call ptr @orion_text_concat(ptr %v2840, ptr %v2841)
     %v2843 = call ptr @value_ref(i64 %v2803)
     %v2844 = call ptr @orion_text_concat(ptr %v2842, ptr %v2843)
-    %v2845 = getelementptr i8, ptr @.str_548, i64 16
+    %v2845 = getelementptr i8, ptr @.str_550, i64 16
     %v2846 = call ptr @orion_text_concat(ptr %v2844, ptr %v2845)
     %v2847 = call ptr @orion_text_concat(ptr %v2846, ptr %v2824)
     %v2848 = getelementptr i8, ptr @.str_227, i64 16
@@ -41323,15 +41953,15 @@ if_2816_then:
     br label %if_2816_merge
 if_2816_else:
     %v2853 = load ptr, ptr %v2789
-    %v2854 = getelementptr i8, ptr @.str_660, i64 16
+    %v2854 = getelementptr i8, ptr @.str_662, i64 16
     %v2855 = call ptr @orion_text_concat(ptr %v2853, ptr %v2854)
     %v2856 = call ptr @value_ref(i64 %v1)
     %v2857 = call ptr @orion_text_concat(ptr %v2855, ptr %v2856)
-    %v2858 = getelementptr i8, ptr @.str_550, i64 16
+    %v2858 = getelementptr i8, ptr @.str_552, i64 16
     %v2859 = call ptr @orion_text_concat(ptr %v2857, ptr %v2858)
     %v2860 = call ptr @value_ref(i64 %v2803)
     %v2861 = call ptr @orion_text_concat(ptr %v2859, ptr %v2860)
-    %v2862 = getelementptr i8, ptr @.str_548, i64 16
+    %v2862 = getelementptr i8, ptr @.str_550, i64 16
     %v2863 = call ptr @orion_text_concat(ptr %v2861, ptr %v2862)
     %v2864 = call ptr @value_ref(i64 %v2809)
     %v2865 = call ptr @orion_text_concat(ptr %v2863, ptr %v2864)
@@ -41373,10 +42003,10 @@ if_2887_then:
     %v2894.cb = icmp ne i64 %v2893, 0
     br i1 %v2894.cb, label %if_2894_then, label %if_2894_else
 if_2894_then:
-    %v2896 = getelementptr i8, ptr @.str_661, i64 16
+    %v2896 = getelementptr i8, ptr @.str_663, i64 16
     br label %if_2894_merge
 if_2894_else:
-    %v2899 = getelementptr i8, ptr @.str_662, i64 16
+    %v2899 = getelementptr i8, ptr @.str_664, i64 16
     br label %if_2894_merge
 if_2894_merge:
     %v2902 = phi ptr [ %v2896, %if_2894_then ], [ %v2899, %if_2894_else ]
@@ -41410,24 +42040,24 @@ if_2905_merge:
     %v2921.cb = icmp ne i64 %v2920, 0
     br i1 %v2921.cb, label %if_2921_then, label %if_2921_else
 if_2921_then:
-    %v2923 = getelementptr i8, ptr @.str_502, i64 16
+    %v2923 = getelementptr i8, ptr @.str_504, i64 16
     %v2924 = call ptr @orion_int_to_text(i64 %v1)
     %v2925 = call ptr @orion_text_concat(ptr %v2923, ptr %v2924)
-    %v2926 = getelementptr i8, ptr @.str_649, i64 16
+    %v2926 = getelementptr i8, ptr @.str_651, i64 16
     %v2927 = call ptr @orion_text_concat(ptr %v2925, ptr %v2926)
     %v2928 = getelementptr i8, ptr @.str_108, i64 16
     %v2929 = call ptr @orion_text_concat(ptr %v2928, ptr %v2927)
-    %v2930 = getelementptr i8, ptr @.str_578, i64 16
+    %v2930 = getelementptr i8, ptr @.str_580, i64 16
     %v2931 = call ptr @orion_text_concat(ptr %v2929, ptr %v2930)
     %v2932.slot = getelementptr i64, ptr %v0, i64 4
     %v2932 = load i64, ptr %v2932.slot
     %v2933 = call ptr @value_ref(i64 %v2932)
     %v2934 = call ptr @orion_text_concat(ptr %v2931, ptr %v2933)
-    %v2935 = getelementptr i8, ptr @.str_568, i64 16
+    %v2935 = getelementptr i8, ptr @.str_570, i64 16
     %v2936 = call ptr @orion_text_concat(ptr %v2934, ptr %v2935)
-    %v2937 = getelementptr i8, ptr @.str_542, i64 16
+    %v2937 = getelementptr i8, ptr @.str_544, i64 16
     %v2938 = call ptr @orion_text_concat(ptr %v2937, ptr %v2902)
-    %v2939 = getelementptr i8, ptr @.str_663, i64 16
+    %v2939 = getelementptr i8, ptr @.str_665, i64 16
     %v2940 = call ptr @orion_text_concat(ptr %v2938, ptr %v2939)
     %v2941.slot = getelementptr i64, ptr %v0, i64 2
     %v2941 = load i64, ptr %v2941.slot
@@ -41442,7 +42072,7 @@ if_2921_then:
     %v2949 = load i64, ptr %v2949.slot
     %v2950 = call ptr @value_ref(i64 %v2949)
     %v2951 = call ptr @orion_text_concat(ptr %v2948, ptr %v2950)
-    %v2952 = getelementptr i8, ptr @.str_548, i64 16
+    %v2952 = getelementptr i8, ptr @.str_550, i64 16
     %v2953 = call ptr @orion_text_concat(ptr %v2951, ptr %v2952)
     %v2954 = call ptr @orion_text_concat(ptr %v2953, ptr %v2927)
     %v2955 = getelementptr i8, ptr @.str_227, i64 16
@@ -41450,13 +42080,13 @@ if_2921_then:
     %v2957 = getelementptr i8, ptr @.str_108, i64 16
     %v2958 = call ptr @value_ref(i64 %v1)
     %v2959 = call ptr @orion_text_concat(ptr %v2957, ptr %v2958)
-    %v2960 = getelementptr i8, ptr @.str_664, i64 16
+    %v2960 = getelementptr i8, ptr @.str_666, i64 16
     %v2961 = call ptr @orion_text_concat(ptr %v2959, ptr %v2960)
     %v2962.slot = getelementptr i64, ptr %v0, i64 2
     %v2962 = load i64, ptr %v2962.slot
     %v2963 = call ptr @value_ref(i64 %v2962)
     %v2964 = call ptr @orion_text_concat(ptr %v2961, ptr %v2963)
-    %v2965 = getelementptr i8, ptr @.str_537, i64 16
+    %v2965 = getelementptr i8, ptr @.str_539, i64 16
     %v2966 = call ptr @orion_text_concat(ptr %v2964, ptr %v2965)
     %v2967 = getelementptr i8, ptr @.str_109, i64 16
     %v2968 = call ptr @orion_text_concat(ptr %v2936, ptr %v2967)
@@ -41468,9 +42098,9 @@ if_2921_then:
     %v2973 = add i64 0, 0
     br label %if_2921_merge
 if_2921_else:
-    %v2976 = getelementptr i8, ptr @.str_542, i64 16
+    %v2976 = getelementptr i8, ptr @.str_544, i64 16
     %v2977 = call ptr @orion_text_concat(ptr %v2976, ptr %v2902)
-    %v2978 = getelementptr i8, ptr @.str_663, i64 16
+    %v2978 = getelementptr i8, ptr @.str_665, i64 16
     %v2979 = call ptr @orion_text_concat(ptr %v2977, ptr %v2978)
     %v2980.slot = getelementptr i64, ptr %v0, i64 2
     %v2980 = load i64, ptr %v2980.slot
@@ -41485,7 +42115,7 @@ if_2921_else:
     %v2988 = load i64, ptr %v2988.slot
     %v2989 = call ptr @value_ref(i64 %v2988)
     %v2990 = call ptr @orion_text_concat(ptr %v2987, ptr %v2989)
-    %v2991 = getelementptr i8, ptr @.str_548, i64 16
+    %v2991 = getelementptr i8, ptr @.str_550, i64 16
     %v2992 = call ptr @orion_text_concat(ptr %v2990, ptr %v2991)
     %v2993.slot = getelementptr i64, ptr %v0, i64 4
     %v2993 = load i64, ptr %v2993.slot
@@ -41496,13 +42126,13 @@ if_2921_else:
     %v2998 = getelementptr i8, ptr @.str_108, i64 16
     %v2999 = call ptr @value_ref(i64 %v1)
     %v3000 = call ptr @orion_text_concat(ptr %v2998, ptr %v2999)
-    %v3001 = getelementptr i8, ptr @.str_664, i64 16
+    %v3001 = getelementptr i8, ptr @.str_666, i64 16
     %v3002 = call ptr @orion_text_concat(ptr %v3000, ptr %v3001)
     %v3003.slot = getelementptr i64, ptr %v0, i64 2
     %v3003 = load i64, ptr %v3003.slot
     %v3004 = call ptr @value_ref(i64 %v3003)
     %v3005 = call ptr @orion_text_concat(ptr %v3002, ptr %v3004)
-    %v3006 = getelementptr i8, ptr @.str_537, i64 16
+    %v3006 = getelementptr i8, ptr @.str_539, i64 16
     %v3007 = call ptr @orion_text_concat(ptr %v3005, ptr %v3006)
     %v3008 = getelementptr i8, ptr @.str_109, i64 16
     %v3009 = call ptr @orion_text_concat(ptr %v2997, ptr %v3008)
@@ -41532,10 +42162,10 @@ if_3021_then:
     %v3028.cb = icmp ne i64 %v3027, 0
     br i1 %v3028.cb, label %if_3028_then, label %if_3028_else
 if_3028_then:
-    %v3030 = getelementptr i8, ptr @.str_665, i64 16
+    %v3030 = getelementptr i8, ptr @.str_667, i64 16
     br label %if_3028_merge
 if_3028_else:
-    %v3033 = getelementptr i8, ptr @.str_666, i64 16
+    %v3033 = getelementptr i8, ptr @.str_668, i64 16
     br label %if_3028_merge
 if_3028_merge:
     %v3036 = phi ptr [ %v3030, %if_3028_then ], [ %v3033, %if_3028_else ]
@@ -41552,9 +42182,9 @@ if_3039_else:
     br label %if_3039_merge
 if_3039_merge:
     %v3047 = phi ptr [ %v3041, %if_3039_then ], [ %v3044, %if_3039_else ]
-    %v3048 = getelementptr i8, ptr @.str_542, i64 16
+    %v3048 = getelementptr i8, ptr @.str_544, i64 16
     %v3049 = call ptr @orion_text_concat(ptr %v3048, ptr %v3036)
-    %v3050 = getelementptr i8, ptr @.str_663, i64 16
+    %v3050 = getelementptr i8, ptr @.str_665, i64 16
     %v3051 = call ptr @orion_text_concat(ptr %v3049, ptr %v3050)
     %v3052.slot = getelementptr i64, ptr %v0, i64 2
     %v3052 = load i64, ptr %v3052.slot
@@ -41574,13 +42204,13 @@ if_3039_merge:
     %v3065 = getelementptr i8, ptr @.str_108, i64 16
     %v3066 = call ptr @value_ref(i64 %v1)
     %v3067 = call ptr @orion_text_concat(ptr %v3065, ptr %v3066)
-    %v3068 = getelementptr i8, ptr @.str_664, i64 16
+    %v3068 = getelementptr i8, ptr @.str_666, i64 16
     %v3069 = call ptr @orion_text_concat(ptr %v3067, ptr %v3068)
     %v3070.slot = getelementptr i64, ptr %v0, i64 2
     %v3070 = load i64, ptr %v3070.slot
     %v3071 = call ptr @value_ref(i64 %v3070)
     %v3072 = call ptr @orion_text_concat(ptr %v3069, ptr %v3071)
-    %v3073 = getelementptr i8, ptr @.str_537, i64 16
+    %v3073 = getelementptr i8, ptr @.str_539, i64 16
     %v3074 = call ptr @orion_text_concat(ptr %v3072, ptr %v3073)
     %v3075 = getelementptr i8, ptr @.str_109, i64 16
     %v3076 = call ptr @orion_text_concat(ptr %v3064, ptr %v3075)
@@ -41614,33 +42244,33 @@ if_3085_then:
     %v3094.cb = icmp ne i64 %v3093, 0
     br i1 %v3094.cb, label %if_3094_then, label %if_3094_else
 if_3094_then:
-    %v3096 = getelementptr i8, ptr @.str_502, i64 16
+    %v3096 = getelementptr i8, ptr @.str_504, i64 16
     %v3097 = call ptr @orion_int_to_text(i64 %v1)
     %v3098 = call ptr @orion_text_concat(ptr %v3096, ptr %v3097)
-    %v3099 = getelementptr i8, ptr @.str_649, i64 16
+    %v3099 = getelementptr i8, ptr @.str_651, i64 16
     %v3100 = call ptr @orion_text_concat(ptr %v3098, ptr %v3099)
     %v3101 = getelementptr i8, ptr @.str_108, i64 16
     %v3102 = call ptr @orion_text_concat(ptr %v3101, ptr %v3100)
-    %v3103 = getelementptr i8, ptr @.str_578, i64 16
+    %v3103 = getelementptr i8, ptr @.str_580, i64 16
     %v3104 = call ptr @orion_text_concat(ptr %v3102, ptr %v3103)
     %v3105.slot = getelementptr i64, ptr %v0, i64 4
     %v3105 = load i64, ptr %v3105.slot
     %v3106 = call ptr @value_ref(i64 %v3105)
     %v3107 = call ptr @orion_text_concat(ptr %v3104, ptr %v3106)
-    %v3108 = getelementptr i8, ptr @.str_568, i64 16
+    %v3108 = getelementptr i8, ptr @.str_570, i64 16
     %v3109 = call ptr @orion_text_concat(ptr %v3107, ptr %v3108)
-    %v3110 = getelementptr i8, ptr @.str_667, i64 16
+    %v3110 = getelementptr i8, ptr @.str_669, i64 16
     %v3111.slot = getelementptr i64, ptr %v0, i64 2
     %v3111 = load i64, ptr %v3111.slot
     %v3112 = call ptr @value_ref(i64 %v3111)
     %v3113 = call ptr @orion_text_concat(ptr %v3110, ptr %v3112)
-    %v3114 = getelementptr i8, ptr @.str_548, i64 16
+    %v3114 = getelementptr i8, ptr @.str_550, i64 16
     %v3115 = call ptr @orion_text_concat(ptr %v3113, ptr %v3114)
     %v3116.slot = getelementptr i64, ptr %v0, i64 3
     %v3116 = load i64, ptr %v3116.slot
     %v3117 = call ptr @value_ref(i64 %v3116)
     %v3118 = call ptr @orion_text_concat(ptr %v3115, ptr %v3117)
-    %v3119 = getelementptr i8, ptr @.str_548, i64 16
+    %v3119 = getelementptr i8, ptr @.str_550, i64 16
     %v3120 = call ptr @orion_text_concat(ptr %v3118, ptr %v3119)
     %v3121 = call ptr @orion_text_concat(ptr %v3120, ptr %v3100)
     %v3122 = getelementptr i8, ptr @.str_227, i64 16
@@ -41648,13 +42278,13 @@ if_3094_then:
     %v3124 = getelementptr i8, ptr @.str_108, i64 16
     %v3125 = call ptr @value_ref(i64 %v1)
     %v3126 = call ptr @orion_text_concat(ptr %v3124, ptr %v3125)
-    %v3127 = getelementptr i8, ptr @.str_664, i64 16
+    %v3127 = getelementptr i8, ptr @.str_666, i64 16
     %v3128 = call ptr @orion_text_concat(ptr %v3126, ptr %v3127)
     %v3129.slot = getelementptr i64, ptr %v0, i64 2
     %v3129 = load i64, ptr %v3129.slot
     %v3130 = call ptr @value_ref(i64 %v3129)
     %v3131 = call ptr @orion_text_concat(ptr %v3128, ptr %v3130)
-    %v3132 = getelementptr i8, ptr @.str_537, i64 16
+    %v3132 = getelementptr i8, ptr @.str_539, i64 16
     %v3133 = call ptr @orion_text_concat(ptr %v3131, ptr %v3132)
     %v3134 = getelementptr i8, ptr @.str_109, i64 16
     %v3135 = call ptr @orion_text_concat(ptr %v3109, ptr %v3134)
@@ -41666,18 +42296,18 @@ if_3094_then:
     %v3140 = add i64 0, 0
     br label %if_3094_merge
 if_3094_else:
-    %v3143 = getelementptr i8, ptr @.str_667, i64 16
+    %v3143 = getelementptr i8, ptr @.str_669, i64 16
     %v3144.slot = getelementptr i64, ptr %v0, i64 2
     %v3144 = load i64, ptr %v3144.slot
     %v3145 = call ptr @value_ref(i64 %v3144)
     %v3146 = call ptr @orion_text_concat(ptr %v3143, ptr %v3145)
-    %v3147 = getelementptr i8, ptr @.str_548, i64 16
+    %v3147 = getelementptr i8, ptr @.str_550, i64 16
     %v3148 = call ptr @orion_text_concat(ptr %v3146, ptr %v3147)
     %v3149.slot = getelementptr i64, ptr %v0, i64 3
     %v3149 = load i64, ptr %v3149.slot
     %v3150 = call ptr @value_ref(i64 %v3149)
     %v3151 = call ptr @orion_text_concat(ptr %v3148, ptr %v3150)
-    %v3152 = getelementptr i8, ptr @.str_548, i64 16
+    %v3152 = getelementptr i8, ptr @.str_550, i64 16
     %v3153 = call ptr @orion_text_concat(ptr %v3151, ptr %v3152)
     %v3154.slot = getelementptr i64, ptr %v0, i64 4
     %v3154 = load i64, ptr %v3154.slot
@@ -41688,13 +42318,13 @@ if_3094_else:
     %v3159 = getelementptr i8, ptr @.str_108, i64 16
     %v3160 = call ptr @value_ref(i64 %v1)
     %v3161 = call ptr @orion_text_concat(ptr %v3159, ptr %v3160)
-    %v3162 = getelementptr i8, ptr @.str_664, i64 16
+    %v3162 = getelementptr i8, ptr @.str_666, i64 16
     %v3163 = call ptr @orion_text_concat(ptr %v3161, ptr %v3162)
     %v3164.slot = getelementptr i64, ptr %v0, i64 2
     %v3164 = load i64, ptr %v3164.slot
     %v3165 = call ptr @value_ref(i64 %v3164)
     %v3166 = call ptr @orion_text_concat(ptr %v3163, ptr %v3165)
-    %v3167 = getelementptr i8, ptr @.str_537, i64 16
+    %v3167 = getelementptr i8, ptr @.str_539, i64 16
     %v3168 = call ptr @orion_text_concat(ptr %v3166, ptr %v3167)
     %v3169 = getelementptr i8, ptr @.str_109, i64 16
     %v3170 = call ptr @orion_text_concat(ptr %v3158, ptr %v3169)
@@ -41724,24 +42354,24 @@ if_3182_then:
     %v3189.cb = icmp ne i64 %v3188, 0
     br i1 %v3189.cb, label %if_3189_then, label %if_3189_else
 if_3189_then:
-    %v3191 = getelementptr i8, ptr @.str_502, i64 16
+    %v3191 = getelementptr i8, ptr @.str_504, i64 16
     %v3192 = call ptr @orion_int_to_text(i64 %v1)
     %v3193 = call ptr @orion_text_concat(ptr %v3191, ptr %v3192)
-    %v3194 = getelementptr i8, ptr @.str_640, i64 16
+    %v3194 = getelementptr i8, ptr @.str_642, i64 16
     %v3195 = call ptr @orion_text_concat(ptr %v3193, ptr %v3194)
     %v3196 = getelementptr i8, ptr @.str_108, i64 16
     %v3197 = call ptr @orion_text_concat(ptr %v3196, ptr %v3195)
-    %v3198 = getelementptr i8, ptr @.str_613, i64 16
+    %v3198 = getelementptr i8, ptr @.str_615, i64 16
     %v3199 = call ptr @orion_text_concat(ptr %v3197, ptr %v3198)
     %v3200.slot = getelementptr i64, ptr %v0, i64 2
     %v3200 = load i64, ptr %v3200.slot
     %v3201 = call ptr @value_ref(i64 %v3200)
     %v3202 = call ptr @orion_text_concat(ptr %v3199, ptr %v3201)
-    %v3203 = getelementptr i8, ptr @.str_643, i64 16
+    %v3203 = getelementptr i8, ptr @.str_645, i64 16
     %v3204 = call ptr @orion_text_concat(ptr %v3202, ptr %v3203)
     %v3205 = call ptr @value_ref(i64 %v1)
     %v3206 = call ptr @orion_text_concat(ptr %v3204, ptr %v3205)
-    %v3207 = getelementptr i8, ptr @.str_668, i64 16
+    %v3207 = getelementptr i8, ptr @.str_670, i64 16
     %v3208 = call ptr @orion_text_concat(ptr %v3206, ptr %v3207)
     %v3209 = call ptr @orion_text_concat(ptr %v3208, ptr %v3195)
     %v3210 = getelementptr i8, ptr @.str_227, i64 16
@@ -41753,7 +42383,7 @@ if_3189_else:
     %v3215 = getelementptr i8, ptr @.str_108, i64 16
     %v3216 = call ptr @value_ref(i64 %v1)
     %v3217 = call ptr @orion_text_concat(ptr %v3215, ptr %v3216)
-    %v3218 = getelementptr i8, ptr @.str_668, i64 16
+    %v3218 = getelementptr i8, ptr @.str_670, i64 16
     %v3219 = call ptr @orion_text_concat(ptr %v3217, ptr %v3218)
     %v3220.slot = getelementptr i64, ptr %v0, i64 2
     %v3220 = load i64, ptr %v3220.slot
@@ -41786,24 +42416,24 @@ if_3235_then:
     %v3242.cb = icmp ne i64 %v3241, 0
     br i1 %v3242.cb, label %if_3242_then, label %if_3242_else
 if_3242_then:
-    %v3244 = getelementptr i8, ptr @.str_502, i64 16
+    %v3244 = getelementptr i8, ptr @.str_504, i64 16
     %v3245 = call ptr @orion_int_to_text(i64 %v1)
     %v3246 = call ptr @orion_text_concat(ptr %v3244, ptr %v3245)
-    %v3247 = getelementptr i8, ptr @.str_640, i64 16
+    %v3247 = getelementptr i8, ptr @.str_642, i64 16
     %v3248 = call ptr @orion_text_concat(ptr %v3246, ptr %v3247)
     %v3249 = getelementptr i8, ptr @.str_108, i64 16
     %v3250 = call ptr @orion_text_concat(ptr %v3249, ptr %v3248)
-    %v3251 = getelementptr i8, ptr @.str_613, i64 16
+    %v3251 = getelementptr i8, ptr @.str_615, i64 16
     %v3252 = call ptr @orion_text_concat(ptr %v3250, ptr %v3251)
     %v3253.slot = getelementptr i64, ptr %v0, i64 2
     %v3253 = load i64, ptr %v3253.slot
     %v3254 = call ptr @value_ref(i64 %v3253)
     %v3255 = call ptr @orion_text_concat(ptr %v3252, ptr %v3254)
-    %v3256 = getelementptr i8, ptr @.str_643, i64 16
+    %v3256 = getelementptr i8, ptr @.str_645, i64 16
     %v3257 = call ptr @orion_text_concat(ptr %v3255, ptr %v3256)
     %v3258 = call ptr @value_ref(i64 %v1)
     %v3259 = call ptr @orion_text_concat(ptr %v3257, ptr %v3258)
-    %v3260 = getelementptr i8, ptr @.str_669, i64 16
+    %v3260 = getelementptr i8, ptr @.str_671, i64 16
     %v3261 = call ptr @orion_text_concat(ptr %v3259, ptr %v3260)
     %v3262 = call ptr @orion_text_concat(ptr %v3261, ptr %v3248)
     %v3263 = getelementptr i8, ptr @.str_227, i64 16
@@ -41815,7 +42445,7 @@ if_3242_else:
     %v3268 = getelementptr i8, ptr @.str_108, i64 16
     %v3269 = call ptr @value_ref(i64 %v1)
     %v3270 = call ptr @orion_text_concat(ptr %v3268, ptr %v3269)
-    %v3271 = getelementptr i8, ptr @.str_669, i64 16
+    %v3271 = getelementptr i8, ptr @.str_671, i64 16
     %v3272 = call ptr @orion_text_concat(ptr %v3270, ptr %v3271)
     %v3273.slot = getelementptr i64, ptr %v0, i64 2
     %v3273 = load i64, ptr %v3273.slot
@@ -41848,24 +42478,24 @@ if_3288_then:
     %v3295.cb = icmp ne i64 %v3294, 0
     br i1 %v3295.cb, label %if_3295_then, label %if_3295_else
 if_3295_then:
-    %v3297 = getelementptr i8, ptr @.str_502, i64 16
+    %v3297 = getelementptr i8, ptr @.str_504, i64 16
     %v3298 = call ptr @orion_int_to_text(i64 %v1)
     %v3299 = call ptr @orion_text_concat(ptr %v3297, ptr %v3298)
-    %v3300 = getelementptr i8, ptr @.str_640, i64 16
+    %v3300 = getelementptr i8, ptr @.str_642, i64 16
     %v3301 = call ptr @orion_text_concat(ptr %v3299, ptr %v3300)
     %v3302 = getelementptr i8, ptr @.str_108, i64 16
     %v3303 = call ptr @orion_text_concat(ptr %v3302, ptr %v3301)
-    %v3304 = getelementptr i8, ptr @.str_613, i64 16
+    %v3304 = getelementptr i8, ptr @.str_615, i64 16
     %v3305 = call ptr @orion_text_concat(ptr %v3303, ptr %v3304)
     %v3306.slot = getelementptr i64, ptr %v0, i64 2
     %v3306 = load i64, ptr %v3306.slot
     %v3307 = call ptr @value_ref(i64 %v3306)
     %v3308 = call ptr @orion_text_concat(ptr %v3305, ptr %v3307)
-    %v3309 = getelementptr i8, ptr @.str_643, i64 16
+    %v3309 = getelementptr i8, ptr @.str_645, i64 16
     %v3310 = call ptr @orion_text_concat(ptr %v3308, ptr %v3309)
     %v3311 = call ptr @value_ref(i64 %v1)
     %v3312 = call ptr @orion_text_concat(ptr %v3310, ptr %v3311)
-    %v3313 = getelementptr i8, ptr @.str_670, i64 16
+    %v3313 = getelementptr i8, ptr @.str_672, i64 16
     %v3314 = call ptr @orion_text_concat(ptr %v3312, ptr %v3313)
     %v3315 = call ptr @orion_text_concat(ptr %v3314, ptr %v3301)
     %v3316 = getelementptr i8, ptr @.str_227, i64 16
@@ -41877,7 +42507,7 @@ if_3295_else:
     %v3321 = getelementptr i8, ptr @.str_108, i64 16
     %v3322 = call ptr @value_ref(i64 %v1)
     %v3323 = call ptr @orion_text_concat(ptr %v3321, ptr %v3322)
-    %v3324 = getelementptr i8, ptr @.str_670, i64 16
+    %v3324 = getelementptr i8, ptr @.str_672, i64 16
     %v3325 = call ptr @orion_text_concat(ptr %v3323, ptr %v3324)
     %v3326.slot = getelementptr i64, ptr %v0, i64 2
     %v3326 = load i64, ptr %v3326.slot
@@ -41910,10 +42540,10 @@ if_3341_then:
     %v3348.cb = icmp ne i64 %v3347, 0
     br i1 %v3348.cb, label %if_3348_then, label %if_3348_else
 if_3348_then:
-    %v3350 = getelementptr i8, ptr @.str_671, i64 16
+    %v3350 = getelementptr i8, ptr @.str_673, i64 16
     br label %if_3348_merge
 if_3348_else:
-    %v3353 = getelementptr i8, ptr @.str_672, i64 16
+    %v3353 = getelementptr i8, ptr @.str_674, i64 16
     br label %if_3348_merge
 if_3348_merge:
     %v3356 = phi ptr [ %v3350, %if_3348_then ], [ %v3353, %if_3348_else ]
@@ -41940,32 +42570,32 @@ if_3359_merge:
     %v3372.cb = icmp ne i64 %v3371, 0
     br i1 %v3372.cb, label %if_3372_then, label %if_3372_else
 if_3372_then:
-    %v3374 = getelementptr i8, ptr @.str_502, i64 16
+    %v3374 = getelementptr i8, ptr @.str_504, i64 16
     %v3375 = call ptr @orion_int_to_text(i64 %v1)
     %v3376 = call ptr @orion_text_concat(ptr %v3374, ptr %v3375)
-    %v3377 = getelementptr i8, ptr @.str_673, i64 16
+    %v3377 = getelementptr i8, ptr @.str_675, i64 16
     %v3378 = call ptr @orion_text_concat(ptr %v3376, ptr %v3377)
-    %v3379 = getelementptr i8, ptr @.str_502, i64 16
+    %v3379 = getelementptr i8, ptr @.str_504, i64 16
     %v3380 = call ptr @orion_int_to_text(i64 %v1)
     %v3381 = call ptr @orion_text_concat(ptr %v3379, ptr %v3380)
-    %v3382 = getelementptr i8, ptr @.str_674, i64 16
+    %v3382 = getelementptr i8, ptr @.str_676, i64 16
     %v3383 = call ptr @orion_text_concat(ptr %v3381, ptr %v3382)
     %v3384 = getelementptr i8, ptr @.str_108, i64 16
     %v3385 = call ptr @orion_text_concat(ptr %v3384, ptr %v3378)
-    %v3386 = getelementptr i8, ptr @.str_578, i64 16
+    %v3386 = getelementptr i8, ptr @.str_580, i64 16
     %v3387 = call ptr @orion_text_concat(ptr %v3385, ptr %v3386)
     %v3388.slot = getelementptr i64, ptr %v0, i64 4
     %v3388 = load i64, ptr %v3388.slot
     %v3389 = call ptr @value_ref(i64 %v3388)
     %v3390 = call ptr @orion_text_concat(ptr %v3387, ptr %v3389)
-    %v3391 = getelementptr i8, ptr @.str_568, i64 16
+    %v3391 = getelementptr i8, ptr @.str_570, i64 16
     %v3392 = call ptr @orion_text_concat(ptr %v3390, ptr %v3391)
     %v3393 = getelementptr i8, ptr @.str_108, i64 16
     %v3394 = call ptr @orion_text_concat(ptr %v3393, ptr %v3383)
-    %v3395 = getelementptr i8, ptr @.str_675, i64 16
+    %v3395 = getelementptr i8, ptr @.str_677, i64 16
     %v3396 = call ptr @orion_text_concat(ptr %v3394, ptr %v3395)
     %v3397 = call ptr @orion_text_concat(ptr %v3396, ptr %v3356)
-    %v3398 = getelementptr i8, ptr @.str_663, i64 16
+    %v3398 = getelementptr i8, ptr @.str_665, i64 16
     %v3399 = call ptr @orion_text_concat(ptr %v3397, ptr %v3398)
     %v3400.slot = getelementptr i64, ptr %v0, i64 2
     %v3400 = load i64, ptr %v3400.slot
@@ -41980,7 +42610,7 @@ if_3372_then:
     %v3408 = load i64, ptr %v3408.slot
     %v3409 = call ptr @value_ref(i64 %v3408)
     %v3410 = call ptr @orion_text_concat(ptr %v3407, ptr %v3409)
-    %v3411 = getelementptr i8, ptr @.str_548, i64 16
+    %v3411 = getelementptr i8, ptr @.str_550, i64 16
     %v3412 = call ptr @orion_text_concat(ptr %v3410, ptr %v3411)
     %v3413 = call ptr @orion_text_concat(ptr %v3412, ptr %v3378)
     %v3414 = getelementptr i8, ptr @.str_227, i64 16
@@ -41988,10 +42618,10 @@ if_3372_then:
     %v3416 = getelementptr i8, ptr @.str_108, i64 16
     %v3417 = call ptr @value_ref(i64 %v1)
     %v3418 = call ptr @orion_text_concat(ptr %v3416, ptr %v3417)
-    %v3419 = getelementptr i8, ptr @.str_613, i64 16
+    %v3419 = getelementptr i8, ptr @.str_615, i64 16
     %v3420 = call ptr @orion_text_concat(ptr %v3418, ptr %v3419)
     %v3421 = call ptr @orion_text_concat(ptr %v3420, ptr %v3383)
-    %v3422 = getelementptr i8, ptr @.str_614, i64 16
+    %v3422 = getelementptr i8, ptr @.str_616, i64 16
     %v3423 = call ptr @orion_text_concat(ptr %v3421, ptr %v3422)
     %v3424 = getelementptr i8, ptr @.str_109, i64 16
     %v3425 = call ptr @orion_text_concat(ptr %v3392, ptr %v3424)
@@ -42006,10 +42636,10 @@ if_3372_else:
     %v3433 = getelementptr i8, ptr @.str_108, i64 16
     %v3434 = call ptr @value_ref(i64 %v1)
     %v3435 = call ptr @orion_text_concat(ptr %v3433, ptr %v3434)
-    %v3436 = getelementptr i8, ptr @.str_675, i64 16
+    %v3436 = getelementptr i8, ptr @.str_677, i64 16
     %v3437 = call ptr @orion_text_concat(ptr %v3435, ptr %v3436)
     %v3438 = call ptr @orion_text_concat(ptr %v3437, ptr %v3356)
-    %v3439 = getelementptr i8, ptr @.str_663, i64 16
+    %v3439 = getelementptr i8, ptr @.str_665, i64 16
     %v3440 = call ptr @orion_text_concat(ptr %v3438, ptr %v3439)
     %v3441.slot = getelementptr i64, ptr %v0, i64 2
     %v3441 = load i64, ptr %v3441.slot
@@ -42024,7 +42654,7 @@ if_3372_else:
     %v3449 = load i64, ptr %v3449.slot
     %v3450 = call ptr @value_ref(i64 %v3449)
     %v3451 = call ptr @orion_text_concat(ptr %v3448, ptr %v3450)
-    %v3452 = getelementptr i8, ptr @.str_548, i64 16
+    %v3452 = getelementptr i8, ptr @.str_550, i64 16
     %v3453 = call ptr @orion_text_concat(ptr %v3451, ptr %v3452)
     %v3454.slot = getelementptr i64, ptr %v0, i64 4
     %v3454 = load i64, ptr %v3454.slot
@@ -42050,7 +42680,7 @@ if_3469_then:
     %v3471 = getelementptr i8, ptr @.str_108, i64 16
     %v3472 = call ptr @value_ref(i64 %v1)
     %v3473 = call ptr @orion_text_concat(ptr %v3471, ptr %v3472)
-    %v3474 = getelementptr i8, ptr @.str_676, i64 16
+    %v3474 = getelementptr i8, ptr @.str_678, i64 16
     %v3475 = call ptr @orion_text_concat(ptr %v3473, ptr %v3474)
     %v3476.slot = getelementptr i64, ptr %v0, i64 2
     %v3476 = load i64, ptr %v3476.slot
@@ -42080,10 +42710,10 @@ if_3488_then:
     %v3495.cb = icmp ne i64 %v3494, 0
     br i1 %v3495.cb, label %if_3495_then, label %if_3495_else
 if_3495_then:
-    %v3497 = getelementptr i8, ptr @.str_677, i64 16
+    %v3497 = getelementptr i8, ptr @.str_679, i64 16
     br label %if_3495_merge
 if_3495_else:
-    %v3500 = getelementptr i8, ptr @.str_678, i64 16
+    %v3500 = getelementptr i8, ptr @.str_680, i64 16
     br label %if_3495_merge
 if_3495_merge:
     %v3503 = phi ptr [ %v3497, %if_3495_then ], [ %v3500, %if_3495_else ]
@@ -42110,17 +42740,17 @@ if_3506_merge:
     %v3519.cb = icmp ne i64 %v3518, 0
     br i1 %v3519.cb, label %if_3519_then, label %if_3519_else
 if_3519_then:
-    %v3521 = getelementptr i8, ptr @.str_502, i64 16
+    %v3521 = getelementptr i8, ptr @.str_504, i64 16
     %v3522 = call ptr @orion_int_to_text(i64 %v1)
     %v3523 = call ptr @orion_text_concat(ptr %v3521, ptr %v3522)
-    %v3524 = getelementptr i8, ptr @.str_641, i64 16
+    %v3524 = getelementptr i8, ptr @.str_643, i64 16
     %v3525 = call ptr @orion_text_concat(ptr %v3523, ptr %v3524)
     %v3526 = getelementptr i8, ptr @.str_108, i64 16
     %v3527 = call ptr @orion_text_concat(ptr %v3526, ptr %v3525)
-    %v3528 = getelementptr i8, ptr @.str_675, i64 16
+    %v3528 = getelementptr i8, ptr @.str_677, i64 16
     %v3529 = call ptr @orion_text_concat(ptr %v3527, ptr %v3528)
     %v3530 = call ptr @orion_text_concat(ptr %v3529, ptr %v3503)
-    %v3531 = getelementptr i8, ptr @.str_663, i64 16
+    %v3531 = getelementptr i8, ptr @.str_665, i64 16
     %v3532 = call ptr @orion_text_concat(ptr %v3530, ptr %v3531)
     %v3533.slot = getelementptr i64, ptr %v0, i64 2
     %v3533 = load i64, ptr %v3533.slot
@@ -42140,10 +42770,10 @@ if_3519_then:
     %v3546 = getelementptr i8, ptr @.str_108, i64 16
     %v3547 = call ptr @value_ref(i64 %v1)
     %v3548 = call ptr @orion_text_concat(ptr %v3546, ptr %v3547)
-    %v3549 = getelementptr i8, ptr @.str_613, i64 16
+    %v3549 = getelementptr i8, ptr @.str_615, i64 16
     %v3550 = call ptr @orion_text_concat(ptr %v3548, ptr %v3549)
     %v3551 = call ptr @orion_text_concat(ptr %v3550, ptr %v3525)
-    %v3552 = getelementptr i8, ptr @.str_614, i64 16
+    %v3552 = getelementptr i8, ptr @.str_616, i64 16
     %v3553 = call ptr @orion_text_concat(ptr %v3551, ptr %v3552)
     %v3554 = getelementptr i8, ptr @.str_109, i64 16
     %v3555 = call ptr @orion_text_concat(ptr %v3545, ptr %v3554)
@@ -42155,10 +42785,10 @@ if_3519_else:
     %v3560 = getelementptr i8, ptr @.str_108, i64 16
     %v3561 = call ptr @value_ref(i64 %v1)
     %v3562 = call ptr @orion_text_concat(ptr %v3560, ptr %v3561)
-    %v3563 = getelementptr i8, ptr @.str_675, i64 16
+    %v3563 = getelementptr i8, ptr @.str_677, i64 16
     %v3564 = call ptr @orion_text_concat(ptr %v3562, ptr %v3563)
     %v3565 = call ptr @orion_text_concat(ptr %v3564, ptr %v3503)
-    %v3566 = getelementptr i8, ptr @.str_663, i64 16
+    %v3566 = getelementptr i8, ptr @.str_665, i64 16
     %v3567 = call ptr @orion_text_concat(ptr %v3565, ptr %v3566)
     %v3568.slot = getelementptr i64, ptr %v0, i64 2
     %v3568 = load i64, ptr %v3568.slot
@@ -42200,10 +42830,10 @@ if_3591_then:
     %v3598.cb = icmp ne i64 %v3597, 0
     br i1 %v3598.cb, label %if_3598_then, label %if_3598_else
 if_3598_then:
-    %v3600 = getelementptr i8, ptr @.str_679, i64 16
+    %v3600 = getelementptr i8, ptr @.str_681, i64 16
     br label %if_3598_merge
 if_3598_else:
-    %v3603 = getelementptr i8, ptr @.str_680, i64 16
+    %v3603 = getelementptr i8, ptr @.str_682, i64 16
     br label %if_3598_merge
 if_3598_merge:
     %v3606 = phi ptr [ %v3600, %if_3598_then ], [ %v3603, %if_3598_else ]
@@ -42223,10 +42853,10 @@ if_3609_merge:
     %v3618 = getelementptr i8, ptr @.str_108, i64 16
     %v3619 = call ptr @value_ref(i64 %v1)
     %v3620 = call ptr @orion_text_concat(ptr %v3618, ptr %v3619)
-    %v3621 = getelementptr i8, ptr @.str_675, i64 16
+    %v3621 = getelementptr i8, ptr @.str_677, i64 16
     %v3622 = call ptr @orion_text_concat(ptr %v3620, ptr %v3621)
     %v3623 = call ptr @orion_text_concat(ptr %v3622, ptr %v3606)
-    %v3624 = getelementptr i8, ptr @.str_663, i64 16
+    %v3624 = getelementptr i8, ptr @.str_665, i64 16
     %v3625 = call ptr @orion_text_concat(ptr %v3623, ptr %v3624)
     %v3626.slot = getelementptr i64, ptr %v0, i64 2
     %v3626 = load i64, ptr %v3626.slot
@@ -42262,7 +42892,7 @@ if_3646_then:
     %v3651 = getelementptr i8, ptr @.str_108, i64 16
     %v3652 = call ptr @value_ref(i64 %v1)
     %v3653 = call ptr @orion_text_concat(ptr %v3651, ptr %v3652)
-    %v3654 = getelementptr i8, ptr @.str_681, i64 16
+    %v3654 = getelementptr i8, ptr @.str_683, i64 16
     %v3655 = call ptr @orion_text_concat(ptr %v3653, ptr %v3654)
     %v3656 = call ptr @orion_int_to_text(i64 %v3650)
     %v3657 = call ptr @orion_text_concat(ptr %v3655, ptr %v3656)
@@ -42296,22 +42926,22 @@ for_3662_body:
     %v3675.i = load i64, ptr %v3675.slot
     %v3675 = inttoptr i64 %v3675.i to ptr
     %v3676 = call ptr @llvm_type_of(ptr %v3675)
-    %v3677 = getelementptr i8, ptr @.str_502, i64 16
+    %v3677 = getelementptr i8, ptr @.str_504, i64 16
     %v3678 = call ptr @orion_int_to_text(i64 %v1)
     %v3679 = call ptr @orion_text_concat(ptr %v3677, ptr %v3678)
-    %v3680 = getelementptr i8, ptr @.str_682, i64 16
+    %v3680 = getelementptr i8, ptr @.str_684, i64 16
     %v3681 = call ptr @orion_text_concat(ptr %v3679, ptr %v3680)
     %v3682 = call ptr @orion_int_to_text(i64 %v3667)
     %v3683 = call ptr @orion_text_concat(ptr %v3681, ptr %v3682)
     %v3684 = load ptr, ptr %v3660
-    %v3685 = getelementptr i8, ptr @.str_638, i64 16
+    %v3685 = getelementptr i8, ptr @.str_640, i64 16
     %v3686 = call ptr @orion_text_concat(ptr %v3684, ptr %v3685)
     %v3687 = call ptr @orion_text_concat(ptr %v3686, ptr %v3683)
-    %v3688 = getelementptr i8, ptr @.str_683, i64 16
+    %v3688 = getelementptr i8, ptr @.str_685, i64 16
     %v3689 = call ptr @orion_text_concat(ptr %v3687, ptr %v3688)
     %v3690 = call ptr @value_ref(i64 %v1)
     %v3691 = call ptr @orion_text_concat(ptr %v3689, ptr %v3690)
-    %v3692 = getelementptr i8, ptr @.str_548, i64 16
+    %v3692 = getelementptr i8, ptr @.str_550, i64 16
     %v3693 = call ptr @orion_text_concat(ptr %v3691, ptr %v3692)
     %v3694 = call ptr @orion_int_to_text(i64 %v3667)
     %v3695 = call ptr @orion_text_concat(ptr %v3693, ptr %v3694)
@@ -42323,70 +42953,70 @@ for_3662_body:
     %v3699.cb = icmp ne i64 %v3698, 0
     br i1 %v3699.cb, label %if_3699_then, label %if_3699_else
 if_3699_then:
-    %v3701 = getelementptr i8, ptr @.str_502, i64 16
+    %v3701 = getelementptr i8, ptr @.str_504, i64 16
     %v3702 = call ptr @orion_int_to_text(i64 %v1)
     %v3703 = call ptr @orion_text_concat(ptr %v3701, ptr %v3702)
-    %v3704 = getelementptr i8, ptr @.str_682, i64 16
+    %v3704 = getelementptr i8, ptr @.str_684, i64 16
     %v3705 = call ptr @orion_text_concat(ptr %v3703, ptr %v3704)
     %v3706 = call ptr @orion_int_to_text(i64 %v3667)
     %v3707 = call ptr @orion_text_concat(ptr %v3705, ptr %v3706)
-    %v3708 = getelementptr i8, ptr @.str_641, i64 16
+    %v3708 = getelementptr i8, ptr @.str_643, i64 16
     %v3709 = call ptr @orion_text_concat(ptr %v3707, ptr %v3708)
     %v3710 = load ptr, ptr %v3660
-    %v3711 = getelementptr i8, ptr @.str_638, i64 16
+    %v3711 = getelementptr i8, ptr @.str_640, i64 16
     %v3712 = call ptr @orion_text_concat(ptr %v3710, ptr %v3711)
     %v3713 = call ptr @orion_text_concat(ptr %v3712, ptr %v3709)
-    %v3714 = getelementptr i8, ptr @.str_578, i64 16
+    %v3714 = getelementptr i8, ptr @.str_580, i64 16
     %v3715 = call ptr @orion_text_concat(ptr %v3713, ptr %v3714)
     %v3716 = call ptr @value_ref(i64 %v3672)
     %v3717 = call ptr @orion_text_concat(ptr %v3715, ptr %v3716)
-    %v3718 = getelementptr i8, ptr @.str_568, i64 16
+    %v3718 = getelementptr i8, ptr @.str_570, i64 16
     %v3719 = call ptr @orion_text_concat(ptr %v3717, ptr %v3718)
     store ptr %v3719, ptr %v3660
     %v3720 = add i64 0, 0
     %v3721 = load ptr, ptr %v3660
-    %v3722 = getelementptr i8, ptr @.str_684, i64 16
+    %v3722 = getelementptr i8, ptr @.str_686, i64 16
     %v3723 = call ptr @orion_text_concat(ptr %v3721, ptr %v3722)
     %v3724 = call ptr @orion_text_concat(ptr %v3723, ptr %v3709)
-    %v3725 = getelementptr i8, ptr @.str_550, i64 16
+    %v3725 = getelementptr i8, ptr @.str_552, i64 16
     %v3726 = call ptr @orion_text_concat(ptr %v3724, ptr %v3725)
     %v3727 = call ptr @orion_text_concat(ptr %v3726, ptr %v3683)
     store ptr %v3727, ptr %v3660
     %v3728 = add i64 0, 0
     br label %if_3699_merge
 if_3699_else:
-    %v3731 = getelementptr i8, ptr @.str_538, i64 16
+    %v3731 = getelementptr i8, ptr @.str_540, i64 16
     %v3732.e = call i64 @orion_text_eq(ptr %v3676, ptr %v3731)
     %v3732 = add i64 %v3732.e, 0
     %v3733.cb = icmp ne i64 %v3732, 0
     br i1 %v3733.cb, label %if_3733_then, label %if_3733_else
 if_3733_then:
-    %v3735 = getelementptr i8, ptr @.str_502, i64 16
+    %v3735 = getelementptr i8, ptr @.str_504, i64 16
     %v3736 = call ptr @orion_int_to_text(i64 %v1)
     %v3737 = call ptr @orion_text_concat(ptr %v3735, ptr %v3736)
-    %v3738 = getelementptr i8, ptr @.str_682, i64 16
+    %v3738 = getelementptr i8, ptr @.str_684, i64 16
     %v3739 = call ptr @orion_text_concat(ptr %v3737, ptr %v3738)
     %v3740 = call ptr @orion_int_to_text(i64 %v3667)
     %v3741 = call ptr @orion_text_concat(ptr %v3739, ptr %v3740)
-    %v3742 = getelementptr i8, ptr @.str_565, i64 16
+    %v3742 = getelementptr i8, ptr @.str_567, i64 16
     %v3743 = call ptr @orion_text_concat(ptr %v3741, ptr %v3742)
     %v3744 = load ptr, ptr %v3660
-    %v3745 = getelementptr i8, ptr @.str_638, i64 16
+    %v3745 = getelementptr i8, ptr @.str_640, i64 16
     %v3746 = call ptr @orion_text_concat(ptr %v3744, ptr %v3745)
     %v3747 = call ptr @orion_text_concat(ptr %v3746, ptr %v3743)
-    %v3748 = getelementptr i8, ptr @.str_685, i64 16
+    %v3748 = getelementptr i8, ptr @.str_687, i64 16
     %v3749 = call ptr @orion_text_concat(ptr %v3747, ptr %v3748)
     %v3750 = call ptr @value_ref(i64 %v3672)
     %v3751 = call ptr @orion_text_concat(ptr %v3749, ptr %v3750)
-    %v3752 = getelementptr i8, ptr @.str_568, i64 16
+    %v3752 = getelementptr i8, ptr @.str_570, i64 16
     %v3753 = call ptr @orion_text_concat(ptr %v3751, ptr %v3752)
     store ptr %v3753, ptr %v3660
     %v3754 = add i64 0, 0
     %v3755 = load ptr, ptr %v3660
-    %v3756 = getelementptr i8, ptr @.str_684, i64 16
+    %v3756 = getelementptr i8, ptr @.str_686, i64 16
     %v3757 = call ptr @orion_text_concat(ptr %v3755, ptr %v3756)
     %v3758 = call ptr @orion_text_concat(ptr %v3757, ptr %v3743)
-    %v3759 = getelementptr i8, ptr @.str_550, i64 16
+    %v3759 = getelementptr i8, ptr @.str_552, i64 16
     %v3760 = call ptr @orion_text_concat(ptr %v3758, ptr %v3759)
     %v3761 = call ptr @orion_text_concat(ptr %v3760, ptr %v3683)
     store ptr %v3761, ptr %v3660
@@ -42394,11 +43024,11 @@ if_3733_then:
     br label %if_3733_merge
 if_3733_else:
     %v3765 = load ptr, ptr %v3660
-    %v3766 = getelementptr i8, ptr @.str_684, i64 16
+    %v3766 = getelementptr i8, ptr @.str_686, i64 16
     %v3767 = call ptr @orion_text_concat(ptr %v3765, ptr %v3766)
     %v3768 = call ptr @value_ref(i64 %v3672)
     %v3769 = call ptr @orion_text_concat(ptr %v3767, ptr %v3768)
-    %v3770 = getelementptr i8, ptr @.str_550, i64 16
+    %v3770 = getelementptr i8, ptr @.str_552, i64 16
     %v3771 = call ptr @orion_text_concat(ptr %v3769, ptr %v3770)
     %v3772 = call ptr @orion_text_concat(ptr %v3771, ptr %v3683)
     store ptr %v3772, ptr %v3660
@@ -42434,48 +43064,48 @@ if_3795_then:
     %v3797.i = load i64, ptr %v3797.slot
     %v3797 = inttoptr i64 %v3797.i to ptr
     %v3798 = call ptr @llvm_type_of(ptr %v3797)
-    %v3799 = getelementptr i8, ptr @.str_502, i64 16
+    %v3799 = getelementptr i8, ptr @.str_504, i64 16
     %v3800 = call ptr @orion_int_to_text(i64 %v1)
     %v3801 = call ptr @orion_text_concat(ptr %v3799, ptr %v3800)
-    %v3802 = getelementptr i8, ptr @.str_604, i64 16
+    %v3802 = getelementptr i8, ptr @.str_606, i64 16
     %v3803 = call ptr @orion_text_concat(ptr %v3801, ptr %v3802)
     %v3804 = getelementptr i8, ptr @.str_108, i64 16
     %v3805 = call ptr @orion_text_concat(ptr %v3804, ptr %v3803)
-    %v3806 = getelementptr i8, ptr @.str_683, i64 16
+    %v3806 = getelementptr i8, ptr @.str_685, i64 16
     %v3807 = call ptr @orion_text_concat(ptr %v3805, ptr %v3806)
     %v3808.slot = getelementptr i64, ptr %v0, i64 2
     %v3808 = load i64, ptr %v3808.slot
     %v3809 = call ptr @value_ref(i64 %v3808)
     %v3810 = call ptr @orion_text_concat(ptr %v3807, ptr %v3809)
-    %v3811 = getelementptr i8, ptr @.str_548, i64 16
+    %v3811 = getelementptr i8, ptr @.str_550, i64 16
     %v3812 = call ptr @orion_text_concat(ptr %v3810, ptr %v3811)
     %v3813.slot = getelementptr i64, ptr %v0, i64 3
     %v3813 = load i64, ptr %v3813.slot
     %v3814 = call ptr @orion_int_to_text(i64 %v3813)
     %v3815 = call ptr @orion_text_concat(ptr %v3812, ptr %v3814)
-    %v3816 = getelementptr i8, ptr @.str_538, i64 16
+    %v3816 = getelementptr i8, ptr @.str_540, i64 16
     %v3817.e = call i64 @orion_text_eq(ptr %v3798, ptr %v3816)
     %v3817 = add i64 %v3817.e, 0
     %v3818.cb = icmp ne i64 %v3817, 0
     br i1 %v3818.cb, label %if_3818_then, label %if_3818_else
 if_3818_then:
-    %v3820 = getelementptr i8, ptr @.str_502, i64 16
+    %v3820 = getelementptr i8, ptr @.str_504, i64 16
     %v3821 = call ptr @orion_int_to_text(i64 %v1)
     %v3822 = call ptr @orion_text_concat(ptr %v3820, ptr %v3821)
-    %v3823 = getelementptr i8, ptr @.str_565, i64 16
+    %v3823 = getelementptr i8, ptr @.str_567, i64 16
     %v3824 = call ptr @orion_text_concat(ptr %v3822, ptr %v3823)
     %v3825 = getelementptr i8, ptr @.str_108, i64 16
     %v3826 = call ptr @orion_text_concat(ptr %v3825, ptr %v3824)
-    %v3827 = getelementptr i8, ptr @.str_686, i64 16
+    %v3827 = getelementptr i8, ptr @.str_688, i64 16
     %v3828 = call ptr @orion_text_concat(ptr %v3826, ptr %v3827)
     %v3829 = call ptr @orion_text_concat(ptr %v3828, ptr %v3803)
     %v3830 = getelementptr i8, ptr @.str_108, i64 16
     %v3831 = call ptr @value_ref(i64 %v1)
     %v3832 = call ptr @orion_text_concat(ptr %v3830, ptr %v3831)
-    %v3833 = getelementptr i8, ptr @.str_687, i64 16
+    %v3833 = getelementptr i8, ptr @.str_689, i64 16
     %v3834 = call ptr @orion_text_concat(ptr %v3832, ptr %v3833)
     %v3835 = call ptr @orion_text_concat(ptr %v3834, ptr %v3824)
-    %v3836 = getelementptr i8, ptr @.str_570, i64 16
+    %v3836 = getelementptr i8, ptr @.str_572, i64 16
     %v3837 = call ptr @orion_text_concat(ptr %v3835, ptr %v3836)
     %v3838 = getelementptr i8, ptr @.str_109, i64 16
     %v3839 = call ptr @orion_text_concat(ptr %v3815, ptr %v3838)
@@ -42495,23 +43125,23 @@ if_3818_merge:
     %v3851.cb = icmp ne i64 %v3850, 0
     br i1 %v3851.cb, label %if_3851_then, label %if_3851_else
 if_3851_then:
-    %v3853 = getelementptr i8, ptr @.str_502, i64 16
+    %v3853 = getelementptr i8, ptr @.str_504, i64 16
     %v3854 = call ptr @orion_int_to_text(i64 %v1)
     %v3855 = call ptr @orion_text_concat(ptr %v3853, ptr %v3854)
-    %v3856 = getelementptr i8, ptr @.str_641, i64 16
+    %v3856 = getelementptr i8, ptr @.str_643, i64 16
     %v3857 = call ptr @orion_text_concat(ptr %v3855, ptr %v3856)
     %v3858 = getelementptr i8, ptr @.str_108, i64 16
     %v3859 = call ptr @orion_text_concat(ptr %v3858, ptr %v3857)
-    %v3860 = getelementptr i8, ptr @.str_686, i64 16
+    %v3860 = getelementptr i8, ptr @.str_688, i64 16
     %v3861 = call ptr @orion_text_concat(ptr %v3859, ptr %v3860)
     %v3862 = call ptr @orion_text_concat(ptr %v3861, ptr %v3803)
     %v3863 = getelementptr i8, ptr @.str_108, i64 16
     %v3864 = call ptr @value_ref(i64 %v1)
     %v3865 = call ptr @orion_text_concat(ptr %v3863, ptr %v3864)
-    %v3866 = getelementptr i8, ptr @.str_613, i64 16
+    %v3866 = getelementptr i8, ptr @.str_615, i64 16
     %v3867 = call ptr @orion_text_concat(ptr %v3865, ptr %v3866)
     %v3868 = call ptr @orion_text_concat(ptr %v3867, ptr %v3857)
-    %v3869 = getelementptr i8, ptr @.str_614, i64 16
+    %v3869 = getelementptr i8, ptr @.str_616, i64 16
     %v3870 = call ptr @orion_text_concat(ptr %v3868, ptr %v3869)
     %v3871 = getelementptr i8, ptr @.str_109, i64 16
     %v3872 = call ptr @orion_text_concat(ptr %v3815, ptr %v3871)
@@ -42534,7 +43164,7 @@ if_3884_then:
     %v3886 = getelementptr i8, ptr @.str_108, i64 16
     %v3887 = call ptr @value_ref(i64 %v1)
     %v3888 = call ptr @orion_text_concat(ptr %v3886, ptr %v3887)
-    %v3889 = getelementptr i8, ptr @.str_686, i64 16
+    %v3889 = getelementptr i8, ptr @.str_688, i64 16
     %v3890 = call ptr @orion_text_concat(ptr %v3888, ptr %v3889)
     %v3891 = call ptr @orion_text_concat(ptr %v3890, ptr %v3803)
     %v3892 = getelementptr i8, ptr @.str_109, i64 16
@@ -42563,10 +43193,10 @@ if_3906_then:
     %v3910 = getelementptr i8, ptr @.str_108, i64 16
     %v3911 = call ptr @value_ref(i64 %v1)
     %v3912 = call ptr @orion_text_concat(ptr %v3910, ptr %v3911)
-    %v3913 = getelementptr i8, ptr @.str_688, i64 16
+    %v3913 = getelementptr i8, ptr @.str_690, i64 16
     %v3914 = call ptr @orion_text_concat(ptr %v3912, ptr %v3913)
     %v3915 = call ptr @orion_text_concat(ptr %v3914, ptr %v3909)
-    %v3916 = getelementptr i8, ptr @.str_689, i64 16
+    %v3916 = getelementptr i8, ptr @.str_691, i64 16
     %v3917 = call ptr @orion_text_concat(ptr %v3915, ptr %v3916)
     store ptr %v3917, ptr %v70
     %v3918 = add i64 0, 0
@@ -42587,10 +43217,10 @@ if_3925_then:
     %v3929 = getelementptr i8, ptr @.str_108, i64 16
     %v3930 = call ptr @value_ref(i64 %v1)
     %v3931 = call ptr @orion_text_concat(ptr %v3929, ptr %v3930)
-    %v3932 = getelementptr i8, ptr @.str_690, i64 16
+    %v3932 = getelementptr i8, ptr @.str_692, i64 16
     %v3933 = call ptr @orion_text_concat(ptr %v3931, ptr %v3932)
     %v3934 = call ptr @orion_text_concat(ptr %v3933, ptr %v3928)
-    %v3935 = getelementptr i8, ptr @.str_550, i64 16
+    %v3935 = getelementptr i8, ptr @.str_552, i64 16
     %v3936 = call ptr @orion_text_concat(ptr %v3934, ptr %v3935)
     %v3937.slot = getelementptr i64, ptr %v0, i64 2
     %v3937 = load i64, ptr %v3937.slot
@@ -42619,7 +43249,7 @@ if_3947_then:
     %v3952.i = load i64, ptr %v3952.slot
     %v3952 = inttoptr i64 %v3952.i to ptr
     %v3953 = call ptr @llvm_type_of(ptr %v3952)
-    %v3954 = getelementptr i8, ptr @.str_691, i64 16
+    %v3954 = getelementptr i8, ptr @.str_693, i64 16
     %v3955 = call ptr @orion_text_concat(ptr %v3954, ptr %v3953)
     %v3956 = getelementptr i8, ptr @.str_97, i64 16
     %v3957 = call ptr @orion_text_concat(ptr %v3955, ptr %v3956)
@@ -42627,7 +43257,7 @@ if_3947_then:
     %v3958 = load i64, ptr %v3958.slot
     %v3959 = call ptr @value_ref(i64 %v3958)
     %v3960 = call ptr @orion_text_concat(ptr %v3957, ptr %v3959)
-    %v3961 = getelementptr i8, ptr @.str_550, i64 16
+    %v3961 = getelementptr i8, ptr @.str_552, i64 16
     %v3962 = call ptr @orion_text_concat(ptr %v3960, ptr %v3961)
     %v3963.slot = getelementptr i64, ptr %v0, i64 2
     %v3963 = load i64, ptr %v3963.slot
@@ -42636,7 +43266,7 @@ if_3947_then:
     %v3966 = getelementptr i8, ptr @.str_108, i64 16
     %v3967 = call ptr @value_ref(i64 %v1)
     %v3968 = call ptr @orion_text_concat(ptr %v3966, ptr %v3967)
-    %v3969 = getelementptr i8, ptr @.str_544, i64 16
+    %v3969 = getelementptr i8, ptr @.str_546, i64 16
     %v3970 = call ptr @orion_text_concat(ptr %v3968, ptr %v3969)
     %v3971 = getelementptr i8, ptr @.str_109, i64 16
     %v3972 = call ptr @orion_text_concat(ptr %v3965, ptr %v3971)
@@ -42671,12 +43301,12 @@ if_3988_then:
     %v3992.cb = icmp ne i64 %v3991, 0
     br i1 %v3992.cb, label %if_3992_then, label %if_3992_else
 if_3992_then:
-    %v3994 = getelementptr i8, ptr @.str_692, i64 16
+    %v3994 = getelementptr i8, ptr @.str_694, i64 16
     store ptr %v3994, ptr %v70
     %v3995 = add i64 0, 0
     br label %if_3992_merge
 if_3992_else:
-    %v3998 = getelementptr i8, ptr @.str_693, i64 16
+    %v3998 = getelementptr i8, ptr @.str_695, i64 16
     store ptr %v3998, ptr %v70
     %v3999 = add i64 0, 0
     br label %if_3992_merge
@@ -42706,22 +43336,22 @@ if_4010_merge:
     %v4020.cb = icmp ne i64 %v4019, 0
     br i1 %v4020.cb, label %if_4020_then, label %if_4020_else
 if_4020_then:
-    %v4022 = getelementptr i8, ptr @.str_502, i64 16
+    %v4022 = getelementptr i8, ptr @.str_504, i64 16
     %v4023 = call ptr @orion_int_to_text(i64 %v1)
     %v4024 = call ptr @orion_text_concat(ptr %v4022, ptr %v4023)
-    %v4025 = getelementptr i8, ptr @.str_694, i64 16
+    %v4025 = getelementptr i8, ptr @.str_696, i64 16
     %v4026 = call ptr @orion_text_concat(ptr %v4024, ptr %v4025)
     %v4027 = getelementptr i8, ptr @.str_108, i64 16
     %v4028 = call ptr @orion_text_concat(ptr %v4027, ptr %v4026)
-    %v4029 = getelementptr i8, ptr @.str_578, i64 16
+    %v4029 = getelementptr i8, ptr @.str_580, i64 16
     %v4030 = call ptr @orion_text_concat(ptr %v4028, ptr %v4029)
     %v4031.slot = getelementptr i64, ptr %v0, i64 2
     %v4031 = load i64, ptr %v4031.slot
     %v4032 = call ptr @value_ref(i64 %v4031)
     %v4033 = call ptr @orion_text_concat(ptr %v4030, ptr %v4032)
-    %v4034 = getelementptr i8, ptr @.str_568, i64 16
+    %v4034 = getelementptr i8, ptr @.str_570, i64 16
     %v4035 = call ptr @orion_text_concat(ptr %v4033, ptr %v4034)
-    %v4036 = getelementptr i8, ptr @.str_695, i64 16
+    %v4036 = getelementptr i8, ptr @.str_697, i64 16
     %v4037 = call ptr @orion_text_concat(ptr %v4036, ptr %v4026)
     %v4038 = getelementptr i8, ptr @.str_109, i64 16
     %v4039 = call ptr @orion_text_concat(ptr %v4035, ptr %v4038)
@@ -42748,22 +43378,22 @@ if_4046_merge:
     %v4056.cb = icmp ne i64 %v4055, 0
     br i1 %v4056.cb, label %if_4056_then, label %if_4056_else
 if_4056_then:
-    %v4058 = getelementptr i8, ptr @.str_502, i64 16
+    %v4058 = getelementptr i8, ptr @.str_504, i64 16
     %v4059 = call ptr @orion_int_to_text(i64 %v1)
     %v4060 = call ptr @orion_text_concat(ptr %v4058, ptr %v4059)
-    %v4061 = getelementptr i8, ptr @.str_694, i64 16
+    %v4061 = getelementptr i8, ptr @.str_696, i64 16
     %v4062 = call ptr @orion_text_concat(ptr %v4060, ptr %v4061)
     %v4063 = getelementptr i8, ptr @.str_108, i64 16
     %v4064 = call ptr @orion_text_concat(ptr %v4063, ptr %v4062)
-    %v4065 = getelementptr i8, ptr @.str_613, i64 16
+    %v4065 = getelementptr i8, ptr @.str_615, i64 16
     %v4066 = call ptr @orion_text_concat(ptr %v4064, ptr %v4065)
     %v4067.slot = getelementptr i64, ptr %v0, i64 2
     %v4067 = load i64, ptr %v4067.slot
     %v4068 = call ptr @value_ref(i64 %v4067)
     %v4069 = call ptr @orion_text_concat(ptr %v4066, ptr %v4068)
-    %v4070 = getelementptr i8, ptr @.str_614, i64 16
+    %v4070 = getelementptr i8, ptr @.str_616, i64 16
     %v4071 = call ptr @orion_text_concat(ptr %v4069, ptr %v4070)
-    %v4072 = getelementptr i8, ptr @.str_696, i64 16
+    %v4072 = getelementptr i8, ptr @.str_698, i64 16
     %v4073 = call ptr @orion_text_concat(ptr %v4072, ptr %v4062)
     %v4074 = getelementptr i8, ptr @.str_109, i64 16
     %v4075 = call ptr @orion_text_concat(ptr %v4071, ptr %v4074)
@@ -42772,7 +43402,7 @@ if_4056_then:
     %v4077 = add i64 0, 0
     br label %if_4056_merge
 if_4056_else:
-    %v4080 = getelementptr i8, ptr @.str_697, i64 16
+    %v4080 = getelementptr i8, ptr @.str_699, i64 16
     %v4081 = call ptr @orion_text_concat(ptr %v4080, ptr %v3984)
     %v4082 = getelementptr i8, ptr @.str_97, i64 16
     %v4083 = call ptr @orion_text_concat(ptr %v4081, ptr %v4082)
@@ -42799,7 +43429,7 @@ if_3981_merge:
     %v4102 = getelementptr i8, ptr @.str_108, i64 16
     %v4103 = call ptr @value_ref(i64 %v1)
     %v4104 = call ptr @orion_text_concat(ptr %v4102, ptr %v4103)
-    %v4105 = getelementptr i8, ptr @.str_534, i64 16
+    %v4105 = getelementptr i8, ptr @.str_536, i64 16
     %v4106 = call ptr @orion_text_concat(ptr %v4104, ptr %v4105)
     %v4107 = call ptr @orion_text_concat(ptr %v4106, ptr %v5)
     %v4108.e = call i64 @orion_text_eq(ptr %v4101, ptr %v4107)
@@ -42807,15 +43437,15 @@ if_3981_merge:
     %v4109.cb = icmp ne i64 %v4108, 0
     br i1 %v4109.cb, label %if_4109_then, label %if_4109_else
 if_4109_then:
-    %v4111 = getelementptr i8, ptr @.str_698, i64 16
+    %v4111 = getelementptr i8, ptr @.str_700, i64 16
     %v4112 = call ptr @orion_text_concat(ptr %v4111, ptr %v5)
-    %v4113 = getelementptr i8, ptr @.str_699, i64 16
+    %v4113 = getelementptr i8, ptr @.str_701, i64 16
     %v4114 = call ptr @orion_text_concat(ptr %v4112, ptr %v4113)
     %v4115.slot = getelementptr i64, ptr %v3, i64 0
     %v4115.i = load i64, ptr %v4115.slot
     %v4115 = inttoptr i64 %v4115.i to ptr
     %v4116 = call ptr @orion_text_concat(ptr %v4114, ptr %v4115)
-    %v4117 = getelementptr i8, ptr @.str_700, i64 16
+    %v4117 = getelementptr i8, ptr @.str_702, i64 16
     %v4118 = call ptr @orion_text_concat(ptr %v4116, ptr %v4117)
     %v4119 = call i64 @compile_error(ptr %v4118)
     br label %if_4109_merge
@@ -42857,7 +43487,7 @@ if_10_merge:
 if_19_then:
     br label %if_19_merge
 if_19_else:
-    %v23 = getelementptr i8, ptr @.str_701, i64 16
+    %v23 = getelementptr i8, ptr @.str_703, i64 16
     %v24.e = call i64 @orion_text_eq(ptr %v0, ptr %v23)
     %v24 = add i64 %v24.e, 0
     br label %if_19_merge
@@ -43125,7 +43755,7 @@ if_104_merge:
     %v172.cb = icmp ne i64 %v171, 0
     br i1 %v172.cb, label %if_172_then, label %if_172_else
 if_172_then:
-    %v174 = getelementptr i8, ptr @.str_538, i64 16
+    %v174 = getelementptr i8, ptr @.str_540, i64 16
     br label %if_172_merge
 if_172_else:
     %v177 = getelementptr i8, ptr @.str_32, i64 16
@@ -43389,7 +44019,7 @@ if_16_merge:
     %v28 = load ptr, ptr %v3
     %v29 = call ptr @orion_text_concat(ptr %v28, ptr %v24)
     %v30 = call ptr @orion_text_concat(ptr %v29, ptr %v27)
-    %v31 = getelementptr i8, ptr @.str_702, i64 16
+    %v31 = getelementptr i8, ptr @.str_704, i64 16
     %v32 = call ptr @orion_text_concat(ptr %v30, ptr %v31)
     %v33 = call ptr @orion_int_to_text(i64 %v10)
     %v34 = call ptr @orion_text_concat(ptr %v32, ptr %v33)
@@ -43510,13 +44140,13 @@ if_24_else:
     %v31.i = load i64, ptr %v31.slot
     %v31 = inttoptr i64 %v31.i to ptr
     %v32 = call ptr @emit_param_list(ptr %v31)
-    %v33 = getelementptr i8, ptr @.str_501, i64 16
+    %v33 = getelementptr i8, ptr @.str_503, i64 16
     %v34.e = call i64 @orion_text_eq(ptr %v3, ptr %v33)
     %v34 = add i64 %v34.e, 0
     %v35.cb = icmp ne i64 %v34, 0
     br i1 %v35.cb, label %if_35_then, label %if_35_else
 if_35_then:
-    %v37 = getelementptr i8, ptr @.str_703, i64 16
+    %v37 = getelementptr i8, ptr @.str_705, i64 16
     br label %if_35_merge
 if_35_else:
     br label %if_35_merge
@@ -43527,15 +44157,15 @@ if_35_merge:
     store ptr %v43, ptr %v44
     %v45 = add i64 0, 0
     %v46 = load ptr, ptr %v44
-    %v47 = getelementptr i8, ptr @.str_704, i64 16
+    %v47 = getelementptr i8, ptr @.str_706, i64 16
     %v48 = call ptr @orion_text_concat(ptr %v47, ptr %v30)
-    %v49 = getelementptr i8, ptr @.str_546, i64 16
+    %v49 = getelementptr i8, ptr @.str_548, i64 16
     %v50 = call ptr @orion_text_concat(ptr %v48, ptr %v49)
     %v51 = call ptr @orion_text_concat(ptr %v50, ptr %v42)
     %v52 = getelementptr i8, ptr @.str_226, i64 16
     %v53 = call ptr @orion_text_concat(ptr %v51, ptr %v52)
     %v54 = call ptr @orion_text_concat(ptr %v53, ptr %v32)
-    %v55 = getelementptr i8, ptr @.str_705, i64 16
+    %v55 = getelementptr i8, ptr @.str_707, i64 16
     %v56 = call ptr @orion_text_concat(ptr %v54, ptr %v55)
     %v57.p = ptrtoint ptr %v56 to i64
     %v57 = call ptr @orion_list_push(ptr %v46, i64 %v57.p)
@@ -43583,7 +44213,7 @@ for_61_step:
     br label %for_61_header
 for_61_end:
     %v87 = load ptr, ptr %v44
-    %v88 = getelementptr i8, ptr @.str_706, i64 16
+    %v88 = getelementptr i8, ptr @.str_708, i64 16
     %v89.p = ptrtoint ptr %v88 to i64
     %v89 = call ptr @orion_list_push(ptr %v87, i64 %v89.p)
     store ptr %v89, ptr %v44
@@ -43609,18 +44239,18 @@ entry:
     %v8 = call ptr @i64_le_escapes(i64 %v7)
     %v9 = call ptr @i64_le_escapes(i64 %v3)
     %v10 = call ptr @orion_text_concat(ptr %v8, ptr %v9)
-    %v11 = getelementptr i8, ptr @.str_707, i64 16
+    %v11 = getelementptr i8, ptr @.str_709, i64 16
     %v12 = call ptr @orion_int_to_text(i64 %v1)
     %v13 = call ptr @orion_text_concat(ptr %v11, ptr %v12)
-    %v14 = getelementptr i8, ptr @.str_708, i64 16
+    %v14 = getelementptr i8, ptr @.str_710, i64 16
     %v15 = call ptr @orion_text_concat(ptr %v13, ptr %v14)
     %v16 = call ptr @orion_int_to_text(i64 %v5)
     %v17 = call ptr @orion_text_concat(ptr %v15, ptr %v16)
-    %v18 = getelementptr i8, ptr @.str_709, i64 16
+    %v18 = getelementptr i8, ptr @.str_711, i64 16
     %v19 = call ptr @orion_text_concat(ptr %v17, ptr %v18)
     %v20 = call ptr @orion_text_concat(ptr %v19, ptr %v10)
     %v21 = call ptr @orion_text_concat(ptr %v20, ptr %v6)
-    %v22 = getelementptr i8, ptr @.str_710, i64 16
+    %v22 = getelementptr i8, ptr @.str_712, i64 16
     %v23 = call ptr @orion_text_concat(ptr %v21, ptr %v22)
     ret ptr %v23
 }
@@ -43718,7 +44348,7 @@ for_6_body:
     %v21 = mul i64 %v19, %v20
     %v22 = sub i64 %v16, %v21
     %v23 = load ptr, ptr %v2
-    %v24 = getelementptr i8, ptr @.str_711, i64 16
+    %v24 = getelementptr i8, ptr @.str_713, i64 16
     %v25 = call ptr @orion_text_concat(ptr %v23, ptr %v24)
     %v26 = call ptr @hex2(i64 %v22)
     %v27 = call ptr @orion_text_concat(ptr %v25, ptr %v26)
@@ -43854,7 +44484,7 @@ if_66_else:
     %v73.cb = icmp ne i64 %v72, 0
     br i1 %v73.cb, label %if_73_then, label %if_73_else
 if_73_then:
-    %v75 = getelementptr i8, ptr @.str_503, i64 16
+    %v75 = getelementptr i8, ptr @.str_505, i64 16
     br label %if_73_merge
 if_73_else:
     %v78 = add i64 0, 11
@@ -43863,7 +44493,7 @@ if_73_else:
     %v80.cb = icmp ne i64 %v79, 0
     br i1 %v80.cb, label %if_80_then, label %if_80_else
 if_80_then:
-    %v82 = getelementptr i8, ptr @.str_504, i64 16
+    %v82 = getelementptr i8, ptr @.str_506, i64 16
     br label %if_80_merge
 if_80_else:
     %v85 = add i64 0, 12
@@ -43872,7 +44502,7 @@ if_80_else:
     %v87.cb = icmp ne i64 %v86, 0
     br i1 %v87.cb, label %if_87_then, label %if_87_else
 if_87_then:
-    %v89 = getelementptr i8, ptr @.str_505, i64 16
+    %v89 = getelementptr i8, ptr @.str_507, i64 16
     br label %if_87_merge
 if_87_else:
     %v92 = add i64 0, 13
@@ -43881,7 +44511,7 @@ if_87_else:
     %v94.cb = icmp ne i64 %v93, 0
     br i1 %v94.cb, label %if_94_then, label %if_94_else
 if_94_then:
-    %v96 = getelementptr i8, ptr @.str_506, i64 16
+    %v96 = getelementptr i8, ptr @.str_508, i64 16
     br label %if_94_merge
 if_94_else:
     %v99 = add i64 0, 14
@@ -43890,10 +44520,10 @@ if_94_else:
     %v101.cb = icmp ne i64 %v100, 0
     br i1 %v101.cb, label %if_101_then, label %if_101_else
 if_101_then:
-    %v103 = getelementptr i8, ptr @.str_507, i64 16
+    %v103 = getelementptr i8, ptr @.str_509, i64 16
     br label %if_101_merge
 if_101_else:
-    %v106 = getelementptr i8, ptr @.str_508, i64 16
+    %v106 = getelementptr i8, ptr @.str_510, i64 16
     br label %if_101_merge
 if_101_merge:
     %v109 = phi ptr [ %v103, %if_101_then ], [ %v106, %if_101_else ]
@@ -43949,992 +44579,992 @@ entry:
     store ptr %v0, ptr %v1
     %v2 = add i64 0, 0
     %v3 = load ptr, ptr %v1
-    %v4 = getelementptr i8, ptr @.str_712, i64 16
+    %v4 = getelementptr i8, ptr @.str_714, i64 16
     %v5 = call ptr @orion_text_concat(ptr %v3, ptr %v4)
     store ptr %v5, ptr %v1
     %v6 = add i64 0, 0
     %v7 = load ptr, ptr %v1
-    %v8 = getelementptr i8, ptr @.str_713, i64 16
+    %v8 = getelementptr i8, ptr @.str_715, i64 16
     %v9 = call ptr @orion_text_concat(ptr %v7, ptr %v8)
     store ptr %v9, ptr %v1
     %v10 = add i64 0, 0
     %v11 = load ptr, ptr %v1
-    %v12 = getelementptr i8, ptr @.str_714, i64 16
+    %v12 = getelementptr i8, ptr @.str_716, i64 16
     %v13 = call ptr @orion_text_concat(ptr %v11, ptr %v12)
     store ptr %v13, ptr %v1
     %v14 = add i64 0, 0
     %v15 = load ptr, ptr %v1
-    %v16 = getelementptr i8, ptr @.str_715, i64 16
+    %v16 = getelementptr i8, ptr @.str_717, i64 16
     %v17 = call ptr @orion_text_concat(ptr %v15, ptr %v16)
     store ptr %v17, ptr %v1
     %v18 = add i64 0, 0
     %v19 = load ptr, ptr %v1
-    %v20 = getelementptr i8, ptr @.str_716, i64 16
+    %v20 = getelementptr i8, ptr @.str_718, i64 16
     %v21 = call ptr @orion_text_concat(ptr %v19, ptr %v20)
     store ptr %v21, ptr %v1
     %v22 = add i64 0, 0
     %v23 = load ptr, ptr %v1
-    %v24 = getelementptr i8, ptr @.str_717, i64 16
+    %v24 = getelementptr i8, ptr @.str_719, i64 16
     %v25 = call ptr @orion_text_concat(ptr %v23, ptr %v24)
     store ptr %v25, ptr %v1
     %v26 = add i64 0, 0
     %v27 = load ptr, ptr %v1
-    %v28 = getelementptr i8, ptr @.str_718, i64 16
+    %v28 = getelementptr i8, ptr @.str_720, i64 16
     %v29 = call ptr @orion_text_concat(ptr %v27, ptr %v28)
     store ptr %v29, ptr %v1
     %v30 = add i64 0, 0
     %v31 = load ptr, ptr %v1
-    %v32 = getelementptr i8, ptr @.str_719, i64 16
+    %v32 = getelementptr i8, ptr @.str_721, i64 16
     %v33 = call ptr @orion_text_concat(ptr %v31, ptr %v32)
     store ptr %v33, ptr %v1
     %v34 = add i64 0, 0
     %v35 = load ptr, ptr %v1
-    %v36 = getelementptr i8, ptr @.str_720, i64 16
+    %v36 = getelementptr i8, ptr @.str_722, i64 16
     %v37 = call ptr @orion_text_concat(ptr %v35, ptr %v36)
     store ptr %v37, ptr %v1
     %v38 = add i64 0, 0
     %v39 = load ptr, ptr %v1
-    %v40 = getelementptr i8, ptr @.str_721, i64 16
+    %v40 = getelementptr i8, ptr @.str_723, i64 16
     %v41 = call ptr @orion_text_concat(ptr %v39, ptr %v40)
     store ptr %v41, ptr %v1
     %v42 = add i64 0, 0
     %v43 = load ptr, ptr %v1
-    %v44 = getelementptr i8, ptr @.str_722, i64 16
+    %v44 = getelementptr i8, ptr @.str_724, i64 16
     %v45 = call ptr @orion_text_concat(ptr %v43, ptr %v44)
     store ptr %v45, ptr %v1
     %v46 = add i64 0, 0
     %v47 = load ptr, ptr %v1
-    %v48 = getelementptr i8, ptr @.str_723, i64 16
+    %v48 = getelementptr i8, ptr @.str_725, i64 16
     %v49 = call ptr @orion_text_concat(ptr %v47, ptr %v48)
     store ptr %v49, ptr %v1
     %v50 = add i64 0, 0
     %v51 = load ptr, ptr %v1
-    %v52 = getelementptr i8, ptr @.str_724, i64 16
+    %v52 = getelementptr i8, ptr @.str_726, i64 16
     %v53 = call ptr @orion_text_concat(ptr %v51, ptr %v52)
     store ptr %v53, ptr %v1
     %v54 = add i64 0, 0
     %v55 = load ptr, ptr %v1
-    %v56 = getelementptr i8, ptr @.str_725, i64 16
+    %v56 = getelementptr i8, ptr @.str_727, i64 16
     %v57 = call ptr @orion_text_concat(ptr %v55, ptr %v56)
     store ptr %v57, ptr %v1
     %v58 = add i64 0, 0
     %v59 = load ptr, ptr %v1
-    %v60 = getelementptr i8, ptr @.str_726, i64 16
+    %v60 = getelementptr i8, ptr @.str_728, i64 16
     %v61 = call ptr @orion_text_concat(ptr %v59, ptr %v60)
     store ptr %v61, ptr %v1
     %v62 = add i64 0, 0
     %v63 = load ptr, ptr %v1
-    %v64 = getelementptr i8, ptr @.str_727, i64 16
+    %v64 = getelementptr i8, ptr @.str_729, i64 16
     %v65 = call ptr @orion_text_concat(ptr %v63, ptr %v64)
     store ptr %v65, ptr %v1
     %v66 = add i64 0, 0
     %v67 = load ptr, ptr %v1
-    %v68 = getelementptr i8, ptr @.str_728, i64 16
+    %v68 = getelementptr i8, ptr @.str_730, i64 16
     %v69 = call ptr @orion_text_concat(ptr %v67, ptr %v68)
     store ptr %v69, ptr %v1
     %v70 = add i64 0, 0
     %v71 = load ptr, ptr %v1
-    %v72 = getelementptr i8, ptr @.str_729, i64 16
+    %v72 = getelementptr i8, ptr @.str_731, i64 16
     %v73 = call ptr @orion_text_concat(ptr %v71, ptr %v72)
     store ptr %v73, ptr %v1
     %v74 = add i64 0, 0
     %v75 = load ptr, ptr %v1
-    %v76 = getelementptr i8, ptr @.str_730, i64 16
+    %v76 = getelementptr i8, ptr @.str_732, i64 16
     %v77 = call ptr @orion_text_concat(ptr %v75, ptr %v76)
     store ptr %v77, ptr %v1
     %v78 = add i64 0, 0
     %v79 = load ptr, ptr %v1
-    %v80 = getelementptr i8, ptr @.str_731, i64 16
+    %v80 = getelementptr i8, ptr @.str_733, i64 16
     %v81 = call ptr @orion_text_concat(ptr %v79, ptr %v80)
     store ptr %v81, ptr %v1
     %v82 = add i64 0, 0
     %v83 = load ptr, ptr %v1
-    %v84 = getelementptr i8, ptr @.str_732, i64 16
+    %v84 = getelementptr i8, ptr @.str_734, i64 16
     %v85 = call ptr @orion_text_concat(ptr %v83, ptr %v84)
     store ptr %v85, ptr %v1
     %v86 = add i64 0, 0
     %v87 = load ptr, ptr %v1
-    %v88 = getelementptr i8, ptr @.str_733, i64 16
+    %v88 = getelementptr i8, ptr @.str_735, i64 16
     %v89 = call ptr @orion_text_concat(ptr %v87, ptr %v88)
     store ptr %v89, ptr %v1
     %v90 = add i64 0, 0
     %v91 = load ptr, ptr %v1
-    %v92 = getelementptr i8, ptr @.str_734, i64 16
+    %v92 = getelementptr i8, ptr @.str_736, i64 16
     %v93 = call ptr @orion_text_concat(ptr %v91, ptr %v92)
     store ptr %v93, ptr %v1
     %v94 = add i64 0, 0
     %v95 = load ptr, ptr %v1
-    %v96 = getelementptr i8, ptr @.str_735, i64 16
+    %v96 = getelementptr i8, ptr @.str_737, i64 16
     %v97 = call ptr @orion_text_concat(ptr %v95, ptr %v96)
     store ptr %v97, ptr %v1
     %v98 = add i64 0, 0
     %v99 = load ptr, ptr %v1
-    %v100 = getelementptr i8, ptr @.str_736, i64 16
+    %v100 = getelementptr i8, ptr @.str_738, i64 16
     %v101 = call ptr @orion_text_concat(ptr %v99, ptr %v100)
     store ptr %v101, ptr %v1
     %v102 = add i64 0, 0
     %v103 = load ptr, ptr %v1
-    %v104 = getelementptr i8, ptr @.str_737, i64 16
+    %v104 = getelementptr i8, ptr @.str_739, i64 16
     %v105 = call ptr @orion_text_concat(ptr %v103, ptr %v104)
     store ptr %v105, ptr %v1
     %v106 = add i64 0, 0
     %v107 = load ptr, ptr %v1
-    %v108 = getelementptr i8, ptr @.str_738, i64 16
+    %v108 = getelementptr i8, ptr @.str_740, i64 16
     %v109 = call ptr @orion_text_concat(ptr %v107, ptr %v108)
     store ptr %v109, ptr %v1
     %v110 = add i64 0, 0
     %v111 = load ptr, ptr %v1
-    %v112 = getelementptr i8, ptr @.str_739, i64 16
+    %v112 = getelementptr i8, ptr @.str_741, i64 16
     %v113 = call ptr @orion_text_concat(ptr %v111, ptr %v112)
     store ptr %v113, ptr %v1
     %v114 = add i64 0, 0
     %v115 = load ptr, ptr %v1
-    %v116 = getelementptr i8, ptr @.str_740, i64 16
+    %v116 = getelementptr i8, ptr @.str_742, i64 16
     %v117 = call ptr @orion_text_concat(ptr %v115, ptr %v116)
     store ptr %v117, ptr %v1
     %v118 = add i64 0, 0
     %v119 = load ptr, ptr %v1
-    %v120 = getelementptr i8, ptr @.str_741, i64 16
+    %v120 = getelementptr i8, ptr @.str_743, i64 16
     %v121 = call ptr @orion_text_concat(ptr %v119, ptr %v120)
     store ptr %v121, ptr %v1
     %v122 = add i64 0, 0
     %v123 = load ptr, ptr %v1
-    %v124 = getelementptr i8, ptr @.str_742, i64 16
+    %v124 = getelementptr i8, ptr @.str_744, i64 16
     %v125 = call ptr @orion_text_concat(ptr %v123, ptr %v124)
     store ptr %v125, ptr %v1
     %v126 = add i64 0, 0
     %v127 = load ptr, ptr %v1
-    %v128 = getelementptr i8, ptr @.str_743, i64 16
+    %v128 = getelementptr i8, ptr @.str_745, i64 16
     %v129 = call ptr @orion_text_concat(ptr %v127, ptr %v128)
     store ptr %v129, ptr %v1
     %v130 = add i64 0, 0
     %v131 = load ptr, ptr %v1
-    %v132 = getelementptr i8, ptr @.str_744, i64 16
+    %v132 = getelementptr i8, ptr @.str_746, i64 16
     %v133 = call ptr @orion_text_concat(ptr %v131, ptr %v132)
     store ptr %v133, ptr %v1
     %v134 = add i64 0, 0
     %v135 = load ptr, ptr %v1
-    %v136 = getelementptr i8, ptr @.str_745, i64 16
+    %v136 = getelementptr i8, ptr @.str_747, i64 16
     %v137 = call ptr @orion_text_concat(ptr %v135, ptr %v136)
     store ptr %v137, ptr %v1
     %v138 = add i64 0, 0
     %v139 = load ptr, ptr %v1
-    %v140 = getelementptr i8, ptr @.str_746, i64 16
+    %v140 = getelementptr i8, ptr @.str_748, i64 16
     %v141 = call ptr @orion_text_concat(ptr %v139, ptr %v140)
     store ptr %v141, ptr %v1
     %v142 = add i64 0, 0
     %v143 = load ptr, ptr %v1
-    %v144 = getelementptr i8, ptr @.str_747, i64 16
+    %v144 = getelementptr i8, ptr @.str_749, i64 16
     %v145 = call ptr @orion_text_concat(ptr %v143, ptr %v144)
     store ptr %v145, ptr %v1
     %v146 = add i64 0, 0
     %v147 = load ptr, ptr %v1
-    %v148 = getelementptr i8, ptr @.str_748, i64 16
+    %v148 = getelementptr i8, ptr @.str_750, i64 16
     %v149 = call ptr @orion_text_concat(ptr %v147, ptr %v148)
     store ptr %v149, ptr %v1
     %v150 = add i64 0, 0
     %v151 = load ptr, ptr %v1
-    %v152 = getelementptr i8, ptr @.str_749, i64 16
+    %v152 = getelementptr i8, ptr @.str_751, i64 16
     %v153 = call ptr @orion_text_concat(ptr %v151, ptr %v152)
     store ptr %v153, ptr %v1
     %v154 = add i64 0, 0
     %v155 = load ptr, ptr %v1
-    %v156 = getelementptr i8, ptr @.str_750, i64 16
+    %v156 = getelementptr i8, ptr @.str_752, i64 16
     %v157 = call ptr @orion_text_concat(ptr %v155, ptr %v156)
     store ptr %v157, ptr %v1
     %v158 = add i64 0, 0
     %v159 = load ptr, ptr %v1
-    %v160 = getelementptr i8, ptr @.str_751, i64 16
+    %v160 = getelementptr i8, ptr @.str_753, i64 16
     %v161 = call ptr @orion_text_concat(ptr %v159, ptr %v160)
     store ptr %v161, ptr %v1
     %v162 = add i64 0, 0
     %v163 = load ptr, ptr %v1
-    %v164 = getelementptr i8, ptr @.str_752, i64 16
+    %v164 = getelementptr i8, ptr @.str_754, i64 16
     %v165 = call ptr @orion_text_concat(ptr %v163, ptr %v164)
     store ptr %v165, ptr %v1
     %v166 = add i64 0, 0
     %v167 = load ptr, ptr %v1
-    %v168 = getelementptr i8, ptr @.str_753, i64 16
+    %v168 = getelementptr i8, ptr @.str_755, i64 16
     %v169 = call ptr @orion_text_concat(ptr %v167, ptr %v168)
     store ptr %v169, ptr %v1
     %v170 = add i64 0, 0
     %v171 = load ptr, ptr %v1
-    %v172 = getelementptr i8, ptr @.str_754, i64 16
+    %v172 = getelementptr i8, ptr @.str_756, i64 16
     %v173 = call ptr @orion_text_concat(ptr %v171, ptr %v172)
     store ptr %v173, ptr %v1
     %v174 = add i64 0, 0
     %v175 = load ptr, ptr %v1
-    %v176 = getelementptr i8, ptr @.str_755, i64 16
+    %v176 = getelementptr i8, ptr @.str_757, i64 16
     %v177 = call ptr @orion_text_concat(ptr %v175, ptr %v176)
     store ptr %v177, ptr %v1
     %v178 = add i64 0, 0
     %v179 = load ptr, ptr %v1
-    %v180 = getelementptr i8, ptr @.str_756, i64 16
+    %v180 = getelementptr i8, ptr @.str_758, i64 16
     %v181 = call ptr @orion_text_concat(ptr %v179, ptr %v180)
     store ptr %v181, ptr %v1
     %v182 = add i64 0, 0
     %v183 = load ptr, ptr %v1
-    %v184 = getelementptr i8, ptr @.str_757, i64 16
+    %v184 = getelementptr i8, ptr @.str_759, i64 16
     %v185 = call ptr @orion_text_concat(ptr %v183, ptr %v184)
     store ptr %v185, ptr %v1
     %v186 = add i64 0, 0
     %v187 = load ptr, ptr %v1
-    %v188 = getelementptr i8, ptr @.str_758, i64 16
+    %v188 = getelementptr i8, ptr @.str_760, i64 16
     %v189 = call ptr @orion_text_concat(ptr %v187, ptr %v188)
     store ptr %v189, ptr %v1
     %v190 = add i64 0, 0
     %v191 = load ptr, ptr %v1
-    %v192 = getelementptr i8, ptr @.str_759, i64 16
+    %v192 = getelementptr i8, ptr @.str_761, i64 16
     %v193 = call ptr @orion_text_concat(ptr %v191, ptr %v192)
     store ptr %v193, ptr %v1
     %v194 = add i64 0, 0
     %v195 = load ptr, ptr %v1
-    %v196 = getelementptr i8, ptr @.str_760, i64 16
+    %v196 = getelementptr i8, ptr @.str_762, i64 16
     %v197 = call ptr @orion_text_concat(ptr %v195, ptr %v196)
     store ptr %v197, ptr %v1
     %v198 = add i64 0, 0
     %v199 = load ptr, ptr %v1
-    %v200 = getelementptr i8, ptr @.str_761, i64 16
+    %v200 = getelementptr i8, ptr @.str_763, i64 16
     %v201 = call ptr @orion_text_concat(ptr %v199, ptr %v200)
     store ptr %v201, ptr %v1
     %v202 = add i64 0, 0
     %v203 = load ptr, ptr %v1
-    %v204 = getelementptr i8, ptr @.str_762, i64 16
+    %v204 = getelementptr i8, ptr @.str_764, i64 16
     %v205 = call ptr @orion_text_concat(ptr %v203, ptr %v204)
     store ptr %v205, ptr %v1
     %v206 = add i64 0, 0
     %v207 = load ptr, ptr %v1
-    %v208 = getelementptr i8, ptr @.str_763, i64 16
+    %v208 = getelementptr i8, ptr @.str_765, i64 16
     %v209 = call ptr @orion_text_concat(ptr %v207, ptr %v208)
     store ptr %v209, ptr %v1
     %v210 = add i64 0, 0
     %v211 = load ptr, ptr %v1
-    %v212 = getelementptr i8, ptr @.str_764, i64 16
+    %v212 = getelementptr i8, ptr @.str_766, i64 16
     %v213 = call ptr @orion_text_concat(ptr %v211, ptr %v212)
     store ptr %v213, ptr %v1
     %v214 = add i64 0, 0
     %v215 = load ptr, ptr %v1
-    %v216 = getelementptr i8, ptr @.str_765, i64 16
+    %v216 = getelementptr i8, ptr @.str_767, i64 16
     %v217 = call ptr @orion_text_concat(ptr %v215, ptr %v216)
     store ptr %v217, ptr %v1
     %v218 = add i64 0, 0
     %v219 = load ptr, ptr %v1
-    %v220 = getelementptr i8, ptr @.str_766, i64 16
+    %v220 = getelementptr i8, ptr @.str_768, i64 16
     %v221 = call ptr @orion_text_concat(ptr %v219, ptr %v220)
     store ptr %v221, ptr %v1
     %v222 = add i64 0, 0
     %v223 = load ptr, ptr %v1
-    %v224 = getelementptr i8, ptr @.str_767, i64 16
+    %v224 = getelementptr i8, ptr @.str_769, i64 16
     %v225 = call ptr @orion_text_concat(ptr %v223, ptr %v224)
     store ptr %v225, ptr %v1
     %v226 = add i64 0, 0
     %v227 = load ptr, ptr %v1
-    %v228 = getelementptr i8, ptr @.str_768, i64 16
+    %v228 = getelementptr i8, ptr @.str_770, i64 16
     %v229 = call ptr @orion_text_concat(ptr %v227, ptr %v228)
     store ptr %v229, ptr %v1
     %v230 = add i64 0, 0
     %v231 = load ptr, ptr %v1
-    %v232 = getelementptr i8, ptr @.str_769, i64 16
+    %v232 = getelementptr i8, ptr @.str_771, i64 16
     %v233 = call ptr @orion_text_concat(ptr %v231, ptr %v232)
     store ptr %v233, ptr %v1
     %v234 = add i64 0, 0
     %v235 = load ptr, ptr %v1
-    %v236 = getelementptr i8, ptr @.str_770, i64 16
+    %v236 = getelementptr i8, ptr @.str_772, i64 16
     %v237 = call ptr @orion_text_concat(ptr %v235, ptr %v236)
     store ptr %v237, ptr %v1
     %v238 = add i64 0, 0
     %v239 = load ptr, ptr %v1
-    %v240 = getelementptr i8, ptr @.str_771, i64 16
+    %v240 = getelementptr i8, ptr @.str_773, i64 16
     %v241 = call ptr @orion_text_concat(ptr %v239, ptr %v240)
     store ptr %v241, ptr %v1
     %v242 = add i64 0, 0
     %v243 = load ptr, ptr %v1
-    %v244 = getelementptr i8, ptr @.str_772, i64 16
+    %v244 = getelementptr i8, ptr @.str_774, i64 16
     %v245 = call ptr @orion_text_concat(ptr %v243, ptr %v244)
     store ptr %v245, ptr %v1
     %v246 = add i64 0, 0
     %v247 = load ptr, ptr %v1
-    %v248 = getelementptr i8, ptr @.str_773, i64 16
+    %v248 = getelementptr i8, ptr @.str_775, i64 16
     %v249 = call ptr @orion_text_concat(ptr %v247, ptr %v248)
     store ptr %v249, ptr %v1
     %v250 = add i64 0, 0
     %v251 = load ptr, ptr %v1
-    %v252 = getelementptr i8, ptr @.str_774, i64 16
+    %v252 = getelementptr i8, ptr @.str_776, i64 16
     %v253 = call ptr @orion_text_concat(ptr %v251, ptr %v252)
     store ptr %v253, ptr %v1
     %v254 = add i64 0, 0
     %v255 = load ptr, ptr %v1
-    %v256 = getelementptr i8, ptr @.str_775, i64 16
+    %v256 = getelementptr i8, ptr @.str_777, i64 16
     %v257 = call ptr @orion_text_concat(ptr %v255, ptr %v256)
     store ptr %v257, ptr %v1
     %v258 = add i64 0, 0
     %v259 = load ptr, ptr %v1
-    %v260 = getelementptr i8, ptr @.str_776, i64 16
+    %v260 = getelementptr i8, ptr @.str_778, i64 16
     %v261 = call ptr @orion_text_concat(ptr %v259, ptr %v260)
     store ptr %v261, ptr %v1
     %v262 = add i64 0, 0
     %v263 = load ptr, ptr %v1
-    %v264 = getelementptr i8, ptr @.str_777, i64 16
+    %v264 = getelementptr i8, ptr @.str_779, i64 16
     %v265 = call ptr @orion_text_concat(ptr %v263, ptr %v264)
     store ptr %v265, ptr %v1
     %v266 = add i64 0, 0
     %v267 = load ptr, ptr %v1
-    %v268 = getelementptr i8, ptr @.str_778, i64 16
+    %v268 = getelementptr i8, ptr @.str_780, i64 16
     %v269 = call ptr @orion_text_concat(ptr %v267, ptr %v268)
     store ptr %v269, ptr %v1
     %v270 = add i64 0, 0
     %v271 = load ptr, ptr %v1
-    %v272 = getelementptr i8, ptr @.str_779, i64 16
+    %v272 = getelementptr i8, ptr @.str_781, i64 16
     %v273 = call ptr @orion_text_concat(ptr %v271, ptr %v272)
     store ptr %v273, ptr %v1
     %v274 = add i64 0, 0
     %v275 = load ptr, ptr %v1
-    %v276 = getelementptr i8, ptr @.str_780, i64 16
+    %v276 = getelementptr i8, ptr @.str_782, i64 16
     %v277 = call ptr @orion_text_concat(ptr %v275, ptr %v276)
     store ptr %v277, ptr %v1
     %v278 = add i64 0, 0
     %v279 = load ptr, ptr %v1
-    %v280 = getelementptr i8, ptr @.str_781, i64 16
+    %v280 = getelementptr i8, ptr @.str_783, i64 16
     %v281 = call ptr @orion_text_concat(ptr %v279, ptr %v280)
     store ptr %v281, ptr %v1
     %v282 = add i64 0, 0
     %v283 = load ptr, ptr %v1
-    %v284 = getelementptr i8, ptr @.str_782, i64 16
+    %v284 = getelementptr i8, ptr @.str_784, i64 16
     %v285 = call ptr @orion_text_concat(ptr %v283, ptr %v284)
     store ptr %v285, ptr %v1
     %v286 = add i64 0, 0
     %v287 = load ptr, ptr %v1
-    %v288 = getelementptr i8, ptr @.str_783, i64 16
+    %v288 = getelementptr i8, ptr @.str_785, i64 16
     %v289 = call ptr @orion_text_concat(ptr %v287, ptr %v288)
     store ptr %v289, ptr %v1
     %v290 = add i64 0, 0
     %v291 = load ptr, ptr %v1
-    %v292 = getelementptr i8, ptr @.str_784, i64 16
+    %v292 = getelementptr i8, ptr @.str_786, i64 16
     %v293 = call ptr @orion_text_concat(ptr %v291, ptr %v292)
     store ptr %v293, ptr %v1
     %v294 = add i64 0, 0
     %v295 = load ptr, ptr %v1
-    %v296 = getelementptr i8, ptr @.str_785, i64 16
+    %v296 = getelementptr i8, ptr @.str_787, i64 16
     %v297 = call ptr @orion_text_concat(ptr %v295, ptr %v296)
     store ptr %v297, ptr %v1
     %v298 = add i64 0, 0
     %v299 = load ptr, ptr %v1
-    %v300 = getelementptr i8, ptr @.str_786, i64 16
+    %v300 = getelementptr i8, ptr @.str_788, i64 16
     %v301 = call ptr @orion_text_concat(ptr %v299, ptr %v300)
     store ptr %v301, ptr %v1
     %v302 = add i64 0, 0
     %v303 = load ptr, ptr %v1
-    %v304 = getelementptr i8, ptr @.str_787, i64 16
+    %v304 = getelementptr i8, ptr @.str_789, i64 16
     %v305 = call ptr @orion_text_concat(ptr %v303, ptr %v304)
     store ptr %v305, ptr %v1
     %v306 = add i64 0, 0
     %v307 = load ptr, ptr %v1
-    %v308 = getelementptr i8, ptr @.str_788, i64 16
+    %v308 = getelementptr i8, ptr @.str_790, i64 16
     %v309 = call ptr @orion_text_concat(ptr %v307, ptr %v308)
     store ptr %v309, ptr %v1
     %v310 = add i64 0, 0
     %v311 = load ptr, ptr %v1
-    %v312 = getelementptr i8, ptr @.str_789, i64 16
+    %v312 = getelementptr i8, ptr @.str_791, i64 16
     %v313 = call ptr @orion_text_concat(ptr %v311, ptr %v312)
     store ptr %v313, ptr %v1
     %v314 = add i64 0, 0
     %v315 = load ptr, ptr %v1
-    %v316 = getelementptr i8, ptr @.str_790, i64 16
+    %v316 = getelementptr i8, ptr @.str_792, i64 16
     %v317 = call ptr @orion_text_concat(ptr %v315, ptr %v316)
     store ptr %v317, ptr %v1
     %v318 = add i64 0, 0
     %v319 = load ptr, ptr %v1
-    %v320 = getelementptr i8, ptr @.str_791, i64 16
+    %v320 = getelementptr i8, ptr @.str_793, i64 16
     %v321 = call ptr @orion_text_concat(ptr %v319, ptr %v320)
     store ptr %v321, ptr %v1
     %v322 = add i64 0, 0
     %v323 = load ptr, ptr %v1
-    %v324 = getelementptr i8, ptr @.str_792, i64 16
+    %v324 = getelementptr i8, ptr @.str_794, i64 16
     %v325 = call ptr @orion_text_concat(ptr %v323, ptr %v324)
     store ptr %v325, ptr %v1
     %v326 = add i64 0, 0
     %v327 = load ptr, ptr %v1
-    %v328 = getelementptr i8, ptr @.str_793, i64 16
+    %v328 = getelementptr i8, ptr @.str_795, i64 16
     %v329 = call ptr @orion_text_concat(ptr %v327, ptr %v328)
     store ptr %v329, ptr %v1
     %v330 = add i64 0, 0
     %v331 = load ptr, ptr %v1
-    %v332 = getelementptr i8, ptr @.str_794, i64 16
+    %v332 = getelementptr i8, ptr @.str_796, i64 16
     %v333 = call ptr @orion_text_concat(ptr %v331, ptr %v332)
     store ptr %v333, ptr %v1
     %v334 = add i64 0, 0
     %v335 = load ptr, ptr %v1
-    %v336 = getelementptr i8, ptr @.str_795, i64 16
+    %v336 = getelementptr i8, ptr @.str_797, i64 16
     %v337 = call ptr @orion_text_concat(ptr %v335, ptr %v336)
     store ptr %v337, ptr %v1
     %v338 = add i64 0, 0
     %v339 = load ptr, ptr %v1
-    %v340 = getelementptr i8, ptr @.str_706, i64 16
+    %v340 = getelementptr i8, ptr @.str_708, i64 16
     %v341 = call ptr @orion_text_concat(ptr %v339, ptr %v340)
     store ptr %v341, ptr %v1
     %v342 = add i64 0, 0
     %v343 = load ptr, ptr %v1
-    %v344 = getelementptr i8, ptr @.str_796, i64 16
+    %v344 = getelementptr i8, ptr @.str_798, i64 16
     %v345 = call ptr @orion_text_concat(ptr %v343, ptr %v344)
     store ptr %v345, ptr %v1
     %v346 = add i64 0, 0
     %v347 = load ptr, ptr %v1
-    %v348 = getelementptr i8, ptr @.str_791, i64 16
+    %v348 = getelementptr i8, ptr @.str_793, i64 16
     %v349 = call ptr @orion_text_concat(ptr %v347, ptr %v348)
     store ptr %v349, ptr %v1
     %v350 = add i64 0, 0
     %v351 = load ptr, ptr %v1
-    %v352 = getelementptr i8, ptr @.str_792, i64 16
+    %v352 = getelementptr i8, ptr @.str_794, i64 16
     %v353 = call ptr @orion_text_concat(ptr %v351, ptr %v352)
     store ptr %v353, ptr %v1
     %v354 = add i64 0, 0
     %v355 = load ptr, ptr %v1
-    %v356 = getelementptr i8, ptr @.str_797, i64 16
+    %v356 = getelementptr i8, ptr @.str_799, i64 16
     %v357 = call ptr @orion_text_concat(ptr %v355, ptr %v356)
     store ptr %v357, ptr %v1
     %v358 = add i64 0, 0
     %v359 = load ptr, ptr %v1
-    %v360 = getelementptr i8, ptr @.str_798, i64 16
+    %v360 = getelementptr i8, ptr @.str_800, i64 16
     %v361 = call ptr @orion_text_concat(ptr %v359, ptr %v360)
     store ptr %v361, ptr %v1
     %v362 = add i64 0, 0
     %v363 = load ptr, ptr %v1
-    %v364 = getelementptr i8, ptr @.str_799, i64 16
+    %v364 = getelementptr i8, ptr @.str_801, i64 16
     %v365 = call ptr @orion_text_concat(ptr %v363, ptr %v364)
     store ptr %v365, ptr %v1
     %v366 = add i64 0, 0
     %v367 = load ptr, ptr %v1
-    %v368 = getelementptr i8, ptr @.str_791, i64 16
+    %v368 = getelementptr i8, ptr @.str_793, i64 16
     %v369 = call ptr @orion_text_concat(ptr %v367, ptr %v368)
     store ptr %v369, ptr %v1
     %v370 = add i64 0, 0
     %v371 = load ptr, ptr %v1
-    %v372 = getelementptr i8, ptr @.str_800, i64 16
+    %v372 = getelementptr i8, ptr @.str_802, i64 16
     %v373 = call ptr @orion_text_concat(ptr %v371, ptr %v372)
     store ptr %v373, ptr %v1
     %v374 = add i64 0, 0
     %v375 = load ptr, ptr %v1
-    %v376 = getelementptr i8, ptr @.str_801, i64 16
+    %v376 = getelementptr i8, ptr @.str_803, i64 16
     %v377 = call ptr @orion_text_concat(ptr %v375, ptr %v376)
     store ptr %v377, ptr %v1
     %v378 = add i64 0, 0
     %v379 = load ptr, ptr %v1
-    %v380 = getelementptr i8, ptr @.str_802, i64 16
+    %v380 = getelementptr i8, ptr @.str_804, i64 16
     %v381 = call ptr @orion_text_concat(ptr %v379, ptr %v380)
     store ptr %v381, ptr %v1
     %v382 = add i64 0, 0
     %v383 = load ptr, ptr %v1
-    %v384 = getelementptr i8, ptr @.str_803, i64 16
+    %v384 = getelementptr i8, ptr @.str_805, i64 16
     %v385 = call ptr @orion_text_concat(ptr %v383, ptr %v384)
     store ptr %v385, ptr %v1
     %v386 = add i64 0, 0
     %v387 = load ptr, ptr %v1
-    %v388 = getelementptr i8, ptr @.str_804, i64 16
+    %v388 = getelementptr i8, ptr @.str_806, i64 16
     %v389 = call ptr @orion_text_concat(ptr %v387, ptr %v388)
     store ptr %v389, ptr %v1
     %v390 = add i64 0, 0
     %v391 = load ptr, ptr %v1
-    %v392 = getelementptr i8, ptr @.str_805, i64 16
+    %v392 = getelementptr i8, ptr @.str_807, i64 16
     %v393 = call ptr @orion_text_concat(ptr %v391, ptr %v392)
     store ptr %v393, ptr %v1
     %v394 = add i64 0, 0
     %v395 = load ptr, ptr %v1
-    %v396 = getelementptr i8, ptr @.str_806, i64 16
+    %v396 = getelementptr i8, ptr @.str_808, i64 16
     %v397 = call ptr @orion_text_concat(ptr %v395, ptr %v396)
     store ptr %v397, ptr %v1
     %v398 = add i64 0, 0
     %v399 = load ptr, ptr %v1
-    %v400 = getelementptr i8, ptr @.str_807, i64 16
+    %v400 = getelementptr i8, ptr @.str_809, i64 16
     %v401 = call ptr @orion_text_concat(ptr %v399, ptr %v400)
     store ptr %v401, ptr %v1
     %v402 = add i64 0, 0
     %v403 = load ptr, ptr %v1
-    %v404 = getelementptr i8, ptr @.str_808, i64 16
+    %v404 = getelementptr i8, ptr @.str_810, i64 16
     %v405 = call ptr @orion_text_concat(ptr %v403, ptr %v404)
     store ptr %v405, ptr %v1
     %v406 = add i64 0, 0
     %v407 = load ptr, ptr %v1
-    %v408 = getelementptr i8, ptr @.str_809, i64 16
+    %v408 = getelementptr i8, ptr @.str_811, i64 16
     %v409 = call ptr @orion_text_concat(ptr %v407, ptr %v408)
     store ptr %v409, ptr %v1
     %v410 = add i64 0, 0
     %v411 = load ptr, ptr %v1
-    %v412 = getelementptr i8, ptr @.str_810, i64 16
+    %v412 = getelementptr i8, ptr @.str_812, i64 16
     %v413 = call ptr @orion_text_concat(ptr %v411, ptr %v412)
     store ptr %v413, ptr %v1
     %v414 = add i64 0, 0
     %v415 = load ptr, ptr %v1
-    %v416 = getelementptr i8, ptr @.str_811, i64 16
+    %v416 = getelementptr i8, ptr @.str_813, i64 16
     %v417 = call ptr @orion_text_concat(ptr %v415, ptr %v416)
     store ptr %v417, ptr %v1
     %v418 = add i64 0, 0
     %v419 = load ptr, ptr %v1
-    %v420 = getelementptr i8, ptr @.str_812, i64 16
+    %v420 = getelementptr i8, ptr @.str_814, i64 16
     %v421 = call ptr @orion_text_concat(ptr %v419, ptr %v420)
     store ptr %v421, ptr %v1
     %v422 = add i64 0, 0
     %v423 = load ptr, ptr %v1
-    %v424 = getelementptr i8, ptr @.str_801, i64 16
+    %v424 = getelementptr i8, ptr @.str_803, i64 16
     %v425 = call ptr @orion_text_concat(ptr %v423, ptr %v424)
     store ptr %v425, ptr %v1
     %v426 = add i64 0, 0
     %v427 = load ptr, ptr %v1
-    %v428 = getelementptr i8, ptr @.str_813, i64 16
+    %v428 = getelementptr i8, ptr @.str_815, i64 16
     %v429 = call ptr @orion_text_concat(ptr %v427, ptr %v428)
     store ptr %v429, ptr %v1
     %v430 = add i64 0, 0
     %v431 = load ptr, ptr %v1
-    %v432 = getelementptr i8, ptr @.str_814, i64 16
+    %v432 = getelementptr i8, ptr @.str_816, i64 16
     %v433 = call ptr @orion_text_concat(ptr %v431, ptr %v432)
     store ptr %v433, ptr %v1
     %v434 = add i64 0, 0
     %v435 = load ptr, ptr %v1
-    %v436 = getelementptr i8, ptr @.str_815, i64 16
+    %v436 = getelementptr i8, ptr @.str_817, i64 16
     %v437 = call ptr @orion_text_concat(ptr %v435, ptr %v436)
     store ptr %v437, ptr %v1
     %v438 = add i64 0, 0
     %v439 = load ptr, ptr %v1
-    %v440 = getelementptr i8, ptr @.str_816, i64 16
+    %v440 = getelementptr i8, ptr @.str_818, i64 16
     %v441 = call ptr @orion_text_concat(ptr %v439, ptr %v440)
     store ptr %v441, ptr %v1
     %v442 = add i64 0, 0
     %v443 = load ptr, ptr %v1
-    %v444 = getelementptr i8, ptr @.str_817, i64 16
+    %v444 = getelementptr i8, ptr @.str_819, i64 16
     %v445 = call ptr @orion_text_concat(ptr %v443, ptr %v444)
     store ptr %v445, ptr %v1
     %v446 = add i64 0, 0
     %v447 = load ptr, ptr %v1
-    %v448 = getelementptr i8, ptr @.str_818, i64 16
+    %v448 = getelementptr i8, ptr @.str_820, i64 16
     %v449 = call ptr @orion_text_concat(ptr %v447, ptr %v448)
     store ptr %v449, ptr %v1
     %v450 = add i64 0, 0
     %v451 = load ptr, ptr %v1
-    %v452 = getelementptr i8, ptr @.str_819, i64 16
+    %v452 = getelementptr i8, ptr @.str_821, i64 16
     %v453 = call ptr @orion_text_concat(ptr %v451, ptr %v452)
     store ptr %v453, ptr %v1
     %v454 = add i64 0, 0
     %v455 = load ptr, ptr %v1
-    %v456 = getelementptr i8, ptr @.str_820, i64 16
+    %v456 = getelementptr i8, ptr @.str_822, i64 16
     %v457 = call ptr @orion_text_concat(ptr %v455, ptr %v456)
     store ptr %v457, ptr %v1
     %v458 = add i64 0, 0
     %v459 = load ptr, ptr %v1
-    %v460 = getelementptr i8, ptr @.str_821, i64 16
+    %v460 = getelementptr i8, ptr @.str_823, i64 16
     %v461 = call ptr @orion_text_concat(ptr %v459, ptr %v460)
     store ptr %v461, ptr %v1
     %v462 = add i64 0, 0
     %v463 = load ptr, ptr %v1
-    %v464 = getelementptr i8, ptr @.str_822, i64 16
+    %v464 = getelementptr i8, ptr @.str_824, i64 16
     %v465 = call ptr @orion_text_concat(ptr %v463, ptr %v464)
     store ptr %v465, ptr %v1
     %v466 = add i64 0, 0
     %v467 = load ptr, ptr %v1
-    %v468 = getelementptr i8, ptr @.str_823, i64 16
+    %v468 = getelementptr i8, ptr @.str_825, i64 16
     %v469 = call ptr @orion_text_concat(ptr %v467, ptr %v468)
     store ptr %v469, ptr %v1
     %v470 = add i64 0, 0
     %v471 = load ptr, ptr %v1
-    %v472 = getelementptr i8, ptr @.str_824, i64 16
+    %v472 = getelementptr i8, ptr @.str_826, i64 16
     %v473 = call ptr @orion_text_concat(ptr %v471, ptr %v472)
     store ptr %v473, ptr %v1
     %v474 = add i64 0, 0
     %v475 = load ptr, ptr %v1
-    %v476 = getelementptr i8, ptr @.str_825, i64 16
+    %v476 = getelementptr i8, ptr @.str_827, i64 16
     %v477 = call ptr @orion_text_concat(ptr %v475, ptr %v476)
     store ptr %v477, ptr %v1
     %v478 = add i64 0, 0
     %v479 = load ptr, ptr %v1
-    %v480 = getelementptr i8, ptr @.str_826, i64 16
+    %v480 = getelementptr i8, ptr @.str_828, i64 16
     %v481 = call ptr @orion_text_concat(ptr %v479, ptr %v480)
     store ptr %v481, ptr %v1
     %v482 = add i64 0, 0
     %v483 = load ptr, ptr %v1
-    %v484 = getelementptr i8, ptr @.str_827, i64 16
+    %v484 = getelementptr i8, ptr @.str_829, i64 16
     %v485 = call ptr @orion_text_concat(ptr %v483, ptr %v484)
     store ptr %v485, ptr %v1
     %v486 = add i64 0, 0
     %v487 = load ptr, ptr %v1
-    %v488 = getelementptr i8, ptr @.str_828, i64 16
+    %v488 = getelementptr i8, ptr @.str_830, i64 16
     %v489 = call ptr @orion_text_concat(ptr %v487, ptr %v488)
     store ptr %v489, ptr %v1
     %v490 = add i64 0, 0
     %v491 = load ptr, ptr %v1
-    %v492 = getelementptr i8, ptr @.str_829, i64 16
+    %v492 = getelementptr i8, ptr @.str_831, i64 16
     %v493 = call ptr @orion_text_concat(ptr %v491, ptr %v492)
     store ptr %v493, ptr %v1
     %v494 = add i64 0, 0
     %v495 = load ptr, ptr %v1
-    %v496 = getelementptr i8, ptr @.str_816, i64 16
+    %v496 = getelementptr i8, ptr @.str_818, i64 16
     %v497 = call ptr @orion_text_concat(ptr %v495, ptr %v496)
     store ptr %v497, ptr %v1
     %v498 = add i64 0, 0
     %v499 = load ptr, ptr %v1
-    %v500 = getelementptr i8, ptr @.str_830, i64 16
+    %v500 = getelementptr i8, ptr @.str_832, i64 16
     %v501 = call ptr @orion_text_concat(ptr %v499, ptr %v500)
     store ptr %v501, ptr %v1
     %v502 = add i64 0, 0
     %v503 = load ptr, ptr %v1
-    %v504 = getelementptr i8, ptr @.str_831, i64 16
+    %v504 = getelementptr i8, ptr @.str_833, i64 16
     %v505 = call ptr @orion_text_concat(ptr %v503, ptr %v504)
     store ptr %v505, ptr %v1
     %v506 = add i64 0, 0
     %v507 = load ptr, ptr %v1
-    %v508 = getelementptr i8, ptr @.str_832, i64 16
+    %v508 = getelementptr i8, ptr @.str_834, i64 16
     %v509 = call ptr @orion_text_concat(ptr %v507, ptr %v508)
     store ptr %v509, ptr %v1
     %v510 = add i64 0, 0
     %v511 = load ptr, ptr %v1
-    %v512 = getelementptr i8, ptr @.str_833, i64 16
+    %v512 = getelementptr i8, ptr @.str_835, i64 16
     %v513 = call ptr @orion_text_concat(ptr %v511, ptr %v512)
     store ptr %v513, ptr %v1
     %v514 = add i64 0, 0
     %v515 = load ptr, ptr %v1
-    %v516 = getelementptr i8, ptr @.str_798, i64 16
+    %v516 = getelementptr i8, ptr @.str_800, i64 16
     %v517 = call ptr @orion_text_concat(ptr %v515, ptr %v516)
     store ptr %v517, ptr %v1
     %v518 = add i64 0, 0
     %v519 = load ptr, ptr %v1
-    %v520 = getelementptr i8, ptr @.str_834, i64 16
+    %v520 = getelementptr i8, ptr @.str_836, i64 16
     %v521 = call ptr @orion_text_concat(ptr %v519, ptr %v520)
     store ptr %v521, ptr %v1
     %v522 = add i64 0, 0
     %v523 = load ptr, ptr %v1
-    %v524 = getelementptr i8, ptr @.str_835, i64 16
+    %v524 = getelementptr i8, ptr @.str_837, i64 16
     %v525 = call ptr @orion_text_concat(ptr %v523, ptr %v524)
     store ptr %v525, ptr %v1
     %v526 = add i64 0, 0
     %v527 = load ptr, ptr %v1
-    %v528 = getelementptr i8, ptr @.str_836, i64 16
+    %v528 = getelementptr i8, ptr @.str_838, i64 16
     %v529 = call ptr @orion_text_concat(ptr %v527, ptr %v528)
     store ptr %v529, ptr %v1
     %v530 = add i64 0, 0
     %v531 = load ptr, ptr %v1
-    %v532 = getelementptr i8, ptr @.str_837, i64 16
+    %v532 = getelementptr i8, ptr @.str_839, i64 16
     %v533 = call ptr @orion_text_concat(ptr %v531, ptr %v532)
     store ptr %v533, ptr %v1
     %v534 = add i64 0, 0
     %v535 = load ptr, ptr %v1
-    %v536 = getelementptr i8, ptr @.str_838, i64 16
+    %v536 = getelementptr i8, ptr @.str_840, i64 16
     %v537 = call ptr @orion_text_concat(ptr %v535, ptr %v536)
     store ptr %v537, ptr %v1
     %v538 = add i64 0, 0
     %v539 = load ptr, ptr %v1
-    %v540 = getelementptr i8, ptr @.str_839, i64 16
+    %v540 = getelementptr i8, ptr @.str_841, i64 16
     %v541 = call ptr @orion_text_concat(ptr %v539, ptr %v540)
     store ptr %v541, ptr %v1
     %v542 = add i64 0, 0
     %v543 = load ptr, ptr %v1
-    %v544 = getelementptr i8, ptr @.str_791, i64 16
+    %v544 = getelementptr i8, ptr @.str_793, i64 16
     %v545 = call ptr @orion_text_concat(ptr %v543, ptr %v544)
     store ptr %v545, ptr %v1
     %v546 = add i64 0, 0
     %v547 = load ptr, ptr %v1
-    %v548 = getelementptr i8, ptr @.str_840, i64 16
+    %v548 = getelementptr i8, ptr @.str_842, i64 16
     %v549 = call ptr @orion_text_concat(ptr %v547, ptr %v548)
     store ptr %v549, ptr %v1
     %v550 = add i64 0, 0
     %v551 = load ptr, ptr %v1
-    %v552 = getelementptr i8, ptr @.str_841, i64 16
+    %v552 = getelementptr i8, ptr @.str_843, i64 16
     %v553 = call ptr @orion_text_concat(ptr %v551, ptr %v552)
     store ptr %v553, ptr %v1
     %v554 = add i64 0, 0
     %v555 = load ptr, ptr %v1
-    %v556 = getelementptr i8, ptr @.str_842, i64 16
+    %v556 = getelementptr i8, ptr @.str_844, i64 16
     %v557 = call ptr @orion_text_concat(ptr %v555, ptr %v556)
     store ptr %v557, ptr %v1
     %v558 = add i64 0, 0
     %v559 = load ptr, ptr %v1
-    %v560 = getelementptr i8, ptr @.str_798, i64 16
+    %v560 = getelementptr i8, ptr @.str_800, i64 16
     %v561 = call ptr @orion_text_concat(ptr %v559, ptr %v560)
     store ptr %v561, ptr %v1
     %v562 = add i64 0, 0
     %v563 = load ptr, ptr %v1
-    %v564 = getelementptr i8, ptr @.str_843, i64 16
+    %v564 = getelementptr i8, ptr @.str_845, i64 16
     %v565 = call ptr @orion_text_concat(ptr %v563, ptr %v564)
     store ptr %v565, ptr %v1
     %v566 = add i64 0, 0
     %v567 = load ptr, ptr %v1
-    %v568 = getelementptr i8, ptr @.str_844, i64 16
+    %v568 = getelementptr i8, ptr @.str_846, i64 16
     %v569 = call ptr @orion_text_concat(ptr %v567, ptr %v568)
     store ptr %v569, ptr %v1
     %v570 = add i64 0, 0
     %v571 = load ptr, ptr %v1
-    %v572 = getelementptr i8, ptr @.str_791, i64 16
+    %v572 = getelementptr i8, ptr @.str_793, i64 16
     %v573 = call ptr @orion_text_concat(ptr %v571, ptr %v572)
     store ptr %v573, ptr %v1
     %v574 = add i64 0, 0
     %v575 = load ptr, ptr %v1
-    %v576 = getelementptr i8, ptr @.str_845, i64 16
+    %v576 = getelementptr i8, ptr @.str_847, i64 16
     %v577 = call ptr @orion_text_concat(ptr %v575, ptr %v576)
     store ptr %v577, ptr %v1
     %v578 = add i64 0, 0
     %v579 = load ptr, ptr %v1
-    %v580 = getelementptr i8, ptr @.str_846, i64 16
+    %v580 = getelementptr i8, ptr @.str_848, i64 16
     %v581 = call ptr @orion_text_concat(ptr %v579, ptr %v580)
     store ptr %v581, ptr %v1
     %v582 = add i64 0, 0
     %v583 = load ptr, ptr %v1
-    %v584 = getelementptr i8, ptr @.str_847, i64 16
+    %v584 = getelementptr i8, ptr @.str_849, i64 16
     %v585 = call ptr @orion_text_concat(ptr %v583, ptr %v584)
     store ptr %v585, ptr %v1
     %v586 = add i64 0, 0
     %v587 = load ptr, ptr %v1
-    %v588 = getelementptr i8, ptr @.str_848, i64 16
+    %v588 = getelementptr i8, ptr @.str_850, i64 16
     %v589 = call ptr @orion_text_concat(ptr %v587, ptr %v588)
     store ptr %v589, ptr %v1
     %v590 = add i64 0, 0
     %v591 = load ptr, ptr %v1
-    %v592 = getelementptr i8, ptr @.str_849, i64 16
+    %v592 = getelementptr i8, ptr @.str_851, i64 16
     %v593 = call ptr @orion_text_concat(ptr %v591, ptr %v592)
     store ptr %v593, ptr %v1
     %v594 = add i64 0, 0
     %v595 = load ptr, ptr %v1
-    %v596 = getelementptr i8, ptr @.str_850, i64 16
+    %v596 = getelementptr i8, ptr @.str_852, i64 16
     %v597 = call ptr @orion_text_concat(ptr %v595, ptr %v596)
     store ptr %v597, ptr %v1
     %v598 = add i64 0, 0
     %v599 = load ptr, ptr %v1
-    %v600 = getelementptr i8, ptr @.str_851, i64 16
+    %v600 = getelementptr i8, ptr @.str_853, i64 16
     %v601 = call ptr @orion_text_concat(ptr %v599, ptr %v600)
     store ptr %v601, ptr %v1
     %v602 = add i64 0, 0
     %v603 = load ptr, ptr %v1
-    %v604 = getelementptr i8, ptr @.str_852, i64 16
+    %v604 = getelementptr i8, ptr @.str_854, i64 16
     %v605 = call ptr @orion_text_concat(ptr %v603, ptr %v604)
     store ptr %v605, ptr %v1
     %v606 = add i64 0, 0
     %v607 = load ptr, ptr %v1
-    %v608 = getelementptr i8, ptr @.str_853, i64 16
+    %v608 = getelementptr i8, ptr @.str_855, i64 16
     %v609 = call ptr @orion_text_concat(ptr %v607, ptr %v608)
     store ptr %v609, ptr %v1
     %v610 = add i64 0, 0
     %v611 = load ptr, ptr %v1
-    %v612 = getelementptr i8, ptr @.str_854, i64 16
+    %v612 = getelementptr i8, ptr @.str_856, i64 16
     %v613 = call ptr @orion_text_concat(ptr %v611, ptr %v612)
     store ptr %v613, ptr %v1
     %v614 = add i64 0, 0
     %v615 = load ptr, ptr %v1
-    %v616 = getelementptr i8, ptr @.str_855, i64 16
+    %v616 = getelementptr i8, ptr @.str_857, i64 16
     %v617 = call ptr @orion_text_concat(ptr %v615, ptr %v616)
     store ptr %v617, ptr %v1
     %v618 = add i64 0, 0
     %v619 = load ptr, ptr %v1
-    %v620 = getelementptr i8, ptr @.str_856, i64 16
+    %v620 = getelementptr i8, ptr @.str_858, i64 16
     %v621 = call ptr @orion_text_concat(ptr %v619, ptr %v620)
     store ptr %v621, ptr %v1
     %v622 = add i64 0, 0
     %v623 = load ptr, ptr %v1
-    %v624 = getelementptr i8, ptr @.str_857, i64 16
+    %v624 = getelementptr i8, ptr @.str_859, i64 16
     %v625 = call ptr @orion_text_concat(ptr %v623, ptr %v624)
     store ptr %v625, ptr %v1
     %v626 = add i64 0, 0
     %v627 = load ptr, ptr %v1
-    %v628 = getelementptr i8, ptr @.str_858, i64 16
+    %v628 = getelementptr i8, ptr @.str_860, i64 16
     %v629 = call ptr @orion_text_concat(ptr %v627, ptr %v628)
     store ptr %v629, ptr %v1
     %v630 = add i64 0, 0
     %v631 = load ptr, ptr %v1
-    %v632 = getelementptr i8, ptr @.str_859, i64 16
+    %v632 = getelementptr i8, ptr @.str_861, i64 16
     %v633 = call ptr @orion_text_concat(ptr %v631, ptr %v632)
     store ptr %v633, ptr %v1
     %v634 = add i64 0, 0
     %v635 = load ptr, ptr %v1
-    %v636 = getelementptr i8, ptr @.str_860, i64 16
+    %v636 = getelementptr i8, ptr @.str_862, i64 16
     %v637 = call ptr @orion_text_concat(ptr %v635, ptr %v636)
     store ptr %v637, ptr %v1
     %v638 = add i64 0, 0
     %v639 = load ptr, ptr %v1
-    %v640 = getelementptr i8, ptr @.str_861, i64 16
+    %v640 = getelementptr i8, ptr @.str_863, i64 16
     %v641 = call ptr @orion_text_concat(ptr %v639, ptr %v640)
     store ptr %v641, ptr %v1
     %v642 = add i64 0, 0
     %v643 = load ptr, ptr %v1
-    %v644 = getelementptr i8, ptr @.str_862, i64 16
+    %v644 = getelementptr i8, ptr @.str_864, i64 16
     %v645 = call ptr @orion_text_concat(ptr %v643, ptr %v644)
     store ptr %v645, ptr %v1
     %v646 = add i64 0, 0
     %v647 = load ptr, ptr %v1
-    %v648 = getelementptr i8, ptr @.str_863, i64 16
+    %v648 = getelementptr i8, ptr @.str_865, i64 16
     %v649 = call ptr @orion_text_concat(ptr %v647, ptr %v648)
     store ptr %v649, ptr %v1
     %v650 = add i64 0, 0
     %v651 = load ptr, ptr %v1
-    %v652 = getelementptr i8, ptr @.str_864, i64 16
+    %v652 = getelementptr i8, ptr @.str_866, i64 16
     %v653 = call ptr @orion_text_concat(ptr %v651, ptr %v652)
     store ptr %v653, ptr %v1
     %v654 = add i64 0, 0
     %v655 = load ptr, ptr %v1
-    %v656 = getelementptr i8, ptr @.str_865, i64 16
+    %v656 = getelementptr i8, ptr @.str_867, i64 16
     %v657 = call ptr @orion_text_concat(ptr %v655, ptr %v656)
     store ptr %v657, ptr %v1
     %v658 = add i64 0, 0
     %v659 = load ptr, ptr %v1
-    %v660 = getelementptr i8, ptr @.str_866, i64 16
+    %v660 = getelementptr i8, ptr @.str_868, i64 16
     %v661 = call ptr @orion_text_concat(ptr %v659, ptr %v660)
     store ptr %v661, ptr %v1
     %v662 = add i64 0, 0
     %v663 = load ptr, ptr %v1
-    %v664 = getelementptr i8, ptr @.str_867, i64 16
+    %v664 = getelementptr i8, ptr @.str_869, i64 16
     %v665 = call ptr @orion_text_concat(ptr %v663, ptr %v664)
     store ptr %v665, ptr %v1
     %v666 = add i64 0, 0
     %v667 = load ptr, ptr %v1
-    %v668 = getelementptr i8, ptr @.str_868, i64 16
+    %v668 = getelementptr i8, ptr @.str_870, i64 16
     %v669 = call ptr @orion_text_concat(ptr %v667, ptr %v668)
     store ptr %v669, ptr %v1
     %v670 = add i64 0, 0
     %v671 = load ptr, ptr %v1
-    %v672 = getelementptr i8, ptr @.str_869, i64 16
+    %v672 = getelementptr i8, ptr @.str_871, i64 16
     %v673 = call ptr @orion_text_concat(ptr %v671, ptr %v672)
     store ptr %v673, ptr %v1
     %v674 = add i64 0, 0
     %v675 = load ptr, ptr %v1
-    %v676 = getelementptr i8, ptr @.str_870, i64 16
+    %v676 = getelementptr i8, ptr @.str_872, i64 16
     %v677 = call ptr @orion_text_concat(ptr %v675, ptr %v676)
     store ptr %v677, ptr %v1
     %v678 = add i64 0, 0
     %v679 = load ptr, ptr %v1
-    %v680 = getelementptr i8, ptr @.str_871, i64 16
+    %v680 = getelementptr i8, ptr @.str_873, i64 16
     %v681 = call ptr @orion_text_concat(ptr %v679, ptr %v680)
     store ptr %v681, ptr %v1
     %v682 = add i64 0, 0
     %v683 = load ptr, ptr %v1
-    %v684 = getelementptr i8, ptr @.str_872, i64 16
+    %v684 = getelementptr i8, ptr @.str_874, i64 16
     %v685 = call ptr @orion_text_concat(ptr %v683, ptr %v684)
     store ptr %v685, ptr %v1
     %v686 = add i64 0, 0
     %v687 = load ptr, ptr %v1
-    %v688 = getelementptr i8, ptr @.str_873, i64 16
+    %v688 = getelementptr i8, ptr @.str_875, i64 16
     %v689 = call ptr @orion_text_concat(ptr %v687, ptr %v688)
     store ptr %v689, ptr %v1
     %v690 = add i64 0, 0
     %v691 = load ptr, ptr %v1
-    %v692 = getelementptr i8, ptr @.str_874, i64 16
+    %v692 = getelementptr i8, ptr @.str_876, i64 16
     %v693 = call ptr @orion_text_concat(ptr %v691, ptr %v692)
     store ptr %v693, ptr %v1
     %v694 = add i64 0, 0
     %v695 = load ptr, ptr %v1
-    %v696 = getelementptr i8, ptr @.str_875, i64 16
+    %v696 = getelementptr i8, ptr @.str_877, i64 16
     %v697 = call ptr @orion_text_concat(ptr %v695, ptr %v696)
     store ptr %v697, ptr %v1
     %v698 = add i64 0, 0
     %v699 = load ptr, ptr %v1
-    %v700 = getelementptr i8, ptr @.str_876, i64 16
+    %v700 = getelementptr i8, ptr @.str_878, i64 16
     %v701 = call ptr @orion_text_concat(ptr %v699, ptr %v700)
     store ptr %v701, ptr %v1
     %v702 = add i64 0, 0
     %v703 = load ptr, ptr %v1
-    %v704 = getelementptr i8, ptr @.str_877, i64 16
+    %v704 = getelementptr i8, ptr @.str_879, i64 16
     %v705 = call ptr @orion_text_concat(ptr %v703, ptr %v704)
     store ptr %v705, ptr %v1
     %v706 = add i64 0, 0
     %v707 = load ptr, ptr %v1
-    %v708 = getelementptr i8, ptr @.str_878, i64 16
+    %v708 = getelementptr i8, ptr @.str_880, i64 16
     %v709 = call ptr @orion_text_concat(ptr %v707, ptr %v708)
     store ptr %v709, ptr %v1
     %v710 = add i64 0, 0
     %v711 = load ptr, ptr %v1
-    %v712 = getelementptr i8, ptr @.str_879, i64 16
+    %v712 = getelementptr i8, ptr @.str_881, i64 16
     %v713 = call ptr @orion_text_concat(ptr %v711, ptr %v712)
     store ptr %v713, ptr %v1
     %v714 = add i64 0, 0
     %v715 = load ptr, ptr %v1
-    %v716 = getelementptr i8, ptr @.str_880, i64 16
+    %v716 = getelementptr i8, ptr @.str_882, i64 16
     %v717 = call ptr @orion_text_concat(ptr %v715, ptr %v716)
     store ptr %v717, ptr %v1
     %v718 = add i64 0, 0
     %v719 = load ptr, ptr %v1
-    %v720 = getelementptr i8, ptr @.str_881, i64 16
+    %v720 = getelementptr i8, ptr @.str_883, i64 16
     %v721 = call ptr @orion_text_concat(ptr %v719, ptr %v720)
     store ptr %v721, ptr %v1
     %v722 = add i64 0, 0
     %v723 = load ptr, ptr %v1
-    %v724 = getelementptr i8, ptr @.str_882, i64 16
+    %v724 = getelementptr i8, ptr @.str_884, i64 16
     %v725 = call ptr @orion_text_concat(ptr %v723, ptr %v724)
     store ptr %v725, ptr %v1
     %v726 = add i64 0, 0
     %v727 = load ptr, ptr %v1
-    %v728 = getelementptr i8, ptr @.str_883, i64 16
+    %v728 = getelementptr i8, ptr @.str_885, i64 16
     %v729 = call ptr @orion_text_concat(ptr %v727, ptr %v728)
     store ptr %v729, ptr %v1
     %v730 = add i64 0, 0
     %v731 = load ptr, ptr %v1
-    %v732 = getelementptr i8, ptr @.str_798, i64 16
+    %v732 = getelementptr i8, ptr @.str_800, i64 16
     %v733 = call ptr @orion_text_concat(ptr %v731, ptr %v732)
     store ptr %v733, ptr %v1
     %v734 = add i64 0, 0
     %v735 = load ptr, ptr %v1
-    %v736 = getelementptr i8, ptr @.str_884, i64 16
+    %v736 = getelementptr i8, ptr @.str_886, i64 16
     %v737 = call ptr @orion_text_concat(ptr %v735, ptr %v736)
     store ptr %v737, ptr %v1
     %v738 = add i64 0, 0
     %v739 = load ptr, ptr %v1
-    %v740 = getelementptr i8, ptr @.str_885, i64 16
+    %v740 = getelementptr i8, ptr @.str_887, i64 16
     %v741 = call ptr @orion_text_concat(ptr %v739, ptr %v740)
     store ptr %v741, ptr %v1
     %v742 = add i64 0, 0
     %v743 = load ptr, ptr %v1
-    %v744 = getelementptr i8, ptr @.str_886, i64 16
+    %v744 = getelementptr i8, ptr @.str_888, i64 16
     %v745 = call ptr @orion_text_concat(ptr %v743, ptr %v744)
     store ptr %v745, ptr %v1
     %v746 = add i64 0, 0
     %v747 = load ptr, ptr %v1
-    %v748 = getelementptr i8, ptr @.str_887, i64 16
+    %v748 = getelementptr i8, ptr @.str_889, i64 16
     %v749 = call ptr @orion_text_concat(ptr %v747, ptr %v748)
     store ptr %v749, ptr %v1
     %v750 = add i64 0, 0
     %v751 = load ptr, ptr %v1
-    %v752 = getelementptr i8, ptr @.str_888, i64 16
+    %v752 = getelementptr i8, ptr @.str_890, i64 16
     %v753 = call ptr @orion_text_concat(ptr %v751, ptr %v752)
     store ptr %v753, ptr %v1
     %v754 = add i64 0, 0
     %v755 = load ptr, ptr %v1
-    %v756 = getelementptr i8, ptr @.str_889, i64 16
+    %v756 = getelementptr i8, ptr @.str_891, i64 16
     %v757 = call ptr @orion_text_concat(ptr %v755, ptr %v756)
     store ptr %v757, ptr %v1
     %v758 = add i64 0, 0
     %v759 = load ptr, ptr %v1
-    %v760 = getelementptr i8, ptr @.str_890, i64 16
+    %v760 = getelementptr i8, ptr @.str_892, i64 16
     %v761 = call ptr @orion_text_concat(ptr %v759, ptr %v760)
     store ptr %v761, ptr %v1
     %v762 = add i64 0, 0
     %v763 = load ptr, ptr %v1
-    %v764 = getelementptr i8, ptr @.str_891, i64 16
+    %v764 = getelementptr i8, ptr @.str_893, i64 16
     %v765 = call ptr @orion_text_concat(ptr %v763, ptr %v764)
     store ptr %v765, ptr %v1
     %v766 = add i64 0, 0
     %v767 = load ptr, ptr %v1
-    %v768 = getelementptr i8, ptr @.str_892, i64 16
+    %v768 = getelementptr i8, ptr @.str_894, i64 16
     %v769 = call ptr @orion_text_concat(ptr %v767, ptr %v768)
     store ptr %v769, ptr %v1
     %v770 = add i64 0, 0
     %v771 = load ptr, ptr %v1
-    %v772 = getelementptr i8, ptr @.str_893, i64 16
+    %v772 = getelementptr i8, ptr @.str_895, i64 16
     %v773 = call ptr @orion_text_concat(ptr %v771, ptr %v772)
     store ptr %v773, ptr %v1
     %v774 = add i64 0, 0
     %v775 = load ptr, ptr %v1
-    %v776 = getelementptr i8, ptr @.str_894, i64 16
+    %v776 = getelementptr i8, ptr @.str_896, i64 16
     %v777 = call ptr @orion_text_concat(ptr %v775, ptr %v776)
     store ptr %v777, ptr %v1
     %v778 = add i64 0, 0
     %v779 = load ptr, ptr %v1
-    %v780 = getelementptr i8, ptr @.str_895, i64 16
+    %v780 = getelementptr i8, ptr @.str_897, i64 16
     %v781 = call ptr @orion_text_concat(ptr %v779, ptr %v780)
     store ptr %v781, ptr %v1
     %v782 = add i64 0, 0
     %v783 = load ptr, ptr %v1
-    %v784 = getelementptr i8, ptr @.str_896, i64 16
+    %v784 = getelementptr i8, ptr @.str_898, i64 16
     %v785 = call ptr @orion_text_concat(ptr %v783, ptr %v784)
     store ptr %v785, ptr %v1
     %v786 = add i64 0, 0
     %v787 = load ptr, ptr %v1
-    %v788 = getelementptr i8, ptr @.str_897, i64 16
+    %v788 = getelementptr i8, ptr @.str_899, i64 16
     %v789 = call ptr @orion_text_concat(ptr %v787, ptr %v788)
     store ptr %v789, ptr %v1
     %v790 = add i64 0, 0
     %v791 = load ptr, ptr %v1
-    %v792 = getelementptr i8, ptr @.str_898, i64 16
+    %v792 = getelementptr i8, ptr @.str_900, i64 16
     %v793 = call ptr @orion_text_concat(ptr %v791, ptr %v792)
     store ptr %v793, ptr %v1
     %v794 = add i64 0, 0
@@ -44944,4252 +45574,4252 @@ entry:
     store ptr %v797, ptr %v1
     %v798 = add i64 0, 0
     %v799 = load ptr, ptr %v1
-    %v800 = getelementptr i8, ptr @.str_899, i64 16
+    %v800 = getelementptr i8, ptr @.str_901, i64 16
     %v801 = call ptr @orion_text_concat(ptr %v799, ptr %v800)
     store ptr %v801, ptr %v1
     %v802 = add i64 0, 0
     %v803 = load ptr, ptr %v1
-    %v804 = getelementptr i8, ptr @.str_791, i64 16
+    %v804 = getelementptr i8, ptr @.str_793, i64 16
     %v805 = call ptr @orion_text_concat(ptr %v803, ptr %v804)
     store ptr %v805, ptr %v1
     %v806 = add i64 0, 0
     %v807 = load ptr, ptr %v1
-    %v808 = getelementptr i8, ptr @.str_900, i64 16
+    %v808 = getelementptr i8, ptr @.str_902, i64 16
     %v809 = call ptr @orion_text_concat(ptr %v807, ptr %v808)
     store ptr %v809, ptr %v1
     %v810 = add i64 0, 0
     %v811 = load ptr, ptr %v1
-    %v812 = getelementptr i8, ptr @.str_901, i64 16
+    %v812 = getelementptr i8, ptr @.str_903, i64 16
     %v813 = call ptr @orion_text_concat(ptr %v811, ptr %v812)
     store ptr %v813, ptr %v1
     %v814 = add i64 0, 0
     %v815 = load ptr, ptr %v1
-    %v816 = getelementptr i8, ptr @.str_902, i64 16
+    %v816 = getelementptr i8, ptr @.str_904, i64 16
     %v817 = call ptr @orion_text_concat(ptr %v815, ptr %v816)
     store ptr %v817, ptr %v1
     %v818 = add i64 0, 0
     %v819 = load ptr, ptr %v1
-    %v820 = getelementptr i8, ptr @.str_903, i64 16
+    %v820 = getelementptr i8, ptr @.str_905, i64 16
     %v821 = call ptr @orion_text_concat(ptr %v819, ptr %v820)
     store ptr %v821, ptr %v1
     %v822 = add i64 0, 0
     %v823 = load ptr, ptr %v1
-    %v824 = getelementptr i8, ptr @.str_904, i64 16
+    %v824 = getelementptr i8, ptr @.str_906, i64 16
     %v825 = call ptr @orion_text_concat(ptr %v823, ptr %v824)
     store ptr %v825, ptr %v1
     %v826 = add i64 0, 0
     %v827 = load ptr, ptr %v1
-    %v828 = getelementptr i8, ptr @.str_905, i64 16
+    %v828 = getelementptr i8, ptr @.str_907, i64 16
     %v829 = call ptr @orion_text_concat(ptr %v827, ptr %v828)
     store ptr %v829, ptr %v1
     %v830 = add i64 0, 0
     %v831 = load ptr, ptr %v1
-    %v832 = getelementptr i8, ptr @.str_833, i64 16
+    %v832 = getelementptr i8, ptr @.str_835, i64 16
     %v833 = call ptr @orion_text_concat(ptr %v831, ptr %v832)
     store ptr %v833, ptr %v1
     %v834 = add i64 0, 0
     %v835 = load ptr, ptr %v1
-    %v836 = getelementptr i8, ptr @.str_798, i64 16
+    %v836 = getelementptr i8, ptr @.str_800, i64 16
     %v837 = call ptr @orion_text_concat(ptr %v835, ptr %v836)
     store ptr %v837, ptr %v1
     %v838 = add i64 0, 0
     %v839 = load ptr, ptr %v1
-    %v840 = getelementptr i8, ptr @.str_906, i64 16
+    %v840 = getelementptr i8, ptr @.str_908, i64 16
     %v841 = call ptr @orion_text_concat(ptr %v839, ptr %v840)
     store ptr %v841, ptr %v1
     %v842 = add i64 0, 0
     %v843 = load ptr, ptr %v1
-    %v844 = getelementptr i8, ptr @.str_791, i64 16
+    %v844 = getelementptr i8, ptr @.str_793, i64 16
     %v845 = call ptr @orion_text_concat(ptr %v843, ptr %v844)
     store ptr %v845, ptr %v1
     %v846 = add i64 0, 0
     %v847 = load ptr, ptr %v1
-    %v848 = getelementptr i8, ptr @.str_907, i64 16
+    %v848 = getelementptr i8, ptr @.str_909, i64 16
     %v849 = call ptr @orion_text_concat(ptr %v847, ptr %v848)
     store ptr %v849, ptr %v1
     %v850 = add i64 0, 0
     %v851 = load ptr, ptr %v1
-    %v852 = getelementptr i8, ptr @.str_908, i64 16
+    %v852 = getelementptr i8, ptr @.str_910, i64 16
     %v853 = call ptr @orion_text_concat(ptr %v851, ptr %v852)
     store ptr %v853, ptr %v1
     %v854 = add i64 0, 0
     %v855 = load ptr, ptr %v1
-    %v856 = getelementptr i8, ptr @.str_909, i64 16
+    %v856 = getelementptr i8, ptr @.str_911, i64 16
     %v857 = call ptr @orion_text_concat(ptr %v855, ptr %v856)
     store ptr %v857, ptr %v1
     %v858 = add i64 0, 0
     %v859 = load ptr, ptr %v1
-    %v860 = getelementptr i8, ptr @.str_910, i64 16
+    %v860 = getelementptr i8, ptr @.str_912, i64 16
     %v861 = call ptr @orion_text_concat(ptr %v859, ptr %v860)
     store ptr %v861, ptr %v1
     %v862 = add i64 0, 0
     %v863 = load ptr, ptr %v1
-    %v864 = getelementptr i8, ptr @.str_798, i64 16
+    %v864 = getelementptr i8, ptr @.str_800, i64 16
     %v865 = call ptr @orion_text_concat(ptr %v863, ptr %v864)
     store ptr %v865, ptr %v1
     %v866 = add i64 0, 0
     %v867 = load ptr, ptr %v1
-    %v868 = getelementptr i8, ptr @.str_911, i64 16
+    %v868 = getelementptr i8, ptr @.str_913, i64 16
     %v869 = call ptr @orion_text_concat(ptr %v867, ptr %v868)
     store ptr %v869, ptr %v1
     %v870 = add i64 0, 0
     %v871 = load ptr, ptr %v1
-    %v872 = getelementptr i8, ptr @.str_912, i64 16
+    %v872 = getelementptr i8, ptr @.str_914, i64 16
     %v873 = call ptr @orion_text_concat(ptr %v871, ptr %v872)
     store ptr %v873, ptr %v1
     %v874 = add i64 0, 0
     %v875 = load ptr, ptr %v1
-    %v876 = getelementptr i8, ptr @.str_791, i64 16
+    %v876 = getelementptr i8, ptr @.str_793, i64 16
     %v877 = call ptr @orion_text_concat(ptr %v875, ptr %v876)
     store ptr %v877, ptr %v1
     %v878 = add i64 0, 0
     %v879 = load ptr, ptr %v1
-    %v880 = getelementptr i8, ptr @.str_913, i64 16
+    %v880 = getelementptr i8, ptr @.str_915, i64 16
     %v881 = call ptr @orion_text_concat(ptr %v879, ptr %v880)
     store ptr %v881, ptr %v1
     %v882 = add i64 0, 0
     %v883 = load ptr, ptr %v1
-    %v884 = getelementptr i8, ptr @.str_914, i64 16
+    %v884 = getelementptr i8, ptr @.str_916, i64 16
     %v885 = call ptr @orion_text_concat(ptr %v883, ptr %v884)
     store ptr %v885, ptr %v1
     %v886 = add i64 0, 0
     %v887 = load ptr, ptr %v1
-    %v888 = getelementptr i8, ptr @.str_915, i64 16
+    %v888 = getelementptr i8, ptr @.str_917, i64 16
     %v889 = call ptr @orion_text_concat(ptr %v887, ptr %v888)
     store ptr %v889, ptr %v1
     %v890 = add i64 0, 0
     %v891 = load ptr, ptr %v1
-    %v892 = getelementptr i8, ptr @.str_916, i64 16
+    %v892 = getelementptr i8, ptr @.str_918, i64 16
     %v893 = call ptr @orion_text_concat(ptr %v891, ptr %v892)
     store ptr %v893, ptr %v1
     %v894 = add i64 0, 0
     %v895 = load ptr, ptr %v1
-    %v896 = getelementptr i8, ptr @.str_917, i64 16
+    %v896 = getelementptr i8, ptr @.str_919, i64 16
     %v897 = call ptr @orion_text_concat(ptr %v895, ptr %v896)
     store ptr %v897, ptr %v1
     %v898 = add i64 0, 0
     %v899 = load ptr, ptr %v1
-    %v900 = getelementptr i8, ptr @.str_918, i64 16
+    %v900 = getelementptr i8, ptr @.str_920, i64 16
     %v901 = call ptr @orion_text_concat(ptr %v899, ptr %v900)
     store ptr %v901, ptr %v1
     %v902 = add i64 0, 0
     %v903 = load ptr, ptr %v1
-    %v904 = getelementptr i8, ptr @.str_919, i64 16
+    %v904 = getelementptr i8, ptr @.str_921, i64 16
     %v905 = call ptr @orion_text_concat(ptr %v903, ptr %v904)
     store ptr %v905, ptr %v1
     %v906 = add i64 0, 0
     %v907 = load ptr, ptr %v1
-    %v908 = getelementptr i8, ptr @.str_920, i64 16
+    %v908 = getelementptr i8, ptr @.str_922, i64 16
     %v909 = call ptr @orion_text_concat(ptr %v907, ptr %v908)
     store ptr %v909, ptr %v1
     %v910 = add i64 0, 0
     %v911 = load ptr, ptr %v1
-    %v912 = getelementptr i8, ptr @.str_921, i64 16
+    %v912 = getelementptr i8, ptr @.str_923, i64 16
     %v913 = call ptr @orion_text_concat(ptr %v911, ptr %v912)
     store ptr %v913, ptr %v1
     %v914 = add i64 0, 0
     %v915 = load ptr, ptr %v1
-    %v916 = getelementptr i8, ptr @.str_922, i64 16
+    %v916 = getelementptr i8, ptr @.str_924, i64 16
     %v917 = call ptr @orion_text_concat(ptr %v915, ptr %v916)
     store ptr %v917, ptr %v1
     %v918 = add i64 0, 0
     %v919 = load ptr, ptr %v1
-    %v920 = getelementptr i8, ptr @.str_923, i64 16
+    %v920 = getelementptr i8, ptr @.str_925, i64 16
     %v921 = call ptr @orion_text_concat(ptr %v919, ptr %v920)
     store ptr %v921, ptr %v1
     %v922 = add i64 0, 0
     %v923 = load ptr, ptr %v1
-    %v924 = getelementptr i8, ptr @.str_924, i64 16
+    %v924 = getelementptr i8, ptr @.str_926, i64 16
     %v925 = call ptr @orion_text_concat(ptr %v923, ptr %v924)
     store ptr %v925, ptr %v1
     %v926 = add i64 0, 0
     %v927 = load ptr, ptr %v1
-    %v928 = getelementptr i8, ptr @.str_832, i64 16
+    %v928 = getelementptr i8, ptr @.str_834, i64 16
     %v929 = call ptr @orion_text_concat(ptr %v927, ptr %v928)
     store ptr %v929, ptr %v1
     %v930 = add i64 0, 0
     %v931 = load ptr, ptr %v1
-    %v932 = getelementptr i8, ptr @.str_833, i64 16
+    %v932 = getelementptr i8, ptr @.str_835, i64 16
     %v933 = call ptr @orion_text_concat(ptr %v931, ptr %v932)
     store ptr %v933, ptr %v1
     %v934 = add i64 0, 0
     %v935 = load ptr, ptr %v1
-    %v936 = getelementptr i8, ptr @.str_798, i64 16
+    %v936 = getelementptr i8, ptr @.str_800, i64 16
     %v937 = call ptr @orion_text_concat(ptr %v935, ptr %v936)
     store ptr %v937, ptr %v1
     %v938 = add i64 0, 0
     %v939 = load ptr, ptr %v1
-    %v940 = getelementptr i8, ptr @.str_925, i64 16
+    %v940 = getelementptr i8, ptr @.str_927, i64 16
     %v941 = call ptr @orion_text_concat(ptr %v939, ptr %v940)
     store ptr %v941, ptr %v1
     %v942 = add i64 0, 0
     %v943 = load ptr, ptr %v1
-    %v944 = getelementptr i8, ptr @.str_926, i64 16
+    %v944 = getelementptr i8, ptr @.str_928, i64 16
     %v945 = call ptr @orion_text_concat(ptr %v943, ptr %v944)
     store ptr %v945, ptr %v1
     %v946 = add i64 0, 0
     %v947 = load ptr, ptr %v1
-    %v948 = getelementptr i8, ptr @.str_791, i64 16
+    %v948 = getelementptr i8, ptr @.str_793, i64 16
     %v949 = call ptr @orion_text_concat(ptr %v947, ptr %v948)
     store ptr %v949, ptr %v1
     %v950 = add i64 0, 0
     %v951 = load ptr, ptr %v1
-    %v952 = getelementptr i8, ptr @.str_927, i64 16
+    %v952 = getelementptr i8, ptr @.str_929, i64 16
     %v953 = call ptr @orion_text_concat(ptr %v951, ptr %v952)
     store ptr %v953, ptr %v1
     %v954 = add i64 0, 0
     %v955 = load ptr, ptr %v1
-    %v956 = getelementptr i8, ptr @.str_928, i64 16
+    %v956 = getelementptr i8, ptr @.str_930, i64 16
     %v957 = call ptr @orion_text_concat(ptr %v955, ptr %v956)
     store ptr %v957, ptr %v1
     %v958 = add i64 0, 0
     %v959 = load ptr, ptr %v1
-    %v960 = getelementptr i8, ptr @.str_929, i64 16
+    %v960 = getelementptr i8, ptr @.str_931, i64 16
     %v961 = call ptr @orion_text_concat(ptr %v959, ptr %v960)
     store ptr %v961, ptr %v1
     %v962 = add i64 0, 0
     %v963 = load ptr, ptr %v1
-    %v964 = getelementptr i8, ptr @.str_930, i64 16
+    %v964 = getelementptr i8, ptr @.str_932, i64 16
     %v965 = call ptr @orion_text_concat(ptr %v963, ptr %v964)
     store ptr %v965, ptr %v1
     %v966 = add i64 0, 0
     %v967 = load ptr, ptr %v1
-    %v968 = getelementptr i8, ptr @.str_798, i64 16
+    %v968 = getelementptr i8, ptr @.str_800, i64 16
     %v969 = call ptr @orion_text_concat(ptr %v967, ptr %v968)
     store ptr %v969, ptr %v1
     %v970 = add i64 0, 0
     %v971 = load ptr, ptr %v1
-    %v972 = getelementptr i8, ptr @.str_931, i64 16
+    %v972 = getelementptr i8, ptr @.str_933, i64 16
     %v973 = call ptr @orion_text_concat(ptr %v971, ptr %v972)
     store ptr %v973, ptr %v1
     %v974 = add i64 0, 0
     %v975 = load ptr, ptr %v1
-    %v976 = getelementptr i8, ptr @.str_791, i64 16
+    %v976 = getelementptr i8, ptr @.str_793, i64 16
     %v977 = call ptr @orion_text_concat(ptr %v975, ptr %v976)
     store ptr %v977, ptr %v1
     %v978 = add i64 0, 0
     %v979 = load ptr, ptr %v1
-    %v980 = getelementptr i8, ptr @.str_913, i64 16
+    %v980 = getelementptr i8, ptr @.str_915, i64 16
     %v981 = call ptr @orion_text_concat(ptr %v979, ptr %v980)
     store ptr %v981, ptr %v1
     %v982 = add i64 0, 0
     %v983 = load ptr, ptr %v1
-    %v984 = getelementptr i8, ptr @.str_932, i64 16
+    %v984 = getelementptr i8, ptr @.str_934, i64 16
     %v985 = call ptr @orion_text_concat(ptr %v983, ptr %v984)
     store ptr %v985, ptr %v1
     %v986 = add i64 0, 0
     %v987 = load ptr, ptr %v1
-    %v988 = getelementptr i8, ptr @.str_933, i64 16
+    %v988 = getelementptr i8, ptr @.str_935, i64 16
     %v989 = call ptr @orion_text_concat(ptr %v987, ptr %v988)
     store ptr %v989, ptr %v1
     %v990 = add i64 0, 0
     %v991 = load ptr, ptr %v1
-    %v992 = getelementptr i8, ptr @.str_934, i64 16
+    %v992 = getelementptr i8, ptr @.str_936, i64 16
     %v993 = call ptr @orion_text_concat(ptr %v991, ptr %v992)
     store ptr %v993, ptr %v1
     %v994 = add i64 0, 0
     %v995 = load ptr, ptr %v1
-    %v996 = getelementptr i8, ptr @.str_935, i64 16
+    %v996 = getelementptr i8, ptr @.str_937, i64 16
     %v997 = call ptr @orion_text_concat(ptr %v995, ptr %v996)
     store ptr %v997, ptr %v1
     %v998 = add i64 0, 0
     %v999 = load ptr, ptr %v1
-    %v1000 = getelementptr i8, ptr @.str_936, i64 16
+    %v1000 = getelementptr i8, ptr @.str_938, i64 16
     %v1001 = call ptr @orion_text_concat(ptr %v999, ptr %v1000)
     store ptr %v1001, ptr %v1
     %v1002 = add i64 0, 0
     %v1003 = load ptr, ptr %v1
-    %v1004 = getelementptr i8, ptr @.str_937, i64 16
+    %v1004 = getelementptr i8, ptr @.str_939, i64 16
     %v1005 = call ptr @orion_text_concat(ptr %v1003, ptr %v1004)
     store ptr %v1005, ptr %v1
     %v1006 = add i64 0, 0
     %v1007 = load ptr, ptr %v1
-    %v1008 = getelementptr i8, ptr @.str_938, i64 16
+    %v1008 = getelementptr i8, ptr @.str_940, i64 16
     %v1009 = call ptr @orion_text_concat(ptr %v1007, ptr %v1008)
     store ptr %v1009, ptr %v1
     %v1010 = add i64 0, 0
     %v1011 = load ptr, ptr %v1
-    %v1012 = getelementptr i8, ptr @.str_939, i64 16
+    %v1012 = getelementptr i8, ptr @.str_941, i64 16
     %v1013 = call ptr @orion_text_concat(ptr %v1011, ptr %v1012)
     store ptr %v1013, ptr %v1
     %v1014 = add i64 0, 0
     %v1015 = load ptr, ptr %v1
-    %v1016 = getelementptr i8, ptr @.str_940, i64 16
+    %v1016 = getelementptr i8, ptr @.str_942, i64 16
     %v1017 = call ptr @orion_text_concat(ptr %v1015, ptr %v1016)
     store ptr %v1017, ptr %v1
     %v1018 = add i64 0, 0
     %v1019 = load ptr, ptr %v1
-    %v1020 = getelementptr i8, ptr @.str_941, i64 16
+    %v1020 = getelementptr i8, ptr @.str_943, i64 16
     %v1021 = call ptr @orion_text_concat(ptr %v1019, ptr %v1020)
     store ptr %v1021, ptr %v1
     %v1022 = add i64 0, 0
     %v1023 = load ptr, ptr %v1
-    %v1024 = getelementptr i8, ptr @.str_942, i64 16
+    %v1024 = getelementptr i8, ptr @.str_944, i64 16
     %v1025 = call ptr @orion_text_concat(ptr %v1023, ptr %v1024)
     store ptr %v1025, ptr %v1
     %v1026 = add i64 0, 0
     %v1027 = load ptr, ptr %v1
-    %v1028 = getelementptr i8, ptr @.str_812, i64 16
+    %v1028 = getelementptr i8, ptr @.str_814, i64 16
     %v1029 = call ptr @orion_text_concat(ptr %v1027, ptr %v1028)
     store ptr %v1029, ptr %v1
     %v1030 = add i64 0, 0
     %v1031 = load ptr, ptr %v1
-    %v1032 = getelementptr i8, ptr @.str_933, i64 16
+    %v1032 = getelementptr i8, ptr @.str_935, i64 16
     %v1033 = call ptr @orion_text_concat(ptr %v1031, ptr %v1032)
     store ptr %v1033, ptr %v1
     %v1034 = add i64 0, 0
     %v1035 = load ptr, ptr %v1
-    %v1036 = getelementptr i8, ptr @.str_943, i64 16
+    %v1036 = getelementptr i8, ptr @.str_945, i64 16
     %v1037 = call ptr @orion_text_concat(ptr %v1035, ptr %v1036)
     store ptr %v1037, ptr %v1
     %v1038 = add i64 0, 0
     %v1039 = load ptr, ptr %v1
-    %v1040 = getelementptr i8, ptr @.str_944, i64 16
+    %v1040 = getelementptr i8, ptr @.str_946, i64 16
     %v1041 = call ptr @orion_text_concat(ptr %v1039, ptr %v1040)
     store ptr %v1041, ptr %v1
     %v1042 = add i64 0, 0
     %v1043 = load ptr, ptr %v1
-    %v1044 = getelementptr i8, ptr @.str_798, i64 16
+    %v1044 = getelementptr i8, ptr @.str_800, i64 16
     %v1045 = call ptr @orion_text_concat(ptr %v1043, ptr %v1044)
     store ptr %v1045, ptr %v1
     %v1046 = add i64 0, 0
     %v1047 = load ptr, ptr %v1
-    %v1048 = getelementptr i8, ptr @.str_945, i64 16
+    %v1048 = getelementptr i8, ptr @.str_947, i64 16
     %v1049 = call ptr @orion_text_concat(ptr %v1047, ptr %v1048)
     store ptr %v1049, ptr %v1
     %v1050 = add i64 0, 0
     %v1051 = load ptr, ptr %v1
-    %v1052 = getelementptr i8, ptr @.str_791, i64 16
+    %v1052 = getelementptr i8, ptr @.str_793, i64 16
     %v1053 = call ptr @orion_text_concat(ptr %v1051, ptr %v1052)
     store ptr %v1053, ptr %v1
     %v1054 = add i64 0, 0
     %v1055 = load ptr, ptr %v1
-    %v1056 = getelementptr i8, ptr @.str_946, i64 16
+    %v1056 = getelementptr i8, ptr @.str_948, i64 16
     %v1057 = call ptr @orion_text_concat(ptr %v1055, ptr %v1056)
     store ptr %v1057, ptr %v1
     %v1058 = add i64 0, 0
     %v1059 = load ptr, ptr %v1
-    %v1060 = getelementptr i8, ptr @.str_947, i64 16
+    %v1060 = getelementptr i8, ptr @.str_949, i64 16
     %v1061 = call ptr @orion_text_concat(ptr %v1059, ptr %v1060)
     store ptr %v1061, ptr %v1
     %v1062 = add i64 0, 0
     %v1063 = load ptr, ptr %v1
-    %v1064 = getelementptr i8, ptr @.str_933, i64 16
+    %v1064 = getelementptr i8, ptr @.str_935, i64 16
     %v1065 = call ptr @orion_text_concat(ptr %v1063, ptr %v1064)
     store ptr %v1065, ptr %v1
     %v1066 = add i64 0, 0
     %v1067 = load ptr, ptr %v1
-    %v1068 = getelementptr i8, ptr @.str_934, i64 16
+    %v1068 = getelementptr i8, ptr @.str_936, i64 16
     %v1069 = call ptr @orion_text_concat(ptr %v1067, ptr %v1068)
     store ptr %v1069, ptr %v1
     %v1070 = add i64 0, 0
     %v1071 = load ptr, ptr %v1
-    %v1072 = getelementptr i8, ptr @.str_935, i64 16
+    %v1072 = getelementptr i8, ptr @.str_937, i64 16
     %v1073 = call ptr @orion_text_concat(ptr %v1071, ptr %v1072)
     store ptr %v1073, ptr %v1
     %v1074 = add i64 0, 0
     %v1075 = load ptr, ptr %v1
-    %v1076 = getelementptr i8, ptr @.str_948, i64 16
+    %v1076 = getelementptr i8, ptr @.str_950, i64 16
     %v1077 = call ptr @orion_text_concat(ptr %v1075, ptr %v1076)
     store ptr %v1077, ptr %v1
     %v1078 = add i64 0, 0
     %v1079 = load ptr, ptr %v1
-    %v1080 = getelementptr i8, ptr @.str_937, i64 16
+    %v1080 = getelementptr i8, ptr @.str_939, i64 16
     %v1081 = call ptr @orion_text_concat(ptr %v1079, ptr %v1080)
     store ptr %v1081, ptr %v1
     %v1082 = add i64 0, 0
     %v1083 = load ptr, ptr %v1
-    %v1084 = getelementptr i8, ptr @.str_938, i64 16
+    %v1084 = getelementptr i8, ptr @.str_940, i64 16
     %v1085 = call ptr @orion_text_concat(ptr %v1083, ptr %v1084)
     store ptr %v1085, ptr %v1
     %v1086 = add i64 0, 0
     %v1087 = load ptr, ptr %v1
-    %v1088 = getelementptr i8, ptr @.str_949, i64 16
+    %v1088 = getelementptr i8, ptr @.str_951, i64 16
     %v1089 = call ptr @orion_text_concat(ptr %v1087, ptr %v1088)
     store ptr %v1089, ptr %v1
     %v1090 = add i64 0, 0
     %v1091 = load ptr, ptr %v1
-    %v1092 = getelementptr i8, ptr @.str_950, i64 16
+    %v1092 = getelementptr i8, ptr @.str_952, i64 16
     %v1093 = call ptr @orion_text_concat(ptr %v1091, ptr %v1092)
     store ptr %v1093, ptr %v1
     %v1094 = add i64 0, 0
     %v1095 = load ptr, ptr %v1
-    %v1096 = getelementptr i8, ptr @.str_951, i64 16
+    %v1096 = getelementptr i8, ptr @.str_953, i64 16
     %v1097 = call ptr @orion_text_concat(ptr %v1095, ptr %v1096)
     store ptr %v1097, ptr %v1
     %v1098 = add i64 0, 0
     %v1099 = load ptr, ptr %v1
-    %v1100 = getelementptr i8, ptr @.str_952, i64 16
+    %v1100 = getelementptr i8, ptr @.str_954, i64 16
     %v1101 = call ptr @orion_text_concat(ptr %v1099, ptr %v1100)
     store ptr %v1101, ptr %v1
     %v1102 = add i64 0, 0
     %v1103 = load ptr, ptr %v1
-    %v1104 = getelementptr i8, ptr @.str_812, i64 16
+    %v1104 = getelementptr i8, ptr @.str_814, i64 16
     %v1105 = call ptr @orion_text_concat(ptr %v1103, ptr %v1104)
     store ptr %v1105, ptr %v1
     %v1106 = add i64 0, 0
     %v1107 = load ptr, ptr %v1
-    %v1108 = getelementptr i8, ptr @.str_933, i64 16
+    %v1108 = getelementptr i8, ptr @.str_935, i64 16
     %v1109 = call ptr @orion_text_concat(ptr %v1107, ptr %v1108)
     store ptr %v1109, ptr %v1
     %v1110 = add i64 0, 0
     %v1111 = load ptr, ptr %v1
-    %v1112 = getelementptr i8, ptr @.str_943, i64 16
+    %v1112 = getelementptr i8, ptr @.str_945, i64 16
     %v1113 = call ptr @orion_text_concat(ptr %v1111, ptr %v1112)
     store ptr %v1113, ptr %v1
     %v1114 = add i64 0, 0
     %v1115 = load ptr, ptr %v1
-    %v1116 = getelementptr i8, ptr @.str_953, i64 16
+    %v1116 = getelementptr i8, ptr @.str_955, i64 16
     %v1117 = call ptr @orion_text_concat(ptr %v1115, ptr %v1116)
     store ptr %v1117, ptr %v1
     %v1118 = add i64 0, 0
     %v1119 = load ptr, ptr %v1
-    %v1120 = getelementptr i8, ptr @.str_832, i64 16
+    %v1120 = getelementptr i8, ptr @.str_834, i64 16
     %v1121 = call ptr @orion_text_concat(ptr %v1119, ptr %v1120)
     store ptr %v1121, ptr %v1
     %v1122 = add i64 0, 0
     %v1123 = load ptr, ptr %v1
-    %v1124 = getelementptr i8, ptr @.str_833, i64 16
+    %v1124 = getelementptr i8, ptr @.str_835, i64 16
     %v1125 = call ptr @orion_text_concat(ptr %v1123, ptr %v1124)
     store ptr %v1125, ptr %v1
     %v1126 = add i64 0, 0
     %v1127 = load ptr, ptr %v1
-    %v1128 = getelementptr i8, ptr @.str_798, i64 16
+    %v1128 = getelementptr i8, ptr @.str_800, i64 16
     %v1129 = call ptr @orion_text_concat(ptr %v1127, ptr %v1128)
     store ptr %v1129, ptr %v1
     %v1130 = add i64 0, 0
     %v1131 = load ptr, ptr %v1
-    %v1132 = getelementptr i8, ptr @.str_954, i64 16
+    %v1132 = getelementptr i8, ptr @.str_956, i64 16
     %v1133 = call ptr @orion_text_concat(ptr %v1131, ptr %v1132)
     store ptr %v1133, ptr %v1
     %v1134 = add i64 0, 0
     %v1135 = load ptr, ptr %v1
-    %v1136 = getelementptr i8, ptr @.str_791, i64 16
+    %v1136 = getelementptr i8, ptr @.str_793, i64 16
     %v1137 = call ptr @orion_text_concat(ptr %v1135, ptr %v1136)
     store ptr %v1137, ptr %v1
     %v1138 = add i64 0, 0
     %v1139 = load ptr, ptr %v1
-    %v1140 = getelementptr i8, ptr @.str_955, i64 16
+    %v1140 = getelementptr i8, ptr @.str_957, i64 16
     %v1141 = call ptr @orion_text_concat(ptr %v1139, ptr %v1140)
     store ptr %v1141, ptr %v1
     %v1142 = add i64 0, 0
     %v1143 = load ptr, ptr %v1
-    %v1144 = getelementptr i8, ptr @.str_933, i64 16
+    %v1144 = getelementptr i8, ptr @.str_935, i64 16
     %v1145 = call ptr @orion_text_concat(ptr %v1143, ptr %v1144)
     store ptr %v1145, ptr %v1
     %v1146 = add i64 0, 0
     %v1147 = load ptr, ptr %v1
-    %v1148 = getelementptr i8, ptr @.str_934, i64 16
+    %v1148 = getelementptr i8, ptr @.str_936, i64 16
     %v1149 = call ptr @orion_text_concat(ptr %v1147, ptr %v1148)
     store ptr %v1149, ptr %v1
     %v1150 = add i64 0, 0
     %v1151 = load ptr, ptr %v1
-    %v1152 = getelementptr i8, ptr @.str_935, i64 16
+    %v1152 = getelementptr i8, ptr @.str_937, i64 16
     %v1153 = call ptr @orion_text_concat(ptr %v1151, ptr %v1152)
     store ptr %v1153, ptr %v1
     %v1154 = add i64 0, 0
     %v1155 = load ptr, ptr %v1
-    %v1156 = getelementptr i8, ptr @.str_805, i64 16
+    %v1156 = getelementptr i8, ptr @.str_807, i64 16
     %v1157 = call ptr @orion_text_concat(ptr %v1155, ptr %v1156)
     store ptr %v1157, ptr %v1
     %v1158 = add i64 0, 0
     %v1159 = load ptr, ptr %v1
-    %v1160 = getelementptr i8, ptr @.str_937, i64 16
+    %v1160 = getelementptr i8, ptr @.str_939, i64 16
     %v1161 = call ptr @orion_text_concat(ptr %v1159, ptr %v1160)
     store ptr %v1161, ptr %v1
     %v1162 = add i64 0, 0
     %v1163 = load ptr, ptr %v1
-    %v1164 = getelementptr i8, ptr @.str_938, i64 16
+    %v1164 = getelementptr i8, ptr @.str_940, i64 16
     %v1165 = call ptr @orion_text_concat(ptr %v1163, ptr %v1164)
     store ptr %v1165, ptr %v1
     %v1166 = add i64 0, 0
     %v1167 = load ptr, ptr %v1
-    %v1168 = getelementptr i8, ptr @.str_956, i64 16
+    %v1168 = getelementptr i8, ptr @.str_958, i64 16
     %v1169 = call ptr @orion_text_concat(ptr %v1167, ptr %v1168)
     store ptr %v1169, ptr %v1
     %v1170 = add i64 0, 0
     %v1171 = load ptr, ptr %v1
-    %v1172 = getelementptr i8, ptr @.str_812, i64 16
+    %v1172 = getelementptr i8, ptr @.str_814, i64 16
     %v1173 = call ptr @orion_text_concat(ptr %v1171, ptr %v1172)
     store ptr %v1173, ptr %v1
     %v1174 = add i64 0, 0
     %v1175 = load ptr, ptr %v1
-    %v1176 = getelementptr i8, ptr @.str_933, i64 16
+    %v1176 = getelementptr i8, ptr @.str_935, i64 16
     %v1177 = call ptr @orion_text_concat(ptr %v1175, ptr %v1176)
     store ptr %v1177, ptr %v1
     %v1178 = add i64 0, 0
     %v1179 = load ptr, ptr %v1
-    %v1180 = getelementptr i8, ptr @.str_943, i64 16
+    %v1180 = getelementptr i8, ptr @.str_945, i64 16
     %v1181 = call ptr @orion_text_concat(ptr %v1179, ptr %v1180)
     store ptr %v1181, ptr %v1
     %v1182 = add i64 0, 0
     %v1183 = load ptr, ptr %v1
-    %v1184 = getelementptr i8, ptr @.str_944, i64 16
+    %v1184 = getelementptr i8, ptr @.str_946, i64 16
     %v1185 = call ptr @orion_text_concat(ptr %v1183, ptr %v1184)
     store ptr %v1185, ptr %v1
     %v1186 = add i64 0, 0
     %v1187 = load ptr, ptr %v1
-    %v1188 = getelementptr i8, ptr @.str_798, i64 16
+    %v1188 = getelementptr i8, ptr @.str_800, i64 16
     %v1189 = call ptr @orion_text_concat(ptr %v1187, ptr %v1188)
     store ptr %v1189, ptr %v1
     %v1190 = add i64 0, 0
     %v1191 = load ptr, ptr %v1
-    %v1192 = getelementptr i8, ptr @.str_957, i64 16
+    %v1192 = getelementptr i8, ptr @.str_959, i64 16
     %v1193 = call ptr @orion_text_concat(ptr %v1191, ptr %v1192)
     store ptr %v1193, ptr %v1
     %v1194 = add i64 0, 0
     %v1195 = load ptr, ptr %v1
-    %v1196 = getelementptr i8, ptr @.str_791, i64 16
+    %v1196 = getelementptr i8, ptr @.str_793, i64 16
     %v1197 = call ptr @orion_text_concat(ptr %v1195, ptr %v1196)
     store ptr %v1197, ptr %v1
     %v1198 = add i64 0, 0
     %v1199 = load ptr, ptr %v1
-    %v1200 = getelementptr i8, ptr @.str_958, i64 16
+    %v1200 = getelementptr i8, ptr @.str_960, i64 16
     %v1201 = call ptr @orion_text_concat(ptr %v1199, ptr %v1200)
     store ptr %v1201, ptr %v1
     %v1202 = add i64 0, 0
     %v1203 = load ptr, ptr %v1
-    %v1204 = getelementptr i8, ptr @.str_914, i64 16
+    %v1204 = getelementptr i8, ptr @.str_916, i64 16
     %v1205 = call ptr @orion_text_concat(ptr %v1203, ptr %v1204)
     store ptr %v1205, ptr %v1
     %v1206 = add i64 0, 0
     %v1207 = load ptr, ptr %v1
-    %v1208 = getelementptr i8, ptr @.str_915, i64 16
+    %v1208 = getelementptr i8, ptr @.str_917, i64 16
     %v1209 = call ptr @orion_text_concat(ptr %v1207, ptr %v1208)
     store ptr %v1209, ptr %v1
     %v1210 = add i64 0, 0
     %v1211 = load ptr, ptr %v1
-    %v1212 = getelementptr i8, ptr @.str_916, i64 16
+    %v1212 = getelementptr i8, ptr @.str_918, i64 16
     %v1213 = call ptr @orion_text_concat(ptr %v1211, ptr %v1212)
     store ptr %v1213, ptr %v1
     %v1214 = add i64 0, 0
     %v1215 = load ptr, ptr %v1
-    %v1216 = getelementptr i8, ptr @.str_917, i64 16
+    %v1216 = getelementptr i8, ptr @.str_919, i64 16
     %v1217 = call ptr @orion_text_concat(ptr %v1215, ptr %v1216)
     store ptr %v1217, ptr %v1
     %v1218 = add i64 0, 0
     %v1219 = load ptr, ptr %v1
-    %v1220 = getelementptr i8, ptr @.str_959, i64 16
+    %v1220 = getelementptr i8, ptr @.str_961, i64 16
     %v1221 = call ptr @orion_text_concat(ptr %v1219, ptr %v1220)
     store ptr %v1221, ptr %v1
     %v1222 = add i64 0, 0
     %v1223 = load ptr, ptr %v1
-    %v1224 = getelementptr i8, ptr @.str_960, i64 16
+    %v1224 = getelementptr i8, ptr @.str_962, i64 16
     %v1225 = call ptr @orion_text_concat(ptr %v1223, ptr %v1224)
     store ptr %v1225, ptr %v1
     %v1226 = add i64 0, 0
     %v1227 = load ptr, ptr %v1
-    %v1228 = getelementptr i8, ptr @.str_961, i64 16
+    %v1228 = getelementptr i8, ptr @.str_963, i64 16
     %v1229 = call ptr @orion_text_concat(ptr %v1227, ptr %v1228)
     store ptr %v1229, ptr %v1
     %v1230 = add i64 0, 0
     %v1231 = load ptr, ptr %v1
-    %v1232 = getelementptr i8, ptr @.str_962, i64 16
+    %v1232 = getelementptr i8, ptr @.str_964, i64 16
     %v1233 = call ptr @orion_text_concat(ptr %v1231, ptr %v1232)
     store ptr %v1233, ptr %v1
     %v1234 = add i64 0, 0
     %v1235 = load ptr, ptr %v1
-    %v1236 = getelementptr i8, ptr @.str_933, i64 16
+    %v1236 = getelementptr i8, ptr @.str_935, i64 16
     %v1237 = call ptr @orion_text_concat(ptr %v1235, ptr %v1236)
     store ptr %v1237, ptr %v1
     %v1238 = add i64 0, 0
     %v1239 = load ptr, ptr %v1
-    %v1240 = getelementptr i8, ptr @.str_934, i64 16
+    %v1240 = getelementptr i8, ptr @.str_936, i64 16
     %v1241 = call ptr @orion_text_concat(ptr %v1239, ptr %v1240)
     store ptr %v1241, ptr %v1
     %v1242 = add i64 0, 0
     %v1243 = load ptr, ptr %v1
-    %v1244 = getelementptr i8, ptr @.str_935, i64 16
+    %v1244 = getelementptr i8, ptr @.str_937, i64 16
     %v1245 = call ptr @orion_text_concat(ptr %v1243, ptr %v1244)
     store ptr %v1245, ptr %v1
     %v1246 = add i64 0, 0
     %v1247 = load ptr, ptr %v1
-    %v1248 = getelementptr i8, ptr @.str_963, i64 16
+    %v1248 = getelementptr i8, ptr @.str_965, i64 16
     %v1249 = call ptr @orion_text_concat(ptr %v1247, ptr %v1248)
     store ptr %v1249, ptr %v1
     %v1250 = add i64 0, 0
     %v1251 = load ptr, ptr %v1
-    %v1252 = getelementptr i8, ptr @.str_937, i64 16
+    %v1252 = getelementptr i8, ptr @.str_939, i64 16
     %v1253 = call ptr @orion_text_concat(ptr %v1251, ptr %v1252)
     store ptr %v1253, ptr %v1
     %v1254 = add i64 0, 0
     %v1255 = load ptr, ptr %v1
-    %v1256 = getelementptr i8, ptr @.str_938, i64 16
+    %v1256 = getelementptr i8, ptr @.str_940, i64 16
     %v1257 = call ptr @orion_text_concat(ptr %v1255, ptr %v1256)
     store ptr %v1257, ptr %v1
     %v1258 = add i64 0, 0
     %v1259 = load ptr, ptr %v1
-    %v1260 = getelementptr i8, ptr @.str_964, i64 16
+    %v1260 = getelementptr i8, ptr @.str_966, i64 16
     %v1261 = call ptr @orion_text_concat(ptr %v1259, ptr %v1260)
     store ptr %v1261, ptr %v1
     %v1262 = add i64 0, 0
     %v1263 = load ptr, ptr %v1
-    %v1264 = getelementptr i8, ptr @.str_965, i64 16
+    %v1264 = getelementptr i8, ptr @.str_967, i64 16
     %v1265 = call ptr @orion_text_concat(ptr %v1263, ptr %v1264)
     store ptr %v1265, ptr %v1
     %v1266 = add i64 0, 0
     %v1267 = load ptr, ptr %v1
-    %v1268 = getelementptr i8, ptr @.str_966, i64 16
+    %v1268 = getelementptr i8, ptr @.str_968, i64 16
     %v1269 = call ptr @orion_text_concat(ptr %v1267, ptr %v1268)
     store ptr %v1269, ptr %v1
     %v1270 = add i64 0, 0
     %v1271 = load ptr, ptr %v1
-    %v1272 = getelementptr i8, ptr @.str_812, i64 16
+    %v1272 = getelementptr i8, ptr @.str_814, i64 16
     %v1273 = call ptr @orion_text_concat(ptr %v1271, ptr %v1272)
     store ptr %v1273, ptr %v1
     %v1274 = add i64 0, 0
     %v1275 = load ptr, ptr %v1
-    %v1276 = getelementptr i8, ptr @.str_933, i64 16
+    %v1276 = getelementptr i8, ptr @.str_935, i64 16
     %v1277 = call ptr @orion_text_concat(ptr %v1275, ptr %v1276)
     store ptr %v1277, ptr %v1
     %v1278 = add i64 0, 0
     %v1279 = load ptr, ptr %v1
-    %v1280 = getelementptr i8, ptr @.str_943, i64 16
+    %v1280 = getelementptr i8, ptr @.str_945, i64 16
     %v1281 = call ptr @orion_text_concat(ptr %v1279, ptr %v1280)
     store ptr %v1281, ptr %v1
     %v1282 = add i64 0, 0
     %v1283 = load ptr, ptr %v1
-    %v1284 = getelementptr i8, ptr @.str_967, i64 16
+    %v1284 = getelementptr i8, ptr @.str_969, i64 16
     %v1285 = call ptr @orion_text_concat(ptr %v1283, ptr %v1284)
     store ptr %v1285, ptr %v1
     %v1286 = add i64 0, 0
     %v1287 = load ptr, ptr %v1
-    %v1288 = getelementptr i8, ptr @.str_798, i64 16
+    %v1288 = getelementptr i8, ptr @.str_800, i64 16
     %v1289 = call ptr @orion_text_concat(ptr %v1287, ptr %v1288)
     store ptr %v1289, ptr %v1
     %v1290 = add i64 0, 0
     %v1291 = load ptr, ptr %v1
-    %v1292 = getelementptr i8, ptr @.str_968, i64 16
+    %v1292 = getelementptr i8, ptr @.str_970, i64 16
     %v1293 = call ptr @orion_text_concat(ptr %v1291, ptr %v1292)
     store ptr %v1293, ptr %v1
     %v1294 = add i64 0, 0
     %v1295 = load ptr, ptr %v1
-    %v1296 = getelementptr i8, ptr @.str_791, i64 16
+    %v1296 = getelementptr i8, ptr @.str_793, i64 16
     %v1297 = call ptr @orion_text_concat(ptr %v1295, ptr %v1296)
     store ptr %v1297, ptr %v1
     %v1298 = add i64 0, 0
     %v1299 = load ptr, ptr %v1
-    %v1300 = getelementptr i8, ptr @.str_969, i64 16
+    %v1300 = getelementptr i8, ptr @.str_971, i64 16
     %v1301 = call ptr @orion_text_concat(ptr %v1299, ptr %v1300)
     store ptr %v1301, ptr %v1
     %v1302 = add i64 0, 0
     %v1303 = load ptr, ptr %v1
-    %v1304 = getelementptr i8, ptr @.str_970, i64 16
+    %v1304 = getelementptr i8, ptr @.str_972, i64 16
     %v1305 = call ptr @orion_text_concat(ptr %v1303, ptr %v1304)
     store ptr %v1305, ptr %v1
     %v1306 = add i64 0, 0
     %v1307 = load ptr, ptr %v1
-    %v1308 = getelementptr i8, ptr @.str_971, i64 16
+    %v1308 = getelementptr i8, ptr @.str_973, i64 16
     %v1309 = call ptr @orion_text_concat(ptr %v1307, ptr %v1308)
     store ptr %v1309, ptr %v1
     %v1310 = add i64 0, 0
     %v1311 = load ptr, ptr %v1
-    %v1312 = getelementptr i8, ptr @.str_972, i64 16
+    %v1312 = getelementptr i8, ptr @.str_974, i64 16
     %v1313 = call ptr @orion_text_concat(ptr %v1311, ptr %v1312)
     store ptr %v1313, ptr %v1
     %v1314 = add i64 0, 0
     %v1315 = load ptr, ptr %v1
-    %v1316 = getelementptr i8, ptr @.str_933, i64 16
+    %v1316 = getelementptr i8, ptr @.str_935, i64 16
     %v1317 = call ptr @orion_text_concat(ptr %v1315, ptr %v1316)
     store ptr %v1317, ptr %v1
     %v1318 = add i64 0, 0
     %v1319 = load ptr, ptr %v1
-    %v1320 = getelementptr i8, ptr @.str_934, i64 16
+    %v1320 = getelementptr i8, ptr @.str_936, i64 16
     %v1321 = call ptr @orion_text_concat(ptr %v1319, ptr %v1320)
     store ptr %v1321, ptr %v1
     %v1322 = add i64 0, 0
     %v1323 = load ptr, ptr %v1
-    %v1324 = getelementptr i8, ptr @.str_973, i64 16
+    %v1324 = getelementptr i8, ptr @.str_975, i64 16
     %v1325 = call ptr @orion_text_concat(ptr %v1323, ptr %v1324)
     store ptr %v1325, ptr %v1
     %v1326 = add i64 0, 0
     %v1327 = load ptr, ptr %v1
-    %v1328 = getelementptr i8, ptr @.str_974, i64 16
+    %v1328 = getelementptr i8, ptr @.str_976, i64 16
     %v1329 = call ptr @orion_text_concat(ptr %v1327, ptr %v1328)
     store ptr %v1329, ptr %v1
     %v1330 = add i64 0, 0
     %v1331 = load ptr, ptr %v1
-    %v1332 = getelementptr i8, ptr @.str_937, i64 16
+    %v1332 = getelementptr i8, ptr @.str_939, i64 16
     %v1333 = call ptr @orion_text_concat(ptr %v1331, ptr %v1332)
     store ptr %v1333, ptr %v1
     %v1334 = add i64 0, 0
     %v1335 = load ptr, ptr %v1
-    %v1336 = getelementptr i8, ptr @.str_938, i64 16
+    %v1336 = getelementptr i8, ptr @.str_940, i64 16
     %v1337 = call ptr @orion_text_concat(ptr %v1335, ptr %v1336)
     store ptr %v1337, ptr %v1
     %v1338 = add i64 0, 0
     %v1339 = load ptr, ptr %v1
-    %v1340 = getelementptr i8, ptr @.str_975, i64 16
+    %v1340 = getelementptr i8, ptr @.str_977, i64 16
     %v1341 = call ptr @orion_text_concat(ptr %v1339, ptr %v1340)
     store ptr %v1341, ptr %v1
     %v1342 = add i64 0, 0
     %v1343 = load ptr, ptr %v1
-    %v1344 = getelementptr i8, ptr @.str_976, i64 16
+    %v1344 = getelementptr i8, ptr @.str_978, i64 16
     %v1345 = call ptr @orion_text_concat(ptr %v1343, ptr %v1344)
     store ptr %v1345, ptr %v1
     %v1346 = add i64 0, 0
     %v1347 = load ptr, ptr %v1
-    %v1348 = getelementptr i8, ptr @.str_977, i64 16
+    %v1348 = getelementptr i8, ptr @.str_979, i64 16
     %v1349 = call ptr @orion_text_concat(ptr %v1347, ptr %v1348)
     store ptr %v1349, ptr %v1
     %v1350 = add i64 0, 0
     %v1351 = load ptr, ptr %v1
-    %v1352 = getelementptr i8, ptr @.str_978, i64 16
+    %v1352 = getelementptr i8, ptr @.str_980, i64 16
     %v1353 = call ptr @orion_text_concat(ptr %v1351, ptr %v1352)
     store ptr %v1353, ptr %v1
     %v1354 = add i64 0, 0
     %v1355 = load ptr, ptr %v1
-    %v1356 = getelementptr i8, ptr @.str_979, i64 16
+    %v1356 = getelementptr i8, ptr @.str_981, i64 16
     %v1357 = call ptr @orion_text_concat(ptr %v1355, ptr %v1356)
     store ptr %v1357, ptr %v1
     %v1358 = add i64 0, 0
     %v1359 = load ptr, ptr %v1
-    %v1360 = getelementptr i8, ptr @.str_980, i64 16
+    %v1360 = getelementptr i8, ptr @.str_982, i64 16
     %v1361 = call ptr @orion_text_concat(ptr %v1359, ptr %v1360)
     store ptr %v1361, ptr %v1
     %v1362 = add i64 0, 0
     %v1363 = load ptr, ptr %v1
-    %v1364 = getelementptr i8, ptr @.str_981, i64 16
+    %v1364 = getelementptr i8, ptr @.str_983, i64 16
     %v1365 = call ptr @orion_text_concat(ptr %v1363, ptr %v1364)
     store ptr %v1365, ptr %v1
     %v1366 = add i64 0, 0
     %v1367 = load ptr, ptr %v1
-    %v1368 = getelementptr i8, ptr @.str_982, i64 16
+    %v1368 = getelementptr i8, ptr @.str_984, i64 16
     %v1369 = call ptr @orion_text_concat(ptr %v1367, ptr %v1368)
     store ptr %v1369, ptr %v1
     %v1370 = add i64 0, 0
     %v1371 = load ptr, ptr %v1
-    %v1372 = getelementptr i8, ptr @.str_979, i64 16
+    %v1372 = getelementptr i8, ptr @.str_981, i64 16
     %v1373 = call ptr @orion_text_concat(ptr %v1371, ptr %v1372)
     store ptr %v1373, ptr %v1
     %v1374 = add i64 0, 0
     %v1375 = load ptr, ptr %v1
-    %v1376 = getelementptr i8, ptr @.str_983, i64 16
+    %v1376 = getelementptr i8, ptr @.str_985, i64 16
     %v1377 = call ptr @orion_text_concat(ptr %v1375, ptr %v1376)
     store ptr %v1377, ptr %v1
     %v1378 = add i64 0, 0
     %v1379 = load ptr, ptr %v1
-    %v1380 = getelementptr i8, ptr @.str_984, i64 16
+    %v1380 = getelementptr i8, ptr @.str_986, i64 16
     %v1381 = call ptr @orion_text_concat(ptr %v1379, ptr %v1380)
     store ptr %v1381, ptr %v1
     %v1382 = add i64 0, 0
     %v1383 = load ptr, ptr %v1
-    %v1384 = getelementptr i8, ptr @.str_966, i64 16
+    %v1384 = getelementptr i8, ptr @.str_968, i64 16
     %v1385 = call ptr @orion_text_concat(ptr %v1383, ptr %v1384)
     store ptr %v1385, ptr %v1
     %v1386 = add i64 0, 0
     %v1387 = load ptr, ptr %v1
-    %v1388 = getelementptr i8, ptr @.str_812, i64 16
+    %v1388 = getelementptr i8, ptr @.str_814, i64 16
     %v1389 = call ptr @orion_text_concat(ptr %v1387, ptr %v1388)
     store ptr %v1389, ptr %v1
     %v1390 = add i64 0, 0
     %v1391 = load ptr, ptr %v1
-    %v1392 = getelementptr i8, ptr @.str_933, i64 16
+    %v1392 = getelementptr i8, ptr @.str_935, i64 16
     %v1393 = call ptr @orion_text_concat(ptr %v1391, ptr %v1392)
     store ptr %v1393, ptr %v1
     %v1394 = add i64 0, 0
     %v1395 = load ptr, ptr %v1
-    %v1396 = getelementptr i8, ptr @.str_943, i64 16
+    %v1396 = getelementptr i8, ptr @.str_945, i64 16
     %v1397 = call ptr @orion_text_concat(ptr %v1395, ptr %v1396)
     store ptr %v1397, ptr %v1
     %v1398 = add i64 0, 0
     %v1399 = load ptr, ptr %v1
-    %v1400 = getelementptr i8, ptr @.str_967, i64 16
+    %v1400 = getelementptr i8, ptr @.str_969, i64 16
     %v1401 = call ptr @orion_text_concat(ptr %v1399, ptr %v1400)
     store ptr %v1401, ptr %v1
     %v1402 = add i64 0, 0
     %v1403 = load ptr, ptr %v1
-    %v1404 = getelementptr i8, ptr @.str_798, i64 16
+    %v1404 = getelementptr i8, ptr @.str_800, i64 16
     %v1405 = call ptr @orion_text_concat(ptr %v1403, ptr %v1404)
     store ptr %v1405, ptr %v1
     %v1406 = add i64 0, 0
     %v1407 = load ptr, ptr %v1
-    %v1408 = getelementptr i8, ptr @.str_985, i64 16
+    %v1408 = getelementptr i8, ptr @.str_987, i64 16
     %v1409 = call ptr @orion_text_concat(ptr %v1407, ptr %v1408)
     store ptr %v1409, ptr %v1
     %v1410 = add i64 0, 0
     %v1411 = load ptr, ptr %v1
-    %v1412 = getelementptr i8, ptr @.str_986, i64 16
+    %v1412 = getelementptr i8, ptr @.str_988, i64 16
     %v1413 = call ptr @orion_text_concat(ptr %v1411, ptr %v1412)
     store ptr %v1413, ptr %v1
     %v1414 = add i64 0, 0
     %v1415 = load ptr, ptr %v1
-    %v1416 = getelementptr i8, ptr @.str_987, i64 16
+    %v1416 = getelementptr i8, ptr @.str_989, i64 16
     %v1417 = call ptr @orion_text_concat(ptr %v1415, ptr %v1416)
     store ptr %v1417, ptr %v1
     %v1418 = add i64 0, 0
     %v1419 = load ptr, ptr %v1
-    %v1420 = getelementptr i8, ptr @.str_791, i64 16
+    %v1420 = getelementptr i8, ptr @.str_793, i64 16
     %v1421 = call ptr @orion_text_concat(ptr %v1419, ptr %v1420)
     store ptr %v1421, ptr %v1
     %v1422 = add i64 0, 0
     %v1423 = load ptr, ptr %v1
-    %v1424 = getelementptr i8, ptr @.str_988, i64 16
+    %v1424 = getelementptr i8, ptr @.str_990, i64 16
     %v1425 = call ptr @orion_text_concat(ptr %v1423, ptr %v1424)
     store ptr %v1425, ptr %v1
     %v1426 = add i64 0, 0
     %v1427 = load ptr, ptr %v1
-    %v1428 = getelementptr i8, ptr @.str_989, i64 16
+    %v1428 = getelementptr i8, ptr @.str_991, i64 16
     %v1429 = call ptr @orion_text_concat(ptr %v1427, ptr %v1428)
     store ptr %v1429, ptr %v1
     %v1430 = add i64 0, 0
     %v1431 = load ptr, ptr %v1
-    %v1432 = getelementptr i8, ptr @.str_990, i64 16
+    %v1432 = getelementptr i8, ptr @.str_992, i64 16
     %v1433 = call ptr @orion_text_concat(ptr %v1431, ptr %v1432)
     store ptr %v1433, ptr %v1
     %v1434 = add i64 0, 0
     %v1435 = load ptr, ptr %v1
-    %v1436 = getelementptr i8, ptr @.str_991, i64 16
+    %v1436 = getelementptr i8, ptr @.str_993, i64 16
     %v1437 = call ptr @orion_text_concat(ptr %v1435, ptr %v1436)
     store ptr %v1437, ptr %v1
     %v1438 = add i64 0, 0
     %v1439 = load ptr, ptr %v1
-    %v1440 = getelementptr i8, ptr @.str_992, i64 16
+    %v1440 = getelementptr i8, ptr @.str_994, i64 16
     %v1441 = call ptr @orion_text_concat(ptr %v1439, ptr %v1440)
     store ptr %v1441, ptr %v1
     %v1442 = add i64 0, 0
     %v1443 = load ptr, ptr %v1
-    %v1444 = getelementptr i8, ptr @.str_993, i64 16
+    %v1444 = getelementptr i8, ptr @.str_995, i64 16
     %v1445 = call ptr @orion_text_concat(ptr %v1443, ptr %v1444)
     store ptr %v1445, ptr %v1
     %v1446 = add i64 0, 0
     %v1447 = load ptr, ptr %v1
-    %v1448 = getelementptr i8, ptr @.str_994, i64 16
+    %v1448 = getelementptr i8, ptr @.str_996, i64 16
     %v1449 = call ptr @orion_text_concat(ptr %v1447, ptr %v1448)
     store ptr %v1449, ptr %v1
     %v1450 = add i64 0, 0
     %v1451 = load ptr, ptr %v1
-    %v1452 = getelementptr i8, ptr @.str_995, i64 16
+    %v1452 = getelementptr i8, ptr @.str_997, i64 16
     %v1453 = call ptr @orion_text_concat(ptr %v1451, ptr %v1452)
     store ptr %v1453, ptr %v1
     %v1454 = add i64 0, 0
     %v1455 = load ptr, ptr %v1
-    %v1456 = getelementptr i8, ptr @.str_996, i64 16
+    %v1456 = getelementptr i8, ptr @.str_998, i64 16
     %v1457 = call ptr @orion_text_concat(ptr %v1455, ptr %v1456)
     store ptr %v1457, ptr %v1
     %v1458 = add i64 0, 0
     %v1459 = load ptr, ptr %v1
-    %v1460 = getelementptr i8, ptr @.str_997, i64 16
+    %v1460 = getelementptr i8, ptr @.str_999, i64 16
     %v1461 = call ptr @orion_text_concat(ptr %v1459, ptr %v1460)
     store ptr %v1461, ptr %v1
     %v1462 = add i64 0, 0
     %v1463 = load ptr, ptr %v1
-    %v1464 = getelementptr i8, ptr @.str_998, i64 16
+    %v1464 = getelementptr i8, ptr @.str_1000, i64 16
     %v1465 = call ptr @orion_text_concat(ptr %v1463, ptr %v1464)
     store ptr %v1465, ptr %v1
     %v1466 = add i64 0, 0
     %v1467 = load ptr, ptr %v1
-    %v1468 = getelementptr i8, ptr @.str_999, i64 16
+    %v1468 = getelementptr i8, ptr @.str_1001, i64 16
     %v1469 = call ptr @orion_text_concat(ptr %v1467, ptr %v1468)
     store ptr %v1469, ptr %v1
     %v1470 = add i64 0, 0
     %v1471 = load ptr, ptr %v1
-    %v1472 = getelementptr i8, ptr @.str_1000, i64 16
+    %v1472 = getelementptr i8, ptr @.str_1002, i64 16
     %v1473 = call ptr @orion_text_concat(ptr %v1471, ptr %v1472)
     store ptr %v1473, ptr %v1
     %v1474 = add i64 0, 0
     %v1475 = load ptr, ptr %v1
-    %v1476 = getelementptr i8, ptr @.str_798, i64 16
+    %v1476 = getelementptr i8, ptr @.str_800, i64 16
     %v1477 = call ptr @orion_text_concat(ptr %v1475, ptr %v1476)
     store ptr %v1477, ptr %v1
     %v1478 = add i64 0, 0
     %v1479 = load ptr, ptr %v1
-    %v1480 = getelementptr i8, ptr @.str_1001, i64 16
+    %v1480 = getelementptr i8, ptr @.str_1003, i64 16
     %v1481 = call ptr @orion_text_concat(ptr %v1479, ptr %v1480)
     store ptr %v1481, ptr %v1
     %v1482 = add i64 0, 0
     %v1483 = load ptr, ptr %v1
-    %v1484 = getelementptr i8, ptr @.str_791, i64 16
+    %v1484 = getelementptr i8, ptr @.str_793, i64 16
     %v1485 = call ptr @orion_text_concat(ptr %v1483, ptr %v1484)
     store ptr %v1485, ptr %v1
     %v1486 = add i64 0, 0
     %v1487 = load ptr, ptr %v1
-    %v1488 = getelementptr i8, ptr @.str_1002, i64 16
+    %v1488 = getelementptr i8, ptr @.str_1004, i64 16
     %v1489 = call ptr @orion_text_concat(ptr %v1487, ptr %v1488)
     store ptr %v1489, ptr %v1
     %v1490 = add i64 0, 0
     %v1491 = load ptr, ptr %v1
-    %v1492 = getelementptr i8, ptr @.str_1003, i64 16
+    %v1492 = getelementptr i8, ptr @.str_1005, i64 16
     %v1493 = call ptr @orion_text_concat(ptr %v1491, ptr %v1492)
     store ptr %v1493, ptr %v1
     %v1494 = add i64 0, 0
     %v1495 = load ptr, ptr %v1
-    %v1496 = getelementptr i8, ptr @.str_1004, i64 16
+    %v1496 = getelementptr i8, ptr @.str_1006, i64 16
     %v1497 = call ptr @orion_text_concat(ptr %v1495, ptr %v1496)
     store ptr %v1497, ptr %v1
     %v1498 = add i64 0, 0
     %v1499 = load ptr, ptr %v1
-    %v1500 = getelementptr i8, ptr @.str_1005, i64 16
+    %v1500 = getelementptr i8, ptr @.str_1007, i64 16
     %v1501 = call ptr @orion_text_concat(ptr %v1499, ptr %v1500)
     store ptr %v1501, ptr %v1
     %v1502 = add i64 0, 0
     %v1503 = load ptr, ptr %v1
-    %v1504 = getelementptr i8, ptr @.str_1006, i64 16
+    %v1504 = getelementptr i8, ptr @.str_1008, i64 16
     %v1505 = call ptr @orion_text_concat(ptr %v1503, ptr %v1504)
     store ptr %v1505, ptr %v1
     %v1506 = add i64 0, 0
     %v1507 = load ptr, ptr %v1
-    %v1508 = getelementptr i8, ptr @.str_1007, i64 16
+    %v1508 = getelementptr i8, ptr @.str_1009, i64 16
     %v1509 = call ptr @orion_text_concat(ptr %v1507, ptr %v1508)
     store ptr %v1509, ptr %v1
     %v1510 = add i64 0, 0
     %v1511 = load ptr, ptr %v1
-    %v1512 = getelementptr i8, ptr @.str_1008, i64 16
+    %v1512 = getelementptr i8, ptr @.str_1010, i64 16
     %v1513 = call ptr @orion_text_concat(ptr %v1511, ptr %v1512)
     store ptr %v1513, ptr %v1
     %v1514 = add i64 0, 0
     %v1515 = load ptr, ptr %v1
-    %v1516 = getelementptr i8, ptr @.str_1009, i64 16
+    %v1516 = getelementptr i8, ptr @.str_1011, i64 16
     %v1517 = call ptr @orion_text_concat(ptr %v1515, ptr %v1516)
     store ptr %v1517, ptr %v1
     %v1518 = add i64 0, 0
     %v1519 = load ptr, ptr %v1
-    %v1520 = getelementptr i8, ptr @.str_798, i64 16
+    %v1520 = getelementptr i8, ptr @.str_800, i64 16
     %v1521 = call ptr @orion_text_concat(ptr %v1519, ptr %v1520)
     store ptr %v1521, ptr %v1
     %v1522 = add i64 0, 0
     %v1523 = load ptr, ptr %v1
-    %v1524 = getelementptr i8, ptr @.str_1010, i64 16
+    %v1524 = getelementptr i8, ptr @.str_1012, i64 16
     %v1525 = call ptr @orion_text_concat(ptr %v1523, ptr %v1524)
     store ptr %v1525, ptr %v1
     %v1526 = add i64 0, 0
     %v1527 = load ptr, ptr %v1
-    %v1528 = getelementptr i8, ptr @.str_791, i64 16
+    %v1528 = getelementptr i8, ptr @.str_793, i64 16
     %v1529 = call ptr @orion_text_concat(ptr %v1527, ptr %v1528)
     store ptr %v1529, ptr %v1
     %v1530 = add i64 0, 0
     %v1531 = load ptr, ptr %v1
-    %v1532 = getelementptr i8, ptr @.str_1011, i64 16
+    %v1532 = getelementptr i8, ptr @.str_1013, i64 16
     %v1533 = call ptr @orion_text_concat(ptr %v1531, ptr %v1532)
     store ptr %v1533, ptr %v1
     %v1534 = add i64 0, 0
     %v1535 = load ptr, ptr %v1
-    %v1536 = getelementptr i8, ptr @.str_1012, i64 16
+    %v1536 = getelementptr i8, ptr @.str_1014, i64 16
     %v1537 = call ptr @orion_text_concat(ptr %v1535, ptr %v1536)
     store ptr %v1537, ptr %v1
     %v1538 = add i64 0, 0
     %v1539 = load ptr, ptr %v1
-    %v1540 = getelementptr i8, ptr @.str_1013, i64 16
+    %v1540 = getelementptr i8, ptr @.str_1015, i64 16
     %v1541 = call ptr @orion_text_concat(ptr %v1539, ptr %v1540)
     store ptr %v1541, ptr %v1
     %v1542 = add i64 0, 0
     %v1543 = load ptr, ptr %v1
-    %v1544 = getelementptr i8, ptr @.str_1014, i64 16
+    %v1544 = getelementptr i8, ptr @.str_1016, i64 16
     %v1545 = call ptr @orion_text_concat(ptr %v1543, ptr %v1544)
     store ptr %v1545, ptr %v1
     %v1546 = add i64 0, 0
     %v1547 = load ptr, ptr %v1
-    %v1548 = getelementptr i8, ptr @.str_1015, i64 16
+    %v1548 = getelementptr i8, ptr @.str_1017, i64 16
     %v1549 = call ptr @orion_text_concat(ptr %v1547, ptr %v1548)
     store ptr %v1549, ptr %v1
     %v1550 = add i64 0, 0
     %v1551 = load ptr, ptr %v1
-    %v1552 = getelementptr i8, ptr @.str_933, i64 16
+    %v1552 = getelementptr i8, ptr @.str_935, i64 16
     %v1553 = call ptr @orion_text_concat(ptr %v1551, ptr %v1552)
     store ptr %v1553, ptr %v1
     %v1554 = add i64 0, 0
     %v1555 = load ptr, ptr %v1
-    %v1556 = getelementptr i8, ptr @.str_934, i64 16
+    %v1556 = getelementptr i8, ptr @.str_936, i64 16
     %v1557 = call ptr @orion_text_concat(ptr %v1555, ptr %v1556)
     store ptr %v1557, ptr %v1
     %v1558 = add i64 0, 0
     %v1559 = load ptr, ptr %v1
-    %v1560 = getelementptr i8, ptr @.str_1016, i64 16
+    %v1560 = getelementptr i8, ptr @.str_1018, i64 16
     %v1561 = call ptr @orion_text_concat(ptr %v1559, ptr %v1560)
     store ptr %v1561, ptr %v1
     %v1562 = add i64 0, 0
     %v1563 = load ptr, ptr %v1
-    %v1564 = getelementptr i8, ptr @.str_1017, i64 16
+    %v1564 = getelementptr i8, ptr @.str_1019, i64 16
     %v1565 = call ptr @orion_text_concat(ptr %v1563, ptr %v1564)
     store ptr %v1565, ptr %v1
     %v1566 = add i64 0, 0
     %v1567 = load ptr, ptr %v1
-    %v1568 = getelementptr i8, ptr @.str_1018, i64 16
+    %v1568 = getelementptr i8, ptr @.str_1020, i64 16
     %v1569 = call ptr @orion_text_concat(ptr %v1567, ptr %v1568)
     store ptr %v1569, ptr %v1
     %v1570 = add i64 0, 0
     %v1571 = load ptr, ptr %v1
-    %v1572 = getelementptr i8, ptr @.str_1019, i64 16
+    %v1572 = getelementptr i8, ptr @.str_1021, i64 16
     %v1573 = call ptr @orion_text_concat(ptr %v1571, ptr %v1572)
     store ptr %v1573, ptr %v1
     %v1574 = add i64 0, 0
     %v1575 = load ptr, ptr %v1
-    %v1576 = getelementptr i8, ptr @.str_1020, i64 16
+    %v1576 = getelementptr i8, ptr @.str_1022, i64 16
     %v1577 = call ptr @orion_text_concat(ptr %v1575, ptr %v1576)
     store ptr %v1577, ptr %v1
     %v1578 = add i64 0, 0
     %v1579 = load ptr, ptr %v1
-    %v1580 = getelementptr i8, ptr @.str_1021, i64 16
+    %v1580 = getelementptr i8, ptr @.str_1023, i64 16
     %v1581 = call ptr @orion_text_concat(ptr %v1579, ptr %v1580)
     store ptr %v1581, ptr %v1
     %v1582 = add i64 0, 0
     %v1583 = load ptr, ptr %v1
-    %v1584 = getelementptr i8, ptr @.str_1022, i64 16
+    %v1584 = getelementptr i8, ptr @.str_1024, i64 16
     %v1585 = call ptr @orion_text_concat(ptr %v1583, ptr %v1584)
     store ptr %v1585, ptr %v1
     %v1586 = add i64 0, 0
     %v1587 = load ptr, ptr %v1
-    %v1588 = getelementptr i8, ptr @.str_1023, i64 16
+    %v1588 = getelementptr i8, ptr @.str_1025, i64 16
     %v1589 = call ptr @orion_text_concat(ptr %v1587, ptr %v1588)
     store ptr %v1589, ptr %v1
     %v1590 = add i64 0, 0
     %v1591 = load ptr, ptr %v1
-    %v1592 = getelementptr i8, ptr @.str_1024, i64 16
+    %v1592 = getelementptr i8, ptr @.str_1026, i64 16
     %v1593 = call ptr @orion_text_concat(ptr %v1591, ptr %v1592)
     store ptr %v1593, ptr %v1
     %v1594 = add i64 0, 0
     %v1595 = load ptr, ptr %v1
-    %v1596 = getelementptr i8, ptr @.str_1025, i64 16
+    %v1596 = getelementptr i8, ptr @.str_1027, i64 16
     %v1597 = call ptr @orion_text_concat(ptr %v1595, ptr %v1596)
     store ptr %v1597, ptr %v1
     %v1598 = add i64 0, 0
     %v1599 = load ptr, ptr %v1
-    %v1600 = getelementptr i8, ptr @.str_1026, i64 16
+    %v1600 = getelementptr i8, ptr @.str_1028, i64 16
     %v1601 = call ptr @orion_text_concat(ptr %v1599, ptr %v1600)
     store ptr %v1601, ptr %v1
     %v1602 = add i64 0, 0
     %v1603 = load ptr, ptr %v1
-    %v1604 = getelementptr i8, ptr @.str_1027, i64 16
+    %v1604 = getelementptr i8, ptr @.str_1029, i64 16
     %v1605 = call ptr @orion_text_concat(ptr %v1603, ptr %v1604)
     store ptr %v1605, ptr %v1
     %v1606 = add i64 0, 0
     %v1607 = load ptr, ptr %v1
-    %v1608 = getelementptr i8, ptr @.str_812, i64 16
+    %v1608 = getelementptr i8, ptr @.str_814, i64 16
     %v1609 = call ptr @orion_text_concat(ptr %v1607, ptr %v1608)
     store ptr %v1609, ptr %v1
     %v1610 = add i64 0, 0
     %v1611 = load ptr, ptr %v1
-    %v1612 = getelementptr i8, ptr @.str_933, i64 16
+    %v1612 = getelementptr i8, ptr @.str_935, i64 16
     %v1613 = call ptr @orion_text_concat(ptr %v1611, ptr %v1612)
     store ptr %v1613, ptr %v1
     %v1614 = add i64 0, 0
     %v1615 = load ptr, ptr %v1
-    %v1616 = getelementptr i8, ptr @.str_1028, i64 16
+    %v1616 = getelementptr i8, ptr @.str_1030, i64 16
     %v1617 = call ptr @orion_text_concat(ptr %v1615, ptr %v1616)
     store ptr %v1617, ptr %v1
     %v1618 = add i64 0, 0
     %v1619 = load ptr, ptr %v1
-    %v1620 = getelementptr i8, ptr @.str_1029, i64 16
+    %v1620 = getelementptr i8, ptr @.str_1031, i64 16
     %v1621 = call ptr @orion_text_concat(ptr %v1619, ptr %v1620)
     store ptr %v1621, ptr %v1
     %v1622 = add i64 0, 0
     %v1623 = load ptr, ptr %v1
-    %v1624 = getelementptr i8, ptr @.str_1030, i64 16
+    %v1624 = getelementptr i8, ptr @.str_1032, i64 16
     %v1625 = call ptr @orion_text_concat(ptr %v1623, ptr %v1624)
     store ptr %v1625, ptr %v1
     %v1626 = add i64 0, 0
     %v1627 = load ptr, ptr %v1
-    %v1628 = getelementptr i8, ptr @.str_1031, i64 16
+    %v1628 = getelementptr i8, ptr @.str_1033, i64 16
     %v1629 = call ptr @orion_text_concat(ptr %v1627, ptr %v1628)
     store ptr %v1629, ptr %v1
     %v1630 = add i64 0, 0
     %v1631 = load ptr, ptr %v1
-    %v1632 = getelementptr i8, ptr @.str_1032, i64 16
+    %v1632 = getelementptr i8, ptr @.str_1034, i64 16
     %v1633 = call ptr @orion_text_concat(ptr %v1631, ptr %v1632)
     store ptr %v1633, ptr %v1
     %v1634 = add i64 0, 0
     %v1635 = load ptr, ptr %v1
-    %v1636 = getelementptr i8, ptr @.str_1033, i64 16
+    %v1636 = getelementptr i8, ptr @.str_1035, i64 16
     %v1637 = call ptr @orion_text_concat(ptr %v1635, ptr %v1636)
     store ptr %v1637, ptr %v1
     %v1638 = add i64 0, 0
     %v1639 = load ptr, ptr %v1
-    %v1640 = getelementptr i8, ptr @.str_1034, i64 16
+    %v1640 = getelementptr i8, ptr @.str_1036, i64 16
     %v1641 = call ptr @orion_text_concat(ptr %v1639, ptr %v1640)
     store ptr %v1641, ptr %v1
     %v1642 = add i64 0, 0
     %v1643 = load ptr, ptr %v1
-    %v1644 = getelementptr i8, ptr @.str_1035, i64 16
+    %v1644 = getelementptr i8, ptr @.str_1037, i64 16
     %v1645 = call ptr @orion_text_concat(ptr %v1643, ptr %v1644)
     store ptr %v1645, ptr %v1
     %v1646 = add i64 0, 0
     %v1647 = load ptr, ptr %v1
-    %v1648 = getelementptr i8, ptr @.str_1036, i64 16
+    %v1648 = getelementptr i8, ptr @.str_1038, i64 16
     %v1649 = call ptr @orion_text_concat(ptr %v1647, ptr %v1648)
     store ptr %v1649, ptr %v1
     %v1650 = add i64 0, 0
     %v1651 = load ptr, ptr %v1
-    %v1652 = getelementptr i8, ptr @.str_1037, i64 16
+    %v1652 = getelementptr i8, ptr @.str_1039, i64 16
     %v1653 = call ptr @orion_text_concat(ptr %v1651, ptr %v1652)
     store ptr %v1653, ptr %v1
     %v1654 = add i64 0, 0
     %v1655 = load ptr, ptr %v1
-    %v1656 = getelementptr i8, ptr @.str_1038, i64 16
+    %v1656 = getelementptr i8, ptr @.str_1040, i64 16
     %v1657 = call ptr @orion_text_concat(ptr %v1655, ptr %v1656)
     store ptr %v1657, ptr %v1
     %v1658 = add i64 0, 0
     %v1659 = load ptr, ptr %v1
-    %v1660 = getelementptr i8, ptr @.str_1039, i64 16
+    %v1660 = getelementptr i8, ptr @.str_1041, i64 16
     %v1661 = call ptr @orion_text_concat(ptr %v1659, ptr %v1660)
     store ptr %v1661, ptr %v1
     %v1662 = add i64 0, 0
     %v1663 = load ptr, ptr %v1
-    %v1664 = getelementptr i8, ptr @.str_1040, i64 16
+    %v1664 = getelementptr i8, ptr @.str_1042, i64 16
     %v1665 = call ptr @orion_text_concat(ptr %v1663, ptr %v1664)
     store ptr %v1665, ptr %v1
     %v1666 = add i64 0, 0
     %v1667 = load ptr, ptr %v1
-    %v1668 = getelementptr i8, ptr @.str_1041, i64 16
+    %v1668 = getelementptr i8, ptr @.str_1043, i64 16
     %v1669 = call ptr @orion_text_concat(ptr %v1667, ptr %v1668)
     store ptr %v1669, ptr %v1
     %v1670 = add i64 0, 0
     %v1671 = load ptr, ptr %v1
-    %v1672 = getelementptr i8, ptr @.str_1042, i64 16
+    %v1672 = getelementptr i8, ptr @.str_1044, i64 16
     %v1673 = call ptr @orion_text_concat(ptr %v1671, ptr %v1672)
     store ptr %v1673, ptr %v1
     %v1674 = add i64 0, 0
     %v1675 = load ptr, ptr %v1
-    %v1676 = getelementptr i8, ptr @.str_1043, i64 16
+    %v1676 = getelementptr i8, ptr @.str_1045, i64 16
     %v1677 = call ptr @orion_text_concat(ptr %v1675, ptr %v1676)
     store ptr %v1677, ptr %v1
     %v1678 = add i64 0, 0
     %v1679 = load ptr, ptr %v1
-    %v1680 = getelementptr i8, ptr @.str_1044, i64 16
+    %v1680 = getelementptr i8, ptr @.str_1046, i64 16
     %v1681 = call ptr @orion_text_concat(ptr %v1679, ptr %v1680)
     store ptr %v1681, ptr %v1
     %v1682 = add i64 0, 0
     %v1683 = load ptr, ptr %v1
-    %v1684 = getelementptr i8, ptr @.str_1045, i64 16
+    %v1684 = getelementptr i8, ptr @.str_1047, i64 16
     %v1685 = call ptr @orion_text_concat(ptr %v1683, ptr %v1684)
     store ptr %v1685, ptr %v1
     %v1686 = add i64 0, 0
     %v1687 = load ptr, ptr %v1
-    %v1688 = getelementptr i8, ptr @.str_1046, i64 16
+    %v1688 = getelementptr i8, ptr @.str_1048, i64 16
     %v1689 = call ptr @orion_text_concat(ptr %v1687, ptr %v1688)
     store ptr %v1689, ptr %v1
     %v1690 = add i64 0, 0
     %v1691 = load ptr, ptr %v1
-    %v1692 = getelementptr i8, ptr @.str_1047, i64 16
+    %v1692 = getelementptr i8, ptr @.str_1049, i64 16
     %v1693 = call ptr @orion_text_concat(ptr %v1691, ptr %v1692)
     store ptr %v1693, ptr %v1
     %v1694 = add i64 0, 0
     %v1695 = load ptr, ptr %v1
-    %v1696 = getelementptr i8, ptr @.str_1048, i64 16
+    %v1696 = getelementptr i8, ptr @.str_1050, i64 16
     %v1697 = call ptr @orion_text_concat(ptr %v1695, ptr %v1696)
     store ptr %v1697, ptr %v1
     %v1698 = add i64 0, 0
     %v1699 = load ptr, ptr %v1
-    %v1700 = getelementptr i8, ptr @.str_1049, i64 16
+    %v1700 = getelementptr i8, ptr @.str_1051, i64 16
     %v1701 = call ptr @orion_text_concat(ptr %v1699, ptr %v1700)
     store ptr %v1701, ptr %v1
     %v1702 = add i64 0, 0
     %v1703 = load ptr, ptr %v1
-    %v1704 = getelementptr i8, ptr @.str_1050, i64 16
+    %v1704 = getelementptr i8, ptr @.str_1052, i64 16
     %v1705 = call ptr @orion_text_concat(ptr %v1703, ptr %v1704)
     store ptr %v1705, ptr %v1
     %v1706 = add i64 0, 0
     %v1707 = load ptr, ptr %v1
-    %v1708 = getelementptr i8, ptr @.str_1051, i64 16
+    %v1708 = getelementptr i8, ptr @.str_1053, i64 16
     %v1709 = call ptr @orion_text_concat(ptr %v1707, ptr %v1708)
     store ptr %v1709, ptr %v1
     %v1710 = add i64 0, 0
     %v1711 = load ptr, ptr %v1
-    %v1712 = getelementptr i8, ptr @.str_1052, i64 16
+    %v1712 = getelementptr i8, ptr @.str_1054, i64 16
     %v1713 = call ptr @orion_text_concat(ptr %v1711, ptr %v1712)
     store ptr %v1713, ptr %v1
     %v1714 = add i64 0, 0
     %v1715 = load ptr, ptr %v1
-    %v1716 = getelementptr i8, ptr @.str_1053, i64 16
+    %v1716 = getelementptr i8, ptr @.str_1055, i64 16
     %v1717 = call ptr @orion_text_concat(ptr %v1715, ptr %v1716)
     store ptr %v1717, ptr %v1
     %v1718 = add i64 0, 0
     %v1719 = load ptr, ptr %v1
-    %v1720 = getelementptr i8, ptr @.str_1054, i64 16
+    %v1720 = getelementptr i8, ptr @.str_1056, i64 16
     %v1721 = call ptr @orion_text_concat(ptr %v1719, ptr %v1720)
     store ptr %v1721, ptr %v1
     %v1722 = add i64 0, 0
     %v1723 = load ptr, ptr %v1
-    %v1724 = getelementptr i8, ptr @.str_1055, i64 16
+    %v1724 = getelementptr i8, ptr @.str_1057, i64 16
     %v1725 = call ptr @orion_text_concat(ptr %v1723, ptr %v1724)
     store ptr %v1725, ptr %v1
     %v1726 = add i64 0, 0
     %v1727 = load ptr, ptr %v1
-    %v1728 = getelementptr i8, ptr @.str_1056, i64 16
+    %v1728 = getelementptr i8, ptr @.str_1058, i64 16
     %v1729 = call ptr @orion_text_concat(ptr %v1727, ptr %v1728)
     store ptr %v1729, ptr %v1
     %v1730 = add i64 0, 0
     %v1731 = load ptr, ptr %v1
-    %v1732 = getelementptr i8, ptr @.str_1032, i64 16
+    %v1732 = getelementptr i8, ptr @.str_1034, i64 16
     %v1733 = call ptr @orion_text_concat(ptr %v1731, ptr %v1732)
     store ptr %v1733, ptr %v1
     %v1734 = add i64 0, 0
     %v1735 = load ptr, ptr %v1
-    %v1736 = getelementptr i8, ptr @.str_798, i64 16
+    %v1736 = getelementptr i8, ptr @.str_800, i64 16
     %v1737 = call ptr @orion_text_concat(ptr %v1735, ptr %v1736)
     store ptr %v1737, ptr %v1
     %v1738 = add i64 0, 0
     %v1739 = load ptr, ptr %v1
-    %v1740 = getelementptr i8, ptr @.str_1057, i64 16
+    %v1740 = getelementptr i8, ptr @.str_1059, i64 16
     %v1741 = call ptr @orion_text_concat(ptr %v1739, ptr %v1740)
     store ptr %v1741, ptr %v1
     %v1742 = add i64 0, 0
     %v1743 = load ptr, ptr %v1
-    %v1744 = getelementptr i8, ptr @.str_791, i64 16
+    %v1744 = getelementptr i8, ptr @.str_793, i64 16
     %v1745 = call ptr @orion_text_concat(ptr %v1743, ptr %v1744)
     store ptr %v1745, ptr %v1
     %v1746 = add i64 0, 0
     %v1747 = load ptr, ptr %v1
-    %v1748 = getelementptr i8, ptr @.str_1058, i64 16
+    %v1748 = getelementptr i8, ptr @.str_1060, i64 16
     %v1749 = call ptr @orion_text_concat(ptr %v1747, ptr %v1748)
     store ptr %v1749, ptr %v1
     %v1750 = add i64 0, 0
     %v1751 = load ptr, ptr %v1
-    %v1752 = getelementptr i8, ptr @.str_1059, i64 16
+    %v1752 = getelementptr i8, ptr @.str_1061, i64 16
     %v1753 = call ptr @orion_text_concat(ptr %v1751, ptr %v1752)
     store ptr %v1753, ptr %v1
     %v1754 = add i64 0, 0
     %v1755 = load ptr, ptr %v1
-    %v1756 = getelementptr i8, ptr @.str_1060, i64 16
+    %v1756 = getelementptr i8, ptr @.str_1062, i64 16
     %v1757 = call ptr @orion_text_concat(ptr %v1755, ptr %v1756)
     store ptr %v1757, ptr %v1
     %v1758 = add i64 0, 0
     %v1759 = load ptr, ptr %v1
-    %v1760 = getelementptr i8, ptr @.str_1061, i64 16
+    %v1760 = getelementptr i8, ptr @.str_1063, i64 16
     %v1761 = call ptr @orion_text_concat(ptr %v1759, ptr %v1760)
     store ptr %v1761, ptr %v1
     %v1762 = add i64 0, 0
     %v1763 = load ptr, ptr %v1
-    %v1764 = getelementptr i8, ptr @.str_1062, i64 16
+    %v1764 = getelementptr i8, ptr @.str_1064, i64 16
     %v1765 = call ptr @orion_text_concat(ptr %v1763, ptr %v1764)
     store ptr %v1765, ptr %v1
     %v1766 = add i64 0, 0
     %v1767 = load ptr, ptr %v1
-    %v1768 = getelementptr i8, ptr @.str_1063, i64 16
+    %v1768 = getelementptr i8, ptr @.str_1065, i64 16
     %v1769 = call ptr @orion_text_concat(ptr %v1767, ptr %v1768)
     store ptr %v1769, ptr %v1
     %v1770 = add i64 0, 0
     %v1771 = load ptr, ptr %v1
-    %v1772 = getelementptr i8, ptr @.str_1064, i64 16
+    %v1772 = getelementptr i8, ptr @.str_1066, i64 16
     %v1773 = call ptr @orion_text_concat(ptr %v1771, ptr %v1772)
     store ptr %v1773, ptr %v1
     %v1774 = add i64 0, 0
     %v1775 = load ptr, ptr %v1
-    %v1776 = getelementptr i8, ptr @.str_1065, i64 16
+    %v1776 = getelementptr i8, ptr @.str_1067, i64 16
     %v1777 = call ptr @orion_text_concat(ptr %v1775, ptr %v1776)
     store ptr %v1777, ptr %v1
     %v1778 = add i64 0, 0
     %v1779 = load ptr, ptr %v1
-    %v1780 = getelementptr i8, ptr @.str_1066, i64 16
+    %v1780 = getelementptr i8, ptr @.str_1068, i64 16
     %v1781 = call ptr @orion_text_concat(ptr %v1779, ptr %v1780)
     store ptr %v1781, ptr %v1
     %v1782 = add i64 0, 0
     %v1783 = load ptr, ptr %v1
-    %v1784 = getelementptr i8, ptr @.str_1067, i64 16
+    %v1784 = getelementptr i8, ptr @.str_1069, i64 16
     %v1785 = call ptr @orion_text_concat(ptr %v1783, ptr %v1784)
     store ptr %v1785, ptr %v1
     %v1786 = add i64 0, 0
     %v1787 = load ptr, ptr %v1
-    %v1788 = getelementptr i8, ptr @.str_1068, i64 16
+    %v1788 = getelementptr i8, ptr @.str_1070, i64 16
     %v1789 = call ptr @orion_text_concat(ptr %v1787, ptr %v1788)
     store ptr %v1789, ptr %v1
     %v1790 = add i64 0, 0
     %v1791 = load ptr, ptr %v1
-    %v1792 = getelementptr i8, ptr @.str_1069, i64 16
+    %v1792 = getelementptr i8, ptr @.str_1071, i64 16
     %v1793 = call ptr @orion_text_concat(ptr %v1791, ptr %v1792)
     store ptr %v1793, ptr %v1
     %v1794 = add i64 0, 0
     %v1795 = load ptr, ptr %v1
-    %v1796 = getelementptr i8, ptr @.str_1070, i64 16
+    %v1796 = getelementptr i8, ptr @.str_1072, i64 16
     %v1797 = call ptr @orion_text_concat(ptr %v1795, ptr %v1796)
     store ptr %v1797, ptr %v1
     %v1798 = add i64 0, 0
     %v1799 = load ptr, ptr %v1
-    %v1800 = getelementptr i8, ptr @.str_991, i64 16
+    %v1800 = getelementptr i8, ptr @.str_993, i64 16
     %v1801 = call ptr @orion_text_concat(ptr %v1799, ptr %v1800)
     store ptr %v1801, ptr %v1
     %v1802 = add i64 0, 0
     %v1803 = load ptr, ptr %v1
-    %v1804 = getelementptr i8, ptr @.str_992, i64 16
+    %v1804 = getelementptr i8, ptr @.str_994, i64 16
     %v1805 = call ptr @orion_text_concat(ptr %v1803, ptr %v1804)
     store ptr %v1805, ptr %v1
     %v1806 = add i64 0, 0
     %v1807 = load ptr, ptr %v1
-    %v1808 = getelementptr i8, ptr @.str_1071, i64 16
+    %v1808 = getelementptr i8, ptr @.str_1073, i64 16
     %v1809 = call ptr @orion_text_concat(ptr %v1807, ptr %v1808)
     store ptr %v1809, ptr %v1
     %v1810 = add i64 0, 0
     %v1811 = load ptr, ptr %v1
-    %v1812 = getelementptr i8, ptr @.str_1072, i64 16
+    %v1812 = getelementptr i8, ptr @.str_1074, i64 16
     %v1813 = call ptr @orion_text_concat(ptr %v1811, ptr %v1812)
     store ptr %v1813, ptr %v1
     %v1814 = add i64 0, 0
     %v1815 = load ptr, ptr %v1
-    %v1816 = getelementptr i8, ptr @.str_1073, i64 16
+    %v1816 = getelementptr i8, ptr @.str_1075, i64 16
     %v1817 = call ptr @orion_text_concat(ptr %v1815, ptr %v1816)
     store ptr %v1817, ptr %v1
     %v1818 = add i64 0, 0
     %v1819 = load ptr, ptr %v1
-    %v1820 = getelementptr i8, ptr @.str_1074, i64 16
+    %v1820 = getelementptr i8, ptr @.str_1076, i64 16
     %v1821 = call ptr @orion_text_concat(ptr %v1819, ptr %v1820)
     store ptr %v1821, ptr %v1
     %v1822 = add i64 0, 0
     %v1823 = load ptr, ptr %v1
-    %v1824 = getelementptr i8, ptr @.str_798, i64 16
+    %v1824 = getelementptr i8, ptr @.str_800, i64 16
     %v1825 = call ptr @orion_text_concat(ptr %v1823, ptr %v1824)
     store ptr %v1825, ptr %v1
     %v1826 = add i64 0, 0
     %v1827 = load ptr, ptr %v1
-    %v1828 = getelementptr i8, ptr @.str_1075, i64 16
+    %v1828 = getelementptr i8, ptr @.str_1077, i64 16
     %v1829 = call ptr @orion_text_concat(ptr %v1827, ptr %v1828)
     store ptr %v1829, ptr %v1
     %v1830 = add i64 0, 0
     %v1831 = load ptr, ptr %v1
-    %v1832 = getelementptr i8, ptr @.str_791, i64 16
+    %v1832 = getelementptr i8, ptr @.str_793, i64 16
     %v1833 = call ptr @orion_text_concat(ptr %v1831, ptr %v1832)
     store ptr %v1833, ptr %v1
     %v1834 = add i64 0, 0
     %v1835 = load ptr, ptr %v1
-    %v1836 = getelementptr i8, ptr @.str_1058, i64 16
+    %v1836 = getelementptr i8, ptr @.str_1060, i64 16
     %v1837 = call ptr @orion_text_concat(ptr %v1835, ptr %v1836)
     store ptr %v1837, ptr %v1
     %v1838 = add i64 0, 0
     %v1839 = load ptr, ptr %v1
-    %v1840 = getelementptr i8, ptr @.str_1059, i64 16
+    %v1840 = getelementptr i8, ptr @.str_1061, i64 16
     %v1841 = call ptr @orion_text_concat(ptr %v1839, ptr %v1840)
     store ptr %v1841, ptr %v1
     %v1842 = add i64 0, 0
     %v1843 = load ptr, ptr %v1
-    %v1844 = getelementptr i8, ptr @.str_1076, i64 16
+    %v1844 = getelementptr i8, ptr @.str_1078, i64 16
     %v1845 = call ptr @orion_text_concat(ptr %v1843, ptr %v1844)
     store ptr %v1845, ptr %v1
     %v1846 = add i64 0, 0
     %v1847 = load ptr, ptr %v1
-    %v1848 = getelementptr i8, ptr @.str_1061, i64 16
+    %v1848 = getelementptr i8, ptr @.str_1063, i64 16
     %v1849 = call ptr @orion_text_concat(ptr %v1847, ptr %v1848)
     store ptr %v1849, ptr %v1
     %v1850 = add i64 0, 0
     %v1851 = load ptr, ptr %v1
-    %v1852 = getelementptr i8, ptr @.str_1062, i64 16
+    %v1852 = getelementptr i8, ptr @.str_1064, i64 16
     %v1853 = call ptr @orion_text_concat(ptr %v1851, ptr %v1852)
     store ptr %v1853, ptr %v1
     %v1854 = add i64 0, 0
     %v1855 = load ptr, ptr %v1
-    %v1856 = getelementptr i8, ptr @.str_1063, i64 16
+    %v1856 = getelementptr i8, ptr @.str_1065, i64 16
     %v1857 = call ptr @orion_text_concat(ptr %v1855, ptr %v1856)
     store ptr %v1857, ptr %v1
     %v1858 = add i64 0, 0
     %v1859 = load ptr, ptr %v1
-    %v1860 = getelementptr i8, ptr @.str_979, i64 16
+    %v1860 = getelementptr i8, ptr @.str_981, i64 16
     %v1861 = call ptr @orion_text_concat(ptr %v1859, ptr %v1860)
     store ptr %v1861, ptr %v1
     %v1862 = add i64 0, 0
     %v1863 = load ptr, ptr %v1
-    %v1864 = getelementptr i8, ptr @.str_983, i64 16
+    %v1864 = getelementptr i8, ptr @.str_985, i64 16
     %v1865 = call ptr @orion_text_concat(ptr %v1863, ptr %v1864)
     store ptr %v1865, ptr %v1
     %v1866 = add i64 0, 0
     %v1867 = load ptr, ptr %v1
-    %v1868 = getelementptr i8, ptr @.str_1066, i64 16
+    %v1868 = getelementptr i8, ptr @.str_1068, i64 16
     %v1869 = call ptr @orion_text_concat(ptr %v1867, ptr %v1868)
     store ptr %v1869, ptr %v1
     %v1870 = add i64 0, 0
     %v1871 = load ptr, ptr %v1
-    %v1872 = getelementptr i8, ptr @.str_1077, i64 16
+    %v1872 = getelementptr i8, ptr @.str_1079, i64 16
     %v1873 = call ptr @orion_text_concat(ptr %v1871, ptr %v1872)
     store ptr %v1873, ptr %v1
     %v1874 = add i64 0, 0
     %v1875 = load ptr, ptr %v1
-    %v1876 = getelementptr i8, ptr @.str_883, i64 16
+    %v1876 = getelementptr i8, ptr @.str_885, i64 16
     %v1877 = call ptr @orion_text_concat(ptr %v1875, ptr %v1876)
     store ptr %v1877, ptr %v1
     %v1878 = add i64 0, 0
     %v1879 = load ptr, ptr %v1
-    %v1880 = getelementptr i8, ptr @.str_798, i64 16
+    %v1880 = getelementptr i8, ptr @.str_800, i64 16
     %v1881 = call ptr @orion_text_concat(ptr %v1879, ptr %v1880)
     store ptr %v1881, ptr %v1
     %v1882 = add i64 0, 0
     %v1883 = load ptr, ptr %v1
-    %v1884 = getelementptr i8, ptr @.str_1078, i64 16
+    %v1884 = getelementptr i8, ptr @.str_1080, i64 16
     %v1885 = call ptr @orion_text_concat(ptr %v1883, ptr %v1884)
     store ptr %v1885, ptr %v1
     %v1886 = add i64 0, 0
     %v1887 = load ptr, ptr %v1
-    %v1888 = getelementptr i8, ptr @.str_791, i64 16
+    %v1888 = getelementptr i8, ptr @.str_793, i64 16
     %v1889 = call ptr @orion_text_concat(ptr %v1887, ptr %v1888)
     store ptr %v1889, ptr %v1
     %v1890 = add i64 0, 0
     %v1891 = load ptr, ptr %v1
-    %v1892 = getelementptr i8, ptr @.str_1058, i64 16
+    %v1892 = getelementptr i8, ptr @.str_1060, i64 16
     %v1893 = call ptr @orion_text_concat(ptr %v1891, ptr %v1892)
     store ptr %v1893, ptr %v1
     %v1894 = add i64 0, 0
     %v1895 = load ptr, ptr %v1
-    %v1896 = getelementptr i8, ptr @.str_1059, i64 16
+    %v1896 = getelementptr i8, ptr @.str_1061, i64 16
     %v1897 = call ptr @orion_text_concat(ptr %v1895, ptr %v1896)
     store ptr %v1897, ptr %v1
     %v1898 = add i64 0, 0
     %v1899 = load ptr, ptr %v1
-    %v1900 = getelementptr i8, ptr @.str_1079, i64 16
+    %v1900 = getelementptr i8, ptr @.str_1081, i64 16
     %v1901 = call ptr @orion_text_concat(ptr %v1899, ptr %v1900)
     store ptr %v1901, ptr %v1
     %v1902 = add i64 0, 0
     %v1903 = load ptr, ptr %v1
-    %v1904 = getelementptr i8, ptr @.str_882, i64 16
+    %v1904 = getelementptr i8, ptr @.str_884, i64 16
     %v1905 = call ptr @orion_text_concat(ptr %v1903, ptr %v1904)
     store ptr %v1905, ptr %v1
     %v1906 = add i64 0, 0
     %v1907 = load ptr, ptr %v1
-    %v1908 = getelementptr i8, ptr @.str_883, i64 16
+    %v1908 = getelementptr i8, ptr @.str_885, i64 16
     %v1909 = call ptr @orion_text_concat(ptr %v1907, ptr %v1908)
     store ptr %v1909, ptr %v1
     %v1910 = add i64 0, 0
     %v1911 = load ptr, ptr %v1
-    %v1912 = getelementptr i8, ptr @.str_1080, i64 16
+    %v1912 = getelementptr i8, ptr @.str_1082, i64 16
     %v1913 = call ptr @orion_text_concat(ptr %v1911, ptr %v1912)
     store ptr %v1913, ptr %v1
     %v1914 = add i64 0, 0
     %v1915 = load ptr, ptr %v1
-    %v1916 = getelementptr i8, ptr @.str_1081, i64 16
+    %v1916 = getelementptr i8, ptr @.str_1083, i64 16
     %v1917 = call ptr @orion_text_concat(ptr %v1915, ptr %v1916)
     store ptr %v1917, ptr %v1
     %v1918 = add i64 0, 0
     %v1919 = load ptr, ptr %v1
-    %v1920 = getelementptr i8, ptr @.str_1082, i64 16
+    %v1920 = getelementptr i8, ptr @.str_1084, i64 16
     %v1921 = call ptr @orion_text_concat(ptr %v1919, ptr %v1920)
     store ptr %v1921, ptr %v1
     %v1922 = add i64 0, 0
     %v1923 = load ptr, ptr %v1
-    %v1924 = getelementptr i8, ptr @.str_798, i64 16
+    %v1924 = getelementptr i8, ptr @.str_800, i64 16
     %v1925 = call ptr @orion_text_concat(ptr %v1923, ptr %v1924)
     store ptr %v1925, ptr %v1
     %v1926 = add i64 0, 0
     %v1927 = load ptr, ptr %v1
-    %v1928 = getelementptr i8, ptr @.str_1083, i64 16
+    %v1928 = getelementptr i8, ptr @.str_1085, i64 16
     %v1929 = call ptr @orion_text_concat(ptr %v1927, ptr %v1928)
     store ptr %v1929, ptr %v1
     %v1930 = add i64 0, 0
     %v1931 = load ptr, ptr %v1
-    %v1932 = getelementptr i8, ptr @.str_791, i64 16
+    %v1932 = getelementptr i8, ptr @.str_793, i64 16
     %v1933 = call ptr @orion_text_concat(ptr %v1931, ptr %v1932)
     store ptr %v1933, ptr %v1
     %v1934 = add i64 0, 0
     %v1935 = load ptr, ptr %v1
-    %v1936 = getelementptr i8, ptr @.str_1058, i64 16
+    %v1936 = getelementptr i8, ptr @.str_1060, i64 16
     %v1937 = call ptr @orion_text_concat(ptr %v1935, ptr %v1936)
     store ptr %v1937, ptr %v1
     %v1938 = add i64 0, 0
     %v1939 = load ptr, ptr %v1
-    %v1940 = getelementptr i8, ptr @.str_1059, i64 16
+    %v1940 = getelementptr i8, ptr @.str_1061, i64 16
     %v1941 = call ptr @orion_text_concat(ptr %v1939, ptr %v1940)
     store ptr %v1941, ptr %v1
     %v1942 = add i64 0, 0
     %v1943 = load ptr, ptr %v1
-    %v1944 = getelementptr i8, ptr @.str_1084, i64 16
+    %v1944 = getelementptr i8, ptr @.str_1086, i64 16
     %v1945 = call ptr @orion_text_concat(ptr %v1943, ptr %v1944)
     store ptr %v1945, ptr %v1
     %v1946 = add i64 0, 0
     %v1947 = load ptr, ptr %v1
-    %v1948 = getelementptr i8, ptr @.str_1085, i64 16
+    %v1948 = getelementptr i8, ptr @.str_1087, i64 16
     %v1949 = call ptr @orion_text_concat(ptr %v1947, ptr %v1948)
     store ptr %v1949, ptr %v1
     %v1950 = add i64 0, 0
     %v1951 = load ptr, ptr %v1
-    %v1952 = getelementptr i8, ptr @.str_883, i64 16
+    %v1952 = getelementptr i8, ptr @.str_885, i64 16
     %v1953 = call ptr @orion_text_concat(ptr %v1951, ptr %v1952)
     store ptr %v1953, ptr %v1
     %v1954 = add i64 0, 0
     %v1955 = load ptr, ptr %v1
-    %v1956 = getelementptr i8, ptr @.str_1065, i64 16
+    %v1956 = getelementptr i8, ptr @.str_1067, i64 16
     %v1957 = call ptr @orion_text_concat(ptr %v1955, ptr %v1956)
     store ptr %v1957, ptr %v1
     %v1958 = add i64 0, 0
     %v1959 = load ptr, ptr %v1
-    %v1960 = getelementptr i8, ptr @.str_1086, i64 16
+    %v1960 = getelementptr i8, ptr @.str_1088, i64 16
     %v1961 = call ptr @orion_text_concat(ptr %v1959, ptr %v1960)
     store ptr %v1961, ptr %v1
     %v1962 = add i64 0, 0
     %v1963 = load ptr, ptr %v1
-    %v1964 = getelementptr i8, ptr @.str_1087, i64 16
+    %v1964 = getelementptr i8, ptr @.str_1089, i64 16
     %v1965 = call ptr @orion_text_concat(ptr %v1963, ptr %v1964)
     store ptr %v1965, ptr %v1
     %v1966 = add i64 0, 0
     %v1967 = load ptr, ptr %v1
-    %v1968 = getelementptr i8, ptr @.str_798, i64 16
+    %v1968 = getelementptr i8, ptr @.str_800, i64 16
     %v1969 = call ptr @orion_text_concat(ptr %v1967, ptr %v1968)
     store ptr %v1969, ptr %v1
     %v1970 = add i64 0, 0
     %v1971 = load ptr, ptr %v1
-    %v1972 = getelementptr i8, ptr @.str_1088, i64 16
+    %v1972 = getelementptr i8, ptr @.str_1090, i64 16
     %v1973 = call ptr @orion_text_concat(ptr %v1971, ptr %v1972)
     store ptr %v1973, ptr %v1
     %v1974 = add i64 0, 0
     %v1975 = load ptr, ptr %v1
-    %v1976 = getelementptr i8, ptr @.str_1089, i64 16
+    %v1976 = getelementptr i8, ptr @.str_1091, i64 16
     %v1977 = call ptr @orion_text_concat(ptr %v1975, ptr %v1976)
     store ptr %v1977, ptr %v1
     %v1978 = add i64 0, 0
     %v1979 = load ptr, ptr %v1
-    %v1980 = getelementptr i8, ptr @.str_1090, i64 16
+    %v1980 = getelementptr i8, ptr @.str_1092, i64 16
     %v1981 = call ptr @orion_text_concat(ptr %v1979, ptr %v1980)
     store ptr %v1981, ptr %v1
     %v1982 = add i64 0, 0
     %v1983 = load ptr, ptr %v1
-    %v1984 = getelementptr i8, ptr @.str_1091, i64 16
+    %v1984 = getelementptr i8, ptr @.str_1093, i64 16
     %v1985 = call ptr @orion_text_concat(ptr %v1983, ptr %v1984)
     store ptr %v1985, ptr %v1
     %v1986 = add i64 0, 0
     %v1987 = load ptr, ptr %v1
-    %v1988 = getelementptr i8, ptr @.str_1092, i64 16
+    %v1988 = getelementptr i8, ptr @.str_1094, i64 16
     %v1989 = call ptr @orion_text_concat(ptr %v1987, ptr %v1988)
     store ptr %v1989, ptr %v1
     %v1990 = add i64 0, 0
     %v1991 = load ptr, ptr %v1
-    %v1992 = getelementptr i8, ptr @.str_1093, i64 16
+    %v1992 = getelementptr i8, ptr @.str_1095, i64 16
     %v1993 = call ptr @orion_text_concat(ptr %v1991, ptr %v1992)
     store ptr %v1993, ptr %v1
     %v1994 = add i64 0, 0
     %v1995 = load ptr, ptr %v1
-    %v1996 = getelementptr i8, ptr @.str_1094, i64 16
+    %v1996 = getelementptr i8, ptr @.str_1096, i64 16
     %v1997 = call ptr @orion_text_concat(ptr %v1995, ptr %v1996)
     store ptr %v1997, ptr %v1
     %v1998 = add i64 0, 0
     %v1999 = load ptr, ptr %v1
-    %v2000 = getelementptr i8, ptr @.str_1095, i64 16
+    %v2000 = getelementptr i8, ptr @.str_1097, i64 16
     %v2001 = call ptr @orion_text_concat(ptr %v1999, ptr %v2000)
     store ptr %v2001, ptr %v1
     %v2002 = add i64 0, 0
     %v2003 = load ptr, ptr %v1
-    %v2004 = getelementptr i8, ptr @.str_1096, i64 16
+    %v2004 = getelementptr i8, ptr @.str_1098, i64 16
     %v2005 = call ptr @orion_text_concat(ptr %v2003, ptr %v2004)
     store ptr %v2005, ptr %v1
     %v2006 = add i64 0, 0
     %v2007 = load ptr, ptr %v1
-    %v2008 = getelementptr i8, ptr @.str_1097, i64 16
+    %v2008 = getelementptr i8, ptr @.str_1099, i64 16
     %v2009 = call ptr @orion_text_concat(ptr %v2007, ptr %v2008)
     store ptr %v2009, ptr %v1
     %v2010 = add i64 0, 0
     %v2011 = load ptr, ptr %v1
-    %v2012 = getelementptr i8, ptr @.str_791, i64 16
+    %v2012 = getelementptr i8, ptr @.str_793, i64 16
     %v2013 = call ptr @orion_text_concat(ptr %v2011, ptr %v2012)
     store ptr %v2013, ptr %v1
     %v2014 = add i64 0, 0
     %v2015 = load ptr, ptr %v1
-    %v2016 = getelementptr i8, ptr @.str_1098, i64 16
+    %v2016 = getelementptr i8, ptr @.str_1100, i64 16
     %v2017 = call ptr @orion_text_concat(ptr %v2015, ptr %v2016)
     store ptr %v2017, ptr %v1
     %v2018 = add i64 0, 0
     %v2019 = load ptr, ptr %v1
-    %v2020 = getelementptr i8, ptr @.str_1099, i64 16
+    %v2020 = getelementptr i8, ptr @.str_1101, i64 16
     %v2021 = call ptr @orion_text_concat(ptr %v2019, ptr %v2020)
     store ptr %v2021, ptr %v1
     %v2022 = add i64 0, 0
     %v2023 = load ptr, ptr %v1
-    %v2024 = getelementptr i8, ptr @.str_1100, i64 16
+    %v2024 = getelementptr i8, ptr @.str_1102, i64 16
     %v2025 = call ptr @orion_text_concat(ptr %v2023, ptr %v2024)
     store ptr %v2025, ptr %v1
     %v2026 = add i64 0, 0
     %v2027 = load ptr, ptr %v1
-    %v2028 = getelementptr i8, ptr @.str_1101, i64 16
+    %v2028 = getelementptr i8, ptr @.str_1103, i64 16
     %v2029 = call ptr @orion_text_concat(ptr %v2027, ptr %v2028)
     store ptr %v2029, ptr %v1
     %v2030 = add i64 0, 0
     %v2031 = load ptr, ptr %v1
-    %v2032 = getelementptr i8, ptr @.str_991, i64 16
+    %v2032 = getelementptr i8, ptr @.str_993, i64 16
     %v2033 = call ptr @orion_text_concat(ptr %v2031, ptr %v2032)
     store ptr %v2033, ptr %v1
     %v2034 = add i64 0, 0
     %v2035 = load ptr, ptr %v1
-    %v2036 = getelementptr i8, ptr @.str_992, i64 16
+    %v2036 = getelementptr i8, ptr @.str_994, i64 16
     %v2037 = call ptr @orion_text_concat(ptr %v2035, ptr %v2036)
     store ptr %v2037, ptr %v1
     %v2038 = add i64 0, 0
     %v2039 = load ptr, ptr %v1
-    %v2040 = getelementptr i8, ptr @.str_1102, i64 16
+    %v2040 = getelementptr i8, ptr @.str_1104, i64 16
     %v2041 = call ptr @orion_text_concat(ptr %v2039, ptr %v2040)
     store ptr %v2041, ptr %v1
     %v2042 = add i64 0, 0
     %v2043 = load ptr, ptr %v1
-    %v2044 = getelementptr i8, ptr @.str_1103, i64 16
+    %v2044 = getelementptr i8, ptr @.str_1105, i64 16
     %v2045 = call ptr @orion_text_concat(ptr %v2043, ptr %v2044)
     store ptr %v2045, ptr %v1
     %v2046 = add i64 0, 0
     %v2047 = load ptr, ptr %v1
-    %v2048 = getelementptr i8, ptr @.str_1104, i64 16
+    %v2048 = getelementptr i8, ptr @.str_1106, i64 16
     %v2049 = call ptr @orion_text_concat(ptr %v2047, ptr %v2048)
     store ptr %v2049, ptr %v1
     %v2050 = add i64 0, 0
     %v2051 = load ptr, ptr %v1
-    %v2052 = getelementptr i8, ptr @.str_1105, i64 16
+    %v2052 = getelementptr i8, ptr @.str_1107, i64 16
     %v2053 = call ptr @orion_text_concat(ptr %v2051, ptr %v2052)
     store ptr %v2053, ptr %v1
     %v2054 = add i64 0, 0
     %v2055 = load ptr, ptr %v1
-    %v2056 = getelementptr i8, ptr @.str_1106, i64 16
+    %v2056 = getelementptr i8, ptr @.str_1108, i64 16
     %v2057 = call ptr @orion_text_concat(ptr %v2055, ptr %v2056)
     store ptr %v2057, ptr %v1
     %v2058 = add i64 0, 0
     %v2059 = load ptr, ptr %v1
-    %v2060 = getelementptr i8, ptr @.str_1107, i64 16
+    %v2060 = getelementptr i8, ptr @.str_1109, i64 16
     %v2061 = call ptr @orion_text_concat(ptr %v2059, ptr %v2060)
     store ptr %v2061, ptr %v1
     %v2062 = add i64 0, 0
     %v2063 = load ptr, ptr %v1
-    %v2064 = getelementptr i8, ptr @.str_1108, i64 16
+    %v2064 = getelementptr i8, ptr @.str_1110, i64 16
     %v2065 = call ptr @orion_text_concat(ptr %v2063, ptr %v2064)
     store ptr %v2065, ptr %v1
     %v2066 = add i64 0, 0
     %v2067 = load ptr, ptr %v1
-    %v2068 = getelementptr i8, ptr @.str_832, i64 16
+    %v2068 = getelementptr i8, ptr @.str_834, i64 16
     %v2069 = call ptr @orion_text_concat(ptr %v2067, ptr %v2068)
     store ptr %v2069, ptr %v1
     %v2070 = add i64 0, 0
     %v2071 = load ptr, ptr %v1
-    %v2072 = getelementptr i8, ptr @.str_1109, i64 16
+    %v2072 = getelementptr i8, ptr @.str_1111, i64 16
     %v2073 = call ptr @orion_text_concat(ptr %v2071, ptr %v2072)
     store ptr %v2073, ptr %v1
     %v2074 = add i64 0, 0
     %v2075 = load ptr, ptr %v1
-    %v2076 = getelementptr i8, ptr @.str_833, i64 16
+    %v2076 = getelementptr i8, ptr @.str_835, i64 16
     %v2077 = call ptr @orion_text_concat(ptr %v2075, ptr %v2076)
     store ptr %v2077, ptr %v1
     %v2078 = add i64 0, 0
     %v2079 = load ptr, ptr %v1
-    %v2080 = getelementptr i8, ptr @.str_798, i64 16
+    %v2080 = getelementptr i8, ptr @.str_800, i64 16
     %v2081 = call ptr @orion_text_concat(ptr %v2079, ptr %v2080)
     store ptr %v2081, ptr %v1
     %v2082 = add i64 0, 0
     %v2083 = load ptr, ptr %v1
-    %v2084 = getelementptr i8, ptr @.str_1110, i64 16
+    %v2084 = getelementptr i8, ptr @.str_1112, i64 16
     %v2085 = call ptr @orion_text_concat(ptr %v2083, ptr %v2084)
     store ptr %v2085, ptr %v1
     %v2086 = add i64 0, 0
     %v2087 = load ptr, ptr %v1
-    %v2088 = getelementptr i8, ptr @.str_791, i64 16
+    %v2088 = getelementptr i8, ptr @.str_793, i64 16
     %v2089 = call ptr @orion_text_concat(ptr %v2087, ptr %v2088)
     store ptr %v2089, ptr %v1
     %v2090 = add i64 0, 0
     %v2091 = load ptr, ptr %v1
-    %v2092 = getelementptr i8, ptr @.str_1111, i64 16
+    %v2092 = getelementptr i8, ptr @.str_1113, i64 16
     %v2093 = call ptr @orion_text_concat(ptr %v2091, ptr %v2092)
     store ptr %v2093, ptr %v1
     %v2094 = add i64 0, 0
     %v2095 = load ptr, ptr %v1
-    %v2096 = getelementptr i8, ptr @.str_1099, i64 16
+    %v2096 = getelementptr i8, ptr @.str_1101, i64 16
     %v2097 = call ptr @orion_text_concat(ptr %v2095, ptr %v2096)
     store ptr %v2097, ptr %v1
     %v2098 = add i64 0, 0
     %v2099 = load ptr, ptr %v1
-    %v2100 = getelementptr i8, ptr @.str_1100, i64 16
+    %v2100 = getelementptr i8, ptr @.str_1102, i64 16
     %v2101 = call ptr @orion_text_concat(ptr %v2099, ptr %v2100)
     store ptr %v2101, ptr %v1
     %v2102 = add i64 0, 0
     %v2103 = load ptr, ptr %v1
-    %v2104 = getelementptr i8, ptr @.str_1101, i64 16
+    %v2104 = getelementptr i8, ptr @.str_1103, i64 16
     %v2105 = call ptr @orion_text_concat(ptr %v2103, ptr %v2104)
     store ptr %v2105, ptr %v1
     %v2106 = add i64 0, 0
     %v2107 = load ptr, ptr %v1
-    %v2108 = getelementptr i8, ptr @.str_883, i64 16
+    %v2108 = getelementptr i8, ptr @.str_885, i64 16
     %v2109 = call ptr @orion_text_concat(ptr %v2107, ptr %v2108)
     store ptr %v2109, ptr %v1
     %v2110 = add i64 0, 0
     %v2111 = load ptr, ptr %v1
-    %v2112 = getelementptr i8, ptr @.str_1102, i64 16
+    %v2112 = getelementptr i8, ptr @.str_1104, i64 16
     %v2113 = call ptr @orion_text_concat(ptr %v2111, ptr %v2112)
     store ptr %v2113, ptr %v1
     %v2114 = add i64 0, 0
     %v2115 = load ptr, ptr %v1
-    %v2116 = getelementptr i8, ptr @.str_1112, i64 16
+    %v2116 = getelementptr i8, ptr @.str_1114, i64 16
     %v2117 = call ptr @orion_text_concat(ptr %v2115, ptr %v2116)
     store ptr %v2117, ptr %v1
     %v2118 = add i64 0, 0
     %v2119 = load ptr, ptr %v1
-    %v2120 = getelementptr i8, ptr @.str_1113, i64 16
+    %v2120 = getelementptr i8, ptr @.str_1115, i64 16
     %v2121 = call ptr @orion_text_concat(ptr %v2119, ptr %v2120)
     store ptr %v2121, ptr %v1
     %v2122 = add i64 0, 0
     %v2123 = load ptr, ptr %v1
-    %v2124 = getelementptr i8, ptr @.str_1109, i64 16
+    %v2124 = getelementptr i8, ptr @.str_1111, i64 16
     %v2125 = call ptr @orion_text_concat(ptr %v2123, ptr %v2124)
     store ptr %v2125, ptr %v1
     %v2126 = add i64 0, 0
     %v2127 = load ptr, ptr %v1
-    %v2128 = getelementptr i8, ptr @.str_881, i64 16
+    %v2128 = getelementptr i8, ptr @.str_883, i64 16
     %v2129 = call ptr @orion_text_concat(ptr %v2127, ptr %v2128)
     store ptr %v2129, ptr %v1
     %v2130 = add i64 0, 0
     %v2131 = load ptr, ptr %v1
-    %v2132 = getelementptr i8, ptr @.str_798, i64 16
+    %v2132 = getelementptr i8, ptr @.str_800, i64 16
     %v2133 = call ptr @orion_text_concat(ptr %v2131, ptr %v2132)
     store ptr %v2133, ptr %v1
     %v2134 = add i64 0, 0
     %v2135 = load ptr, ptr %v1
-    %v2136 = getelementptr i8, ptr @.str_1114, i64 16
+    %v2136 = getelementptr i8, ptr @.str_1116, i64 16
     %v2137 = call ptr @orion_text_concat(ptr %v2135, ptr %v2136)
     store ptr %v2137, ptr %v1
     %v2138 = add i64 0, 0
     %v2139 = load ptr, ptr %v1
-    %v2140 = getelementptr i8, ptr @.str_791, i64 16
+    %v2140 = getelementptr i8, ptr @.str_793, i64 16
     %v2141 = call ptr @orion_text_concat(ptr %v2139, ptr %v2140)
     store ptr %v2141, ptr %v1
     %v2142 = add i64 0, 0
     %v2143 = load ptr, ptr %v1
-    %v2144 = getelementptr i8, ptr @.str_1115, i64 16
+    %v2144 = getelementptr i8, ptr @.str_1117, i64 16
     %v2145 = call ptr @orion_text_concat(ptr %v2143, ptr %v2144)
     store ptr %v2145, ptr %v1
     %v2146 = add i64 0, 0
     %v2147 = load ptr, ptr %v1
-    %v2148 = getelementptr i8, ptr @.str_1116, i64 16
+    %v2148 = getelementptr i8, ptr @.str_1118, i64 16
     %v2149 = call ptr @orion_text_concat(ptr %v2147, ptr %v2148)
     store ptr %v2149, ptr %v1
     %v2150 = add i64 0, 0
     %v2151 = load ptr, ptr %v1
-    %v2152 = getelementptr i8, ptr @.str_1117, i64 16
+    %v2152 = getelementptr i8, ptr @.str_1119, i64 16
     %v2153 = call ptr @orion_text_concat(ptr %v2151, ptr %v2152)
     store ptr %v2153, ptr %v1
     %v2154 = add i64 0, 0
     %v2155 = load ptr, ptr %v1
-    %v2156 = getelementptr i8, ptr @.str_1118, i64 16
+    %v2156 = getelementptr i8, ptr @.str_1120, i64 16
     %v2157 = call ptr @orion_text_concat(ptr %v2155, ptr %v2156)
     store ptr %v2157, ptr %v1
     %v2158 = add i64 0, 0
     %v2159 = load ptr, ptr %v1
-    %v2160 = getelementptr i8, ptr @.str_1119, i64 16
+    %v2160 = getelementptr i8, ptr @.str_1121, i64 16
     %v2161 = call ptr @orion_text_concat(ptr %v2159, ptr %v2160)
     store ptr %v2161, ptr %v1
     %v2162 = add i64 0, 0
     %v2163 = load ptr, ptr %v1
-    %v2164 = getelementptr i8, ptr @.str_1120, i64 16
+    %v2164 = getelementptr i8, ptr @.str_1122, i64 16
     %v2165 = call ptr @orion_text_concat(ptr %v2163, ptr %v2164)
     store ptr %v2165, ptr %v1
     %v2166 = add i64 0, 0
     %v2167 = load ptr, ptr %v1
-    %v2168 = getelementptr i8, ptr @.str_833, i64 16
+    %v2168 = getelementptr i8, ptr @.str_835, i64 16
     %v2169 = call ptr @orion_text_concat(ptr %v2167, ptr %v2168)
     store ptr %v2169, ptr %v1
     %v2170 = add i64 0, 0
     %v2171 = load ptr, ptr %v1
-    %v2172 = getelementptr i8, ptr @.str_798, i64 16
+    %v2172 = getelementptr i8, ptr @.str_800, i64 16
     %v2173 = call ptr @orion_text_concat(ptr %v2171, ptr %v2172)
     store ptr %v2173, ptr %v1
     %v2174 = add i64 0, 0
     %v2175 = load ptr, ptr %v1
-    %v2176 = getelementptr i8, ptr @.str_1121, i64 16
+    %v2176 = getelementptr i8, ptr @.str_1123, i64 16
     %v2177 = call ptr @orion_text_concat(ptr %v2175, ptr %v2176)
     store ptr %v2177, ptr %v1
     %v2178 = add i64 0, 0
     %v2179 = load ptr, ptr %v1
-    %v2180 = getelementptr i8, ptr @.str_791, i64 16
+    %v2180 = getelementptr i8, ptr @.str_793, i64 16
     %v2181 = call ptr @orion_text_concat(ptr %v2179, ptr %v2180)
     store ptr %v2181, ptr %v1
     %v2182 = add i64 0, 0
     %v2183 = load ptr, ptr %v1
-    %v2184 = getelementptr i8, ptr @.str_1122, i64 16
+    %v2184 = getelementptr i8, ptr @.str_1124, i64 16
     %v2185 = call ptr @orion_text_concat(ptr %v2183, ptr %v2184)
     store ptr %v2185, ptr %v1
     %v2186 = add i64 0, 0
     %v2187 = load ptr, ptr %v1
-    %v2188 = getelementptr i8, ptr @.str_1123, i64 16
+    %v2188 = getelementptr i8, ptr @.str_1125, i64 16
     %v2189 = call ptr @orion_text_concat(ptr %v2187, ptr %v2188)
     store ptr %v2189, ptr %v1
     %v2190 = add i64 0, 0
     %v2191 = load ptr, ptr %v1
-    %v2192 = getelementptr i8, ptr @.str_1087, i64 16
+    %v2192 = getelementptr i8, ptr @.str_1089, i64 16
     %v2193 = call ptr @orion_text_concat(ptr %v2191, ptr %v2192)
     store ptr %v2193, ptr %v1
     %v2194 = add i64 0, 0
     %v2195 = load ptr, ptr %v1
-    %v2196 = getelementptr i8, ptr @.str_798, i64 16
+    %v2196 = getelementptr i8, ptr @.str_800, i64 16
     %v2197 = call ptr @orion_text_concat(ptr %v2195, ptr %v2196)
     store ptr %v2197, ptr %v1
     %v2198 = add i64 0, 0
     %v2199 = load ptr, ptr %v1
-    %v2200 = getelementptr i8, ptr @.str_1124, i64 16
+    %v2200 = getelementptr i8, ptr @.str_1126, i64 16
     %v2201 = call ptr @orion_text_concat(ptr %v2199, ptr %v2200)
     store ptr %v2201, ptr %v1
     %v2202 = add i64 0, 0
     %v2203 = load ptr, ptr %v1
-    %v2204 = getelementptr i8, ptr @.str_791, i64 16
+    %v2204 = getelementptr i8, ptr @.str_793, i64 16
     %v2205 = call ptr @orion_text_concat(ptr %v2203, ptr %v2204)
     store ptr %v2205, ptr %v1
     %v2206 = add i64 0, 0
     %v2207 = load ptr, ptr %v1
-    %v2208 = getelementptr i8, ptr @.str_1122, i64 16
+    %v2208 = getelementptr i8, ptr @.str_1124, i64 16
     %v2209 = call ptr @orion_text_concat(ptr %v2207, ptr %v2208)
     store ptr %v2209, ptr %v1
     %v2210 = add i64 0, 0
     %v2211 = load ptr, ptr %v1
-    %v2212 = getelementptr i8, ptr @.str_1123, i64 16
+    %v2212 = getelementptr i8, ptr @.str_1125, i64 16
     %v2213 = call ptr @orion_text_concat(ptr %v2211, ptr %v2212)
     store ptr %v2213, ptr %v1
     %v2214 = add i64 0, 0
     %v2215 = load ptr, ptr %v1
-    %v2216 = getelementptr i8, ptr @.str_1125, i64 16
+    %v2216 = getelementptr i8, ptr @.str_1127, i64 16
     %v2217 = call ptr @orion_text_concat(ptr %v2215, ptr %v2216)
     store ptr %v2217, ptr %v1
     %v2218 = add i64 0, 0
     %v2219 = load ptr, ptr %v1
-    %v2220 = getelementptr i8, ptr @.str_1074, i64 16
+    %v2220 = getelementptr i8, ptr @.str_1076, i64 16
     %v2221 = call ptr @orion_text_concat(ptr %v2219, ptr %v2220)
     store ptr %v2221, ptr %v1
     %v2222 = add i64 0, 0
     %v2223 = load ptr, ptr %v1
-    %v2224 = getelementptr i8, ptr @.str_798, i64 16
+    %v2224 = getelementptr i8, ptr @.str_800, i64 16
     %v2225 = call ptr @orion_text_concat(ptr %v2223, ptr %v2224)
     store ptr %v2225, ptr %v1
     %v2226 = add i64 0, 0
     %v2227 = load ptr, ptr %v1
-    %v2228 = getelementptr i8, ptr @.str_1126, i64 16
+    %v2228 = getelementptr i8, ptr @.str_1128, i64 16
     %v2229 = call ptr @orion_text_concat(ptr %v2227, ptr %v2228)
     store ptr %v2229, ptr %v1
     %v2230 = add i64 0, 0
     %v2231 = load ptr, ptr %v1
-    %v2232 = getelementptr i8, ptr @.str_791, i64 16
+    %v2232 = getelementptr i8, ptr @.str_793, i64 16
     %v2233 = call ptr @orion_text_concat(ptr %v2231, ptr %v2232)
     store ptr %v2233, ptr %v1
     %v2234 = add i64 0, 0
     %v2235 = load ptr, ptr %v1
-    %v2236 = getelementptr i8, ptr @.str_1127, i64 16
+    %v2236 = getelementptr i8, ptr @.str_1129, i64 16
     %v2237 = call ptr @orion_text_concat(ptr %v2235, ptr %v2236)
     store ptr %v2237, ptr %v1
     %v2238 = add i64 0, 0
     %v2239 = load ptr, ptr %v1
-    %v2240 = getelementptr i8, ptr @.str_1015, i64 16
+    %v2240 = getelementptr i8, ptr @.str_1017, i64 16
     %v2241 = call ptr @orion_text_concat(ptr %v2239, ptr %v2240)
     store ptr %v2241, ptr %v1
     %v2242 = add i64 0, 0
     %v2243 = load ptr, ptr %v1
-    %v2244 = getelementptr i8, ptr @.str_1128, i64 16
+    %v2244 = getelementptr i8, ptr @.str_1130, i64 16
     %v2245 = call ptr @orion_text_concat(ptr %v2243, ptr %v2244)
     store ptr %v2245, ptr %v1
     %v2246 = add i64 0, 0
     %v2247 = load ptr, ptr %v1
-    %v2248 = getelementptr i8, ptr @.str_798, i64 16
+    %v2248 = getelementptr i8, ptr @.str_800, i64 16
     %v2249 = call ptr @orion_text_concat(ptr %v2247, ptr %v2248)
     store ptr %v2249, ptr %v1
     %v2250 = add i64 0, 0
     %v2251 = load ptr, ptr %v1
-    %v2252 = getelementptr i8, ptr @.str_1129, i64 16
+    %v2252 = getelementptr i8, ptr @.str_1131, i64 16
     %v2253 = call ptr @orion_text_concat(ptr %v2251, ptr %v2252)
     store ptr %v2253, ptr %v1
     %v2254 = add i64 0, 0
     %v2255 = load ptr, ptr %v1
-    %v2256 = getelementptr i8, ptr @.str_791, i64 16
+    %v2256 = getelementptr i8, ptr @.str_793, i64 16
     %v2257 = call ptr @orion_text_concat(ptr %v2255, ptr %v2256)
     store ptr %v2257, ptr %v1
     %v2258 = add i64 0, 0
     %v2259 = load ptr, ptr %v1
-    %v2260 = getelementptr i8, ptr @.str_1130, i64 16
+    %v2260 = getelementptr i8, ptr @.str_1132, i64 16
     %v2261 = call ptr @orion_text_concat(ptr %v2259, ptr %v2260)
     store ptr %v2261, ptr %v1
     %v2262 = add i64 0, 0
     %v2263 = load ptr, ptr %v1
-    %v2264 = getelementptr i8, ptr @.str_1131, i64 16
+    %v2264 = getelementptr i8, ptr @.str_1133, i64 16
     %v2265 = call ptr @orion_text_concat(ptr %v2263, ptr %v2264)
     store ptr %v2265, ptr %v1
     %v2266 = add i64 0, 0
     %v2267 = load ptr, ptr %v1
-    %v2268 = getelementptr i8, ptr @.str_1132, i64 16
+    %v2268 = getelementptr i8, ptr @.str_1134, i64 16
     %v2269 = call ptr @orion_text_concat(ptr %v2267, ptr %v2268)
     store ptr %v2269, ptr %v1
     %v2270 = add i64 0, 0
     %v2271 = load ptr, ptr %v1
-    %v2272 = getelementptr i8, ptr @.str_1133, i64 16
+    %v2272 = getelementptr i8, ptr @.str_1135, i64 16
     %v2273 = call ptr @orion_text_concat(ptr %v2271, ptr %v2272)
     store ptr %v2273, ptr %v1
     %v2274 = add i64 0, 0
     %v2275 = load ptr, ptr %v1
-    %v2276 = getelementptr i8, ptr @.str_798, i64 16
+    %v2276 = getelementptr i8, ptr @.str_800, i64 16
     %v2277 = call ptr @orion_text_concat(ptr %v2275, ptr %v2276)
     store ptr %v2277, ptr %v1
     %v2278 = add i64 0, 0
     %v2279 = load ptr, ptr %v1
-    %v2280 = getelementptr i8, ptr @.str_1134, i64 16
+    %v2280 = getelementptr i8, ptr @.str_1136, i64 16
     %v2281 = call ptr @orion_text_concat(ptr %v2279, ptr %v2280)
     store ptr %v2281, ptr %v1
     %v2282 = add i64 0, 0
     %v2283 = load ptr, ptr %v1
-    %v2284 = getelementptr i8, ptr @.str_791, i64 16
+    %v2284 = getelementptr i8, ptr @.str_793, i64 16
     %v2285 = call ptr @orion_text_concat(ptr %v2283, ptr %v2284)
     store ptr %v2285, ptr %v1
     %v2286 = add i64 0, 0
     %v2287 = load ptr, ptr %v1
-    %v2288 = getelementptr i8, ptr @.str_1135, i64 16
+    %v2288 = getelementptr i8, ptr @.str_1137, i64 16
     %v2289 = call ptr @orion_text_concat(ptr %v2287, ptr %v2288)
     store ptr %v2289, ptr %v1
     %v2290 = add i64 0, 0
     %v2291 = load ptr, ptr %v1
-    %v2292 = getelementptr i8, ptr @.str_1136, i64 16
+    %v2292 = getelementptr i8, ptr @.str_1138, i64 16
     %v2293 = call ptr @orion_text_concat(ptr %v2291, ptr %v2292)
     store ptr %v2293, ptr %v1
     %v2294 = add i64 0, 0
     %v2295 = load ptr, ptr %v1
-    %v2296 = getelementptr i8, ptr @.str_1137, i64 16
+    %v2296 = getelementptr i8, ptr @.str_1139, i64 16
     %v2297 = call ptr @orion_text_concat(ptr %v2295, ptr %v2296)
     store ptr %v2297, ptr %v1
     %v2298 = add i64 0, 0
     %v2299 = load ptr, ptr %v1
-    %v2300 = getelementptr i8, ptr @.str_1138, i64 16
+    %v2300 = getelementptr i8, ptr @.str_1140, i64 16
     %v2301 = call ptr @orion_text_concat(ptr %v2299, ptr %v2300)
     store ptr %v2301, ptr %v1
     %v2302 = add i64 0, 0
     %v2303 = load ptr, ptr %v1
-    %v2304 = getelementptr i8, ptr @.str_1139, i64 16
+    %v2304 = getelementptr i8, ptr @.str_1141, i64 16
     %v2305 = call ptr @orion_text_concat(ptr %v2303, ptr %v2304)
     store ptr %v2305, ptr %v1
     %v2306 = add i64 0, 0
     %v2307 = load ptr, ptr %v1
-    %v2308 = getelementptr i8, ptr @.str_914, i64 16
+    %v2308 = getelementptr i8, ptr @.str_916, i64 16
     %v2309 = call ptr @orion_text_concat(ptr %v2307, ptr %v2308)
     store ptr %v2309, ptr %v1
     %v2310 = add i64 0, 0
     %v2311 = load ptr, ptr %v1
-    %v2312 = getelementptr i8, ptr @.str_1140, i64 16
+    %v2312 = getelementptr i8, ptr @.str_1142, i64 16
     %v2313 = call ptr @orion_text_concat(ptr %v2311, ptr %v2312)
     store ptr %v2313, ptr %v1
     %v2314 = add i64 0, 0
     %v2315 = load ptr, ptr %v1
-    %v2316 = getelementptr i8, ptr @.str_1141, i64 16
+    %v2316 = getelementptr i8, ptr @.str_1143, i64 16
     %v2317 = call ptr @orion_text_concat(ptr %v2315, ptr %v2316)
     store ptr %v2317, ptr %v1
     %v2318 = add i64 0, 0
     %v2319 = load ptr, ptr %v1
-    %v2320 = getelementptr i8, ptr @.str_1142, i64 16
+    %v2320 = getelementptr i8, ptr @.str_1144, i64 16
     %v2321 = call ptr @orion_text_concat(ptr %v2319, ptr %v2320)
     store ptr %v2321, ptr %v1
     %v2322 = add i64 0, 0
     %v2323 = load ptr, ptr %v1
-    %v2324 = getelementptr i8, ptr @.str_1143, i64 16
+    %v2324 = getelementptr i8, ptr @.str_1145, i64 16
     %v2325 = call ptr @orion_text_concat(ptr %v2323, ptr %v2324)
     store ptr %v2325, ptr %v1
     %v2326 = add i64 0, 0
     %v2327 = load ptr, ptr %v1
-    %v2328 = getelementptr i8, ptr @.str_1144, i64 16
+    %v2328 = getelementptr i8, ptr @.str_1146, i64 16
     %v2329 = call ptr @orion_text_concat(ptr %v2327, ptr %v2328)
     store ptr %v2329, ptr %v1
     %v2330 = add i64 0, 0
     %v2331 = load ptr, ptr %v1
-    %v2332 = getelementptr i8, ptr @.str_933, i64 16
+    %v2332 = getelementptr i8, ptr @.str_935, i64 16
     %v2333 = call ptr @orion_text_concat(ptr %v2331, ptr %v2332)
     store ptr %v2333, ptr %v1
     %v2334 = add i64 0, 0
     %v2335 = load ptr, ptr %v1
-    %v2336 = getelementptr i8, ptr @.str_934, i64 16
+    %v2336 = getelementptr i8, ptr @.str_936, i64 16
     %v2337 = call ptr @orion_text_concat(ptr %v2335, ptr %v2336)
     store ptr %v2337, ptr %v1
     %v2338 = add i64 0, 0
     %v2339 = load ptr, ptr %v1
-    %v2340 = getelementptr i8, ptr @.str_1145, i64 16
+    %v2340 = getelementptr i8, ptr @.str_1147, i64 16
     %v2341 = call ptr @orion_text_concat(ptr %v2339, ptr %v2340)
     store ptr %v2341, ptr %v1
     %v2342 = add i64 0, 0
     %v2343 = load ptr, ptr %v1
-    %v2344 = getelementptr i8, ptr @.str_1146, i64 16
+    %v2344 = getelementptr i8, ptr @.str_1148, i64 16
     %v2345 = call ptr @orion_text_concat(ptr %v2343, ptr %v2344)
     store ptr %v2345, ptr %v1
     %v2346 = add i64 0, 0
     %v2347 = load ptr, ptr %v1
-    %v2348 = getelementptr i8, ptr @.str_1147, i64 16
+    %v2348 = getelementptr i8, ptr @.str_1149, i64 16
     %v2349 = call ptr @orion_text_concat(ptr %v2347, ptr %v2348)
     store ptr %v2349, ptr %v1
     %v2350 = add i64 0, 0
     %v2351 = load ptr, ptr %v1
-    %v2352 = getelementptr i8, ptr @.str_1148, i64 16
+    %v2352 = getelementptr i8, ptr @.str_1150, i64 16
     %v2353 = call ptr @orion_text_concat(ptr %v2351, ptr %v2352)
     store ptr %v2353, ptr %v1
     %v2354 = add i64 0, 0
     %v2355 = load ptr, ptr %v1
-    %v2356 = getelementptr i8, ptr @.str_1149, i64 16
+    %v2356 = getelementptr i8, ptr @.str_1151, i64 16
     %v2357 = call ptr @orion_text_concat(ptr %v2355, ptr %v2356)
     store ptr %v2357, ptr %v1
     %v2358 = add i64 0, 0
     %v2359 = load ptr, ptr %v1
-    %v2360 = getelementptr i8, ptr @.str_1150, i64 16
+    %v2360 = getelementptr i8, ptr @.str_1152, i64 16
     %v2361 = call ptr @orion_text_concat(ptr %v2359, ptr %v2360)
     store ptr %v2361, ptr %v1
     %v2362 = add i64 0, 0
     %v2363 = load ptr, ptr %v1
-    %v2364 = getelementptr i8, ptr @.str_1151, i64 16
+    %v2364 = getelementptr i8, ptr @.str_1153, i64 16
     %v2365 = call ptr @orion_text_concat(ptr %v2363, ptr %v2364)
     store ptr %v2365, ptr %v1
     %v2366 = add i64 0, 0
     %v2367 = load ptr, ptr %v1
-    %v2368 = getelementptr i8, ptr @.str_1152, i64 16
+    %v2368 = getelementptr i8, ptr @.str_1154, i64 16
     %v2369 = call ptr @orion_text_concat(ptr %v2367, ptr %v2368)
     store ptr %v2369, ptr %v1
     %v2370 = add i64 0, 0
     %v2371 = load ptr, ptr %v1
-    %v2372 = getelementptr i8, ptr @.str_933, i64 16
+    %v2372 = getelementptr i8, ptr @.str_935, i64 16
     %v2373 = call ptr @orion_text_concat(ptr %v2371, ptr %v2372)
     store ptr %v2373, ptr %v1
     %v2374 = add i64 0, 0
     %v2375 = load ptr, ptr %v1
-    %v2376 = getelementptr i8, ptr @.str_1153, i64 16
+    %v2376 = getelementptr i8, ptr @.str_1155, i64 16
     %v2377 = call ptr @orion_text_concat(ptr %v2375, ptr %v2376)
     store ptr %v2377, ptr %v1
     %v2378 = add i64 0, 0
     %v2379 = load ptr, ptr %v1
-    %v2380 = getelementptr i8, ptr @.str_1000, i64 16
+    %v2380 = getelementptr i8, ptr @.str_1002, i64 16
     %v2381 = call ptr @orion_text_concat(ptr %v2379, ptr %v2380)
     store ptr %v2381, ptr %v1
     %v2382 = add i64 0, 0
     %v2383 = load ptr, ptr %v1
-    %v2384 = getelementptr i8, ptr @.str_798, i64 16
+    %v2384 = getelementptr i8, ptr @.str_800, i64 16
     %v2385 = call ptr @orion_text_concat(ptr %v2383, ptr %v2384)
     store ptr %v2385, ptr %v1
     %v2386 = add i64 0, 0
     %v2387 = load ptr, ptr %v1
-    %v2388 = getelementptr i8, ptr @.str_1154, i64 16
+    %v2388 = getelementptr i8, ptr @.str_1156, i64 16
     %v2389 = call ptr @orion_text_concat(ptr %v2387, ptr %v2388)
     store ptr %v2389, ptr %v1
     %v2390 = add i64 0, 0
     %v2391 = load ptr, ptr %v1
-    %v2392 = getelementptr i8, ptr @.str_791, i64 16
+    %v2392 = getelementptr i8, ptr @.str_793, i64 16
     %v2393 = call ptr @orion_text_concat(ptr %v2391, ptr %v2392)
     store ptr %v2393, ptr %v1
     %v2394 = add i64 0, 0
     %v2395 = load ptr, ptr %v1
-    %v2396 = getelementptr i8, ptr @.str_1127, i64 16
+    %v2396 = getelementptr i8, ptr @.str_1129, i64 16
     %v2397 = call ptr @orion_text_concat(ptr %v2395, ptr %v2396)
     store ptr %v2397, ptr %v1
     %v2398 = add i64 0, 0
     %v2399 = load ptr, ptr %v1
-    %v2400 = getelementptr i8, ptr @.str_1015, i64 16
+    %v2400 = getelementptr i8, ptr @.str_1017, i64 16
     %v2401 = call ptr @orion_text_concat(ptr %v2399, ptr %v2400)
     store ptr %v2401, ptr %v1
     %v2402 = add i64 0, 0
     %v2403 = load ptr, ptr %v1
-    %v2404 = getelementptr i8, ptr @.str_1155, i64 16
+    %v2404 = getelementptr i8, ptr @.str_1157, i64 16
     %v2405 = call ptr @orion_text_concat(ptr %v2403, ptr %v2404)
     store ptr %v2405, ptr %v1
     %v2406 = add i64 0, 0
     %v2407 = load ptr, ptr %v1
-    %v2408 = getelementptr i8, ptr @.str_1156, i64 16
+    %v2408 = getelementptr i8, ptr @.str_1158, i64 16
     %v2409 = call ptr @orion_text_concat(ptr %v2407, ptr %v2408)
     store ptr %v2409, ptr %v1
     %v2410 = add i64 0, 0
     %v2411 = load ptr, ptr %v1
-    %v2412 = getelementptr i8, ptr @.str_1157, i64 16
+    %v2412 = getelementptr i8, ptr @.str_1159, i64 16
     %v2413 = call ptr @orion_text_concat(ptr %v2411, ptr %v2412)
     store ptr %v2413, ptr %v1
     %v2414 = add i64 0, 0
     %v2415 = load ptr, ptr %v1
-    %v2416 = getelementptr i8, ptr @.str_1158, i64 16
+    %v2416 = getelementptr i8, ptr @.str_1160, i64 16
     %v2417 = call ptr @orion_text_concat(ptr %v2415, ptr %v2416)
     store ptr %v2417, ptr %v1
     %v2418 = add i64 0, 0
     %v2419 = load ptr, ptr %v1
-    %v2420 = getelementptr i8, ptr @.str_1159, i64 16
+    %v2420 = getelementptr i8, ptr @.str_1161, i64 16
     %v2421 = call ptr @orion_text_concat(ptr %v2419, ptr %v2420)
     store ptr %v2421, ptr %v1
     %v2422 = add i64 0, 0
     %v2423 = load ptr, ptr %v1
-    %v2424 = getelementptr i8, ptr @.str_1130, i64 16
+    %v2424 = getelementptr i8, ptr @.str_1132, i64 16
     %v2425 = call ptr @orion_text_concat(ptr %v2423, ptr %v2424)
     store ptr %v2425, ptr %v1
     %v2426 = add i64 0, 0
     %v2427 = load ptr, ptr %v1
-    %v2428 = getelementptr i8, ptr @.str_1131, i64 16
+    %v2428 = getelementptr i8, ptr @.str_1133, i64 16
     %v2429 = call ptr @orion_text_concat(ptr %v2427, ptr %v2428)
     store ptr %v2429, ptr %v1
     %v2430 = add i64 0, 0
     %v2431 = load ptr, ptr %v1
-    %v2432 = getelementptr i8, ptr @.str_1160, i64 16
+    %v2432 = getelementptr i8, ptr @.str_1162, i64 16
     %v2433 = call ptr @orion_text_concat(ptr %v2431, ptr %v2432)
     store ptr %v2433, ptr %v1
     %v2434 = add i64 0, 0
     %v2435 = load ptr, ptr %v1
-    %v2436 = getelementptr i8, ptr @.str_1032, i64 16
+    %v2436 = getelementptr i8, ptr @.str_1034, i64 16
     %v2437 = call ptr @orion_text_concat(ptr %v2435, ptr %v2436)
     store ptr %v2437, ptr %v1
     %v2438 = add i64 0, 0
     %v2439 = load ptr, ptr %v1
-    %v2440 = getelementptr i8, ptr @.str_1161, i64 16
+    %v2440 = getelementptr i8, ptr @.str_1163, i64 16
     %v2441 = call ptr @orion_text_concat(ptr %v2439, ptr %v2440)
     store ptr %v2441, ptr %v1
     %v2442 = add i64 0, 0
     %v2443 = load ptr, ptr %v1
-    %v2444 = getelementptr i8, ptr @.str_1032, i64 16
+    %v2444 = getelementptr i8, ptr @.str_1034, i64 16
     %v2445 = call ptr @orion_text_concat(ptr %v2443, ptr %v2444)
     store ptr %v2445, ptr %v1
     %v2446 = add i64 0, 0
     %v2447 = load ptr, ptr %v1
-    %v2448 = getelementptr i8, ptr @.str_798, i64 16
+    %v2448 = getelementptr i8, ptr @.str_800, i64 16
     %v2449 = call ptr @orion_text_concat(ptr %v2447, ptr %v2448)
     store ptr %v2449, ptr %v1
     %v2450 = add i64 0, 0
     %v2451 = load ptr, ptr %v1
-    %v2452 = getelementptr i8, ptr @.str_1162, i64 16
+    %v2452 = getelementptr i8, ptr @.str_1164, i64 16
     %v2453 = call ptr @orion_text_concat(ptr %v2451, ptr %v2452)
     store ptr %v2453, ptr %v1
     %v2454 = add i64 0, 0
     %v2455 = load ptr, ptr %v1
-    %v2456 = getelementptr i8, ptr @.str_791, i64 16
+    %v2456 = getelementptr i8, ptr @.str_793, i64 16
     %v2457 = call ptr @orion_text_concat(ptr %v2455, ptr %v2456)
     store ptr %v2457, ptr %v1
     %v2458 = add i64 0, 0
     %v2459 = load ptr, ptr %v1
-    %v2460 = getelementptr i8, ptr @.str_1127, i64 16
+    %v2460 = getelementptr i8, ptr @.str_1129, i64 16
     %v2461 = call ptr @orion_text_concat(ptr %v2459, ptr %v2460)
     store ptr %v2461, ptr %v1
     %v2462 = add i64 0, 0
     %v2463 = load ptr, ptr %v1
-    %v2464 = getelementptr i8, ptr @.str_1015, i64 16
+    %v2464 = getelementptr i8, ptr @.str_1017, i64 16
     %v2465 = call ptr @orion_text_concat(ptr %v2463, ptr %v2464)
     store ptr %v2465, ptr %v1
     %v2466 = add i64 0, 0
     %v2467 = load ptr, ptr %v1
-    %v2468 = getelementptr i8, ptr @.str_1163, i64 16
+    %v2468 = getelementptr i8, ptr @.str_1165, i64 16
     %v2469 = call ptr @orion_text_concat(ptr %v2467, ptr %v2468)
     store ptr %v2469, ptr %v1
     %v2470 = add i64 0, 0
     %v2471 = load ptr, ptr %v1
-    %v2472 = getelementptr i8, ptr @.str_1164, i64 16
+    %v2472 = getelementptr i8, ptr @.str_1166, i64 16
     %v2473 = call ptr @orion_text_concat(ptr %v2471, ptr %v2472)
     store ptr %v2473, ptr %v1
     %v2474 = add i64 0, 0
     %v2475 = load ptr, ptr %v1
-    %v2476 = getelementptr i8, ptr @.str_1165, i64 16
+    %v2476 = getelementptr i8, ptr @.str_1167, i64 16
     %v2477 = call ptr @orion_text_concat(ptr %v2475, ptr %v2476)
     store ptr %v2477, ptr %v1
     %v2478 = add i64 0, 0
     %v2479 = load ptr, ptr %v1
-    %v2480 = getelementptr i8, ptr @.str_1166, i64 16
+    %v2480 = getelementptr i8, ptr @.str_1168, i64 16
     %v2481 = call ptr @orion_text_concat(ptr %v2479, ptr %v2480)
     store ptr %v2481, ptr %v1
     %v2482 = add i64 0, 0
     %v2483 = load ptr, ptr %v1
-    %v2484 = getelementptr i8, ptr @.str_1167, i64 16
+    %v2484 = getelementptr i8, ptr @.str_1169, i64 16
     %v2485 = call ptr @orion_text_concat(ptr %v2483, ptr %v2484)
     store ptr %v2485, ptr %v1
     %v2486 = add i64 0, 0
     %v2487 = load ptr, ptr %v1
-    %v2488 = getelementptr i8, ptr @.str_1116, i64 16
+    %v2488 = getelementptr i8, ptr @.str_1118, i64 16
     %v2489 = call ptr @orion_text_concat(ptr %v2487, ptr %v2488)
     store ptr %v2489, ptr %v1
     %v2490 = add i64 0, 0
     %v2491 = load ptr, ptr %v1
-    %v2492 = getelementptr i8, ptr @.str_1168, i64 16
+    %v2492 = getelementptr i8, ptr @.str_1170, i64 16
     %v2493 = call ptr @orion_text_concat(ptr %v2491, ptr %v2492)
     store ptr %v2493, ptr %v1
     %v2494 = add i64 0, 0
     %v2495 = load ptr, ptr %v1
-    %v2496 = getelementptr i8, ptr @.str_1169, i64 16
+    %v2496 = getelementptr i8, ptr @.str_1171, i64 16
     %v2497 = call ptr @orion_text_concat(ptr %v2495, ptr %v2496)
     store ptr %v2497, ptr %v1
     %v2498 = add i64 0, 0
     %v2499 = load ptr, ptr %v1
-    %v2500 = getelementptr i8, ptr @.str_1170, i64 16
+    %v2500 = getelementptr i8, ptr @.str_1172, i64 16
     %v2501 = call ptr @orion_text_concat(ptr %v2499, ptr %v2500)
     store ptr %v2501, ptr %v1
     %v2502 = add i64 0, 0
     %v2503 = load ptr, ptr %v1
-    %v2504 = getelementptr i8, ptr @.str_1171, i64 16
+    %v2504 = getelementptr i8, ptr @.str_1173, i64 16
     %v2505 = call ptr @orion_text_concat(ptr %v2503, ptr %v2504)
     store ptr %v2505, ptr %v1
     %v2506 = add i64 0, 0
     %v2507 = load ptr, ptr %v1
-    %v2508 = getelementptr i8, ptr @.str_1172, i64 16
+    %v2508 = getelementptr i8, ptr @.str_1174, i64 16
     %v2509 = call ptr @orion_text_concat(ptr %v2507, ptr %v2508)
     store ptr %v2509, ptr %v1
     %v2510 = add i64 0, 0
     %v2511 = load ptr, ptr %v1
-    %v2512 = getelementptr i8, ptr @.str_1173, i64 16
+    %v2512 = getelementptr i8, ptr @.str_1175, i64 16
     %v2513 = call ptr @orion_text_concat(ptr %v2511, ptr %v2512)
     store ptr %v2513, ptr %v1
     %v2514 = add i64 0, 0
     %v2515 = load ptr, ptr %v1
-    %v2516 = getelementptr i8, ptr @.str_1174, i64 16
+    %v2516 = getelementptr i8, ptr @.str_1176, i64 16
     %v2517 = call ptr @orion_text_concat(ptr %v2515, ptr %v2516)
     store ptr %v2517, ptr %v1
     %v2518 = add i64 0, 0
     %v2519 = load ptr, ptr %v1
-    %v2520 = getelementptr i8, ptr @.str_1175, i64 16
+    %v2520 = getelementptr i8, ptr @.str_1177, i64 16
     %v2521 = call ptr @orion_text_concat(ptr %v2519, ptr %v2520)
     store ptr %v2521, ptr %v1
     %v2522 = add i64 0, 0
     %v2523 = load ptr, ptr %v1
-    %v2524 = getelementptr i8, ptr @.str_1176, i64 16
+    %v2524 = getelementptr i8, ptr @.str_1178, i64 16
     %v2525 = call ptr @orion_text_concat(ptr %v2523, ptr %v2524)
     store ptr %v2525, ptr %v1
     %v2526 = add i64 0, 0
     %v2527 = load ptr, ptr %v1
-    %v2528 = getelementptr i8, ptr @.str_1177, i64 16
+    %v2528 = getelementptr i8, ptr @.str_1179, i64 16
     %v2529 = call ptr @orion_text_concat(ptr %v2527, ptr %v2528)
     store ptr %v2529, ptr %v1
     %v2530 = add i64 0, 0
     %v2531 = load ptr, ptr %v1
-    %v2532 = getelementptr i8, ptr @.str_1178, i64 16
+    %v2532 = getelementptr i8, ptr @.str_1180, i64 16
     %v2533 = call ptr @orion_text_concat(ptr %v2531, ptr %v2532)
     store ptr %v2533, ptr %v1
     %v2534 = add i64 0, 0
     %v2535 = load ptr, ptr %v1
-    %v2536 = getelementptr i8, ptr @.str_1179, i64 16
+    %v2536 = getelementptr i8, ptr @.str_1181, i64 16
     %v2537 = call ptr @orion_text_concat(ptr %v2535, ptr %v2536)
     store ptr %v2537, ptr %v1
     %v2538 = add i64 0, 0
     %v2539 = load ptr, ptr %v1
-    %v2540 = getelementptr i8, ptr @.str_798, i64 16
+    %v2540 = getelementptr i8, ptr @.str_800, i64 16
     %v2541 = call ptr @orion_text_concat(ptr %v2539, ptr %v2540)
     store ptr %v2541, ptr %v1
     %v2542 = add i64 0, 0
     %v2543 = load ptr, ptr %v1
-    %v2544 = getelementptr i8, ptr @.str_1180, i64 16
+    %v2544 = getelementptr i8, ptr @.str_1182, i64 16
     %v2545 = call ptr @orion_text_concat(ptr %v2543, ptr %v2544)
     store ptr %v2545, ptr %v1
     %v2546 = add i64 0, 0
     %v2547 = load ptr, ptr %v1
-    %v2548 = getelementptr i8, ptr @.str_791, i64 16
+    %v2548 = getelementptr i8, ptr @.str_793, i64 16
     %v2549 = call ptr @orion_text_concat(ptr %v2547, ptr %v2548)
     store ptr %v2549, ptr %v1
     %v2550 = add i64 0, 0
     %v2551 = load ptr, ptr %v1
-    %v2552 = getelementptr i8, ptr @.str_1181, i64 16
+    %v2552 = getelementptr i8, ptr @.str_1183, i64 16
     %v2553 = call ptr @orion_text_concat(ptr %v2551, ptr %v2552)
     store ptr %v2553, ptr %v1
     %v2554 = add i64 0, 0
     %v2555 = load ptr, ptr %v1
-    %v2556 = getelementptr i8, ptr @.str_1127, i64 16
+    %v2556 = getelementptr i8, ptr @.str_1129, i64 16
     %v2557 = call ptr @orion_text_concat(ptr %v2555, ptr %v2556)
     store ptr %v2557, ptr %v1
     %v2558 = add i64 0, 0
     %v2559 = load ptr, ptr %v1
-    %v2560 = getelementptr i8, ptr @.str_1015, i64 16
+    %v2560 = getelementptr i8, ptr @.str_1017, i64 16
     %v2561 = call ptr @orion_text_concat(ptr %v2559, ptr %v2560)
     store ptr %v2561, ptr %v1
     %v2562 = add i64 0, 0
     %v2563 = load ptr, ptr %v1
-    %v2564 = getelementptr i8, ptr @.str_1182, i64 16
+    %v2564 = getelementptr i8, ptr @.str_1184, i64 16
     %v2565 = call ptr @orion_text_concat(ptr %v2563, ptr %v2564)
     store ptr %v2565, ptr %v1
     %v2566 = add i64 0, 0
     %v2567 = load ptr, ptr %v1
-    %v2568 = getelementptr i8, ptr @.str_1183, i64 16
+    %v2568 = getelementptr i8, ptr @.str_1185, i64 16
     %v2569 = call ptr @orion_text_concat(ptr %v2567, ptr %v2568)
     store ptr %v2569, ptr %v1
     %v2570 = add i64 0, 0
     %v2571 = load ptr, ptr %v1
-    %v2572 = getelementptr i8, ptr @.str_1184, i64 16
+    %v2572 = getelementptr i8, ptr @.str_1186, i64 16
     %v2573 = call ptr @orion_text_concat(ptr %v2571, ptr %v2572)
     store ptr %v2573, ptr %v1
     %v2574 = add i64 0, 0
     %v2575 = load ptr, ptr %v1
-    %v2576 = getelementptr i8, ptr @.str_1185, i64 16
+    %v2576 = getelementptr i8, ptr @.str_1187, i64 16
     %v2577 = call ptr @orion_text_concat(ptr %v2575, ptr %v2576)
     store ptr %v2577, ptr %v1
     %v2578 = add i64 0, 0
     %v2579 = load ptr, ptr %v1
-    %v2580 = getelementptr i8, ptr @.str_1186, i64 16
+    %v2580 = getelementptr i8, ptr @.str_1188, i64 16
     %v2581 = call ptr @orion_text_concat(ptr %v2579, ptr %v2580)
     store ptr %v2581, ptr %v1
     %v2582 = add i64 0, 0
     %v2583 = load ptr, ptr %v1
-    %v2584 = getelementptr i8, ptr @.str_1160, i64 16
+    %v2584 = getelementptr i8, ptr @.str_1162, i64 16
     %v2585 = call ptr @orion_text_concat(ptr %v2583, ptr %v2584)
     store ptr %v2585, ptr %v1
     %v2586 = add i64 0, 0
     %v2587 = load ptr, ptr %v1
-    %v2588 = getelementptr i8, ptr @.str_1055, i64 16
+    %v2588 = getelementptr i8, ptr @.str_1057, i64 16
     %v2589 = call ptr @orion_text_concat(ptr %v2587, ptr %v2588)
     store ptr %v2589, ptr %v1
     %v2590 = add i64 0, 0
     %v2591 = load ptr, ptr %v1
-    %v2592 = getelementptr i8, ptr @.str_1056, i64 16
+    %v2592 = getelementptr i8, ptr @.str_1058, i64 16
     %v2593 = call ptr @orion_text_concat(ptr %v2591, ptr %v2592)
     store ptr %v2593, ptr %v1
     %v2594 = add i64 0, 0
     %v2595 = load ptr, ptr %v1
-    %v2596 = getelementptr i8, ptr @.str_944, i64 16
+    %v2596 = getelementptr i8, ptr @.str_946, i64 16
     %v2597 = call ptr @orion_text_concat(ptr %v2595, ptr %v2596)
     store ptr %v2597, ptr %v1
     %v2598 = add i64 0, 0
     %v2599 = load ptr, ptr %v1
-    %v2600 = getelementptr i8, ptr @.str_1036, i64 16
+    %v2600 = getelementptr i8, ptr @.str_1038, i64 16
     %v2601 = call ptr @orion_text_concat(ptr %v2599, ptr %v2600)
     store ptr %v2601, ptr %v1
     %v2602 = add i64 0, 0
     %v2603 = load ptr, ptr %v1
-    %v2604 = getelementptr i8, ptr @.str_1187, i64 16
+    %v2604 = getelementptr i8, ptr @.str_1189, i64 16
     %v2605 = call ptr @orion_text_concat(ptr %v2603, ptr %v2604)
     store ptr %v2605, ptr %v1
     %v2606 = add i64 0, 0
     %v2607 = load ptr, ptr %v1
-    %v2608 = getelementptr i8, ptr @.str_1188, i64 16
+    %v2608 = getelementptr i8, ptr @.str_1190, i64 16
     %v2609 = call ptr @orion_text_concat(ptr %v2607, ptr %v2608)
     store ptr %v2609, ptr %v1
     %v2610 = add i64 0, 0
     %v2611 = load ptr, ptr %v1
-    %v2612 = getelementptr i8, ptr @.str_798, i64 16
+    %v2612 = getelementptr i8, ptr @.str_800, i64 16
     %v2613 = call ptr @orion_text_concat(ptr %v2611, ptr %v2612)
     store ptr %v2613, ptr %v1
     %v2614 = add i64 0, 0
     %v2615 = load ptr, ptr %v1
-    %v2616 = getelementptr i8, ptr @.str_1189, i64 16
+    %v2616 = getelementptr i8, ptr @.str_1191, i64 16
     %v2617 = call ptr @orion_text_concat(ptr %v2615, ptr %v2616)
     store ptr %v2617, ptr %v1
     %v2618 = add i64 0, 0
     %v2619 = load ptr, ptr %v1
-    %v2620 = getelementptr i8, ptr @.str_791, i64 16
+    %v2620 = getelementptr i8, ptr @.str_793, i64 16
     %v2621 = call ptr @orion_text_concat(ptr %v2619, ptr %v2620)
     store ptr %v2621, ptr %v1
     %v2622 = add i64 0, 0
     %v2623 = load ptr, ptr %v1
-    %v2624 = getelementptr i8, ptr @.str_1190, i64 16
+    %v2624 = getelementptr i8, ptr @.str_1192, i64 16
     %v2625 = call ptr @orion_text_concat(ptr %v2623, ptr %v2624)
     store ptr %v2625, ptr %v1
     %v2626 = add i64 0, 0
     %v2627 = load ptr, ptr %v1
-    %v2628 = getelementptr i8, ptr @.str_1191, i64 16
+    %v2628 = getelementptr i8, ptr @.str_1193, i64 16
     %v2629 = call ptr @orion_text_concat(ptr %v2627, ptr %v2628)
     store ptr %v2629, ptr %v1
     %v2630 = add i64 0, 0
     %v2631 = load ptr, ptr %v1
-    %v2632 = getelementptr i8, ptr @.str_1192, i64 16
+    %v2632 = getelementptr i8, ptr @.str_1194, i64 16
     %v2633 = call ptr @orion_text_concat(ptr %v2631, ptr %v2632)
     store ptr %v2633, ptr %v1
     %v2634 = add i64 0, 0
     %v2635 = load ptr, ptr %v1
-    %v2636 = getelementptr i8, ptr @.str_1193, i64 16
+    %v2636 = getelementptr i8, ptr @.str_1195, i64 16
     %v2637 = call ptr @orion_text_concat(ptr %v2635, ptr %v2636)
     store ptr %v2637, ptr %v1
     %v2638 = add i64 0, 0
     %v2639 = load ptr, ptr %v1
-    %v2640 = getelementptr i8, ptr @.str_1194, i64 16
+    %v2640 = getelementptr i8, ptr @.str_1196, i64 16
     %v2641 = call ptr @orion_text_concat(ptr %v2639, ptr %v2640)
     store ptr %v2641, ptr %v1
     %v2642 = add i64 0, 0
     %v2643 = load ptr, ptr %v1
-    %v2644 = getelementptr i8, ptr @.str_1004, i64 16
+    %v2644 = getelementptr i8, ptr @.str_1006, i64 16
     %v2645 = call ptr @orion_text_concat(ptr %v2643, ptr %v2644)
     store ptr %v2645, ptr %v1
     %v2646 = add i64 0, 0
     %v2647 = load ptr, ptr %v1
-    %v2648 = getelementptr i8, ptr @.str_1005, i64 16
+    %v2648 = getelementptr i8, ptr @.str_1007, i64 16
     %v2649 = call ptr @orion_text_concat(ptr %v2647, ptr %v2648)
     store ptr %v2649, ptr %v1
     %v2650 = add i64 0, 0
     %v2651 = load ptr, ptr %v1
-    %v2652 = getelementptr i8, ptr @.str_1195, i64 16
+    %v2652 = getelementptr i8, ptr @.str_1197, i64 16
     %v2653 = call ptr @orion_text_concat(ptr %v2651, ptr %v2652)
     store ptr %v2653, ptr %v1
     %v2654 = add i64 0, 0
     %v2655 = load ptr, ptr %v1
-    %v2656 = getelementptr i8, ptr @.str_1007, i64 16
+    %v2656 = getelementptr i8, ptr @.str_1009, i64 16
     %v2657 = call ptr @orion_text_concat(ptr %v2655, ptr %v2656)
     store ptr %v2657, ptr %v1
     %v2658 = add i64 0, 0
     %v2659 = load ptr, ptr %v1
-    %v2660 = getelementptr i8, ptr @.str_1008, i64 16
+    %v2660 = getelementptr i8, ptr @.str_1010, i64 16
     %v2661 = call ptr @orion_text_concat(ptr %v2659, ptr %v2660)
     store ptr %v2661, ptr %v1
     %v2662 = add i64 0, 0
     %v2663 = load ptr, ptr %v1
-    %v2664 = getelementptr i8, ptr @.str_1009, i64 16
+    %v2664 = getelementptr i8, ptr @.str_1011, i64 16
     %v2665 = call ptr @orion_text_concat(ptr %v2663, ptr %v2664)
     store ptr %v2665, ptr %v1
     %v2666 = add i64 0, 0
     %v2667 = load ptr, ptr %v1
-    %v2668 = getelementptr i8, ptr @.str_798, i64 16
+    %v2668 = getelementptr i8, ptr @.str_800, i64 16
     %v2669 = call ptr @orion_text_concat(ptr %v2667, ptr %v2668)
     store ptr %v2669, ptr %v1
     %v2670 = add i64 0, 0
     %v2671 = load ptr, ptr %v1
-    %v2672 = getelementptr i8, ptr @.str_1196, i64 16
+    %v2672 = getelementptr i8, ptr @.str_1198, i64 16
     %v2673 = call ptr @orion_text_concat(ptr %v2671, ptr %v2672)
     store ptr %v2673, ptr %v1
     %v2674 = add i64 0, 0
     %v2675 = load ptr, ptr %v1
-    %v2676 = getelementptr i8, ptr @.str_791, i64 16
+    %v2676 = getelementptr i8, ptr @.str_793, i64 16
     %v2677 = call ptr @orion_text_concat(ptr %v2675, ptr %v2676)
     store ptr %v2677, ptr %v1
     %v2678 = add i64 0, 0
     %v2679 = load ptr, ptr %v1
-    %v2680 = getelementptr i8, ptr @.str_1011, i64 16
+    %v2680 = getelementptr i8, ptr @.str_1013, i64 16
     %v2681 = call ptr @orion_text_concat(ptr %v2679, ptr %v2680)
     store ptr %v2681, ptr %v1
     %v2682 = add i64 0, 0
     %v2683 = load ptr, ptr %v1
-    %v2684 = getelementptr i8, ptr @.str_1012, i64 16
+    %v2684 = getelementptr i8, ptr @.str_1014, i64 16
     %v2685 = call ptr @orion_text_concat(ptr %v2683, ptr %v2684)
     store ptr %v2685, ptr %v1
     %v2686 = add i64 0, 0
     %v2687 = load ptr, ptr %v1
-    %v2688 = getelementptr i8, ptr @.str_1013, i64 16
+    %v2688 = getelementptr i8, ptr @.str_1015, i64 16
     %v2689 = call ptr @orion_text_concat(ptr %v2687, ptr %v2688)
     store ptr %v2689, ptr %v1
     %v2690 = add i64 0, 0
     %v2691 = load ptr, ptr %v1
-    %v2692 = getelementptr i8, ptr @.str_1014, i64 16
+    %v2692 = getelementptr i8, ptr @.str_1016, i64 16
     %v2693 = call ptr @orion_text_concat(ptr %v2691, ptr %v2692)
     store ptr %v2693, ptr %v1
     %v2694 = add i64 0, 0
     %v2695 = load ptr, ptr %v1
-    %v2696 = getelementptr i8, ptr @.str_1015, i64 16
+    %v2696 = getelementptr i8, ptr @.str_1017, i64 16
     %v2697 = call ptr @orion_text_concat(ptr %v2695, ptr %v2696)
     store ptr %v2697, ptr %v1
     %v2698 = add i64 0, 0
     %v2699 = load ptr, ptr %v1
-    %v2700 = getelementptr i8, ptr @.str_933, i64 16
+    %v2700 = getelementptr i8, ptr @.str_935, i64 16
     %v2701 = call ptr @orion_text_concat(ptr %v2699, ptr %v2700)
     store ptr %v2701, ptr %v1
     %v2702 = add i64 0, 0
     %v2703 = load ptr, ptr %v1
-    %v2704 = getelementptr i8, ptr @.str_934, i64 16
+    %v2704 = getelementptr i8, ptr @.str_936, i64 16
     %v2705 = call ptr @orion_text_concat(ptr %v2703, ptr %v2704)
     store ptr %v2705, ptr %v1
     %v2706 = add i64 0, 0
     %v2707 = load ptr, ptr %v1
-    %v2708 = getelementptr i8, ptr @.str_1016, i64 16
+    %v2708 = getelementptr i8, ptr @.str_1018, i64 16
     %v2709 = call ptr @orion_text_concat(ptr %v2707, ptr %v2708)
     store ptr %v2709, ptr %v1
     %v2710 = add i64 0, 0
     %v2711 = load ptr, ptr %v1
-    %v2712 = getelementptr i8, ptr @.str_1017, i64 16
+    %v2712 = getelementptr i8, ptr @.str_1019, i64 16
     %v2713 = call ptr @orion_text_concat(ptr %v2711, ptr %v2712)
     store ptr %v2713, ptr %v1
     %v2714 = add i64 0, 0
     %v2715 = load ptr, ptr %v1
-    %v2716 = getelementptr i8, ptr @.str_1018, i64 16
+    %v2716 = getelementptr i8, ptr @.str_1020, i64 16
     %v2717 = call ptr @orion_text_concat(ptr %v2715, ptr %v2716)
     store ptr %v2717, ptr %v1
     %v2718 = add i64 0, 0
     %v2719 = load ptr, ptr %v1
-    %v2720 = getelementptr i8, ptr @.str_1019, i64 16
+    %v2720 = getelementptr i8, ptr @.str_1021, i64 16
     %v2721 = call ptr @orion_text_concat(ptr %v2719, ptr %v2720)
     store ptr %v2721, ptr %v1
     %v2722 = add i64 0, 0
     %v2723 = load ptr, ptr %v1
-    %v2724 = getelementptr i8, ptr @.str_1020, i64 16
+    %v2724 = getelementptr i8, ptr @.str_1022, i64 16
     %v2725 = call ptr @orion_text_concat(ptr %v2723, ptr %v2724)
     store ptr %v2725, ptr %v1
     %v2726 = add i64 0, 0
     %v2727 = load ptr, ptr %v1
-    %v2728 = getelementptr i8, ptr @.str_1021, i64 16
+    %v2728 = getelementptr i8, ptr @.str_1023, i64 16
     %v2729 = call ptr @orion_text_concat(ptr %v2727, ptr %v2728)
     store ptr %v2729, ptr %v1
     %v2730 = add i64 0, 0
     %v2731 = load ptr, ptr %v1
-    %v2732 = getelementptr i8, ptr @.str_1022, i64 16
+    %v2732 = getelementptr i8, ptr @.str_1024, i64 16
     %v2733 = call ptr @orion_text_concat(ptr %v2731, ptr %v2732)
     store ptr %v2733, ptr %v1
     %v2734 = add i64 0, 0
     %v2735 = load ptr, ptr %v1
-    %v2736 = getelementptr i8, ptr @.str_1023, i64 16
+    %v2736 = getelementptr i8, ptr @.str_1025, i64 16
     %v2737 = call ptr @orion_text_concat(ptr %v2735, ptr %v2736)
     store ptr %v2737, ptr %v1
     %v2738 = add i64 0, 0
     %v2739 = load ptr, ptr %v1
-    %v2740 = getelementptr i8, ptr @.str_1024, i64 16
+    %v2740 = getelementptr i8, ptr @.str_1026, i64 16
     %v2741 = call ptr @orion_text_concat(ptr %v2739, ptr %v2740)
     store ptr %v2741, ptr %v1
     %v2742 = add i64 0, 0
     %v2743 = load ptr, ptr %v1
-    %v2744 = getelementptr i8, ptr @.str_1025, i64 16
+    %v2744 = getelementptr i8, ptr @.str_1027, i64 16
     %v2745 = call ptr @orion_text_concat(ptr %v2743, ptr %v2744)
     store ptr %v2745, ptr %v1
     %v2746 = add i64 0, 0
     %v2747 = load ptr, ptr %v1
-    %v2748 = getelementptr i8, ptr @.str_1026, i64 16
+    %v2748 = getelementptr i8, ptr @.str_1028, i64 16
     %v2749 = call ptr @orion_text_concat(ptr %v2747, ptr %v2748)
     store ptr %v2749, ptr %v1
     %v2750 = add i64 0, 0
     %v2751 = load ptr, ptr %v1
-    %v2752 = getelementptr i8, ptr @.str_1027, i64 16
+    %v2752 = getelementptr i8, ptr @.str_1029, i64 16
     %v2753 = call ptr @orion_text_concat(ptr %v2751, ptr %v2752)
     store ptr %v2753, ptr %v1
     %v2754 = add i64 0, 0
     %v2755 = load ptr, ptr %v1
-    %v2756 = getelementptr i8, ptr @.str_812, i64 16
+    %v2756 = getelementptr i8, ptr @.str_814, i64 16
     %v2757 = call ptr @orion_text_concat(ptr %v2755, ptr %v2756)
     store ptr %v2757, ptr %v1
     %v2758 = add i64 0, 0
     %v2759 = load ptr, ptr %v1
-    %v2760 = getelementptr i8, ptr @.str_933, i64 16
+    %v2760 = getelementptr i8, ptr @.str_935, i64 16
     %v2761 = call ptr @orion_text_concat(ptr %v2759, ptr %v2760)
     store ptr %v2761, ptr %v1
     %v2762 = add i64 0, 0
     %v2763 = load ptr, ptr %v1
-    %v2764 = getelementptr i8, ptr @.str_1028, i64 16
+    %v2764 = getelementptr i8, ptr @.str_1030, i64 16
     %v2765 = call ptr @orion_text_concat(ptr %v2763, ptr %v2764)
     store ptr %v2765, ptr %v1
     %v2766 = add i64 0, 0
     %v2767 = load ptr, ptr %v1
-    %v2768 = getelementptr i8, ptr @.str_1029, i64 16
+    %v2768 = getelementptr i8, ptr @.str_1031, i64 16
     %v2769 = call ptr @orion_text_concat(ptr %v2767, ptr %v2768)
     store ptr %v2769, ptr %v1
     %v2770 = add i64 0, 0
     %v2771 = load ptr, ptr %v1
-    %v2772 = getelementptr i8, ptr @.str_1030, i64 16
+    %v2772 = getelementptr i8, ptr @.str_1032, i64 16
     %v2773 = call ptr @orion_text_concat(ptr %v2771, ptr %v2772)
     store ptr %v2773, ptr %v1
     %v2774 = add i64 0, 0
     %v2775 = load ptr, ptr %v1
-    %v2776 = getelementptr i8, ptr @.str_1031, i64 16
+    %v2776 = getelementptr i8, ptr @.str_1033, i64 16
     %v2777 = call ptr @orion_text_concat(ptr %v2775, ptr %v2776)
     store ptr %v2777, ptr %v1
     %v2778 = add i64 0, 0
     %v2779 = load ptr, ptr %v1
-    %v2780 = getelementptr i8, ptr @.str_1032, i64 16
+    %v2780 = getelementptr i8, ptr @.str_1034, i64 16
     %v2781 = call ptr @orion_text_concat(ptr %v2779, ptr %v2780)
     store ptr %v2781, ptr %v1
     %v2782 = add i64 0, 0
     %v2783 = load ptr, ptr %v1
-    %v2784 = getelementptr i8, ptr @.str_1033, i64 16
+    %v2784 = getelementptr i8, ptr @.str_1035, i64 16
     %v2785 = call ptr @orion_text_concat(ptr %v2783, ptr %v2784)
     store ptr %v2785, ptr %v1
     %v2786 = add i64 0, 0
     %v2787 = load ptr, ptr %v1
-    %v2788 = getelementptr i8, ptr @.str_1034, i64 16
+    %v2788 = getelementptr i8, ptr @.str_1036, i64 16
     %v2789 = call ptr @orion_text_concat(ptr %v2787, ptr %v2788)
     store ptr %v2789, ptr %v1
     %v2790 = add i64 0, 0
     %v2791 = load ptr, ptr %v1
-    %v2792 = getelementptr i8, ptr @.str_1035, i64 16
+    %v2792 = getelementptr i8, ptr @.str_1037, i64 16
     %v2793 = call ptr @orion_text_concat(ptr %v2791, ptr %v2792)
     store ptr %v2793, ptr %v1
     %v2794 = add i64 0, 0
     %v2795 = load ptr, ptr %v1
-    %v2796 = getelementptr i8, ptr @.str_1036, i64 16
+    %v2796 = getelementptr i8, ptr @.str_1038, i64 16
     %v2797 = call ptr @orion_text_concat(ptr %v2795, ptr %v2796)
     store ptr %v2797, ptr %v1
     %v2798 = add i64 0, 0
     %v2799 = load ptr, ptr %v1
-    %v2800 = getelementptr i8, ptr @.str_1037, i64 16
+    %v2800 = getelementptr i8, ptr @.str_1039, i64 16
     %v2801 = call ptr @orion_text_concat(ptr %v2799, ptr %v2800)
     store ptr %v2801, ptr %v1
     %v2802 = add i64 0, 0
     %v2803 = load ptr, ptr %v1
-    %v2804 = getelementptr i8, ptr @.str_1038, i64 16
+    %v2804 = getelementptr i8, ptr @.str_1040, i64 16
     %v2805 = call ptr @orion_text_concat(ptr %v2803, ptr %v2804)
     store ptr %v2805, ptr %v1
     %v2806 = add i64 0, 0
     %v2807 = load ptr, ptr %v1
-    %v2808 = getelementptr i8, ptr @.str_1197, i64 16
+    %v2808 = getelementptr i8, ptr @.str_1199, i64 16
     %v2809 = call ptr @orion_text_concat(ptr %v2807, ptr %v2808)
     store ptr %v2809, ptr %v1
     %v2810 = add i64 0, 0
     %v2811 = load ptr, ptr %v1
-    %v2812 = getelementptr i8, ptr @.str_1040, i64 16
+    %v2812 = getelementptr i8, ptr @.str_1042, i64 16
     %v2813 = call ptr @orion_text_concat(ptr %v2811, ptr %v2812)
     store ptr %v2813, ptr %v1
     %v2814 = add i64 0, 0
     %v2815 = load ptr, ptr %v1
-    %v2816 = getelementptr i8, ptr @.str_1041, i64 16
+    %v2816 = getelementptr i8, ptr @.str_1043, i64 16
     %v2817 = call ptr @orion_text_concat(ptr %v2815, ptr %v2816)
     store ptr %v2817, ptr %v1
     %v2818 = add i64 0, 0
     %v2819 = load ptr, ptr %v1
-    %v2820 = getelementptr i8, ptr @.str_1042, i64 16
+    %v2820 = getelementptr i8, ptr @.str_1044, i64 16
     %v2821 = call ptr @orion_text_concat(ptr %v2819, ptr %v2820)
     store ptr %v2821, ptr %v1
     %v2822 = add i64 0, 0
     %v2823 = load ptr, ptr %v1
-    %v2824 = getelementptr i8, ptr @.str_1043, i64 16
+    %v2824 = getelementptr i8, ptr @.str_1045, i64 16
     %v2825 = call ptr @orion_text_concat(ptr %v2823, ptr %v2824)
     store ptr %v2825, ptr %v1
     %v2826 = add i64 0, 0
     %v2827 = load ptr, ptr %v1
-    %v2828 = getelementptr i8, ptr @.str_1044, i64 16
+    %v2828 = getelementptr i8, ptr @.str_1046, i64 16
     %v2829 = call ptr @orion_text_concat(ptr %v2827, ptr %v2828)
     store ptr %v2829, ptr %v1
     %v2830 = add i64 0, 0
     %v2831 = load ptr, ptr %v1
-    %v2832 = getelementptr i8, ptr @.str_1045, i64 16
+    %v2832 = getelementptr i8, ptr @.str_1047, i64 16
     %v2833 = call ptr @orion_text_concat(ptr %v2831, ptr %v2832)
     store ptr %v2833, ptr %v1
     %v2834 = add i64 0, 0
     %v2835 = load ptr, ptr %v1
-    %v2836 = getelementptr i8, ptr @.str_1046, i64 16
+    %v2836 = getelementptr i8, ptr @.str_1048, i64 16
     %v2837 = call ptr @orion_text_concat(ptr %v2835, ptr %v2836)
     store ptr %v2837, ptr %v1
     %v2838 = add i64 0, 0
     %v2839 = load ptr, ptr %v1
-    %v2840 = getelementptr i8, ptr @.str_1048, i64 16
+    %v2840 = getelementptr i8, ptr @.str_1050, i64 16
     %v2841 = call ptr @orion_text_concat(ptr %v2839, ptr %v2840)
     store ptr %v2841, ptr %v1
     %v2842 = add i64 0, 0
     %v2843 = load ptr, ptr %v1
-    %v2844 = getelementptr i8, ptr @.str_1049, i64 16
+    %v2844 = getelementptr i8, ptr @.str_1051, i64 16
     %v2845 = call ptr @orion_text_concat(ptr %v2843, ptr %v2844)
     store ptr %v2845, ptr %v1
     %v2846 = add i64 0, 0
     %v2847 = load ptr, ptr %v1
-    %v2848 = getelementptr i8, ptr @.str_1050, i64 16
+    %v2848 = getelementptr i8, ptr @.str_1052, i64 16
     %v2849 = call ptr @orion_text_concat(ptr %v2847, ptr %v2848)
     store ptr %v2849, ptr %v1
     %v2850 = add i64 0, 0
     %v2851 = load ptr, ptr %v1
-    %v2852 = getelementptr i8, ptr @.str_1051, i64 16
+    %v2852 = getelementptr i8, ptr @.str_1053, i64 16
     %v2853 = call ptr @orion_text_concat(ptr %v2851, ptr %v2852)
     store ptr %v2853, ptr %v1
     %v2854 = add i64 0, 0
     %v2855 = load ptr, ptr %v1
-    %v2856 = getelementptr i8, ptr @.str_1198, i64 16
+    %v2856 = getelementptr i8, ptr @.str_1200, i64 16
     %v2857 = call ptr @orion_text_concat(ptr %v2855, ptr %v2856)
     store ptr %v2857, ptr %v1
     %v2858 = add i64 0, 0
     %v2859 = load ptr, ptr %v1
-    %v2860 = getelementptr i8, ptr @.str_1199, i64 16
+    %v2860 = getelementptr i8, ptr @.str_1201, i64 16
     %v2861 = call ptr @orion_text_concat(ptr %v2859, ptr %v2860)
     store ptr %v2861, ptr %v1
     %v2862 = add i64 0, 0
     %v2863 = load ptr, ptr %v1
-    %v2864 = getelementptr i8, ptr @.str_1053, i64 16
+    %v2864 = getelementptr i8, ptr @.str_1055, i64 16
     %v2865 = call ptr @orion_text_concat(ptr %v2863, ptr %v2864)
     store ptr %v2865, ptr %v1
     %v2866 = add i64 0, 0
     %v2867 = load ptr, ptr %v1
-    %v2868 = getelementptr i8, ptr @.str_1054, i64 16
+    %v2868 = getelementptr i8, ptr @.str_1056, i64 16
     %v2869 = call ptr @orion_text_concat(ptr %v2867, ptr %v2868)
     store ptr %v2869, ptr %v1
     %v2870 = add i64 0, 0
     %v2871 = load ptr, ptr %v1
-    %v2872 = getelementptr i8, ptr @.str_1055, i64 16
+    %v2872 = getelementptr i8, ptr @.str_1057, i64 16
     %v2873 = call ptr @orion_text_concat(ptr %v2871, ptr %v2872)
     store ptr %v2873, ptr %v1
     %v2874 = add i64 0, 0
     %v2875 = load ptr, ptr %v1
-    %v2876 = getelementptr i8, ptr @.str_1056, i64 16
+    %v2876 = getelementptr i8, ptr @.str_1058, i64 16
     %v2877 = call ptr @orion_text_concat(ptr %v2875, ptr %v2876)
     store ptr %v2877, ptr %v1
     %v2878 = add i64 0, 0
     %v2879 = load ptr, ptr %v1
-    %v2880 = getelementptr i8, ptr @.str_1032, i64 16
+    %v2880 = getelementptr i8, ptr @.str_1034, i64 16
     %v2881 = call ptr @orion_text_concat(ptr %v2879, ptr %v2880)
     store ptr %v2881, ptr %v1
     %v2882 = add i64 0, 0
     %v2883 = load ptr, ptr %v1
-    %v2884 = getelementptr i8, ptr @.str_798, i64 16
+    %v2884 = getelementptr i8, ptr @.str_800, i64 16
     %v2885 = call ptr @orion_text_concat(ptr %v2883, ptr %v2884)
     store ptr %v2885, ptr %v1
     %v2886 = add i64 0, 0
     %v2887 = load ptr, ptr %v1
-    %v2888 = getelementptr i8, ptr @.str_1200, i64 16
+    %v2888 = getelementptr i8, ptr @.str_1202, i64 16
     %v2889 = call ptr @orion_text_concat(ptr %v2887, ptr %v2888)
     store ptr %v2889, ptr %v1
     %v2890 = add i64 0, 0
     %v2891 = load ptr, ptr %v1
-    %v2892 = getelementptr i8, ptr @.str_791, i64 16
+    %v2892 = getelementptr i8, ptr @.str_793, i64 16
     %v2893 = call ptr @orion_text_concat(ptr %v2891, ptr %v2892)
     store ptr %v2893, ptr %v1
     %v2894 = add i64 0, 0
     %v2895 = load ptr, ptr %v1
-    %v2896 = getelementptr i8, ptr @.str_1011, i64 16
+    %v2896 = getelementptr i8, ptr @.str_1013, i64 16
     %v2897 = call ptr @orion_text_concat(ptr %v2895, ptr %v2896)
     store ptr %v2897, ptr %v1
     %v2898 = add i64 0, 0
     %v2899 = load ptr, ptr %v1
-    %v2900 = getelementptr i8, ptr @.str_1013, i64 16
+    %v2900 = getelementptr i8, ptr @.str_1015, i64 16
     %v2901 = call ptr @orion_text_concat(ptr %v2899, ptr %v2900)
     store ptr %v2901, ptr %v1
     %v2902 = add i64 0, 0
     %v2903 = load ptr, ptr %v1
-    %v2904 = getelementptr i8, ptr @.str_1015, i64 16
+    %v2904 = getelementptr i8, ptr @.str_1017, i64 16
     %v2905 = call ptr @orion_text_concat(ptr %v2903, ptr %v2904)
     store ptr %v2905, ptr %v1
     %v2906 = add i64 0, 0
     %v2907 = load ptr, ptr %v1
-    %v2908 = getelementptr i8, ptr @.str_933, i64 16
+    %v2908 = getelementptr i8, ptr @.str_935, i64 16
     %v2909 = call ptr @orion_text_concat(ptr %v2907, ptr %v2908)
     store ptr %v2909, ptr %v1
     %v2910 = add i64 0, 0
     %v2911 = load ptr, ptr %v1
-    %v2912 = getelementptr i8, ptr @.str_934, i64 16
+    %v2912 = getelementptr i8, ptr @.str_936, i64 16
     %v2913 = call ptr @orion_text_concat(ptr %v2911, ptr %v2912)
     store ptr %v2913, ptr %v1
     %v2914 = add i64 0, 0
     %v2915 = load ptr, ptr %v1
-    %v2916 = getelementptr i8, ptr @.str_1016, i64 16
+    %v2916 = getelementptr i8, ptr @.str_1018, i64 16
     %v2917 = call ptr @orion_text_concat(ptr %v2915, ptr %v2916)
     store ptr %v2917, ptr %v1
     %v2918 = add i64 0, 0
     %v2919 = load ptr, ptr %v1
-    %v2920 = getelementptr i8, ptr @.str_1017, i64 16
+    %v2920 = getelementptr i8, ptr @.str_1019, i64 16
     %v2921 = call ptr @orion_text_concat(ptr %v2919, ptr %v2920)
     store ptr %v2921, ptr %v1
     %v2922 = add i64 0, 0
     %v2923 = load ptr, ptr %v1
-    %v2924 = getelementptr i8, ptr @.str_1201, i64 16
+    %v2924 = getelementptr i8, ptr @.str_1203, i64 16
     %v2925 = call ptr @orion_text_concat(ptr %v2923, ptr %v2924)
     store ptr %v2925, ptr %v1
     %v2926 = add i64 0, 0
     %v2927 = load ptr, ptr %v1
-    %v2928 = getelementptr i8, ptr @.str_1148, i64 16
+    %v2928 = getelementptr i8, ptr @.str_1150, i64 16
     %v2929 = call ptr @orion_text_concat(ptr %v2927, ptr %v2928)
     store ptr %v2929, ptr %v1
     %v2930 = add i64 0, 0
     %v2931 = load ptr, ptr %v1
-    %v2932 = getelementptr i8, ptr @.str_1202, i64 16
+    %v2932 = getelementptr i8, ptr @.str_1204, i64 16
     %v2933 = call ptr @orion_text_concat(ptr %v2931, ptr %v2932)
     store ptr %v2933, ptr %v1
     %v2934 = add i64 0, 0
     %v2935 = load ptr, ptr %v1
-    %v2936 = getelementptr i8, ptr @.str_1203, i64 16
+    %v2936 = getelementptr i8, ptr @.str_1205, i64 16
     %v2937 = call ptr @orion_text_concat(ptr %v2935, ptr %v2936)
     store ptr %v2937, ptr %v1
     %v2938 = add i64 0, 0
     %v2939 = load ptr, ptr %v1
-    %v2940 = getelementptr i8, ptr @.str_1204, i64 16
+    %v2940 = getelementptr i8, ptr @.str_1206, i64 16
     %v2941 = call ptr @orion_text_concat(ptr %v2939, ptr %v2940)
     store ptr %v2941, ptr %v1
     %v2942 = add i64 0, 0
     %v2943 = load ptr, ptr %v1
-    %v2944 = getelementptr i8, ptr @.str_1022, i64 16
+    %v2944 = getelementptr i8, ptr @.str_1024, i64 16
     %v2945 = call ptr @orion_text_concat(ptr %v2943, ptr %v2944)
     store ptr %v2945, ptr %v1
     %v2946 = add i64 0, 0
     %v2947 = load ptr, ptr %v1
-    %v2948 = getelementptr i8, ptr @.str_1023, i64 16
+    %v2948 = getelementptr i8, ptr @.str_1025, i64 16
     %v2949 = call ptr @orion_text_concat(ptr %v2947, ptr %v2948)
     store ptr %v2949, ptr %v1
     %v2950 = add i64 0, 0
     %v2951 = load ptr, ptr %v1
-    %v2952 = getelementptr i8, ptr @.str_1024, i64 16
+    %v2952 = getelementptr i8, ptr @.str_1026, i64 16
     %v2953 = call ptr @orion_text_concat(ptr %v2951, ptr %v2952)
     store ptr %v2953, ptr %v1
     %v2954 = add i64 0, 0
     %v2955 = load ptr, ptr %v1
-    %v2956 = getelementptr i8, ptr @.str_1025, i64 16
+    %v2956 = getelementptr i8, ptr @.str_1027, i64 16
     %v2957 = call ptr @orion_text_concat(ptr %v2955, ptr %v2956)
     store ptr %v2957, ptr %v1
     %v2958 = add i64 0, 0
     %v2959 = load ptr, ptr %v1
-    %v2960 = getelementptr i8, ptr @.str_1205, i64 16
+    %v2960 = getelementptr i8, ptr @.str_1207, i64 16
     %v2961 = call ptr @orion_text_concat(ptr %v2959, ptr %v2960)
     store ptr %v2961, ptr %v1
     %v2962 = add i64 0, 0
     %v2963 = load ptr, ptr %v1
-    %v2964 = getelementptr i8, ptr @.str_1206, i64 16
+    %v2964 = getelementptr i8, ptr @.str_1208, i64 16
     %v2965 = call ptr @orion_text_concat(ptr %v2963, ptr %v2964)
     store ptr %v2965, ptr %v1
     %v2966 = add i64 0, 0
     %v2967 = load ptr, ptr %v1
-    %v2968 = getelementptr i8, ptr @.str_1030, i64 16
+    %v2968 = getelementptr i8, ptr @.str_1032, i64 16
     %v2969 = call ptr @orion_text_concat(ptr %v2967, ptr %v2968)
     store ptr %v2969, ptr %v1
     %v2970 = add i64 0, 0
     %v2971 = load ptr, ptr %v1
-    %v2972 = getelementptr i8, ptr @.str_1207, i64 16
+    %v2972 = getelementptr i8, ptr @.str_1209, i64 16
     %v2973 = call ptr @orion_text_concat(ptr %v2971, ptr %v2972)
     store ptr %v2973, ptr %v1
     %v2974 = add i64 0, 0
     %v2975 = load ptr, ptr %v1
-    %v2976 = getelementptr i8, ptr @.str_1087, i64 16
+    %v2976 = getelementptr i8, ptr @.str_1089, i64 16
     %v2977 = call ptr @orion_text_concat(ptr %v2975, ptr %v2976)
     store ptr %v2977, ptr %v1
     %v2978 = add i64 0, 0
     %v2979 = load ptr, ptr %v1
-    %v2980 = getelementptr i8, ptr @.str_1027, i64 16
+    %v2980 = getelementptr i8, ptr @.str_1029, i64 16
     %v2981 = call ptr @orion_text_concat(ptr %v2979, ptr %v2980)
     store ptr %v2981, ptr %v1
     %v2982 = add i64 0, 0
     %v2983 = load ptr, ptr %v1
-    %v2984 = getelementptr i8, ptr @.str_812, i64 16
+    %v2984 = getelementptr i8, ptr @.str_814, i64 16
     %v2985 = call ptr @orion_text_concat(ptr %v2983, ptr %v2984)
     store ptr %v2985, ptr %v1
     %v2986 = add i64 0, 0
     %v2987 = load ptr, ptr %v1
-    %v2988 = getelementptr i8, ptr @.str_933, i64 16
+    %v2988 = getelementptr i8, ptr @.str_935, i64 16
     %v2989 = call ptr @orion_text_concat(ptr %v2987, ptr %v2988)
     store ptr %v2989, ptr %v1
     %v2990 = add i64 0, 0
     %v2991 = load ptr, ptr %v1
-    %v2992 = getelementptr i8, ptr @.str_1208, i64 16
+    %v2992 = getelementptr i8, ptr @.str_1210, i64 16
     %v2993 = call ptr @orion_text_concat(ptr %v2991, ptr %v2992)
     store ptr %v2993, ptr %v1
     %v2994 = add i64 0, 0
     %v2995 = load ptr, ptr %v1
-    %v2996 = getelementptr i8, ptr @.str_883, i64 16
+    %v2996 = getelementptr i8, ptr @.str_885, i64 16
     %v2997 = call ptr @orion_text_concat(ptr %v2995, ptr %v2996)
     store ptr %v2997, ptr %v1
     %v2998 = add i64 0, 0
     %v2999 = load ptr, ptr %v1
-    %v3000 = getelementptr i8, ptr @.str_798, i64 16
+    %v3000 = getelementptr i8, ptr @.str_800, i64 16
     %v3001 = call ptr @orion_text_concat(ptr %v2999, ptr %v3000)
     store ptr %v3001, ptr %v1
     %v3002 = add i64 0, 0
     %v3003 = load ptr, ptr %v1
-    %v3004 = getelementptr i8, ptr @.str_1209, i64 16
+    %v3004 = getelementptr i8, ptr @.str_1211, i64 16
     %v3005 = call ptr @orion_text_concat(ptr %v3003, ptr %v3004)
     store ptr %v3005, ptr %v1
     %v3006 = add i64 0, 0
     %v3007 = load ptr, ptr %v1
-    %v3008 = getelementptr i8, ptr @.str_791, i64 16
+    %v3008 = getelementptr i8, ptr @.str_793, i64 16
     %v3009 = call ptr @orion_text_concat(ptr %v3007, ptr %v3008)
     store ptr %v3009, ptr %v1
     %v3010 = add i64 0, 0
     %v3011 = load ptr, ptr %v1
-    %v3012 = getelementptr i8, ptr @.str_1011, i64 16
+    %v3012 = getelementptr i8, ptr @.str_1013, i64 16
     %v3013 = call ptr @orion_text_concat(ptr %v3011, ptr %v3012)
     store ptr %v3013, ptr %v1
     %v3014 = add i64 0, 0
     %v3015 = load ptr, ptr %v1
-    %v3016 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3016 = getelementptr i8, ptr @.str_1015, i64 16
     %v3017 = call ptr @orion_text_concat(ptr %v3015, ptr %v3016)
     store ptr %v3017, ptr %v1
     %v3018 = add i64 0, 0
     %v3019 = load ptr, ptr %v1
-    %v3020 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3020 = getelementptr i8, ptr @.str_1017, i64 16
     %v3021 = call ptr @orion_text_concat(ptr %v3019, ptr %v3020)
     store ptr %v3021, ptr %v1
     %v3022 = add i64 0, 0
     %v3023 = load ptr, ptr %v1
-    %v3024 = getelementptr i8, ptr @.str_933, i64 16
+    %v3024 = getelementptr i8, ptr @.str_935, i64 16
     %v3025 = call ptr @orion_text_concat(ptr %v3023, ptr %v3024)
     store ptr %v3025, ptr %v1
     %v3026 = add i64 0, 0
     %v3027 = load ptr, ptr %v1
-    %v3028 = getelementptr i8, ptr @.str_934, i64 16
+    %v3028 = getelementptr i8, ptr @.str_936, i64 16
     %v3029 = call ptr @orion_text_concat(ptr %v3027, ptr %v3028)
     store ptr %v3029, ptr %v1
     %v3030 = add i64 0, 0
     %v3031 = load ptr, ptr %v1
-    %v3032 = getelementptr i8, ptr @.str_1016, i64 16
+    %v3032 = getelementptr i8, ptr @.str_1018, i64 16
     %v3033 = call ptr @orion_text_concat(ptr %v3031, ptr %v3032)
     store ptr %v3033, ptr %v1
     %v3034 = add i64 0, 0
     %v3035 = load ptr, ptr %v1
-    %v3036 = getelementptr i8, ptr @.str_1017, i64 16
+    %v3036 = getelementptr i8, ptr @.str_1019, i64 16
     %v3037 = call ptr @orion_text_concat(ptr %v3035, ptr %v3036)
     store ptr %v3037, ptr %v1
     %v3038 = add i64 0, 0
     %v3039 = load ptr, ptr %v1
-    %v3040 = getelementptr i8, ptr @.str_1201, i64 16
+    %v3040 = getelementptr i8, ptr @.str_1203, i64 16
     %v3041 = call ptr @orion_text_concat(ptr %v3039, ptr %v3040)
     store ptr %v3041, ptr %v1
     %v3042 = add i64 0, 0
     %v3043 = load ptr, ptr %v1
-    %v3044 = getelementptr i8, ptr @.str_1148, i64 16
+    %v3044 = getelementptr i8, ptr @.str_1150, i64 16
     %v3045 = call ptr @orion_text_concat(ptr %v3043, ptr %v3044)
     store ptr %v3045, ptr %v1
     %v3046 = add i64 0, 0
     %v3047 = load ptr, ptr %v1
-    %v3048 = getelementptr i8, ptr @.str_1202, i64 16
+    %v3048 = getelementptr i8, ptr @.str_1204, i64 16
     %v3049 = call ptr @orion_text_concat(ptr %v3047, ptr %v3048)
     store ptr %v3049, ptr %v1
     %v3050 = add i64 0, 0
     %v3051 = load ptr, ptr %v1
-    %v3052 = getelementptr i8, ptr @.str_1204, i64 16
+    %v3052 = getelementptr i8, ptr @.str_1206, i64 16
     %v3053 = call ptr @orion_text_concat(ptr %v3051, ptr %v3052)
     store ptr %v3053, ptr %v1
     %v3054 = add i64 0, 0
     %v3055 = load ptr, ptr %v1
-    %v3056 = getelementptr i8, ptr @.str_1022, i64 16
+    %v3056 = getelementptr i8, ptr @.str_1024, i64 16
     %v3057 = call ptr @orion_text_concat(ptr %v3055, ptr %v3056)
     store ptr %v3057, ptr %v1
     %v3058 = add i64 0, 0
     %v3059 = load ptr, ptr %v1
-    %v3060 = getelementptr i8, ptr @.str_1023, i64 16
+    %v3060 = getelementptr i8, ptr @.str_1025, i64 16
     %v3061 = call ptr @orion_text_concat(ptr %v3059, ptr %v3060)
     store ptr %v3061, ptr %v1
     %v3062 = add i64 0, 0
     %v3063 = load ptr, ptr %v1
-    %v3064 = getelementptr i8, ptr @.str_1024, i64 16
+    %v3064 = getelementptr i8, ptr @.str_1026, i64 16
     %v3065 = call ptr @orion_text_concat(ptr %v3063, ptr %v3064)
     store ptr %v3065, ptr %v1
     %v3066 = add i64 0, 0
     %v3067 = load ptr, ptr %v1
-    %v3068 = getelementptr i8, ptr @.str_1025, i64 16
+    %v3068 = getelementptr i8, ptr @.str_1027, i64 16
     %v3069 = call ptr @orion_text_concat(ptr %v3067, ptr %v3068)
     store ptr %v3069, ptr %v1
     %v3070 = add i64 0, 0
     %v3071 = load ptr, ptr %v1
-    %v3072 = getelementptr i8, ptr @.str_1205, i64 16
+    %v3072 = getelementptr i8, ptr @.str_1207, i64 16
     %v3073 = call ptr @orion_text_concat(ptr %v3071, ptr %v3072)
     store ptr %v3073, ptr %v1
     %v3074 = add i64 0, 0
     %v3075 = load ptr, ptr %v1
-    %v3076 = getelementptr i8, ptr @.str_1206, i64 16
+    %v3076 = getelementptr i8, ptr @.str_1208, i64 16
     %v3077 = call ptr @orion_text_concat(ptr %v3075, ptr %v3076)
     store ptr %v3077, ptr %v1
     %v3078 = add i64 0, 0
     %v3079 = load ptr, ptr %v1
-    %v3080 = getelementptr i8, ptr @.str_881, i64 16
+    %v3080 = getelementptr i8, ptr @.str_883, i64 16
     %v3081 = call ptr @orion_text_concat(ptr %v3079, ptr %v3080)
     store ptr %v3081, ptr %v1
     %v3082 = add i64 0, 0
     %v3083 = load ptr, ptr %v1
-    %v3084 = getelementptr i8, ptr @.str_1027, i64 16
+    %v3084 = getelementptr i8, ptr @.str_1029, i64 16
     %v3085 = call ptr @orion_text_concat(ptr %v3083, ptr %v3084)
     store ptr %v3085, ptr %v1
     %v3086 = add i64 0, 0
     %v3087 = load ptr, ptr %v1
-    %v3088 = getelementptr i8, ptr @.str_812, i64 16
+    %v3088 = getelementptr i8, ptr @.str_814, i64 16
     %v3089 = call ptr @orion_text_concat(ptr %v3087, ptr %v3088)
     store ptr %v3089, ptr %v1
     %v3090 = add i64 0, 0
     %v3091 = load ptr, ptr %v1
-    %v3092 = getelementptr i8, ptr @.str_933, i64 16
+    %v3092 = getelementptr i8, ptr @.str_935, i64 16
     %v3093 = call ptr @orion_text_concat(ptr %v3091, ptr %v3092)
     store ptr %v3093, ptr %v1
     %v3094 = add i64 0, 0
     %v3095 = load ptr, ptr %v1
-    %v3096 = getelementptr i8, ptr @.str_1208, i64 16
+    %v3096 = getelementptr i8, ptr @.str_1210, i64 16
     %v3097 = call ptr @orion_text_concat(ptr %v3095, ptr %v3096)
     store ptr %v3097, ptr %v1
     %v3098 = add i64 0, 0
     %v3099 = load ptr, ptr %v1
-    %v3100 = getelementptr i8, ptr @.str_883, i64 16
+    %v3100 = getelementptr i8, ptr @.str_885, i64 16
     %v3101 = call ptr @orion_text_concat(ptr %v3099, ptr %v3100)
     store ptr %v3101, ptr %v1
     %v3102 = add i64 0, 0
     %v3103 = load ptr, ptr %v1
-    %v3104 = getelementptr i8, ptr @.str_798, i64 16
+    %v3104 = getelementptr i8, ptr @.str_800, i64 16
     %v3105 = call ptr @orion_text_concat(ptr %v3103, ptr %v3104)
     store ptr %v3105, ptr %v1
     %v3106 = add i64 0, 0
     %v3107 = load ptr, ptr %v1
-    %v3108 = getelementptr i8, ptr @.str_1210, i64 16
+    %v3108 = getelementptr i8, ptr @.str_1212, i64 16
     %v3109 = call ptr @orion_text_concat(ptr %v3107, ptr %v3108)
     store ptr %v3109, ptr %v1
     %v3110 = add i64 0, 0
     %v3111 = load ptr, ptr %v1
-    %v3112 = getelementptr i8, ptr @.str_791, i64 16
+    %v3112 = getelementptr i8, ptr @.str_793, i64 16
     %v3113 = call ptr @orion_text_concat(ptr %v3111, ptr %v3112)
     store ptr %v3113, ptr %v1
     %v3114 = add i64 0, 0
     %v3115 = load ptr, ptr %v1
-    %v3116 = getelementptr i8, ptr @.str_1011, i64 16
+    %v3116 = getelementptr i8, ptr @.str_1013, i64 16
     %v3117 = call ptr @orion_text_concat(ptr %v3115, ptr %v3116)
     store ptr %v3117, ptr %v1
     %v3118 = add i64 0, 0
     %v3119 = load ptr, ptr %v1
-    %v3120 = getelementptr i8, ptr @.str_1012, i64 16
+    %v3120 = getelementptr i8, ptr @.str_1014, i64 16
     %v3121 = call ptr @orion_text_concat(ptr %v3119, ptr %v3120)
     store ptr %v3121, ptr %v1
     %v3122 = add i64 0, 0
     %v3123 = load ptr, ptr %v1
-    %v3124 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3124 = getelementptr i8, ptr @.str_1015, i64 16
     %v3125 = call ptr @orion_text_concat(ptr %v3123, ptr %v3124)
     store ptr %v3125, ptr %v1
     %v3126 = add i64 0, 0
     %v3127 = load ptr, ptr %v1
-    %v3128 = getelementptr i8, ptr @.str_1014, i64 16
+    %v3128 = getelementptr i8, ptr @.str_1016, i64 16
     %v3129 = call ptr @orion_text_concat(ptr %v3127, ptr %v3128)
     store ptr %v3129, ptr %v1
     %v3130 = add i64 0, 0
     %v3131 = load ptr, ptr %v1
-    %v3132 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3132 = getelementptr i8, ptr @.str_1017, i64 16
     %v3133 = call ptr @orion_text_concat(ptr %v3131, ptr %v3132)
     store ptr %v3133, ptr %v1
     %v3134 = add i64 0, 0
     %v3135 = load ptr, ptr %v1
-    %v3136 = getelementptr i8, ptr @.str_933, i64 16
+    %v3136 = getelementptr i8, ptr @.str_935, i64 16
     %v3137 = call ptr @orion_text_concat(ptr %v3135, ptr %v3136)
     store ptr %v3137, ptr %v1
     %v3138 = add i64 0, 0
     %v3139 = load ptr, ptr %v1
-    %v3140 = getelementptr i8, ptr @.str_934, i64 16
+    %v3140 = getelementptr i8, ptr @.str_936, i64 16
     %v3141 = call ptr @orion_text_concat(ptr %v3139, ptr %v3140)
     store ptr %v3141, ptr %v1
     %v3142 = add i64 0, 0
     %v3143 = load ptr, ptr %v1
-    %v3144 = getelementptr i8, ptr @.str_1016, i64 16
+    %v3144 = getelementptr i8, ptr @.str_1018, i64 16
     %v3145 = call ptr @orion_text_concat(ptr %v3143, ptr %v3144)
     store ptr %v3145, ptr %v1
     %v3146 = add i64 0, 0
     %v3147 = load ptr, ptr %v1
-    %v3148 = getelementptr i8, ptr @.str_1017, i64 16
+    %v3148 = getelementptr i8, ptr @.str_1019, i64 16
     %v3149 = call ptr @orion_text_concat(ptr %v3147, ptr %v3148)
     store ptr %v3149, ptr %v1
     %v3150 = add i64 0, 0
     %v3151 = load ptr, ptr %v1
-    %v3152 = getelementptr i8, ptr @.str_1018, i64 16
+    %v3152 = getelementptr i8, ptr @.str_1020, i64 16
     %v3153 = call ptr @orion_text_concat(ptr %v3151, ptr %v3152)
     store ptr %v3153, ptr %v1
     %v3154 = add i64 0, 0
     %v3155 = load ptr, ptr %v1
-    %v3156 = getelementptr i8, ptr @.str_1019, i64 16
+    %v3156 = getelementptr i8, ptr @.str_1021, i64 16
     %v3157 = call ptr @orion_text_concat(ptr %v3155, ptr %v3156)
     store ptr %v3157, ptr %v1
     %v3158 = add i64 0, 0
     %v3159 = load ptr, ptr %v1
-    %v3160 = getelementptr i8, ptr @.str_1020, i64 16
+    %v3160 = getelementptr i8, ptr @.str_1022, i64 16
     %v3161 = call ptr @orion_text_concat(ptr %v3159, ptr %v3160)
     store ptr %v3161, ptr %v1
     %v3162 = add i64 0, 0
     %v3163 = load ptr, ptr %v1
-    %v3164 = getelementptr i8, ptr @.str_1021, i64 16
+    %v3164 = getelementptr i8, ptr @.str_1023, i64 16
     %v3165 = call ptr @orion_text_concat(ptr %v3163, ptr %v3164)
     store ptr %v3165, ptr %v1
     %v3166 = add i64 0, 0
     %v3167 = load ptr, ptr %v1
-    %v3168 = getelementptr i8, ptr @.str_1022, i64 16
+    %v3168 = getelementptr i8, ptr @.str_1024, i64 16
     %v3169 = call ptr @orion_text_concat(ptr %v3167, ptr %v3168)
     store ptr %v3169, ptr %v1
     %v3170 = add i64 0, 0
     %v3171 = load ptr, ptr %v1
-    %v3172 = getelementptr i8, ptr @.str_1211, i64 16
+    %v3172 = getelementptr i8, ptr @.str_1213, i64 16
     %v3173 = call ptr @orion_text_concat(ptr %v3171, ptr %v3172)
     store ptr %v3173, ptr %v1
     %v3174 = add i64 0, 0
     %v3175 = load ptr, ptr %v1
-    %v3176 = getelementptr i8, ptr @.str_1026, i64 16
+    %v3176 = getelementptr i8, ptr @.str_1028, i64 16
     %v3177 = call ptr @orion_text_concat(ptr %v3175, ptr %v3176)
     store ptr %v3177, ptr %v1
     %v3178 = add i64 0, 0
     %v3179 = load ptr, ptr %v1
-    %v3180 = getelementptr i8, ptr @.str_1027, i64 16
+    %v3180 = getelementptr i8, ptr @.str_1029, i64 16
     %v3181 = call ptr @orion_text_concat(ptr %v3179, ptr %v3180)
     store ptr %v3181, ptr %v1
     %v3182 = add i64 0, 0
     %v3183 = load ptr, ptr %v1
-    %v3184 = getelementptr i8, ptr @.str_812, i64 16
+    %v3184 = getelementptr i8, ptr @.str_814, i64 16
     %v3185 = call ptr @orion_text_concat(ptr %v3183, ptr %v3184)
     store ptr %v3185, ptr %v1
     %v3186 = add i64 0, 0
     %v3187 = load ptr, ptr %v1
-    %v3188 = getelementptr i8, ptr @.str_933, i64 16
+    %v3188 = getelementptr i8, ptr @.str_935, i64 16
     %v3189 = call ptr @orion_text_concat(ptr %v3187, ptr %v3188)
     store ptr %v3189, ptr %v1
     %v3190 = add i64 0, 0
     %v3191 = load ptr, ptr %v1
-    %v3192 = getelementptr i8, ptr @.str_1028, i64 16
+    %v3192 = getelementptr i8, ptr @.str_1030, i64 16
     %v3193 = call ptr @orion_text_concat(ptr %v3191, ptr %v3192)
     store ptr %v3193, ptr %v1
     %v3194 = add i64 0, 0
     %v3195 = load ptr, ptr %v1
-    %v3196 = getelementptr i8, ptr @.str_1029, i64 16
+    %v3196 = getelementptr i8, ptr @.str_1031, i64 16
     %v3197 = call ptr @orion_text_concat(ptr %v3195, ptr %v3196)
     store ptr %v3197, ptr %v1
     %v3198 = add i64 0, 0
     %v3199 = load ptr, ptr %v1
-    %v3200 = getelementptr i8, ptr @.str_1030, i64 16
+    %v3200 = getelementptr i8, ptr @.str_1032, i64 16
     %v3201 = call ptr @orion_text_concat(ptr %v3199, ptr %v3200)
     store ptr %v3201, ptr %v1
     %v3202 = add i64 0, 0
     %v3203 = load ptr, ptr %v1
-    %v3204 = getelementptr i8, ptr @.str_1031, i64 16
+    %v3204 = getelementptr i8, ptr @.str_1033, i64 16
     %v3205 = call ptr @orion_text_concat(ptr %v3203, ptr %v3204)
     store ptr %v3205, ptr %v1
     %v3206 = add i64 0, 0
     %v3207 = load ptr, ptr %v1
-    %v3208 = getelementptr i8, ptr @.str_1032, i64 16
+    %v3208 = getelementptr i8, ptr @.str_1034, i64 16
     %v3209 = call ptr @orion_text_concat(ptr %v3207, ptr %v3208)
     store ptr %v3209, ptr %v1
     %v3210 = add i64 0, 0
     %v3211 = load ptr, ptr %v1
-    %v3212 = getelementptr i8, ptr @.str_1033, i64 16
+    %v3212 = getelementptr i8, ptr @.str_1035, i64 16
     %v3213 = call ptr @orion_text_concat(ptr %v3211, ptr %v3212)
     store ptr %v3213, ptr %v1
     %v3214 = add i64 0, 0
     %v3215 = load ptr, ptr %v1
-    %v3216 = getelementptr i8, ptr @.str_1034, i64 16
+    %v3216 = getelementptr i8, ptr @.str_1036, i64 16
     %v3217 = call ptr @orion_text_concat(ptr %v3215, ptr %v3216)
     store ptr %v3217, ptr %v1
     %v3218 = add i64 0, 0
     %v3219 = load ptr, ptr %v1
-    %v3220 = getelementptr i8, ptr @.str_1035, i64 16
+    %v3220 = getelementptr i8, ptr @.str_1037, i64 16
     %v3221 = call ptr @orion_text_concat(ptr %v3219, ptr %v3220)
     store ptr %v3221, ptr %v1
     %v3222 = add i64 0, 0
     %v3223 = load ptr, ptr %v1
-    %v3224 = getelementptr i8, ptr @.str_1036, i64 16
+    %v3224 = getelementptr i8, ptr @.str_1038, i64 16
     %v3225 = call ptr @orion_text_concat(ptr %v3223, ptr %v3224)
     store ptr %v3225, ptr %v1
     %v3226 = add i64 0, 0
     %v3227 = load ptr, ptr %v1
-    %v3228 = getelementptr i8, ptr @.str_1037, i64 16
+    %v3228 = getelementptr i8, ptr @.str_1039, i64 16
     %v3229 = call ptr @orion_text_concat(ptr %v3227, ptr %v3228)
     store ptr %v3229, ptr %v1
     %v3230 = add i64 0, 0
     %v3231 = load ptr, ptr %v1
-    %v3232 = getelementptr i8, ptr @.str_1038, i64 16
+    %v3232 = getelementptr i8, ptr @.str_1040, i64 16
     %v3233 = call ptr @orion_text_concat(ptr %v3231, ptr %v3232)
     store ptr %v3233, ptr %v1
     %v3234 = add i64 0, 0
     %v3235 = load ptr, ptr %v1
-    %v3236 = getelementptr i8, ptr @.str_1197, i64 16
+    %v3236 = getelementptr i8, ptr @.str_1199, i64 16
     %v3237 = call ptr @orion_text_concat(ptr %v3235, ptr %v3236)
     store ptr %v3237, ptr %v1
     %v3238 = add i64 0, 0
     %v3239 = load ptr, ptr %v1
-    %v3240 = getelementptr i8, ptr @.str_1040, i64 16
+    %v3240 = getelementptr i8, ptr @.str_1042, i64 16
     %v3241 = call ptr @orion_text_concat(ptr %v3239, ptr %v3240)
     store ptr %v3241, ptr %v1
     %v3242 = add i64 0, 0
     %v3243 = load ptr, ptr %v1
-    %v3244 = getelementptr i8, ptr @.str_1041, i64 16
+    %v3244 = getelementptr i8, ptr @.str_1043, i64 16
     %v3245 = call ptr @orion_text_concat(ptr %v3243, ptr %v3244)
     store ptr %v3245, ptr %v1
     %v3246 = add i64 0, 0
     %v3247 = load ptr, ptr %v1
-    %v3248 = getelementptr i8, ptr @.str_1042, i64 16
+    %v3248 = getelementptr i8, ptr @.str_1044, i64 16
     %v3249 = call ptr @orion_text_concat(ptr %v3247, ptr %v3248)
     store ptr %v3249, ptr %v1
     %v3250 = add i64 0, 0
     %v3251 = load ptr, ptr %v1
-    %v3252 = getelementptr i8, ptr @.str_1043, i64 16
+    %v3252 = getelementptr i8, ptr @.str_1045, i64 16
     %v3253 = call ptr @orion_text_concat(ptr %v3251, ptr %v3252)
     store ptr %v3253, ptr %v1
     %v3254 = add i64 0, 0
     %v3255 = load ptr, ptr %v1
-    %v3256 = getelementptr i8, ptr @.str_1044, i64 16
+    %v3256 = getelementptr i8, ptr @.str_1046, i64 16
     %v3257 = call ptr @orion_text_concat(ptr %v3255, ptr %v3256)
     store ptr %v3257, ptr %v1
     %v3258 = add i64 0, 0
     %v3259 = load ptr, ptr %v1
-    %v3260 = getelementptr i8, ptr @.str_1045, i64 16
+    %v3260 = getelementptr i8, ptr @.str_1047, i64 16
     %v3261 = call ptr @orion_text_concat(ptr %v3259, ptr %v3260)
     store ptr %v3261, ptr %v1
     %v3262 = add i64 0, 0
     %v3263 = load ptr, ptr %v1
-    %v3264 = getelementptr i8, ptr @.str_1046, i64 16
+    %v3264 = getelementptr i8, ptr @.str_1048, i64 16
     %v3265 = call ptr @orion_text_concat(ptr %v3263, ptr %v3264)
     store ptr %v3265, ptr %v1
     %v3266 = add i64 0, 0
     %v3267 = load ptr, ptr %v1
-    %v3268 = getelementptr i8, ptr @.str_1048, i64 16
+    %v3268 = getelementptr i8, ptr @.str_1050, i64 16
     %v3269 = call ptr @orion_text_concat(ptr %v3267, ptr %v3268)
     store ptr %v3269, ptr %v1
     %v3270 = add i64 0, 0
     %v3271 = load ptr, ptr %v1
-    %v3272 = getelementptr i8, ptr @.str_1049, i64 16
+    %v3272 = getelementptr i8, ptr @.str_1051, i64 16
     %v3273 = call ptr @orion_text_concat(ptr %v3271, ptr %v3272)
     store ptr %v3273, ptr %v1
     %v3274 = add i64 0, 0
     %v3275 = load ptr, ptr %v1
-    %v3276 = getelementptr i8, ptr @.str_1050, i64 16
+    %v3276 = getelementptr i8, ptr @.str_1052, i64 16
     %v3277 = call ptr @orion_text_concat(ptr %v3275, ptr %v3276)
     store ptr %v3277, ptr %v1
     %v3278 = add i64 0, 0
     %v3279 = load ptr, ptr %v1
-    %v3280 = getelementptr i8, ptr @.str_1051, i64 16
+    %v3280 = getelementptr i8, ptr @.str_1053, i64 16
     %v3281 = call ptr @orion_text_concat(ptr %v3279, ptr %v3280)
     store ptr %v3281, ptr %v1
     %v3282 = add i64 0, 0
     %v3283 = load ptr, ptr %v1
-    %v3284 = getelementptr i8, ptr @.str_1212, i64 16
+    %v3284 = getelementptr i8, ptr @.str_1214, i64 16
     %v3285 = call ptr @orion_text_concat(ptr %v3283, ptr %v3284)
     store ptr %v3285, ptr %v1
     %v3286 = add i64 0, 0
     %v3287 = load ptr, ptr %v1
-    %v3288 = getelementptr i8, ptr @.str_1054, i64 16
+    %v3288 = getelementptr i8, ptr @.str_1056, i64 16
     %v3289 = call ptr @orion_text_concat(ptr %v3287, ptr %v3288)
     store ptr %v3289, ptr %v1
     %v3290 = add i64 0, 0
     %v3291 = load ptr, ptr %v1
-    %v3292 = getelementptr i8, ptr @.str_1055, i64 16
+    %v3292 = getelementptr i8, ptr @.str_1057, i64 16
     %v3293 = call ptr @orion_text_concat(ptr %v3291, ptr %v3292)
     store ptr %v3293, ptr %v1
     %v3294 = add i64 0, 0
     %v3295 = load ptr, ptr %v1
-    %v3296 = getelementptr i8, ptr @.str_1056, i64 16
+    %v3296 = getelementptr i8, ptr @.str_1058, i64 16
     %v3297 = call ptr @orion_text_concat(ptr %v3295, ptr %v3296)
     store ptr %v3297, ptr %v1
     %v3298 = add i64 0, 0
     %v3299 = load ptr, ptr %v1
-    %v3300 = getelementptr i8, ptr @.str_1032, i64 16
+    %v3300 = getelementptr i8, ptr @.str_1034, i64 16
     %v3301 = call ptr @orion_text_concat(ptr %v3299, ptr %v3300)
     store ptr %v3301, ptr %v1
     %v3302 = add i64 0, 0
     %v3303 = load ptr, ptr %v1
-    %v3304 = getelementptr i8, ptr @.str_798, i64 16
+    %v3304 = getelementptr i8, ptr @.str_800, i64 16
     %v3305 = call ptr @orion_text_concat(ptr %v3303, ptr %v3304)
     store ptr %v3305, ptr %v1
     %v3306 = add i64 0, 0
     %v3307 = load ptr, ptr %v1
-    %v3308 = getelementptr i8, ptr @.str_1213, i64 16
+    %v3308 = getelementptr i8, ptr @.str_1215, i64 16
     %v3309 = call ptr @orion_text_concat(ptr %v3307, ptr %v3308)
     store ptr %v3309, ptr %v1
     %v3310 = add i64 0, 0
     %v3311 = load ptr, ptr %v1
-    %v3312 = getelementptr i8, ptr @.str_791, i64 16
+    %v3312 = getelementptr i8, ptr @.str_793, i64 16
     %v3313 = call ptr @orion_text_concat(ptr %v3311, ptr %v3312)
     store ptr %v3313, ptr %v1
     %v3314 = add i64 0, 0
     %v3315 = load ptr, ptr %v1
-    %v3316 = getelementptr i8, ptr @.str_1011, i64 16
+    %v3316 = getelementptr i8, ptr @.str_1013, i64 16
     %v3317 = call ptr @orion_text_concat(ptr %v3315, ptr %v3316)
     store ptr %v3317, ptr %v1
     %v3318 = add i64 0, 0
     %v3319 = load ptr, ptr %v1
-    %v3320 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3320 = getelementptr i8, ptr @.str_1015, i64 16
     %v3321 = call ptr @orion_text_concat(ptr %v3319, ptr %v3320)
     store ptr %v3321, ptr %v1
     %v3322 = add i64 0, 0
     %v3323 = load ptr, ptr %v1
-    %v3324 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3324 = getelementptr i8, ptr @.str_1017, i64 16
     %v3325 = call ptr @orion_text_concat(ptr %v3323, ptr %v3324)
     store ptr %v3325, ptr %v1
     %v3326 = add i64 0, 0
     %v3327 = load ptr, ptr %v1
-    %v3328 = getelementptr i8, ptr @.str_933, i64 16
+    %v3328 = getelementptr i8, ptr @.str_935, i64 16
     %v3329 = call ptr @orion_text_concat(ptr %v3327, ptr %v3328)
     store ptr %v3329, ptr %v1
     %v3330 = add i64 0, 0
     %v3331 = load ptr, ptr %v1
-    %v3332 = getelementptr i8, ptr @.str_934, i64 16
+    %v3332 = getelementptr i8, ptr @.str_936, i64 16
     %v3333 = call ptr @orion_text_concat(ptr %v3331, ptr %v3332)
     store ptr %v3333, ptr %v1
     %v3334 = add i64 0, 0
     %v3335 = load ptr, ptr %v1
-    %v3336 = getelementptr i8, ptr @.str_1016, i64 16
+    %v3336 = getelementptr i8, ptr @.str_1018, i64 16
     %v3337 = call ptr @orion_text_concat(ptr %v3335, ptr %v3336)
     store ptr %v3337, ptr %v1
     %v3338 = add i64 0, 0
     %v3339 = load ptr, ptr %v1
-    %v3340 = getelementptr i8, ptr @.str_1017, i64 16
+    %v3340 = getelementptr i8, ptr @.str_1019, i64 16
     %v3341 = call ptr @orion_text_concat(ptr %v3339, ptr %v3340)
     store ptr %v3341, ptr %v1
     %v3342 = add i64 0, 0
     %v3343 = load ptr, ptr %v1
-    %v3344 = getelementptr i8, ptr @.str_1214, i64 16
+    %v3344 = getelementptr i8, ptr @.str_1216, i64 16
     %v3345 = call ptr @orion_text_concat(ptr %v3343, ptr %v3344)
     store ptr %v3345, ptr %v1
     %v3346 = add i64 0, 0
     %v3347 = load ptr, ptr %v1
-    %v3348 = getelementptr i8, ptr @.str_1019, i64 16
+    %v3348 = getelementptr i8, ptr @.str_1021, i64 16
     %v3349 = call ptr @orion_text_concat(ptr %v3347, ptr %v3348)
     store ptr %v3349, ptr %v1
     %v3350 = add i64 0, 0
     %v3351 = load ptr, ptr %v1
-    %v3352 = getelementptr i8, ptr @.str_1020, i64 16
+    %v3352 = getelementptr i8, ptr @.str_1022, i64 16
     %v3353 = call ptr @orion_text_concat(ptr %v3351, ptr %v3352)
     store ptr %v3353, ptr %v1
     %v3354 = add i64 0, 0
     %v3355 = load ptr, ptr %v1
-    %v3356 = getelementptr i8, ptr @.str_1021, i64 16
+    %v3356 = getelementptr i8, ptr @.str_1023, i64 16
     %v3357 = call ptr @orion_text_concat(ptr %v3355, ptr %v3356)
     store ptr %v3357, ptr %v1
     %v3358 = add i64 0, 0
     %v3359 = load ptr, ptr %v1
-    %v3360 = getelementptr i8, ptr @.str_1022, i64 16
+    %v3360 = getelementptr i8, ptr @.str_1024, i64 16
     %v3361 = call ptr @orion_text_concat(ptr %v3359, ptr %v3360)
     store ptr %v3361, ptr %v1
     %v3362 = add i64 0, 0
     %v3363 = load ptr, ptr %v1
-    %v3364 = getelementptr i8, ptr @.str_1023, i64 16
+    %v3364 = getelementptr i8, ptr @.str_1025, i64 16
     %v3365 = call ptr @orion_text_concat(ptr %v3363, ptr %v3364)
     store ptr %v3365, ptr %v1
     %v3366 = add i64 0, 0
     %v3367 = load ptr, ptr %v1
-    %v3368 = getelementptr i8, ptr @.str_1024, i64 16
+    %v3368 = getelementptr i8, ptr @.str_1026, i64 16
     %v3369 = call ptr @orion_text_concat(ptr %v3367, ptr %v3368)
     store ptr %v3369, ptr %v1
     %v3370 = add i64 0, 0
     %v3371 = load ptr, ptr %v1
-    %v3372 = getelementptr i8, ptr @.str_1025, i64 16
+    %v3372 = getelementptr i8, ptr @.str_1027, i64 16
     %v3373 = call ptr @orion_text_concat(ptr %v3371, ptr %v3372)
     store ptr %v3373, ptr %v1
     %v3374 = add i64 0, 0
     %v3375 = load ptr, ptr %v1
-    %v3376 = getelementptr i8, ptr @.str_1215, i64 16
+    %v3376 = getelementptr i8, ptr @.str_1217, i64 16
     %v3377 = call ptr @orion_text_concat(ptr %v3375, ptr %v3376)
     store ptr %v3377, ptr %v1
     %v3378 = add i64 0, 0
     %v3379 = load ptr, ptr %v1
-    %v3380 = getelementptr i8, ptr @.str_1027, i64 16
+    %v3380 = getelementptr i8, ptr @.str_1029, i64 16
     %v3381 = call ptr @orion_text_concat(ptr %v3379, ptr %v3380)
     store ptr %v3381, ptr %v1
     %v3382 = add i64 0, 0
     %v3383 = load ptr, ptr %v1
-    %v3384 = getelementptr i8, ptr @.str_812, i64 16
+    %v3384 = getelementptr i8, ptr @.str_814, i64 16
     %v3385 = call ptr @orion_text_concat(ptr %v3383, ptr %v3384)
     store ptr %v3385, ptr %v1
     %v3386 = add i64 0, 0
     %v3387 = load ptr, ptr %v1
-    %v3388 = getelementptr i8, ptr @.str_933, i64 16
+    %v3388 = getelementptr i8, ptr @.str_935, i64 16
     %v3389 = call ptr @orion_text_concat(ptr %v3387, ptr %v3388)
     store ptr %v3389, ptr %v1
     %v3390 = add i64 0, 0
     %v3391 = load ptr, ptr %v1
-    %v3392 = getelementptr i8, ptr @.str_1216, i64 16
+    %v3392 = getelementptr i8, ptr @.str_1218, i64 16
     %v3393 = call ptr @orion_text_concat(ptr %v3391, ptr %v3392)
     store ptr %v3393, ptr %v1
     %v3394 = add i64 0, 0
     %v3395 = load ptr, ptr %v1
-    %v3396 = getelementptr i8, ptr @.str_1217, i64 16
+    %v3396 = getelementptr i8, ptr @.str_1219, i64 16
     %v3397 = call ptr @orion_text_concat(ptr %v3395, ptr %v3396)
     store ptr %v3397, ptr %v1
     %v3398 = add i64 0, 0
     %v3399 = load ptr, ptr %v1
-    %v3400 = getelementptr i8, ptr @.str_1218, i64 16
+    %v3400 = getelementptr i8, ptr @.str_1220, i64 16
     %v3401 = call ptr @orion_text_concat(ptr %v3399, ptr %v3400)
     store ptr %v3401, ptr %v1
     %v3402 = add i64 0, 0
     %v3403 = load ptr, ptr %v1
-    %v3404 = getelementptr i8, ptr @.str_1219, i64 16
+    %v3404 = getelementptr i8, ptr @.str_1221, i64 16
     %v3405 = call ptr @orion_text_concat(ptr %v3403, ptr %v3404)
     store ptr %v3405, ptr %v1
     %v3406 = add i64 0, 0
     %v3407 = load ptr, ptr %v1
-    %v3408 = getelementptr i8, ptr @.str_1220, i64 16
+    %v3408 = getelementptr i8, ptr @.str_1222, i64 16
     %v3409 = call ptr @orion_text_concat(ptr %v3407, ptr %v3408)
     store ptr %v3409, ptr %v1
     %v3410 = add i64 0, 0
     %v3411 = load ptr, ptr %v1
-    %v3412 = getelementptr i8, ptr @.str_1221, i64 16
+    %v3412 = getelementptr i8, ptr @.str_1223, i64 16
     %v3413 = call ptr @orion_text_concat(ptr %v3411, ptr %v3412)
     store ptr %v3413, ptr %v1
     %v3414 = add i64 0, 0
     %v3415 = load ptr, ptr %v1
-    %v3416 = getelementptr i8, ptr @.str_1222, i64 16
+    %v3416 = getelementptr i8, ptr @.str_1224, i64 16
     %v3417 = call ptr @orion_text_concat(ptr %v3415, ptr %v3416)
     store ptr %v3417, ptr %v1
     %v3418 = add i64 0, 0
     %v3419 = load ptr, ptr %v1
-    %v3420 = getelementptr i8, ptr @.str_1223, i64 16
+    %v3420 = getelementptr i8, ptr @.str_1225, i64 16
     %v3421 = call ptr @orion_text_concat(ptr %v3419, ptr %v3420)
     store ptr %v3421, ptr %v1
     %v3422 = add i64 0, 0
     %v3423 = load ptr, ptr %v1
-    %v3424 = getelementptr i8, ptr @.str_1029, i64 16
+    %v3424 = getelementptr i8, ptr @.str_1031, i64 16
     %v3425 = call ptr @orion_text_concat(ptr %v3423, ptr %v3424)
     store ptr %v3425, ptr %v1
     %v3426 = add i64 0, 0
     %v3427 = load ptr, ptr %v1
-    %v3428 = getelementptr i8, ptr @.str_1030, i64 16
+    %v3428 = getelementptr i8, ptr @.str_1032, i64 16
     %v3429 = call ptr @orion_text_concat(ptr %v3427, ptr %v3428)
     store ptr %v3429, ptr %v1
     %v3430 = add i64 0, 0
     %v3431 = load ptr, ptr %v1
-    %v3432 = getelementptr i8, ptr @.str_1224, i64 16
+    %v3432 = getelementptr i8, ptr @.str_1226, i64 16
     %v3433 = call ptr @orion_text_concat(ptr %v3431, ptr %v3432)
     store ptr %v3433, ptr %v1
     %v3434 = add i64 0, 0
     %v3435 = load ptr, ptr %v1
-    %v3436 = getelementptr i8, ptr @.str_1225, i64 16
+    %v3436 = getelementptr i8, ptr @.str_1227, i64 16
     %v3437 = call ptr @orion_text_concat(ptr %v3435, ptr %v3436)
     store ptr %v3437, ptr %v1
     %v3438 = add i64 0, 0
     %v3439 = load ptr, ptr %v1
-    %v3440 = getelementptr i8, ptr @.str_1226, i64 16
+    %v3440 = getelementptr i8, ptr @.str_1228, i64 16
     %v3441 = call ptr @orion_text_concat(ptr %v3439, ptr %v3440)
     store ptr %v3441, ptr %v1
     %v3442 = add i64 0, 0
     %v3443 = load ptr, ptr %v1
-    %v3444 = getelementptr i8, ptr @.str_1032, i64 16
+    %v3444 = getelementptr i8, ptr @.str_1034, i64 16
     %v3445 = call ptr @orion_text_concat(ptr %v3443, ptr %v3444)
     store ptr %v3445, ptr %v1
     %v3446 = add i64 0, 0
     %v3447 = load ptr, ptr %v1
-    %v3448 = getelementptr i8, ptr @.str_1208, i64 16
+    %v3448 = getelementptr i8, ptr @.str_1210, i64 16
     %v3449 = call ptr @orion_text_concat(ptr %v3447, ptr %v3448)
     store ptr %v3449, ptr %v1
     %v3450 = add i64 0, 0
     %v3451 = load ptr, ptr %v1
-    %v3452 = getelementptr i8, ptr @.str_1032, i64 16
+    %v3452 = getelementptr i8, ptr @.str_1034, i64 16
     %v3453 = call ptr @orion_text_concat(ptr %v3451, ptr %v3452)
     store ptr %v3453, ptr %v1
     %v3454 = add i64 0, 0
     %v3455 = load ptr, ptr %v1
-    %v3456 = getelementptr i8, ptr @.str_798, i64 16
+    %v3456 = getelementptr i8, ptr @.str_800, i64 16
     %v3457 = call ptr @orion_text_concat(ptr %v3455, ptr %v3456)
     store ptr %v3457, ptr %v1
     %v3458 = add i64 0, 0
     %v3459 = load ptr, ptr %v1
-    %v3460 = getelementptr i8, ptr @.str_1227, i64 16
+    %v3460 = getelementptr i8, ptr @.str_1229, i64 16
     %v3461 = call ptr @orion_text_concat(ptr %v3459, ptr %v3460)
     store ptr %v3461, ptr %v1
     %v3462 = add i64 0, 0
     %v3463 = load ptr, ptr %v1
-    %v3464 = getelementptr i8, ptr @.str_791, i64 16
+    %v3464 = getelementptr i8, ptr @.str_793, i64 16
     %v3465 = call ptr @orion_text_concat(ptr %v3463, ptr %v3464)
     store ptr %v3465, ptr %v1
     %v3466 = add i64 0, 0
     %v3467 = load ptr, ptr %v1
-    %v3468 = getelementptr i8, ptr @.str_1011, i64 16
+    %v3468 = getelementptr i8, ptr @.str_1013, i64 16
     %v3469 = call ptr @orion_text_concat(ptr %v3467, ptr %v3468)
     store ptr %v3469, ptr %v1
     %v3470 = add i64 0, 0
     %v3471 = load ptr, ptr %v1
-    %v3472 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3472 = getelementptr i8, ptr @.str_1015, i64 16
     %v3473 = call ptr @orion_text_concat(ptr %v3471, ptr %v3472)
     store ptr %v3473, ptr %v1
     %v3474 = add i64 0, 0
     %v3475 = load ptr, ptr %v1
-    %v3476 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3476 = getelementptr i8, ptr @.str_1017, i64 16
     %v3477 = call ptr @orion_text_concat(ptr %v3475, ptr %v3476)
     store ptr %v3477, ptr %v1
     %v3478 = add i64 0, 0
     %v3479 = load ptr, ptr %v1
-    %v3480 = getelementptr i8, ptr @.str_933, i64 16
+    %v3480 = getelementptr i8, ptr @.str_935, i64 16
     %v3481 = call ptr @orion_text_concat(ptr %v3479, ptr %v3480)
     store ptr %v3481, ptr %v1
     %v3482 = add i64 0, 0
     %v3483 = load ptr, ptr %v1
-    %v3484 = getelementptr i8, ptr @.str_934, i64 16
+    %v3484 = getelementptr i8, ptr @.str_936, i64 16
     %v3485 = call ptr @orion_text_concat(ptr %v3483, ptr %v3484)
     store ptr %v3485, ptr %v1
     %v3486 = add i64 0, 0
     %v3487 = load ptr, ptr %v1
-    %v3488 = getelementptr i8, ptr @.str_1016, i64 16
+    %v3488 = getelementptr i8, ptr @.str_1018, i64 16
     %v3489 = call ptr @orion_text_concat(ptr %v3487, ptr %v3488)
     store ptr %v3489, ptr %v1
     %v3490 = add i64 0, 0
     %v3491 = load ptr, ptr %v1
-    %v3492 = getelementptr i8, ptr @.str_1017, i64 16
+    %v3492 = getelementptr i8, ptr @.str_1019, i64 16
     %v3493 = call ptr @orion_text_concat(ptr %v3491, ptr %v3492)
     store ptr %v3493, ptr %v1
     %v3494 = add i64 0, 0
     %v3495 = load ptr, ptr %v1
-    %v3496 = getelementptr i8, ptr @.str_1214, i64 16
+    %v3496 = getelementptr i8, ptr @.str_1216, i64 16
     %v3497 = call ptr @orion_text_concat(ptr %v3495, ptr %v3496)
     store ptr %v3497, ptr %v1
     %v3498 = add i64 0, 0
     %v3499 = load ptr, ptr %v1
-    %v3500 = getelementptr i8, ptr @.str_1019, i64 16
+    %v3500 = getelementptr i8, ptr @.str_1021, i64 16
     %v3501 = call ptr @orion_text_concat(ptr %v3499, ptr %v3500)
     store ptr %v3501, ptr %v1
     %v3502 = add i64 0, 0
     %v3503 = load ptr, ptr %v1
-    %v3504 = getelementptr i8, ptr @.str_1020, i64 16
+    %v3504 = getelementptr i8, ptr @.str_1022, i64 16
     %v3505 = call ptr @orion_text_concat(ptr %v3503, ptr %v3504)
     store ptr %v3505, ptr %v1
     %v3506 = add i64 0, 0
     %v3507 = load ptr, ptr %v1
-    %v3508 = getelementptr i8, ptr @.str_1021, i64 16
+    %v3508 = getelementptr i8, ptr @.str_1023, i64 16
     %v3509 = call ptr @orion_text_concat(ptr %v3507, ptr %v3508)
     store ptr %v3509, ptr %v1
     %v3510 = add i64 0, 0
     %v3511 = load ptr, ptr %v1
-    %v3512 = getelementptr i8, ptr @.str_1022, i64 16
+    %v3512 = getelementptr i8, ptr @.str_1024, i64 16
     %v3513 = call ptr @orion_text_concat(ptr %v3511, ptr %v3512)
     store ptr %v3513, ptr %v1
     %v3514 = add i64 0, 0
     %v3515 = load ptr, ptr %v1
-    %v3516 = getelementptr i8, ptr @.str_1211, i64 16
+    %v3516 = getelementptr i8, ptr @.str_1213, i64 16
     %v3517 = call ptr @orion_text_concat(ptr %v3515, ptr %v3516)
     store ptr %v3517, ptr %v1
     %v3518 = add i64 0, 0
     %v3519 = load ptr, ptr %v1
-    %v3520 = getelementptr i8, ptr @.str_1215, i64 16
+    %v3520 = getelementptr i8, ptr @.str_1217, i64 16
     %v3521 = call ptr @orion_text_concat(ptr %v3519, ptr %v3520)
     store ptr %v3521, ptr %v1
     %v3522 = add i64 0, 0
     %v3523 = load ptr, ptr %v1
-    %v3524 = getelementptr i8, ptr @.str_1027, i64 16
+    %v3524 = getelementptr i8, ptr @.str_1029, i64 16
     %v3525 = call ptr @orion_text_concat(ptr %v3523, ptr %v3524)
     store ptr %v3525, ptr %v1
     %v3526 = add i64 0, 0
     %v3527 = load ptr, ptr %v1
-    %v3528 = getelementptr i8, ptr @.str_812, i64 16
+    %v3528 = getelementptr i8, ptr @.str_814, i64 16
     %v3529 = call ptr @orion_text_concat(ptr %v3527, ptr %v3528)
     store ptr %v3529, ptr %v1
     %v3530 = add i64 0, 0
     %v3531 = load ptr, ptr %v1
-    %v3532 = getelementptr i8, ptr @.str_933, i64 16
+    %v3532 = getelementptr i8, ptr @.str_935, i64 16
     %v3533 = call ptr @orion_text_concat(ptr %v3531, ptr %v3532)
     store ptr %v3533, ptr %v1
     %v3534 = add i64 0, 0
     %v3535 = load ptr, ptr %v1
-    %v3536 = getelementptr i8, ptr @.str_1216, i64 16
+    %v3536 = getelementptr i8, ptr @.str_1218, i64 16
     %v3537 = call ptr @orion_text_concat(ptr %v3535, ptr %v3536)
     store ptr %v3537, ptr %v1
     %v3538 = add i64 0, 0
     %v3539 = load ptr, ptr %v1
-    %v3540 = getelementptr i8, ptr @.str_1217, i64 16
+    %v3540 = getelementptr i8, ptr @.str_1219, i64 16
     %v3541 = call ptr @orion_text_concat(ptr %v3539, ptr %v3540)
     store ptr %v3541, ptr %v1
     %v3542 = add i64 0, 0
     %v3543 = load ptr, ptr %v1
-    %v3544 = getelementptr i8, ptr @.str_1218, i64 16
+    %v3544 = getelementptr i8, ptr @.str_1220, i64 16
     %v3545 = call ptr @orion_text_concat(ptr %v3543, ptr %v3544)
     store ptr %v3545, ptr %v1
     %v3546 = add i64 0, 0
     %v3547 = load ptr, ptr %v1
-    %v3548 = getelementptr i8, ptr @.str_1219, i64 16
+    %v3548 = getelementptr i8, ptr @.str_1221, i64 16
     %v3549 = call ptr @orion_text_concat(ptr %v3547, ptr %v3548)
     store ptr %v3549, ptr %v1
     %v3550 = add i64 0, 0
     %v3551 = load ptr, ptr %v1
-    %v3552 = getelementptr i8, ptr @.str_1220, i64 16
+    %v3552 = getelementptr i8, ptr @.str_1222, i64 16
     %v3553 = call ptr @orion_text_concat(ptr %v3551, ptr %v3552)
     store ptr %v3553, ptr %v1
     %v3554 = add i64 0, 0
     %v3555 = load ptr, ptr %v1
-    %v3556 = getelementptr i8, ptr @.str_1221, i64 16
+    %v3556 = getelementptr i8, ptr @.str_1223, i64 16
     %v3557 = call ptr @orion_text_concat(ptr %v3555, ptr %v3556)
     store ptr %v3557, ptr %v1
     %v3558 = add i64 0, 0
     %v3559 = load ptr, ptr %v1
-    %v3560 = getelementptr i8, ptr @.str_1222, i64 16
+    %v3560 = getelementptr i8, ptr @.str_1224, i64 16
     %v3561 = call ptr @orion_text_concat(ptr %v3559, ptr %v3560)
     store ptr %v3561, ptr %v1
     %v3562 = add i64 0, 0
     %v3563 = load ptr, ptr %v1
-    %v3564 = getelementptr i8, ptr @.str_1223, i64 16
+    %v3564 = getelementptr i8, ptr @.str_1225, i64 16
     %v3565 = call ptr @orion_text_concat(ptr %v3563, ptr %v3564)
     store ptr %v3565, ptr %v1
     %v3566 = add i64 0, 0
     %v3567 = load ptr, ptr %v1
-    %v3568 = getelementptr i8, ptr @.str_1029, i64 16
+    %v3568 = getelementptr i8, ptr @.str_1031, i64 16
     %v3569 = call ptr @orion_text_concat(ptr %v3567, ptr %v3568)
     store ptr %v3569, ptr %v1
     %v3570 = add i64 0, 0
     %v3571 = load ptr, ptr %v1
-    %v3572 = getelementptr i8, ptr @.str_1030, i64 16
+    %v3572 = getelementptr i8, ptr @.str_1032, i64 16
     %v3573 = call ptr @orion_text_concat(ptr %v3571, ptr %v3572)
     store ptr %v3573, ptr %v1
     %v3574 = add i64 0, 0
     %v3575 = load ptr, ptr %v1
-    %v3576 = getelementptr i8, ptr @.str_1224, i64 16
+    %v3576 = getelementptr i8, ptr @.str_1226, i64 16
     %v3577 = call ptr @orion_text_concat(ptr %v3575, ptr %v3576)
     store ptr %v3577, ptr %v1
     %v3578 = add i64 0, 0
     %v3579 = load ptr, ptr %v1
-    %v3580 = getelementptr i8, ptr @.str_1225, i64 16
+    %v3580 = getelementptr i8, ptr @.str_1227, i64 16
     %v3581 = call ptr @orion_text_concat(ptr %v3579, ptr %v3580)
     store ptr %v3581, ptr %v1
     %v3582 = add i64 0, 0
     %v3583 = load ptr, ptr %v1
-    %v3584 = getelementptr i8, ptr @.str_1226, i64 16
+    %v3584 = getelementptr i8, ptr @.str_1228, i64 16
     %v3585 = call ptr @orion_text_concat(ptr %v3583, ptr %v3584)
     store ptr %v3585, ptr %v1
     %v3586 = add i64 0, 0
     %v3587 = load ptr, ptr %v1
-    %v3588 = getelementptr i8, ptr @.str_1032, i64 16
+    %v3588 = getelementptr i8, ptr @.str_1034, i64 16
     %v3589 = call ptr @orion_text_concat(ptr %v3587, ptr %v3588)
     store ptr %v3589, ptr %v1
     %v3590 = add i64 0, 0
     %v3591 = load ptr, ptr %v1
-    %v3592 = getelementptr i8, ptr @.str_1208, i64 16
+    %v3592 = getelementptr i8, ptr @.str_1210, i64 16
     %v3593 = call ptr @orion_text_concat(ptr %v3591, ptr %v3592)
     store ptr %v3593, ptr %v1
     %v3594 = add i64 0, 0
     %v3595 = load ptr, ptr %v1
-    %v3596 = getelementptr i8, ptr @.str_1032, i64 16
+    %v3596 = getelementptr i8, ptr @.str_1034, i64 16
     %v3597 = call ptr @orion_text_concat(ptr %v3595, ptr %v3596)
     store ptr %v3597, ptr %v1
     %v3598 = add i64 0, 0
     %v3599 = load ptr, ptr %v1
-    %v3600 = getelementptr i8, ptr @.str_798, i64 16
+    %v3600 = getelementptr i8, ptr @.str_800, i64 16
     %v3601 = call ptr @orion_text_concat(ptr %v3599, ptr %v3600)
     store ptr %v3601, ptr %v1
     %v3602 = add i64 0, 0
     %v3603 = load ptr, ptr %v1
-    %v3604 = getelementptr i8, ptr @.str_1228, i64 16
+    %v3604 = getelementptr i8, ptr @.str_1230, i64 16
     %v3605 = call ptr @orion_text_concat(ptr %v3603, ptr %v3604)
     store ptr %v3605, ptr %v1
     %v3606 = add i64 0, 0
     %v3607 = load ptr, ptr %v1
-    %v3608 = getelementptr i8, ptr @.str_791, i64 16
+    %v3608 = getelementptr i8, ptr @.str_793, i64 16
     %v3609 = call ptr @orion_text_concat(ptr %v3607, ptr %v3608)
     store ptr %v3609, ptr %v1
     %v3610 = add i64 0, 0
     %v3611 = load ptr, ptr %v1
-    %v3612 = getelementptr i8, ptr @.str_1011, i64 16
+    %v3612 = getelementptr i8, ptr @.str_1013, i64 16
     %v3613 = call ptr @orion_text_concat(ptr %v3611, ptr %v3612)
     store ptr %v3613, ptr %v1
     %v3614 = add i64 0, 0
     %v3615 = load ptr, ptr %v1
-    %v3616 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3616 = getelementptr i8, ptr @.str_1015, i64 16
     %v3617 = call ptr @orion_text_concat(ptr %v3615, ptr %v3616)
     store ptr %v3617, ptr %v1
     %v3618 = add i64 0, 0
     %v3619 = load ptr, ptr %v1
-    %v3620 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3620 = getelementptr i8, ptr @.str_1017, i64 16
     %v3621 = call ptr @orion_text_concat(ptr %v3619, ptr %v3620)
     store ptr %v3621, ptr %v1
     %v3622 = add i64 0, 0
     %v3623 = load ptr, ptr %v1
-    %v3624 = getelementptr i8, ptr @.str_933, i64 16
+    %v3624 = getelementptr i8, ptr @.str_935, i64 16
     %v3625 = call ptr @orion_text_concat(ptr %v3623, ptr %v3624)
     store ptr %v3625, ptr %v1
     %v3626 = add i64 0, 0
     %v3627 = load ptr, ptr %v1
-    %v3628 = getelementptr i8, ptr @.str_934, i64 16
+    %v3628 = getelementptr i8, ptr @.str_936, i64 16
     %v3629 = call ptr @orion_text_concat(ptr %v3627, ptr %v3628)
     store ptr %v3629, ptr %v1
     %v3630 = add i64 0, 0
     %v3631 = load ptr, ptr %v1
-    %v3632 = getelementptr i8, ptr @.str_1016, i64 16
+    %v3632 = getelementptr i8, ptr @.str_1018, i64 16
     %v3633 = call ptr @orion_text_concat(ptr %v3631, ptr %v3632)
     store ptr %v3633, ptr %v1
     %v3634 = add i64 0, 0
     %v3635 = load ptr, ptr %v1
-    %v3636 = getelementptr i8, ptr @.str_1017, i64 16
+    %v3636 = getelementptr i8, ptr @.str_1019, i64 16
     %v3637 = call ptr @orion_text_concat(ptr %v3635, ptr %v3636)
     store ptr %v3637, ptr %v1
     %v3638 = add i64 0, 0
     %v3639 = load ptr, ptr %v1
-    %v3640 = getelementptr i8, ptr @.str_1201, i64 16
+    %v3640 = getelementptr i8, ptr @.str_1203, i64 16
     %v3641 = call ptr @orion_text_concat(ptr %v3639, ptr %v3640)
     store ptr %v3641, ptr %v1
     %v3642 = add i64 0, 0
     %v3643 = load ptr, ptr %v1
-    %v3644 = getelementptr i8, ptr @.str_1148, i64 16
+    %v3644 = getelementptr i8, ptr @.str_1150, i64 16
     %v3645 = call ptr @orion_text_concat(ptr %v3643, ptr %v3644)
     store ptr %v3645, ptr %v1
     %v3646 = add i64 0, 0
     %v3647 = load ptr, ptr %v1
-    %v3648 = getelementptr i8, ptr @.str_1202, i64 16
+    %v3648 = getelementptr i8, ptr @.str_1204, i64 16
     %v3649 = call ptr @orion_text_concat(ptr %v3647, ptr %v3648)
     store ptr %v3649, ptr %v1
     %v3650 = add i64 0, 0
     %v3651 = load ptr, ptr %v1
-    %v3652 = getelementptr i8, ptr @.str_1203, i64 16
+    %v3652 = getelementptr i8, ptr @.str_1205, i64 16
     %v3653 = call ptr @orion_text_concat(ptr %v3651, ptr %v3652)
     store ptr %v3653, ptr %v1
     %v3654 = add i64 0, 0
     %v3655 = load ptr, ptr %v1
-    %v3656 = getelementptr i8, ptr @.str_1204, i64 16
+    %v3656 = getelementptr i8, ptr @.str_1206, i64 16
     %v3657 = call ptr @orion_text_concat(ptr %v3655, ptr %v3656)
     store ptr %v3657, ptr %v1
     %v3658 = add i64 0, 0
     %v3659 = load ptr, ptr %v1
-    %v3660 = getelementptr i8, ptr @.str_1022, i64 16
+    %v3660 = getelementptr i8, ptr @.str_1024, i64 16
     %v3661 = call ptr @orion_text_concat(ptr %v3659, ptr %v3660)
     store ptr %v3661, ptr %v1
     %v3662 = add i64 0, 0
     %v3663 = load ptr, ptr %v1
-    %v3664 = getelementptr i8, ptr @.str_1211, i64 16
+    %v3664 = getelementptr i8, ptr @.str_1213, i64 16
     %v3665 = call ptr @orion_text_concat(ptr %v3663, ptr %v3664)
     store ptr %v3665, ptr %v1
     %v3666 = add i64 0, 0
     %v3667 = load ptr, ptr %v1
-    %v3668 = getelementptr i8, ptr @.str_1205, i64 16
+    %v3668 = getelementptr i8, ptr @.str_1207, i64 16
     %v3669 = call ptr @orion_text_concat(ptr %v3667, ptr %v3668)
     store ptr %v3669, ptr %v1
     %v3670 = add i64 0, 0
     %v3671 = load ptr, ptr %v1
-    %v3672 = getelementptr i8, ptr @.str_1206, i64 16
+    %v3672 = getelementptr i8, ptr @.str_1208, i64 16
     %v3673 = call ptr @orion_text_concat(ptr %v3671, ptr %v3672)
     store ptr %v3673, ptr %v1
     %v3674 = add i64 0, 0
     %v3675 = load ptr, ptr %v1
-    %v3676 = getelementptr i8, ptr @.str_1030, i64 16
+    %v3676 = getelementptr i8, ptr @.str_1032, i64 16
     %v3677 = call ptr @orion_text_concat(ptr %v3675, ptr %v3676)
     store ptr %v3677, ptr %v1
     %v3678 = add i64 0, 0
     %v3679 = load ptr, ptr %v1
-    %v3680 = getelementptr i8, ptr @.str_1207, i64 16
+    %v3680 = getelementptr i8, ptr @.str_1209, i64 16
     %v3681 = call ptr @orion_text_concat(ptr %v3679, ptr %v3680)
     store ptr %v3681, ptr %v1
     %v3682 = add i64 0, 0
     %v3683 = load ptr, ptr %v1
-    %v3684 = getelementptr i8, ptr @.str_1087, i64 16
+    %v3684 = getelementptr i8, ptr @.str_1089, i64 16
     %v3685 = call ptr @orion_text_concat(ptr %v3683, ptr %v3684)
     store ptr %v3685, ptr %v1
     %v3686 = add i64 0, 0
     %v3687 = load ptr, ptr %v1
-    %v3688 = getelementptr i8, ptr @.str_1027, i64 16
+    %v3688 = getelementptr i8, ptr @.str_1029, i64 16
     %v3689 = call ptr @orion_text_concat(ptr %v3687, ptr %v3688)
     store ptr %v3689, ptr %v1
     %v3690 = add i64 0, 0
     %v3691 = load ptr, ptr %v1
-    %v3692 = getelementptr i8, ptr @.str_812, i64 16
+    %v3692 = getelementptr i8, ptr @.str_814, i64 16
     %v3693 = call ptr @orion_text_concat(ptr %v3691, ptr %v3692)
     store ptr %v3693, ptr %v1
     %v3694 = add i64 0, 0
     %v3695 = load ptr, ptr %v1
-    %v3696 = getelementptr i8, ptr @.str_933, i64 16
+    %v3696 = getelementptr i8, ptr @.str_935, i64 16
     %v3697 = call ptr @orion_text_concat(ptr %v3695, ptr %v3696)
     store ptr %v3697, ptr %v1
     %v3698 = add i64 0, 0
     %v3699 = load ptr, ptr %v1
-    %v3700 = getelementptr i8, ptr @.str_1208, i64 16
+    %v3700 = getelementptr i8, ptr @.str_1210, i64 16
     %v3701 = call ptr @orion_text_concat(ptr %v3699, ptr %v3700)
     store ptr %v3701, ptr %v1
     %v3702 = add i64 0, 0
     %v3703 = load ptr, ptr %v1
-    %v3704 = getelementptr i8, ptr @.str_883, i64 16
+    %v3704 = getelementptr i8, ptr @.str_885, i64 16
     %v3705 = call ptr @orion_text_concat(ptr %v3703, ptr %v3704)
     store ptr %v3705, ptr %v1
     %v3706 = add i64 0, 0
     %v3707 = load ptr, ptr %v1
-    %v3708 = getelementptr i8, ptr @.str_798, i64 16
+    %v3708 = getelementptr i8, ptr @.str_800, i64 16
     %v3709 = call ptr @orion_text_concat(ptr %v3707, ptr %v3708)
     store ptr %v3709, ptr %v1
     %v3710 = add i64 0, 0
     %v3711 = load ptr, ptr %v1
-    %v3712 = getelementptr i8, ptr @.str_1229, i64 16
+    %v3712 = getelementptr i8, ptr @.str_1231, i64 16
     %v3713 = call ptr @orion_text_concat(ptr %v3711, ptr %v3712)
     store ptr %v3713, ptr %v1
     %v3714 = add i64 0, 0
     %v3715 = load ptr, ptr %v1
-    %v3716 = getelementptr i8, ptr @.str_791, i64 16
+    %v3716 = getelementptr i8, ptr @.str_793, i64 16
     %v3717 = call ptr @orion_text_concat(ptr %v3715, ptr %v3716)
     store ptr %v3717, ptr %v1
     %v3718 = add i64 0, 0
     %v3719 = load ptr, ptr %v1
-    %v3720 = getelementptr i8, ptr @.str_1011, i64 16
+    %v3720 = getelementptr i8, ptr @.str_1013, i64 16
     %v3721 = call ptr @orion_text_concat(ptr %v3719, ptr %v3720)
     store ptr %v3721, ptr %v1
     %v3722 = add i64 0, 0
     %v3723 = load ptr, ptr %v1
-    %v3724 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3724 = getelementptr i8, ptr @.str_1015, i64 16
     %v3725 = call ptr @orion_text_concat(ptr %v3723, ptr %v3724)
     store ptr %v3725, ptr %v1
     %v3726 = add i64 0, 0
     %v3727 = load ptr, ptr %v1
-    %v3728 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3728 = getelementptr i8, ptr @.str_1017, i64 16
     %v3729 = call ptr @orion_text_concat(ptr %v3727, ptr %v3728)
     store ptr %v3729, ptr %v1
     %v3730 = add i64 0, 0
     %v3731 = load ptr, ptr %v1
-    %v3732 = getelementptr i8, ptr @.str_933, i64 16
+    %v3732 = getelementptr i8, ptr @.str_935, i64 16
     %v3733 = call ptr @orion_text_concat(ptr %v3731, ptr %v3732)
     store ptr %v3733, ptr %v1
     %v3734 = add i64 0, 0
     %v3735 = load ptr, ptr %v1
-    %v3736 = getelementptr i8, ptr @.str_934, i64 16
+    %v3736 = getelementptr i8, ptr @.str_936, i64 16
     %v3737 = call ptr @orion_text_concat(ptr %v3735, ptr %v3736)
     store ptr %v3737, ptr %v1
     %v3738 = add i64 0, 0
     %v3739 = load ptr, ptr %v1
-    %v3740 = getelementptr i8, ptr @.str_1016, i64 16
+    %v3740 = getelementptr i8, ptr @.str_1018, i64 16
     %v3741 = call ptr @orion_text_concat(ptr %v3739, ptr %v3740)
     store ptr %v3741, ptr %v1
     %v3742 = add i64 0, 0
     %v3743 = load ptr, ptr %v1
-    %v3744 = getelementptr i8, ptr @.str_1017, i64 16
+    %v3744 = getelementptr i8, ptr @.str_1019, i64 16
     %v3745 = call ptr @orion_text_concat(ptr %v3743, ptr %v3744)
     store ptr %v3745, ptr %v1
     %v3746 = add i64 0, 0
     %v3747 = load ptr, ptr %v1
-    %v3748 = getelementptr i8, ptr @.str_1201, i64 16
+    %v3748 = getelementptr i8, ptr @.str_1203, i64 16
     %v3749 = call ptr @orion_text_concat(ptr %v3747, ptr %v3748)
     store ptr %v3749, ptr %v1
     %v3750 = add i64 0, 0
     %v3751 = load ptr, ptr %v1
-    %v3752 = getelementptr i8, ptr @.str_1148, i64 16
+    %v3752 = getelementptr i8, ptr @.str_1150, i64 16
     %v3753 = call ptr @orion_text_concat(ptr %v3751, ptr %v3752)
     store ptr %v3753, ptr %v1
     %v3754 = add i64 0, 0
     %v3755 = load ptr, ptr %v1
-    %v3756 = getelementptr i8, ptr @.str_1202, i64 16
+    %v3756 = getelementptr i8, ptr @.str_1204, i64 16
     %v3757 = call ptr @orion_text_concat(ptr %v3755, ptr %v3756)
     store ptr %v3757, ptr %v1
     %v3758 = add i64 0, 0
     %v3759 = load ptr, ptr %v1
-    %v3760 = getelementptr i8, ptr @.str_1204, i64 16
+    %v3760 = getelementptr i8, ptr @.str_1206, i64 16
     %v3761 = call ptr @orion_text_concat(ptr %v3759, ptr %v3760)
     store ptr %v3761, ptr %v1
     %v3762 = add i64 0, 0
     %v3763 = load ptr, ptr %v1
-    %v3764 = getelementptr i8, ptr @.str_1022, i64 16
+    %v3764 = getelementptr i8, ptr @.str_1024, i64 16
     %v3765 = call ptr @orion_text_concat(ptr %v3763, ptr %v3764)
     store ptr %v3765, ptr %v1
     %v3766 = add i64 0, 0
     %v3767 = load ptr, ptr %v1
-    %v3768 = getelementptr i8, ptr @.str_1211, i64 16
+    %v3768 = getelementptr i8, ptr @.str_1213, i64 16
     %v3769 = call ptr @orion_text_concat(ptr %v3767, ptr %v3768)
     store ptr %v3769, ptr %v1
     %v3770 = add i64 0, 0
     %v3771 = load ptr, ptr %v1
-    %v3772 = getelementptr i8, ptr @.str_1205, i64 16
+    %v3772 = getelementptr i8, ptr @.str_1207, i64 16
     %v3773 = call ptr @orion_text_concat(ptr %v3771, ptr %v3772)
     store ptr %v3773, ptr %v1
     %v3774 = add i64 0, 0
     %v3775 = load ptr, ptr %v1
-    %v3776 = getelementptr i8, ptr @.str_1206, i64 16
+    %v3776 = getelementptr i8, ptr @.str_1208, i64 16
     %v3777 = call ptr @orion_text_concat(ptr %v3775, ptr %v3776)
     store ptr %v3777, ptr %v1
     %v3778 = add i64 0, 0
     %v3779 = load ptr, ptr %v1
-    %v3780 = getelementptr i8, ptr @.str_881, i64 16
+    %v3780 = getelementptr i8, ptr @.str_883, i64 16
     %v3781 = call ptr @orion_text_concat(ptr %v3779, ptr %v3780)
     store ptr %v3781, ptr %v1
     %v3782 = add i64 0, 0
     %v3783 = load ptr, ptr %v1
-    %v3784 = getelementptr i8, ptr @.str_1027, i64 16
+    %v3784 = getelementptr i8, ptr @.str_1029, i64 16
     %v3785 = call ptr @orion_text_concat(ptr %v3783, ptr %v3784)
     store ptr %v3785, ptr %v1
     %v3786 = add i64 0, 0
     %v3787 = load ptr, ptr %v1
-    %v3788 = getelementptr i8, ptr @.str_812, i64 16
+    %v3788 = getelementptr i8, ptr @.str_814, i64 16
     %v3789 = call ptr @orion_text_concat(ptr %v3787, ptr %v3788)
     store ptr %v3789, ptr %v1
     %v3790 = add i64 0, 0
     %v3791 = load ptr, ptr %v1
-    %v3792 = getelementptr i8, ptr @.str_933, i64 16
+    %v3792 = getelementptr i8, ptr @.str_935, i64 16
     %v3793 = call ptr @orion_text_concat(ptr %v3791, ptr %v3792)
     store ptr %v3793, ptr %v1
     %v3794 = add i64 0, 0
     %v3795 = load ptr, ptr %v1
-    %v3796 = getelementptr i8, ptr @.str_1208, i64 16
+    %v3796 = getelementptr i8, ptr @.str_1210, i64 16
     %v3797 = call ptr @orion_text_concat(ptr %v3795, ptr %v3796)
     store ptr %v3797, ptr %v1
     %v3798 = add i64 0, 0
     %v3799 = load ptr, ptr %v1
-    %v3800 = getelementptr i8, ptr @.str_883, i64 16
+    %v3800 = getelementptr i8, ptr @.str_885, i64 16
     %v3801 = call ptr @orion_text_concat(ptr %v3799, ptr %v3800)
     store ptr %v3801, ptr %v1
     %v3802 = add i64 0, 0
     %v3803 = load ptr, ptr %v1
-    %v3804 = getelementptr i8, ptr @.str_798, i64 16
+    %v3804 = getelementptr i8, ptr @.str_800, i64 16
     %v3805 = call ptr @orion_text_concat(ptr %v3803, ptr %v3804)
     store ptr %v3805, ptr %v1
     %v3806 = add i64 0, 0
     %v3807 = load ptr, ptr %v1
-    %v3808 = getelementptr i8, ptr @.str_1230, i64 16
+    %v3808 = getelementptr i8, ptr @.str_1232, i64 16
     %v3809 = call ptr @orion_text_concat(ptr %v3807, ptr %v3808)
     store ptr %v3809, ptr %v1
     %v3810 = add i64 0, 0
     %v3811 = load ptr, ptr %v1
-    %v3812 = getelementptr i8, ptr @.str_791, i64 16
+    %v3812 = getelementptr i8, ptr @.str_793, i64 16
     %v3813 = call ptr @orion_text_concat(ptr %v3811, ptr %v3812)
     store ptr %v3813, ptr %v1
     %v3814 = add i64 0, 0
     %v3815 = load ptr, ptr %v1
-    %v3816 = getelementptr i8, ptr @.str_1231, i64 16
+    %v3816 = getelementptr i8, ptr @.str_1233, i64 16
     %v3817 = call ptr @orion_text_concat(ptr %v3815, ptr %v3816)
     store ptr %v3817, ptr %v1
     %v3818 = add i64 0, 0
     %v3819 = load ptr, ptr %v1
-    %v3820 = getelementptr i8, ptr @.str_1068, i64 16
+    %v3820 = getelementptr i8, ptr @.str_1070, i64 16
     %v3821 = call ptr @orion_text_concat(ptr %v3819, ptr %v3820)
     store ptr %v3821, ptr %v1
     %v3822 = add i64 0, 0
     %v3823 = load ptr, ptr %v1
-    %v3824 = getelementptr i8, ptr @.str_1232, i64 16
+    %v3824 = getelementptr i8, ptr @.str_1234, i64 16
     %v3825 = call ptr @orion_text_concat(ptr %v3823, ptr %v3824)
     store ptr %v3825, ptr %v1
     %v3826 = add i64 0, 0
     %v3827 = load ptr, ptr %v1
-    %v3828 = getelementptr i8, ptr @.str_1233, i64 16
+    %v3828 = getelementptr i8, ptr @.str_1235, i64 16
     %v3829 = call ptr @orion_text_concat(ptr %v3827, ptr %v3828)
     store ptr %v3829, ptr %v1
     %v3830 = add i64 0, 0
     %v3831 = load ptr, ptr %v1
-    %v3832 = getelementptr i8, ptr @.str_1234, i64 16
+    %v3832 = getelementptr i8, ptr @.str_1236, i64 16
     %v3833 = call ptr @orion_text_concat(ptr %v3831, ptr %v3832)
     store ptr %v3833, ptr %v1
     %v3834 = add i64 0, 0
     %v3835 = load ptr, ptr %v1
-    %v3836 = getelementptr i8, ptr @.str_1071, i64 16
+    %v3836 = getelementptr i8, ptr @.str_1073, i64 16
     %v3837 = call ptr @orion_text_concat(ptr %v3835, ptr %v3836)
     store ptr %v3837, ptr %v1
     %v3838 = add i64 0, 0
     %v3839 = load ptr, ptr %v1
-    %v3840 = getelementptr i8, ptr @.str_1235, i64 16
+    %v3840 = getelementptr i8, ptr @.str_1237, i64 16
     %v3841 = call ptr @orion_text_concat(ptr %v3839, ptr %v3840)
     store ptr %v3841, ptr %v1
     %v3842 = add i64 0, 0
     %v3843 = load ptr, ptr %v1
-    %v3844 = getelementptr i8, ptr @.str_1087, i64 16
+    %v3844 = getelementptr i8, ptr @.str_1089, i64 16
     %v3845 = call ptr @orion_text_concat(ptr %v3843, ptr %v3844)
     store ptr %v3845, ptr %v1
     %v3846 = add i64 0, 0
     %v3847 = load ptr, ptr %v1
-    %v3848 = getelementptr i8, ptr @.str_798, i64 16
+    %v3848 = getelementptr i8, ptr @.str_800, i64 16
     %v3849 = call ptr @orion_text_concat(ptr %v3847, ptr %v3848)
     store ptr %v3849, ptr %v1
     %v3850 = add i64 0, 0
     %v3851 = load ptr, ptr %v1
-    %v3852 = getelementptr i8, ptr @.str_1236, i64 16
+    %v3852 = getelementptr i8, ptr @.str_1238, i64 16
     %v3853 = call ptr @orion_text_concat(ptr %v3851, ptr %v3852)
     store ptr %v3853, ptr %v1
     %v3854 = add i64 0, 0
     %v3855 = load ptr, ptr %v1
-    %v3856 = getelementptr i8, ptr @.str_791, i64 16
+    %v3856 = getelementptr i8, ptr @.str_793, i64 16
     %v3857 = call ptr @orion_text_concat(ptr %v3855, ptr %v3856)
     store ptr %v3857, ptr %v1
     %v3858 = add i64 0, 0
     %v3859 = load ptr, ptr %v1
-    %v3860 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3860 = getelementptr i8, ptr @.str_1015, i64 16
     %v3861 = call ptr @orion_text_concat(ptr %v3859, ptr %v3860)
     store ptr %v3861, ptr %v1
     %v3862 = add i64 0, 0
     %v3863 = load ptr, ptr %v1
-    %v3864 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3864 = getelementptr i8, ptr @.str_1017, i64 16
     %v3865 = call ptr @orion_text_concat(ptr %v3863, ptr %v3864)
     store ptr %v3865, ptr %v1
     %v3866 = add i64 0, 0
     %v3867 = load ptr, ptr %v1
-    %v3868 = getelementptr i8, ptr @.str_1128, i64 16
+    %v3868 = getelementptr i8, ptr @.str_1130, i64 16
     %v3869 = call ptr @orion_text_concat(ptr %v3867, ptr %v3868)
     store ptr %v3869, ptr %v1
     %v3870 = add i64 0, 0
     %v3871 = load ptr, ptr %v1
-    %v3872 = getelementptr i8, ptr @.str_798, i64 16
+    %v3872 = getelementptr i8, ptr @.str_800, i64 16
     %v3873 = call ptr @orion_text_concat(ptr %v3871, ptr %v3872)
     store ptr %v3873, ptr %v1
     %v3874 = add i64 0, 0
     %v3875 = load ptr, ptr %v1
-    %v3876 = getelementptr i8, ptr @.str_1237, i64 16
+    %v3876 = getelementptr i8, ptr @.str_1239, i64 16
     %v3877 = call ptr @orion_text_concat(ptr %v3875, ptr %v3876)
     store ptr %v3877, ptr %v1
     %v3878 = add i64 0, 0
     %v3879 = load ptr, ptr %v1
-    %v3880 = getelementptr i8, ptr @.str_791, i64 16
+    %v3880 = getelementptr i8, ptr @.str_793, i64 16
     %v3881 = call ptr @orion_text_concat(ptr %v3879, ptr %v3880)
     store ptr %v3881, ptr %v1
     %v3882 = add i64 0, 0
     %v3883 = load ptr, ptr %v1
-    %v3884 = getelementptr i8, ptr @.str_1011, i64 16
+    %v3884 = getelementptr i8, ptr @.str_1013, i64 16
     %v3885 = call ptr @orion_text_concat(ptr %v3883, ptr %v3884)
     store ptr %v3885, ptr %v1
     %v3886 = add i64 0, 0
     %v3887 = load ptr, ptr %v1
-    %v3888 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3888 = getelementptr i8, ptr @.str_1015, i64 16
     %v3889 = call ptr @orion_text_concat(ptr %v3887, ptr %v3888)
     store ptr %v3889, ptr %v1
     %v3890 = add i64 0, 0
     %v3891 = load ptr, ptr %v1
-    %v3892 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3892 = getelementptr i8, ptr @.str_1017, i64 16
     %v3893 = call ptr @orion_text_concat(ptr %v3891, ptr %v3892)
     store ptr %v3893, ptr %v1
     %v3894 = add i64 0, 0
     %v3895 = load ptr, ptr %v1
-    %v3896 = getelementptr i8, ptr @.str_1238, i64 16
+    %v3896 = getelementptr i8, ptr @.str_1240, i64 16
     %v3897 = call ptr @orion_text_concat(ptr %v3895, ptr %v3896)
     store ptr %v3897, ptr %v1
     %v3898 = add i64 0, 0
     %v3899 = load ptr, ptr %v1
-    %v3900 = getelementptr i8, ptr @.str_933, i64 16
+    %v3900 = getelementptr i8, ptr @.str_935, i64 16
     %v3901 = call ptr @orion_text_concat(ptr %v3899, ptr %v3900)
     store ptr %v3901, ptr %v1
     %v3902 = add i64 0, 0
     %v3903 = load ptr, ptr %v1
-    %v3904 = getelementptr i8, ptr @.str_934, i64 16
+    %v3904 = getelementptr i8, ptr @.str_936, i64 16
     %v3905 = call ptr @orion_text_concat(ptr %v3903, ptr %v3904)
     store ptr %v3905, ptr %v1
     %v3906 = add i64 0, 0
     %v3907 = load ptr, ptr %v1
-    %v3908 = getelementptr i8, ptr @.str_935, i64 16
+    %v3908 = getelementptr i8, ptr @.str_937, i64 16
     %v3909 = call ptr @orion_text_concat(ptr %v3907, ptr %v3908)
     store ptr %v3909, ptr %v1
     %v3910 = add i64 0, 0
     %v3911 = load ptr, ptr %v1
-    %v3912 = getelementptr i8, ptr @.str_1017, i64 16
+    %v3912 = getelementptr i8, ptr @.str_1019, i64 16
     %v3913 = call ptr @orion_text_concat(ptr %v3911, ptr %v3912)
     store ptr %v3913, ptr %v1
     %v3914 = add i64 0, 0
     %v3915 = load ptr, ptr %v1
-    %v3916 = getelementptr i8, ptr @.str_937, i64 16
+    %v3916 = getelementptr i8, ptr @.str_939, i64 16
     %v3917 = call ptr @orion_text_concat(ptr %v3915, ptr %v3916)
     store ptr %v3917, ptr %v1
     %v3918 = add i64 0, 0
     %v3919 = load ptr, ptr %v1
-    %v3920 = getelementptr i8, ptr @.str_938, i64 16
+    %v3920 = getelementptr i8, ptr @.str_940, i64 16
     %v3921 = call ptr @orion_text_concat(ptr %v3919, ptr %v3920)
     store ptr %v3921, ptr %v1
     %v3922 = add i64 0, 0
     %v3923 = load ptr, ptr %v1
-    %v3924 = getelementptr i8, ptr @.str_1202, i64 16
+    %v3924 = getelementptr i8, ptr @.str_1204, i64 16
     %v3925 = call ptr @orion_text_concat(ptr %v3923, ptr %v3924)
     store ptr %v3925, ptr %v1
     %v3926 = add i64 0, 0
     %v3927 = load ptr, ptr %v1
-    %v3928 = getelementptr i8, ptr @.str_1204, i64 16
+    %v3928 = getelementptr i8, ptr @.str_1206, i64 16
     %v3929 = call ptr @orion_text_concat(ptr %v3927, ptr %v3928)
     store ptr %v3929, ptr %v1
     %v3930 = add i64 0, 0
     %v3931 = load ptr, ptr %v1
-    %v3932 = getelementptr i8, ptr @.str_1022, i64 16
+    %v3932 = getelementptr i8, ptr @.str_1024, i64 16
     %v3933 = call ptr @orion_text_concat(ptr %v3931, ptr %v3932)
     store ptr %v3933, ptr %v1
     %v3934 = add i64 0, 0
     %v3935 = load ptr, ptr %v1
-    %v3936 = getelementptr i8, ptr @.str_1239, i64 16
+    %v3936 = getelementptr i8, ptr @.str_1241, i64 16
     %v3937 = call ptr @orion_text_concat(ptr %v3935, ptr %v3936)
     store ptr %v3937, ptr %v1
     %v3938 = add i64 0, 0
     %v3939 = load ptr, ptr %v1
-    %v3940 = getelementptr i8, ptr @.str_812, i64 16
+    %v3940 = getelementptr i8, ptr @.str_814, i64 16
     %v3941 = call ptr @orion_text_concat(ptr %v3939, ptr %v3940)
     store ptr %v3941, ptr %v1
     %v3942 = add i64 0, 0
     %v3943 = load ptr, ptr %v1
-    %v3944 = getelementptr i8, ptr @.str_933, i64 16
+    %v3944 = getelementptr i8, ptr @.str_935, i64 16
     %v3945 = call ptr @orion_text_concat(ptr %v3943, ptr %v3944)
     store ptr %v3945, ptr %v1
     %v3946 = add i64 0, 0
     %v3947 = load ptr, ptr %v1
-    %v3948 = getelementptr i8, ptr @.str_943, i64 16
+    %v3948 = getelementptr i8, ptr @.str_945, i64 16
     %v3949 = call ptr @orion_text_concat(ptr %v3947, ptr %v3948)
     store ptr %v3949, ptr %v1
     %v3950 = add i64 0, 0
     %v3951 = load ptr, ptr %v1
-    %v3952 = getelementptr i8, ptr @.str_1000, i64 16
+    %v3952 = getelementptr i8, ptr @.str_1002, i64 16
     %v3953 = call ptr @orion_text_concat(ptr %v3951, ptr %v3952)
     store ptr %v3953, ptr %v1
     %v3954 = add i64 0, 0
     %v3955 = load ptr, ptr %v1
-    %v3956 = getelementptr i8, ptr @.str_798, i64 16
+    %v3956 = getelementptr i8, ptr @.str_800, i64 16
     %v3957 = call ptr @orion_text_concat(ptr %v3955, ptr %v3956)
     store ptr %v3957, ptr %v1
     %v3958 = add i64 0, 0
     %v3959 = load ptr, ptr %v1
-    %v3960 = getelementptr i8, ptr @.str_1240, i64 16
+    %v3960 = getelementptr i8, ptr @.str_1242, i64 16
     %v3961 = call ptr @orion_text_concat(ptr %v3959, ptr %v3960)
     store ptr %v3961, ptr %v1
     %v3962 = add i64 0, 0
     %v3963 = load ptr, ptr %v1
-    %v3964 = getelementptr i8, ptr @.str_791, i64 16
+    %v3964 = getelementptr i8, ptr @.str_793, i64 16
     %v3965 = call ptr @orion_text_concat(ptr %v3963, ptr %v3964)
     store ptr %v3965, ptr %v1
     %v3966 = add i64 0, 0
     %v3967 = load ptr, ptr %v1
-    %v3968 = getelementptr i8, ptr @.str_1011, i64 16
+    %v3968 = getelementptr i8, ptr @.str_1013, i64 16
     %v3969 = call ptr @orion_text_concat(ptr %v3967, ptr %v3968)
     store ptr %v3969, ptr %v1
     %v3970 = add i64 0, 0
     %v3971 = load ptr, ptr %v1
-    %v3972 = getelementptr i8, ptr @.str_1013, i64 16
+    %v3972 = getelementptr i8, ptr @.str_1015, i64 16
     %v3973 = call ptr @orion_text_concat(ptr %v3971, ptr %v3972)
     store ptr %v3973, ptr %v1
     %v3974 = add i64 0, 0
     %v3975 = load ptr, ptr %v1
-    %v3976 = getelementptr i8, ptr @.str_1015, i64 16
+    %v3976 = getelementptr i8, ptr @.str_1017, i64 16
     %v3977 = call ptr @orion_text_concat(ptr %v3975, ptr %v3976)
     store ptr %v3977, ptr %v1
     %v3978 = add i64 0, 0
     %v3979 = load ptr, ptr %v1
-    %v3980 = getelementptr i8, ptr @.str_1238, i64 16
+    %v3980 = getelementptr i8, ptr @.str_1240, i64 16
     %v3981 = call ptr @orion_text_concat(ptr %v3979, ptr %v3980)
     store ptr %v3981, ptr %v1
     %v3982 = add i64 0, 0
     %v3983 = load ptr, ptr %v1
-    %v3984 = getelementptr i8, ptr @.str_933, i64 16
+    %v3984 = getelementptr i8, ptr @.str_935, i64 16
     %v3985 = call ptr @orion_text_concat(ptr %v3983, ptr %v3984)
     store ptr %v3985, ptr %v1
     %v3986 = add i64 0, 0
     %v3987 = load ptr, ptr %v1
-    %v3988 = getelementptr i8, ptr @.str_934, i64 16
+    %v3988 = getelementptr i8, ptr @.str_936, i64 16
     %v3989 = call ptr @orion_text_concat(ptr %v3987, ptr %v3988)
     store ptr %v3989, ptr %v1
     %v3990 = add i64 0, 0
     %v3991 = load ptr, ptr %v1
-    %v3992 = getelementptr i8, ptr @.str_935, i64 16
+    %v3992 = getelementptr i8, ptr @.str_937, i64 16
     %v3993 = call ptr @orion_text_concat(ptr %v3991, ptr %v3992)
     store ptr %v3993, ptr %v1
     %v3994 = add i64 0, 0
     %v3995 = load ptr, ptr %v1
-    %v3996 = getelementptr i8, ptr @.str_1017, i64 16
+    %v3996 = getelementptr i8, ptr @.str_1019, i64 16
     %v3997 = call ptr @orion_text_concat(ptr %v3995, ptr %v3996)
     store ptr %v3997, ptr %v1
     %v3998 = add i64 0, 0
     %v3999 = load ptr, ptr %v1
-    %v4000 = getelementptr i8, ptr @.str_937, i64 16
+    %v4000 = getelementptr i8, ptr @.str_939, i64 16
     %v4001 = call ptr @orion_text_concat(ptr %v3999, ptr %v4000)
     store ptr %v4001, ptr %v1
     %v4002 = add i64 0, 0
     %v4003 = load ptr, ptr %v1
-    %v4004 = getelementptr i8, ptr @.str_938, i64 16
+    %v4004 = getelementptr i8, ptr @.str_940, i64 16
     %v4005 = call ptr @orion_text_concat(ptr %v4003, ptr %v4004)
     store ptr %v4005, ptr %v1
     %v4006 = add i64 0, 0
     %v4007 = load ptr, ptr %v1
-    %v4008 = getelementptr i8, ptr @.str_1202, i64 16
+    %v4008 = getelementptr i8, ptr @.str_1204, i64 16
     %v4009 = call ptr @orion_text_concat(ptr %v4007, ptr %v4008)
     store ptr %v4009, ptr %v1
     %v4010 = add i64 0, 0
     %v4011 = load ptr, ptr %v1
-    %v4012 = getelementptr i8, ptr @.str_1203, i64 16
+    %v4012 = getelementptr i8, ptr @.str_1205, i64 16
     %v4013 = call ptr @orion_text_concat(ptr %v4011, ptr %v4012)
     store ptr %v4013, ptr %v1
     %v4014 = add i64 0, 0
     %v4015 = load ptr, ptr %v1
-    %v4016 = getelementptr i8, ptr @.str_1030, i64 16
+    %v4016 = getelementptr i8, ptr @.str_1032, i64 16
     %v4017 = call ptr @orion_text_concat(ptr %v4015, ptr %v4016)
     store ptr %v4017, ptr %v1
     %v4018 = add i64 0, 0
     %v4019 = load ptr, ptr %v1
-    %v4020 = getelementptr i8, ptr @.str_1241, i64 16
+    %v4020 = getelementptr i8, ptr @.str_1243, i64 16
     %v4021 = call ptr @orion_text_concat(ptr %v4019, ptr %v4020)
     store ptr %v4021, ptr %v1
     %v4022 = add i64 0, 0
     %v4023 = load ptr, ptr %v1
-    %v4024 = getelementptr i8, ptr @.str_1242, i64 16
+    %v4024 = getelementptr i8, ptr @.str_1244, i64 16
     %v4025 = call ptr @orion_text_concat(ptr %v4023, ptr %v4024)
     store ptr %v4025, ptr %v1
     %v4026 = add i64 0, 0
     %v4027 = load ptr, ptr %v1
-    %v4028 = getelementptr i8, ptr @.str_812, i64 16
+    %v4028 = getelementptr i8, ptr @.str_814, i64 16
     %v4029 = call ptr @orion_text_concat(ptr %v4027, ptr %v4028)
     store ptr %v4029, ptr %v1
     %v4030 = add i64 0, 0
     %v4031 = load ptr, ptr %v1
-    %v4032 = getelementptr i8, ptr @.str_933, i64 16
+    %v4032 = getelementptr i8, ptr @.str_935, i64 16
     %v4033 = call ptr @orion_text_concat(ptr %v4031, ptr %v4032)
     store ptr %v4033, ptr %v1
     %v4034 = add i64 0, 0
     %v4035 = load ptr, ptr %v1
-    %v4036 = getelementptr i8, ptr @.str_943, i64 16
+    %v4036 = getelementptr i8, ptr @.str_945, i64 16
     %v4037 = call ptr @orion_text_concat(ptr %v4035, ptr %v4036)
     store ptr %v4037, ptr %v1
     %v4038 = add i64 0, 0
     %v4039 = load ptr, ptr %v1
-    %v4040 = getelementptr i8, ptr @.str_1000, i64 16
+    %v4040 = getelementptr i8, ptr @.str_1002, i64 16
     %v4041 = call ptr @orion_text_concat(ptr %v4039, ptr %v4040)
     store ptr %v4041, ptr %v1
     %v4042 = add i64 0, 0
     %v4043 = load ptr, ptr %v1
-    %v4044 = getelementptr i8, ptr @.str_798, i64 16
+    %v4044 = getelementptr i8, ptr @.str_800, i64 16
     %v4045 = call ptr @orion_text_concat(ptr %v4043, ptr %v4044)
     store ptr %v4045, ptr %v1
     %v4046 = add i64 0, 0
     %v4047 = load ptr, ptr %v1
-    %v4048 = getelementptr i8, ptr @.str_1243, i64 16
+    %v4048 = getelementptr i8, ptr @.str_1245, i64 16
     %v4049 = call ptr @orion_text_concat(ptr %v4047, ptr %v4048)
     store ptr %v4049, ptr %v1
     %v4050 = add i64 0, 0
     %v4051 = load ptr, ptr %v1
-    %v4052 = getelementptr i8, ptr @.str_791, i64 16
+    %v4052 = getelementptr i8, ptr @.str_793, i64 16
     %v4053 = call ptr @orion_text_concat(ptr %v4051, ptr %v4052)
     store ptr %v4053, ptr %v1
     %v4054 = add i64 0, 0
     %v4055 = load ptr, ptr %v1
-    %v4056 = getelementptr i8, ptr @.str_1244, i64 16
+    %v4056 = getelementptr i8, ptr @.str_1246, i64 16
     %v4057 = call ptr @orion_text_concat(ptr %v4055, ptr %v4056)
     store ptr %v4057, ptr %v1
     %v4058 = add i64 0, 0
     %v4059 = load ptr, ptr %v1
-    %v4060 = getelementptr i8, ptr @.str_1068, i64 16
+    %v4060 = getelementptr i8, ptr @.str_1070, i64 16
     %v4061 = call ptr @orion_text_concat(ptr %v4059, ptr %v4060)
     store ptr %v4061, ptr %v1
     %v4062 = add i64 0, 0
     %v4063 = load ptr, ptr %v1
-    %v4064 = getelementptr i8, ptr @.str_1232, i64 16
+    %v4064 = getelementptr i8, ptr @.str_1234, i64 16
     %v4065 = call ptr @orion_text_concat(ptr %v4063, ptr %v4064)
     store ptr %v4065, ptr %v1
     %v4066 = add i64 0, 0
     %v4067 = load ptr, ptr %v1
-    %v4068 = getelementptr i8, ptr @.str_1233, i64 16
+    %v4068 = getelementptr i8, ptr @.str_1235, i64 16
     %v4069 = call ptr @orion_text_concat(ptr %v4067, ptr %v4068)
     store ptr %v4069, ptr %v1
     %v4070 = add i64 0, 0
     %v4071 = load ptr, ptr %v1
-    %v4072 = getelementptr i8, ptr @.str_1234, i64 16
+    %v4072 = getelementptr i8, ptr @.str_1236, i64 16
     %v4073 = call ptr @orion_text_concat(ptr %v4071, ptr %v4072)
     store ptr %v4073, ptr %v1
     %v4074 = add i64 0, 0
     %v4075 = load ptr, ptr %v1
-    %v4076 = getelementptr i8, ptr @.str_1071, i64 16
+    %v4076 = getelementptr i8, ptr @.str_1073, i64 16
     %v4077 = call ptr @orion_text_concat(ptr %v4075, ptr %v4076)
     store ptr %v4077, ptr %v1
     %v4078 = add i64 0, 0
     %v4079 = load ptr, ptr %v1
-    %v4080 = getelementptr i8, ptr @.str_1245, i64 16
+    %v4080 = getelementptr i8, ptr @.str_1247, i64 16
     %v4081 = call ptr @orion_text_concat(ptr %v4079, ptr %v4080)
     store ptr %v4081, ptr %v1
     %v4082 = add i64 0, 0
     %v4083 = load ptr, ptr %v1
-    %v4084 = getelementptr i8, ptr @.str_1087, i64 16
+    %v4084 = getelementptr i8, ptr @.str_1089, i64 16
     %v4085 = call ptr @orion_text_concat(ptr %v4083, ptr %v4084)
     store ptr %v4085, ptr %v1
     %v4086 = add i64 0, 0
     %v4087 = load ptr, ptr %v1
-    %v4088 = getelementptr i8, ptr @.str_798, i64 16
+    %v4088 = getelementptr i8, ptr @.str_800, i64 16
     %v4089 = call ptr @orion_text_concat(ptr %v4087, ptr %v4088)
     store ptr %v4089, ptr %v1
     %v4090 = add i64 0, 0
     %v4091 = load ptr, ptr %v1
-    %v4092 = getelementptr i8, ptr @.str_1246, i64 16
+    %v4092 = getelementptr i8, ptr @.str_1248, i64 16
     %v4093 = call ptr @orion_text_concat(ptr %v4091, ptr %v4092)
     store ptr %v4093, ptr %v1
     %v4094 = add i64 0, 0
     %v4095 = load ptr, ptr %v1
-    %v4096 = getelementptr i8, ptr @.str_791, i64 16
+    %v4096 = getelementptr i8, ptr @.str_793, i64 16
     %v4097 = call ptr @orion_text_concat(ptr %v4095, ptr %v4096)
     store ptr %v4097, ptr %v1
     %v4098 = add i64 0, 0
     %v4099 = load ptr, ptr %v1
-    %v4100 = getelementptr i8, ptr @.str_907, i64 16
+    %v4100 = getelementptr i8, ptr @.str_909, i64 16
     %v4101 = call ptr @orion_text_concat(ptr %v4099, ptr %v4100)
     store ptr %v4101, ptr %v1
     %v4102 = add i64 0, 0
     %v4103 = load ptr, ptr %v1
-    %v4104 = getelementptr i8, ptr @.str_1247, i64 16
+    %v4104 = getelementptr i8, ptr @.str_1249, i64 16
     %v4105 = call ptr @orion_text_concat(ptr %v4103, ptr %v4104)
     store ptr %v4105, ptr %v1
     %v4106 = add i64 0, 0
     %v4107 = load ptr, ptr %v1
-    %v4108 = getelementptr i8, ptr @.str_909, i64 16
+    %v4108 = getelementptr i8, ptr @.str_911, i64 16
     %v4109 = call ptr @orion_text_concat(ptr %v4107, ptr %v4108)
     store ptr %v4109, ptr %v1
     %v4110 = add i64 0, 0
     %v4111 = load ptr, ptr %v1
-    %v4112 = getelementptr i8, ptr @.str_910, i64 16
+    %v4112 = getelementptr i8, ptr @.str_912, i64 16
     %v4113 = call ptr @orion_text_concat(ptr %v4111, ptr %v4112)
     store ptr %v4113, ptr %v1
     %v4114 = add i64 0, 0
     %v4115 = load ptr, ptr %v1
-    %v4116 = getelementptr i8, ptr @.str_798, i64 16
+    %v4116 = getelementptr i8, ptr @.str_800, i64 16
     %v4117 = call ptr @orion_text_concat(ptr %v4115, ptr %v4116)
     store ptr %v4117, ptr %v1
     %v4118 = add i64 0, 0
     %v4119 = load ptr, ptr %v1
-    %v4120 = getelementptr i8, ptr @.str_1248, i64 16
+    %v4120 = getelementptr i8, ptr @.str_1250, i64 16
     %v4121 = call ptr @orion_text_concat(ptr %v4119, ptr %v4120)
     store ptr %v4121, ptr %v1
     %v4122 = add i64 0, 0
     %v4123 = load ptr, ptr %v1
-    %v4124 = getelementptr i8, ptr @.str_1249, i64 16
+    %v4124 = getelementptr i8, ptr @.str_1251, i64 16
     %v4125 = call ptr @orion_text_concat(ptr %v4123, ptr %v4124)
     store ptr %v4125, ptr %v1
     %v4126 = add i64 0, 0
     %v4127 = load ptr, ptr %v1
-    %v4128 = getelementptr i8, ptr @.str_1250, i64 16
+    %v4128 = getelementptr i8, ptr @.str_1252, i64 16
     %v4129 = call ptr @orion_text_concat(ptr %v4127, ptr %v4128)
     store ptr %v4129, ptr %v1
     %v4130 = add i64 0, 0
     %v4131 = load ptr, ptr %v1
-    %v4132 = getelementptr i8, ptr @.str_1251, i64 16
+    %v4132 = getelementptr i8, ptr @.str_1253, i64 16
     %v4133 = call ptr @orion_text_concat(ptr %v4131, ptr %v4132)
     store ptr %v4133, ptr %v1
     %v4134 = add i64 0, 0
     %v4135 = load ptr, ptr %v1
-    %v4136 = getelementptr i8, ptr @.str_1252, i64 16
+    %v4136 = getelementptr i8, ptr @.str_1254, i64 16
     %v4137 = call ptr @orion_text_concat(ptr %v4135, ptr %v4136)
     store ptr %v4137, ptr %v1
     %v4138 = add i64 0, 0
     %v4139 = load ptr, ptr %v1
-    %v4140 = getelementptr i8, ptr @.str_1253, i64 16
+    %v4140 = getelementptr i8, ptr @.str_1255, i64 16
     %v4141 = call ptr @orion_text_concat(ptr %v4139, ptr %v4140)
     store ptr %v4141, ptr %v1
     %v4142 = add i64 0, 0
     %v4143 = load ptr, ptr %v1
-    %v4144 = getelementptr i8, ptr @.str_1249, i64 16
+    %v4144 = getelementptr i8, ptr @.str_1251, i64 16
     %v4145 = call ptr @orion_text_concat(ptr %v4143, ptr %v4144)
     store ptr %v4145, ptr %v1
     %v4146 = add i64 0, 0
     %v4147 = load ptr, ptr %v1
-    %v4148 = getelementptr i8, ptr @.str_1250, i64 16
+    %v4148 = getelementptr i8, ptr @.str_1252, i64 16
     %v4149 = call ptr @orion_text_concat(ptr %v4147, ptr %v4148)
     store ptr %v4149, ptr %v1
     %v4150 = add i64 0, 0
     %v4151 = load ptr, ptr %v1
-    %v4152 = getelementptr i8, ptr @.str_1254, i64 16
+    %v4152 = getelementptr i8, ptr @.str_1256, i64 16
     %v4153 = call ptr @orion_text_concat(ptr %v4151, ptr %v4152)
     store ptr %v4153, ptr %v1
     %v4154 = add i64 0, 0
     %v4155 = load ptr, ptr %v1
-    %v4156 = getelementptr i8, ptr @.str_1252, i64 16
+    %v4156 = getelementptr i8, ptr @.str_1254, i64 16
     %v4157 = call ptr @orion_text_concat(ptr %v4155, ptr %v4156)
     store ptr %v4157, ptr %v1
     %v4158 = add i64 0, 0
     %v4159 = load ptr, ptr %v1
-    %v4160 = getelementptr i8, ptr @.str_1255, i64 16
+    %v4160 = getelementptr i8, ptr @.str_1257, i64 16
     %v4161 = call ptr @orion_text_concat(ptr %v4159, ptr %v4160)
     store ptr %v4161, ptr %v1
     %v4162 = add i64 0, 0
     %v4163 = load ptr, ptr %v1
-    %v4164 = getelementptr i8, ptr @.str_1249, i64 16
+    %v4164 = getelementptr i8, ptr @.str_1251, i64 16
     %v4165 = call ptr @orion_text_concat(ptr %v4163, ptr %v4164)
     store ptr %v4165, ptr %v1
     %v4166 = add i64 0, 0
     %v4167 = load ptr, ptr %v1
-    %v4168 = getelementptr i8, ptr @.str_1250, i64 16
+    %v4168 = getelementptr i8, ptr @.str_1252, i64 16
     %v4169 = call ptr @orion_text_concat(ptr %v4167, ptr %v4168)
     store ptr %v4169, ptr %v1
     %v4170 = add i64 0, 0
     %v4171 = load ptr, ptr %v1
-    %v4172 = getelementptr i8, ptr @.str_1256, i64 16
+    %v4172 = getelementptr i8, ptr @.str_1258, i64 16
     %v4173 = call ptr @orion_text_concat(ptr %v4171, ptr %v4172)
     store ptr %v4173, ptr %v1
     %v4174 = add i64 0, 0
     %v4175 = load ptr, ptr %v1
-    %v4176 = getelementptr i8, ptr @.str_1252, i64 16
+    %v4176 = getelementptr i8, ptr @.str_1254, i64 16
     %v4177 = call ptr @orion_text_concat(ptr %v4175, ptr %v4176)
     store ptr %v4177, ptr %v1
     %v4178 = add i64 0, 0
     %v4179 = load ptr, ptr %v1
-    %v4180 = getelementptr i8, ptr @.str_1257, i64 16
+    %v4180 = getelementptr i8, ptr @.str_1259, i64 16
     %v4181 = call ptr @orion_text_concat(ptr %v4179, ptr %v4180)
     store ptr %v4181, ptr %v1
     %v4182 = add i64 0, 0
     %v4183 = load ptr, ptr %v1
-    %v4184 = getelementptr i8, ptr @.str_1258, i64 16
+    %v4184 = getelementptr i8, ptr @.str_1260, i64 16
     %v4185 = call ptr @orion_text_concat(ptr %v4183, ptr %v4184)
     store ptr %v4185, ptr %v1
     %v4186 = add i64 0, 0
     %v4187 = load ptr, ptr %v1
-    %v4188 = getelementptr i8, ptr @.str_1259, i64 16
+    %v4188 = getelementptr i8, ptr @.str_1261, i64 16
     %v4189 = call ptr @orion_text_concat(ptr %v4187, ptr %v4188)
     store ptr %v4189, ptr %v1
     %v4190 = add i64 0, 0
     %v4191 = load ptr, ptr %v1
-    %v4192 = getelementptr i8, ptr @.str_1260, i64 16
+    %v4192 = getelementptr i8, ptr @.str_1262, i64 16
     %v4193 = call ptr @orion_text_concat(ptr %v4191, ptr %v4192)
     store ptr %v4193, ptr %v1
     %v4194 = add i64 0, 0
     %v4195 = load ptr, ptr %v1
-    %v4196 = getelementptr i8, ptr @.str_1261, i64 16
+    %v4196 = getelementptr i8, ptr @.str_1263, i64 16
     %v4197 = call ptr @orion_text_concat(ptr %v4195, ptr %v4196)
     store ptr %v4197, ptr %v1
     %v4198 = add i64 0, 0
@@ -49205,7 +49835,7 @@ entry:
     store ptr %v1, ptr %v2
     %v3 = add i64 0, 0
     %v4 = load ptr, ptr %v2
-    %v5 = getelementptr i8, ptr @.str_1262, i64 16
+    %v5 = getelementptr i8, ptr @.str_1264, i64 16
     %v6.p = ptrtoint ptr %v5 to i64
     %v6 = call ptr @orion_list_push(ptr %v4, i64 %v6.p)
     store ptr %v6, ptr %v2
@@ -49344,9 +49974,9 @@ if_95_then:
     %v97 = inttoptr i64 %v97.i to ptr
     %v98 = call ptr @llvm_type_of(ptr %v97)
     %v99 = load ptr, ptr %v2
-    %v100 = getelementptr i8, ptr @.str_1263, i64 16
+    %v100 = getelementptr i8, ptr @.str_1265, i64 16
     %v101 = call ptr @orion_text_concat(ptr %v100, ptr %v98)
-    %v102 = getelementptr i8, ptr @.str_546, i64 16
+    %v102 = getelementptr i8, ptr @.str_548, i64 16
     %v103 = call ptr @orion_text_concat(ptr %v101, ptr %v102)
     %v104.slot = getelementptr i64, ptr %v85, i64 0
     %v104.i = load i64, ptr %v104.slot
@@ -49359,7 +49989,7 @@ if_95_then:
     %v108 = inttoptr i64 %v108.i to ptr
     %v109 = call ptr @emit_param_types(ptr %v108)
     %v110 = call ptr @orion_text_concat(ptr %v107, ptr %v109)
-    %v111 = getelementptr i8, ptr @.str_1264, i64 16
+    %v111 = getelementptr i8, ptr @.str_1266, i64 16
     %v112 = call ptr @orion_text_concat(ptr %v110, ptr %v111)
     %v113.p = ptrtoint ptr %v112 to i64
     %v113 = call ptr @orion_list_push(ptr %v99, i64 %v113.p)
@@ -49403,67 +50033,67 @@ for_75_step:
     br label %for_75_header
 for_75_end:
     %v145 = load ptr, ptr %v2
-    %v146 = getelementptr i8, ptr @.str_1265, i64 16
+    %v146 = getelementptr i8, ptr @.str_1267, i64 16
     %v147.p = ptrtoint ptr %v146 to i64
     %v147 = call ptr @orion_list_push(ptr %v145, i64 %v147.p)
     store ptr %v147, ptr %v2
     %v148 = add i64 0, 0
     %v149 = load ptr, ptr %v2
-    %v150 = getelementptr i8, ptr @.str_1266, i64 16
+    %v150 = getelementptr i8, ptr @.str_1268, i64 16
     %v151.p = ptrtoint ptr %v150 to i64
     %v151 = call ptr @orion_list_push(ptr %v149, i64 %v151.p)
     store ptr %v151, ptr %v2
     %v152 = add i64 0, 0
     %v153 = load ptr, ptr %v2
-    %v154 = getelementptr i8, ptr @.str_1267, i64 16
+    %v154 = getelementptr i8, ptr @.str_1269, i64 16
     %v155.p = ptrtoint ptr %v154 to i64
     %v155 = call ptr @orion_list_push(ptr %v153, i64 %v155.p)
     store ptr %v155, ptr %v2
     %v156 = add i64 0, 0
     %v157 = load ptr, ptr %v2
-    %v158 = getelementptr i8, ptr @.str_791, i64 16
+    %v158 = getelementptr i8, ptr @.str_793, i64 16
     %v159.p = ptrtoint ptr %v158 to i64
     %v159 = call ptr @orion_list_push(ptr %v157, i64 %v159.p)
     store ptr %v159, ptr %v2
     %v160 = add i64 0, 0
     %v161 = load ptr, ptr %v2
-    %v162 = getelementptr i8, ptr @.str_1268, i64 16
+    %v162 = getelementptr i8, ptr @.str_1270, i64 16
     %v163.p = ptrtoint ptr %v162 to i64
     %v163 = call ptr @orion_list_push(ptr %v161, i64 %v163.p)
     store ptr %v163, ptr %v2
     %v164 = add i64 0, 0
     %v165 = load ptr, ptr %v2
-    %v166 = getelementptr i8, ptr @.str_1269, i64 16
+    %v166 = getelementptr i8, ptr @.str_1271, i64 16
     %v167.p = ptrtoint ptr %v166 to i64
     %v167 = call ptr @orion_list_push(ptr %v165, i64 %v167.p)
     store ptr %v167, ptr %v2
     %v168 = add i64 0, 0
     %v169 = load ptr, ptr %v2
-    %v170 = getelementptr i8, ptr @.str_1270, i64 16
+    %v170 = getelementptr i8, ptr @.str_1272, i64 16
     %v171.p = ptrtoint ptr %v170 to i64
     %v171 = call ptr @orion_list_push(ptr %v169, i64 %v171.p)
     store ptr %v171, ptr %v2
     %v172 = add i64 0, 0
     %v173 = load ptr, ptr %v2
-    %v174 = getelementptr i8, ptr @.str_1271, i64 16
+    %v174 = getelementptr i8, ptr @.str_1273, i64 16
     %v175.p = ptrtoint ptr %v174 to i64
     %v175 = call ptr @orion_list_push(ptr %v173, i64 %v175.p)
     store ptr %v175, ptr %v2
     %v176 = add i64 0, 0
     %v177 = load ptr, ptr %v2
-    %v178 = getelementptr i8, ptr @.str_1272, i64 16
+    %v178 = getelementptr i8, ptr @.str_1274, i64 16
     %v179.p = ptrtoint ptr %v178 to i64
     %v179 = call ptr @orion_list_push(ptr %v177, i64 %v179.p)
     store ptr %v179, ptr %v2
     %v180 = add i64 0, 0
     %v181 = load ptr, ptr %v2
-    %v182 = getelementptr i8, ptr @.str_1273, i64 16
+    %v182 = getelementptr i8, ptr @.str_1275, i64 16
     %v183.p = ptrtoint ptr %v182 to i64
     %v183 = call ptr @orion_list_push(ptr %v181, i64 %v183.p)
     store ptr %v183, ptr %v2
     %v184 = add i64 0, 0
     %v185 = load ptr, ptr %v2
-    %v186 = getelementptr i8, ptr @.str_706, i64 16
+    %v186 = getelementptr i8, ptr @.str_708, i64 16
     %v187.p = ptrtoint ptr %v186 to i64
     %v187 = call ptr @orion_list_push(ptr %v185, i64 %v187.p)
     store ptr %v187, ptr %v2
@@ -49896,7 +50526,7 @@ if_18_then:
     %v20.i = call i64 @orion_list_at(ptr %v1, i64 %v11)
     %v20 = inttoptr i64 %v20.i to ptr
     %v21 = call ptr @orion_text_concat(ptr %v20, ptr %v0)
-    %v22 = getelementptr i8, ptr @.str_1274, i64 16
+    %v22 = getelementptr i8, ptr @.str_1276, i64 16
     %v23 = call ptr @orion_text_concat(ptr %v21, ptr %v22)
     %v24 = call ptr @orion_file_read(ptr %v23)
     %v25 = getelementptr i8, ptr @.str_5, i64 16
@@ -49945,11 +50575,11 @@ if_5_then:
     %v11 = getelementptr i8, ptr @.str_231, i64 16
     %v12 = call ptr @orion_text_concat(ptr %v10, ptr %v11)
     %v13 = call ptr @orion_text_concat(ptr %v12, ptr %v0)
-    %v14 = getelementptr i8, ptr @.str_1275, i64 16
+    %v14 = getelementptr i8, ptr @.str_1277, i64 16
     %v15 = call ptr @orion_text_concat(ptr %v13, ptr %v14)
     %v16 = call ptr @orion_text_concat(ptr %v15, ptr %v1)
     %v17 = call ptr @orion_text_concat(ptr %v16, ptr %v10)
-    %v18 = getelementptr i8, ptr @.str_1276, i64 16
+    %v18 = getelementptr i8, ptr @.str_1278, i64 16
     %v19 = call ptr @orion_text_concat(ptr %v17, ptr %v18)
     br label %if_5_merge
 if_5_else:
@@ -49970,7 +50600,7 @@ entry:
 define ptr @drv_red(ptr %p0) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
-    %v1 = getelementptr i8, ptr @.str_1277, i64 16
+    %v1 = getelementptr i8, ptr @.str_1279, i64 16
     %v2 = call ptr @drv_sty(ptr %v1, ptr %v0)
     ret ptr %v2
 }
@@ -50107,15 +50737,15 @@ loop_20_end:
     %v99 = load i64, ptr %v18
     %v100 = add i64 0, 1024
     %v101 = sdiv i64 %v99, %v100
-    %v102 = getelementptr i8, ptr @.str_1278, i64 16
+    %v102 = getelementptr i8, ptr @.str_1280, i64 16
     %v103 = load i64, ptr %v15
     %v104 = call ptr @orion_int_to_text(i64 %v103)
     %v105 = call ptr @orion_text_concat(ptr %v102, ptr %v104)
-    %v106 = getelementptr i8, ptr @.str_1279, i64 16
+    %v106 = getelementptr i8, ptr @.str_1281, i64 16
     %v107 = call ptr @orion_text_concat(ptr %v105, ptr %v106)
     %v108 = call ptr @orion_int_to_text(i64 %v101)
     %v109 = call ptr @orion_text_concat(ptr %v107, ptr %v108)
-    %v110 = getelementptr i8, ptr @.str_1280, i64 16
+    %v110 = getelementptr i8, ptr @.str_1282, i64 16
     %v111 = call ptr @orion_text_concat(ptr %v109, ptr %v110)
     %v112 = call ptr @drv_dim(ptr %v111)
     call i32 @puts(ptr %v112)
@@ -50354,7 +50984,7 @@ if_5_then:
 if_5_else:
     br label %if_5_merge
 if_5_merge:
-    %v12 = getelementptr i8, ptr @.str_1281, i64 16
+    %v12 = getelementptr i8, ptr @.str_1283, i64 16
     %v13 = call i64 @drv_starts(ptr %v0, ptr %v12)
     %v14.cb = icmp ne i64 %v13, 0
     br i1 %v14.cb, label %if_14_then, label %if_14_else
@@ -50364,14 +50994,14 @@ if_14_then:
 if_14_else:
     br label %if_14_merge
 if_14_merge:
-    %v21 = getelementptr i8, ptr @.str_1282, i64 16
+    %v21 = getelementptr i8, ptr @.str_1284, i64 16
     %v22 = call i64 @drv_starts(ptr %v0, ptr %v21)
     %v23.cb = icmp ne i64 %v22, 0
     br i1 %v23.cb, label %if_23_then, label %if_23_else
 if_23_then:
     br label %if_23_merge
 if_23_else:
-    %v27 = getelementptr i8, ptr @.str_1283, i64 16
+    %v27 = getelementptr i8, ptr @.str_1285, i64 16
     %v28 = call i64 @drv_starts(ptr %v0, ptr %v27)
     br label %if_23_merge
 if_23_merge:
@@ -50381,7 +51011,7 @@ if_23_merge:
 if_32_then:
     br label %if_32_merge
 if_32_else:
-    %v36 = getelementptr i8, ptr @.str_1284, i64 16
+    %v36 = getelementptr i8, ptr @.str_1286, i64 16
     %v37 = call i64 @drv_starts(ptr %v0, ptr %v36)
     br label %if_32_merge
 if_32_merge:
@@ -50394,14 +51024,14 @@ if_41_then:
 if_41_else:
     br label %if_41_merge
 if_41_merge:
-    %v48 = getelementptr i8, ptr @.str_1285, i64 16
+    %v48 = getelementptr i8, ptr @.str_1287, i64 16
     %v49 = call i64 @drv_starts(ptr %v0, ptr %v48)
     %v50.cb = icmp ne i64 %v49, 0
     br i1 %v50.cb, label %if_50_then, label %if_50_else
 if_50_then:
     br label %if_50_merge
 if_50_else:
-    %v54 = getelementptr i8, ptr @.str_1286, i64 16
+    %v54 = getelementptr i8, ptr @.str_1288, i64 16
     %v55 = call i64 @drv_starts(ptr %v0, ptr %v54)
     br label %if_50_merge
 if_50_merge:
@@ -50411,7 +51041,7 @@ if_50_merge:
 if_59_then:
     br label %if_59_merge
 if_59_else:
-    %v63 = getelementptr i8, ptr @.str_1287, i64 16
+    %v63 = getelementptr i8, ptr @.str_1289, i64 16
     %v64 = call i64 @drv_starts(ptr %v0, ptr %v63)
     br label %if_59_merge
 if_59_merge:
@@ -50421,7 +51051,7 @@ if_59_merge:
 if_68_then:
     br label %if_68_merge
 if_68_else:
-    %v72 = getelementptr i8, ptr @.str_1288, i64 16
+    %v72 = getelementptr i8, ptr @.str_1290, i64 16
     %v73 = call i64 @drv_starts(ptr %v0, ptr %v72)
     br label %if_68_merge
 if_68_merge:
@@ -50431,7 +51061,7 @@ if_68_merge:
 if_77_then:
     br label %if_77_merge
 if_77_else:
-    %v81 = getelementptr i8, ptr @.str_1289, i64 16
+    %v81 = getelementptr i8, ptr @.str_1291, i64 16
     %v82 = call i64 @drv_starts(ptr %v0, ptr %v81)
     br label %if_77_merge
 if_77_merge:
@@ -50441,7 +51071,7 @@ if_77_merge:
 if_86_then:
     br label %if_86_merge
 if_86_else:
-    %v90 = getelementptr i8, ptr @.str_1290, i64 16
+    %v90 = getelementptr i8, ptr @.str_1292, i64 16
     %v91 = call i64 @drv_starts(ptr %v0, ptr %v90)
     br label %if_86_merge
 if_86_merge:
@@ -50451,7 +51081,7 @@ if_86_merge:
 if_95_then:
     br label %if_95_merge
 if_95_else:
-    %v99 = getelementptr i8, ptr @.str_1291, i64 16
+    %v99 = getelementptr i8, ptr @.str_1293, i64 16
     %v100 = call i64 @drv_starts(ptr %v0, ptr %v99)
     br label %if_95_merge
 if_95_merge:
@@ -50464,14 +51094,14 @@ if_104_then:
 if_104_else:
     br label %if_104_merge
 if_104_merge:
-    %v111 = getelementptr i8, ptr @.str_1292, i64 16
+    %v111 = getelementptr i8, ptr @.str_1294, i64 16
     %v112 = call i64 @drv_starts(ptr %v0, ptr %v111)
     %v113.cb = icmp ne i64 %v112, 0
     br i1 %v113.cb, label %if_113_then, label %if_113_else
 if_113_then:
     br label %if_113_merge
 if_113_else:
-    %v117 = getelementptr i8, ptr @.str_1293, i64 16
+    %v117 = getelementptr i8, ptr @.str_1295, i64 16
     %v118 = call i64 @drv_starts(ptr %v0, ptr %v117)
     br label %if_113_merge
 if_113_merge:
@@ -50481,7 +51111,7 @@ if_113_merge:
 if_122_then:
     br label %if_122_merge
 if_122_else:
-    %v126 = getelementptr i8, ptr @.str_1294, i64 16
+    %v126 = getelementptr i8, ptr @.str_1296, i64 16
     %v127 = call i64 @drv_starts(ptr %v0, ptr %v126)
     br label %if_122_merge
 if_122_merge:
@@ -50494,14 +51124,14 @@ if_131_then:
 if_131_else:
     br label %if_131_merge
 if_131_merge:
-    %v138 = getelementptr i8, ptr @.str_1295, i64 16
+    %v138 = getelementptr i8, ptr @.str_1297, i64 16
     %v139 = call i64 @drv_starts(ptr %v0, ptr %v138)
     %v140.cb = icmp ne i64 %v139, 0
     br i1 %v140.cb, label %if_140_then, label %if_140_else
 if_140_then:
     br label %if_140_merge
 if_140_else:
-    %v144 = getelementptr i8, ptr @.str_1296, i64 16
+    %v144 = getelementptr i8, ptr @.str_1298, i64 16
     %v145 = call i64 @drv_starts(ptr %v0, ptr %v144)
     br label %if_140_merge
 if_140_merge:
@@ -50511,7 +51141,7 @@ if_140_merge:
 if_149_then:
     br label %if_149_merge
 if_149_else:
-    %v153 = getelementptr i8, ptr @.str_1297, i64 16
+    %v153 = getelementptr i8, ptr @.str_1299, i64 16
     %v154 = call i64 @drv_starts(ptr %v0, ptr %v153)
     br label %if_149_merge
 if_149_merge:
@@ -50521,7 +51151,7 @@ if_149_merge:
 if_158_then:
     br label %if_158_merge
 if_158_else:
-    %v162 = getelementptr i8, ptr @.str_1298, i64 16
+    %v162 = getelementptr i8, ptr @.str_1300, i64 16
     %v163 = call i64 @drv_starts(ptr %v0, ptr %v162)
     br label %if_158_merge
 if_158_merge:
@@ -50715,7 +51345,7 @@ entry:
     %v3.cb = icmp ne i64 %v2, 0
     br i1 %v3.cb, label %if_3_then, label %if_3_else
 if_3_then:
-    %v5 = getelementptr i8, ptr @.str_1299, i64 16
+    %v5 = getelementptr i8, ptr @.str_1301, i64 16
     ret ptr %v5
 if_3_else:
     br label %if_3_merge
@@ -50730,7 +51360,7 @@ if_3_merge:
     br i1 %v15.cb, label %if_15_then, label %if_15_else
 if_15_then:
     %v17 = load ptr, ptr %v11
-    %v18 = getelementptr i8, ptr @.str_1300, i64 16
+    %v18 = getelementptr i8, ptr @.str_1302, i64 16
     %v19 = call ptr @orion_text_concat(ptr %v17, ptr %v18)
     store ptr %v19, ptr %v11
     %v20 = add i64 0, 0
@@ -50744,7 +51374,7 @@ if_15_merge:
     br i1 %v27.cb, label %if_27_then, label %if_27_else
 if_27_then:
     %v29 = load ptr, ptr %v11
-    %v30 = getelementptr i8, ptr @.str_1301, i64 16
+    %v30 = getelementptr i8, ptr @.str_1303, i64 16
     %v31 = call ptr @orion_text_concat(ptr %v29, ptr %v30)
     store ptr %v31, ptr %v11
     %v32 = add i64 0, 0
@@ -50758,7 +51388,7 @@ if_27_merge:
     br i1 %v39.cb, label %if_39_then, label %if_39_else
 if_39_then:
     %v41 = load ptr, ptr %v11
-    %v42 = getelementptr i8, ptr @.str_1302, i64 16
+    %v42 = getelementptr i8, ptr @.str_1304, i64 16
     %v43 = call ptr @orion_text_concat(ptr %v41, ptr %v42)
     store ptr %v43, ptr %v11
     %v44 = add i64 0, 0
@@ -50772,7 +51402,7 @@ if_39_merge:
     br i1 %v51.cb, label %if_51_then, label %if_51_else
 if_51_then:
     %v53 = load ptr, ptr %v11
-    %v54 = getelementptr i8, ptr @.str_1303, i64 16
+    %v54 = getelementptr i8, ptr @.str_1305, i64 16
     %v55 = call ptr @orion_text_concat(ptr %v53, ptr %v54)
     store ptr %v55, ptr %v11
     %v56 = add i64 0, 0
@@ -50786,7 +51416,7 @@ if_51_merge:
     br i1 %v63.cb, label %if_63_then, label %if_63_else
 if_63_then:
     %v65 = load ptr, ptr %v11
-    %v66 = getelementptr i8, ptr @.str_1304, i64 16
+    %v66 = getelementptr i8, ptr @.str_1306, i64 16
     %v67 = call ptr @orion_text_concat(ptr %v65, ptr %v66)
     store ptr %v67, ptr %v11
     %v68 = add i64 0, 0
@@ -50800,7 +51430,7 @@ if_63_merge:
     br i1 %v75.cb, label %if_75_then, label %if_75_else
 if_75_then:
     %v77 = load ptr, ptr %v11
-    %v78 = getelementptr i8, ptr @.str_1305, i64 16
+    %v78 = getelementptr i8, ptr @.str_1307, i64 16
     %v79 = call ptr @orion_text_concat(ptr %v77, ptr %v78)
     store ptr %v79, ptr %v11
     %v80 = add i64 0, 0
@@ -50814,7 +51444,7 @@ if_75_merge:
     br i1 %v87.cb, label %if_87_then, label %if_87_else
 if_87_then:
     %v89 = load ptr, ptr %v11
-    %v90 = getelementptr i8, ptr @.str_1306, i64 16
+    %v90 = getelementptr i8, ptr @.str_1308, i64 16
     %v91 = call ptr @orion_text_concat(ptr %v89, ptr %v90)
     store ptr %v91, ptr %v11
     %v92 = add i64 0, 0
@@ -51100,20 +51730,20 @@ for_172_step:
     %v208 = add i64 0, 0
     br label %for_172_header
 for_172_end:
-    %v211 = getelementptr i8, ptr @.str_1307, i64 16
+    %v211 = getelementptr i8, ptr @.str_1309, i64 16
     %v212 = call ptr @orion_int_to_text(i64 %v2)
     %v213 = call ptr @orion_text_concat(ptr %v211, ptr %v212)
-    %v214 = getelementptr i8, ptr @.str_1308, i64 16
+    %v214 = getelementptr i8, ptr @.str_1310, i64 16
     %v215 = call ptr @orion_text_concat(ptr %v213, ptr %v214)
     %v216 = load i64, ptr %v170
     %v217 = call ptr @orion_int_to_text(i64 %v216)
     %v218 = call ptr @orion_text_concat(ptr %v215, ptr %v217)
-    %v219 = getelementptr i8, ptr @.str_1309, i64 16
+    %v219 = getelementptr i8, ptr @.str_1311, i64 16
     %v220 = call ptr @orion_text_concat(ptr %v218, ptr %v219)
     %v221 = load i64, ptr %v53
     %v222 = call ptr @orion_int_to_text(i64 %v221)
     %v223 = call ptr @orion_text_concat(ptr %v220, ptr %v222)
-    %v224 = getelementptr i8, ptr @.str_1310, i64 16
+    %v224 = getelementptr i8, ptr @.str_1312, i64 16
     %v225 = call ptr @orion_text_concat(ptr %v223, ptr %v224)
     call i32 @puts(ptr %v225)
     %v226 = add i64 0, 0
@@ -51130,7 +51760,7 @@ entry:
     %v3.cb = icmp ne i64 %v2, 0
     br i1 %v3.cb, label %if_3_then, label %if_3_else
 if_3_then:
-    %v5.ps = getelementptr i8, ptr @.str_1311, i64 16
+    %v5.ps = getelementptr i8, ptr @.str_1313, i64 16
     call i32 @puts(ptr %v5.ps)
     %v5 = add i64 0, 0
     %v6 = add i64 0, 0
@@ -51157,7 +51787,7 @@ if_16_then:
     %v19 = call ptr @orion_text_from_c(ptr %v19.raw)
     br label %if_16_merge
 if_16_else:
-    %v22 = getelementptr i8, ptr @.str_1312, i64 16
+    %v22 = getelementptr i8, ptr @.str_1314, i64 16
     br label %if_16_merge
 if_16_merge:
     %v25 = phi ptr [ %v19, %if_16_then ], [ %v22, %if_16_else ]
@@ -51168,7 +51798,7 @@ if_16_merge:
     %v29.cb = icmp ne i64 %v28, 0
     br i1 %v29.cb, label %if_29_then, label %if_29_else
 if_29_then:
-    %v31 = getelementptr i8, ptr @.str_1313, i64 16
+    %v31 = getelementptr i8, ptr @.str_1315, i64 16
     %v32 = call ptr @orion_text_concat(ptr %v31, ptr %v12)
     %v33 = getelementptr i8, ptr @.str_481, i64 16
     %v34 = call ptr @orion_text_concat(ptr %v32, ptr %v33)
@@ -51219,34 +51849,34 @@ for_47_step:
     br label %for_47_header
 for_47_end:
     %v70 = load ptr, ptr %v45
-    %v71 = getelementptr i8, ptr @.str_1314, i64 16
+    %v71 = getelementptr i8, ptr @.str_1316, i64 16
     %v72 = call ptr @orion_text_concat(ptr %v43, ptr %v71)
     %v73.p = ptrtoint ptr %v72 to i64
     %v73 = call ptr @orion_list_push(ptr %v70, i64 %v73.p)
     store ptr %v73, ptr %v45
     %v74 = add i64 0, 0
     %v75 = load ptr, ptr %v45
-    %v76 = getelementptr i8, ptr @.str_1315, i64 16
+    %v76 = getelementptr i8, ptr @.str_1317, i64 16
     %v77 = call ptr @orion_text_concat(ptr %v43, ptr %v76)
     %v78.p = ptrtoint ptr %v77 to i64
     %v78 = call ptr @orion_list_push(ptr %v75, i64 %v78.p)
     store ptr %v78, ptr %v45
     %v79 = add i64 0, 0
     %v80 = load ptr, ptr %v45
-    %v81 = getelementptr i8, ptr @.str_1316, i64 16
+    %v81 = getelementptr i8, ptr @.str_1318, i64 16
     %v82 = call ptr @orion_text_concat(ptr %v43, ptr %v81)
     %v83.p = ptrtoint ptr %v82 to i64
     %v83 = call ptr @orion_list_push(ptr %v80, i64 %v83.p)
     store ptr %v83, ptr %v45
     %v84 = add i64 0, 0
     %v85 = load ptr, ptr %v45
-    %v86 = getelementptr i8, ptr @.str_1317, i64 16
+    %v86 = getelementptr i8, ptr @.str_1319, i64 16
     %v87.p = ptrtoint ptr %v86 to i64
     %v87 = call ptr @orion_list_push(ptr %v85, i64 %v87.p)
     store ptr %v87, ptr %v45
     %v88 = add i64 0, 0
     %v89 = load ptr, ptr %v45
-    %v90 = getelementptr i8, ptr @.str_1318, i64 16
+    %v90 = getelementptr i8, ptr @.str_1320, i64 16
     %v91.p = ptrtoint ptr %v90 to i64
     %v91 = call ptr @orion_list_push(ptr %v89, i64 %v91.p)
     store ptr %v91, ptr %v45
@@ -51260,7 +51890,7 @@ for_47_end:
     %v99 = call i64 @__orion_monotonic_ms()
     %v100 = call ptr @ast_program_to_ir(ptr %v98)
     %v101 = call i64 @__orion_monotonic_ms()
-    %v102 = getelementptr i8, ptr @.str_1319, i64 16
+    %v102 = getelementptr i8, ptr @.str_1321, i64 16
     %v103.e = call i64 @orion_text_eq(ptr %v25, ptr %v102)
     %v103 = add i64 %v103.e, 0
     %v104.cb = icmp ne i64 %v103, 0
@@ -51278,22 +51908,22 @@ if_104_merge:
     %v115 = sub i64 %v101, %v99
     %v116 = sub i64 %v112, %v101
     %v117 = sub i64 %v112, %v95
-    %v118 = getelementptr i8, ptr @.str_1320, i64 16
+    %v118 = getelementptr i8, ptr @.str_1322, i64 16
     %v119 = call ptr @orion_int_to_text(i64 %v117)
     %v120 = call ptr @orion_text_concat(ptr %v118, ptr %v119)
-    %v121 = getelementptr i8, ptr @.str_1321, i64 16
+    %v121 = getelementptr i8, ptr @.str_1323, i64 16
     %v122 = call ptr @orion_text_concat(ptr %v120, ptr %v121)
     %v123 = call ptr @orion_int_to_text(i64 %v113)
     %v124 = call ptr @orion_text_concat(ptr %v122, ptr %v123)
-    %v125 = getelementptr i8, ptr @.str_1322, i64 16
+    %v125 = getelementptr i8, ptr @.str_1324, i64 16
     %v126 = call ptr @orion_text_concat(ptr %v124, ptr %v125)
     %v127 = call ptr @orion_int_to_text(i64 %v114)
     %v128 = call ptr @orion_text_concat(ptr %v126, ptr %v127)
-    %v129 = getelementptr i8, ptr @.str_1323, i64 16
+    %v129 = getelementptr i8, ptr @.str_1325, i64 16
     %v130 = call ptr @orion_text_concat(ptr %v128, ptr %v129)
     %v131 = call ptr @orion_int_to_text(i64 %v115)
     %v132 = call ptr @orion_text_concat(ptr %v130, ptr %v131)
-    %v133 = getelementptr i8, ptr @.str_1324, i64 16
+    %v133 = getelementptr i8, ptr @.str_1326, i64 16
     %v134 = call ptr @orion_text_concat(ptr %v132, ptr %v133)
     %v135 = call ptr @orion_int_to_text(i64 %v116)
     %v136 = call ptr @orion_text_concat(ptr %v134, ptr %v135)
@@ -51309,10 +51939,10 @@ if_104_merge:
     %v144.cb = icmp ne i64 %v143, 0
     br i1 %v144.cb, label %if_144_then, label %if_144_else
 if_144_then:
-    %v146 = getelementptr i8, ptr @.str_1325, i64 16
+    %v146 = getelementptr i8, ptr @.str_1327, i64 16
     %v147 = call ptr @orion_int_to_text(i64 %v141)
     %v148 = call ptr @orion_text_concat(ptr %v146, ptr %v147)
-    %v149 = getelementptr i8, ptr @.str_1326, i64 16
+    %v149 = getelementptr i8, ptr @.str_1328, i64 16
     %v150 = call ptr @orion_text_concat(ptr %v148, ptr %v149)
     %v151 = call ptr @drv_red(ptr %v150)
     call i32 @puts(ptr %v151)
@@ -51329,7 +51959,7 @@ if_144_else:
     %v161.cb = icmp ne i64 %v160, 0
     br i1 %v161.cb, label %if_161_then, label %if_161_else
 if_161_then:
-    %v163 = getelementptr i8, ptr @.str_1327, i64 16
+    %v163 = getelementptr i8, ptr @.str_1329, i64 16
     %v164 = call ptr @orion_text_concat(ptr %v163, ptr %v25)
     %v165 = call ptr @drv_dim(ptr %v164)
     call i32 @puts(ptr %v165)
@@ -51337,7 +51967,7 @@ if_161_then:
     %v167 = add i64 0, 0
     br label %if_161_merge
 if_161_else:
-    %v170 = getelementptr i8, ptr @.str_1328, i64 16
+    %v170 = getelementptr i8, ptr @.str_1330, i64 16
     %v171 = call ptr @drv_red(ptr %v170)
     call i32 @puts(ptr %v171)
     %v172 = add i64 0, 0

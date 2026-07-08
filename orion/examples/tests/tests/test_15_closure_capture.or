@@ -1,0 +1,7 @@
+# A lambda that captures a local (`k`) and is CALLED in its defining scope
+# works via the lambda lift (captures are threaded at the call site).
+# Escaping such a closure is a compile error until env-struct closures land.
+fn main() -> int:
+    k = 10
+    add_k = |n| n + k
+    add_k(5)
