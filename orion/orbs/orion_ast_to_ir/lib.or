@@ -2597,7 +2597,10 @@ fn nlam_synth(lam: Map) -> Map:
     mut typed_params = slice([lam], 0, 0)
     typed_params = push(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
     for pi in 0..<n_lp:
-        typed_params = push(typed_params, {"name": at(lam_params, pi), "type": {"kind": "Named", "name": "int"}})
+        mut p_ty = {"kind": "Named", "name": "int"}
+        if has(lam, "param_types"):
+            p_ty = at(get_list(lam, "param_types"), pi)
+        typed_params = push(typed_params, {"name": at(lam_params, pi), "type": p_ty})
     ctr = slot_get_int("otir:nlam_ctr")
     slot_set("otir:nlam_ctr", ctr + 1)
     synth_name = "__nlambda_{ctr}"
@@ -2940,7 +2943,10 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             typed_params = push(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
                             for pi in 0..<n_lp:
                                 p_name = at(lam_params, pi)
-                                typed_params = push(typed_params, {"name": p_name, "type": {"kind": "Named", "name": "int"}})
+                                mut p_ty = {"kind": "Named", "name": "int"}
+                                if has(lam, "param_types"):
+                                    p_ty = at(get_list(lam, "param_types"), pi)
+                                typed_params = push(typed_params, {"name": p_name, "type": p_ty})
                             synth_name = "__lambda_{lambda_counter}"
                             lambda_counter = lambda_counter + 1
                             # Prologue: cap_i = at(__env, 2 + i)  (slots 0/1 are
