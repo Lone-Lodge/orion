@@ -2802,6 +2802,27 @@ fn nlam_block_has(block: Map) -> bool:
 
 
 pub fn ast_program_to_ir(program: Map) -> IRModule:
+    # Duplicate-function guard. Two `fn name` definitions collide into one
+    # LLVM symbol — most often the same helper defined in two `use`d orbs,
+    # since function names are global (no orb namespaces yet). Flag it with a
+    # clear message instead of a confusing "unknown function" or a link-time
+    # duplicate-symbol error. Externs are declarations, not definitions, so
+    # re-declaring them across orbs stays legal and is not checked here.
+    dup_decls = get_list(program, "decls")
+    dup_n = len(dup_decls)
+    mut seen_fn_names = slice([""], 0, 0)
+    for ddi in 0..<dup_n:
+        dd = at(dup_decls, ddi)
+        if get(dd, "kind") == "Fn":
+            dnm = get(dd, "name")
+            mut dup_already = false
+            for dsj in 0..<len(seen_fn_names):
+                if at(seen_fn_names, dsj) == dnm:
+                    dup_already = true
+            if dup_already:
+                compile_error("orion: ERROR — function `{dnm}` is defined more than once (two `use`d orbs may both define it — names are global, so rename one)")
+            seen_fn_names = push(seen_fn_names, dnm)
+
     # Pass -1: `fact` inlining. Replace reads of reactive `fact` bindings
     # with their defining expression so they recompute on each read. Gated
     # by a prescan — no facts means the decls pass through untouched.
