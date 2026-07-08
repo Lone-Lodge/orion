@@ -799,6 +799,13 @@ fn sc_if(cond: Map, then_e: Map, else_e: Map) -> Map:
 
 fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     op = get(node, "op")
+    # Division / modulo by the literal 0 is always a fault. Catch it at
+    # compile time with a clear message instead of the raw SIGFPE crash a
+    # runtime `x / 0` produces.
+    if op == "/" or op == "%":
+        divz_r = get(node, "right")
+        if get(divz_r, "kind") == "Int" and get(divz_r, "value") == "0":
+            compile_error("orion: ERROR — division by zero (the divisor is the literal `0`)")
     if op == "and":
         return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "right"), sc_int("0")))
     if op == "or":
