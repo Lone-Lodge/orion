@@ -165,3 +165,52 @@ pub fn split(t: Text, sep: Text) -> [Text]:
 #   replace("a,b,c", ",", "; ")  ->  "a; b; c"
 pub fn replace(t: Text, from: Text, to: Text) -> Text:
     join(split(t, from), to)
+
+# First byte index of `sub` in `t`, or -1 if absent. Empty `sub` -> 0.
+pub fn index_of(t: Text, sub: Text) -> int:
+    tb = bytes_from_text(t)
+    sb = bytes_from_text(sub)
+    tlen = bytes_length(tb)
+    slen = bytes_length(sb)
+    mut found = 0 - 1
+    if slen == 0:
+        found = 0
+    else:
+        mut i = 0
+        loop:
+            if i > tlen - slen or found >= 0:
+                break
+            mut matched = 1
+            for j in 0..<slen:
+                if byte_at(tb, i + j) != byte_at(sb, j):
+                    matched = 0
+            if matched == 1:
+                found = i
+            i = i + 1
+    found
+
+# Pad `t` on the left with `pad` until it is at least `width` bytes wide.
+pub fn pad_left(t: Text, width: int, pad: Text) -> Text:
+    mut out = t
+    mut k = len(t)
+    loop:
+        if k >= width:
+            break
+        out = "{pad}{out}"
+        k = k + 1
+    out
+
+# Pad `t` on the right with `pad` until it is at least `width` bytes wide.
+pub fn pad_right(t: Text, width: int, pad: Text) -> Text:
+    mut out = t
+    mut k = len(t)
+    loop:
+        if k >= width:
+            break
+        out = "{out}{pad}"
+        k = k + 1
+    out
+
+# Split `t` into lines on '\n'.
+pub fn lines(t: Text) -> [Text]:
+    split(t, "\n")
