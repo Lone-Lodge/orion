@@ -271,6 +271,9 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         callee_ref = value_ref(inst.value)
         result = "    {value_ref(my_id)} = call {ret_ty} {callee_ref}({arg_text})"
 
+    if op == "int_to_ptr":
+        result = "    {value_ref(my_id)} = inttoptr i64 {value_ref(inst.value)} to ptr"
+
     if op == "make_closure":
         # Build [fn_ptr_as_int, is_lambda_flag, cap0, cap1, ...] as a list.
         n_caps = len(inst.args)

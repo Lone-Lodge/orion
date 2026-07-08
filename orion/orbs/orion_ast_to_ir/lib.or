@@ -1221,14 +1221,29 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         idx_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
-        # Carry the element type from a parameterised list ("list:text") onto
-        # the list_at inst so downstream type checks (e.g. text_cmp) see it.
-        list_type = get_value_type(idx_r.function, list_r.id)
-        elem_type = extract_list_elem(list_type)
-        at_inst = ir_list_at(list_r.id, idx_r.id)
-        at_inst_typed = Inst{op: at_inst.op, type_text: elem_type, value: at_inst.value, lhs: at_inst.lhs, rhs: at_inst.rhs, name: at_inst.name, args: at_inst.args}
-        pr = ir_fn_push(idx_r.function, at_inst_typed)
-        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+        # Closure env read: `at(__env, const)` inside a synth lambda. The env
+        # list is i64, so a text/list/map capture is stored ptr-as-int — read
+        # it as i64, then re-type per the code recorded at make_closure.
+        mut is_env_cap = false
+        mut cap_code = 0
+        if get(list_node, "kind") == "Ident" and get(list_node, "name") == "__env" and get(idx_node, "kind") == "Int":
+            slot_j = parse_int(get(idx_node, "value")) - 2
+            cap_code = slot_get_int("clos:{fn_value.name}:capty:{slot_j}")
+            if cap_code != 0:
+                is_env_cap = true
+        if is_env_cap:
+            pr_at = ir_fn_push(idx_r.function, ir_list_at(list_r.id, idx_r.id))
+            pr_rt = ir_fn_push(pr_at.function, ir_int_to_ptr(pr_at.id, cap_code_type(cap_code)))
+            result = ConvResult{function: pr_rt.function, scope: idx_r.scope, id: pr_rt.id}
+        else:
+            # Carry the element type from a parameterised list ("list:text") onto
+            # the list_at inst so downstream type checks (e.g. text_cmp) see it.
+            list_type = get_value_type(idx_r.function, list_r.id)
+            elem_type = extract_list_elem(list_type)
+            at_inst = ir_list_at(list_r.id, idx_r.id)
+            at_inst_typed = Inst{op: at_inst.op, type_text: elem_type, value: at_inst.value, lhs: at_inst.lhs, rhs: at_inst.rhs, name: at_inst.name, args: at_inst.args}
+            pr = ir_fn_push(idx_r.function, at_inst_typed)
+            result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
     if is_len:
         arg_node = at(args, 0)
         arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
@@ -1959,7 +1974,11 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
     if is_make_closure:
         # Lambda closure: lower each captured expr, then pack [fn_ptr, 1, caps].
+        # Record each capture's type-code (0 int / 1 text / 2 list / 3 map) so
+        # __lambda_N's prologue reads it back with the right type — the env list
+        # itself is i64, so a text/list/map capture must be re-typed on read.
         mc_caps = get_list(node, "caps")
+        mc_fn_name = get(node, "fn")
         mut mc_fn = fn_value
         mut mc_scope = scope
         mut mc_cap_ids = slice([0], 0, 0)
@@ -1968,7 +1987,8 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             mc_fn = mc_cap_r.function
             mc_scope = mc_cap_r.scope
             mc_cap_ids = push(mc_cap_ids, mc_cap_r.id)
-        pr_mc = ir_fn_push(mc_fn, ir_make_closure(get(node, "fn"), mc_cap_ids, 1))
+            slot_set("clos:{mc_fn_name}:capty:{mci}", cap_type_code(get_value_type(mc_fn, mc_cap_r.id)))
+        pr_mc = ir_fn_push(mc_fn, ir_make_closure(mc_fn_name, mc_cap_ids, 1))
         result = ConvResult{function: pr_mc.function, scope: mc_scope, id: pr_mc.id}
     if is_block:
         result = ast_block_to_ir(fn_value, scope, node)
@@ -2158,6 +2178,29 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         pr_fallback = ir_fn_push(fn_value, ir_iconst(0))
         result = ConvResult{function: pr_fallback.function, scope: scope, id: pr_fallback.id}
     result
+
+
+# Closure capture type-codes: 0 = i64/int, 1 = text, 2 = list, 3 = map.
+# Anything else (struct etc.) falls back to 0 (read as i64).
+fn cap_type_code(t: Text) -> int:
+    mut code = 0
+    if t == "text":
+        code = 1
+    if is_list_type(t):
+        code = 2
+    if t == "map":
+        code = 3
+    code
+
+fn cap_code_type(code: int) -> Text:
+    mut t = "i64"
+    if code == 1:
+        t = "text"
+    if code == 2:
+        t = "list:i64"
+    if code == 3:
+        t = "map"
+    t
 
 
 # Map a parser type-node to an IR type string ("text" / "list" / "i64").

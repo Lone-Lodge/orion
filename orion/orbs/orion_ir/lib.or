@@ -545,6 +545,13 @@ pub fn ir_closure_call(closure_id: int, arg_ids: [int], ret_type: Text) -> Inst:
     Inst{op: "closure_call", type_text: ret_type, value: closure_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
 
 
+# Reinterpret an i64 (a ptr stored as int — e.g. a text/list/map closure
+# capture read back from the env) as a typed ptr value. type_text carries
+# the intended type ("text" / "list:i64" / "map") so downstream ops see it.
+pub fn ir_int_to_ptr(src_id: int, type_text: Text) -> Inst:
+    Inst{op: "int_to_ptr", type_text: type_text, value: src_id, lhs: 0, rhs: 0, name: "", args: []}
+
+
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:
     mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
