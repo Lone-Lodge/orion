@@ -1,0 +1,24 @@
+# dict — friendly names for the map built-ins a newcomer reaches for.
+#
+#   keys(m)            ->  ["a", "b"]      (map keys are text)
+#   size(m)            ->  2
+#   has_key(m, "a")    ->  1
+#   values(m)          ->  [1, 2]          (int-valued maps)
+#
+# `has(m, k)` and `get_or(m, k, default)` are already built in.
+
+# The keys of `m`, as a list of text.
+pub fn keys(m: Map) -> [Text]:
+    map_keys(m)
+
+# Number of entries.
+pub fn size(m: Map) -> int:
+    len(m)
+
+# 1 if `k` is present, else 0.
+pub fn has_key(m: Map, k: Text) -> int:
+    if has(m, k) then 1 else 0
+
+# The values of an int-valued map, in key order.
+pub fn values(m: Map) -> [int]:
+    map_values(m)
