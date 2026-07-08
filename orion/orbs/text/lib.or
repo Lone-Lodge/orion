@@ -159,3 +159,9 @@ pub fn split(t: Text, sep: Text) -> [Text]:
                 i = i + 1
         out = push(out, bytes_to_text(bytes_slice(tb, start, tlen)))
     out
+
+# Replace every occurrence of `from` with `to` — split on `from`, rejoin
+# with `to`. An empty `from` returns `t` unchanged.
+#   replace("a,b,c", ",", "; ")  ->  "a; b; c"
+pub fn replace(t: Text, from: Text, to: Text) -> Text:
+    join(split(t, from), to)
