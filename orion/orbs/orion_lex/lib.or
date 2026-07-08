@@ -132,11 +132,16 @@ fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: in
     mut cursor = start + 1
     mut buffer = bytes_zeros(0)
     mut closed = false
+    # Depth of unescaped `{…}` interpolation braces. A `"` inside braces
+    # belongs to an interpolated expression (e.g. a map key `m["k"]`), not
+    # the string terminator — so it doesn't end the literal.
+    mut brace_depth = 0
     loop:
         if cursor >= byte_count:
             break
         current = byte_at(bytes, cursor)
-        if current == 34:
+        is_close_quote = current == 34 and brace_depth == 0
+        if is_close_quote:
             closed = true
             cursor += 1
             break
@@ -156,6 +161,12 @@ fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: in
                 buffer = push(buffer, next_byte)
                 cursor += 2
         else:
+            # Track interpolation depth on unescaped braces (escaped `\{` is
+            # handled above and never reaches here).
+            if current == 123:
+                brace_depth = brace_depth + 1
+            if current == 125 and brace_depth > 0:
+                brace_depth = brace_depth - 1
             buffer = push(buffer, current)
             cursor += 1
     text_value = bytes_to_text(buffer)
