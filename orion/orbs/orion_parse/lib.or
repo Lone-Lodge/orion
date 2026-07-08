@@ -933,7 +933,11 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         value_here = psr_peek_value(tokens, cursor)
         col_here = if cursor >= len(tokens) then 0 else get_int(at(tokens, cursor), "col")
         is_eof = kind_here == "eof"
-        starts_new_decl = kind_here == "ident" and (value_here == "fn" or value_here == "pub" or value_here == "data" or value_here == "enum" or value_here == "use" or value_here == "system" or value_here == "impl" or value_here == "trait" or value_here == "extern")
+        # `fn(` is a lambda EXPRESSION (e.g. a bare `fn(n): n+1` as a fn body),
+        # not a new declaration — only `fn NAME(` starts a decl. Without this,
+        # the body loop breaks on the lambda and it mis-parses as a decl named `(`.
+        fn_is_lambda = value_here == "fn" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "("
+        starts_new_decl = kind_here == "ident" and (((value_here == "fn") and not fn_is_lambda) or value_here == "pub" or value_here == "data" or value_here == "enum" or value_here == "use" or value_here == "system" or value_here == "impl" or value_here == "trait" or value_here == "extern")
         dedented = col_here < min_col
         if is_eof or starts_new_decl or dedented:
             break
