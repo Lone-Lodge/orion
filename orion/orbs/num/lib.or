@@ -1,0 +1,39 @@
+# num — the small integer helpers every program reaches for.
+#
+#   abs(-3)            ->  3
+#   min(4, 9)          ->  4
+#   max(4, 9)          ->  9
+#   clamp(12, 0, 10)   ->  10
+#   sign(-5)           ->  -1
+
+# Absolute value.
+pub fn abs(x: int) -> int:
+    if x < 0 then 0 - x else x
+
+# The smaller of two values.
+pub fn min(a: int, b: int) -> int:
+    if a < b then a else b
+
+# The larger of two values.
+pub fn max(a: int, b: int) -> int:
+    if a > b then a else b
+
+# Constrain `x` to the range [lo, hi].
+pub fn clamp(x: int, lo: int, hi: int) -> int:
+    if x < lo then lo else (if x > hi then hi else x)
+
+# -1, 0, or 1 by the sign of `x`.
+pub fn sign(x: int) -> int:
+    if x > 0 then 1 else (if x < 0 then 0 - 1 else 0)
+
+# Greatest common divisor (Euclid). gcd(0, 0) is 0.
+pub fn gcd(a: int, b: int) -> int:
+    mut x = abs(a)
+    mut y = abs(b)
+    loop:
+        if y == 0:
+            break
+        t = y
+        y = x % y
+        x = t
+    x
