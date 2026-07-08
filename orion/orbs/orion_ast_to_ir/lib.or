@@ -2695,7 +2695,44 @@ fn nlam_lift_stmt(stmt: Map) -> Map:
         r = nlam_lift(get(stmt, fld))
         out = set(out, fld, get(r, "node"))
         synths = get_list(r, "synths")
+    # Recurse into nested block bodies so a lambda inside a for/loop/if body
+    # (e.g. `for i in ...: g = fn(n): n + i`) is lifted too.
+    if kind == "Loop" or kind == "ForRange" or kind == "ForIn" or kind == "ForWith":
+        br = nlam_lift_block(get(stmt, "body"))
+        out = set(out, "body", get(br, "block"))
+        synths = get_list(br, "synths")
+    if kind == "IfBlock":
+        tr = nlam_lift_block(get(stmt, "then"))
+        out = set(out, "then", get(tr, "block"))
+        mut ifsyn = get_list(tr, "synths")
+        els = get(stmt, "else")
+        if get(els, "kind") == "Block":
+            er = nlam_lift_block(els)
+            out = set(out, "else", get(er, "block"))
+            ersyn = get_list(er, "synths")
+            for ej in 0..<len(ersyn):
+                ifsyn = push(ifsyn, at(ersyn, ej))
+        if get(els, "kind") == "IfBlock":
+            er2 = nlam_lift_stmt(els)
+            out = set(out, "else", get(er2, "stmt"))
+            ersyn2 = get_list(er2, "synths")
+            for ej2 in 0..<len(ersyn2):
+                ifsyn = push(ifsyn, at(ersyn2, ej2))
+        synths = ifsyn
     {"stmt": out, "synths": synths}
+
+# Lift lambdas in every statement of a block. Returns {block, synths}.
+fn nlam_lift_block(block: Map) -> Map:
+    stmts = get_list(block, "stmts")
+    mut out_stmts = slice(stmts, 0, 0)
+    mut synths = slice([block], 0, 0)
+    for i in 0..<len(stmts):
+        r = nlam_lift_stmt(at(stmts, i))
+        out_stmts = push(out_stmts, get(r, "stmt"))
+        rs = get_list(r, "synths")
+        for j in 0..<len(rs):
+            synths = push(synths, at(rs, j))
+    {"block": set(block, "stmts", out_stmts), "synths": synths}
 
 # Does this expression contain a lambda (nested in a call arg / operand)?
 fn nlam_has(node: Map) -> bool:
@@ -2715,7 +2752,7 @@ fn nlam_has(node: Map) -> bool:
             found = true
     found
 
-# Does a statement's expr/value field contain a nested lambda?
+# Does a statement (or a nested block it holds) contain a lambda?
 fn nlam_stmt_has(stmt: Map) -> bool:
     kind = get(stmt, "kind")
     mut found = false
@@ -2723,6 +2760,27 @@ fn nlam_stmt_has(stmt: Map) -> bool:
         found = nlam_has(get(stmt, "value"))
     if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer" or kind == "Destroy":
         found = nlam_has(get(stmt, "expr"))
+    if kind == "Loop" or kind == "ForRange" or kind == "ForIn" or kind == "ForWith":
+        if nlam_block_has(get(stmt, "body")):
+            found = true
+    if kind == "IfBlock":
+        if nlam_block_has(get(stmt, "then")):
+            found = true
+        els = get(stmt, "else")
+        if get(els, "kind") == "Block":
+            if nlam_block_has(els):
+                found = true
+        if get(els, "kind") == "IfBlock":
+            if nlam_stmt_has(els):
+                found = true
+    found
+
+fn nlam_block_has(block: Map) -> bool:
+    stmts = get_list(block, "stmts")
+    mut found = false
+    for i in 0..<len(stmts):
+        if nlam_stmt_has(at(stmts, i)):
+            found = true
     found
 
 
