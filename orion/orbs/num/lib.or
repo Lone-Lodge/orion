@@ -37,3 +37,24 @@ pub fn gcd(a: int, b: int) -> int:
         y = x % y
         x = t
     x
+
+# Parse a base-10 integer out of text. A leading '-' negates; digits are
+# read left to right and any non-digit is skipped. parse("") is 0.
+#   parse("42")   ->  42
+#   parse("-7")   ->  -7
+# Pairs with split: split("3,4,5", ",") then parse each piece.
+pub fn parse(t: Text) -> int:
+    b = bytes_from_text(t)
+    total = bytes_length(b)
+    mut value = 0
+    mut start = 0
+    mut neg = 0
+    if total > 0:
+        if byte_at(b, 0) == 45:
+            neg = 1
+            start = 1
+    for i in start..<total:
+        d = byte_at(b, i)
+        if d >= 48 and d <= 57:
+            value = value * 10 + (d - 48)
+    if neg == 1 then 0 - value else value
