@@ -33,6 +33,12 @@ Roadmap: maps, text lists, struct types.
 ### `pub fn ir_type_void() -> Text: "void"`
 
 
+### `pub fn compile_error(msg: Text)`
+
+
+### `pub fn compile_errors() -> int`
+
+
 ### `pub fn ir_iconst(value: int) -> Inst`
 
 --- Instruction builders ---
@@ -94,10 +100,35 @@ Comparison ops. Produce i64 with value 0 (false) or 1 (true).
 Print an i64 value as decimal text + newline to stdout.
 Produces a void value (the instruction has no SSA-id consumers).
 
+### `pub fn ir_print_float(value_id: int) -> Inst`
+
+
 ### `pub fn ir_select(cond_id: int, then_id: int, else_id: int) -> Inst`
 
 Select: result = if cond != 0 then then_id else else_id.
 Branchless via cmov — works for any tree-shaped IR.
+
+### `pub fn ir_fconst(literal: Text) -> Inst`
+
+--- Floats (f64 / LLVM double) ---
+Float constant. The literal TEXT is kept in `name`; emit converts it
+to an exact hex bit-pattern via orion_f64_literal_hex at compile time
+(decimal FP literals like 0.1 are rejected by LLVM unless exact).
+
+### `pub fn ir_fbin(op_name: Text, lhs: int, rhs: int) -> Inst`
+
+Float arithmetic: op_name is fadd/fsub/fmul/fdiv.
+
+### `pub fn ir_fcmp(cc: Text, lhs: int, rhs: int) -> Inst`
+
+Float comparison: cc is oeq/one/olt/ole/ogt/oge. Produces i64 0/1.
+
+### `pub fn ir_sitofp(value_id: int) -> Inst`
+
+int → float / float → int conversions.
+
+### `pub fn ir_fptosi(value_id: int) -> Inst`
+
 
 ### `pub fn ir_call(fn_name: Text, arg_ids: [int], ret_type: Text) -> Inst`
 
@@ -136,6 +167,18 @@ Length of a text string (calls libc strlen).
 
 slice(text, lo, hi) — substring from byte index lo (inclusive) to hi (exclusive).
 Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
+
+### `pub fn ir_list_slice(list_id: int, lo_id: int, hi_id: int, list_type: Text) -> Inst`
+
+slice(list, lo, hi) — half-open, clamped; type_text carries the
+source list type so element typing survives the slice.
+
+### `pub fn ir_fmath1(libm: Text, arg_id: int) -> Inst`
+
+Float math — name holds the libm symbol (sqrt/sin/.../log).
+
+### `pub fn ir_fmath2(libm: Text, a_id: int, b_id: int) -> Inst`
+
 
 ### `pub fn ir_text_contains(text_id: int, sub_id: int) -> Inst`
 
@@ -202,19 +245,94 @@ future enhancement.
 Push: copy all items + append val, return new list ptr.
 Caller pattern: `xs = push(xs, val)`.
 
-### `pub fn ir_map_lit(pair_ids: [int]) -> Inst`
+### `pub fn ir_list_push_mut(list_id: int, val_id: int) -> Inst`
+
+In-place push — ONLY emitted for the self-rebind statement form
+`x = push(x, v)`, where the old list value is dead after the
+statement. Amortized O(1) vs list_push's O(n) copy. Callers holding
+an alias to x across a self-rebind push observe the mutation — same
+caveat as lodge-orion's Arc::get_mut fast path.
+
+### `pub fn ir_vec_add(a_id: int, b_id: int) -> Inst`
+
+SIMD-style elementwise vector ops. Returns a new int list (vec_add/sub/mul)
+or i64 (vec_dot).
+
+### `pub fn ir_vec_sub(a_id: int, b_id: int) -> Inst`
+
+
+### `pub fn ir_vec_mul(a_id: int, b_id: int) -> Inst`
+
+
+### `pub fn ir_vec_dot(a_id: int, b_id: int) -> Inst`
+
+
+### `pub fn ir_time_now_ms() -> Inst`
+
+Async runtime primitives.
+
+### `pub fn ir_monotonic_ms() -> Inst`
+
+
+### `pub fn ir_sleep_ms(ms_id: int) -> Inst`
+
+
+### `pub fn ir_map_lit(pair_ids: [int], val_type: Text) -> Inst`
 
 --- Maps (text key → i64 value) ---
 A map is a ptr to a heap buffer laid out as
   [i64 length, i64 key0_ptr, i64 val0, i64 key1_ptr, i64 val1, ...]
 Keys are text pointers stored as i64 (lossless on 64-bit).
 args alternates: [key0_id, val0_id, key1_id, val1_id, ...].
+`val_type` is the map's homogeneous value type (i64 / text / list:… / map).
+It rides in type_text as `map:<val_type>` so get()/[] recover the value type
+through mut slots, set-results and copies — a bare `map` lost it and made
+`get` guess `text`, concatenating int values as pointers (a crash).
 
 ### `pub fn ir_map_get(map_id: int, key_id: int, value_type: Text) -> Inst`
 
 
 ### `pub fn ir_map_has(map_id: int, key_id: int) -> Inst`
 
+
+### `pub fn ir_map_set_val(map_id: int, key_id: int, val_id: int, map_type: Text) -> Inst`
+
+set(map, key, val) — mutates in place (indirect handle survives
+growth) and re-yields the map so `m = set(m, k, v)` value-semantics
+call sites keep working. Same aliasing caveat as list_push_mut.
+
+### `pub fn ir_map_remove(map_id: int, key_id: int) -> Inst`
+
+
+### `pub fn ir_list_set_val(list_id: int, idx_id: int, val_id: int, list_type: Text) -> Inst`
+
+set(list, index, val) — in-place store, re-yields the list.
+
+### `pub fn ir_slot_has(key_id: int) -> Inst`
+
+slot_has(key) → 0/1; slot_get_int(key) → raw i64 (0 when unset).
+The typed pair that replaces interp-only `type_of(slot_get(k))`
+probing — works identically native and interpreted.
+
+### `pub fn ir_slot_get_int(key_id: int) -> Inst`
+
+
+### `pub fn ir_map_len(map_id: int) -> Inst`
+
+
+### `pub fn ir_map_keys(map_id: int) -> Inst`
+
+
+### `pub fn ir_map_values(map_id: int) -> Inst`
+
+
+### `pub fn ir_map_get_or(map_id: int, key_id: int, dflt_id: int, value_type: Text) -> Inst`
+
+get_or(map, key, default) — result typed after the default value.
+
+### `pub fn ir_f64_to_text(value_id: int) -> Inst`
+
+f64 → Text ("%g") for interpolation and to_text.
 
 ### `pub fn ir_struct_cons(struct_name: Text, n_fields: int, value_ids: [int]) -> Inst`
 
@@ -283,6 +401,12 @@ the param's declared type ("i64" or "text").
 ### `pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult`
 
 
+### `pub fn ir_fn_set_inst(fn_value: IRFn, idx: int, inst: Inst) -> IRFn`
+
+Overwrite the instruction at `idx` — used to back-patch an alloca's element
+type once inference resolves an empty list (`mut x = []` then `push`). Same
+in-place caveat as ir_fn_push: the caller drops the old IRFn.
+
 ### `pub fn ir_module_new() -> IRModule`
 
 --- Module builders ---
@@ -296,6 +420,45 @@ the param's declared type ("i64" or "text").
 
 ### `pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text`
 
+
+### `pub fn ir_perform_int(handler_name: Text, arg_id: int) -> Inst`
+
+Effects: perform with one-shot continuation via setjmp/longjmp.
+`perform Effect.op(arg)` lowers to this. emit_llvm wraps the call in
+setjmp dance so the handler can `resume_int(value)` to come back.
+For now: single i64 arg, i64 return. Generalize later.
+
+### `pub fn ir_perform_text(handler_name: Text, arg_id: int) -> Inst`
+
+
+### `pub fn ir_fn_ref(fn_name: Text) -> Inst`
+
+First-class fn reference — produces a ptr-typed SSA value holding
+the address of the named global fn. Used for higher-order fns.
+
+### `pub fn ir_indirect_call(callee_id: int, arg_ids: [int], ret_type: Text) -> Inst`
+
+Indirect call through a fn-ptr value (not a global fn name).
+callee_id is the SSA value holding the ptr; ret_type is what the
+fn returns. For now we restrict to all-i64 args / i64 or text ret.
+
+### `pub fn ir_make_closure(fn_name: Text, cap_ids: [int], is_lambda: int) -> Inst`
+
+Closure value = a list [fn_ptr_as_int, is_lambda_flag, cap0, cap1, ...].
+`is_lambda` (lhs) is 1 for a lambda (its fn takes the closure as a leading
+`env` arg and reads captures out of it), 0 for a plain fn-ref (called with
+no env). `name` is the target fn; `args` are the captured SSA value ids.
+
+### `pub fn ir_closure_call(closure_id: int, arg_ids: [int], ret_type: Text) -> Inst`
+
+Call a closure value: load its fn-ptr, and dispatch on the is_lambda flag —
+a lambda is invoked as fn(env, args...), a plain fn-ref as fn(args...).
+
+### `pub fn ir_int_to_ptr(src_id: int, type_text: Text) -> Inst`
+
+Reinterpret an i64 (a ptr stored as int — e.g. a text/list/map closure
+capture read back from the env) as a typed ptr value. type_text carries
+the intended type ("text" / "list:i64" / "map") so downstream ops see it.
 
 ### `pub fn ir_dump_fn(fn_value: IRFn) -> Text`
 
