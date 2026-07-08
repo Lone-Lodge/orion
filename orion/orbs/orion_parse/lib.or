@@ -937,9 +937,34 @@ fn psr_peek_col(tokens: [Map], position: int) -> int:
     else:
         get_int(at(tokens, cursor), "col")
 
+# Index of the `]` that closes the `[` at `open_idx` (nesting-aware), or -1.
+# Used to spot `IDENT[idx] = …` element assignment: scan to the matching
+# bracket, then check whether `=` follows.
+fn psr_match_bracket(tokens: [Map], open_idx: int) -> int:
+    total = len(tokens)
+    mut depth = 0
+    mut result = 0 - 1
+    mut i = open_idx
+    loop:
+        if i >= total or result >= 0:
+            break
+        k = psr_peek_kind(tokens, i)
+        v = psr_peek_value(tokens, i)
+        if k == "eof":
+            break
+        if k == "symbol" and v == "[":
+            depth = depth + 1
+        if k == "symbol" and v == "]":
+            depth = depth - 1
+            if depth == 0:
+                result = i
+        i = i + 1
+    result
+
 # Parse a body of one-or-more statements. A statement is either:
 #   `mut name = expr`   (MutLet — declare mutable)
 #   `name = expr`       (LetOrAssign — decide in codegen)
+#   `name[idx] = expr`  (element assignment — sugar for `name = set(...)`)
 #   `break`             (Break)
 #   `loop:` then block  (Loop)
 #   `expr`              (ExprStmt — evaluate)
@@ -992,6 +1017,13 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # `name = expr` — either immutable let OR reassignment, decided
         # by the codegen scope tracker.
         is_let_or_assign = (not is_mut_decl) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
+        # `IDENT[idx] = val` — element/entry assignment. Find the `]` closing
+        # the `[` at cursor+1; if `=` follows, desugar to `IDENT = set(IDENT,
+        # idx, val)` (set() dispatches list vs map, returns the updated
+        # container). A bare `IDENT[idx]` with no `=` stays an expression.
+        idx_open_here = kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "["
+        idx_assign_close = if idx_open_here then psr_match_bracket(tokens, cursor + 1) else (0 - 1)
+        is_index_assign = idx_assign_close >= 0 and psr_peek_kind(tokens, idx_assign_close + 1) == "symbol" and psr_peek_value(tokens, idx_assign_close + 1) == "="
         # `name += expr` (or -= *= /=) — compound assignment, desugared
         # to `name = name OP expr`.
         compound_op_value = psr_peek_value(tokens, cursor + 1)
@@ -1043,6 +1075,13 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             assign_expr_result = psr_parse_expr(tokens, cursor + 2)
             statements = push(statements, {"kind": "LetOrAssign", "name": assign_name, "value": get_map(assign_expr_result, "node"), "line": assign_line, "col": assign_col})
             cursor = get_int(assign_expr_result, "next")
+        if is_index_assign:
+            ia_name = value_here
+            ia_idx_result = psr_parse_expr(tokens, cursor + 2)
+            ia_val_result = psr_parse_expr(tokens, idx_assign_close + 2)
+            ia_set = {"kind": "Call", "callee": "set", "args": [{"kind": "Ident", "name": ia_name}, get_map(ia_idx_result, "node"), get_map(ia_val_result, "node")]}
+            statements = push(statements, {"kind": "LetOrAssign", "name": ia_name, "value": ia_set})
+            cursor = get_int(ia_val_result, "next")
         if is_compound_assign:
             compound_name = value_here
             compound_op_text = psr_peek_value(tokens, cursor + 1)
@@ -1240,7 +1279,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                     ci = ci - 1
                 statements = push(statements, {"kind": "IfBlock", "cond": get_map(cond_probe, "node"), "then": get_map(then_body_result, "node"), "else": else_node})
                 cursor = if_cursor
-        is_plain_expr = not (is_mut_decl or is_typed_mut_decl or is_fact_decl or is_let_or_assign or is_break or is_continue or is_require or is_ensure or is_return or is_destroy or is_loop or is_for or is_match or actually_if_block)
+        is_plain_expr = not (is_mut_decl or is_typed_mut_decl or is_fact_decl or is_let_or_assign or is_index_assign or is_break or is_continue or is_require or is_ensure or is_return or is_destroy or is_loop or is_for or is_match or actually_if_block)
         if is_plain_expr:
             expr_result = psr_parse_expr(tokens, cursor)
             expr_next = get_int(expr_result, "next")

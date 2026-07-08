@@ -1953,12 +1953,20 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
 pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     kind = get(node, "kind")
-    # `xs[i]` is sugar for `at(xs, i)` — desugar here so the `at` builtin's
-    # element typing and bounds handling are reused verbatim. Nested indexing
-    # (`xss[0][1]`) falls out naturally: the inner Index lowers as `at`'s arg.
+    # `xs[i]` / `m[k]` is sugar for `at(xs, i)` (lists) or `get(m, k)` (maps),
+    # reusing those builtins' element typing verbatim. The container is probed
+    # on a throwaway lowering (index bases are idents/params, so nothing
+    # duplicated survives — the real accessor re-lowers into the pristine
+    # fn_value). Nested indexing (`xss[0][1]`) falls out: the inner Index
+    # lowers as the accessor's argument.
     if kind == "Index":
-        at_call = {"kind": "Call", "callee": "at", "args": [get(node, "object"), get(node, "index")]}
-        return ast_expr_to_ir(fn_value, scope, at_call)
+        idx_obj = get(node, "object")
+        idx_key = get(node, "index")
+        idx_probe = ast_expr_to_ir(fn_value, scope, idx_obj)
+        idx_obj_type = get_value_type(idx_probe.function, idx_probe.id)
+        idx_callee = if idx_obj_type == "map" then "get" else "at"
+        idx_call = {"kind": "Call", "callee": idx_callee, "args": [idx_obj, idx_key]}
+        return ast_expr_to_ir(fn_value, scope, idx_call)
     is_block = kind == "Block"
     is_int = kind == "Int"
     is_float_lit = kind == "Float"

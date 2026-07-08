@@ -1,0 +1,12 @@
+# `xs[i] = v` element assignment (sugar for `xs = set(xs, i, v)`) and `[]`
+# reads for both lists (`xs[i]` -> at) and maps (`m[k]` -> get). Before,
+# `xs[i] = v` silently did nothing and `m[k]` failed to lower.
+fn main() -> int:
+    mut xs = [1, 2, 3]
+    xs[0] = 10
+    xs[2] = 30
+    i = 1
+    xs[i] = 20            # index by a variable
+
+    m = {"a": 2, "b": 5}
+    xs[0] + xs[1] + xs[2] + m["a"] + m["b"]   # 10 + 20 + 30 + 2 + 5 = 67
