@@ -5,6 +5,8 @@
 #   msg.starts_with("hello")
 #   msg.ends_with("!")
 #   msg.byte_count()
+#   split("a,b,c", ",")   ->  ["a", "b", "c"]
+#   join(parts, ", ")     ->  "a, b, c"
 #
 # All thanks to MethodCall desugar: `msg.starts_with("x")` lowers to
 # `starts_with(msg, "x")`.
@@ -91,3 +93,44 @@ pub fn lower(t: Text) -> Text:
             new_b = b + 32
         out = bytes_concat(out, [new_b])
     bytes_to_text(out)
+
+# Join a list of pieces with `sep` between them.
+#   join(["a", "b", "c"], "-")  ->  "a-b-c"
+pub fn join(parts: [Text], sep: Text) -> Text:
+    mut out = ""
+    n = len(parts)
+    for i in 0..<n:
+        if i > 0:
+            out = "{out}{sep}"
+        out = "{out}{at(parts, i)}"
+    out
+
+# Split `t` on every occurrence of `sep`, returning the pieces.
+#   split("a,b,c", ",")  ->  ["a", "b", "c"]
+# An empty `sep` yields the whole string as a single piece.
+pub fn split(t: Text, sep: Text) -> [Text]:
+    tb = bytes_from_text(t)
+    sb = bytes_from_text(sep)
+    tlen = bytes_length(tb)
+    slen = bytes_length(sb)
+    mut out = []
+    if slen == 0:
+        out = push(out, t)
+    else:
+        mut start = 0
+        mut i = 0
+        loop:
+            if i > tlen - slen:
+                break
+            mut matched = 1
+            for j in 0..<slen:
+                if byte_at(tb, i + j) != byte_at(sb, j):
+                    matched = 0
+            if matched == 1:
+                out = push(out, bytes_to_text(bytes_slice(tb, start, i)))
+                i = i + slen
+                start = i
+            else:
+                i = i + 1
+        out = push(out, bytes_to_text(bytes_slice(tb, start, tlen)))
+    out
