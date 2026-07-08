@@ -13695,71 +13695,96 @@ entry:
     br label %loop_17_header
 loop_17_header:
     %v19 = load i64, ptr %v15
-    %v20 = call ptr @psr_peek_kind(ptr %v0, i64 %v19)
-    %v21 = load i64, ptr %v15
-    %v22 = call ptr @psr_peek_value(ptr %v0, i64 %v21)
-    %v23 = call i64 @psr_op_prec(ptr %v20, ptr %v22)
-    %v24 = add i64 0, 0
-    %v25.b = icmp eq i64 %v23, %v24
-    %v25 = zext i1 %v25.b to i64
-    %v26.cb = icmp ne i64 %v25, 0
-    br i1 %v26.cb, label %if_26_then, label %if_26_else
-if_26_then:
-    br label %if_26_merge
-if_26_else:
-    %v30.b = icmp slt i64 %v23, %v2
-    %v30 = zext i1 %v30.b to i64
-    br label %if_26_merge
-if_26_merge:
-    %v33 = phi i64 [ %v25, %if_26_then ], [ %v30, %if_26_else ]
-    %v34.cb = icmp ne i64 %v33, 0
-    br i1 %v34.cb, label %if_34_then, label %if_34_else
-if_34_then:
+    %v20 = call i64 @psr_skip_newlines(ptr %v0, i64 %v19)
+    %v21 = call ptr @psr_peek_kind(ptr %v0, i64 %v20)
+    %v22 = getelementptr i8, ptr @.str_245, i64 16
+    %v23.e = call i64 @orion_text_eq(ptr %v21, ptr %v22)
+    %v23 = add i64 %v23.e, 0
+    %v24.cb = icmp ne i64 %v23, 0
+    br i1 %v24.cb, label %if_24_then, label %if_24_else
+if_24_then:
+    %v26 = call ptr @psr_peek_value(ptr %v0, i64 %v20)
+    %v27 = getelementptr i8, ptr @.str_220, i64 16
+    %v28.e = call i64 @orion_text_eq(ptr %v26, ptr %v27)
+    %v28 = add i64 %v28.e, 0
+    br label %if_24_merge
+if_24_else:
+    %v31 = add i64 0, 0
+    br label %if_24_merge
+if_24_merge:
+    %v34 = phi i64 [ %v28, %if_24_then ], [ %v31, %if_24_else ]
+    %v35.cb = icmp ne i64 %v34, 0
+    br i1 %v35.cb, label %if_35_then, label %if_35_else
+if_35_then:
+    br label %if_35_merge
+if_35_else:
+    %v39 = load i64, ptr %v15
+    br label %if_35_merge
+if_35_merge:
+    %v42 = phi i64 [ %v20, %if_35_then ], [ %v39, %if_35_else ]
+    %v43 = call ptr @psr_peek_kind(ptr %v0, i64 %v42)
+    %v44 = call ptr @psr_peek_value(ptr %v0, i64 %v42)
+    %v45 = call i64 @psr_op_prec(ptr %v43, ptr %v44)
+    %v46 = add i64 0, 0
+    %v47.b = icmp eq i64 %v45, %v46
+    %v47 = zext i1 %v47.b to i64
+    %v48.cb = icmp ne i64 %v47, 0
+    br i1 %v48.cb, label %if_48_then, label %if_48_else
+if_48_then:
+    br label %if_48_merge
+if_48_else:
+    %v52.b = icmp slt i64 %v45, %v2
+    %v52 = zext i1 %v52.b to i64
+    br label %if_48_merge
+if_48_merge:
+    %v55 = phi i64 [ %v47, %if_48_then ], [ %v52, %if_48_else ]
+    %v56.cb = icmp ne i64 %v55, 0
+    br i1 %v56.cb, label %if_56_then, label %if_56_else
+if_56_then:
     br label %loop_17_end
-if_34_else:
-    br label %if_34_merge
-if_34_merge:
-    %v40 = load i64, ptr %v15
-    %v41 = add i64 0, 1
-    %v42 = add i64 %v40, %v41
-    %v43 = add i64 0, 1
-    %v44 = add i64 %v23, %v43
-    %v45 = call ptr @psr_parse_expr_at(ptr %v0, i64 %v42, i64 %v44)
-    %v46 = getelementptr i8, ptr @.str_114, i64 16
-    %v47 = getelementptr i8, ptr @.str_309, i64 16
-    %v48 = getelementptr i8, ptr @.str_296, i64 16
-    %v49 = getelementptr i8, ptr @.str_310, i64 16
-    %v50 = load ptr, ptr %v11
-    %v51 = getelementptr i8, ptr @.str_311, i64 16
-    %v52 = getelementptr i8, ptr @.str_256, i64 16
-    %v53.i = call i64 @orion_map_get(ptr %v45, ptr %v52)
-    %v53 = inttoptr i64 %v53.i to ptr
-    %v54 = call ptr @orion_map_new(i64 4)
-    %v54.p0 = ptrtoint ptr %v47 to i64
-    call void @orion_map_set(ptr %v54, ptr %v46, i64 %v54.p0)
-    %v54.p1 = ptrtoint ptr %v22 to i64
-    call void @orion_map_set(ptr %v54, ptr %v48, i64 %v54.p1)
-    %v54.p2 = ptrtoint ptr %v50 to i64
-    call void @orion_map_set(ptr %v54, ptr %v49, i64 %v54.p2)
-    %v54.p3 = ptrtoint ptr %v53 to i64
-    call void @orion_map_set(ptr %v54, ptr %v51, i64 %v54.p3)
-    store ptr %v54, ptr %v11
-    %v55 = add i64 0, 0
-    %v56 = getelementptr i8, ptr @.str_120, i64 16
-    %v57 = call i64 @orion_map_get(ptr %v45, ptr %v56)
-    store i64 %v57, ptr %v15
-    %v58 = add i64 0, 0
+if_56_else:
+    br label %if_56_merge
+if_56_merge:
+    %v62 = add i64 0, 1
+    %v63 = add i64 %v42, %v62
+    %v64 = add i64 0, 1
+    %v65 = add i64 %v45, %v64
+    %v66 = call ptr @psr_parse_expr_at(ptr %v0, i64 %v63, i64 %v65)
+    %v67 = getelementptr i8, ptr @.str_114, i64 16
+    %v68 = getelementptr i8, ptr @.str_309, i64 16
+    %v69 = getelementptr i8, ptr @.str_296, i64 16
+    %v70 = getelementptr i8, ptr @.str_310, i64 16
+    %v71 = load ptr, ptr %v11
+    %v72 = getelementptr i8, ptr @.str_311, i64 16
+    %v73 = getelementptr i8, ptr @.str_256, i64 16
+    %v74.i = call i64 @orion_map_get(ptr %v66, ptr %v73)
+    %v74 = inttoptr i64 %v74.i to ptr
+    %v75 = call ptr @orion_map_new(i64 4)
+    %v75.p0 = ptrtoint ptr %v68 to i64
+    call void @orion_map_set(ptr %v75, ptr %v67, i64 %v75.p0)
+    %v75.p1 = ptrtoint ptr %v44 to i64
+    call void @orion_map_set(ptr %v75, ptr %v69, i64 %v75.p1)
+    %v75.p2 = ptrtoint ptr %v71 to i64
+    call void @orion_map_set(ptr %v75, ptr %v70, i64 %v75.p2)
+    %v75.p3 = ptrtoint ptr %v74 to i64
+    call void @orion_map_set(ptr %v75, ptr %v72, i64 %v75.p3)
+    store ptr %v75, ptr %v11
+    %v76 = add i64 0, 0
+    %v77 = getelementptr i8, ptr @.str_120, i64 16
+    %v78 = call i64 @orion_map_get(ptr %v66, ptr %v77)
+    store i64 %v78, ptr %v15
+    %v79 = add i64 0, 0
     br label %loop_17_header
 loop_17_end:
-    %v61 = getelementptr i8, ptr @.str_256, i64 16
-    %v62 = load ptr, ptr %v11
-    %v63 = getelementptr i8, ptr @.str_120, i64 16
-    %v64 = load i64, ptr %v15
-    %v65 = call ptr @orion_map_new(i64 2)
-    %v65.p0 = ptrtoint ptr %v62 to i64
-    call void @orion_map_set(ptr %v65, ptr %v61, i64 %v65.p0)
-    call void @orion_map_set(ptr %v65, ptr %v63, i64 %v64)
-    ret ptr %v65
+    %v82 = getelementptr i8, ptr @.str_256, i64 16
+    %v83 = load ptr, ptr %v11
+    %v84 = getelementptr i8, ptr @.str_120, i64 16
+    %v85 = load i64, ptr %v15
+    %v86 = call ptr @orion_map_new(i64 2)
+    %v86.p0 = ptrtoint ptr %v83 to i64
+    call void @orion_map_set(ptr %v86, ptr %v82, i64 %v86.p0)
+    call void @orion_map_set(ptr %v86, ptr %v84, i64 %v85)
+    ret ptr %v86
 }
 
 define ptr @psr_parse_expr(ptr %p0, i64 %p1) {
