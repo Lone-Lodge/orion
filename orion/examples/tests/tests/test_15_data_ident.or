@@ -1,0 +1,8 @@
+# Regression: `data` (the struct-decl keyword) used as a plain variable
+# name. It only opens a declaration when a name follows (`data Point:`);
+# `data = …` is an ordinary binding. Before, naming a variable `data`
+# silently truncated the function body to `ret 0` with no diagnostic.
+fn main() -> int:
+    data = [4, 5, 6]
+    print_line("data has {len(data)} items")
+    at(data, 0) + at(data, 1) + at(data, 2)   # 15

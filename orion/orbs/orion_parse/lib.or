@@ -959,7 +959,21 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # not a new declaration — only `fn NAME(` starts a decl. Without this,
         # the body loop breaks on the lambda and it mis-parses as a decl named `(`.
         fn_is_lambda = value_here == "fn" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "("
-        starts_new_decl = kind_here == "ident" and (((value_here == "fn") and not fn_is_lambda) or value_here == "pub" or value_here == "data" or value_here == "enum" or value_here == "use" or value_here == "system" or value_here == "impl" or value_here == "trait" or value_here == "extern")
+        # `data` / `enum` / `system` / `impl` / `trait` NAME a thing
+        # (`data Point:`), so they only open a declaration when an ident — the
+        # name — follows. Used any other way the word is an ordinary identifier:
+        # `data = [1,2,3]`, a bare `data` return, `data[i]`. Before this, a
+        # variable named `data` made the body loop break here, silently
+        # truncating the function to `ret 0` with no error. (Sibling top-level
+        # decls are still caught by the dedent rule below.)
+        names_a_decl = value_here == "data" or value_here == "enum" or value_here == "system" or value_here == "impl" or value_here == "trait"
+        named_decl_here = names_a_decl and psr_peek_kind(tokens, cursor + 1) == "ident"
+        # No declaration form is `KEYWORD =`, so a decl word immediately
+        # followed by `=` is an assignment to a same-named variable, not a
+        # decl — never silently end the body on it.
+        next_is_assign = psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
+        other_decl_here = (((value_here == "fn") and not fn_is_lambda) or value_here == "pub" or value_here == "use" or value_here == "extern") and not next_is_assign
+        starts_new_decl = kind_here == "ident" and (named_decl_here or other_decl_here)
         dedented = col_here < min_col
         if is_eof or starts_new_decl or dedented:
             break
