@@ -2369,9 +2369,19 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
     if get(body, "kind") == "Block" and len(get_list(body, "stmts")) == 0:
         compile_error("orion: ERROR — function `{name}` has an empty body (add a body, or check for a keyword used as a variable name)")
     body_result = ast_expr_to_ir(fn_value, scope, body)
-    # Only emit the trailing `ret` if the body didn't already terminate
-    # (avoids double-terminator when the body is e.g. an infinite loop).
+    # Return-type guard: the tail expression's storage shape (i64 vs pointer)
+    # must match the declared return type. Catches `fn f() -> int: "hello"`
+    # (returns text) instead of silently returning garbage. Only compares the
+    # i64/ptr bucket, like the reassignment check — text/list/map/struct all
+    # share ptr storage, so no false positive between them. `fn`, `f64` and
+    # `Unit` are exempt (bit-punned fn pointers, doubles, void).
     if is_block_terminated(body_result.function) == 0:
+        rt_body = get_value_type(body_result.function, body_result.id)
+        rt_exempt = ret_type == "fn" or ret_type == "f64" or ret_type == "Unit" or rt_body == "fn" or rt_body == "f64" or rt_body == "void" or rt_body == "Unit"
+        rt_decl_ll = if ret_type == "i64" then "i64" else "ptr"
+        rt_body_ll = if rt_body == "i64" then "i64" else "ptr"
+        if (not rt_exempt) and rt_decl_ll != rt_body_ll:
+            compile_error("orion: ERROR — function `{name}` is declared to return `{ret_type}` but its body returns `{rt_body}`")
         ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
         ret_result.function
     else:
