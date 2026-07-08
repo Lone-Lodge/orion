@@ -1,0 +1,7 @@
+# Interpolation with a nested string quote: `"{m["a"]}"`. The lexer keeps
+# the inner quotes because they sit inside `{...}` (an interpolated map
+# lookup), instead of ending the string at the first one.
+fn main() -> int:
+    m = {"a": 7, "b": 9}
+    s = "k={m["a"]}"        # "k=7"  (3 bytes)
+    len(s) * 10             # 30
