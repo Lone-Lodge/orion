@@ -448,7 +448,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     if slot_ll != new_ll:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                        compile_error("orion: ERROR at line {line}:{col} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}`, but the new value is a `{friendly_type(new_type)}`)")
                     # Resolve an empty list's element type from the first
                     # concrete value stored into it: `mut x = []` allocates
                     # list:i64 (no element to peek), so `x = push(x, textv)`
@@ -1271,7 +1271,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
                 else:
-                    compile_error("orion: ERROR — len() on untyped value (type `{arg_type}`) — read it through a typed accessor (get_int/get_map/get_list or a typed fn) so len knows the shape")
+                    compile_error("orion: ERROR — len() on untyped value (type `{friendly_type(arg_type)}`) — read it through a typed accessor (get_int/get_map/get_list or a typed fn) so len knows the shape")
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
@@ -2257,6 +2257,35 @@ fn extract_map_val(type_text: Text) -> Text:
             result = "{result}{single}"
         result
 
+# Render an internal type name in the user's terms for error messages:
+# i64 -> int, f64 -> float, list:T -> [T], struct:Foo -> Foo, void -> nothing.
+fn friendly_type(t: Text) -> Text:
+    if t == "i64":
+        "int"
+    else if t == "f64":
+        "float"
+    else if t == "void" or t == "Unit":
+        "nothing"
+    else if is_list_type(t):
+        "[{friendly_type(extract_list_elem(t))}]"
+    else if is_map_type(t):
+        "map"
+    else:
+        # struct:Foo -> Foo; text / fn / ptr pass through unchanged.
+        fb = bytes_from_text(t)
+        fn2 = len(fb)
+        mut is_struct = false
+        if fn2 >= 7:
+            if at(fb, 0) == 115 and at(fb, 1) == 116 and at(fb, 2) == 114 and at(fb, 3) == 117 and at(fb, 4) == 99 and at(fb, 5) == 116 and at(fb, 6) == 58:
+                is_struct = true
+        if is_struct:
+            mut r = ""
+            for fi in 7..<fn2:
+                r = "{r}{bytes_to_text([at(fb, fi)])}"
+            r
+        else:
+            t
+
 
 fn ast_type_to_ir(type_node: Map) -> Text:
     kind = get(type_node, "kind")
@@ -2381,7 +2410,7 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         rt_decl_ll = if ret_type == "i64" then "i64" else "ptr"
         rt_body_ll = if rt_body == "i64" then "i64" else "ptr"
         if (not rt_exempt) and rt_decl_ll != rt_body_ll:
-            compile_error("orion: ERROR — function `{name}` is declared to return `{ret_type}` but its body returns `{rt_body}`")
+            compile_error("orion: ERROR — function `{name}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}`")
         ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
         ret_result.function
     else:
