@@ -58,3 +58,22 @@ pub fn parse(t: Text) -> int:
         if d >= 48 and d <= 57:
             value = value * 10 + (d - 48)
     if neg == 1 then 0 - value else value
+
+# Integer power (ipow): base^exp for exp >= 0. Negative exp yields 0.
+#   ipow(2, 10)  ->  1024
+pub fn ipow(base: int, exp: int) -> int:
+    mut result = 1
+    if exp >= 0:
+        for _ in 0..<exp:
+            result = result * base
+    else:
+        result = 0
+    result
+
+# 1 if `n` is even, else 0.
+pub fn is_even(n: int) -> int:
+    if n % 2 == 0 then 1 else 0
+
+# 1 if `n` is odd, else 0.
+pub fn is_odd(n: int) -> int:
+    if n % 2 == 0 then 0 else 1
