@@ -2267,10 +2267,10 @@ fn ast_type_to_ir(type_node: Map) -> Text:
         "list:{elem}"
     else:
         name = get(type_node, "name")
-        if name == "Text":
+        if name == "Text" or name == "text":
             "text"
         else:
-            if name == "Map":
+            if name == "Map" or name == "map":
                 "map"
             else:
                 if name == "fn" or name == "ptr":
@@ -2310,10 +2310,10 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
         "list:{elem_type}"
     else:
         name = get(type_node, "name")
-        if name == "Text":
+        if name == "Text" or name == "text":
             "text"
         else:
-            if name == "Map":
+            if name == "Map" or name == "map":
                 "map"
             else:
                 if name == "fn" or name == "ptr":

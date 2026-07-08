@@ -1,0 +1,9 @@
+# The built-in type names accept their lowercase spelling: `text` works
+# like `Text`, `map` like `Map`. Before, a lowercase `text` annotation was
+# an unknown name that silently became i64 — so `len(x)` later failed with
+# a confusing "untyped value" error.
+fn slen(x: text) -> int:
+    len(x)
+
+fn main() -> int:
+    slen("hello")
