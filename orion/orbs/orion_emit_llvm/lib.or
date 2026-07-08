@@ -930,7 +930,7 @@ fn evac_code(orion_type: Text) -> int:
         2
     else if orion_type == "list:text":
         3
-    else if orion_type == "map":
+    else if orion_type == "map" or orion_type == "map:i64" or orion_type == "map:text" or orion_type == "map:map":
         4
     else if orion_type == "list:map":
         5
@@ -948,10 +948,15 @@ fn llvm_type_of(orion_type: Text) -> Text:
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
+    # `map:T` (value-typed map) — a map handle, also a ptr.
+    mut is_map_elem = false
+    if len(bs) >= 4:
+        if at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58:
+            is_map_elem = true
     if orion_type == "f64":
         "double"
     else:
-        if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem then "ptr" else "i64"
+        if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem or is_map_elem then "ptr" else "i64"
 
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).

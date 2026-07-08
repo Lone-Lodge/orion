@@ -1256,7 +1256,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             pr = ir_fn_push(arg_r.function, ir_text_len(arg_r.id))
             result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
         else:
-            if arg_type == "map":
+            if is_map_type(arg_type):
                 pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
                 result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
             else:
@@ -1272,18 +1272,11 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_node = at(args, 1)
         map_r = ast_expr_to_ir(fn_value, scope, map_node)
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
-        # Infer value type by peeking the source map's first value.
-        # Maps in our codebase are usually homogeneous: all-text or all-int.
-        mut get_type = "text"
-        map_fn = map_r.function
-        map_insts = map_fn.instructions
-        map_inst = at(map_insts, map_r.id)
-        map_args = map_inst.args
-        if map_inst.op == "map_lit" and len(map_args) >= 2:
-            first_val_id = at(map_args, 1)
-            first_val_type = get_value_type(map_fn, first_val_id)
-            if first_val_type == "i64":
-                get_type = "i64"
+        # The map's value type rides in its type_text (`map:<T>`), so it
+        # survives mut slots, set-results and copies — unlike the old peek at
+        # the producing map_lit, which defaulted to `text` for any indirection
+        # and made `get(m,a) + get(m,b)` concat int values as pointers (crash).
+        get_type = extract_map_val(get_value_type(map_r.function, map_r.id))
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, get_type))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
     if is_has:
@@ -1307,13 +1300,13 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if len(sc_tgt_bs) >= 4:
             if at(sc_tgt_bs, 0) == 108 and at(sc_tgt_bs, 1) == 105 and at(sc_tgt_bs, 2) == 115 and at(sc_tgt_bs, 3) == 116:
                 sc_is_list = true
-        mut sc_is_map = sc_tgt_type == "map"
+        mut sc_is_map = is_map_type(sc_tgt_type)
         if not sc_is_list:
             if not sc_is_map:
                 sc_is_map = sc_key_type == "text"
                 sc_is_list = not sc_is_map
         if sc_is_map:
-            pr_ms = ir_fn_push(sc_val.function, ir_map_set_val(sc_tgt.id, sc_key.id, sc_val.id))
+            pr_ms = ir_fn_push(sc_val.function, ir_map_set_val(sc_tgt.id, sc_key.id, sc_val.id, sc_tgt_type))
             result = ConvResult{function: pr_ms.function, scope: sc_val.scope, id: pr_ms.id}
         if sc_is_list:
             pr_ls = ir_fn_push(sc_val.function, ir_list_set_val(sc_tgt.id, sc_key.id, sc_val.id, sc_tgt_type))
@@ -1947,7 +1940,12 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         current_scope = val_r.scope
         pair_ids = push(pair_ids, pr_key.id)
         pair_ids = push(pair_ids, val_r.id)
-    pr = ir_fn_push(current_fn, ir_map_lit(pair_ids))
+    # Maps are homogeneous; take the value type from the first pair's value so
+    # get()/[] recover it later. Empty map -> i64 (no values to mistype).
+    mut map_val_type = "i64"
+    if n_pairs > 0:
+        map_val_type = get_value_type(current_fn, at(pair_ids, 1))
+    pr = ir_fn_push(current_fn, ir_map_lit(pair_ids, map_val_type))
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
 
@@ -1964,7 +1962,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         idx_key = get(node, "index")
         idx_probe = ast_expr_to_ir(fn_value, scope, idx_obj)
         idx_obj_type = get_value_type(idx_probe.function, idx_probe.id)
-        idx_callee = if idx_obj_type == "map" then "get" else "at"
+        idx_callee = if is_map_type(idx_obj_type) then "get" else "at"
         idx_call = {"kind": "Call", "callee": idx_callee, "args": [idx_obj, idx_key]}
         return ast_expr_to_ir(fn_value, scope, idx_call)
     is_block = kind == "Block"
@@ -2242,6 +2240,36 @@ fn extract_list_elem(type_text: Text) -> Text:
     else:
         mut result = ""
         for ci in 5..<n:
+            single = bytes_to_text([at(bs, ci)])
+            result = "{result}{single}"
+        result
+
+# True for `map` or a value-typed `map:<T>`.
+fn is_map_type(type_text: Text) -> bool:
+    if type_text == "map":
+        true
+    else:
+        bs = bytes_from_text(type_text)
+        n = len(bs)
+        if n >= 4:
+            at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58
+        else:
+            false
+
+# The value type from a `map:<T>` type_text. Bare `map` (or non-map) yields
+# `text` — the historic default for untyped maps.
+fn extract_map_val(type_text: Text) -> Text:
+    bs = bytes_from_text(type_text)
+    n = len(bs)
+    mut is_param = false
+    if n >= 4:
+        if at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58:
+            is_param = true
+    if not is_param:
+        "text"
+    else:
+        mut result = ""
+        for ci in 4..<n:
             single = bytes_to_text([at(bs, ci)])
             result = "{result}{single}"
         result
