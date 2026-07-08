@@ -2331,6 +2331,14 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         fn_value = pr.function
         scope = scope_bind(scope, param_name, pr.id)
     body = get(ast_fn, "body")
+    # A block-form fn with zero statements means the body was empty in source
+    # (a forgotten body) OR a mis-parse swallowed it (e.g. a keyword used as a
+    # variable name that ended the body early). Lowering an empty block just
+    # emits `ret 0` — a silently wrong program. Make it loud instead. Externs
+    # are a separate ExternFn node and never reach here; short-form `= expr`
+    # fns carry a one-statement block, so neither is affected.
+    if get(body, "kind") == "Block" and len(get_list(body, "stmts")) == 0:
+        compile_error("orion: ERROR — function `{name}` has an empty body (add a body, or check for a keyword used as a variable name)")
     body_result = ast_expr_to_ir(fn_value, scope, body)
     # Only emit the trailing `ret` if the body didn't already terminate
     # (avoids double-terminator when the body is e.g. an infinite loop).
