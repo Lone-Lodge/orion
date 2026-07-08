@@ -2575,6 +2575,157 @@ fn lam_stmts_escapes(stmts: [Map], names: [Text]) -> Text:
     hit
 
 
+# ---- nested lambda lift (lambda in a call-arg / expression position) -----
+# The main lift handles `name = fn(...)` and bare/returned lambdas. This lifts
+# a lambda that sits deeper — e.g. `apply(fn(n): n+1, x)` — into the same
+# closure form. It's additive (own `__nlambda` prefix + slot counter, so it
+# never collides with the main lift's `__lambda`), and only walks the node
+# kinds a call-arg lambda actually reaches.
+
+fn nlam_capture_scan(lam_body: Map, lam_params: [Text]) -> [Text]:
+    n_lp = len(lam_params)
+    init_work = [lam_body]
+    mut worklist = init_work
+    mut caps = slice([""], 0, 0)
+    mut seen_caps = slice([""], 0, 0)
+    loop:
+        w_n = len(worklist)
+        if w_n == 0:
+            break
+        cur = at(worklist, w_n - 1)
+        worklist = slice(worklist, 0, w_n - 1)
+        ck = get(cur, "kind")
+        if ck == "Ident":
+            cn = get(cur, "name")
+            mut is_param = false
+            for lp_w in 0..<n_lp:
+                if at(lam_params, lp_w) == cn:
+                    is_param = true
+            mut already = false
+            for sc in 0..<len(seen_caps):
+                if at(seen_caps, sc) == cn:
+                    already = true
+            if not is_param and not already:
+                caps = push(caps, cn)
+                seen_caps = push(seen_caps, cn)
+        if ck == "Binary":
+            worklist = push(worklist, get(cur, "left"))
+            worklist = push(worklist, get(cur, "right"))
+        if ck == "Unary":
+            worklist = push(worklist, get(cur, "operand"))
+        if ck == "Call":
+            call_args = get_list(cur, "args")
+            for cai in 0..<len(call_args):
+                worklist = push(worklist, at(call_args, cai))
+        if ck == "If":
+            worklist = push(worklist, get(cur, "cond"))
+            worklist = push(worklist, get(cur, "then"))
+            worklist = push(worklist, get(cur, "else"))
+    caps
+
+# Synthesize a __nlambda_N fn for `lam`; return {closure: MakeClosure, decl: Fn}.
+fn nlam_synth(lam: Map) -> Map:
+    lam_params = get_list(lam, "params")
+    n_lp = len(lam_params)
+    lam_body = get(lam, "body")
+    caps = nlam_capture_scan(lam_body, lam_params)
+    n_caps = len(caps)
+    mut typed_params = slice([lam], 0, 0)
+    typed_params = push(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
+    for pi in 0..<n_lp:
+        typed_params = push(typed_params, {"name": at(lam_params, pi), "type": {"kind": "Named", "name": "int"}})
+    ctr = slot_get_int("otir:nlam_ctr")
+    slot_set("otir:nlam_ctr", ctr + 1)
+    synth_name = "__nlambda_{ctr}"
+    mut synth_stmts = slice([lam_body], 0, 0)
+    for ci in 0..<n_caps:
+        cap_slot = 2 + ci
+        at_call = {"kind": "Call", "callee": "at", "args": [{"kind": "Ident", "name": "__env"}, {"kind": "Int", "value": "{cap_slot}"}]}
+        synth_stmts = push(synth_stmts, {"kind": "LetOrAssign", "name": at(caps, ci), "value": at_call})
+    synth_stmts = push(synth_stmts, {"kind": "ExprStmt", "expr": lam_body})
+    synth_body = {"kind": "Block", "stmts": synth_stmts}
+    synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
+    mut cap_nodes = slice([lam], 0, 0)
+    for cj in 0..<n_caps:
+        cap_nodes = push(cap_nodes, {"kind": "Ident", "name": at(caps, cj)})
+    closure = {"kind": "MakeClosure", "fn": synth_name, "caps": cap_nodes, "is_lambda": 1}
+    {"closure": closure, "decl": synth_decl}
+
+# Lift lambdas inside an expression; return {node: rewritten, synths: [Fn]}.
+fn nlam_lift(node: Map) -> Map:
+    kind = get(node, "kind")
+    mut synths = slice([node], 0, 0)
+    if kind == "Lambda":
+        s = nlam_synth(node)
+        synths = push(synths, get(s, "decl"))
+        return {"node": get(s, "closure"), "synths": synths}
+    mut out = node
+    if kind == "Call":
+        args = get_list(node, "args")
+        mut new_args = slice(args, 0, 0)
+        for i in 0..<len(args):
+            ar = nlam_lift(at(args, i))
+            new_args = push(new_args, get(ar, "node"))
+            ars = get_list(ar, "synths")
+            for j in 0..<len(ars):
+                synths = push(synths, at(ars, j))
+        out = set(out, "args", new_args)
+    if kind == "Binary":
+        lr = nlam_lift(get(node, "left"))
+        rr = nlam_lift(get(node, "right"))
+        out = set(out, "left", get(lr, "node"))
+        out = set(out, "right", get(rr, "node"))
+        for j in 0..<len(get_list(lr, "synths")):
+            synths = push(synths, at(get_list(lr, "synths"), j))
+        for j in 0..<len(get_list(rr, "synths")):
+            synths = push(synths, at(get_list(rr, "synths"), j))
+    {"node": out, "synths": synths}
+
+# Lift lambdas in a statement's expression field. Returns {stmt, synths}.
+fn nlam_lift_stmt(stmt: Map) -> Map:
+    kind = get(stmt, "kind")
+    mut out = stmt
+    mut synths = slice([stmt], 0, 0)
+    mut fld = ""
+    if kind == "MutLet" or kind == "LetOrAssign":
+        fld = "value"
+    if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer" or kind == "Destroy":
+        fld = "expr"
+    if fld != "":
+        r = nlam_lift(get(stmt, fld))
+        out = set(out, fld, get(r, "node"))
+        synths = get_list(r, "synths")
+    {"stmt": out, "synths": synths}
+
+# Does this expression contain a lambda (nested in a call arg / operand)?
+fn nlam_has(node: Map) -> bool:
+    kind = get(node, "kind")
+    mut found = false
+    if kind == "Lambda":
+        found = true
+    if kind == "Call":
+        args = get_list(node, "args")
+        for i in 0..<len(args):
+            if nlam_has(at(args, i)):
+                found = true
+    if kind == "Binary":
+        if nlam_has(get(node, "left")):
+            found = true
+        if nlam_has(get(node, "right")):
+            found = true
+    found
+
+# Does a statement's expr/value field contain a nested lambda?
+fn nlam_stmt_has(stmt: Map) -> bool:
+    kind = get(stmt, "kind")
+    mut found = false
+    if kind == "MutLet" or kind == "LetOrAssign":
+        found = nlam_has(get(stmt, "value"))
+    if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer" or kind == "Destroy":
+        found = nlam_has(get(stmt, "expr"))
+    found
+
+
 pub fn ast_program_to_ir(program: Map) -> IRModule:
     # Pass -1: `fact` inlining. Replace reads of reactive `fact` bindings
     # with their defining expression so they recompute on each read. Gated
@@ -2627,6 +2778,8 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                     if sc_kind == "ExprStmt" or sc_kind == "Return":
                         if get(get(sc_stmt, "expr"), "kind") == "Lambda":
                             has_any_lambda = true
+                    if nlam_stmt_has(sc_stmt):
+                        has_any_lambda = true
     # Pre-scan to find Lambda bindings + their captures. Used by the next
     # phase to emit a clean error if any captures exist (real env-struct
     # closures need more wiring than this minimal lift can offer today).
@@ -2792,12 +2945,16 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             if is_expr_lambda:
                                 new_stmts = push(new_stmts, {"kind": stmt_kind, "expr": new_value})
                         if not is_lambda_stmt:
-                            # Non-lambda statement passes through unchanged.
-                            # Calls to a closure binding resolve to closure_call
-                            # at lowering (the binding holds a closure value), so
-                            # there's no call-site cap rewrite and no escape
-                            # restriction — escaping closures now work.
-                            new_stmts = push(new_stmts, stmt)
+                            # Non-lambda statement: lift any lambda nested in its
+                            # expression (e.g. `apply(fn(n): n+1, x)`) into a
+                            # closure + synth decls, then pass it through. Calls
+                            # to a closure binding resolve to closure_call at
+                            # lowering, so no cap rewrite / escape restriction.
+                            nl = nlam_lift_stmt(stmt)
+                            new_stmts = push(new_stmts, get(nl, "stmt"))
+                            nl_synths = get_list(nl, "synths")
+                            for nsi in 0..<len(nl_synths):
+                                synth_decls = push(synth_decls, at(nl_synths, nsi))
                     new_body = {"kind": "Block", "stmts": new_stmts}
                     rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body}
                     working_decls = push(working_decls, rewritten_decl)
