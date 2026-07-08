@@ -714,7 +714,10 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": bare_enum}, "method": name, "args": []}
             result = ast_expr_to_ir(fn_value, scope, vc_node)
         if bare_enum == "" and fn_ret != "":
-            pr_fnref = ir_fn_push(fn_value, ir_fn_ref(name))
+            # A bare fn name used as a value becomes a plain-fn closure
+            # [fn_ptr, 0] — flag 0 so closure_call invokes it without an env.
+            no_caps = slice([0], 0, 0)
+            pr_fnref = ir_fn_push(fn_value, ir_make_closure(name, no_caps, 0))
             result = ConvResult{function: pr_fnref.function, scope: scope, id: pr_fnref.id}
         if bare_enum == "" and fn_ret == "":
             # Unknown ident — likely a `{expr}` interpolation the parser
@@ -1539,9 +1542,10 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_scope = arg_r.scope
             arg_ids = push(arg_ids, arg_r.id)
         if is_local_callee:
-            # Indirect call. Return type defaults to i64 — proper type
-            # tracking on fn-ref values is future work.
-            pr = ir_fn_push(current_fn, ir_indirect_call(bound_id, arg_ids, "i64"))
+            # The local holds a closure value ([fn_ptr, flag, caps...]); call
+            # through it. Return type defaults to i64 — proper type tracking on
+            # closure values is future work.
+            pr = ir_fn_push(current_fn, ir_closure_call(bound_id, arg_ids, "i64"))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
         else:
             call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
@@ -1951,7 +1955,21 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_method_call = kind == "MethodCall"
     is_question = kind == "Question"
     is_perform = kind == "Perform"
+    is_make_closure = kind == "MakeClosure"
     mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    if is_make_closure:
+        # Lambda closure: lower each captured expr, then pack [fn_ptr, 1, caps].
+        mc_caps = get_list(node, "caps")
+        mut mc_fn = fn_value
+        mut mc_scope = scope
+        mut mc_cap_ids = slice([0], 0, 0)
+        for mci in 0..<len(mc_caps):
+            mc_cap_r = ast_expr_to_ir(mc_fn, mc_scope, at(mc_caps, mci))
+            mc_fn = mc_cap_r.function
+            mc_scope = mc_cap_r.scope
+            mc_cap_ids = push(mc_cap_ids, mc_cap_r.id)
+        pr_mc = ir_fn_push(mc_fn, ir_make_closure(get(node, "fn"), mc_cap_ids, 1))
+        result = ConvResult{function: pr_mc.function, scope: mc_scope, id: pr_mc.id}
     if is_block:
         result = ast_block_to_ir(fn_value, scope, node)
     if is_int:
@@ -2132,7 +2150,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         else:
             pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_name, arg_id))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
-    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform
+    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
@@ -2727,82 +2745,46 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                                     worklist = push(worklist, get(cur, "then"))
                                     worklist = push(worklist, get(cur, "else"))
                             n_caps = len(caps)
+                            # __lambda_N(__env, params): the captures live in the
+                            # closure list __env; a prologue binds each by name so
+                            # the body is unchanged. env is the leading param.
                             init_typed = get_list(decl, "params")
                             mut typed_params = init_typed
                             typed_params = slice(typed_params, 0, 0)
-                            for ci in 0..<n_caps:
-                                cap_name = at(caps, ci)
-                                typed_params = push(typed_params, {"name": cap_name, "type": {"kind": "Named", "name": "int"}})
+                            typed_params = push(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
                             for pi in 0..<n_lp:
                                 p_name = at(lam_params, pi)
                                 typed_params = push(typed_params, {"name": p_name, "type": {"kind": "Named", "name": "int"}})
                             synth_name = "__lambda_{lambda_counter}"
                             lambda_counter = lambda_counter + 1
-                            synth_body_stmt = {"kind": "ExprStmt", "expr": lam_body}
-                            stmt_seed = [synth_body_stmt]
-                            synth_body = {"kind": "Block", "stmts": stmt_seed}
+                            # Prologue: cap_i = at(__env, 2 + i)  (slots 0/1 are
+                            # the fn-ptr and the is_lambda flag).
+                            mut synth_stmts = slice([lam_body], 0, 0)
+                            for ci in 0..<n_caps:
+                                cap_name = at(caps, ci)
+                                cap_slot = 2 + ci
+                                at_call = {"kind": "Call", "callee": "at", "args": [{"kind": "Ident", "name": "__env"}, {"kind": "Int", "value": "{cap_slot}"}]}
+                                synth_stmts = push(synth_stmts, {"kind": "LetOrAssign", "name": cap_name, "value": at_call})
+                            synth_stmts = push(synth_stmts, {"kind": "ExprStmt", "expr": lam_body})
+                            synth_body = {"kind": "Block", "stmts": synth_stmts}
                             synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
                             synth_decls = push(synth_decls, synth_decl)
                             bind_name = get(stmt, "name")
                             binding_names = push(binding_names, bind_name)
-                            mut caps_csv = ""
+                            # The binding value builds the closure: [ptr, 1, caps].
+                            mut cap_nodes = slice([lam_body], 0, 0)
                             for cj in 0..<n_caps:
-                                csep = if cj == 0 then "" else ","
-                                caps_csv = "{caps_csv}{csep}{at(caps, cj)}"
-                            binding_caps = push(binding_caps, caps_csv)
-                            new_value = {"kind": "Ident", "name": synth_name}
+                                cap_nodes = push(cap_nodes, {"kind": "Ident", "name": at(caps, cj)})
+                            new_value = {"kind": "MakeClosure", "fn": synth_name, "caps": cap_nodes, "is_lambda": 1}
                             new_stmts = push(new_stmts, {"kind": stmt_kind, "name": bind_name, "value": new_value})
                         if not is_let_lambda:
-                            mut rewritten_stmt = stmt
-                            if stmt_kind == "ExprStmt":
-                                expr = get(stmt, "expr")
-                                if get(expr, "kind") == "Call":
-                                    callee = get(expr, "callee")
-                                    n_bn = len(binding_names)
-                                    mut match_idx = 0 - 1
-                                    for bi in 0..<n_bn:
-                                        if at(binding_names, bi) == callee:
-                                            match_idx = bi
-                                    if match_idx >= 0:
-                                        caps_csv2 = at(binding_caps, match_idx)
-                                        if caps_csv2 != "":
-                                            cap_bs = bytes_from_text(caps_csv2)
-                                            cap_n = len(cap_bs)
-                                            mut cap_names = slice([""], 0, 0)
-                                            mut cur_cap = ""
-                                            for cbi in 0..<cap_n:
-                                                cb = at(cap_bs, cbi)
-                                                if cb == 44:
-                                                    cap_names = push(cap_names, cur_cap)
-                                                    cur_cap = ""
-                                                if cb != 44:
-                                                    next_cbi = cbi + 1
-                                                    cur_cap = "{cur_cap}{bytes_to_text(bytes_slice(cap_bs, cbi, next_cbi))}"
-                                            if cur_cap != "":
-                                                cap_names = push(cap_names, cur_cap)
-                                            old_args = get_list(expr, "args")
-                                            old_n_args = len(old_args)
-                                            mut new_args = slice(old_args, 0, 0)
-                                            n_cap_names = len(cap_names)
-                                            for cni in 0..<n_cap_names:
-                                                new_args = push(new_args, {"kind": "Ident", "name": at(cap_names, cni)})
-                                            for oai in 0..<old_n_args:
-                                                new_args = push(new_args, at(old_args, oai))
-                                            new_call = {"kind": "Call", "callee": callee, "args": new_args}
-                                            rewritten_stmt = {"kind": "ExprStmt", "expr": new_call}
-                            new_stmts = push(new_stmts, rewritten_stmt)
+                            # Non-lambda statement passes through unchanged.
+                            # Calls to a closure binding resolve to closure_call
+                            # at lowering (the binding holds a closure value), so
+                            # there's no call-site cap rewrite and no escape
+                            # restriction — escaping closures now work.
+                            new_stmts = push(new_stmts, stmt)
                     new_body = {"kind": "Block", "stmts": new_stmts}
-                    # Fail loud if any CAPTURING lambda binding escapes (used as
-                    # a value / nested-called) rather than being called directly
-                    # where its captures are still in scope. See lam_* above.
-                    mut esc_names = slice([""], 0, 0)
-                    for bci in 0..<len(binding_names):
-                        if at(binding_caps, bci) != "":
-                            esc_names = push(esc_names, at(binding_names, bci))
-                    if len(esc_names) > 0:
-                        esc_hit = lam_stmts_escapes(new_stmts, esc_names)
-                        if esc_hit != "":
-                            compile_error("orion: ERROR — capturing lambda `{esc_hit}` is used as a value (passed, returned, or assigned); escaping closures aren't supported yet — call it directly in its defining scope, or inline the capture")
                     rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body}
                     working_decls = push(working_decls, rewritten_decl)
                 if body_kind != "Block":

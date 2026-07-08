@@ -271,6 +271,53 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         callee_ref = value_ref(inst.value)
         result = "    {value_ref(my_id)} = call {ret_ty} {callee_ref}({arg_text})"
 
+    if op == "make_closure":
+        # Build [fn_ptr_as_int, is_lambda_flag, cap0, cap1, ...] as a list.
+        n_caps = len(inst.args)
+        total = 2 + n_caps
+        mut mc = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {total})"
+        mc = "{mc}\n    %v{my_id}.fp = ptrtoint ptr @{inst.name} to i64"
+        mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 0, i64 %v{my_id}.fp)"
+        mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 1, i64 {inst.lhs})"
+        for ci in 0..<n_caps:
+            cap_id = at(inst.args, ci)
+            cap_slot = 2 + ci
+            cap_ty = llvm_type_of(ssa_value_type(cap_id, fn_value, module))
+            if cap_ty == "ptr":
+                mc = "{mc}\n    %v{my_id}.c{ci} = ptrtoint ptr {value_ref(cap_id)} to i64"
+                mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {cap_slot}, i64 %v{my_id}.c{ci})"
+            else:
+                mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {cap_slot}, i64 {value_ref(cap_id)})"
+        result = mc
+
+    if op == "closure_call":
+        # Load fn-ptr + flag; a lambda is called fn(env, args), a plain fn-ref
+        # fn(args). env is the closure list itself.
+        clos = value_ref(inst.value)
+        cc_ret = llvm_type_of(inst.type_text)
+        n_ca = len(inst.args)
+        mut cc_args = ""
+        for cai in 0..<n_ca:
+            ca_id = at(inst.args, cai)
+            ca_ty = llvm_type_of(ssa_value_type(ca_id, fn_value, module))
+            csep = if cai == 0 then "" else ", "
+            cc_args = "{cc_args}{csep}{ca_ty} {value_ref(ca_id)}"
+        lam_args = if n_ca == 0 then "ptr {clos}" else "ptr {clos}, {cc_args}"
+        mut cc = "    %v{my_id}.fpi = call i64 @orion_list_at(ptr {clos}, i64 0)"
+        cc = "{cc}\n    %v{my_id}.flg = call i64 @orion_list_at(ptr {clos}, i64 1)"
+        cc = "{cc}\n    %v{my_id}.p = inttoptr i64 %v{my_id}.fpi to ptr"
+        cc = "{cc}\n    %v{my_id}.isl = icmp eq i64 %v{my_id}.flg, 1"
+        cc = "{cc}\n    br i1 %v{my_id}.isl, label %clam{my_id}, label %cpln{my_id}"
+        cc = "{cc}\nclam{my_id}:"
+        cc = "{cc}\n    %v{my_id}.r1 = call {cc_ret} %v{my_id}.p({lam_args})"
+        cc = "{cc}\n    br label %cmrg{my_id}"
+        cc = "{cc}\ncpln{my_id}:"
+        cc = "{cc}\n    %v{my_id}.r2 = call {cc_ret} %v{my_id}.p({cc_args})"
+        cc = "{cc}\n    br label %cmrg{my_id}"
+        cc = "{cc}\ncmrg{my_id}:"
+        cc = "{cc}\n    {value_ref(my_id)} = phi {cc_ret} [ %v{my_id}.r1, %clam{my_id} ], [ %v{my_id}.r2, %cpln{my_id} ]"
+        result = cc
+
     if op == "label":
         # Emit basic-block label (no leading 4-space indent).
         result = "{inst.name}:"
