@@ -1,22 +1,26 @@
 # iter — functional list operations, powered by closures.
 #
-# Each takes a closure (a `fn(...)` value) and applies it across a list.
-# Predicates return 1 (keep / true) or 0 (drop / false) — Orion's closures
-# carry int captures, so these are int-list utilities today.
+# Generic over the element type `T`: map / filter / reduce / … work on a
+# list of ANY type — `[int]`, `[Text]`, `[[int]]`, structs. The closure
+# names the element type so its body can use `len` / `at` / `get`:
 #
-#   doubled = map([1, 2, 3], fn(x): x * 2)          # [2, 4, 6]
-#   evens   = filter(xs, fn(x): if x % 2 == 0 then 1 else 0)
-#   total   = reduce(xs, 0, fn(acc, x): acc + x)    # sum
+#   doubled = map([1, 2, 3], fn(x): x * 2)              # int, no annotation
+#   lengths = map(words,     fn(s: Text): len(s))       # Text — annotate `s`
+#   evens   = filter(xs,     fn(x): if x % 2 == 0 then 1 else 0)
+#   total   = reduce(xs, 0,  fn(acc, x): acc + x)        # sum
+#
+# `int` elements need no annotation (the default); non-int elements do.
+# Predicates return 1 (keep / true) or 0 (drop / false).
 
 # Apply `f` to every element, collecting the results.
-pub fn map(xs: [int], f: fn) -> [int]:
+pub fn map<T>(xs: [T], f: fn) -> [int]:
     mut out = []
     for i in 0..<len(xs):
         out = push(out, f(at(xs, i)))
     out
 
-# Keep the elements for which `pred(x)` is 1.
-pub fn filter(xs: [int], pred: fn) -> [int]:
+# Keep the elements for which `pred(x)` is 1. Result keeps the element type.
+pub fn filter<T>(xs: [T], pred: fn) -> [T]:
     mut out = []
     for i in 0..<len(xs):
         x = at(xs, i)
@@ -25,14 +29,14 @@ pub fn filter(xs: [int], pred: fn) -> [int]:
     out
 
 # Fold left: acc starts at `init`, then acc = f(acc, x) for each element.
-pub fn reduce(xs: [int], init: int, f: fn) -> int:
+pub fn reduce<T>(xs: [T], init: int, f: fn) -> int:
     mut acc = init
     for i in 0..<len(xs):
         acc = f(acc, at(xs, i))
     acc
 
 # 1 if `pred(x)` is 1 for at least one element, else 0.
-pub fn any(xs: [int], pred: fn) -> int:
+pub fn any<T>(xs: [T], pred: fn) -> int:
     mut found = 0
     for i in 0..<len(xs):
         if pred(at(xs, i)) == 1:
@@ -40,7 +44,7 @@ pub fn any(xs: [int], pred: fn) -> int:
     found
 
 # 1 if `pred(x)` is 1 for every element (vacuously 1 for an empty list).
-pub fn all(xs: [int], pred: fn) -> int:
+pub fn all<T>(xs: [T], pred: fn) -> int:
     mut ok = 1
     for i in 0..<len(xs):
         if pred(at(xs, i)) == 0:
@@ -48,7 +52,7 @@ pub fn all(xs: [int], pred: fn) -> int:
     ok
 
 # Index of the first element where `pred(x)` is 1, or -1 if none match.
-pub fn find_index(xs: [int], pred: fn) -> int:
+pub fn find_index<T>(xs: [T], pred: fn) -> int:
     mut idx = 0 - 1
     for i in 0..<len(xs):
         if idx < 0:
@@ -57,7 +61,7 @@ pub fn find_index(xs: [int], pred: fn) -> int:
     idx
 
 # How many elements satisfy `pred`.
-pub fn count(xs: [int], pred: fn) -> int:
+pub fn count<T>(xs: [T], pred: fn) -> int:
     mut n = 0
     for i in 0..<len(xs):
         if pred(at(xs, i)) == 1:
