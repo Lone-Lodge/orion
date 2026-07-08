@@ -2021,31 +2021,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if is_field:
         result = ast_field_to_ir(fn_value, scope, node)
     if is_binary:
-        bin_op = get(node, "op")
-        if bin_op == "|>":
-            # Pipe: `x |> f` → `f(x)`; `x |> f(a, b)` → `f(x, a, b)`.
-            # Desugar before lowering — keeps the rest of the pipeline simple.
-            pipe_lhs = get(node, "left")
-            pipe_rhs = get(node, "right")
-            rhs_kind = get(pipe_rhs, "kind")
-            mut desugared_call = pipe_rhs
-            if rhs_kind == "Ident":
-                # x |> f → f(x)
-                callee_name = get(pipe_rhs, "name")
-                desugared_call = {"kind": "Call", "callee": callee_name, "args": [pipe_lhs]}
-            if rhs_kind == "Call":
-                # x |> f(a, b) → f(x, a, b)
-                callee_name = get(pipe_rhs, "callee")
-                orig_args = get_list(pipe_rhs, "args")
-                new_args = [pipe_lhs]
-                mut combined_args = new_args
-                n_orig = len(orig_args)
-                for ai in 0..<n_orig:
-                    combined_args = push(combined_args, at(orig_args, ai))
-                desugared_call = {"kind": "Call", "callee": callee_name, "args": combined_args}
-            result = ast_call_to_ir(fn_value, scope, desugared_call)
-        else:
-            result = ast_binop_to_ir(fn_value, scope, node)
+        result = ast_binop_to_ir(fn_value, scope, node)
     if is_ident:
         result = ast_ident_to_ir(fn_value, scope, node)
     if is_call:

@@ -331,7 +331,6 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     is_str = kind == "str"
     is_lbracket = kind == "symbol" and value == "["
     is_lbrace = kind == "symbol" and value == "\{"
-    is_pipe = kind == "symbol" and value == "|"
     # Parenthesised expression — just parse the inner expr and consume `)`.
     is_lparen = kind == "symbol" and value == "("
     # `if` and `match` are idents at the lex layer — we recognise them
@@ -463,27 +462,6 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         if psr_peek_kind(tokens, inner_next) == "symbol" and psr_peek_value(tokens, inner_next) == ")":
             inner_next = inner_next + 1
         result = {"node": get_map(inner, "node"), "next": inner_next}
-    if is_pipe:
-        # Lambda literal — `|param, param| expr`. Collect idents until the
-        # closing `|`, then parse the body expression.
-        mut lam_cursor = position + 1
-        params = []
-        mut params_list = params
-        loop:
-            lam_kind = psr_peek_kind(tokens, lam_cursor)
-            lam_val = psr_peek_value(tokens, lam_cursor)
-            if lam_kind == "symbol" and lam_val == "|":
-                lam_cursor = lam_cursor + 1
-                break
-            if lam_kind == "eof":
-                break
-            if lam_kind == "ident":
-                params_list = push(params_list, lam_val)
-                lam_cursor = lam_cursor + 1
-            if lam_kind == "symbol" and lam_val == ",":
-                lam_cursor = lam_cursor + 1
-        body_result = psr_parse_expr(tokens, lam_cursor)
-        result = {"node": {"kind": "Lambda", "params": params_list, "body": get_map(body_result, "node")}, "next": get_int(body_result, "next")}
     result
 
 # `TypeName{field: value, ...}` — struct construction. The leading `{`
@@ -772,9 +750,6 @@ fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
         is_cmp = op_value == "==" or op_value == "!=" or op_value == "<" or op_value == ">" or op_value == "<=" or op_value == ">="
         is_add = op_value == "+" or op_value == "-"
         is_mul = op_value == "*" or op_value == "/" or op_value == "%"
-        is_pipe = op_value == "|>"
-        if is_pipe:
-            precedence = 3
         if is_cmp:
             precedence = 10
         if is_add:
@@ -848,22 +823,14 @@ fn psr_parse_expr_at(tokens: [Map], position: int, min_prec: int) -> Map:
     mut current_node = get_map(postfix_result, "node")
     mut cursor = get_int(postfix_result, "next")
     loop:
-        # A pipe `|>` may open a continuation line: `xs\n  |> map(f)\n  |> sum()`.
-        # Skip the newline(s) before a leading `|>` so the chain keeps flowing
-        # down the page. `|>` can never begin a statement (it needs a left
-        # operand), so peeking past the break is unambiguous — no other
-        # operator is allowed to swallow a line break here.
-        scan = psr_skip_newlines(tokens, cursor)
-        pipe_continues = psr_peek_kind(tokens, scan) == "symbol" and psr_peek_value(tokens, scan) == "|>"
-        op_cursor = if pipe_continues then scan else cursor
-        op_kind = psr_peek_kind(tokens, op_cursor)
-        op_value = psr_peek_value(tokens, op_cursor)
+        op_kind = psr_peek_kind(tokens, cursor)
+        op_value = psr_peek_value(tokens, cursor)
         prec = psr_op_prec(op_kind, op_value)
         if prec == 0 or prec < min_prec:
             break
         # Left-associative — RHS uses prec+1 so we don't gather more at
         # the same level (e.g. `a-b-c` parses as `(a-b)-c`, not `a-(b-c)`).
-        rhs_result = psr_parse_expr_at(tokens, op_cursor + 1, prec + 1)
+        rhs_result = psr_parse_expr_at(tokens, cursor + 1, prec + 1)
         current_node = {"kind": "Binary", "op": op_value, "left": current_node, "right": get_map(rhs_result, "node")}
         cursor = get_int(rhs_result, "next")
     {"node": current_node, "next": cursor}
