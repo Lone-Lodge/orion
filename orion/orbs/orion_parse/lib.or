@@ -865,14 +865,22 @@ fn psr_parse_expr_at(tokens: [Map], position: int, min_prec: int) -> Map:
     mut current_node = get_map(postfix_result, "node")
     mut cursor = get_int(postfix_result, "next")
     loop:
-        op_kind = psr_peek_kind(tokens, cursor)
-        op_value = psr_peek_value(tokens, cursor)
+        # A pipe `|>` may open a continuation line: `xs\n  |> map(f)\n  |> sum()`.
+        # Skip the newline(s) before a leading `|>` so the chain keeps flowing
+        # down the page. `|>` can never begin a statement (it needs a left
+        # operand), so peeking past the break is unambiguous — no other
+        # operator is allowed to swallow a line break here.
+        scan = psr_skip_newlines(tokens, cursor)
+        pipe_continues = psr_peek_kind(tokens, scan) == "symbol" and psr_peek_value(tokens, scan) == "|>"
+        op_cursor = if pipe_continues then scan else cursor
+        op_kind = psr_peek_kind(tokens, op_cursor)
+        op_value = psr_peek_value(tokens, op_cursor)
         prec = psr_op_prec(op_kind, op_value)
         if prec == 0 or prec < min_prec:
             break
         # Left-associative — RHS uses prec+1 so we don't gather more at
         # the same level (e.g. `a-b-c` parses as `(a-b)-c`, not `a-(b-c)`).
-        rhs_result = psr_parse_expr_at(tokens, cursor + 1, prec + 1)
+        rhs_result = psr_parse_expr_at(tokens, op_cursor + 1, prec + 1)
         current_node = {"kind": "Binary", "op": op_value, "left": current_node, "right": get_map(rhs_result, "node")}
         cursor = get_int(rhs_result, "next")
     {"node": current_node, "next": cursor}
