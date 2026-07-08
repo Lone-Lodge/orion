@@ -94,6 +94,31 @@ pub fn lower(t: Text) -> Text:
         out = bytes_concat(out, [new_b])
     bytes_to_text(out)
 
+# Remove leading and trailing ASCII whitespace (space, tab, newline, CR).
+#   trim("  hi  ")  ->  "hi"
+pub fn trim(t: Text) -> Text:
+    tb = bytes_from_text(t)
+    n = bytes_length(tb)
+    mut lo = 0
+    mut hi = n
+    loop:
+        if lo >= hi:
+            break
+        b = byte_at(tb, lo)
+        if b == 32 or b == 9 or b == 10 or b == 13:
+            lo = lo + 1
+        else:
+            break
+    loop:
+        if hi <= lo:
+            break
+        b = byte_at(tb, hi - 1)
+        if b == 32 or b == 9 or b == 10 or b == 13:
+            hi = hi - 1
+        else:
+            break
+    bytes_to_text(bytes_slice(tb, lo, hi))
+
 # Join a list of pieces with `sep` between them.
 #   join(["a", "b", "c"], "-")  ->  "a-b-c"
 pub fn join(parts: [Text], sep: Text) -> Text:
