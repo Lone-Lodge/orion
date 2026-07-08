@@ -1,0 +1,65 @@
+# iter — functional list operations, powered by closures.
+#
+# Each takes a closure (a `fn(...)` value) and applies it across a list.
+# Predicates return 1 (keep / true) or 0 (drop / false) — Orion's closures
+# carry int captures, so these are int-list utilities today.
+#
+#   doubled = map([1, 2, 3], fn(x): x * 2)          # [2, 4, 6]
+#   evens   = filter(xs, fn(x): if x % 2 == 0 then 1 else 0)
+#   total   = reduce(xs, 0, fn(acc, x): acc + x)    # sum
+
+# Apply `f` to every element, collecting the results.
+pub fn map(xs: [int], f: fn) -> [int]:
+    mut out = []
+    for i in 0..<len(xs):
+        out = push(out, f(at(xs, i)))
+    out
+
+# Keep the elements for which `pred(x)` is 1.
+pub fn filter(xs: [int], pred: fn) -> [int]:
+    mut out = []
+    for i in 0..<len(xs):
+        x = at(xs, i)
+        if pred(x) == 1:
+            out = push(out, x)
+    out
+
+# Fold left: acc starts at `init`, then acc = f(acc, x) for each element.
+pub fn reduce(xs: [int], init: int, f: fn) -> int:
+    mut acc = init
+    for i in 0..<len(xs):
+        acc = f(acc, at(xs, i))
+    acc
+
+# 1 if `pred(x)` is 1 for at least one element, else 0.
+pub fn any(xs: [int], pred: fn) -> int:
+    mut found = 0
+    for i in 0..<len(xs):
+        if pred(at(xs, i)) == 1:
+            found = 1
+    found
+
+# 1 if `pred(x)` is 1 for every element (vacuously 1 for an empty list).
+pub fn all(xs: [int], pred: fn) -> int:
+    mut ok = 1
+    for i in 0..<len(xs):
+        if pred(at(xs, i)) == 0:
+            ok = 0
+    ok
+
+# Index of the first element where `pred(x)` is 1, or -1 if none match.
+pub fn find_index(xs: [int], pred: fn) -> int:
+    mut idx = 0 - 1
+    for i in 0..<len(xs):
+        if idx < 0:
+            if pred(at(xs, i)) == 1:
+                idx = i
+    idx
+
+# How many elements satisfy `pred`.
+pub fn count(xs: [int], pred: fn) -> int:
+    mut n = 0
+    for i in 0..<len(xs):
+        if pred(at(xs, i)) == 1:
+            n = n + 1
+    n

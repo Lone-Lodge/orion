@@ -1,0 +1,3 @@
+name = "iter"
+version = "0.1.0"
+description = "Functional list operations (map / filter / reduce / any / all / find) powered by closures"

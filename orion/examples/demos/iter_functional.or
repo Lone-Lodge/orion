@@ -1,0 +1,26 @@
+# iter — functional list operations with closures.
+# Build: this is a library-using program; compile with the orbs/ root:
+#   orion.exe examples/demos/iter_functional.or out.ll orbs
+#
+# Shows map / filter / reduce / count taking `fn(...)` closures, including
+# a closure that captures a local (`bonus`).
+use iter
+
+fn main() -> int:
+    scores = [40, 75, 88, 12, 95, 60]
+    bonus = 5
+
+    # map with a captured value: everyone gets a bonus.
+    boosted = map(scores, fn(s): s + bonus)          # [45, 80, 93, 17, 100, 65]
+
+    # filter: only the passing scores (>= 65 after bonus).
+    passing = filter(boosted, fn(s): if s >= 65 then 1 else 0)  # [80, 93, 100, 65]
+
+    # reduce: total of the passing scores.
+    total = reduce(passing, 0, fn(acc, s): acc + s)  # 338
+
+    # count how many were perfect (100).
+    perfect = count(boosted, fn(s): if s == 100 then 1 else 0)  # 1
+
+    print_line("passing: {len(passing)}   total: {total}   perfect: {perfect}")
+    total
