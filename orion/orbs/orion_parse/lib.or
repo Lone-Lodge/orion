@@ -381,9 +381,15 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         result = {"node": {"kind": "Perform", "effect": eff_name, "op": op_name, "args": perf_args_list}, "next": pc}
     if is_fn_lambda:
         # `fn(a, b): expr` — collect param idents up to `)`, skip `:`, parse body.
+        # A param may carry a type: `fn(s: text): len(s)`. Types collect into a
+        # parallel `param_types` list (defaulting to `int` when omitted) so the
+        # lambda-lift can give the synthesized fn's param its real type — that's
+        # what lets a closure use `len`/`at` on a captured or passed text/list.
         mut fl_cursor = position + 2
         fl_params = []
         mut fl_list = fl_params
+        fl_ptypes = []
+        mut fl_types = fl_ptypes
         loop:
             fk = psr_peek_kind(tokens, fl_cursor)
             fv = psr_peek_value(tokens, fl_cursor)
@@ -395,12 +401,20 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
             if fk == "ident":
                 fl_list = push(fl_list, fv)
                 fl_cursor = fl_cursor + 1
+                # Optional `: type` — parse it, else default to `int`.
+                if psr_peek_kind(tokens, fl_cursor) == "symbol" and psr_peek_value(tokens, fl_cursor) == ":":
+                    fl_cursor = fl_cursor + 1
+                    fl_ty_r = psr_parse_type(tokens, fl_cursor)
+                    fl_types = push(fl_types, get_map(fl_ty_r, "node"))
+                    fl_cursor = get_int(fl_ty_r, "next")
+                else:
+                    fl_types = push(fl_types, {"kind": "Named", "name": "int"})
             if fk == "symbol" and fv == ",":
                 fl_cursor = fl_cursor + 1
         if psr_peek_kind(tokens, fl_cursor) == "symbol" and psr_peek_value(tokens, fl_cursor) == ":":
             fl_cursor = fl_cursor + 1
         fl_body = psr_parse_expr(tokens, fl_cursor)
-        result = {"node": {"kind": "Lambda", "params": fl_list, "body": get_map(fl_body, "node")}, "next": get_int(fl_body, "next")}
+        result = {"node": {"kind": "Lambda", "params": fl_list, "param_types": fl_types, "body": get_map(fl_body, "node")}, "next": get_int(fl_body, "next")}
     if is_call:
         result = psr_parse_call(tokens, position, value)
     is_true = is_ident and value == "true"
