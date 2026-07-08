@@ -1,0 +1,3 @@
+name = "list"
+version = "0.1.0"
+description = "Everyday integer-list helpers (range / reverse / includes / index_of / first / last / sum)"

@@ -1,0 +1,58 @@
+# list — everyday integer-list helpers that don't need a closure.
+# (For map / filter / reduce and friends, see the `iter` orb.)
+#
+#   range(4)              ->  [0, 1, 2, 3]
+#   reverse([1, 2, 3])    ->  [3, 2, 1]
+#   includes([1, 2], 2)   ->  1
+#   index_of([5, 6], 6)   ->  1
+#   first([9, 8])         ->  9
+#   last([9, 8])          ->  8
+#   sum([1, 2, 3])        ->  6
+
+# [0, 1, …, n-1]. Empty for n <= 0.
+pub fn range(n: int) -> [int]:
+    mut out = []
+    for i in 0..<n:
+        out = push(out, i)
+    out
+
+# A new list with the elements in reverse order.
+pub fn reverse(xs: [int]) -> [int]:
+    mut out = []
+    n = len(xs)
+    for i in 0..<n:
+        out = push(out, at(xs, n - 1 - i))
+    out
+
+# 1 if `v` appears in `xs`, else 0. (Named `includes` to avoid the built-in
+# `contains`, which is text-substring only.)
+pub fn includes(xs: [int], v: int) -> int:
+    mut found = 0
+    for i in 0..<len(xs):
+        if at(xs, i) == v:
+            found = 1
+    found
+
+# First index of `v`, or -1 if absent.
+pub fn index_of(xs: [int], v: int) -> int:
+    mut idx = 0 - 1
+    for i in 0..<len(xs):
+        if idx < 0:
+            if at(xs, i) == v:
+                idx = i
+    idx
+
+# First / last element, or 0 for an empty list.
+pub fn first(xs: [int]) -> int:
+    if len(xs) > 0 then at(xs, 0) else 0
+
+pub fn last(xs: [int]) -> int:
+    n = len(xs)
+    if n > 0 then at(xs, n - 1) else 0
+
+# Sum of all elements (0 for empty).
+pub fn sum(xs: [int]) -> int:
+    mut total = 0
+    for i in 0..<len(xs):
+        total = total + at(xs, i)
+    total
