@@ -217,8 +217,6 @@ fn slx_scan_op_short(first: int, second: int) -> Text:
         result = "*="
     if first == 47 and second == 61:
         result = "/="
-    if first == 46 and second == 46:
-        result = ".."
     if result == "":
         result = slx_scan_op_single(first)
     result

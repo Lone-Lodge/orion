@@ -146,7 +146,7 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
             op_kind = psr_peek_kind(tokens, cursor)
             op_val = psr_peek_value(tokens, cursor)
             # Range op: ..= (== ...) or ..<
-            is_range_op = op_kind == "symbol" and (op_val == "..." or op_val == "..=" or op_val == "..<" or op_val == "..")
+            is_range_op = op_kind == "symbol" and (op_val == "..=" or op_val == "..<")
             if is_range_op:
                 cursor = cursor + 1
                 # Some `...` are tokenised as `..` + `.` — tolerate trailing dot
@@ -154,7 +154,7 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
                     cursor = cursor + 1
                 high_text = psr_peek_value(tokens, cursor)
                 cursor = cursor + 1
-                inclusive = op_val == "..." or op_val == "..="
+                inclusive = op_val == "..="
                 {"node": {"kind": "Range", "low": low_text, "high": high_text, "inclusive": inclusive}, "next": cursor}
             else:
                 # Bare int that's not a range — treat as Named with the text
@@ -1118,7 +1118,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                 # Detect `..<` or `..=` to produce ForRange directly.
                 range_op_kind = psr_peek_kind(tokens, for_cursor)
                 range_op_val = psr_peek_value(tokens, for_cursor)
-                is_range = range_op_kind == "symbol" and (range_op_val == "..<" or range_op_val == "..=" or range_op_val == "..")
+                is_range = range_op_kind == "symbol" and (range_op_val == "..<" or range_op_val == "..=")
                 if is_range:
                     for_cursor = for_cursor + 1
                     high_result = psr_parse_expr(tokens, for_cursor)
