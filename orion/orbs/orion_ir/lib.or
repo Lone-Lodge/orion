@@ -531,6 +531,20 @@ pub fn ir_indirect_call(callee_id: int, arg_ids: [int], ret_type: Text) -> Inst:
     Inst{op: "indirect_call", type_text: ret_type, value: callee_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
 
 
+# Closure value = a list [fn_ptr_as_int, is_lambda_flag, cap0, cap1, ...].
+# `is_lambda` (lhs) is 1 for a lambda (its fn takes the closure as a leading
+# `env` arg and reads captures out of it), 0 for a plain fn-ref (called with
+# no env). `name` is the target fn; `args` are the captured SSA value ids.
+pub fn ir_make_closure(fn_name: Text, cap_ids: [int], is_lambda: int) -> Inst:
+    Inst{op: "make_closure", type_text: "ptr", value: 0, lhs: is_lambda, rhs: 0, name: fn_name, args: cap_ids}
+
+
+# Call a closure value: load its fn-ptr, and dispatch on the is_lambda flag —
+# a lambda is invoked as fn(env, args...), a plain fn-ref as fn(args...).
+pub fn ir_closure_call(closure_id: int, arg_ids: [int], ret_type: Text) -> Inst:
+    Inst{op: "closure_call", type_text: ret_type, value: closure_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
+
+
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:
     mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
