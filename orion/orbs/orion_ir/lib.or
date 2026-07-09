@@ -335,8 +335,12 @@ pub fn ir_sleep_ms(ms_id: int) -> Inst:
 #   [i64 length, i64 key0_ptr, i64 val0, i64 key1_ptr, i64 val1, ...]
 # Keys are text pointers stored as i64 (lossless on 64-bit).
 # args alternates: [key0_id, val0_id, key1_id, val1_id, ...].
-pub fn ir_map_lit(pair_ids: [int]) -> Inst:
-    Inst{op: "map_lit", type_text: "map", value: 0, lhs: 0, rhs: 0, name: "", args: pair_ids}
+# `val_type` is the map's homogeneous value type (i64 / text / list:… / map).
+# It rides in type_text as `map:<val_type>` so get()/[] recover the value type
+# through mut slots, set-results and copies — a bare `map` lost it and made
+# `get` guess `text`, concatenating int values as pointers (a crash).
+pub fn ir_map_lit(pair_ids: [int], val_type: Text) -> Inst:
+    Inst{op: "map_lit", type_text: "map:{val_type}", value: 0, lhs: 0, rhs: 0, name: "", args: pair_ids}
 
 pub fn ir_map_get(map_id: int, key_id: int, value_type: Text) -> Inst:
     Inst{op: "map_get", type_text: value_type, value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
@@ -347,8 +351,8 @@ pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
 # set(map, key, val) — mutates in place (indirect handle survives
 # growth) and re-yields the map so `m = set(m, k, v)` value-semantics
 # call sites keep working. Same aliasing caveat as list_push_mut.
-pub fn ir_map_set_val(map_id: int, key_id: int, val_id: int) -> Inst:
-    Inst{op: "map_set_val", type_text: "map", value: map_id, lhs: key_id, rhs: val_id, name: "", args: []}
+pub fn ir_map_set_val(map_id: int, key_id: int, val_id: int, map_type: Text) -> Inst:
+    Inst{op: "map_set_val", type_text: map_type, value: map_id, lhs: key_id, rhs: val_id, name: "", args: []}
 
 pub fn ir_map_remove(map_id: int, key_id: int) -> Inst:
     Inst{op: "map_remove", type_text: "map", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
@@ -466,6 +470,14 @@ pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
     new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
     PushResult{function: new_fn, id: new_id}
 
+# Overwrite the instruction at `idx` — used to back-patch an alloca's element
+# type once inference resolves an empty list (`mut x = []` then `push`). Same
+# in-place caveat as ir_fn_push: the caller drops the old IRFn.
+pub fn ir_fn_set_inst(fn_value: IRFn, idx: int, inst: Inst) -> IRFn:
+    mut insts = fn_value.instructions
+    insts = set(insts, idx, inst)
+    IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
+
 
 # --- Module builders ---
 
@@ -521,6 +533,27 @@ pub fn ir_fn_ref(fn_name: Text) -> Inst:
 # fn returns. For now we restrict to all-i64 args / i64 or text ret.
 pub fn ir_indirect_call(callee_id: int, arg_ids: [int], ret_type: Text) -> Inst:
     Inst{op: "indirect_call", type_text: ret_type, value: callee_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
+
+
+# Closure value = a list [fn_ptr_as_int, is_lambda_flag, cap0, cap1, ...].
+# `is_lambda` (lhs) is 1 for a lambda (its fn takes the closure as a leading
+# `env` arg and reads captures out of it), 0 for a plain fn-ref (called with
+# no env). `name` is the target fn; `args` are the captured SSA value ids.
+pub fn ir_make_closure(fn_name: Text, cap_ids: [int], is_lambda: int) -> Inst:
+    Inst{op: "make_closure", type_text: "ptr", value: 0, lhs: is_lambda, rhs: 0, name: fn_name, args: cap_ids}
+
+
+# Call a closure value: load its fn-ptr, and dispatch on the is_lambda flag —
+# a lambda is invoked as fn(env, args...), a plain fn-ref as fn(args...).
+pub fn ir_closure_call(closure_id: int, arg_ids: [int], ret_type: Text) -> Inst:
+    Inst{op: "closure_call", type_text: ret_type, value: closure_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
+
+
+# Reinterpret an i64 (a ptr stored as int — e.g. a text/list/map closure
+# capture read back from the env) as a typed ptr value. type_text carries
+# the intended type ("text" / "list:i64" / "map") so downstream ops see it.
+pub fn ir_int_to_ptr(src_id: int, type_text: Text) -> Inst:
+    Inst{op: "int_to_ptr", type_text: type_text, value: src_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:

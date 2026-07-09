@@ -4,86 +4,107 @@
 
 ### Core language
 - `fn` / `pub fn` declarations, `extern fn` for FFI
-- `mut name = ...` (mutable bindings), `name = ...` (reassignment)
-- Type annotations on params, optional on locals
+- `mut name = ...` (mutable bindings), `name = ...` (immutable binding / reassignment)
+- `fact name = expr` — reactive derived binding; reading `name` re-evaluates
+  `expr` against current state (lowered by inlining, so no runtime tick needed)
+- Type annotations on params, optional on locals. Built-in type names are
+  case-insensitive: `int`, `text`/`Text`, `map`/`Map`, `list`/`List`, `bool`, `float`
 - `return <expr>` keyword (early-exit)
 - `if cond:` block-form + `if c then a else b` expression-form
-- `for v in 0..<n:` (exclusive range) and `for v in list:`
+- `for v in 0..<n:` (exclusive) and `for v in 0..=n:` (inclusive) ranges; `for v in list:`
 - `for idx, v in list:` (with-index iteration)
 - `for v with Component:` (ECS query — for entities)
 - `loop:` + `break` + `continue` (unbounded loops)
-- `match` on int/text patterns + enum-variant destructuring
+- `match` on int/text patterns + enum-variant destructuring; exhaustiveness checked
 - `data` structs (not OOP — pure record types)
 - `enum` sum types with payload (tag + val_int + val_text)
 - `?` operator (early-return-on-Err for sum types)
-- Method-call syntax: `text.upper()`, `list.len()`
-- String interpolation: `"{name} = {value}"`
-- Bitwise ops: `<<`, `>>`, `&`, `|`, `^`, `~`
-- Compound assignment: `+=`, `-=`, `*=`, `/=`
-- Unary negation: `-x`
-- `defer <expr>` — runs at block end + before any `return` (LIFO order; block-scope)
-- Pipe operator: `x |> f` → `f(x)`; `x |> f(a, b)` → `f(x, a, b)`
-- Exhaustiveness check on enum match (no wildcard → all variants required)
-- **First-class fn refs**: `f = some_fn` binds a fn-pointer; `f(args)` calls indirect
-- **Higher-order fns**: `fn apply(f: fn, x: int) -> int: f(x)` works end-to-end
-- Lambda parsing: `|x| x + 1` syntax parsed but lowering deferred (use named fn + ref instead)
+- Method-call syntax: `text.upper()`, `list.len()`, `xs.slice(1, 3)` (desugars `x.f(a)` → `f(x, a)`)
+- String interpolation of any expression: `"{a + b}"`, `"{xs[0]}"`, `"{f(x)}"`
+- `xs[i]` / `m[k]` indexing and `xs[i] = v` / `m[k] = v` element assignment
+- Compound assignment: `+=`, `-=`, `*=`, `/=`; unary negation `-x`
+- `defer <expr>` — runs at block end + before any `return` (LIFO, block-scoped)
 - Contracts: `require <cond>`, `ensure <cond>` (runtime checked)
 - `comptime` constant folding
 
+### Functions as values
+- **First-class fn refs**: `f = some_fn` binds a fn-pointer; `f(args)` calls indirect
+- **Higher-order fns**: `fn apply(f: fn, x: int) -> int: f(x)` end-to-end
+- **Lambdas**: `fn(x): x + 1` (the one lambda syntax), with typed params `fn(s: Text): len(s)`
+- **Real closures**: a lambda captures locals by value — `add_k = fn(n): n + k` — in
+  every position (binding, returned/factory, inline-arg, nested-block, escaping),
+  with int / text / list / map captures
+- **Generics** (erasure): `fn map<T>(xs: [T], f: fn) -> [int]` — the `iter` orb is generic
+  over the element type
+
+### Checks (loud, not silent)
+- Return type must match the body — only when an explicit `-> type` is
+  declared (`fn f() -> int: "hi"` is an error; a `->`-less procedure is exempt)
+- Reassignment type must match the binding
+- Division / modulo by the literal `0` (compile time)
+- Duplicate function definitions; empty function bodies
+- Errors report types in source terms (`int`, `[int]`, `Point`)
+- **Runtime**: out-of-range `xs[i]` traps with `list index N out of range (len L)`
+  and `x / 0` traps with `division by zero` (exit 70) — no more silent garbage
+  or bare SIGFPE
+- Using an unannotated parameter as text/list names the parameter and points
+  at the fix (untyped params default to `int`)
+
 ### Effects (algebraic — rare next-gen feature)
 - `effect Name: op_name: fn(params) -> ret` declarations
-- `perform Effect.op(args)` — invoke
-- Static dispatch via fn naming: `__handler_Effect_op`
-- One-shot continuations via setjmp/longjmp:
-  - `resume_int(value)` — return-via-longjmp with int
-  - `resume_text(value)` — return-via-longjmp with text
+- `perform Effect.op(args)` — invoke; static dispatch via `__handler_Effect_op`
+- One-shot continuations via setjmp/longjmp: `resume_int(v)`, `resume_text(v)`
 
 ### Concurrency
-- `spawn job <expr>` + `.await` (basic)
-- `parallel for` (footprint-checked)
-- `scope:` (structured concurrency block)
+- `spawn job <expr>` + `.await` (basic), `parallel for` (footprint-checked), `scope:` block
 
 ### Tooling
-- Self-hosting: `orion.exe` (294KB native PE) compiles its own bundle
+- Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 82/82 tests passing
+- 108/108 smoke tests passing; 15/15 demos
 
 ### Stdlib orbs (pure Orion)
-bytes, text, fs, io, time, math, random, log, hash, json, csv, xml, regex, url, base64, hex, color, crypto, easing, noise, format, collections, env, sysinfo, image, audio, gpu, wgsl, net, result, option, assert, plus orion compiler internals (lex/parse/ir/ast_to_ir/emit_llvm).
+`text` (split/join/replace/trim/pad/upper/lower/starts_with/…),
+`num` (abs/min/max/clamp/sign/gcd/parse/ipow/is_even/is_odd),
+`list` (range/reversed/includes/find/first/last/max_of/min_of/avg),
+`dict` (keys/values/size/has_key),
+`iter` (map/filter/reduce/any/all/find_index/count/sum/sort_by/max_by/min_by — generic, closure-powered),
+plus `result`, `option`, `assert`, `log`, `os`, `async`, `scheduler`, `closure`,
+and the compiler internals (`orion_lex` / `orion_parse` / `orion_ir` /
+`orion_ast_to_ir` / `orion_emit_llvm` / `orion_driver`).
 
 ## What's missing (ranked by impact)
 
-### Critical gaps (every modern language has these)
-1. **Generics** — `fn id<T>(x: T) -> T`, `List<int>` parameterized. 8-12h.
-2. **Lambda lift pass** — `|x| x + 1` inline syntax. Parser done; needs tree
-   walker that hoists Lambdas as `__lambda_N` top-level fns + rewrites
-   references. Workaround today: use named fns + first-class fn refs (works).
-3. **Closures with captures** — `fn outer(): adder = |y| x + y`. Needs env
-   struct + capture analysis on top of lambda lift. 5-8h.
-4. **Type inference** — currently you annotate; full HM/bidirectional inference. 6-10h.
+### Language
+1. **Non-int param inference** — locals infer from their initializer and the
+   return type is optional, but a parameter used as text/list/map still needs
+   annotating. This is *deliberate*: the annotation keeps a signature readable
+   (a newcomer reads `fn f(s: text)`, not the call sites), and inferring it
+   would add a second way to say the same thing. The compiler now names the
+   parameter and suggests the fix instead of failing cryptically.
+2. **Orb namespaces** — function names are global across `use`d orbs (a clash is a
+   clear error today, but there is no `list.sum` qualification).
+3. **Generic return-type re-typing** — an element read out of a returned generic
+   list (`filter(words, …)[0]`) is opaque at the call site (erasure limit).
 
-### Important for next-gen game/AI
-4. **Async runtime** — effects are sync; need scheduler + libco for multi-shot. 15-25h.
-5. **SIMD primitives** — `vec4`, `mat4` with hardware vector ops. 8-12h.
-6. **First-class tensors** — needed for "AI-friendly" claim. 30-50h.
+### Next-gen game / AI
+4. **Async runtime** — effects are sync; need a scheduler + multi-shot continuations.
+5. **SIMD primitives**, **first-class tensors**.
 
-### Quality of life
-7. **Block-scope defer (proper)** — outer-block defers should fire on inner return.
-8. **More effect arg types** — currently single int/text arg per perform; need n-arg.
-9. **`handle E: ops in body` syntax** — sugar over current naming convention.
-10. **Hot reload** — DLL swap for game-dev iteration. 10-20h.
-
-### Niche but cool
-11. **Refinement types** — `int where x > 0` statically checked. 40-80h.
-12. **Distinct/newtype** — `type UserId = distinct int`. 3-5h.
-13. **Macros** — comptime code generation. 15-25h.
-14. **Linear types** — Hylo-style move semantics. 30-50h.
+### Niche
+6. Refinement types, distinct/newtype, macros, hot reload.
 
 ## Honest summary
 
-**Orion is REAL.** It's self-hosting, has algebraic effects with continuations (OCaml 5 territory — rare), sum types, pattern matching, all the modern semantics. Game demos work end-to-end natively via orion.exe.
+**Orion is REAL and self-hosting** — it compiles its own bundle to a native
+binary, with closures, generics, sum types, pattern matching, algebraic effects
+with continuations, and a small readable standard library.
 
-**Orion is NOT FINISHED.** No language ever is. Rust at this maturity didn't have async/await, didn't have const generics. Go still doesn't have generics in some forms.
+**Orion is deliberately KISS** — one obvious way to write a lambda (`fn(x): …`),
+to chain (plain intermediate variables), and to range (`..<` / `..=`); no cryptic
+one-symbol operators. The compiler tries to *do what you mean* (case-insensitive
+type names) and to *fail loudly* rather than miscompile silently.
 
-The remaining gaps (#1–#3 critical) prevent serious production use. Plan: **dedicate one focused session per gap.** Each is 5-12h of careful systems work. Trying to ship them in a tired chat-session = buggy half-features.
+**Orion is NOT FINISHED** — no language is. The gaps above are real, but the core
+is solid enough to write ordinary programs (see `examples/demos/`) without surprises.

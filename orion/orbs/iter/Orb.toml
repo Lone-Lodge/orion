@@ -1,0 +1,3 @@
+name = "iter"
+version = "0.1.0"
+description = "Generic functional list operations (map / filter / reduce / any / all / find / count over any element type, plus int sum / sort_by / max_by / min_by) powered by closures"

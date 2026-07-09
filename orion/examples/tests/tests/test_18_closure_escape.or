@@ -1,0 +1,10 @@
+# Escaping closure: a capturing lambda passed to another fn keeps its
+# captures (env-struct closure = [fn_ptr, flag, caps...]). a=10, b=3,
+# g(5) = 10 + 3 + 5 = 18. (Before real closures this silently miscompiled.)
+fn apply(f: fn, x: int) -> int:
+    f(x)
+fn main() -> int:
+    a = 10
+    b = 3
+    g = fn(n): a + b + n
+    apply(g, 5)

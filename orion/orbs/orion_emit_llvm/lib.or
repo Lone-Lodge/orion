@@ -271,6 +271,56 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         callee_ref = value_ref(inst.value)
         result = "    {value_ref(my_id)} = call {ret_ty} {callee_ref}({arg_text})"
 
+    if op == "int_to_ptr":
+        result = "    {value_ref(my_id)} = inttoptr i64 {value_ref(inst.value)} to ptr"
+
+    if op == "make_closure":
+        # Build [fn_ptr_as_int, is_lambda_flag, cap0, cap1, ...] as a list.
+        n_caps = len(inst.args)
+        total = 2 + n_caps
+        mut mc = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {total})"
+        mc = "{mc}\n    %v{my_id}.fp = ptrtoint ptr @{inst.name} to i64"
+        mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 0, i64 %v{my_id}.fp)"
+        mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 1, i64 {inst.lhs})"
+        for ci in 0..<n_caps:
+            cap_id = at(inst.args, ci)
+            cap_slot = 2 + ci
+            cap_ty = llvm_type_of(ssa_value_type(cap_id, fn_value, module))
+            if cap_ty == "ptr":
+                mc = "{mc}\n    %v{my_id}.c{ci} = ptrtoint ptr {value_ref(cap_id)} to i64"
+                mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {cap_slot}, i64 %v{my_id}.c{ci})"
+            else:
+                mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {cap_slot}, i64 {value_ref(cap_id)})"
+        result = mc
+
+    if op == "closure_call":
+        # Load fn-ptr + flag; a lambda is called fn(env, args), a plain fn-ref
+        # fn(args). env is the closure list itself.
+        clos = value_ref(inst.value)
+        cc_ret = llvm_type_of(inst.type_text)
+        n_ca = len(inst.args)
+        mut cc_args = ""
+        for cai in 0..<n_ca:
+            ca_id = at(inst.args, cai)
+            ca_ty = llvm_type_of(ssa_value_type(ca_id, fn_value, module))
+            csep = if cai == 0 then "" else ", "
+            cc_args = "{cc_args}{csep}{ca_ty} {value_ref(ca_id)}"
+        lam_args = if n_ca == 0 then "ptr {clos}" else "ptr {clos}, {cc_args}"
+        mut cc = "    %v{my_id}.fpi = call i64 @orion_list_at(ptr {clos}, i64 0)"
+        cc = "{cc}\n    %v{my_id}.flg = call i64 @orion_list_at(ptr {clos}, i64 1)"
+        cc = "{cc}\n    %v{my_id}.p = inttoptr i64 %v{my_id}.fpi to ptr"
+        cc = "{cc}\n    %v{my_id}.isl = icmp eq i64 %v{my_id}.flg, 1"
+        cc = "{cc}\n    br i1 %v{my_id}.isl, label %clam{my_id}, label %cpln{my_id}"
+        cc = "{cc}\nclam{my_id}:"
+        cc = "{cc}\n    %v{my_id}.r1 = call {cc_ret} %v{my_id}.p({lam_args})"
+        cc = "{cc}\n    br label %cmrg{my_id}"
+        cc = "{cc}\ncpln{my_id}:"
+        cc = "{cc}\n    %v{my_id}.r2 = call {cc_ret} %v{my_id}.p({cc_args})"
+        cc = "{cc}\n    br label %cmrg{my_id}"
+        cc = "{cc}\ncmrg{my_id}:"
+        cc = "{cc}\n    {value_ref(my_id)} = phi {cc_ret} [ %v{my_id}.r1, %clam{my_id} ], [ %v{my_id}.r2, %cpln{my_id} ]"
+        result = cc
+
     if op == "label":
         # Emit basic-block label (no leading 4-space indent).
         result = "{inst.name}:"
@@ -326,9 +376,9 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "imul":
         result = "    {value_ref(my_id)} = mul i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
     if op == "idiv":
-        result = "    {value_ref(my_id)} = sdiv i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+        result = "    {value_ref(my_id)} = call i64 @orion_idiv(i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
     if op == "imod":
-        result = "    {value_ref(my_id)} = srem i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
+        result = "    {value_ref(my_id)} = call i64 @orion_imod(i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
 
     if is_icmp:
         cc = icmp_cc(op)
@@ -880,7 +930,7 @@ fn evac_code(orion_type: Text) -> int:
         2
     else if orion_type == "list:text":
         3
-    else if orion_type == "map":
+    else if orion_type == "map" or orion_type == "map:i64" or orion_type == "map:text" or orion_type == "map:map":
         4
     else if orion_type == "list:map":
         5
@@ -898,10 +948,15 @@ fn llvm_type_of(orion_type: Text) -> Text:
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
+    # `map:T` (value-typed map) — a map handle, also a ptr.
+    mut is_map_elem = false
+    if len(bs) >= 4:
+        if at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58:
+            is_map_elem = true
     if orion_type == "f64":
         "double"
     else:
-        if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem then "ptr" else "i64"
+        if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem or is_map_elem then "ptr" else "i64"
 
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).
@@ -1238,6 +1293,10 @@ fn emit_runtime() -> Text:
     text = "{text}@.fmt_float = private unnamed_addr constant [4 x i8] c\"%g\\0A\\00\"\n"
     text = "{text}@.fmt_g = private unnamed_addr constant [3 x i8] c\"%g\\00\"\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
+    text = "{text}@.msg_oob = private unnamed_addr constant [48 x i8] c\"orion: list index %lld out of range (len %lld)\\0A\\00\"\n"
+    text = "{text}@.msg_divz = private unnamed_addr constant [25 x i8] c\"orion: division by zero\\0A\\00\"\n"
+    text = "{text}@.msg_modz = private unnamed_addr constant [23 x i8] c\"orion: modulo by zero\\0A\\00\"\n"
+    text = "{text}declare void @exit(i32)\n"
     text = "{text}\n"
     text = "{text}define ptr @orion_text_concat(ptr %a, ptr %b) \{\n"
     text = "{text}entry:\n"
@@ -1637,10 +1696,50 @@ fn emit_runtime() -> Text:
     text = "{text}\}\n\n"
     text = "{text}define i64 @orion_list_at(ptr %list, i64 %idx) \{\n"
     text = "{text}entry:\n"
+    text = "{text}  %at_len_slot = getelementptr i64, ptr %list, i64 1\n"
+    text = "{text}  %at_len = load i64, ptr %at_len_slot\n"
+    # Unsigned compare catches idx < 0 (wraps to a huge value) and idx >= len
+    # in one test. Out-of-range indexing used to load adjacent memory and
+    # return garbage with exit 0 — silent wrong answer. Fail loudly instead.
+    text = "{text}  %at_oob = icmp uge i64 %idx, %at_len\n"
+    text = "{text}  br i1 %at_oob, label %at_fail, label %at_ok\n"
+    text = "{text}at_fail:\n"
+    text = "{text}  %_atp = call i32 (ptr, ...) @printf(ptr @.msg_oob, i64 %idx, i64 %at_len)\n"
+    text = "{text}  call void @exit(i32 70)\n"
+    text = "{text}  unreachable\n"
+    text = "{text}at_ok:\n"
     text = "{text}  %offset = add i64 %idx, 2\n"
     text = "{text}  %slot = getelementptr i64, ptr %list, i64 %offset\n"
     text = "{text}  %val = load i64, ptr %slot\n"
     text = "{text}  ret i64 %val\n"
+    text = "{text}\}\n\n"
+    # Checked integer division / modulo. Raw sdiv/srem by zero raises SIGFPE
+    # (an ugly crash with no message); route through these so a runtime `x / 0`
+    # prints a clear line and exits. The literal `/ 0` is still caught earlier
+    # at compile time.
+    text = "{text}define i64 @orion_idiv(i64 %a, i64 %b) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %dz = icmp eq i64 %b, 0\n"
+    text = "{text}  br i1 %dz, label %dfail, label %dok\n"
+    text = "{text}dfail:\n"
+    text = "{text}  %_dp = call i32 (ptr, ...) @printf(ptr @.msg_divz)\n"
+    text = "{text}  call void @exit(i32 70)\n"
+    text = "{text}  unreachable\n"
+    text = "{text}dok:\n"
+    text = "{text}  %dq = sdiv i64 %a, %b\n"
+    text = "{text}  ret i64 %dq\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_imod(i64 %a, i64 %b) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %mz = icmp eq i64 %b, 0\n"
+    text = "{text}  br i1 %mz, label %mfail, label %mok\n"
+    text = "{text}mfail:\n"
+    text = "{text}  %_mp = call i32 (ptr, ...) @printf(ptr @.msg_modz)\n"
+    text = "{text}  call void @exit(i32 70)\n"
+    text = "{text}  unreachable\n"
+    text = "{text}mok:\n"
+    text = "{text}  %mr = srem i64 %a, %b\n"
+    text = "{text}  ret i64 %mr\n"
     text = "{text}\}\n\n"
     # slice(list, lo, hi) — half-open [lo, hi), bounds clamped like the interp.
     text = "{text}define ptr @orion_list_slice(ptr %list, i64 %lo, i64 %hi) \{\n"

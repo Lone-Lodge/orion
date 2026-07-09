@@ -1,0 +1,8 @@
+# `list` (and `List`) as a bare type annotation now resolves to a list,
+# like `text`/`map`. Before it was an unknown name that became i64, so
+# `len(xs)` failed. (Prefer `[int]` when you know the element type.)
+fn count_items(xs: list) -> int:
+    len(xs)
+
+fn main() -> int:
+    count_items([10, 20, 30])

@@ -15,6 +15,7 @@
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -1385,4 +1386,43 @@ void __orion_sleep_ms(long long ms) {
         nanosleep(&t, NULL);
     }
 }
+#include <dirent.h>
+/* POSIX mirror of the Windows FindFirstFile version: newline-separated file
+ * names (directories skipped), returned as a headered Text. */
+const char *orion_dir_list(const char *dir) {
+    DIR *d = opendir(dir);
+    if (!d) return otx_empty.z;
+    size_t cap = 4096, len = 0;
+    char *out = (char *)malloc(cap);
+    out[0] = 0;
+    struct dirent *ent;
+    while ((ent = readdir(d))) {
+        char full[4096];
+        struct stat st;
+        snprintf(full, sizeof(full), "%s/%s", dir, ent->d_name);
+        if (stat(full, &st) == 0 && S_ISDIR(st.st_mode)) continue;
+        size_t n = strlen(ent->d_name);
+        if (len + n + 2 > cap) { cap *= 2; out = (char *)realloc(out, cap); }
+        if (len > 0) out[len++] = '\n';
+        memcpy(out + len, ent->d_name, n + 1);
+        len += n;
+    }
+    closedir(d);
+    {
+        char *evac = orion_text_alloc((long long)len);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
+}
+#endif
+
+/* Host OS for the few places Orion code must branch on it (path separators,
+ * clang target). 0 = Windows, 1 = Linux/other POSIX, 2 = macOS. */
+#if defined(_WIN32)
+long long host_os(void) { return 0; }
+#elif defined(__APPLE__)
+long long host_os(void) { return 2; }
+#else
+long long host_os(void) { return 1; }
 #endif

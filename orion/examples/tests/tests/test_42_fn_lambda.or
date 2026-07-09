@@ -1,0 +1,7 @@
+# Anonymous fn / lambda in expression position: `fn(params): body`.
+# A newcomer who can read `fn add(n): ...` can read this. Same node as |n|.
+fn apply(f: fn, x: int) -> int:
+    f(x)
+fn main() -> int:
+    add1 = fn(n): n + 1
+    apply(add1, 41)

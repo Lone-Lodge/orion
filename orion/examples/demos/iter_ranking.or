@@ -1,0 +1,23 @@
+# iter ranking — sort_by / max_by / min_by, all driven by closures.
+# Build: orion.exe examples/demos/iter_ranking.or out.ll orbs
+#
+# The comparison / key is a `fn(...)` closure, so one `sort_by` covers
+# every ordering: ascending, descending, or by any computed key.
+use iter
+
+fn main() -> int:
+    scores = [40, 75, 88, 12, 95, 60]
+
+    # Leaderboard: highest first. The closure IS the ordering.
+    board = sort_by(scores, fn(a, b): if a > b then 1 else 0)   # [95,88,75,60,40,12]
+
+    top    = max_by(scores, fn(x): x)                           # 95
+    bottom = min_by(scores, fn(x): x)                           # 12
+    spread = top - bottom                                       # 83
+
+    # Closest to the pass mark (65), ranked by distance — the key closure
+    # turns "nearness" into an int min_by can compare.
+    nearest_pass = min_by(scores, fn(x): if x >= 65 then x - 65 else 65 - x)  # 60
+
+    print_line("winner: {at(board, 0)}   spread: {spread}   nearest 65: {nearest_pass}")
+    at(board, 0)

@@ -227,7 +227,7 @@ fn scope_lookup_fn_ret_loc(scope: Scope, fn_name: Text, node: Map) -> Text:
     if found == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion: ERROR at line {line}:{col} — call to unknown function `{fn_name}` (returning i64 as guess)")
+        compile_error("orion: ERROR at line {line}:{col} — call to unknown function `{fn_name}`")
         result = "i64"
     result
 
@@ -398,6 +398,14 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_fn = er.function
             current_scope = er.scope
             last_id = er.id
+        # A bare `If` node in statement position — produced by the `match:`
+        # cond-form desugar — is an if-EXPRESSION used as the block value.
+        # Route it through the expr path (the block-form `if` is `IfBlock`).
+        if already_done == 0 and stmt_kind == "If":
+            er = ast_expr_to_ir(current_fn, current_scope, stmt)
+            current_fn = er.function
+            current_scope = er.scope
+            last_id = er.id
         if already_done == 0 and is_let:
             name = get(stmt, "name")
             # `x = push(x, v)` is a plain copying push like every push —
@@ -440,7 +448,15 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     if slot_ll != new_ll:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion: ERROR at line {line}:{col} — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                        compile_error("orion: ERROR at line {line}:{col} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}`, but the new value is a `{friendly_type(new_type)}`)")
+                    # Resolve an empty list's element type from the first
+                    # concrete value stored into it: `mut x = []` allocates
+                    # list:i64 (no element to peek), so `x = push(x, textv)`
+                    # reveals list:text. Back-patch the slot so later
+                    # `at(x, i)` reads the right element type — no annotation.
+                    if slot_type == "list:i64" and is_list_type(new_type) and extract_list_elem(new_type) != "i64":
+                        patched = Inst{op: alloca_inst.op, type_text: new_type, value: alloca_inst.value, lhs: alloca_inst.lhs, rhs: alloca_inst.rhs, name: alloca_inst.name, args: alloca_inst.args}
+                        current_fn = ir_fn_set_inst(current_fn, ptr_id, patched)
                     pr_store = ir_fn_push(current_fn, ir_store(ptr_id, er.id))
                     current_fn = pr_store.function
                     last_id = pr_store.id
@@ -505,7 +521,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if already_done == 0 and is_defer:
             # Just stash the expression; we'll emit it at block end / before return.
             defer_exprs = push(defer_exprs, get(stmt, "expr"))
-        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt
+        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt or stmt_kind == "If"
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
@@ -698,7 +714,10 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": bare_enum}, "method": name, "args": []}
             result = ast_expr_to_ir(fn_value, scope, vc_node)
         if bare_enum == "" and fn_ret != "":
-            pr_fnref = ir_fn_push(fn_value, ir_fn_ref(name))
+            # A bare fn name used as a value becomes a plain-fn closure
+            # [fn_ptr, 0] — flag 0 so closure_call invokes it without an env.
+            no_caps = slice([0], 0, 0)
+            pr_fnref = ir_fn_push(fn_value, ir_make_closure(name, no_caps, 0))
             result = ConvResult{function: pr_fnref.function, scope: scope, id: pr_fnref.id}
         if bare_enum == "" and fn_ret == "":
             # Unknown ident — likely a `{expr}` interpolation the parser
@@ -780,10 +799,28 @@ fn sc_if(cond: Map, then_e: Map, else_e: Map) -> Map:
 
 fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     op = get(node, "op")
+    # Division / modulo by the literal 0 is always a fault. Catch it at
+    # compile time with a clear message instead of the raw SIGFPE crash a
+    # runtime `x / 0` produces.
+    if op == "/" or op == "%":
+        divz_r = get(node, "right")
+        if get(divz_r, "kind") == "Int" and get(divz_r, "value") == "0":
+            compile_error("orion: ERROR — division by zero (the divisor is the literal `0`)")
     if op == "and":
         return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "right"), sc_int("0")))
     if op == "or":
-        return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), sc_int("1"), get(node, "right")))
+        # `x or default` — value-preserving fallback: the left value if it is
+        # truthy/present, else the right (was `sc_int("1")` = boolean or).
+        # Emit `left` ONCE and bind it to a temp, then branch on the temp —
+        # `sc_if(left, left, right)` would DUPLICATE the left AST and blow up
+        # exponentially on left-associative `a or b or c…` chains.
+        or_left_r = ast_expr_to_ir(fn_value, scope, get(node, "left"))
+        or_fn = or_left_r.function
+        or_n = len(or_fn.instructions)
+        or_tmp = "__or_tmp_{or_n}"
+        or_scope = scope_bind(or_left_r.scope, or_tmp, or_left_r.id)
+        or_ref = {"kind": "Ident", "name": or_tmp}
+        return ast_if_to_ir(or_fn, or_scope, sc_if(or_ref, or_ref, get(node, "right")))
     left_result = ast_expr_to_ir(fn_value, scope, get(node, "left"))
     right_result = ast_expr_to_ir(left_result.function, left_result.scope, get(node, "right"))
     left_type = get_value_type(right_result.function, left_result.id)
@@ -955,7 +992,7 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 line = if has(node, "line") then get_int(node, "line") else 0
                 col = if has(node, "col") then get_int(node, "col") else 0
                 bad_fn = result_fn.name
-                compile_error("orion: ERROR in fn {bad_fn} (line {line}:{col}) — if/else branches have different types ({then_type} vs {else_type})")
+                compile_error("orion: ERROR in fn {bad_fn} (line {line}:{col}) — if/else branches have different types ({friendly_type(then_type)} vs {friendly_type(else_type)})")
             pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
             result_id = pr_phi.id
             result_fn = pr_phi.function
@@ -1033,7 +1070,29 @@ fn find_variant_enum(scope: Scope, callee: Text) -> Text:
 
 fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     callee = get(node, "callee")
-    args = get_list(node, "args")
+    mut args = get_list(node, "args")
+    # Named-argument reorder: `f(y = 3, x = 5)` → positional order via the
+    # `otir:param:<fn>:<name>` slots. Positional args fill in source order.
+    mut na_has = 0
+    for na_i in 0..<len(args):
+        if get(at(args, na_i), "kind") == "NamedArg":
+            na_has = 1
+    if na_has == 1:
+        na_total = len(args)
+        na_seed = []
+        mut na_pos = na_seed
+        for na_j in 0..<na_total:
+            na_pos = push(na_pos, {"kind": "Int", "value": "0"})
+        mut na_next = 0
+        for na_k in 0..<na_total:
+            na_a = at(args, na_k)
+            if get(na_a, "kind") == "NamedArg":
+                na_slot = slot_get_int("otir:param:" + callee + ":" + get(na_a, "name"))
+                na_pos = set(na_pos, na_slot, get_map(na_a, "value"))
+            else:
+                na_pos = set(na_pos, na_next, na_a)
+                na_next = na_next + 1
+        args = na_pos
     # Variant-as-callee → route through the EnumName.Variant(...) sugar
     # (same MethodCall lowering path). Checked BEFORE builtins/user fns —
     # a variant name shadows nothing else by construction.
@@ -1169,14 +1228,29 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         idx_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
-        # Carry the element type from a parameterised list ("list:text") onto
-        # the list_at inst so downstream type checks (e.g. text_cmp) see it.
-        list_type = get_value_type(idx_r.function, list_r.id)
-        elem_type = extract_list_elem(list_type)
-        at_inst = ir_list_at(list_r.id, idx_r.id)
-        at_inst_typed = Inst{op: at_inst.op, type_text: elem_type, value: at_inst.value, lhs: at_inst.lhs, rhs: at_inst.rhs, name: at_inst.name, args: at_inst.args}
-        pr = ir_fn_push(idx_r.function, at_inst_typed)
-        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+        # Closure env read: `at(__env, const)` inside a synth lambda. The env
+        # list is i64, so a text/list/map capture is stored ptr-as-int — read
+        # it as i64, then re-type per the code recorded at make_closure.
+        mut is_env_cap = false
+        mut cap_code = 0
+        if get(list_node, "kind") == "Ident" and get(list_node, "name") == "__env" and get(idx_node, "kind") == "Int":
+            slot_j = parse_int(get(idx_node, "value")) - 2
+            cap_code = slot_get_int("clos:{fn_value.name}:capty:{slot_j}")
+            if cap_code != 0:
+                is_env_cap = true
+        if is_env_cap:
+            pr_at = ir_fn_push(idx_r.function, ir_list_at(list_r.id, idx_r.id))
+            pr_rt = ir_fn_push(pr_at.function, ir_int_to_ptr(pr_at.id, cap_code_type(cap_code)))
+            result = ConvResult{function: pr_rt.function, scope: idx_r.scope, id: pr_rt.id}
+        else:
+            # Carry the element type from a parameterised list ("list:text") onto
+            # the list_at inst so downstream type checks (e.g. text_cmp) see it.
+            list_type = get_value_type(idx_r.function, list_r.id)
+            elem_type = extract_list_elem(list_type)
+            at_inst = ir_list_at(list_r.id, idx_r.id)
+            at_inst_typed = Inst{op: at_inst.op, type_text: elem_type, value: at_inst.value, lhs: at_inst.lhs, rhs: at_inst.rhs, name: at_inst.name, args: at_inst.args}
+            pr = ir_fn_push(idx_r.function, at_inst_typed)
+            result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
     if is_len:
         arg_node = at(args, 0)
         arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
@@ -1189,7 +1263,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             pr = ir_fn_push(arg_r.function, ir_text_len(arg_r.id))
             result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
         else:
-            if arg_type == "map":
+            if is_map_type(arg_type):
                 pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
                 result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
             else:
@@ -1197,7 +1271,13 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
                 else:
-                    compile_error("orion: ERROR — len() on untyped value (type `{arg_type}`) — read it through a typed accessor (get_int/get_map/get_list or a typed fn) so len knows the shape")
+                    # `len` needs to know if the value is text or a list (strlen
+                    # vs a header read). An `int`-typed arg usually means an
+                    # unannotated parameter: untyped params default to `int`, so
+                    # `fn f(s): len(s)` treats `s` as int. Name it and point at
+                    # the fix — annotate the param — instead of a cryptic message.
+                    len_who = if get(arg_node, "kind") == "Ident" then "`" + get(arg_node, "name") + "`" else "this value"
+                    compile_error("orion: ERROR — len({len_who}) but {len_who} is `{friendly_type(arg_type)}`, not text or a list. If it is an unannotated parameter, add a type (e.g. `s: text` or `s: [int]`) — untyped params default to `int`.")
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
@@ -1205,18 +1285,11 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_node = at(args, 1)
         map_r = ast_expr_to_ir(fn_value, scope, map_node)
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
-        # Infer value type by peeking the source map's first value.
-        # Maps in our codebase are usually homogeneous: all-text or all-int.
-        mut get_type = "text"
-        map_fn = map_r.function
-        map_insts = map_fn.instructions
-        map_inst = at(map_insts, map_r.id)
-        map_args = map_inst.args
-        if map_inst.op == "map_lit" and len(map_args) >= 2:
-            first_val_id = at(map_args, 1)
-            first_val_type = get_value_type(map_fn, first_val_id)
-            if first_val_type == "i64":
-                get_type = "i64"
+        # The map's value type rides in its type_text (`map:<T>`), so it
+        # survives mut slots, set-results and copies — unlike the old peek at
+        # the producing map_lit, which defaulted to `text` for any indirection
+        # and made `get(m,a) + get(m,b)` concat int values as pointers (crash).
+        get_type = extract_map_val(get_value_type(map_r.function, map_r.id))
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, get_type))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
     if is_has:
@@ -1240,13 +1313,13 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if len(sc_tgt_bs) >= 4:
             if at(sc_tgt_bs, 0) == 108 and at(sc_tgt_bs, 1) == 105 and at(sc_tgt_bs, 2) == 115 and at(sc_tgt_bs, 3) == 116:
                 sc_is_list = true
-        mut sc_is_map = sc_tgt_type == "map"
+        mut sc_is_map = is_map_type(sc_tgt_type)
         if not sc_is_list:
             if not sc_is_map:
                 sc_is_map = sc_key_type == "text"
                 sc_is_list = not sc_is_map
         if sc_is_map:
-            pr_ms = ir_fn_push(sc_val.function, ir_map_set_val(sc_tgt.id, sc_key.id, sc_val.id))
+            pr_ms = ir_fn_push(sc_val.function, ir_map_set_val(sc_tgt.id, sc_key.id, sc_val.id, sc_tgt_type))
             result = ConvResult{function: pr_ms.function, scope: sc_val.scope, id: pr_ms.id}
         if sc_is_list:
             pr_ls = ir_fn_push(sc_val.function, ir_list_set_val(sc_tgt.id, sc_key.id, sc_val.id, sc_tgt_type))
@@ -1271,7 +1344,12 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         val_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
-        pr = ir_fn_push(val_r.function, ir_list_push(list_r.id, val_r.id))
+        # Carry the pushed element's type onto the result ("list:T"), so a
+        # `x = push(x, v)` self-rebind can back-patch an empty list's slot.
+        push_val_type = get_value_type(val_r.function, val_r.id)
+        push_base = ir_list_push(list_r.id, val_r.id)
+        push_typed = Inst{op: push_base.op, type_text: "list:{push_val_type}", value: push_base.value, lhs: push_base.lhs, rhs: push_base.rhs, name: push_base.name, args: push_base.args}
+        pr = ir_fn_push(val_r.function, push_typed)
         result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
     if is_push_mut:
         # Explicit in-place append for accumulators the caller KNOWS it
@@ -1485,9 +1563,10 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_scope = arg_r.scope
             arg_ids = push(arg_ids, arg_r.id)
         if is_local_callee:
-            # Indirect call. Return type defaults to i64 — proper type
-            # tracking on fn-ref values is future work.
-            pr = ir_fn_push(current_fn, ir_indirect_call(bound_id, arg_ids, "i64"))
+            # The local holds a closure value ([fn_ptr, flag, caps...]); call
+            # through it. Return type defaults to i64 — proper type tracking on
+            # closure values is future work.
+            pr = ir_fn_push(current_fn, ir_closure_call(bound_id, arg_ids, "i64"))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
         else:
             call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
@@ -1874,12 +1953,31 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         current_scope = val_r.scope
         pair_ids = push(pair_ids, pr_key.id)
         pair_ids = push(pair_ids, val_r.id)
-    pr = ir_fn_push(current_fn, ir_map_lit(pair_ids))
+    # Maps are homogeneous; take the value type from the first pair's value so
+    # get()/[] recover it later. Empty map -> i64 (no values to mistype).
+    mut map_val_type = "i64"
+    if n_pairs > 0:
+        map_val_type = get_value_type(current_fn, at(pair_ids, 1))
+    pr = ir_fn_push(current_fn, ir_map_lit(pair_ids, map_val_type))
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
 
 pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     kind = get(node, "kind")
+    # `xs[i]` / `m[k]` is sugar for `at(xs, i)` (lists) or `get(m, k)` (maps),
+    # reusing those builtins' element typing verbatim. The container is probed
+    # on a throwaway lowering (index bases are idents/params, so nothing
+    # duplicated survives — the real accessor re-lowers into the pristine
+    # fn_value). Nested indexing (`xss[0][1]`) falls out: the inner Index
+    # lowers as the accessor's argument.
+    if kind == "Index":
+        idx_obj = get(node, "object")
+        idx_key = get(node, "index")
+        idx_probe = ast_expr_to_ir(fn_value, scope, idx_obj)
+        idx_obj_type = get_value_type(idx_probe.function, idx_probe.id)
+        idx_callee = if is_map_type(idx_obj_type) then "get" else "at"
+        idx_call = {"kind": "Call", "callee": idx_callee, "args": [idx_obj, idx_key]}
+        return ast_expr_to_ir(fn_value, scope, idx_call)
     is_block = kind == "Block"
     is_int = kind == "Int"
     is_float_lit = kind == "Float"
@@ -1897,7 +1995,26 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_method_call = kind == "MethodCall"
     is_question = kind == "Question"
     is_perform = kind == "Perform"
+    is_make_closure = kind == "MakeClosure"
     mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    if is_make_closure:
+        # Lambda closure: lower each captured expr, then pack [fn_ptr, 1, caps].
+        # Record each capture's type-code (0 int / 1 text / 2 list / 3 map) so
+        # __lambda_N's prologue reads it back with the right type — the env list
+        # itself is i64, so a text/list/map capture must be re-typed on read.
+        mc_caps = get_list(node, "caps")
+        mc_fn_name = get(node, "fn")
+        mut mc_fn = fn_value
+        mut mc_scope = scope
+        mut mc_cap_ids = slice([0], 0, 0)
+        for mci in 0..<len(mc_caps):
+            mc_cap_r = ast_expr_to_ir(mc_fn, mc_scope, at(mc_caps, mci))
+            mc_fn = mc_cap_r.function
+            mc_scope = mc_cap_r.scope
+            mc_cap_ids = push(mc_cap_ids, mc_cap_r.id)
+            slot_set("clos:{mc_fn_name}:capty:{mci}", cap_type_code(get_value_type(mc_fn, mc_cap_r.id)))
+        pr_mc = ir_fn_push(mc_fn, ir_make_closure(mc_fn_name, mc_cap_ids, 1))
+        result = ConvResult{function: pr_mc.function, scope: mc_scope, id: pr_mc.id}
     if is_block:
         result = ast_block_to_ir(fn_value, scope, node)
     if is_int:
@@ -1917,31 +2034,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if is_field:
         result = ast_field_to_ir(fn_value, scope, node)
     if is_binary:
-        bin_op = get(node, "op")
-        if bin_op == "|>":
-            # Pipe: `x |> f` → `f(x)`; `x |> f(a, b)` → `f(x, a, b)`.
-            # Desugar before lowering — keeps the rest of the pipeline simple.
-            pipe_lhs = get(node, "left")
-            pipe_rhs = get(node, "right")
-            rhs_kind = get(pipe_rhs, "kind")
-            mut desugared_call = pipe_rhs
-            if rhs_kind == "Ident":
-                # x |> f → f(x)
-                callee_name = get(pipe_rhs, "name")
-                desugared_call = {"kind": "Call", "callee": callee_name, "args": [pipe_lhs]}
-            if rhs_kind == "Call":
-                # x |> f(a, b) → f(x, a, b)
-                callee_name = get(pipe_rhs, "callee")
-                orig_args = get_list(pipe_rhs, "args")
-                new_args = [pipe_lhs]
-                mut combined_args = new_args
-                n_orig = len(orig_args)
-                for ai in 0..<n_orig:
-                    combined_args = push(combined_args, at(orig_args, ai))
-                desugared_call = {"kind": "Call", "callee": callee_name, "args": combined_args}
-            result = ast_call_to_ir(fn_value, scope, desugared_call)
-        else:
-            result = ast_binop_to_ir(fn_value, scope, node)
+        result = ast_binop_to_ir(fn_value, scope, node)
     if is_ident:
         result = ast_ident_to_ir(fn_value, scope, node)
     if is_call:
@@ -2078,7 +2171,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         else:
             pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_name, arg_id))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
-    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform
+    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
@@ -2086,6 +2179,29 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         pr_fallback = ir_fn_push(fn_value, ir_iconst(0))
         result = ConvResult{function: pr_fallback.function, scope: scope, id: pr_fallback.id}
     result
+
+
+# Closure capture type-codes: 0 = i64/int, 1 = text, 2 = list, 3 = map.
+# Anything else (struct etc.) falls back to 0 (read as i64).
+fn cap_type_code(t: Text) -> int:
+    mut code = 0
+    if t == "text":
+        code = 1
+    if is_list_type(t):
+        code = 2
+    if t == "map":
+        code = 3
+    code
+
+fn cap_code_type(code: int) -> Text:
+    mut t = "i64"
+    if code == 1:
+        t = "text"
+    if code == 2:
+        t = "list:i64"
+    if code == 3:
+        t = "map"
+    t
 
 
 # Map a parser type-node to an IR type string ("text" / "list" / "i64").
@@ -2117,6 +2233,65 @@ fn extract_list_elem(type_text: Text) -> Text:
             result = "{result}{single}"
         result
 
+# True for `map` or a value-typed `map:<T>`.
+fn is_map_type(type_text: Text) -> bool:
+    if type_text == "map":
+        true
+    else:
+        bs = bytes_from_text(type_text)
+        n = len(bs)
+        if n >= 4:
+            at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58
+        else:
+            false
+
+# The value type from a `map:<T>` type_text. Bare `map` (or non-map) yields
+# `text` — the historic default for untyped maps.
+fn extract_map_val(type_text: Text) -> Text:
+    bs = bytes_from_text(type_text)
+    n = len(bs)
+    mut is_param = false
+    if n >= 4:
+        if at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58:
+            is_param = true
+    if not is_param:
+        "text"
+    else:
+        mut result = ""
+        for ci in 4..<n:
+            single = bytes_to_text([at(bs, ci)])
+            result = "{result}{single}"
+        result
+
+# Render an internal type name in the user's terms for error messages:
+# i64 -> int, f64 -> float, list:T -> [T], struct:Foo -> Foo, void -> nothing.
+fn friendly_type(t: Text) -> Text:
+    if t == "i64":
+        "int"
+    else if t == "f64":
+        "float"
+    else if t == "void" or t == "Unit":
+        "nothing"
+    else if is_list_type(t):
+        "[{friendly_type(extract_list_elem(t))}]"
+    else if is_map_type(t):
+        "map"
+    else:
+        # struct:Foo -> Foo; text / fn / ptr pass through unchanged.
+        fb = bytes_from_text(t)
+        fn2 = len(fb)
+        mut is_struct = false
+        if fn2 >= 7:
+            if at(fb, 0) == 115 and at(fb, 1) == 116 and at(fb, 2) == 114 and at(fb, 3) == 117 and at(fb, 4) == 99 and at(fb, 5) == 116 and at(fb, 6) == 58:
+                is_struct = true
+        if is_struct:
+            mut r = ""
+            for fi in 7..<fn2:
+                r = "{r}{bytes_to_text([at(fb, fi)])}"
+            r
+        else:
+            t
+
 
 fn ast_type_to_ir(type_node: Map) -> Text:
     kind = get(type_node, "kind")
@@ -2134,11 +2309,13 @@ fn ast_type_to_ir(type_node: Map) -> Text:
         "list:{elem}"
     else:
         name = get(type_node, "name")
-        if name == "Text":
+        if name == "Text" or name == "text":
             "text"
         else:
-            if name == "Map":
+            if name == "Map" or name == "map":
                 "map"
+            else if name == "List" or name == "list":
+                "list"
             else:
                 if name == "fn" or name == "ptr":
                     # Function pointer / generic pointer — encode as "fn"
@@ -2177,11 +2354,13 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
         "list:{elem_type}"
     else:
         name = get(type_node, "name")
-        if name == "Text":
+        if name == "Text" or name == "text":
             "text"
         else:
-            if name == "Map":
+            if name == "Map" or name == "map":
                 "map"
+            else if name == "List" or name == "list":
+                "list"
             else:
                 if name == "fn" or name == "ptr":
                     "fn"
@@ -2216,23 +2395,503 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         fn_value = pr.function
         scope = scope_bind(scope, param_name, pr.id)
     body = get(ast_fn, "body")
+    # A block-form fn with zero statements means the body was empty in source
+    # (a forgotten body) OR a mis-parse swallowed it (e.g. a keyword used as a
+    # variable name that ended the body early). Lowering an empty block just
+    # emits `ret 0` — a silently wrong program. Make it loud instead. Externs
+    # are a separate ExternFn node and never reach here; short-form `= expr`
+    # fns carry a one-statement block, so neither is affected.
+    if get(body, "kind") == "Block" and len(get_list(body, "stmts")) == 0:
+        compile_error("orion: ERROR — function `{name}` has an empty body (add a body, or check for a keyword used as a variable name)")
     body_result = ast_expr_to_ir(fn_value, scope, body)
-    # Only emit the trailing `ret` if the body didn't already terminate
-    # (avoids double-terminator when the body is e.g. an infinite loop).
+    # Return-type guard: the tail expression's storage shape (i64 vs pointer)
+    # must match the declared return type. Catches `fn f() -> int: "hello"`
+    # (returns text) instead of silently returning garbage. Only compares the
+    # i64/ptr bucket, like the reassignment check — text/list/map/struct all
+    # share ptr storage, so no false positive between them. `fn`, `f64` and
+    # `Unit` are exempt (bit-punned fn pointers, doubles, void).
     if is_block_terminated(body_result.function) == 0:
+        rt_body = get_value_type(body_result.function, body_result.id)
+        # A fn with no `-> type` gets the `Unit` sentinel (a void procedure
+        # called for its effect). There's no declared return to violate, so
+        # exempt it — only an EXPLICIT return type is a contract to check.
+        ret_undeclared = has(ret_type_node, "name") and get(ret_type_node, "name") == "Unit"
+        rt_exempt = ret_undeclared or ret_type == "fn" or ret_type == "f64" or ret_type == "Unit" or rt_body == "fn" or rt_body == "f64" or rt_body == "void" or rt_body == "Unit"
+        rt_decl_ll = if ret_type == "i64" then "i64" else "ptr"
+        rt_body_ll = if rt_body == "i64" then "i64" else "ptr"
+        if (not rt_exempt) and rt_decl_ll != rt_body_ll:
+            compile_error("orion: ERROR — function `{name}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}`")
         ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
         ret_result.function
     else:
         body_result.function
 
 
+# ---- `fact` inlining (reactive derived bindings) ---------------------
+# `fact name = expr` re-evaluates `expr` on EVERY read. We lower it by
+# INLINING: each later reference to `name` is replaced by the defining
+# expression, so the value is recomputed at each use site — exactly the
+# re-evaluate-on-read semantics. The Fact stmt itself emits no code.
+#
+# Substituted subtrees are ALIASED, not deep-copied: lowering treats the
+# AST as read-only, and emitting the same subtree at N read sites is the
+# intended N-times re-evaluation (linear in read count). `fact` bodies are
+# "one thought per line", so nesting blow-up stays negligible in practice.
+#
+# The whole pass is gated behind fact_block_has() so it is a strict no-op
+# on fact-free code (the entire compiler bundle + existing tests) — the AST
+# comes through byte-identical, which keeps self-bootstrap safe.
+
+fn fact_find(names: [Text], target: Text) -> int:
+    mut found = 0 - 1
+    n = len(names)
+    for i in 0..<n:
+        if at(names, i) == target:
+            found = i
+    found
+
+# Rewrite a list of expression nodes (call args, list items, ...).
+fn fact_rw_list(items: [Map], names: [Text], exprs: [Map]) -> [Map]:
+    mut out = slice(items, 0, 0)
+    n = len(items)
+    for i in 0..<n:
+        out = push(out, fact_rw_expr(at(items, i), names, exprs))
+    out
+
+# Rewrite the `value` field of each entry (MapLit pairs, StructCons fields).
+fn fact_rw_pairs(pairs: [Map], names: [Text], exprs: [Map]) -> [Map]:
+    mut out = slice(pairs, 0, 0)
+    n = len(pairs)
+    for i in 0..<n:
+        p = at(pairs, i)
+        out = push(out, set(p, "value", fact_rw_expr(get(p, "value"), names, exprs)))
+    out
+
+# Rewrite the `body` expression of each match arm.
+fn fact_rw_arms(arms: [Map], names: [Text], exprs: [Map]) -> [Map]:
+    mut out = slice(arms, 0, 0)
+    n = len(arms)
+    for i in 0..<n:
+        a = at(arms, i)
+        out = push(out, set(a, "body", fact_rw_expr(get(a, "body"), names, exprs)))
+    out
+
+# Rewrite one expression node: substitute fact idents, recurse into children.
+fn fact_rw_expr(node: Map, names: [Text], exprs: [Map]) -> Map:
+    kind = get(node, "kind")
+    mut out = node
+    if kind == "Ident":
+        idx = fact_find(names, get(node, "name"))
+        if idx >= 0:
+            out = at(exprs, idx)
+    if kind == "Binary":
+        out = set(out, "left", fact_rw_expr(get(node, "left"), names, exprs))
+        out = set(out, "right", fact_rw_expr(get(node, "right"), names, exprs))
+    if kind == "Unary":
+        out = set(out, "operand", fact_rw_expr(get(node, "operand"), names, exprs))
+    if kind == "Call":
+        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+    if kind == "Perform":
+        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+    if kind == "MethodCall":
+        out = set(out, "receiver", fact_rw_expr(get(node, "receiver"), names, exprs))
+        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+    if kind == "Field":
+        out = set(out, "object", fact_rw_expr(get(node, "object"), names, exprs))
+    if kind == "Index":
+        out = set(out, "object", fact_rw_expr(get(node, "object"), names, exprs))
+        out = set(out, "index", fact_rw_expr(get(node, "index"), names, exprs))
+    if kind == "Question":
+        out = set(out, "inner", fact_rw_expr(get(node, "inner"), names, exprs))
+    if kind == "If":
+        out = set(out, "cond", fact_rw_expr(get(node, "cond"), names, exprs))
+        out = set(out, "then", fact_rw_expr(get(node, "then"), names, exprs))
+        out = set(out, "else", fact_rw_expr(get(node, "else"), names, exprs))
+    if kind == "ListLit":
+        out = set(out, "items", fact_rw_list(get_list(node, "items"), names, exprs))
+    if kind == "NamedArg":
+        out = set(out, "value", fact_rw_expr(get(node, "value"), names, exprs))
+    if kind == "MapLit":
+        out = set(out, "pairs", fact_rw_pairs(get_list(node, "pairs"), names, exprs))
+    if kind == "StructCons":
+        out = set(out, "fields", fact_rw_pairs(get_list(node, "fields"), names, exprs))
+    if kind == "Match":
+        out = set(out, "scrutinee", fact_rw_expr(get(node, "scrutinee"), names, exprs))
+        out = set(out, "arms", fact_rw_arms(get_list(node, "arms"), names, exprs))
+    out
+
+# An IfBlock's else is either a Block or a chained IfBlock (else-if ladder).
+fn fact_rw_else(node: Map, names: [Text], exprs: [Map]) -> Map:
+    kind = get(node, "kind")
+    mut out = node
+    if kind == "Block":
+        out = fact_rw_block(node, names, exprs)
+    if kind == "IfBlock":
+        out = fact_rw_stmt(node, names, exprs)
+    out
+
+# Rewrite one statement: fix up its expression fields + nested blocks.
+fn fact_rw_stmt(s: Map, names: [Text], exprs: [Map]) -> Map:
+    kind = get(s, "kind")
+    mut out = s
+    if kind == "MutLet":
+        out = set(out, "value", fact_rw_expr(get(s, "value"), names, exprs))
+    if kind == "LetOrAssign":
+        out = set(out, "value", fact_rw_expr(get(s, "value"), names, exprs))
+    if kind == "ExprStmt":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Return":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Require":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Ensure":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Defer":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Destroy":
+        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+    if kind == "Loop":
+        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+    if kind == "ForRange":
+        out = set(out, "low", fact_rw_expr(get(s, "low"), names, exprs))
+        out = set(out, "high", fact_rw_expr(get(s, "high"), names, exprs))
+        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+    if kind == "ForIn":
+        out = set(out, "iter", fact_rw_expr(get(s, "iter"), names, exprs))
+        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+    if kind == "ForWith":
+        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+    if kind == "IfBlock":
+        out = set(out, "cond", fact_rw_expr(get(s, "cond"), names, exprs))
+        out = set(out, "then", fact_rw_block(get(s, "then"), names, exprs))
+        out = set(out, "else", fact_rw_else(get(s, "else"), names, exprs))
+    if kind == "Match":
+        out = set(out, "scrutinee", fact_rw_expr(get(s, "scrutinee"), names, exprs))
+        out = set(out, "arms", fact_rw_arms(get(s, "arms"), names, exprs))
+    out
+
+# Rewrite a Block. Facts declared in it extend the binding env for the
+# statements that follow (and for nested blocks); the Fact stmt is dropped.
+fn fact_rw_block(block: Map, names: [Text], exprs: [Map]) -> Map:
+    stmts = get_list(block, "stmts")
+    n = len(stmts)
+    mut out = slice(stmts, 0, 0)
+    mut cur_names = names
+    mut cur_exprs = exprs
+    for i in 0..<n:
+        s = at(stmts, i)
+        if get(s, "kind") == "Fact":
+            rhs = fact_rw_expr(get(s, "value"), cur_names, cur_exprs)
+            cur_names = push(cur_names, get(s, "name"))
+            cur_exprs = push(cur_exprs, rhs)
+        else:
+            out = push(out, fact_rw_stmt(s, cur_names, cur_exprs))
+    set(block, "stmts", out)
+
+# Does this else-node (Block or ladder IfBlock) contain any `fact`?
+fn fact_else_has(node: Map) -> bool:
+    kind = get(node, "kind")
+    mut found = false
+    if kind == "Block":
+        if fact_block_has(node):
+            found = true
+    if kind == "IfBlock":
+        if fact_block_has(get(node, "then")):
+            found = true
+        if fact_else_has(get(node, "else")):
+            found = true
+    found
+
+# Recursively: does this block (or a nested block) declare any `fact`?
+# Gates the whole pass so fact-free programs are untouched.
+fn fact_block_has(block: Map) -> bool:
+    stmts = get_list(block, "stmts")
+    n = len(stmts)
+    mut found = false
+    for i in 0..<n:
+        s = at(stmts, i)
+        k = get(s, "kind")
+        if k == "Fact":
+            found = true
+        if k == "Loop" or k == "ForRange" or k == "ForIn" or k == "ForWith":
+            if fact_block_has(get(s, "body")):
+                found = true
+        if k == "IfBlock":
+            if fact_block_has(get(s, "then")):
+                found = true
+            if fact_else_has(get(s, "else")):
+                found = true
+    found
+
+
+
+# ---- nested lambda lift (lambda in a call-arg / expression position) -----
+# The main lift handles `name = fn(...)` and bare/returned lambdas. This lifts
+# a lambda that sits deeper — e.g. `apply(fn(n): n+1, x)` — into the same
+# closure form. It's additive (own `__nlambda` prefix + slot counter, so it
+# never collides with the main lift's `__lambda`), and only walks the node
+# kinds a call-arg lambda actually reaches.
+
+fn nlam_capture_scan(lam_body: Map, lam_params: [Text]) -> [Text]:
+    n_lp = len(lam_params)
+    init_work = [lam_body]
+    mut worklist = init_work
+    mut caps = slice([""], 0, 0)
+    mut seen_caps = slice([""], 0, 0)
+    loop:
+        w_n = len(worklist)
+        if w_n == 0:
+            break
+        cur = at(worklist, w_n - 1)
+        worklist = slice(worklist, 0, w_n - 1)
+        ck = get(cur, "kind")
+        if ck == "Ident":
+            cn = get(cur, "name")
+            mut is_param = false
+            for lp_w in 0..<n_lp:
+                if at(lam_params, lp_w) == cn:
+                    is_param = true
+            mut already = false
+            for sc in 0..<len(seen_caps):
+                if at(seen_caps, sc) == cn:
+                    already = true
+            if not is_param and not already:
+                caps = push(caps, cn)
+                seen_caps = push(seen_caps, cn)
+        if ck == "Binary":
+            worklist = push(worklist, get(cur, "left"))
+            worklist = push(worklist, get(cur, "right"))
+        if ck == "Unary":
+            worklist = push(worklist, get(cur, "operand"))
+        if ck == "Call":
+            call_args = get_list(cur, "args")
+            for cai in 0..<len(call_args):
+                worklist = push(worklist, at(call_args, cai))
+        if ck == "If":
+            worklist = push(worklist, get(cur, "cond"))
+            worklist = push(worklist, get(cur, "then"))
+            worklist = push(worklist, get(cur, "else"))
+    caps
+
+# Synthesize a __nlambda_N fn for `lam`; return {closure: MakeClosure, decl: Fn}.
+fn nlam_synth(lam: Map) -> Map:
+    lam_params = get_list(lam, "params")
+    n_lp = len(lam_params)
+    lam_body = get(lam, "body")
+    caps = nlam_capture_scan(lam_body, lam_params)
+    n_caps = len(caps)
+    mut typed_params = slice([lam], 0, 0)
+    typed_params = push(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
+    for pi in 0..<n_lp:
+        mut p_ty = {"kind": "Named", "name": "int"}
+        if has(lam, "param_types"):
+            p_ty = at(get_list(lam, "param_types"), pi)
+        typed_params = push(typed_params, {"name": at(lam_params, pi), "type": p_ty})
+    ctr = slot_get_int("otir:nlam_ctr")
+    slot_set("otir:nlam_ctr", ctr + 1)
+    synth_name = "__nlambda_{ctr}"
+    mut synth_stmts = slice([lam_body], 0, 0)
+    for ci in 0..<n_caps:
+        cap_slot = 2 + ci
+        at_call = {"kind": "Call", "callee": "at", "args": [{"kind": "Ident", "name": "__env"}, {"kind": "Int", "value": "{cap_slot}"}]}
+        synth_stmts = push(synth_stmts, {"kind": "LetOrAssign", "name": at(caps, ci), "value": at_call})
+    synth_stmts = push(synth_stmts, {"kind": "ExprStmt", "expr": lam_body})
+    synth_body = {"kind": "Block", "stmts": synth_stmts}
+    synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
+    mut cap_nodes = slice([lam], 0, 0)
+    for cj in 0..<n_caps:
+        cap_nodes = push(cap_nodes, {"kind": "Ident", "name": at(caps, cj)})
+    closure = {"kind": "MakeClosure", "fn": synth_name, "caps": cap_nodes, "is_lambda": 1}
+    {"closure": closure, "decl": synth_decl}
+
+# Lift lambdas inside an expression; return {node: rewritten, synths: [Fn]}.
+fn nlam_lift(node: Map) -> Map:
+    kind = get(node, "kind")
+    mut synths = slice([node], 0, 0)
+    if kind == "Lambda":
+        s = nlam_synth(node)
+        synths = push(synths, get(s, "decl"))
+        return {"node": get(s, "closure"), "synths": synths}
+    mut out = node
+    if kind == "Call":
+        args = get_list(node, "args")
+        mut new_args = slice(args, 0, 0)
+        for i in 0..<len(args):
+            ar = nlam_lift(at(args, i))
+            new_args = push(new_args, get(ar, "node"))
+            ars = get_list(ar, "synths")
+            for j in 0..<len(ars):
+                synths = push(synths, at(ars, j))
+        out = set(out, "args", new_args)
+    if kind == "Binary":
+        lr = nlam_lift(get(node, "left"))
+        rr = nlam_lift(get(node, "right"))
+        out = set(out, "left", get(lr, "node"))
+        out = set(out, "right", get(rr, "node"))
+        for j in 0..<len(get_list(lr, "synths")):
+            synths = push(synths, at(get_list(lr, "synths"), j))
+        for j in 0..<len(get_list(rr, "synths")):
+            synths = push(synths, at(get_list(rr, "synths"), j))
+    {"node": out, "synths": synths}
+
+# Lift lambdas in a statement's expression field. Returns {stmt, synths}.
+fn nlam_lift_stmt(stmt: Map) -> Map:
+    kind = get(stmt, "kind")
+    mut out = stmt
+    mut synths = slice([stmt], 0, 0)
+    mut fld = ""
+    if kind == "MutLet" or kind == "LetOrAssign":
+        fld = "value"
+    if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer" or kind == "Destroy":
+        fld = "expr"
+    if fld != "":
+        r = nlam_lift(get(stmt, fld))
+        out = set(out, fld, get(r, "node"))
+        synths = get_list(r, "synths")
+    # Recurse into nested block bodies so a lambda inside a for/loop/if body
+    # (e.g. `for i in ...: g = fn(n): n + i`) is lifted too.
+    if kind == "Loop" or kind == "ForRange" or kind == "ForIn" or kind == "ForWith":
+        br = nlam_lift_block(get(stmt, "body"))
+        out = set(out, "body", get(br, "block"))
+        synths = get_list(br, "synths")
+    if kind == "IfBlock":
+        tr = nlam_lift_block(get(stmt, "then"))
+        out = set(out, "then", get(tr, "block"))
+        mut ifsyn = get_list(tr, "synths")
+        els = get(stmt, "else")
+        if get(els, "kind") == "Block":
+            er = nlam_lift_block(els)
+            out = set(out, "else", get(er, "block"))
+            ersyn = get_list(er, "synths")
+            for ej in 0..<len(ersyn):
+                ifsyn = push(ifsyn, at(ersyn, ej))
+        if get(els, "kind") == "IfBlock":
+            er2 = nlam_lift_stmt(els)
+            out = set(out, "else", get(er2, "stmt"))
+            ersyn2 = get_list(er2, "synths")
+            for ej2 in 0..<len(ersyn2):
+                ifsyn = push(ifsyn, at(ersyn2, ej2))
+        synths = ifsyn
+    {"stmt": out, "synths": synths}
+
+# Lift lambdas in every statement of a block. Returns {block, synths}.
+fn nlam_lift_block(block: Map) -> Map:
+    stmts = get_list(block, "stmts")
+    mut out_stmts = slice(stmts, 0, 0)
+    mut synths = slice([block], 0, 0)
+    for i in 0..<len(stmts):
+        r = nlam_lift_stmt(at(stmts, i))
+        out_stmts = push(out_stmts, get(r, "stmt"))
+        rs = get_list(r, "synths")
+        for j in 0..<len(rs):
+            synths = push(synths, at(rs, j))
+    {"block": set(block, "stmts", out_stmts), "synths": synths}
+
+# Does this expression contain a lambda (nested in a call arg / operand)?
+fn nlam_has(node: Map) -> bool:
+    kind = get(node, "kind")
+    mut found = false
+    if kind == "Lambda":
+        found = true
+    if kind == "Call":
+        args = get_list(node, "args")
+        for i in 0..<len(args):
+            if nlam_has(at(args, i)):
+                found = true
+    if kind == "Binary":
+        if nlam_has(get(node, "left")):
+            found = true
+        if nlam_has(get(node, "right")):
+            found = true
+    found
+
+# Does a statement (or a nested block it holds) contain a lambda?
+fn nlam_stmt_has(stmt: Map) -> bool:
+    kind = get(stmt, "kind")
+    mut found = false
+    if kind == "MutLet" or kind == "LetOrAssign":
+        found = nlam_has(get(stmt, "value"))
+    if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer" or kind == "Destroy":
+        found = nlam_has(get(stmt, "expr"))
+    if kind == "Loop" or kind == "ForRange" or kind == "ForIn" or kind == "ForWith":
+        if nlam_block_has(get(stmt, "body")):
+            found = true
+    if kind == "IfBlock":
+        if nlam_block_has(get(stmt, "then")):
+            found = true
+        els = get(stmt, "else")
+        if get(els, "kind") == "Block":
+            if nlam_block_has(els):
+                found = true
+        if get(els, "kind") == "IfBlock":
+            if nlam_stmt_has(els):
+                found = true
+    found
+
+fn nlam_block_has(block: Map) -> bool:
+    stmts = get_list(block, "stmts")
+    mut found = false
+    for i in 0..<len(stmts):
+        if nlam_stmt_has(at(stmts, i)):
+            found = true
+    found
+
+
 pub fn ast_program_to_ir(program: Map) -> IRModule:
+    # Duplicate-function guard. Two `fn name` definitions collide into one
+    # LLVM symbol — most often the same helper defined in two `use`d orbs,
+    # since function names are global (no orb namespaces yet). Flag it with a
+    # clear message instead of a confusing "unknown function" or a link-time
+    # duplicate-symbol error. Externs are declarations, not definitions, so
+    # re-declaring them across orbs stays legal and is not checked here.
+    dup_decls = get_list(program, "decls")
+    dup_n = len(dup_decls)
+    mut seen_fn_names = slice([""], 0, 0)
+    for ddi in 0..<dup_n:
+        dd = at(dup_decls, ddi)
+        if get(dd, "kind") == "Fn":
+            dnm = get(dd, "name")
+            mut dup_already = false
+            for dsj in 0..<len(seen_fn_names):
+                if at(seen_fn_names, dsj) == dnm:
+                    dup_already = true
+            if dup_already:
+                compile_error("orion: ERROR — function `{dnm}` is defined more than once (two `use`d orbs may both define it — names are global, so rename one)")
+            seen_fn_names = push(seen_fn_names, dnm)
+
+    # Pass -1: `fact` inlining. Replace reads of reactive `fact` bindings
+    # with their defining expression so they recompute on each read. Gated
+    # by a prescan — no facts means the decls pass through untouched.
+    raw_decls_src = get_list(program, "decls")
+    rd_src_n = len(raw_decls_src)
+    mut any_fact = false
+    for fi in 0..<rd_src_n:
+        fd = at(raw_decls_src, fi)
+        fdk = get(fd, "kind")
+        if fdk == "Fn" or fdk == "System":
+            if fact_block_has(get(fd, "body")):
+                any_fact = true
+    mut fact_decls = raw_decls_src
+    if any_fact:
+        mut rewritten = slice(raw_decls_src, 0, 0)
+        for fi2 in 0..<rd_src_n:
+            mut fd2 = at(raw_decls_src, fi2)
+            fd2k = get(fd2, "kind")
+            if fd2k == "Fn" or fd2k == "System":
+                fb2 = get(fd2, "body")
+                e_names = slice([""], 0, 0)
+                e_exprs = slice(get_list(fb2, "stmts"), 0, 0)
+                fd2 = set(fd2, "body", fact_rw_block(fb2, e_names, e_exprs))
+            rewritten = push(rewritten, fd2)
+        fact_decls = rewritten
+    program_facted = set(program, "decls", fact_decls)
+
     # Pass 0: lambda lift. For each `name = |params| body` LetOrAssign at
     # top of a fn body, hoist as synthesized __lambda_N global fn. We
     # pre-scan for any Lambda — if none, take the early-return path that
     # leaves decls unmodified (avoids if/else type-mismatch on empty-list
     # initialization, which broke the bundle build before).
-    raw_decls = get_list(program, "decls")
+    raw_decls = get_list(program_facted, "decls")
     raw_total = len(raw_decls)
     mut has_any_lambda = false
     for sc_idx in 0..<raw_total:
@@ -2248,6 +2907,11 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                     if sc_kind == "LetOrAssign" or sc_kind == "MutLet":
                         if get(get(sc_stmt, "value"), "kind") == "Lambda":
                             has_any_lambda = true
+                    if sc_kind == "ExprStmt" or sc_kind == "Return":
+                        if get(get(sc_stmt, "expr"), "kind") == "Lambda":
+                            has_any_lambda = true
+                    if nlam_stmt_has(sc_stmt):
+                        has_any_lambda = true
     # Pre-scan to find Lambda bindings + their captures. Used by the next
     # phase to emit a clean error if any captures exist (real env-struct
     # closures need more wiring than this minimal lift can offer today).
@@ -2317,8 +2981,16 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                         if stmt_kind == "LetOrAssign" or stmt_kind == "MutLet":
                             if get(get(stmt, "value"), "kind") == "Lambda":
                                 is_let_lambda = true
-                        if is_let_lambda:
-                            lam = get(stmt, "value")
+                        # A bare/returned lambda — the last expr of a fn body or
+                        # an explicit `return fn(...)` — lifts the same way; we
+                        # place the resulting closure back in expr position.
+                        mut is_expr_lambda = false
+                        if stmt_kind == "ExprStmt" or stmt_kind == "Return":
+                            if get(get(stmt, "expr"), "kind") == "Lambda":
+                                is_expr_lambda = true
+                        is_lambda_stmt = is_let_lambda or is_expr_lambda
+                        if is_lambda_stmt:
+                            lam = if is_let_lambda then get(stmt, "value") else get(stmt, "expr")
                             lam_params = get_list(lam, "params")
                             n_lp = len(lam_params)
                             lam_body = get(lam, "body")
@@ -2369,70 +3041,55 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                                     worklist = push(worklist, get(cur, "then"))
                                     worklist = push(worklist, get(cur, "else"))
                             n_caps = len(caps)
+                            # __lambda_N(__env, params): the captures live in the
+                            # closure list __env; a prologue binds each by name so
+                            # the body is unchanged. env is the leading param.
                             init_typed = get_list(decl, "params")
                             mut typed_params = init_typed
                             typed_params = slice(typed_params, 0, 0)
-                            for ci in 0..<n_caps:
-                                cap_name = at(caps, ci)
-                                typed_params = push(typed_params, {"name": cap_name, "type": {"kind": "Named", "name": "int"}})
+                            typed_params = push(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
                             for pi in 0..<n_lp:
                                 p_name = at(lam_params, pi)
-                                typed_params = push(typed_params, {"name": p_name, "type": {"kind": "Named", "name": "int"}})
+                                mut p_ty = {"kind": "Named", "name": "int"}
+                                if has(lam, "param_types"):
+                                    p_ty = at(get_list(lam, "param_types"), pi)
+                                typed_params = push(typed_params, {"name": p_name, "type": p_ty})
                             synth_name = "__lambda_{lambda_counter}"
                             lambda_counter = lambda_counter + 1
-                            synth_body_stmt = {"kind": "ExprStmt", "expr": lam_body}
-                            stmt_seed = [synth_body_stmt]
-                            synth_body = {"kind": "Block", "stmts": stmt_seed}
+                            # Prologue: cap_i = at(__env, 2 + i)  (slots 0/1 are
+                            # the fn-ptr and the is_lambda flag).
+                            mut synth_stmts = slice([lam_body], 0, 0)
+                            for ci in 0..<n_caps:
+                                cap_name = at(caps, ci)
+                                cap_slot = 2 + ci
+                                at_call = {"kind": "Call", "callee": "at", "args": [{"kind": "Ident", "name": "__env"}, {"kind": "Int", "value": "{cap_slot}"}]}
+                                synth_stmts = push(synth_stmts, {"kind": "LetOrAssign", "name": cap_name, "value": at_call})
+                            synth_stmts = push(synth_stmts, {"kind": "ExprStmt", "expr": lam_body})
+                            synth_body = {"kind": "Block", "stmts": synth_stmts}
                             synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
                             synth_decls = push(synth_decls, synth_decl)
                             bind_name = get(stmt, "name")
                             binding_names = push(binding_names, bind_name)
-                            mut caps_csv = ""
+                            # The binding value builds the closure: [ptr, 1, caps].
+                            mut cap_nodes = slice([lam_body], 0, 0)
                             for cj in 0..<n_caps:
-                                csep = if cj == 0 then "" else ","
-                                caps_csv = "{caps_csv}{csep}{at(caps, cj)}"
-                            binding_caps = push(binding_caps, caps_csv)
-                            new_value = {"kind": "Ident", "name": synth_name}
-                            new_stmts = push(new_stmts, {"kind": stmt_kind, "name": bind_name, "value": new_value})
-                        if not is_let_lambda:
-                            mut rewritten_stmt = stmt
-                            if stmt_kind == "ExprStmt":
-                                expr = get(stmt, "expr")
-                                if get(expr, "kind") == "Call":
-                                    callee = get(expr, "callee")
-                                    n_bn = len(binding_names)
-                                    mut match_idx = 0 - 1
-                                    for bi in 0..<n_bn:
-                                        if at(binding_names, bi) == callee:
-                                            match_idx = bi
-                                    if match_idx >= 0:
-                                        caps_csv2 = at(binding_caps, match_idx)
-                                        if caps_csv2 != "":
-                                            cap_bs = bytes_from_text(caps_csv2)
-                                            cap_n = len(cap_bs)
-                                            mut cap_names = slice([""], 0, 0)
-                                            mut cur_cap = ""
-                                            for cbi in 0..<cap_n:
-                                                cb = at(cap_bs, cbi)
-                                                if cb == 44:
-                                                    cap_names = push(cap_names, cur_cap)
-                                                    cur_cap = ""
-                                                if cb != 44:
-                                                    next_cbi = cbi + 1
-                                                    cur_cap = "{cur_cap}{bytes_to_text(bytes_slice(cap_bs, cbi, next_cbi))}"
-                                            if cur_cap != "":
-                                                cap_names = push(cap_names, cur_cap)
-                                            old_args = get_list(expr, "args")
-                                            old_n_args = len(old_args)
-                                            mut new_args = slice(old_args, 0, 0)
-                                            n_cap_names = len(cap_names)
-                                            for cni in 0..<n_cap_names:
-                                                new_args = push(new_args, {"kind": "Ident", "name": at(cap_names, cni)})
-                                            for oai in 0..<old_n_args:
-                                                new_args = push(new_args, at(old_args, oai))
-                                            new_call = {"kind": "Call", "callee": callee, "args": new_args}
-                                            rewritten_stmt = {"kind": "ExprStmt", "expr": new_call}
-                            new_stmts = push(new_stmts, rewritten_stmt)
+                                cap_nodes = push(cap_nodes, {"kind": "Ident", "name": at(caps, cj)})
+                            new_value = {"kind": "MakeClosure", "fn": synth_name, "caps": cap_nodes, "is_lambda": 1}
+                            if is_let_lambda:
+                                new_stmts = push(new_stmts, {"kind": stmt_kind, "name": bind_name, "value": new_value})
+                            if is_expr_lambda:
+                                new_stmts = push(new_stmts, {"kind": stmt_kind, "expr": new_value})
+                        if not is_lambda_stmt:
+                            # Non-lambda statement: lift any lambda nested in its
+                            # expression (e.g. `apply(fn(n): n+1, x)`) into a
+                            # closure + synth decls, then pass it through. Calls
+                            # to a closure binding resolve to closure_call at
+                            # lowering, so no cap rewrite / escape restriction.
+                            nl = nlam_lift_stmt(stmt)
+                            new_stmts = push(new_stmts, get(nl, "stmt"))
+                            nl_synths = get_list(nl, "synths")
+                            for nsi in 0..<len(nl_synths):
+                                synth_decls = push(synth_decls, at(nl_synths, nsi))
                     new_body = {"kind": "Block", "stmts": new_stmts}
                     rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body}
                     working_decls = push(working_decls, rewritten_decl)
@@ -2521,6 +3178,12 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             # argument count silently shifts every parameter — caught
             # here instead of as a runtime pointer crash.
             slot_set("otir:arity:" + fn_name, len(get_list(decl, "params")))
+            # Parameter-position registry: `otir:param:<fn>:<name>` -> index,
+            # so a named argument `f(x = 5)` can be reordered to its slot.
+            fn_params_list = get_list(decl, "params")
+            for fp_i in 0..<len(fn_params_list):
+                fp = at(fn_params_list, fp_i)
+                slot_set("otir:param:" + fn_name + ":" + get(fp, "name"), fp_i)
         if decl_kind_1b == "ExternFn":
             ext_name = get(decl, "name")
             ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)

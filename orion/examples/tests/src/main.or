@@ -35,7 +35,11 @@ fn parse_expected(filename: Text) -> int:
 
 
 # Compile one source file. Returns 1 if ok, 0 if compilation failed.
-fn compile_one(src_path: Text, ll_path: Text, exe_path: Text) -> int:
+# rt_obj is the runtime PRE-COMPILED once (see main) — linking that object
+# is ~10x faster than re-compiling orion_rt.c (all of Windows.h) per test.
+# clang_path / mangle / host_triple are host-specific (see main): the compiler
+# always emits a Windows triple, so off Windows we retarget the IR here.
+fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clang_path: Text, mangle: Text, host_triple: Text) -> int:
     src = read_file(src_path)
     tokens = self_lex(src)
     ast = self_parse(tokens)
@@ -51,13 +55,26 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text) -> int:
     # is a process-global counter, so compare the delta for THIS file.
     errs_before = compile_errors()
     module = ast_program_to_ir(ast)
-    llvm_text = emit_module(module)
+    mut llvm_text = emit_module(module)
     if compile_errors() > errs_before:
         return 0
+    # Retarget the baked-in Windows triple to the host (Linux/Mac). The
+    # compiler pins a Windows triple (the effect ABI needs it), so a non-
+    # Windows runner rewrites the two header tokens before clang. mangle "w"
+    # = Windows = leave as-is.
+    # Anchor to the header context ("datalayout = / triple = ") so we patch
+    # only the two module-header lines, never a same-looking byte sequence
+    # inside a program string constant (that would change the constant's
+    # length and desync its LLVM array-size prefix).
+    if mangle != "w":
+        llvm_text = str_replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
+        llvm_text = str_replace(llvm_text, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
     write_file(ll_path, llvm_text)
-    clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
-    rt_c = "E:/lone-lodge/orion/runtime/orion_rt.c"
-    args = [ll_path, rt_c, "-Os", "-o", exe_path]
+    # Link the pre-built runtime object; -O0 skips the LLVM opt pipeline
+    # (tests only assert exit codes, so optimization buys nothing here).
+    # -Wno-override-module: silence clang's note that our retargeted triple
+    # differs from its own default (harmless; no-op on Windows).
+    args = [ll_path, rt_obj, "-O0", "-Wno-override-module", "-o", exe_path]
     exit_code = run_command(clang_path, args)
     if exit_code == 0 then 1 else 0
 
@@ -70,13 +87,35 @@ fn fmt_ms(seconds: f64) -> Text:
 
 fn main() -> int:
     mkdir_all("dist")
+    # Host-specific toolchain bits. The runner works on Windows/Linux/Mac:
+    # clang location, the datalayout mangling + target triple to retarget the
+    # compiler's Windows IR to, all keyed off host_os() (0=Win 1=Linux 2=Mac).
+    # rt_c is relative to this project dir (examples/tests), so no absolute,
+    # machine-specific path is baked in.
+    os = os_kind()
+    mut clang_path = "clang"
+    mut mangle = "e"
+    mut host_triple = "x86_64-unknown-linux-gnu"
+    if os == 0:
+        clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
+        mangle = "w"
+        host_triple = ""
+    if os == 2:
+        mangle = "o"
+        host_triple = "arm64-apple-macosx"
+    rt_obj = "dist/orion_rt.o"
+    rt_c = "../../runtime/orion_rt.c"
+    # Pre-compile the runtime ONCE to an object file. Every test then just
+    # links this object instead of re-compiling orion_rt.c (all of Windows.h)
+    # from scratch — the single biggest per-test cost.
+    run_command(clang_path, ["-c", "-Os", rt_c, "-o", rt_obj])
     raw_files = list_dir("tests")
     raw_total = len(raw_files)
     # Only run .or files. Without this filter, non-source files like
     # KNOWN_BUGS.md get fed to the compiler, produce broken-but-not-crashing
     # .exe's, exit=0 happens to match parse_expected()=0, and we get a
     # silent false pass. Filter at the source.
-    mut files: [Text] = []
+    mut files = []
     for raw_index in 0..<raw_total:
         raw_name = at(raw_files, raw_index)
         name_bytes = bytes_from_text(raw_name)
@@ -92,14 +131,24 @@ fn main() -> int:
             files = push(files, raw_name)
     total_tests = len(files)
 
-    print_line("=== Orion test runner (LLVM backend) ===")
-    print_line("")
-    print_line("--------------------------------------------------------------------")
-
     mut pass_count = 0
     mut fail_count = 0
-    mut total_compile_seconds = 0.0
+    mut total_compile_ms = 0
     mut total_bytes = 0
+
+    # ANSI colors (ESC = byte 27) — green PASS, red FAIL, dim detail.
+    esc = bytes_to_text([27])
+    c_green = "{esc}[32m"
+    c_red = "{esc}[31m"
+    c_cyan = "{esc}[36m"
+    c_bold = "{esc}[1m"
+    c_dim = "{esc}[2m"
+    c_off = "{esc}[0m"
+
+    print_line("")
+    print_line("  {c_bold}{c_cyan}◆ Orion{c_off} {c_dim}test runner · LLVM backend · {total_tests} tests{c_off}")
+    print_line("  {c_dim}──────────────────────────────────────────────{c_off}")
+    print_line("")
 
     for file_index in 0..<total_tests:
         filename = at(files, file_index)
@@ -109,9 +158,9 @@ fn main() -> int:
         expected = parse_expected(filename)
 
         compile_start = now()
-        ok = compile_one(src_path, ll_path, exe_path)
-        compile_seconds = elapsed(compile_start)
-        total_compile_seconds = total_compile_seconds + compile_seconds
+        ok = compile_one(src_path, ll_path, exe_path, rt_obj, clang_path, mangle, host_triple)
+        compile_ms = elapsed(compile_start)
+        total_compile_ms = total_compile_ms + compile_ms
 
         size_bytes = file_size(exe_path)
         total_bytes = total_bytes + size_bytes
@@ -119,25 +168,23 @@ fn main() -> int:
         actual = run_command(exe_path, [])
 
         passed = ok == 1 and actual == expected
-        status_txt = if passed then "PASS" else "FAIL"
+        status_txt = if passed then "{c_green}PASS{c_off}" else "{c_red}FAIL{c_off}"
         if passed:
             pass_count = pass_count + 1
         else:
             fail_count = fail_count + 1
 
-        time_txt = fmt_ms(compile_seconds)
-        line_a = "  {filename} :  expected={expected} actual={actual}"
-        line_b = "  {status_txt}  compile={time_txt}  size={size_bytes}b"
-        print_line("{line_a}  {line_b}")
+        done_n = file_index + 1
+        print_line("{c_dim}[{done_n}/{total_tests}]{c_off} {status_txt} {filename}  {c_dim}{compile_ms}ms  {size_bytes}b{c_off}")
 
     print_line("--------------------------------------------------------------------")
     print_line("")
-    print_line("Pass: {pass_count} / {total_tests}")
+    all_pass = fail_count == 0
+    summary_color = if all_pass then c_green else c_red
+    print_line("{summary_color}Pass: {pass_count} / {total_tests}{c_off}")
     if fail_count > 0:
-        print_line("Fail: {fail_count}")
-    avg_seconds = total_compile_seconds / to_float(total_tests)
-    print_line("Total compile time: {fmt_ms(total_compile_seconds)}")
-    print_line("Average per test:   {fmt_ms(avg_seconds)}")
-    print_line("Total binary size:  {total_bytes} bytes")
+        print_line("{c_red}Fail: {fail_count}{c_off}")
+    avg_ms = total_compile_ms / total_tests
+    print_line("{c_dim}Total compile: {total_compile_ms}ms   avg: {avg_ms}ms/test   binaries: {total_bytes}b{c_off}")
 
     fail_count

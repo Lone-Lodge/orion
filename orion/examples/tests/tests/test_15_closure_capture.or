@@ -1,0 +1,5 @@
+# A lambda that captures a local (`k`) via the `fn(...)` form.
+fn main() -> int:
+    k = 10
+    add_k = fn(n): n + k
+    add_k(5)

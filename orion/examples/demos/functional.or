@@ -44,8 +44,9 @@ fn main() -> int:
     # Apply twice
     d = twice(inc, 0)       # inc(inc(0)) = 2
 
-    # Pipe operator chains the same thing more readably:
-    e = 10 |> double |> inc # double(10)=20, inc(20)=21
+    # Chain with plain intermediate variables — readable, top to bottom.
+    step = double(10)       # 20
+    e = inc(step)           # 21
 
     # Total: 45 (c) - 3 = 42
     c - 3

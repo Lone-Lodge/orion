@@ -45,8 +45,15 @@ fn os_join(acc: Text, args: [Text], i: int) -> Text:
 # "build/app.exe") by searching the CALLER exe's directory, not the cwd — so a
 # just-built exe isn't found. Backslashes make it a plain cwd-relative path
 # (no search). Convert only the command; args keep their slashes (clang source
-# paths and linker flags like "/STACK" must stay intact).
-fn win_path(p: Text) -> Text = str_replace(p, "/", "\\")
+# paths and linker flags like "/STACK" must stay intact). POSIX shells use
+# forward slashes, so this is a Windows-only fixup — a no-op elsewhere, or it
+# would corrupt every relative path on Linux/Mac.
+extern fn host_os() -> int
+# Public wrapper so other orbs can branch on the host without re-declaring the
+# extern (a second `declare` in the bundle is an LLVM redefinition error).
+# 0 = Windows, 1 = Linux, 2 = macOS.
+pub fn os_kind() -> int = host_os()
+fn win_path(p: Text) -> Text = if host_os() == 0 then str_replace(p, "/", "\\") else p
 
 pub fn run_command(cmd: Text, args: [Text]) -> int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))
 

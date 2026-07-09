@@ -196,12 +196,9 @@ fn drv_or(a: int, b: int) -> int:
 fn drv_name_idx(names: [Text], name: Text) -> int:
     n = len(names)
     for i in 0..<n:
-        if drv_text_at(names, i) == name:
+        if at(names, i) == name:
             return i
     0 - 1
-
-fn drv_text_at(xs: [Text], i: int) -> Text:
-    at(xs, i)
 
 fn drv_int_at(xs: [int], i: int) -> int:
     at(xs, i)
@@ -297,7 +294,7 @@ fn drv_facts(module: IRModule) -> int:
             pure_count = pure_count + 1
         else:
             fl = drv_flags_text(b)
-            fname = drv_text_at(names, i)
+            fname = at(names, i)
             print_line("{fname}:{fl}")
     print_line("facts: {n} fn(s), {pure_count} pure ({pass} closure passes)")
     0

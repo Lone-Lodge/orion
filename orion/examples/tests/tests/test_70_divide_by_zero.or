@@ -1,0 +1,7 @@
+# A runtime `x / 0` used to raise SIGFPE (an ugly crash, no message).
+# It now traps loudly: prints `orion: division by zero` and exits 70.
+# (The literal `/ 0` is still caught earlier, at compile time.)
+fn main() -> int:
+    mut d = 3
+    d = d - 3
+    100 / d

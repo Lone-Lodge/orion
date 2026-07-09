@@ -1,4 +1,4 @@
-# orion monorepo (lodge-orion + orion-self).
+# orion — the fully self-hosted Orion compiler (written in Orion).
 # Other lone-lodge projects live in sibling dirs with their own repos.
 
 # === Sibling projects (their own repos) ===
@@ -22,6 +22,13 @@ veil/
 *.pdb
 *.lib
 *.exp
+
+# Bootstrap seed — the ONE checked-in binary self-hosting needs (see
+# orion/tools/seed/README.md). Excepted from *.exe so a fresh clone can
+# bootstrap without lodge-orion. The .ll is the platform-neutral seed:
+# compile it with clang + orion_rt.c to link an orion.exe for ANY OS.
+!orion/tools/seed/orion.exe
+!orion/tools/seed/orion.ll
 
 # === IDE / OS ===
 .vscode/

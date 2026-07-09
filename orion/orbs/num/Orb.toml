@@ -1,0 +1,3 @@
+name = "num"
+version = "0.1.0"
+description = "Small integer helpers: abs / min / max / clamp / sign / gcd / parse / ipow / is_even / is_odd"
