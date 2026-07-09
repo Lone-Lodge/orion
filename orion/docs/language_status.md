@@ -20,7 +20,10 @@
   or an indented block (bind locals, last expression is the arm's value —
   like an `if` branch). Works in expression and statement position
 - `data` structs (not OOP — pure record types)
-- `enum` sum types with payload (tag + val_int + val_text)
+- `enum` sum types with per-variant payloads, incl. multiple mixed fields
+  (`Add(int, int)`, `Rel(int, text, int)`), destructured in `match`
+  (`Add(l, r) -> …`). A `data` struct can hold a `[Enum]` field, so recursive
+  structures work as an arena (`[Node]`, children referenced by index)
 - `?` operator (early-return-on-Err for sum types)
 - Method-call syntax: `text.upper()`, `list.len()`, `xs.slice(1, 3)` (desugars `x.f(a)` → `f(x, a)`)
 - String interpolation of any expression: `"{a + b}"`, `"{xs[0]}"`, `"{f(x)}"`
@@ -67,9 +70,10 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 114/114 smoke tests passing; 19/19 demos (incl. a recursive-descent
+- 114/114 smoke tests passing; 20/20 demos (incl. a recursive-descent
   arithmetic calculator, a mini-interpreter with variables, an RPN stack
-  machine on an `enum`, and a safe evaluator that propagates errors with `?`)
+  machine on an `enum`, a safe evaluator that propagates errors with `?`,
+  and an arena-based AST evaluator — parse into `[Node]`, then walk it)
 
 ### Stdlib orbs (pure Orion)
 `text` (split/join/replace/trim/pad/upper/lower/starts_with/…),
