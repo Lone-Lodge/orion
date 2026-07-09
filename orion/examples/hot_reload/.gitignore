@@ -1,4 +1,10 @@
 *.so
 *.ll
 *.o
+_*
+watch
 reload
+probe
+*.out
+plugin_gen*.so
+plugin.or

@@ -46,3 +46,28 @@ ordinary compile-to-native path pointed at a `.so`.
 
 Files: `reload.or` (the host loop), `plugin_v1.or` / `plugin_v2.or` (the
 gameplay code, "edited" between builds), `run.sh` (compiles both + runs).
+
+## Auto watch-and-reload
+
+`run.sh` does one scripted swap. `run_watch.sh` does the real live loop:
+
+```
+bash examples/hot_reload/run_watch.sh
+```
+
+It launches `watch.or` (a ~25-line Orion program) and edits `plugin.or` while
+it runs. The watcher notices the source changed, **invokes the compiler at
+runtime** to rebuild the `.so`, and hot-swaps it — state carries straight
+through:
+
+```
+tick -> state = 5
+  * source changed -> recompiled + hot-swapped (gen 1)
+tick -> state = 15
+tick -> state = 55
+```
+
+`watch.or` uses `run_command` (from the `os` orb) to call the compiler,
+`read_file` to detect the edit by content, `sleep_ms` to pace the loop, and
+`dlopen`/`dlsym` + `call_ptr` to load and call the fresh code. The whole
+live-coding loop is Orion driving Orion.
