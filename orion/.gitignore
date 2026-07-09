@@ -1,0 +1,7 @@
+# Build artifacts — everything here is generated, never committed.
+/dist/
+out.ll
+*.o
+*.exe
+# stray emitted IR (the committed bootstrap seed lives at tools/seed/orion.ll)
+/*.ll
