@@ -13,7 +13,6 @@
 - `if cond:` block-form + `if c then a else b` expression-form
 - `for v in 0..<n:` (exclusive) and `for v in 0..=n:` (inclusive) ranges; `for v in list:`
 - `for idx, v in list:` (with-index iteration)
-- `for v with Component:` (ECS query — for entities)
 - `loop:` + `break` + `continue` (unbounded loops)
 - `match` on int/text patterns + enum-variant destructuring; exhaustiveness
   checked. Arms are `-> expr`, an inline assignment (`Num(v) -> total += v`),
@@ -64,8 +63,10 @@
 - `perform Effect.op(args)` — invoke; static dispatch via `__handler_Effect_op`
 - One-shot continuations via setjmp/longjmp: `resume_int(v)`, `resume_text(v)`
 
-### Concurrency
-- `spawn job <expr>` + `.await` (basic), `parallel for` (footprint-checked), `scope:` block
+### Concurrency — NOT working (parsed/reserved only)
+- `spawn` / `job` / `.await` / `parallel for` / `scope:` and the ECS `for v
+  with Component:` are reserved words with **no lowering** — they fail to
+  parse or are skipped. Listed here as direction, not as features.
 
 ### Tooling
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)

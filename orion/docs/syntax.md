@@ -147,7 +147,6 @@ Loops:
 for i in 0..<n:            # counted (exclusive); 0..=n for inclusive
 for x in xs:               # over a list
 for i, x in xs:            # with index
-for e with Health:         # ECS query — entities having a component
 
 loop:                      # unbounded
     if done: break
@@ -204,17 +203,7 @@ n = perform Random.roll(100)       # invoke the effect
 # resume_int(v) / resume_text(v) resume a one-shot continuation
 ```
 
-## 12. Concurrency (basic)
-
-```orion
-spawn job compute()                # spawn a job
-result.await                       # await it
-parallel for x in xs:              # data-parallel loop (footprint-checked)
-scope:                             # a scope block
-    ...
-```
-
-## 13. Runtime safety
+## 12. Runtime safety
 
 Out-of-range `xs[i]` and a runtime `x / 0` **trap loudly** with a message and
 exit 70 — never silent garbage or a bare SIGFPE. The literal `/ 0`, a return
@@ -223,12 +212,20 @@ are caught at **compile time**.
 
 ---
 
-## Reserved / experimental keywords
+## Reserved / aspirational — parsed but NOT lowered (do not use)
 
-These are lexed as keywords and are part of the language's direction, but are
-not exercised by the demo suite the way §1–13 are — treat them as in-progress:
-`trait`, `impl`, `system`, `deterministic`, `raw`, `frame`, `before`, `after`,
-`as`, `self`.
+These are lexed (and some parse into AST nodes), so they *look* like syntax,
+but the compiler has no lowering for them — they either fail to parse or are
+silently skipped. They are direction, not features:
+
+- **Concurrency**: `spawn` / `job` / `scope:` / `parallel for` / `.await`
+- **ECS query**: `for e with Component:`
+- **Types/traits**: `trait`, `impl`, `system`, `deterministic`, `raw`,
+  `frame`, `before`, `after`, `as`, `self`
+
+Effects (§11) DO work; the concurrency words above do not (as of this writing).
+If you write one, you'll get an "unknown identifier" or "unhandled statement
+kind" error — the compiler fails loudly rather than pretending.
 
 ## The KISS rules of thumb
 
