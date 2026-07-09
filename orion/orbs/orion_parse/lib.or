@@ -967,12 +967,12 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # slot's element type, which inference can't recover for `[]` (an empty
         # list has no element to peek). `mut`-led, so no keyword-clash risk.
         is_typed_mut_decl = kind_here == "ident" and value_here == "mut" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == ":"
-        # `fact name = expr` — a reactive derived binding. Reading `name`
+        # `derived name = expr` — a reactive derived binding. Reading `name`
         # re-evaluates `expr` in the current scope, so it always reflects the
         # latest values of whatever it reads. Lowered by inlining (see the
-        # fact pass in orion_ast_to_ir). Only the `fact NAME =` shape is a
-        # keyword; a bare `fact` elsewhere stays a plain identifier.
-        is_fact_decl = kind_here == "ident" and value_here == "fact" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
+        # derived-binding pass in orion_ast_to_ir). Only the `derived NAME =`
+        # shape is special; a bare `derived` elsewhere stays a plain identifier.
+        is_fact_decl = kind_here == "ident" and value_here == "derived" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
         # `name = expr` — either immutable let OR reassignment, decided
         # by the codegen scope tracker.
         is_let_or_assign = (not is_mut_decl) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="

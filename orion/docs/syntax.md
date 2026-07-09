@@ -41,7 +41,7 @@ String interpolation — `{expr}` runs any expression:
 x = 5             # immutable binding (also: reassignment of a mut var)
 mut n = 0         # mutable binding
 mut xs: [int] = []   # typed mut (needed when the value can't be inferred, e.g. [])
-fact area = w * w    # reactive: reading `area` re-evaluates `w * w` each time
+derived area = w * w   # reactive: reading `area` re-evaluates `w * w` each time
 ```
 
 Locals infer their type from the right-hand side. Function *parameters* are

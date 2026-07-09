@@ -1550,7 +1550,7 @@ after:
 @.str_322 = private unnamed_addr constant [22 x i8] c"\C4\2E\15\18\00\00\00\00\05\00\00\00\00\00\00\00inner\00", align 8
 @.str_323 = private unnamed_addr constant [21 x i8] c"\77\3C\A2\39\00\00\00\00\04\00\00\00\00\00\00\00type\00", align 8
 @.str_324 = private unnamed_addr constant [24 x i8] c"\F6\F1\7F\25\00\00\00\00\07\00\00\00\00\00\00\00Unknown\00", align 8
-@.str_325 = private unnamed_addr constant [21 x i8] c"\8D\AE\BB\37\00\00\00\00\04\00\00\00\00\00\00\00fact\00", align 8
+@.str_325 = private unnamed_addr constant [24 x i8] c"\59\D1\94\09\00\00\00\00\07\00\00\00\00\00\00\00derived\00", align 8
 @.str_326 = private unnamed_addr constant [22 x i8] c"\82\60\4F\36\00\00\00\00\05\00\00\00\00\00\00\00defer\00", align 8
 @.str_327 = private unnamed_addr constant [23 x i8] c"\C0\36\14\1F\00\00\00\00\06\00\00\00\00\00\00\00handle\00", align 8
 @.str_328 = private unnamed_addr constant [26 x i8] c"\85\E2\6F\35\00\00\00\00\09\00\00\00\00\00\00\00decl_type\00", align 8

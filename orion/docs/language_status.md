@@ -5,7 +5,7 @@
 ### Core language
 - `fn` / `pub fn` declarations, `extern fn` for FFI
 - `mut name = ...` (mutable bindings), `name = ...` (immutable binding / reassignment)
-- `fact name = expr` — reactive derived binding; reading `name` re-evaluates
+- `derived name = expr` — reactive derived binding; reading `name` re-evaluates
   `expr` against current state (lowered by inlining, so no runtime tick needed)
 - Type annotations on params, optional on locals. Built-in type names are
   case-insensitive: `int`, `text`/`Text`, `map`/`Map`, `list`/`List`, `bool`, `float`
