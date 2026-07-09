@@ -67,9 +67,9 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 114/114 smoke tests passing; 18/18 demos (incl. a recursive-descent
-  arithmetic calculator, a mini-interpreter with variables, and an RPN
-  stack machine built on an `enum` sum type)
+- 114/114 smoke tests passing; 19/19 demos (incl. a recursive-descent
+  arithmetic calculator, a mini-interpreter with variables, an RPN stack
+  machine on an `enum`, and a safe evaluator that propagates errors with `?`)
 
 ### Stdlib orbs (pure Orion)
 `text` (split/join/replace/trim/pad/upper/lower/starts_with/…),
