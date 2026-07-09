@@ -1,0 +1,148 @@
+# calculator — a real arithmetic evaluator: tokenize -> parse -> evaluate.
+#
+# Build: orion.exe examples/demos/calculator.or out.ll orbs
+#
+# A capstone that ties the language together:
+#   - a hand-written tokenizer over the raw bytes of the input
+#   - a recursive-descent parser/evaluator with correct precedence
+#     (`+ -` bind looser than `* /`), parentheses, and unary minus
+#   - mutual recursion (expr -> term -> factor -> expr)
+#   - `match` to dispatch on the operator, `data` structs to thread state
+#   - graceful divide-by-zero handling (the program CHOOSES to report it
+#     instead of trapping)
+#
+# Grammar:
+#   expr   := term  (('+' | '-') term)*
+#   term   := factor (('*' | '/') factor)*
+#   factor := number | '(' expr ')' | '-' factor
+#
+# main evaluates a handful of expressions and returns the last result.
+
+use text
+
+# A token is a map {"kind": Text, "val": int}. `val` is only meaningful
+# for numbers; operators carry 0.
+fn tok(kind: Text, val: int) -> Map:
+    {"kind": kind, "val": val}
+
+# The result of parsing a sub-expression: its value and the index of the
+# next unconsumed token. Threading `next` is how recursive descent walks
+# the token list without a mutable cursor shared across functions.
+data Parsed: val: int, next: int
+
+fn is_digit(b: int) -> int:
+    if b >= 48 and b <= 57 then 1 else 0
+
+# ---- Tokenizer -------------------------------------------------------
+
+fn tokenize(src: Text) -> [Map]:
+    bs = bytes_from_text(src)
+    n = len(bs)
+    mut toks = []
+    mut i = 0
+    loop:
+        if i >= n:
+            break
+        b = at(bs, i)
+        if b == 32:                         # space — skip
+            i = i + 1
+        else:
+            if is_digit(b) == 1:            # a run of digits -> one number
+                mut num = 0
+                loop:
+                    if i >= n:
+                        break
+                    d = at(bs, i)
+                    if is_digit(d) == 0:
+                        break
+                    num = num * 10 + (d - 48)
+                    i = i + 1
+                toks = push(toks, tok("num", num))
+            else:
+                kind = match b:
+                    43 -> "plus"            # +
+                    45 -> "minus"           # -
+                    42 -> "star"            # *
+                    47 -> "slash"           # /
+                    40 -> "lparen"          # (
+                    41 -> "rparen"          # )
+                    _ -> "bad"
+                toks = push(toks, tok(kind, 0))
+                i = i + 1
+    toks
+
+# ---- Recursive-descent parser + evaluator ----------------------------
+
+fn parse_factor(toks: [Map], pos: int) -> Parsed:
+    t = at(toks, pos)
+    k = get(t, "kind")
+    if k == "lparen":
+        inner = parse_expr(toks, pos + 1)
+        # inner.next points at the ')' — step over it
+        Parsed{val: inner.val, next: inner.next + 1}
+    else:
+        if k == "minus":                    # unary minus: -factor
+            f = parse_factor(toks, pos + 1)
+            Parsed{val: 0 - f.val, next: f.next}
+        else:                               # a number
+            Parsed{val: get(t, "val"), next: pos + 1}
+
+fn parse_term(toks: [Map], pos: int) -> Parsed:
+    left = parse_factor(toks, pos)
+    mut val = left.val
+    mut i = left.next
+    loop:
+        if i >= len(toks):
+            break
+        k = get(at(toks, i), "kind")
+        if k != "star" and k != "slash":
+            break
+        r = parse_factor(toks, i + 1)
+        if k == "star":
+            val = val * r.val
+        else:
+            if r.val == 0:                  # handle it, don't trap
+                print_line("  (calculator: divide by zero — using 0)")
+                val = 0
+            else:
+                val = val / r.val
+        i = r.next
+    Parsed{val: val, next: i}
+
+fn parse_expr(toks: [Map], pos: int) -> Parsed:
+    left = parse_term(toks, pos)
+    mut val = left.val
+    mut i = left.next
+    loop:
+        if i >= len(toks):
+            break
+        k = get(at(toks, i), "kind")
+        if k != "plus" and k != "minus":
+            break
+        r = parse_term(toks, i + 1)
+        val = if k == "plus" then val + r.val else val - r.val
+        i = r.next
+    Parsed{val: val, next: i}
+
+fn eval(src: Text) -> int:
+    toks = tokenize(src)
+    result = parse_expr(toks, 0)
+    result.val
+
+# ---- Main ------------------------------------------------------------
+
+fn main() -> int:
+    a = eval("3 + 4 * 2")               # precedence:      = 11
+    b = eval("(3 + 4) * 2")             # parens:          = 14
+    c = eval("2 * (3 + 4) - 10 / 2")    # mixed:           = 9
+    d = eval("-5 + 8")                  # unary minus:     = 3
+    e = eval("100 / (2 - 2)")           # divide by zero:  = 0 (handled)
+
+    print_line("3 + 4 * 2            = {a}")
+    print_line("(3 + 4) * 2          = {b}")
+    print_line("2 * (3 + 4) - 10 / 2 = {c}")
+    print_line("-5 + 8               = {d}")
+    print_line("100 / (2 - 2)        = {e}")
+
+    # 11 + 14 + 9 + 3 + 0 = 37, +5 = 42
+    a + b + c + d + e + 5

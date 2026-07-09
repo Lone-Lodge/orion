@@ -62,7 +62,8 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 108/108 smoke tests passing; 15/15 demos
+- 111/111 smoke tests passing; 16/16 demos (incl. a recursive-descent
+  arithmetic calculator — tokenize → parse → evaluate)
 
 ### Stdlib orbs (pure Orion)
 `text` (split/join/replace/trim/pad/upper/lower/starts_with/…),
