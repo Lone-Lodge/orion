@@ -21,6 +21,8 @@
 - `?` operator (early-return-on-Err for sum types)
 - Method-call syntax: `text.upper()`, `list.len()`, `xs.slice(1, 3)` (desugars `x.f(a)` → `f(x, a)`)
 - String interpolation of any expression: `"{a + b}"`, `"{xs[0]}"`, `"{f(x)}"`
+- Character literals: `'+'` is the byte value `43` (an int, not a new type),
+  escapes too (`'\n'`, `'\t'`, `'\''`) — readable notation for ASCII codes
 - `xs[i]` / `m[k]` indexing and `xs[i] = v` / `m[k] = v` element assignment
 - Compound assignment: `+=`, `-=`, `*=`, `/=`; unary negation `-x`
 - `defer <expr>` — runs at block end + before any `return` (LIFO, block-scoped)
@@ -62,7 +64,7 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 111/111 smoke tests passing; 16/16 demos (incl. a recursive-descent
+- 112/112 smoke tests passing; 16/16 demos (incl. a recursive-descent
   arithmetic calculator — tokenize → parse → evaluate)
 
 ### Stdlib orbs (pure Orion)

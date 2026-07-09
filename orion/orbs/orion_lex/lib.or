@@ -123,7 +123,58 @@ fn slx_resolve_escape(escape_char: int) -> int:
     if escape_char == 114: result = 13
     if escape_char == 116: result = 9
     if escape_char == 48: result = 0
+    if escape_char == 39: result = 39
     result
+
+# Decimal text for a small non-negative int (byte values 0-255). Used to
+# emit a char literal as an ordinary int token — the parser then treats
+# `'+'` exactly like `43`, so no new AST node or type is needed.
+fn slx_int_to_text(n: int) -> Text:
+    if n == 0:
+        return "0"
+    mut digits = bytes_zeros(0)
+    mut v = n
+    loop:
+        if v <= 0:
+            break
+        digits = push(digits, 48 + (v % 10))
+        v = v / 10
+    mut out = bytes_zeros(0)
+    mut i = len(digits) - 1
+    loop:
+        if i < 0:
+            break
+        out = push(out, at(digits, i))
+        i = i - 1
+    bytes_to_text(out)
+
+# A character literal `'c'` (or an escape like `'\n'`) lexes to an int token
+# holding the byte value. Readable notation for a byte — `match b: '+' -> …`
+# instead of the magic number `43`.
+fn slx_scan_char(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
+    mut cursor = start + 1
+    mut value = 0
+    mut ok = false
+    if cursor < byte_count:
+        c = byte_at(bytes, cursor)
+        if c == 92 and cursor + 1 < byte_count:
+            resolved = slx_resolve_escape(byte_at(bytes, cursor + 1))
+            if resolved >= 0:
+                value = resolved
+                cursor += 2
+                ok = true
+        else:
+            if c != 39:
+                value = c
+                cursor += 1
+                ok = true
+    if ok and cursor < byte_count and byte_at(bytes, cursor) == 39:
+        cursor += 1
+        {"token": slx_make_token("int", slx_int_to_text(value), line, col), "next": cursor}
+    else:
+        # Malformed (empty '' or unterminated). Advance one byte so the main
+        # loop can't hang; emit nothing usable — a later parse error follows.
+        {"token": slx_make_token("newline", "\n", line, col), "next": start + 1}
 
 fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
     # Consume the opening quote, walk until the closing one. Returns
@@ -329,6 +380,7 @@ pub fn self_lex(source: Text) -> [Map]:
         is_ws = slx_is_space(current)
         is_comment = current == 35
         is_string = current == 34
+        is_char = current == 39
         is_digit = slx_is_digit(current)
         is_ident = slx_is_ident_start(current)
         if is_nl:
@@ -344,6 +396,10 @@ pub fn self_lex(source: Text) -> [Map]:
             scanned = slx_scan_string(bytes, cursor, byte_count, line, col)
             tokens = slx_push_token(tokens, get(scanned, "token"))
             cursor = get_int(scanned, "next")
+        if is_char:
+            scanned = slx_scan_char(bytes, cursor, byte_count, line, col)
+            tokens = slx_push_token(tokens, get(scanned, "token"))
+            cursor = get_int(scanned, "next")
         if is_digit:
             scanned = slx_scan_number(bytes, cursor, byte_count, line, col)
             tokens = slx_push_token(tokens, get(scanned, "token"))
@@ -352,7 +408,7 @@ pub fn self_lex(source: Text) -> [Map]:
             scanned = slx_scan_ident(bytes, cursor, byte_count, line, col)
             tokens = slx_push_token(tokens, get(scanned, "token"))
             cursor = get_int(scanned, "next")
-        is_unknown = not (is_nl or is_ws or is_comment or is_string or is_digit or is_ident)
+        is_unknown = not (is_nl or is_ws or is_comment or is_string or is_char or is_digit or is_ident)
         if is_unknown:
             op_text = slx_scan_op(bytes, cursor, byte_count)
             if op_text == "":
