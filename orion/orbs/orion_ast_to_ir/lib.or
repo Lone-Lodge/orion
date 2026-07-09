@@ -2859,7 +2859,16 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     mut seen_fn_names = slice([""], 0, 0)
     for ddi in 0..<dup_n:
         dd = at(dup_decls, ddi)
-        if get(dd, "kind") == "Fn":
+        ddk = get(dd, "kind")
+        # `trait` / `impl` / `system` parse but have no lowering. Left alone
+        # they compile to nothing (trait/impl) or silently corrupt the program
+        # (a `system` decl swallows the following `fn`, so `main` returns 0).
+        # Reject them loudly instead of miscompiling — they're reserved for a
+        # future generation, not usable today.
+        if ddk == "Trait" or ddk == "Impl" or ddk == "System":
+            word = if ddk == "Trait" then "trait" else if ddk == "Impl" then "impl" else "system"
+            compile_error("orion: ERROR — `{word}` declarations are not supported yet (reserved for a future version; remove it)")
+        if ddk == "Fn":
             dnm = get(dd, "name")
             mut dup_already = false
             for dsj in 0..<len(seen_fn_names):

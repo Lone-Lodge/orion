@@ -186,7 +186,7 @@ xs.slice(1, 3)                      # half-open slice [1, 3)
 require x > 0                       # precondition — traps (exit 70) if false
 ensure result >= 0                 # postcondition — traps (exit 70) if false
 defer cleanup()                    # runs at block end + before any return (LIFO)
-comptime BIG = 2 * 21              # constant folded at compile time
+comptime fn big() -> int = 2 * 21  # `comptime` modifier: folded at compile time
 ```
 
 ## 11. Effects (algebraic — with continuations)
@@ -213,18 +213,18 @@ are caught at **compile time**.
 
 ## Reserved / aspirational — parsed but NOT lowered (do not use)
 
-These are lexed (and some parse into AST nodes), so they *look* like syntax,
-but the compiler has no lowering for them — they either fail to parse or are
-silently skipped. They are direction, not features:
+These *look* like syntax but the compiler has no lowering for them. Using one
+is a **loud error**, never a silent miscompile:
 
+- **Types/traits**: `trait`, `impl`, `system` → clear "not supported yet" error
 - **Concurrency**: `spawn` / `job` / `scope:` / `parallel for` / `.await`
-- **ECS query**: `for e with Component:`
-- **Types/traits**: `trait`, `impl`, `system`, `deterministic`, `raw`,
-  `frame`, `before`, `after`, `as`, `self`
+  → "unknown identifier" / "unhandled statement kind"
+- **ECS query**: `for e with Component:` → unhandled
+- Other reserved words: `deterministic`, `raw`, `frame`, `before`, `after`,
+  `as`, `self`
 
-Effects (§11) DO work; the concurrency words above do not (as of this writing).
-If you write one, you'll get an "unknown identifier" or "unhandled statement
-kind" error — the compiler fails loudly rather than pretending.
+Effects (§11) DO work. If you reach for one of the above you get told, rather
+than getting a program that quietly does the wrong thing.
 
 ## The KISS rules of thumb
 
