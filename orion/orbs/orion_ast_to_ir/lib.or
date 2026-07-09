@@ -1713,10 +1713,21 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 probed = true
     if not probed:
         if n_arms > 0:
-            first_body = get(at(arms, 0), "body")
-            first_kind = get(first_body, "kind")
-            if first_kind == "Str":
-                result_type = "text"
+            # No wildcard: probe the FIRST arm's body. Bind its pattern
+            # variables to a scratch value so a body like `IntV(n) -> IntV(n)`
+            # lowers and reveals its real (enum/struct) type instead of
+            # defaulting to i64 — which would mis-store the value and trip the
+            # return-type check. The probe fn is discarded; only the type is
+            # read. Subsumes the old first-arm-Str heuristic.
+            first_arm = at(arms, 0)
+            pr_dummy = ir_fn_push(scrut_r.function, ir_iconst(0))
+            mut probe_scope = scrut_r.scope
+            first_binds = if has(first_arm, "bindings") then get_list(first_arm, "bindings") else []
+            for bpi in 0..<len(first_binds):
+                probe_scope = scope_bind(probe_scope, at(first_binds, bpi), pr_dummy.id)
+            fa_r = ast_expr_to_ir(pr_dummy.function, probe_scope, get(first_arm, "body"))
+            if fa_r.id >= 0:
+                result_type = get_value_type(fa_r.function, fa_r.id)
     pr_alloca = ir_fn_push(scrut_r.function, ir_alloca(result_type))
     result_ptr_id = pr_alloca.id
     mut current_fn = pr_alloca.function
