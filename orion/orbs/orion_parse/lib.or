@@ -163,6 +163,20 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
             name_text = psr_peek_value(tokens, position)
             {"node": {"kind": "Named", "name": name_text}, "next": position + 1}
 
+# A match/cond arm body. Inline `-> expr` stays a single expression. But when
+# a newline follows (the body starts on the next line, indented deeper than the
+# arm), parse it as a block: bind locals, then the last expression is the arm's
+# value — exactly like an `if` branch. Keeps multi-step arms flat instead of
+# forcing them into nested if/else. Block bodies lower for free (ast_expr_to_ir
+# already yields a Block's last-statement value).
+fn psr_parse_arm_body(tokens: [Map], position: int, arm_col: int) -> Map:
+    if psr_peek_kind(tokens, position) == "newline":
+        block_start = psr_skip_newlines(tokens, position)
+        block_col = psr_peek_col(tokens, block_start)
+        if block_col > arm_col:
+            return psr_parse_body_at(tokens, block_start, block_col)
+    psr_parse_expr(tokens, position)
+
 # Parse a `match EXPR:` block — used both as statement and as expression.
 # `position` points at the `match` keyword. Returns {node, next}.
 fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
@@ -210,7 +224,7 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
                     match_cursor = match_cursor + 1
         if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "->":
             match_cursor = match_cursor + 1
-        body_result = psr_parse_expr(tokens, match_cursor)
+        body_result = psr_parse_arm_body(tokens, match_cursor, arm_col)
         arms_list = push(arms_list, {"pattern": pat_value, "pat_kind": pat_kind, "bindings": pat_binding_list, "body": get_map(body_result, "node")})
         match_cursor = get_int(body_result, "next")
         match_cursor = psr_skip_newlines(tokens, match_cursor)
@@ -240,7 +254,7 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
                 cursor = cursor + 1
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
                 cursor = cursor + 1
-            eb = psr_parse_expr(tokens, cursor)
+            eb = psr_parse_arm_body(tokens, cursor, arm_col)
             cm_else = get_map(eb, "node")
             cursor = get_int(eb, "next")
             cursor = psr_skip_newlines(tokens, cursor)
@@ -251,7 +265,7 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
             cursor = cursor + 1
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
             cursor = cursor + 1
-        br = psr_parse_expr(tokens, cursor)
+        br = psr_parse_arm_body(tokens, cursor, arm_col)
         cm_cond_list = push(cm_cond_list, get_map(cr, "node"))
         cm_body_list = push(cm_body_list, get_map(br, "node"))
         cursor = get_int(br, "next")

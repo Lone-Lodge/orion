@@ -9115,6 +9115,38 @@ if_16_merge:
     ret ptr %v181
 }
 
+define ptr @psr_parse_arm_body(ptr %p0, i64 %p1, i64 %p2) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = add i64 0, %p1
+    %v2 = add i64 0, %p2
+    %v3 = call ptr @psr_peek_kind(ptr %v0, i64 %v1)
+    %v4 = getelementptr i8, ptr @.str_208, i64 16
+    %v5.e = call i64 @orion_text_eq(ptr %v3, ptr %v4)
+    %v5 = add i64 %v5.e, 0
+    %v6.cb = icmp ne i64 %v5, 0
+    br i1 %v6.cb, label %if_6_then, label %if_6_else
+if_6_then:
+    %v8 = call i64 @psr_skip_newlines(ptr %v0, i64 %v1)
+    %v9 = call i64 @psr_peek_col(ptr %v0, i64 %v8)
+    %v10.b = icmp sgt i64 %v9, %v2
+    %v10 = zext i1 %v10.b to i64
+    %v11.cb = icmp ne i64 %v10, 0
+    br i1 %v11.cb, label %if_11_then, label %if_11_else
+if_11_then:
+    %v13 = call ptr @psr_parse_body_at(ptr %v0, i64 %v8, i64 %v9)
+    ret ptr %v13
+if_11_else:
+    br label %if_11_merge
+if_11_merge:
+    br label %if_6_merge
+if_6_else:
+    br label %if_6_merge
+if_6_merge:
+    %v22 = call ptr @psr_parse_expr(ptr %v0, i64 %v1)
+    ret ptr %v22
+}
+
 define ptr @psr_parse_match_node(ptr %p0, i64 %p1) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
@@ -9421,7 +9453,7 @@ if_242_else:
     br label %if_242_merge
 if_242_merge:
     %v252 = load i64, ptr %v4
-    %v253 = call ptr @psr_parse_expr(ptr %v0, i64 %v252)
+    %v253 = call ptr @psr_parse_arm_body(ptr %v0, i64 %v252, i64 %v67)
     %v254 = load ptr, ptr %v69
     %v255 = getelementptr i8, ptr @.str_267, i64 16
     %v256 = getelementptr i8, ptr @.str_268, i64 16
@@ -9622,7 +9654,7 @@ if_103_else:
     br label %if_103_merge
 if_103_merge:
     %v113 = load i64, ptr %v3
-    %v114 = call ptr @psr_parse_expr(ptr %v0, i64 %v113)
+    %v114 = call ptr @psr_parse_arm_body(ptr %v0, i64 %v113, i64 %v6)
     %v115 = getelementptr i8, ptr @.str_256, i64 16
     %v116.i = call i64 @orion_map_get(ptr %v114, ptr %v115)
     %v116 = inttoptr i64 %v116.i to ptr
@@ -9709,7 +9741,7 @@ if_175_else:
     br label %if_175_merge
 if_175_merge:
     %v185 = load i64, ptr %v3
-    %v186 = call ptr @psr_parse_expr(ptr %v0, i64 %v185)
+    %v186 = call ptr @psr_parse_arm_body(ptr %v0, i64 %v185, i64 %v6)
     %v187 = load ptr, ptr %v8
     %v188 = getelementptr i8, ptr @.str_256, i64 16
     %v189.i = call i64 @orion_map_get(ptr %v129, ptr %v188)

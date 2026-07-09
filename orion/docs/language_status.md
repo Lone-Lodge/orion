@@ -15,7 +15,9 @@
 - `for idx, v in list:` (with-index iteration)
 - `for v with Component:` (ECS query — for entities)
 - `loop:` + `break` + `continue` (unbounded loops)
-- `match` on int/text patterns + enum-variant destructuring; exhaustiveness checked
+- `match` on int/text patterns + enum-variant destructuring; exhaustiveness
+  checked. Arms are `-> expr`, or an indented block (bind locals, last
+  expression is the arm's value — like an `if` branch)
 - `data` structs (not OOP — pure record types)
 - `enum` sum types with payload (tag + val_int + val_text)
 - `?` operator (early-return-on-Err for sum types)
@@ -64,7 +66,7 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 112/112 smoke tests passing; 17/17 demos (incl. a recursive-descent
+- 113/113 smoke tests passing; 17/17 demos (incl. a recursive-descent
   arithmetic calculator and a mini-interpreter with variables — tokenize →
   parse → evaluate)
 
