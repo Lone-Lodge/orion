@@ -16,8 +16,9 @@
 - `for v with Component:` (ECS query — for entities)
 - `loop:` + `break` + `continue` (unbounded loops)
 - `match` on int/text patterns + enum-variant destructuring; exhaustiveness
-  checked. Arms are `-> expr`, or an indented block (bind locals, last
-  expression is the arm's value — like an `if` branch)
+  checked. Arms are `-> expr`, an inline assignment (`Num(v) -> total += v`),
+  or an indented block (bind locals, last expression is the arm's value —
+  like an `if` branch). Works in expression and statement position
 - `data` structs (not OOP — pure record types)
 - `enum` sum types with payload (tag + val_int + val_text)
 - `?` operator (early-return-on-Err for sum types)
@@ -66,9 +67,9 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 113/113 smoke tests passing; 17/17 demos (incl. a recursive-descent
-  arithmetic calculator and a mini-interpreter with variables — tokenize →
-  parse → evaluate)
+- 114/114 smoke tests passing; 18/18 demos (incl. a recursive-descent
+  arithmetic calculator, a mini-interpreter with variables, and an RPN
+  stack machine built on an `enum` sum type)
 
 ### Stdlib orbs (pure Orion)
 `text` (split/join/replace/trim/pad/upper/lower/starts_with/…),

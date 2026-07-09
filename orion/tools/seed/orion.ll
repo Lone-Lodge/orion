@@ -9143,8 +9143,93 @@ if_11_merge:
 if_6_else:
     br label %if_6_merge
 if_6_merge:
-    %v22 = call ptr @psr_parse_expr(ptr %v0, i64 %v1)
-    ret ptr %v22
+    %v22 = call ptr @psr_peek_kind(ptr %v0, i64 %v1)
+    %v23 = getelementptr i8, ptr @.str_120, i64 16
+    %v24.e = call i64 @orion_text_eq(ptr %v22, ptr %v23)
+    %v24 = add i64 %v24.e, 0
+    %v25.cb = icmp ne i64 %v24, 0
+    br i1 %v25.cb, label %if_25_then, label %if_25_else
+if_25_then:
+    %v27 = add i64 0, 1
+    %v28 = add i64 %v1, %v27
+    %v29 = call ptr @psr_peek_kind(ptr %v0, i64 %v28)
+    %v30 = getelementptr i8, ptr @.str_245, i64 16
+    %v31.e = call i64 @orion_text_eq(ptr %v29, ptr %v30)
+    %v31 = add i64 %v31.e, 0
+    br label %if_25_merge
+if_25_else:
+    %v34 = add i64 0, 0
+    br label %if_25_merge
+if_25_merge:
+    %v37 = phi i64 [ %v31, %if_25_then ], [ %v34, %if_25_else ]
+    %v38.cb = icmp ne i64 %v37, 0
+    br i1 %v38.cb, label %if_38_then, label %if_38_else
+if_38_then:
+    %v40 = add i64 0, 1
+    %v41 = add i64 %v1, %v40
+    %v42 = call ptr @psr_peek_value(ptr %v0, i64 %v41)
+    %v43 = getelementptr i8, ptr @.str_226, i64 16
+    %v44.e = call i64 @orion_text_eq(ptr %v42, ptr %v43)
+    %v44 = add i64 %v44.e, 0
+    %v45.cb = icmp ne i64 %v44, 0
+    br i1 %v45.cb, label %if_45_then, label %if_45_else
+if_45_then:
+    br label %if_45_merge
+if_45_else:
+    %v49 = getelementptr i8, ptr @.str_218, i64 16
+    %v50.e = call i64 @orion_text_eq(ptr %v42, ptr %v49)
+    %v50 = add i64 %v50.e, 0
+    br label %if_45_merge
+if_45_merge:
+    %v53 = phi i64 [ %v44, %if_45_then ], [ %v50, %if_45_else ]
+    %v54.cb = icmp ne i64 %v53, 0
+    br i1 %v54.cb, label %if_54_then, label %if_54_else
+if_54_then:
+    br label %if_54_merge
+if_54_else:
+    %v58 = getelementptr i8, ptr @.str_219, i64 16
+    %v59.e = call i64 @orion_text_eq(ptr %v42, ptr %v58)
+    %v59 = add i64 %v59.e, 0
+    br label %if_54_merge
+if_54_merge:
+    %v62 = phi i64 [ %v53, %if_54_then ], [ %v59, %if_54_else ]
+    %v63.cb = icmp ne i64 %v62, 0
+    br i1 %v63.cb, label %if_63_then, label %if_63_else
+if_63_then:
+    br label %if_63_merge
+if_63_else:
+    %v67 = getelementptr i8, ptr @.str_220, i64 16
+    %v68.e = call i64 @orion_text_eq(ptr %v42, ptr %v67)
+    %v68 = add i64 %v68.e, 0
+    br label %if_63_merge
+if_63_merge:
+    %v71 = phi i64 [ %v62, %if_63_then ], [ %v68, %if_63_else ]
+    %v72.cb = icmp ne i64 %v71, 0
+    br i1 %v72.cb, label %if_72_then, label %if_72_else
+if_72_then:
+    br label %if_72_merge
+if_72_else:
+    %v76 = getelementptr i8, ptr @.str_221, i64 16
+    %v77.e = call i64 @orion_text_eq(ptr %v42, ptr %v76)
+    %v77 = add i64 %v77.e, 0
+    br label %if_72_merge
+if_72_merge:
+    %v80 = phi i64 [ %v71, %if_72_then ], [ %v77, %if_72_else ]
+    %v81.cb = icmp ne i64 %v80, 0
+    br i1 %v81.cb, label %if_81_then, label %if_81_else
+if_81_then:
+    %v83 = call i64 @psr_peek_col(ptr %v0, i64 %v1)
+    %v84 = call ptr @psr_parse_body_at(ptr %v0, i64 %v1, i64 %v83)
+    ret ptr %v84
+if_81_else:
+    br label %if_81_merge
+if_81_merge:
+    br label %if_38_merge
+if_38_else:
+    br label %if_38_merge
+if_38_merge:
+    %v93 = call ptr @psr_parse_expr(ptr %v0, i64 %v1)
+    ret ptr %v93
 }
 
 define ptr @psr_parse_match_node(ptr %p0, i64 %p1) {

@@ -1,0 +1,90 @@
+# rpn — a reverse-Polish (postfix) calculator, modelled with a real sum type.
+#
+# Build: orion.exe examples/demos/rpn.or out.ll orbs
+#
+# Where the recursive-descent calculator threads precedence, RPN is a plain
+# left-to-right stack machine — so it shows off a different set of features:
+#   - an `enum` (sum type): a token is EITHER a number OR an operator
+#   - `match` with variant destructuring (`Num(v)`, `Op(o)`) to pull the payload
+#   - a block arm (the `Op` case pops two, applies, pushes) next to an inline arm
+#   - a list used as a stack (push / peek / drop-last via slice)
+#
+# "3 4 + 5 *"  parses as  (3 + 4) * 5 = 35.
+
+use text
+
+enum Token: Num(int), Op(text)
+
+fn is_digit(b: int) -> int:
+    if b >= '0' and b <= '9' then 1 else 0
+
+# ---- Tokenizer: bytes -> [Token] -------------------------------------
+
+fn tokenize(src: Text) -> [Token]:
+    bs = bytes_from_text(src)
+    n = len(bs)
+    mut toks = []
+    mut i = 0
+    loop:
+        if i >= n:
+            break
+        b = at(bs, i)
+        if b == ' ':
+            i = i + 1
+        else:
+            if is_digit(b) == 1:                # a run of digits -> Num
+                mut num = 0
+                loop:
+                    if i >= n:
+                        break
+                    d = at(bs, i)
+                    if is_digit(d) == 0:
+                        break
+                    num = num * 10 + (d - '0')
+                    i = i + 1
+                toks = push(toks, Token.Num(num))
+            else:                               # a single char -> Op
+                toks = push(toks, Token.Op(bytes_to_text(push([], b))))
+                i = i + 1
+    toks
+
+fn apply(op: Text, a: int, b: int) -> int:
+    match op:
+        "+" -> a + b
+        "-" -> a - b
+        "*" -> a * b
+        _ ->
+            if b == 0:
+                print_line("  (rpn: divide by zero — using 0)")
+                0
+            else:
+                a / b
+
+# ---- Evaluator: a left-to-right stack machine ------------------------
+
+fn eval(toks: [Token]) -> int:
+    mut stack = []
+    for t in toks:
+        match t:
+            Num(v) -> stack = push(stack, v)    # inline arm
+            Op(o) ->                            # block arm: pop 2, apply, push
+                top = len(stack)
+                b = at(stack, top - 1)
+                a = at(stack, top - 2)
+                stack = slice(stack, 0, top - 2)
+                stack = push(stack, apply(o, a, b))
+    at(stack, len(stack) - 1)
+
+fn run(src: Text) -> int:
+    r = eval(tokenize(src))
+    print_line("{src}   =  {r}")
+    r
+
+# ---- Main ------------------------------------------------------------
+
+fn main() -> int:
+    a = run("3 4 + 5 *")        # (3 + 4) * 5   = 35
+    b = run("9 2 -")            # 9 - 2         = 7
+    c = run("2 3 4 * +")        # 2 + (3 * 4)   = 14
+    # 35 + 7 = 42  (c is just to exercise a deeper stack)
+    a + b + c - c

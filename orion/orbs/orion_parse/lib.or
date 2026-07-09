@@ -175,6 +175,15 @@ fn psr_parse_arm_body(tokens: [Map], position: int, arm_col: int) -> Map:
         block_col = psr_peek_col(tokens, block_start)
         if block_col > arm_col:
             return psr_parse_body_at(tokens, block_start, block_col)
+    # An inline `-> name = expr` (or `+=`, `-=`, `*=`, `/=`) is a statement,
+    # not an expression — a side-effecting arm like `Num(v) -> total += v`.
+    # Parse it as a one-statement block (psr_parse_body_at stops at the next
+    # arm's dedent) so the arm can bind/mutate. Without this, psr_parse_expr
+    # stops at the `=` and the rest mis-parses.
+    if psr_peek_kind(tokens, position) == "ident" and psr_peek_kind(tokens, position + 1) == "symbol":
+        nxt = psr_peek_value(tokens, position + 1)
+        if nxt == "=" or nxt == "+=" or nxt == "-=" or nxt == "*=" or nxt == "/=":
+            return psr_parse_body_at(tokens, position, psr_peek_col(tokens, position))
     psr_parse_expr(tokens, position)
 
 # Parse a `match EXPR:` block — used both as statement and as expression.
