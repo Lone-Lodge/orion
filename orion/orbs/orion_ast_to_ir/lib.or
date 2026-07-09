@@ -284,6 +284,18 @@ fn scope_is_mut(scope: Scope, name: Text) -> int:
             found = 1
     result
 
+# A `move x = e` binding: linear (immutable), flag 2. Distinct from mut (1) so
+# `is_real_mut` (== 1) never treats it as mutable. `scope_is_linear` reads the
+# flag back so a read of a linear value can be counted (see ast_ident_to_ir).
+fn scope_bind_linear(scope: Scope, name: Text, id: int) -> Scope:
+    new_names = push(scope.names, name)
+    new_ids = push(scope.ids, id)
+    new_flags = push(scope.mut_flags, 2)
+    Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
+fn scope_is_linear(scope: Scope, name: Text) -> int:
+    if scope_is_mut(scope, name) == 2 then 1 else 0
+
 
 # --- Block terminator detection ---
 # A block is terminated if its last instruction is a `br` or `return`.
@@ -463,7 +475,12 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     current_fn = pr_store.function
                     last_id = pr_store.id
                 else:
-                    current_scope = scope_bind(current_scope, name, er.id)
+                    if has(stmt, "linear"):
+                        # `move x = e` — bind linear and (re)start its read count.
+                        current_scope = scope_bind_linear(current_scope, name, er.id)
+                        slot_set("otir:move:" + current_fn.name + ":" + name, 0)
+                    else:
+                        current_scope = scope_bind(current_scope, name, er.id)
                     last_id = er.id
         if already_done == 0 and is_if_block:
             er = ast_if_to_ir(current_fn, current_scope, stmt)
@@ -715,6 +732,18 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     name = get(node, "name")
     found_id = scope_lookup(scope, name)
     is_mut = scope_is_mut(scope, name)
+    # Linear (`move`) check: a `move x = e` value may be read at most once. Every
+    # read is lowered through here, so counting reads (in a per-function slot)
+    # is complete for straight-line code — a second read is a use-after-move.
+    # Scope is per-function, so keying the count by fn name + var is safe.
+    if found_id >= 0 and scope_is_linear(scope, name) == 1:
+        move_key = "otir:move:" + fn_value.name + ":" + name
+        move_reads = slot_get_int(move_key)
+        if move_reads >= 1:
+            line = if has(node, "line") then get_int(node, "line") else 0
+            col = if has(node, "col") then get_int(node, "col") else 0
+            compile_error("orion: ERROR at line {line}:{col} — value `{name}` used after move (`move` values are linear — read exactly once; bind a plain `{name} = …` if you need to reuse it)")
+        slot_set(move_key, move_reads + 1)
     mut result = ConvResult{function: fn_value, scope: scope, id: found_id}
     if found_id < 0:
         # Not a local — zero-payload enum variant as a bare ident

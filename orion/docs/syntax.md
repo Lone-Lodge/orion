@@ -41,8 +41,14 @@ String interpolation — `{expr}` runs any expression:
 x = 5             # immutable binding (also: reassignment of a mut var)
 mut n = 0         # mutable binding
 mut xs: [int] = []   # typed mut (needed when the value can't be inferred, e.g. [])
+move a = big()       # linear binding — may be read at most once (compile-checked)
 derived area = w * w   # reactive: reading `area` re-evaluates `w * w` each time
 ```
+
+`move` makes an aliasing promise checkable (the honest version of `push_mut`):
+a second read is a use-after-move compile error. MVP scope: straight-line single
+use; a value read in both branches of an `if` is conservatively flagged. `move`
+outside the `move NAME =` shape is a plain identifier.
 
 Locals infer their type from the right-hand side. Function *parameters* are
 annotated (see §5).

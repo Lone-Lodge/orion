@@ -57,6 +57,10 @@
   or bare SIGFPE
 - Using an unannotated parameter as text/list names the parameter and points
   at the fix (untyped params default to `int`)
+- **Linear `move` bindings**: `move x = e` may be read at most once; a second
+  read is a compile-time use-after-move error (the checked form of `push_mut`'s
+  alias promise). First slice — straight-line use; branch/loop paths not yet
+  analyzed (conservatively over-strict on `if` branches)
 
 ### FFI + hot reload
 - `extern fn name(params) -> ret` — call C / runtime / any native symbol
@@ -81,7 +85,7 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 117/117 smoke tests passing; 21/21 demos (incl. a recursive-descent
+- 118/118 smoke tests passing; 21/21 demos (incl. a recursive-descent
   arithmetic calculator, a mini-interpreter with variables, an RPN stack
   machine on an `enum`, a safe evaluator that propagates errors with `?`,
   an arena-based AST evaluator, and a CSV → aligned-table formatter that
