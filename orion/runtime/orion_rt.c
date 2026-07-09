@@ -851,19 +851,13 @@ void __orion_resume_text(char *value) {
 
 /* Timing primitives — backbone of the async runtime. Windows-only for now;
  * port to POSIX (clock_gettime + nanosleep) is a few extra ifdefs. */
-#ifdef _WIN32
-#include <windows.h>
-
-/* Crash forensics: on an unhandled fault, print the exception code
- * and the MODULE-RELATIVE offset (symbolizable against the link map
- * orbit emits next to the exe) before dying. Fail fast, but say
- * where. */
-/* ---- The WHY: cause breadcrumbs ----
- * The engine always knows which bundle/event/rule is executing —
- * a crash should say so. Dispatch layers drop crumbs (bounded
- * copies into static rings, zero alloc, ~20ns); the crash filter
- * prints the trail newest-first. WHAT (exception+poison), WHERE
- * (symbolized stack), WHY (this trail): the full diagnosis. */
+/* ---- The WHY: cause breadcrumbs (PORTABLE) ----
+ * The engine always knows which bundle/event/rule is executing — a crash
+ * should say so. Dispatch layers drop crumbs (bounded copies into static
+ * rings, zero alloc, ~20ns). Recording is zero-API, so it lives OUTSIDE the
+ * platform guard: the emitter calls orion_crumb / orion_crumb_rule on every
+ * platform (astra's `rule` construct does). Only the crash READER below —
+ * which prints the trail newest-first — is Windows-specific for now. */
 #define CRUMB_N 8
 static char crumb_bundle[CRUMB_N][40];
 static char crumb_event[CRUMB_N][24];
@@ -889,6 +883,14 @@ void orion_crumb(const char *bundle, const char *event, long long tick) {
 void orion_crumb_rule(const char *rule) {
     crumb_copy(crumb_rule, rule, sizeof crumb_rule);
 }
+
+#ifdef _WIN32
+#include <windows.h>
+
+/* Crash forensics: on an unhandled fault, print the exception code
+ * and the MODULE-RELATIVE offset (symbolizable against the link map
+ * orbit emits next to the exe) before dying. Fail fast, but say
+ * where. The crumb trail recorded above prints newest-first. */
 
 /* The report goes to stderr AND crash.txt — a console window dies
  * with the process, a file survives to be read (by the pilot or by
