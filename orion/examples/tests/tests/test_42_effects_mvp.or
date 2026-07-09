@@ -1,11 +1,10 @@
 effect AskUser:
     ask: fn(prompt: Text) -> Text
 
-# Handler uses resume_text — control jumps back to caller with the
-# resumed Text value. The "" after is unreachable.
-fn __handler_AskUser_ask(prompt: Text) -> Text:
-    resume_text("default answer")
-    ""
+# The handler resumes with a Text value; control jumps back to the caller.
+# `resume` picks the text path from the argument's type.
+handle AskUser.ask(prompt: Text) -> Text:
+    resume("default answer")
 
 fn main() -> int:
     answer = perform AskUser.ask("hello")
