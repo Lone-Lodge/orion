@@ -195,12 +195,11 @@ comptime BIG = 2 * 21              # constant folded at compile time
 effect Random:                     # declare an effect + its operations
     roll: fn(max: int) -> int
 
-fn __handler_Random_roll(max: int) -> int:   # handler (static dispatch by name)
-    resume_int(73)                 # resume the continuation with a value
-    0
+handle Random.roll(max: int) -> int:   # the handler for that operation
+    resume(73)                     # send a value back to the perform site
 
-n = perform Random.roll(100)       # invoke the effect
-# resume_int(v) / resume_text(v) resume a one-shot continuation
+n = perform Random.roll(100)       # invoke the effect -> n == 73
+# resume(v) resumes the one-shot continuation; int vs text is inferred from v.
 ```
 
 ## 12. Runtime safety

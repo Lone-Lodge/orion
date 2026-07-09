@@ -60,8 +60,9 @@
 
 ### Effects (algebraic — rare next-gen feature)
 - `effect Name: op_name: fn(params) -> ret` declarations
-- `perform Effect.op(args)` — invoke; static dispatch via `__handler_Effect_op`
-- One-shot continuations via setjmp/longjmp: `resume_int(v)`, `resume_text(v)`
+- `handle Name.op(params) -> ret:` — the handler (readable sugar; no magic name)
+- `perform Effect.op(args)` — invoke
+- One-shot continuations via setjmp/longjmp: `resume(v)` (int/text inferred)
 
 ### Concurrency — NOT working (parsed/reserved only)
 - `spawn` / `job` / `.await` / `parallel for` / `scope:` and the ECS `for v
@@ -72,7 +73,7 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 116/116 smoke tests passing; 21/21 demos (incl. a recursive-descent
+- 117/117 smoke tests passing; 21/21 demos (incl. a recursive-descent
   arithmetic calculator, a mini-interpreter with variables, an RPN stack
   machine on an `enum`, a safe evaluator that propagates errors with `?`,
   an arena-based AST evaluator, and a CSV → aligned-table formatter that

@@ -1553,6 +1553,37 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
         cursor = get_int(body_result, "next")
         {"node": {"kind": "Fn", "name": name, "params": get_map(params_result, "node"), "ret": return_node, "body": get_map(body_result, "node")}, "next": cursor}
 
+# `handle Effect.op(params) -> ret:` — readable sugar for an effect handler.
+# It lowers to a fn named `__handler_Effect_op`, which is exactly what
+# `perform Effect.op(...)` dispatches to. Before this you had to hand-write
+# that magic name yourself; now the coupling is explicit and guessable, and
+# the mangling is the compiler's job. Mirrors psr_parse_fn from the `(` on.
+fn psr_parse_handler(tokens: [Map], position: int) -> Map:
+    mut cursor = position + 1              # past `handle`
+    effect_name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ".":
+        cursor += 1
+    op_name = psr_peek_value(tokens, cursor)
+    cursor += 1
+    name = "__handler_" + effect_name + "_" + op_name
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
+        cursor += 1
+    params_result = psr_parse_params(tokens, cursor)
+    cursor = get_int(params_result, "next")
+    mut return_node = {"kind": "Named", "name": "Unit"}
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
+        cursor += 1
+        ret_result = psr_parse_type(tokens, cursor)
+        return_node = get_map(ret_result, "node")
+        cursor = get_int(ret_result, "next")
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
+        cursor += 1
+    cursor = psr_skip_newlines(tokens, cursor)
+    body_result = psr_parse_body(tokens, cursor)
+    cursor = get_int(body_result, "next")
+    {"node": {"kind": "Fn", "name": name, "params": get_map(params_result, "node"), "ret": return_node, "body": get_map(body_result, "node")}, "next": cursor}
+
 # --- top-level ---
 
 # Parse `extern fn name(params) -> type` into an ExternFn decl node.
@@ -1610,6 +1641,7 @@ pub fn self_parse(tokens: [Map]) -> Map:
         is_extern = kind_here == "ident" and value_here == "extern"
         is_use = kind_here == "ident" and value_here == "use"
         is_effect = kind_here == "ident" and value_here == "effect"
+        is_handle = kind_here == "ident" and value_here == "handle"
         is_comptime = kind_here == "ident" and value_here == "comptime"
         is_deterministic = kind_here == "ident" and value_here == "deterministic"
         # `comptime fn` / `deterministic fn` — skip the modifier and treat as fn.
@@ -1635,6 +1667,10 @@ pub fn self_parse(tokens: [Map]) -> Map:
             decl_result = psr_parse_effect(tokens, cursor)
             decls = push(decls, get_map(decl_result, "node"))
             cursor = get_int(decl_result, "next")
+        if is_handle:
+            decl_result = psr_parse_handler(tokens, cursor)
+            decls = push(decls, get_map(decl_result, "node"))
+            cursor = get_int(decl_result, "next")
         if is_system:
             decl_result = psr_parse_system(tokens, cursor)
             decls = push(decls, get_map(decl_result, "node"))
@@ -1656,7 +1692,7 @@ pub fn self_parse(tokens: [Map]) -> Map:
             cursor = get_int(decl_result, "next")
         if is_use:
             cursor = psr_skip_use(tokens, cursor)
-        not_recognized = not (is_fn or is_data or is_enum or is_effect or is_system or is_impl or is_trait or is_extern or is_use)
+        not_recognized = not (is_fn or is_data or is_enum or is_effect or is_handle or is_system or is_impl or is_trait or is_extern or is_use)
         if not_recognized:
             cursor = cursor + 1
         cursor = psr_skip_newlines(tokens, cursor)
