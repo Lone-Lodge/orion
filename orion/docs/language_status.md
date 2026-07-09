@@ -32,7 +32,8 @@
 - `xs[i]` / `m[k]` indexing and `xs[i] = v` / `m[k] = v` element assignment
 - Compound assignment: `+=`, `-=`, `*=`, `/=`; unary negation `-x`
 - `defer <expr>` — runs at block end + before any `return` (LIFO, block-scoped)
-- Contracts: `require <cond>`, `ensure <cond>` (runtime checked)
+- Contracts: `require <cond>`, `ensure <cond>` — runtime checked; a false
+  condition traps loudly (clear message + exit 70)
 - `comptime` constant folding
 
 ### Functions as values
@@ -70,7 +71,7 @@
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 114/114 smoke tests passing; 21/21 demos (incl. a recursive-descent
+- 116/116 smoke tests passing; 21/21 demos (incl. a recursive-descent
   arithmetic calculator, a mini-interpreter with variables, an RPN stack
   machine on an `enum`, a safe evaluator that propagates errors with `?`,
   an arena-based AST evaluator, and a CSV → aligned-table formatter that

@@ -390,6 +390,8 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         is_continue = stmt_kind == "Continue"
         is_return = stmt_kind == "Return"
         is_match_stmt = stmt_kind == "Match"
+        is_require_stmt = stmt_kind == "Require"
+        is_ensure_stmt = stmt_kind == "Ensure"
         # Stop processing further stmts in this block if a prior one
         # already terminated the current basic block (e.g. via break).
         already_done = is_block_terminated(current_fn)
@@ -515,13 +517,22 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_fn = er.function
             current_scope = er.scope
             last_id = er.id
+        # `require cond` / `ensure cond` — evaluate the condition, then call the
+        # runtime checker which traps (clear message + exit 70) when it's false.
+        # Previously these parsed but had no lowering, so they were dropped.
+        if already_done == 0 and (is_require_stmt or is_ensure_stmt):
+            cr = ast_expr_to_ir(current_fn, current_scope, get(stmt, "expr"))
+            checker = if is_require_stmt then "orion_require" else "orion_ensure"
+            pr_chk = ir_fn_push(cr.function, ir_call(checker, [cr.id], "i64"))
+            current_fn = pr_chk.function
+            current_scope = cr.scope
         # Silent-failure guard: if none of the dispatch flags fired for this
         # statement and the block wasn't already terminated, the parser produced
         # a kind we don't lower. Print an error so it's not invisible.
         if already_done == 0 and is_defer:
             # Just stash the expression; we'll emit it at block end / before return.
             defer_exprs = push(defer_exprs, get(stmt, "expr"))
-        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt or stmt_kind == "If"
+        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt or is_require_stmt or is_ensure_stmt or stmt_kind == "If"
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
