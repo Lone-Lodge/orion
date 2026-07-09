@@ -80,6 +80,8 @@ Functions as values, higher-order, lambdas, generics:
 ```orion
 op = add                            # first-class fn reference
 fn apply(f: fn, x: int) -> int: f(x)   # higher-order
+call_ptr(fnptr, arg)                # call a RAW fn pointer (int), e.g. from dlsym
+                                    # — the FFI / hot-reload primitive
 
 inc = fn(n): n + 1                  # lambda (the one lambda syntax)
 sq  = fn(x: int): x * x             # lambda with a typed param

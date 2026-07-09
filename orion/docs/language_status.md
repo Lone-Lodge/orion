@@ -58,6 +58,14 @@
 - Using an unannotated parameter as text/list names the parameter and points
   at the fix (untyped params default to `int`)
 
+### FFI + hot reload
+- `extern fn name(params) -> ret` — call C / runtime / any native symbol
+- `call_ptr(fnptr, arg)` — call a raw function pointer held as an int (e.g. one
+  from `dlsym`); distinct from `f(x)`, which assumes `f` is a closure
+- **Hot reload works**: compile gameplay code to a `.so`, `dlopen`/`dlsym` it,
+  and `call_ptr` the result — swap new code into a running program with state
+  preserved. See `examples/hot_reload/` (Orion host, no restart).
+
 ### Effects (algebraic — rare next-gen feature)
 - `effect Name: op_name: fn(params) -> ret` declarations
 - `handle Name.op(params) -> ret:` — the handler (readable sugar; no magic name)
@@ -108,7 +116,8 @@ and the compiler internals (`orion_lex` / `orion_parse` / `orion_ir` /
 5. **SIMD primitives**, **first-class tensors**.
 
 ### Niche
-6. Refinement types, distinct/newtype, macros, hot reload.
+6. Refinement types, distinct/newtype, macros.
+   (Hot reload is no longer here — it works today; see `examples/hot_reload/`.)
 
 ## Honest summary
 

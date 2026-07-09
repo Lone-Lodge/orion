@@ -1,0 +1,4 @@
+# The "live edit": same function, new behavior. Compiled to plugin_v2.so and
+# hot-swapped into the already-running program by reload.or.
+fn tick(state: int) -> int:
+    state + 10
