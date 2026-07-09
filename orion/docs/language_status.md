@@ -110,10 +110,17 @@ and the compiler internals (`orion_lex` / `orion_parse` / `orion_ir` /
    (a newcomer reads `fn f(s: text)`, not the call sites), and inferring it
    would add a second way to say the same thing. The compiler now names the
    parameter and suggests the fix instead of failing cryptically.
-2. **Orb namespaces** — function names are global across `use`d orbs (a clash is a
-   clear error today, but there is no `list.sum` qualification).
-3. **Generic return-type re-typing** — an element read out of a returned generic
+2. **Generic return-type re-typing** — an element read out of a returned generic
    list (`filter(words, …)[0]`) is opaque at the call site (erasure limit).
+   Pure smart-compiling win: no new syntax, just the right element type.
+
+### Reconsidered — NOT worth building
+- **Orb namespaces** (`iter.sum(xs)`) — deliberately dropped. Both `sum(xs)`
+  and `xs.sum()` already call an orb function, so a qualified form would be a
+  *third* way to say the same thing (against "one obvious way"). Name clashes
+  across `use`d orbs are rare and already caught with a clear compile error,
+  and the flat-concatenation bundler carries no orb provenance to resolve
+  against — so it's a large change for negative KISS value.
 
 ### Next-gen game / AI
 4. **Async runtime** — effects are sync; need a scheduler + multi-shot continuations.
