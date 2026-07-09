@@ -37,12 +37,18 @@
 - **Generics** (erasure): `fn map<T>(xs: [T], f: fn) -> [int]` — the `iter` orb is generic
   over the element type
 
-### Compile-time checks (loud, not silent)
-- Return type must match the body (`fn f() -> int: "hi"` is an error, not garbage)
+### Checks (loud, not silent)
+- Return type must match the body — only when an explicit `-> type` is
+  declared (`fn f() -> int: "hi"` is an error; a `->`-less procedure is exempt)
 - Reassignment type must match the binding
-- Division / modulo by the literal `0`
+- Division / modulo by the literal `0` (compile time)
 - Duplicate function definitions; empty function bodies
 - Errors report types in source terms (`int`, `[int]`, `Point`)
+- **Runtime**: out-of-range `xs[i]` traps with `list index N out of range (len L)`
+  and `x / 0` traps with `division by zero` (exit 70) — no more silent garbage
+  or bare SIGFPE
+- Using an unannotated parameter as text/list names the parameter and points
+  at the fix (untyped params default to `int`)
 
 ### Effects (algebraic — rare next-gen feature)
 - `effect Name: op_name: fn(params) -> ret` declarations
@@ -71,21 +77,23 @@ and the compiler internals (`orion_lex` / `orion_parse` / `orion_ir` /
 ## What's missing (ranked by impact)
 
 ### Language
-1. **Type inference for locals** — annotations are optional but there is no full
-   HM/bidirectional inference; non-int params still need annotating.
+1. **Non-int param inference** — locals infer from their initializer and the
+   return type is optional, but a parameter used as text/list/map still needs
+   annotating. This is *deliberate*: the annotation keeps a signature readable
+   (a newcomer reads `fn f(s: text)`, not the call sites), and inferring it
+   would add a second way to say the same thing. The compiler now names the
+   parameter and suggests the fix instead of failing cryptically.
 2. **Orb namespaces** — function names are global across `use`d orbs (a clash is a
    clear error today, but there is no `list.sum` qualification).
 3. **Generic return-type re-typing** — an element read out of a returned generic
    list (`filter(words, …)[0]`) is opaque at the call site (erasure limit).
-4. **Runtime bounds / div-by-zero** — out-of-range `at()` returns garbage and a
-   runtime `x / 0` still SIGFPEs (only the literal `/ 0` is caught at compile time).
 
 ### Next-gen game / AI
-5. **Async runtime** — effects are sync; need a scheduler + multi-shot continuations.
-6. **SIMD primitives**, **first-class tensors**.
+4. **Async runtime** — effects are sync; need a scheduler + multi-shot continuations.
+5. **SIMD primitives**, **first-class tensors**.
 
 ### Niche
-7. Refinement types, distinct/newtype, macros, hot reload.
+6. Refinement types, distinct/newtype, macros, hot reload.
 
 ## Honest summary
 

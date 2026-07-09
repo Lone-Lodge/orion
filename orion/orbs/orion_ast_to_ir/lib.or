@@ -1271,7 +1271,13 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
                 else:
-                    compile_error("orion: ERROR — len() on untyped value (type `{friendly_type(arg_type)}`) — read it through a typed accessor (get_int/get_map/get_list or a typed fn) so len knows the shape")
+                    # `len` needs to know if the value is text or a list (strlen
+                    # vs a header read). An `int`-typed arg usually means an
+                    # unannotated parameter: untyped params default to `int`, so
+                    # `fn f(s): len(s)` treats `s` as int. Name it and point at
+                    # the fix — annotate the param — instead of a cryptic message.
+                    len_who = if get(arg_node, "kind") == "Ident" then "`" + get(arg_node, "name") + "`" else "this value"
+                    compile_error("orion: ERROR — len({len_who}) but {len_who} is `{friendly_type(arg_type)}`, not text or a list. If it is an unannotated parameter, add a type (e.g. `s: text` or `s: [int]`) — untyped params default to `int`.")
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
@@ -2406,7 +2412,11 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
     # `Unit` are exempt (bit-punned fn pointers, doubles, void).
     if is_block_terminated(body_result.function) == 0:
         rt_body = get_value_type(body_result.function, body_result.id)
-        rt_exempt = ret_type == "fn" or ret_type == "f64" or ret_type == "Unit" or rt_body == "fn" or rt_body == "f64" or rt_body == "void" or rt_body == "Unit"
+        # A fn with no `-> type` gets the `Unit` sentinel (a void procedure
+        # called for its effect). There's no declared return to violate, so
+        # exempt it — only an EXPLICIT return type is a contract to check.
+        ret_undeclared = has(ret_type_node, "name") and get(ret_type_node, "name") == "Unit"
+        rt_exempt = ret_undeclared or ret_type == "fn" or ret_type == "f64" or ret_type == "Unit" or rt_body == "fn" or rt_body == "f64" or rt_body == "void" or rt_body == "Unit"
         rt_decl_ll = if ret_type == "i64" then "i64" else "ptr"
         rt_body_ll = if rt_body == "i64" then "i64" else "ptr"
         if (not rt_exempt) and rt_decl_ll != rt_body_ll:
