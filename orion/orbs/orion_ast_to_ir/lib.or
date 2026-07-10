@@ -1714,18 +1714,43 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if not probed:
         if n_arms > 0:
             # No wildcard: probe the FIRST arm's body. Bind its pattern
-            # variables to a scratch value so a body like `IntV(n) -> IntV(n)`
-            # lowers and reveals its real (enum/struct) type instead of
-            # defaulting to i64 — which would mis-store the value and trip the
-            # return-type check. The probe fn is discarded; only the type is
-            # read. Subsumes the old first-arm-Str heuristic.
+            # variables with their DECLARED payload types (not an i64 scratch)
+            # so a body that IS a payload — `TextV(s) -> s`, `Spawn(comps) ->
+            # comps` — probes as text/map instead of i64. Binding to a generic
+            # i64 dummy mis-typed the whole match, mis-storing the value and
+            # tripping the return-type check (and, for map/list payloads,
+            # segfaulting at runtime when the i64 was used as a pointer).
+            # The probe fn is discarded; only the resulting type is read.
             first_arm = at(arms, 0)
-            pr_dummy = ir_fn_push(scrut_r.function, ir_iconst(0))
+            first_pat = get(first_arm, "pattern")
+            first_pk = get(first_arm, "pat_kind")
+            mut probe_fn = scrut_r.function
             mut probe_scope = scrut_r.scope
             first_binds = if has(first_arm, "bindings") then get_list(first_arm, "bindings") else []
-            for bpi in 0..<len(first_binds):
-                probe_scope = scope_bind(probe_scope, at(first_binds, bpi), pr_dummy.id)
-            fa_r = ast_expr_to_ir(pr_dummy.function, probe_scope, get(first_arm, "body"))
+            # Resolve the first arm's enum (if it is a variant pattern) so we
+            # can type its payload binds like Phase 2b does.
+            mut fa_enum = ""
+            if first_pk == "ident" and first_pat != "_":
+                n_enums_p = len(scope.en_names)
+                for ei in 0..<n_enums_p:
+                    en_name_p = at(scope.en_names, ei)
+                    if not contains_dollar(en_name_p):
+                        if scope_lookup_enum_variant(scope, en_name_p, first_pat) >= 0 and fa_enum == "":
+                            fa_enum = en_name_p
+            if fa_enum != "" and len(first_binds) > 0:
+                payload_types_p = split_csv(scope_lookup_variant_payloads(scope, fa_enum, first_pat))
+                n_pt_p = len(payload_types_p)
+                for bpi in 0..<len(first_binds):
+                    bt_p = if bpi < n_pt_p then at(payload_types_p, bpi) else "i64"
+                    pr_pl = ir_fn_push(probe_fn, ir_field_load(scrut_id, 1 + bpi, bt_p))
+                    probe_fn = pr_pl.function
+                    probe_scope = scope_bind(probe_scope, at(first_binds, bpi), pr_pl.id)
+            else:
+                pr_dummy = ir_fn_push(probe_fn, ir_iconst(0))
+                probe_fn = pr_dummy.function
+                for bpi in 0..<len(first_binds):
+                    probe_scope = scope_bind(probe_scope, at(first_binds, bpi), pr_dummy.id)
+            fa_r = ast_expr_to_ir(probe_fn, probe_scope, get(first_arm, "body"))
             if fa_r.id >= 0:
                 result_type = get_value_type(fa_r.function, fa_r.id)
     pr_alloca = ir_fn_push(scrut_r.function, ir_alloca(result_type))
