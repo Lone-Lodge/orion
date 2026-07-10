@@ -1696,6 +1696,14 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     scrut_id = scrut_r.id
     scrut_type = get_value_type(scrut_r.function, scrut_id)
 
+    # Instruction count BEFORE the result-type probe. `ir_fn_push` mutates the
+    # instruction spine in place (push_mut), so lowering an arm body during the
+    # probe LEAKS those instructions into the real function — they would then
+    # execute for real (running a side-effecting first arm twice). After probing
+    # we truncate back to this baseline, discarding every leaked emission. The
+    # probe reads only the resulting TYPE, never its instructions.
+    probe_base = len(scrut_r.function.instructions)
+
     # Result slot type: probe the WILDCARD arm's body by lowering it
     # against a scratch copy of the fn — IRFn is a value, discarding
     # the probe costs nothing, and wildcard bodies have no pattern
@@ -1753,7 +1761,12 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             fa_r = ast_expr_to_ir(probe_fn, probe_scope, get(first_arm, "body"))
             if fa_r.id >= 0:
                 result_type = get_value_type(fa_r.function, fa_r.id)
-    pr_alloca = ir_fn_push(scrut_r.function, ir_alloca(result_type))
+    # Drop the probe's leaked instructions: rebuild the fn with its spine sliced
+    # back to the pre-probe baseline. `slice` allocates a fresh list, so the
+    # subsequent in-place pushes for the real arm bodies start clean and their
+    # value-ids line up exactly as if no probe had run.
+    clean_fn = IRFn{name: scrut_r.function.name, return_type: scrut_r.function.return_type, params: scrut_r.function.params, instructions: slice(scrut_r.function.instructions, 0, probe_base)}
+    pr_alloca = ir_fn_push(clean_fn, ir_alloca(result_type))
     result_ptr_id = pr_alloca.id
     mut current_fn = pr_alloca.function
     mut current_scope = scrut_r.scope
