@@ -79,6 +79,23 @@ fn strip_struct_prefix(t: Text) -> Text:
     else:
         t
 
+# Coarse category of a CONCRETE pointer type — "text" / "list" / "map" /
+# "struct" — or "" for i64/f64/void/unknown-ptr. Two branches of an if that
+# land in different non-empty categories can't share a phi (a text read of a
+# list pointer is garbage); "" is left lenient so element-type imprecision
+# (list vs list:int) and genuinely-unknown ptrs never false-positive.
+fn ptr_category(t: Text) -> Text:
+    if t == "text":
+        "text"
+    else if is_list_type(t):
+        "list"
+    else if is_map_type(t):
+        "map"
+    else if strip_struct_prefix(t) != t:
+        "struct"
+    else:
+        ""
+
 # The tag-0 (first-declared) variant of an enum, or "" if `enum_name` names
 # no known enum. Used to type the `?` operator's unwrapped success payload.
 fn enum_first_variant(scope: Scope, enum_name: Text) -> Text:
@@ -1054,7 +1071,15 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             # value isn't used downstream.
             then_ll = if then_type == "i64" then "i64" else "ptr"
             else_ll = if else_type == "i64" then "i64" else "ptr"
-            type_mismatch = then_ll != else_ll and then_type != "void" and else_type != "void"
+            # i64-vs-ptr (existing) OR two DIFFERENT concrete ptr categories
+            # (text vs list vs map vs struct) — the latter used to slip through
+            # (both are "ptr" at the LLVM layer) and silently mis-typed the phi
+            # to the then-branch, so `if c then "x" else [1]` compiled and read
+            # the list as text. Same-category (list vs list:int) stays lenient.
+            then_cat = ptr_category(then_type)
+            else_cat = ptr_category(else_type)
+            cat_mismatch = then_cat != "" and else_cat != "" and then_cat != else_cat
+            type_mismatch = (then_ll != else_ll or cat_mismatch) and then_type != "void" and else_type != "void"
             if type_mismatch:
                 line = if has(node, "line") then get_int(node, "line") else 0
                 col = if has(node, "col") then get_int(node, "col") else 0
