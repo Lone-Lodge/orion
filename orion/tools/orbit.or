@@ -321,16 +321,56 @@ fn nb_setting(lines: [Text], key: Text, fallback: Text) -> Text:
             taken = true
     found
 
-fn nb_orb_dirs(lines: [Text]) -> [Text]:
+# The `path:` orb dirs a toml names, each resolved against `base` (the dir
+# of the toml being read) so nested tomls compose — a dep written relative
+# to its own orb becomes relative to the project root as we descend. `base`
+# "" means the current project (paths already root-relative).
+fn nb_dep_dirs(lines: [Text], base: Text) -> [Text]:
     total = len(lines)
-    mut parents = []
+    mut out = []
     for index in 0..<total:
         line = at(lines, index)
         if str_contains(line, "\"path:"):
             rel = str_replace(nb_quoted(line), "path:", "")
-            parent = path_parent(rel)
-            if not list_contains(parents, parent):
-                parents = push(parents, parent)
+            dir = if base == "" then rel else base + "/" + rel
+            if not list_contains(out, dir):
+                out = push(out, dir)
+    out
+
+# Collect an orb's dir plus every orb reachable through its own Orbit.toml,
+# transitively. `acc` doubles as the visited set (a repeated dir short-
+# circuits, guarding against dependency cycles).
+fn nb_expand_orb(orb_dir: Text, acc: [Text]) -> [Text]:
+    if list_contains(acc, orb_dir):
+        acc
+    else:
+        mut out = push(acc, orb_dir)
+        toml = orb_dir + "/Orbit.toml"
+        if file_exists(toml):
+            deps = nb_dep_dirs(nb_lines(read_file(toml)), orb_dir)
+            dep_total = len(deps)
+            for d_index in 0..<dep_total:
+                out = nb_expand_orb(at(deps, d_index), out)
+        out
+
+# Orb search dirs for the native compiler. It resolves `use X` by scanning
+# these for X/lib.or, so a LIBRARY orb's own path deps must contribute too:
+# atlas_ecs `use log` has to find the log orb via atlas_ecs's Orbit.toml,
+# without the consuming executable re-declaring log. So expand the project's
+# direct deps transitively, then map each orb dir to its parent (the search
+# root) plus that root's orbs_native sibling (native backends win clashes).
+fn nb_orb_dirs(lines: [Text]) -> [Text]:
+    direct = nb_dep_dirs(lines, "")
+    direct_total = len(direct)
+    mut all_orbs = []
+    for i in 0..<direct_total:
+        all_orbs = nb_expand_orb(at(direct, i), all_orbs)
+    mut parents = []
+    orb_total = len(all_orbs)
+    for j in 0..<orb_total:
+        parent = path_parent(at(all_orbs, j))
+        if not list_contains(parents, parent):
+            parents = push(parents, parent)
     mut dirs = []
     parent_total = len(parents)
     for p_index in 0..<parent_total:
