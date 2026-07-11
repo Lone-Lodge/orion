@@ -64,6 +64,33 @@ fn scope_lookup_variant_payloads(scope: Scope, enum_name: Text, variant: Text) -
             result = at(scope.en_variants, index)
     result
 
+# "struct:Res" -> "Res"; anything else unchanged. Enum values carry the
+# "struct:" IR prefix (enums lower to structs), so strip it before an
+# enum-table lookup keyed by the plain enum name.
+fn strip_struct_prefix(t: Text) -> Text:
+    b = bytes_from_text(t)
+    n = len(b)
+    mut is_s = false
+    if n >= 7:
+        if at(b, 0) == 115 and at(b, 1) == 116 and at(b, 2) == 114 and at(b, 3) == 117 and at(b, 4) == 99 and at(b, 5) == 116 and at(b, 6) == 58:
+            is_s = true
+    if is_s:
+        bytes_to_text(bytes_slice(b, 7, n))
+    else:
+        t
+
+# The tag-0 (first-declared) variant of an enum, or "" if `enum_name` names
+# no known enum. Used to type the `?` operator's unwrapped success payload.
+fn enum_first_variant(scope: Scope, enum_name: Text) -> Text:
+    total = len(scope.en_names)
+    mut result = ""
+    for index in 0..<total:
+        if at(scope.en_names, index) == enum_name and not contains_dollar(enum_name):
+            names = split_csv(at(scope.en_variants, index))
+            if len(names) > 0 and result == "":
+                result = at(names, 0)
+    result
+
 # Split a comma csv into parts (payload type lists are tiny).
 fn split_csv(csv: Text) -> [Text]:
     bs = bytes_from_text(csv)
@@ -2063,20 +2090,33 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
 pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     kind = get(node, "kind")
-    # `xs[i]` / `m[k]` is sugar for `at(xs, i)` (lists) or `get(m, k)` (maps),
-    # reusing those builtins' element typing verbatim. The container is probed
-    # on a throwaway lowering (index bases are idents/params, so nothing
-    # duplicated survives — the real accessor re-lowers into the pristine
-    # fn_value). Nested indexing (`xss[0][1]`) falls out: the inner Index
-    # lowers as the accessor's argument.
+    # `xs[i]` / `m[k]` is sugar for `at(xs, i)` (lists) or `get(m, k)` (maps).
+    # Lower the container ONCE, then dispatch on its type and emit the accessor
+    # directly — mirroring is_at / is_get's element typing. An earlier version
+    # probed the container on a throwaway lowering and then re-lowered it inside
+    # a synthesized Call; but ir_fn_push mutates the spine in place, so the
+    # probe LEAKED (a side-effecting base ran twice) AND the probe's ident read
+    # bumped the global move counter (a `move` base tripped a false use-after-
+    # move). Lowering once kills both. Nested indexing (`xss[0][1]`) still falls
+    # out: the inner Index lowers as this accessor's container. (The is_at
+    # __env-capture special case can't arise here — captures lower as explicit
+    # `at(__env, n)` calls, never `[]` syntax.)
     if kind == "Index":
         idx_obj = get(node, "object")
         idx_key = get(node, "index")
-        idx_probe = ast_expr_to_ir(fn_value, scope, idx_obj)
-        idx_obj_type = get_value_type(idx_probe.function, idx_probe.id)
-        idx_callee = if is_map_type(idx_obj_type) then "get" else "at"
-        idx_call = {"kind": "Call", "callee": idx_callee, "args": [idx_obj, idx_key]}
-        return ast_expr_to_ir(fn_value, scope, idx_call)
+        obj_r = ast_expr_to_ir(fn_value, scope, idx_obj)
+        key_r = ast_expr_to_ir(obj_r.function, obj_r.scope, idx_key)
+        obj_type = get_value_type(key_r.function, obj_r.id)
+        if is_map_type(obj_type):
+            get_type = extract_map_val(obj_type)
+            pr = ir_fn_push(key_r.function, ir_map_get(obj_r.id, key_r.id, get_type))
+            return ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
+        else:
+            elem_type = extract_list_elem(obj_type)
+            at_inst = ir_list_at(obj_r.id, key_r.id)
+            at_inst_typed = Inst{op: at_inst.op, type_text: elem_type, value: at_inst.value, lhs: at_inst.lhs, rhs: at_inst.rhs, name: at_inst.name, args: at_inst.args}
+            pr = ir_fn_push(key_r.function, at_inst_typed)
+            return ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
     is_block = kind == "Block"
     is_int = kind == "Int"
     is_float_lit = kind == "Float"
@@ -2223,10 +2263,21 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         cur_fn = pr_ret_lbl.function
         pr_ret = ir_fn_push(cur_fn, ir_return(tmp_id))
         cur_fn = pr_ret.function
-        # Continue block — unwrap val_int
+        # Continue block — unwrap the success payload (field 1). Type it from
+        # the enum's tag-0 variant's DECLARED payload, not a bare i64: a
+        # Result[Text]/[list]/[map] carries a pointer there, and reading it as
+        # i64 leaked the raw pointer into downstream text/concat/field use.
+        # Falls back to i64 when the operand's enum can't be resolved.
         pr_cont_lbl = ir_fn_push(cur_fn, ir_label(cont_lbl))
         cur_fn = pr_cont_lbl.function
-        pr_val = ir_fn_push(cur_fn, ir_field_load(tmp_id, 1, "i64"))
+        q_enum = strip_struct_prefix(get_value_type(cur_fn, tmp_id))
+        mut q_payload_type = "i64"
+        q_ok_variant = enum_first_variant(scope, q_enum)
+        if q_ok_variant != "":
+            q_payloads = split_csv(scope_lookup_variant_payloads(scope, q_enum, q_ok_variant))
+            if len(q_payloads) > 0:
+                q_payload_type = at(q_payloads, 0)
+        pr_val = ir_fn_push(cur_fn, ir_field_load(tmp_id, 1, q_payload_type))
         result = ConvResult{function: pr_val.function, scope: inner_r.scope, id: pr_val.id}
     if is_perform:
         # `perform Effect.op(arg)` lowers to a setjmp-protected call so
