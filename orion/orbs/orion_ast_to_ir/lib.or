@@ -1673,10 +1673,17 @@ fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         ConvResult{function: pr.function, scope: operand_r.scope, id: pr.id}
     else:
         if op == "neg":
-            # -x → 0 - x  (works for both i64 and our int type).
-            pr_z = ir_fn_push(operand_r.function, ir_iconst(0))
-            pr_s = ir_fn_push(pr_z.function, ir_isub(pr_z.id, operand_r.id))
-            ConvResult{function: pr_s.function, scope: operand_r.scope, id: pr_s.id}
+            # -x → 0 - x. Dispatch on the operand type: an f64 operand must
+            # use a float zero + fsub, else the subtract is emitted as `sub
+            # i64` over a double (a negative float literal like -7.0 miscompiled).
+            if get_value_type(operand_r.function, operand_r.id) == "f64":
+                pr_z = ir_fn_push(operand_r.function, ir_fconst("0.0"))
+                pr_s = ir_fn_push(pr_z.function, ir_fbin("fsub", pr_z.id, operand_r.id))
+                ConvResult{function: pr_s.function, scope: operand_r.scope, id: pr_s.id}
+            else:
+                pr_z = ir_fn_push(operand_r.function, ir_iconst(0))
+                pr_s = ir_fn_push(pr_z.function, ir_isub(pr_z.id, operand_r.id))
+                ConvResult{function: pr_s.function, scope: operand_r.scope, id: pr_s.id}
         else:
             operand_r
 
