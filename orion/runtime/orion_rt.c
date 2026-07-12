@@ -1354,6 +1354,18 @@ long long __orion_monotonic_ms(void) {
     QueryPerformanceCounter(&c);
     return (long long)(c.QuadPart * 1000 / freq.QuadPart);
 }
+/* Same QPC source in microseconds: sub-millisecond frame costs round to
+ * 0 in the ms clock, so any per-frame capability metric needs this.
+ * Named atlas_* (not orion_*) on purpose: orion_* symbols are treated as
+ * compiler builtins and skip the auto-extern-declare path, so a plain
+ * `extern fn` on an orion_-named symbol never gets its LLVM `declare`. */
+long long atlas_monotonic_us(void) {
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER c;
+    if (!freq.QuadPart) QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&c);
+    return (long long)(c.QuadPart * 1000000 / freq.QuadPart);
+}
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
@@ -1381,6 +1393,10 @@ long long __orion_time_now_ms(void) {
 long long __orion_monotonic_ms(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+long long atlas_monotonic_us(void) {
+    struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
 void __orion_sleep_ms(long long ms) {
     if (ms > 0) {
