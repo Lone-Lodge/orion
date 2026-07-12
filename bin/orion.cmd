@@ -1,4 +1,4 @@
 @echo off
-rem orion shim - the self-hosted native compiler with multi-orb resolution
+rem orion shim — resolves dist\orion.exe RELATIVE to this repo (portable).
 rem usage: orion <input.or> [out.ll] [extra-orb-root...]
-"E:\lone-lodge\orion-self\dist\orion.exe" %*
+"%~dp0..\dist\orion.exe" %*

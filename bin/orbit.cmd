@@ -1,3 +1,3 @@
 @echo off
-rem orbit shim - the self-hosted project tool (built by tools/build_orbit.sh)
-"E:\lone-lodge\orion-self\dist\orbit.exe" %*
+rem orbit shim — resolves dist\orbit.exe RELATIVE to this repo (portable).
+"%~dp0..\dist\orbit.exe" %*
