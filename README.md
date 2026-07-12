@@ -26,6 +26,21 @@ in git history if ever needed).
   xml, regex, url, base64, hex, color, crypto, easing, noise, format,
   collections, env, sysinfo, image, gpu, wgsl, net, result, option, assert.
 
+## Setup (Windows)
+
+Put `orbit` / `orion` on your PATH once — this is what makes `orbit play dev`
+work from any project dir:
+
+```powershell
+E:\lone-lodge\orion\bin\install.ps1
+```
+
+It prepends this repo's `bin\` (self-locating shims → `dist\orbit.exe`) to your
+user PATH and warns if a stale `orbit` elsewhere is shadowing it. That stale
+shim is the usual cause of `The system cannot find the path specified.` — an
+old shortcut pointing at a dead dir. The shims are portable (relative to the
+repo), so cloning to any path Just Works after one `install.ps1`.
+
 ## Building
 
 ```
