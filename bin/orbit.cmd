@@ -1,12 +1,16 @@
 @echo off
-rem orbit shim — resolves dist\orbit.exe RELATIVE to this repo (portable).
-rem Self-diagnosing: a missing exe prints an actionable line instead of
-rem cmd.exe's cryptic "The system cannot find the path specified."
-setlocal
-set "ORBIT_EXE=%~dp0..\dist\orbit.exe"
-if not exist "%ORBIT_EXE%" (
-  echo orbit: toolchain not found at "%ORBIT_EXE%" 1>&2
-  echo        dist\ is gitignored — build it, or run bin\install.ps1 to check paths. 1>&2
+rem orbit shim — finds dist\orbit.exe wherever this shim lives, so it works
+rem both from the repo's own bin\ (bin beside dist) and from a central bin\
+rem on PATH (e.g. lone-lodge\bin, with the repo in an orion\ subdir).
+rem Candidates, most-specific first; first hit wins.
+set "ORBIT_EXE="
+if exist "%~dp0..\dist\orbit.exe"       set "ORBIT_EXE=%~dp0..\dist\orbit.exe"
+if not defined ORBIT_EXE if exist "%~dp0..\orion\dist\orbit.exe" set "ORBIT_EXE=%~dp0..\orion\dist\orbit.exe"
+if not defined ORBIT_EXE if exist "%~dp0orion\dist\orbit.exe"    set "ORBIT_EXE=%~dp0orion\dist\orbit.exe"
+if not defined ORBIT_EXE (
+  echo orbit: orbit.exe not found near "%~dp0" 1>&2
+  echo        looked in ..\dist, ..\orion\dist, orion\dist — dist\ is gitignored, 1>&2
+  echo        so build the toolchain or fix this shim's location. 1>&2
   exit /b 9009
 )
-endlocal & "%~dp0..\dist\orbit.exe" %*
+"%ORBIT_EXE%" %*
