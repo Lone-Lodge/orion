@@ -113,9 +113,15 @@ fn cmd_new():
     write_file(name + "/Orbit.toml", toml_body)
     main_body = "fn add(left: int, right: int) -> int = left + right\n\n# `orbit test` runs functions named test_*.\nfn test_add():\n    require add(2, 3) == 5\n"
     write_file(name + "/src/main.or", main_body)
+    # A self-locating launcher shipped WITH the game (like a .uproject you
+    # double-click): finds the orion toolchain as a sibling folder, so the
+    # game runs with no PATH setup and no install on any clone.
+    play_body = "@echo off\nrem play - launch this game in the Lone-Lodge engine (dev mode, hot-reload).\nrem Self-locating: finds lone-lodge\\orion\\dist\\orbit.exe relative to this file.\nrem No PATH, no install - double-click, or run  .\\play  from a terminal.\nsetlocal\ncd /d \"%~dp0\"\nset \"ENGINE=%~dp0..\\orion\\dist\\orbit.exe\"\nif not exist \"%ENGINE%\" (\n  echo play: engine not found at \"%ENGINE%\" 1>&2\n  echo        expected the orion toolchain as a sibling folder (lone-lodge\\orion). 1>&2\n  pause\n  exit /b 9009\n)\nif \"%~1\"==\"\" ( \"%ENGINE%\" play dev ) else ( \"%ENGINE%\" play %* )\n"
+    write_file(name + "/play.cmd", play_body)
     print("created `" + name + "`")
     print("  " + name + "/Orbit.toml")
     print("  " + name + "/src/main.or")
+    print("  " + name + "/play.cmd   (double-click or `.\\play` to run — no PATH needed)")
     print("")
     print("next:  cd " + name + " && orbit test")
 
