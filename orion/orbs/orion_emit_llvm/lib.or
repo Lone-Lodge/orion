@@ -296,7 +296,17 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "closure_call":
         # Load fn-ptr + flag; a lambda is called fn(env, args), a plain fn-ref
         # fn(args). env is the closure list itself.
-        clos = value_ref(inst.value)
+        # The closure operand must be a ptr to the closure list. It usually is
+        # (a lambda local, a struct field), but a fn-ref reaching us as an i64 —
+        # a `Fn`-typed parameter, or an element read from a list of fn-refs —
+        # holds the pointer BITS as an integer, so recover the ptr first.
+        clos_raw = value_ref(inst.value)
+        clos_lty = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        mut clos = clos_raw
+        mut clos_pre = ""
+        if clos_lty != "ptr":
+            clos_pre = "    %v{my_id}.clp = inttoptr i64 {clos_raw} to ptr\n"
+            clos = "%v{my_id}.clp"
         cc_ret = llvm_type_of(inst.type_text)
         n_ca = len(inst.args)
         mut cc_args = ""
@@ -306,7 +316,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             csep = if cai == 0 then "" else ", "
             cc_args = "{cc_args}{csep}{ca_ty} {value_ref(ca_id)}"
         lam_args = if n_ca == 0 then "ptr {clos}" else "ptr {clos}, {cc_args}"
-        mut cc = "    %v{my_id}.fpi = call i64 @orion_list_at(ptr {clos}, i64 0)"
+        mut cc = "{clos_pre}    %v{my_id}.fpi = call i64 @orion_list_at(ptr {clos}, i64 0)"
         cc = "{cc}\n    %v{my_id}.flg = call i64 @orion_list_at(ptr {clos}, i64 1)"
         cc = "{cc}\n    %v{my_id}.p = inttoptr i64 %v{my_id}.fpi to ptr"
         cc = "{cc}\n    %v{my_id}.isl = icmp eq i64 %v{my_id}.flg, 1"
