@@ -15,6 +15,7 @@ use os
 # with orion.exe + clang and run the native exe. No Rust interp left.
 extern fn orion_console_color() -> int
 extern fn host_self_exe() -> Text
+extern fn host_subdirs(dir: Text) -> Text
 
 # Self-locating toolchain: orbit and orion.exe ship together in <root>/dist,
 # with the runtime at <root>/runtime. Derive both from orbit's OWN path so a
@@ -385,6 +386,45 @@ fn nb_expand_orb(orb_dir: Text, acc: [Text]) -> [Text]:
 # without the consuming executable re-declaring log. So expand the project's
 # direct deps transitively, then map each orb dir to its parent (the search
 # root) plus that root's orbs_native sibling (native backends win clashes).
+# Walk up (relatively) from the project dir to the workspace root — the dir
+# holding a `.orbit` marker. Returns the relative prefix (".", "./..",
+# "./../.." …) or "" if none. This is what frees the layout: drop `.orbit`
+# at the root and every project below it resolves orbs by NAME, wherever
+# each one sits.
+fn find_workspace_root() -> Text:
+    mut rel = "."
+    mut depth = 0
+    loop:
+        if depth > 8:
+            break
+        if file_exists(rel + "/.orbit"):
+            return rel
+        rel = rel + "/.."
+        depth = depth + 1
+    ""
+
+fn scan_noise(name: Text) -> bool:
+    name == "build" or name == "dist" or name == "target" or name == ".git" or name == "node_modules" or name == "assets" or name == "saves" or name == "docs" or name == "examples"
+
+# Every `orbs` / `orbs_native` directory under `root` (depth-bounded) — the
+# exact search dirs the compiler needs to resolve `use X` by name, so a
+# project's [orbs] can list names with no paths.
+fn scan_orb_dirs(dir: Text, depth: int, acc: [Text]) -> [Text]:
+    if depth > 3:
+        return acc
+    subs = str_split(host_subdirs(dir), "\n")
+    mut out = acc
+    for i in 0..<len(subs):
+        name = at(subs, i)
+        if len(name) > 0 and not scan_noise(name):
+            child = dir + "/" + name
+            if name == "orbs" or name == "orbs_native":
+                if not list_contains(out, child):
+                    out = push(out, child)
+            else:
+                out = scan_orb_dirs(child, depth + 1, out)
+    out
+
 fn nb_orb_dirs(lines: [Text]) -> [Text]:
     direct = nb_dep_dirs(lines, "")
     direct_total = len(direct)
@@ -406,6 +446,16 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
             dirs = push(dirs, native_sibling)
     for p2_index in 0..<parent_total:
         dirs = push(dirs, at(parents, p2_index))
+    # Layout-free resolution: when a `.orbit` workspace root is found, add
+    # every orbs dir under it so name-only deps (`atlas_app = "*"`) resolve
+    # regardless of where the project or the orbs live. Explicit path: deps
+    # above still win; this only ADDS search dirs.
+    root = find_workspace_root()
+    if len(root) > 0:
+        scanned = scan_orb_dirs(root, 0, [])
+        for s_index in 0..<len(scanned):
+            if not list_contains(dirs, at(scanned, s_index)):
+                dirs = push(dirs, at(scanned, s_index))
     dirs
 
 fn nb_clang() -> Text:

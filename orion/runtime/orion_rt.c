@@ -1484,6 +1484,37 @@ const char *orion_dir_list(const char *dir) {
         return evac;
     }
 }
+/* Subdirectories of `dir` (newline-separated, excludes . and ..). Lets orbit
+ * scan a workspace for orbs regardless of folder layout. host_* so the
+ * compiler auto-declares it. */
+const char *host_subdirs(const char *dir) {
+    char pattern[1024];
+    WIN32_FIND_DATAA fd;
+    snprintf(pattern, sizeof(pattern), "%s\\*", dir);
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return otx_empty.z;
+    size_t cap = 4096, len = 0;
+    char *out = (char *)malloc(cap);
+    out[0] = 0;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
+        if (fd.cFileName[0] == '.' &&
+            (fd.cFileName[1] == 0 || (fd.cFileName[1] == '.' && fd.cFileName[2] == 0)))
+            continue;
+        size_t n = strlen(fd.cFileName);
+        if (len + n + 2 > cap) { cap *= 2; out = (char *)realloc(out, cap); }
+        if (len > 0) out[len++] = '\n';
+        memcpy(out + len, fd.cFileName, n + 1);
+        len += n;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    {
+        char *evac = orion_text_alloc((long long)len);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
+}
 long long __orion_time_now_ms(void) {
     FILETIME ft; GetSystemTimeAsFileTime(&ft);
     unsigned long long t = ((unsigned long long)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
@@ -1576,6 +1607,37 @@ const char *orion_dir_list(const char *dir) {
         struct stat st;
         snprintf(full, sizeof(full), "%s/%s", dir, ent->d_name);
         if (stat(full, &st) == 0 && S_ISDIR(st.st_mode)) continue;
+        size_t n = strlen(ent->d_name);
+        if (len + n + 2 > cap) { cap *= 2; out = (char *)realloc(out, cap); }
+        if (len > 0) out[len++] = '\n';
+        memcpy(out + len, ent->d_name, n + 1);
+        len += n;
+    }
+    closedir(d);
+    {
+        char *evac = orion_text_alloc((long long)len);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
+}
+/* Subdirectories of `dir` (newline-separated, excludes . and ..). Lets orbit
+ * scan a workspace for orbs regardless of folder layout. */
+const char *host_subdirs(const char *dir) {
+    DIR *d = opendir(dir);
+    if (!d) return otx_empty.z;
+    size_t cap = 4096, len = 0;
+    char *out = (char *)malloc(cap);
+    out[0] = 0;
+    struct dirent *ent;
+    while ((ent = readdir(d))) {
+        if (ent->d_name[0] == '.' &&
+            (ent->d_name[1] == 0 || (ent->d_name[1] == '.' && ent->d_name[2] == 0)))
+            continue;
+        char full[4096];
+        struct stat st;
+        snprintf(full, sizeof(full), "%s/%s", dir, ent->d_name);
+        if (!(stat(full, &st) == 0 && S_ISDIR(st.st_mode))) continue;
         size_t n = strlen(ent->d_name);
         if (len + n + 2 > cap) { cap *= 2; out = (char *)realloc(out, cap); }
         if (len > 0) out[len++] = '\n';
