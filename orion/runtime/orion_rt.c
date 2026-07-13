@@ -1428,6 +1428,9 @@ long long atlas_monotonic_us(void) {
     QueryPerformanceCounter(&c);
     return (long long)(c.QuadPart * 1000000 / freq.QuadPart);
 }
+/* Debug: raw pointer value as int, no dereference — .or code can log a
+ * field's address to spot a -1/garbage pointer without faulting on it. */
+long long atlas_addr(void *p) { return (long long)(long long)p; }
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
@@ -1460,6 +1463,9 @@ long long atlas_monotonic_us(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
+/* Debug: raw pointer value as int, no dereference — .or code can log a
+ * field's address to spot a -1/garbage pointer without faulting on it. */
+long long atlas_addr(void *p) { return (long long)(long long)p; }
 void __orion_sleep_ms(long long ms) {
     if (ms > 0) {
         struct timespec t = { ms / 1000, (ms % 1000) * 1000000 };
