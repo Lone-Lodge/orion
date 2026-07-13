@@ -2450,7 +2450,12 @@ fn friendly_type(t: Text) -> Text:
         if is_struct:
             mut r = ""
             for fi in 7..<fn2:
-                r = "{r}{bytes_to_text([at(fb, fi)])}"
+                # Temp var, NOT `[at(fb, fi)]` inline: a list literal inside a
+                # `{...}` interpolation trips older self-host compilers during
+                # bootstrap (the interpolation splitter mis-tokenizes the `[`
+                # and `)`), which stalls the whole self-host chain.
+                one = [at(fb, fi)]
+                r = "{r}{bytes_to_text(one)}"
             r
         else:
             t
