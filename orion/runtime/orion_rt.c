@@ -1043,13 +1043,26 @@ static const char *orion_exc_name(unsigned long code) {
     }
 }
 
+/* Games run with a build/ dir beside their exe; drop crash artifacts there
+ * so the project root stays clean. Programs with no build/ (the compiler,
+ * CLI tools) fall back to the current directory. */
+static const char *orion_artifact(const char *name, char *buf, size_t n) {
+    DWORD a = GetFileAttributesA("build");
+    if (a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY)) {
+        snprintf(buf, n, "build\\%s", name);
+        return buf;
+    }
+    return name;
+}
+
 static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
     unsigned long long base = (unsigned long long)GetModuleHandleA(NULL);
     unsigned long long at =
         (unsigned long long)info->ExceptionRecord->ExceptionAddress;
     char sym[256];
+    char artbuf[512];
     crash_map_load();
-    crash_tee = fopen("crash.txt", "w");
+    crash_tee = fopen(orion_artifact("crash.txt", artbuf, sizeof artbuf), "w");
     /* Unbuffered: the filter itself may die (nested fault in dbghelp
      * etc.) — every line must hit disk the moment it is written. */
     if (crash_tee)
@@ -1150,7 +1163,9 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                                         void *, void *);
             MdwFn mdw = (MdwFn)GetProcAddress(dh, "MiniDumpWriteDump");
             if (mdw) {
-                HANDLE f = CreateFileA("crash.dmp", GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                char dmpbuf[512];
+                HANDLE f = CreateFileA(orion_artifact("crash.dmp", dmpbuf, sizeof dmpbuf),
+                                       GENERIC_READ | GENERIC_WRITE, 0, NULL,
                                        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
                                        NULL);
                 if (f != INVALID_HANDLE_VALUE) {
