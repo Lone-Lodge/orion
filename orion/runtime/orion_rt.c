@@ -958,9 +958,14 @@ static void crash_map_load(void) {
     }
     fclose(f);
 }
-static void crash_sym(unsigned long long off, char *out, size_t cap) {
-    snprintf(out, cap, "+0x%llx", off);
-    if (!crash_map_buf) return;
+/* Returns 1 when it resolved to a confident named symbol, 0 otherwise.
+ * A match more than 8 KB past the nearest .map symbol is almost always the
+ * WRONG function (the real one is absent from the map) — a confident-looking
+ * bogus name like "RtlUnwind+0x8630" is worse than nothing, so callers can
+ * drop those frames and show only the real trace. */
+static int crash_sym(unsigned long long off, char *out, size_t cap) {
+    snprintf(out, cap, "0x%llx", off);
+    if (!crash_map_buf) return 0;
     /* Map lines: " 0001:HHHHHHHH  name ..." — module offset is the
      * section address + 0x1000. Find the greatest base <= off. */
     unsigned long long best = 0;
@@ -983,8 +988,26 @@ static void crash_sym(unsigned long long off, char *out, size_t cap) {
         }
         p += 6;
     }
-    if (best_name[0])
+    if (best_name[0] && (off - best) <= 0x2000ULL) {
         snprintf(out, cap, "%s+0x%llx", best_name, off - best);
+        return 1;
+    }
+    return 0;
+}
+
+/* Common Windows exception codes → a plain-language name, so the crash
+ * header reads as English instead of a bare hex code. */
+static const char *orion_exc_name(unsigned long code) {
+    switch (code) {
+        case 0xC0000005UL: return "ACCESS VIOLATION (bad pointer)";
+        case 0xC00000FDUL: return "STACK OVERFLOW (runaway recursion)";
+        case 0xC0000094UL: return "INTEGER DIVIDE BY ZERO";
+        case 0xC0000095UL: return "INTEGER OVERFLOW";
+        case 0xC000001DUL: return "ILLEGAL INSTRUCTION";
+        case 0xC0000090UL: return "FLOAT INVALID OPERATION";
+        case 0x80000003UL: return "BREAKPOINT";
+        default:           return "exception";
+    }
 }
 
 static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
@@ -999,7 +1022,8 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
     if (crash_tee)
         setvbuf(crash_tee, NULL, _IONBF, 0);
     crash_sym(at - base, sym, sizeof sym);
-    crash_line("[orion] FATAL: exception 0x%lx at %s",
+    crash_line("[orion] FATAL: %s  (0x%lx)  at %s",
+               orion_exc_name(info->ExceptionRecord->ExceptionCode),
                (unsigned long)info->ExceptionRecord->ExceptionCode, sym);
     crash_print_crumbs();
     /* Backtrace: scan the crashed thread's stack for return addresses
@@ -1011,9 +1035,9 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
         int printed = 0;
         if (rip >= lo && rip < hi) {
             crash_sym(rip - base, sym, sizeof sym);
-            crash_line("[orion]   #%d %s", printed, sym);
-            printed++;
+            crash_line("[orion]   at  %s", sym);
         }
+        crash_line("[orion]   call stack (nearest first):");
         /* Scan only committed stack: a shallow crash puts the stack
          * top within 512 words of rsp, and reading past it would
          * nested-fault and kill the filter mid-report. */
@@ -1024,12 +1048,16 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
             if (shi && (unsigned long long)(sp + i + 1) > shi)
                 break;
             unsigned long long v = sp[i];
-            if (v >= lo && v < hi) {
-                crash_sym(v - base, sym, sizeof sym);
+            /* Only frames that resolve to a REAL named symbol: a stack scan
+             * turns up stale return addresses and misresolved slots, and a
+             * page of bogus "RtlUnwind+0x…" lines buries the real trace. */
+            if (v >= lo && v < hi && crash_sym(v - base, sym, sizeof sym)) {
                 crash_line("[orion]   #%d %s", printed, sym);
                 printed++;
             }
         }
+        if (printed == 0)
+            crash_line("[orion]   (no named frames — see crash.dmp)");
     }
     /* Access violations carry the faulting data address; a 0xdd..dd
      * byte pattern means a read through region memory poisoned at
@@ -1042,10 +1070,19 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
         int poison = ((bad >> 8) & 0xffffffffULL) == 0xddddddddULL ||
                      (bad & 0xffffffff00ULL) == 0xdddddddd00ULL ||
                      ((bad >> 16) & 0xffffffffULL) == 0xddddddddULL;
+        const char *why;
+        if (poison)
+            why = " — 0xDD poison: memory used after its arena was reset (lifetime bug)";
+        else if (bad == 0xffffffffffffffffULL)
+            why = " — value is -1: an uninitialized field or a missing map key read as a pointer";
+        else if (bad < 0x1000ULL)
+            why = " — near-null: an unset struct field or empty/missing value";
+        else
+            why = "";
         crash_line("[orion]        %s address 0x%llx%s",
                    info->ExceptionRecord->ExceptionInformation[0] ? "writing"
                                                                   : "reading",
-                   bad, poison ? " (0xDD poison: reset region memory)" : "");
+                   bad, why);
     }
     fflush(stderr);
     if (crash_tee) {
