@@ -447,9 +447,17 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
     root = find_workspace_root()
     if len(root) > 0:
         scanned = scan_orb_dirs(root, 0, [])
+        # Native backends win name clashes (a game wants orbs_native/atlas_render,
+        # not the wgpu orbs/atlas_render), so add every orbs_native search dir
+        # BEFORE the plain orbs ones — mirroring the path-based order above.
+        for n_index in 0..<len(scanned):
+            nd = at(scanned, n_index)
+            if str_contains(nd, "orbs_native") and not list_contains(dirs, nd):
+                dirs = push(dirs, nd)
         for s_index in 0..<len(scanned):
-            if not list_contains(dirs, at(scanned, s_index)):
-                dirs = push(dirs, at(scanned, s_index))
+            sd = at(scanned, s_index)
+            if not str_contains(sd, "orbs_native") and not list_contains(dirs, sd):
+                dirs = push(dirs, sd)
     dirs
 
 fn nb_clang() -> Text:
