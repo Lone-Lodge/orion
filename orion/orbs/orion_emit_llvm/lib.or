@@ -616,7 +616,12 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         for ai in 0..<n:
             item_id = at(inst.args, ai)
             item_inst = at(fn_value.instructions, item_id)
-            item_ty = llvm_type_of(item_inst.type_text)
+            # Authoritative SSA type, not the raw inst.type_text: a float
+            # LITERAL carries type_text "f64", but a float VARIABLE/param or
+            # arithmetic result does not — so [r, g, b] over f64 params fell
+            # through to the plain path and stored a `double` into an i64 slot
+            # (invalid IR). ssa_value_type resolves the real type either way.
+            item_ty = llvm_type_of(ssa_value_type(item_id, fn_value, module))
             if item_ty == "ptr":
                 tmp = "%v{my_id}.lp{ai}"
                 text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(item_id)} to i64"
