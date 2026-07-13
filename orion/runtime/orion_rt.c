@@ -1493,6 +1493,12 @@ long long atlas_monotonic_us(void) {
     QueryPerformanceCounter(&c);
     return (long long)(c.QuadPart * 1000000 / freq.QuadPart);
 }
+/* Best-effort mkdir (single dir) — games route saves under saves/. Named
+ * atlas_* so the compiler auto-declares it for a plain `extern fn`. */
+long long atlas_mkdir(const char *path) {
+    CreateDirectoryA(path, NULL);
+    return 1;
+}
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
@@ -1524,6 +1530,12 @@ long long __orion_monotonic_ms(void) {
 long long atlas_monotonic_us(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+/* Best-effort mkdir (single dir) — games route saves under saves/. Named
+ * atlas_* so the compiler auto-declares it for a plain `extern fn`. */
+long long atlas_mkdir(const char *path) {
+    mkdir(path, 0755);
+    return 1;
 }
 void __orion_sleep_ms(long long ms) {
     if (ms > 0) {
