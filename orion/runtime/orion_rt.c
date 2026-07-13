@@ -1201,6 +1201,14 @@ static void guard_install(void) {
     if (!vh) vh = AddVectoredExceptionHandler(1, orion_guard_vector);
 }
 
+/* An Orion fn-ref arrives here as a CLOSURE list [fn_addr, flag] — the
+ * compiler wraps every fn-ref value that way (flag 1 = a lambda that takes
+ * its env as a leading arg, else a plain fn-ref). The old code cast this
+ * list pointer straight to code and jumped into the list's own memory (the
+ * wild 0xAA crash the GUI hit; soak never armed the guard). Unwrap it the
+ * way closure_call does: element 0 is the real function, element 1 the flag. */
+extern long long orion_list_at(void *list, long long idx);
+
 long long sup_guard5(long long fn, long long a, long long b, long long c,
                      long long d, long long e) {
     guard_install();
@@ -1217,8 +1225,16 @@ long long sup_guard5(long long fn, long long a, long long b, long long c,
     ((unsigned long long *)guard_jb)[0] = 0;
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
-    long long r = ((long long (*)(long long, long long, long long, long long,
-                                  long long))fn)(a, b, c, d, e);
+    void *clos = (void *)fn;
+    long long real = orion_list_at(clos, 0);
+    long long lam = orion_list_at(clos, 1);
+    long long r;
+    if (lam == 1)
+        r = ((long long (*)(void *, long long, long long, long long, long long,
+                            long long))(void *)real)(clos, a, b, c, d, e);
+    else
+        r = ((long long (*)(long long, long long, long long, long long,
+                            long long))(void *)real)(a, b, c, d, e);
     guard_armed = 0;
     return r;
 }
@@ -1235,9 +1251,18 @@ long long sup_guard7(long long fn, long long a, long long b, long long c,
     ((unsigned long long *)guard_jb)[0] = 0;
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
-    long long r = ((long long (*)(long long, long long, long long, long long,
-                                  long long, long long, long long))fn)(
-        a, b, c, d, e, f, g);
+    void *clos = (void *)fn;
+    long long real = orion_list_at(clos, 0);
+    long long lam = orion_list_at(clos, 1);
+    long long r;
+    if (lam == 1)
+        r = ((long long (*)(void *, long long, long long, long long, long long,
+                            long long, long long, long long))(void *)real)(
+            clos, a, b, c, d, e, f, g);
+    else
+        r = ((long long (*)(long long, long long, long long, long long,
+                            long long, long long, long long))(void *)real)(
+            a, b, c, d, e, f, g);
     guard_armed = 0;
     return r;
 }
