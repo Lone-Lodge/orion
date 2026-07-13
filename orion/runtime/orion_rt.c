@@ -134,18 +134,26 @@ static const char *orion_region_of(uintptr_t a) {
  * GROW when the last cycle's peak crowds the buffer (> 3/4 of cap):
  * double until it fits, so the next cycle bumps instead of spilling.
  *
- * SHRINK when the buffer DWARFS the last cycle (< 1/8 of cap) and we
- * sit above the region's floor: halve ONE step. A transient spike — a
+ * SHRINK when the buffer DWARFS the region's recent working set and has
+ * done so for a SUSTAINED stretch: halve one step. A transient spike — a
  * heavy render frame, a compaction — otherwise pins RSS at the
  * high-water for the whole session (the grow-only bug: fireplace idled
  * at 223 MB because one busy frame grew the arena to 54 MB and it never
- * came back). One step per reset walks a 131 MB cap back to the floor
- * within a few frames of quiet, and the 8x headroom means ordinary
- * frame-to-frame jitter never triggers a resize (no thrash). `high`, if
+ * came back).
+ *
+ * The hysteresis (`streak`) is what stops thrash. Without it, a game that
+ * alternates a busy render frame (need ~700 KB) with an idle frame
+ * (need ~0) grows on the busy frame and shrinks on the idle one, every
+ * frame, forever. So a region only shrinks after `SHRINK_PATIENCE`
+ * CONSECUTIVE resets all sat under 1/4 of cap; any single healthy cycle
+ * resets the streak. A cap that matches the working set (need in the
+ * comfortable [1/4, 3/4] band) is left exactly alone. `high`, if
  * non-NULL, is retracted to `need` on a shrink so the mem report shows
- * the RECENT peak, not a stale session high-water. */
+ * the recent peak, not a stale session high-water. `streak` NULL opts a
+ * region out of shrinking (pools are ring-bounded and never spike). */
+#define SHRINK_PATIENCE 180 /* ~3 s at 60 fps of sustained low use */
 static void region_fit(const char *name, unsigned char **base, size_t *cap,
-                       size_t *high, size_t need, size_t floor) {
+                       size_t *high, size_t need, size_t floor, int *streak) {
     if (!*base) return;
     if (need > (*cap / 4) * 3) {
         size_t want = *cap;
@@ -156,23 +164,28 @@ static void region_fit(const char *name, unsigned char **base, size_t *cap,
         free(*base);
         *base = fresh;
         *cap = want;
+        if (streak) *streak = 0;
         fprintf(stderr, "%s[orion] %s region sized to %llu KB%s\n", c_dim(),
                 name, (unsigned long long)(want / 1024u), c_off());
         return;
     }
-    if (*cap > floor && need < *cap / 8) {
-        size_t want = *cap / 2;
-        if (want < floor) want = floor;
-        unsigned char *fresh = (unsigned char *)malloc(want);
-        if (!fresh) return; /* keep the old buffer; nothing lost */
-        orion_note_freed(name, *base, *cap);
-        free(*base);
-        *base = fresh;
-        *cap = want;
-        if (high) *high = need;
-        fprintf(stderr, "%s[orion] %s region sized down to %llu KB%s\n",
-                c_dim(), name, (unsigned long long)(want / 1024u), c_off());
+    if (!streak || *cap <= floor || need >= *cap / 4) {
+        if (streak) *streak = 0; /* healthy use — reset the patience clock */
+        return;
     }
+    if (++(*streak) < SHRINK_PATIENCE) return;
+    size_t want = *cap / 2;
+    if (want < floor) want = floor;
+    unsigned char *fresh = (unsigned char *)malloc(want);
+    if (!fresh) return; /* keep the old buffer; nothing lost */
+    orion_note_freed(name, *base, *cap);
+    free(*base);
+    *base = fresh;
+    *cap = want;
+    *streak = 0;
+    if (high) *high = need;
+    fprintf(stderr, "%s[orion] %s region sized down to %llu KB%s\n", c_dim(),
+            name, (unsigned long long)(want / 1024u), c_off());
 }
 
 /* ---- Frame arena ---------------------------------------------------
@@ -192,6 +205,7 @@ static size_t arena_cap = 0;
 static size_t arena_used = 0;
 static size_t arena_peak = 0; /* max used since last reset (rewind lowers used) */
 static size_t arena_high = 0; /* recent high-water (retracted on a shrink) */
+static int arena_lowstreak = 0; /* consecutive under-used resets (shrink hysteresis) */
 static int arena_on = 0;
 static orion_ovf *arena_ovf = NULL;
 static size_t arena_ovf_bytes = 0;
@@ -231,6 +245,7 @@ static unsigned char *frame_base = NULL;
 static size_t frame_cap = 0;
 static size_t frame_used = 0;
 static size_t frame_high = 0;
+static int frame_lowstreak = 0; /* shrink hysteresis, see region_fit */
 static int frame_on = 0;
 static int persist_depth = 0;
 static orion_ovf *frame_ovf = NULL;
@@ -260,7 +275,8 @@ long long orion_frame_reset(void) {
     if (frame_base && frame_used > 0) {
         memset(frame_base, 0xDD, frame_used);
     }
-    region_fit("frame", &frame_base, &frame_cap, &frame_high, need, FRAME_START);
+    region_fit("frame", &frame_base, &frame_cap, &frame_high, need, FRAME_START,
+               &frame_lowstreak);
     frame_used = 0;
     return 1;
 }
@@ -371,7 +387,7 @@ long long orion_pool_reset(long long i) {
         memset(pool_base[i], 0xDD, pool_used[i]);
     }
     region_fit("pool", &pool_base[i], &pool_cap[i], &pool_high[i], need,
-               POOL_START);
+               POOL_START, NULL);
     pool_used[i] = 0;
     return 1;
 }
@@ -578,7 +594,8 @@ long long orion_file_stamp(const char *path) {
 long long orion_arena_reset(void) {
     size_t need = arena_peak + arena_ovf_bytes;
     ovf_drain(&arena_ovf, &arena_ovf_bytes);
-    region_fit("arena", &arena_base, &arena_cap, &arena_high, need, ARENA_START);
+    region_fit("arena", &arena_base, &arena_cap, &arena_high, need, ARENA_START,
+               &arena_lowstreak);
     arena_used = 0;
     arena_peak = 0;
     return 1;

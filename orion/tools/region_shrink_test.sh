@@ -49,27 +49,53 @@ int main(void) {
         return 1;
     }
 
-    /* Quiet cycles: tiny allocation each, reset each. Cap must shrink. */
-    int steps = 0;
-    for (int c = 0; c < 64; c++) {
+    /* Sustained quiet: tiny allocation each cycle. Shrink is deliberately
+     * patient (SHRINK_PATIENCE cycles per step), so this takes many
+     * cycles — that patience is what stops the thrash tested below. */
+    int cycles = 0;
+    for (; cycles < 8000; cycles++) {
         orion_alloc(256);
         orion_arena_reset();
-        steps++;
         if (orion_arena_cap() <= (long long)ARENA_START) break;
     }
     long long final_cap = orion_arena_cap();
-    printf("after %d quiet cycles: cap=%lld KB high=%lld KB\n",
-           steps, final_cap / 1024, orion_arena_high() / 1024);
-
+    printf("after %d sustained-quiet cycles: cap=%lld KB high=%lld KB\n",
+           cycles, final_cap / 1024, orion_arena_high() / 1024);
     if (final_cap > (long long)ARENA_START) {
-        printf("FAIL: arena cap did not return to the floor\n");
+        printf("FAIL: arena cap did not return to the floor under sustained quiet\n");
         return 1;
     }
     if (orion_arena_high() > 1024 * 1024) {
         printf("FAIL: high-water was not retracted after shrink\n");
         return 1;
     }
-    printf("PASS: arena grew for the spike then shrank back to the floor\n");
+
+    /* Thrash resistance — the fireplace bug: a game alternates a busy render
+     * frame with an idle one. A cap that matches the busy working set must
+     * stay PUT, not oscillate every frame. Warm to a working size, then
+     * alternate busy(~400 KB)/idle(~0) and assert the cap never moves. */
+    for (int i = 0; i < 40; i++) orion_alloc(10 * 1024); /* ~400 KB */
+    orion_arena_reset();
+    orion_alloc(256);
+    orion_arena_reset();
+    long long work_cap = orion_arena_cap();
+    int resizes = 0;
+    for (int c = 0; c < 2000; c++) {
+        if (c % 2 == 0)
+            for (int i = 0; i < 40; i++) orion_alloc(10 * 1024); /* busy */
+        else
+            orion_alloc(256);                                    /* idle */
+        orion_arena_reset();
+        if (orion_arena_cap() != work_cap) { resizes++; work_cap = orion_arena_cap(); }
+    }
+    printf("thrash test: %d resizes over 2000 alternating frames (cap=%lld KB)\n",
+           resizes, work_cap / 1024);
+    if (resizes > 2) {
+        printf("FAIL: cap thrashed on busy/idle alternation (%d resizes)\n", resizes);
+        return 1;
+    }
+
+    printf("PASS: spike reclaimed, floor reached, no thrash on alternation\n");
     return 0;
 }
 EOF
