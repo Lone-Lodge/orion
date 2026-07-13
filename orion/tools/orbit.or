@@ -507,6 +507,15 @@ fn build_native_entry(variant: Text, entry_override: Text) -> Text:
             else:
                 print(c_dim("orbit: llvm-rc failed — shipping without icon"))
     link_args = push(link_args, "-Os")
+    # Big stack (Windows default is 1 MB). The render path nests deep —
+    # astra eval recursion, render_bundle, the glyph rasterizer, all under
+    # the supervisor's setjmp frames — and overflows the 1 MB default (a
+    # "writing address 0x0" fault in a function prologue). cli_build already
+    # does this for the compiler; the game needs it just as much. Windows
+    # only: POSIX raises the stack via ulimit at run time.
+    if os_kind() == 0:
+        link_args = push(link_args, "-Xlinker")
+        link_args = push(link_args, "/STACK:67108864")
     link_args = push(link_args, "-o")
     link_args = push(link_args, exe)
     link_args = push(link_args, "-luser32")
