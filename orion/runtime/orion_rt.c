@@ -96,6 +96,38 @@ static void ovf_drain(orion_ovf **head, size_t *bytes) {
     *bytes = 0;
 }
 
+/* Region-lifetime forensics. region_fit frees a region's old buffer when
+ * it grows; a struct built in that region and read after the reset now
+ * points into freed (or reused) memory — the classic "value outlived its
+ * region" bug that is otherwise a cryptic wild-pointer crash. Remember the
+ * last few freed ranges (and the live region bounds) so the crash filter
+ * can NAME the region a bad pointer belonged to and prescribe the fix. */
+#define ORION_FREED_RING 8
+static struct {
+    uintptr_t lo, hi;
+    const char *name;
+} orion_freed[ORION_FREED_RING];
+static int orion_freed_n = 0;
+static int orion_region_resized = 0; /* any region grown+freed this run */
+
+static void orion_note_freed(const char *name, unsigned char *base, size_t cap) {
+    int i = orion_freed_n % ORION_FREED_RING;
+    orion_freed[i].lo = (uintptr_t)base;
+    orion_freed[i].hi = (uintptr_t)base + cap;
+    orion_freed[i].name = name;
+    orion_freed_n++;
+    orion_region_resized = 1;
+}
+
+/* Which region does `addr` fall in? Returns a human sentence or NULL. Checks
+ * freed ranges first (the actionable case), then the live regions. */
+static const char *orion_region_of(uintptr_t a) {
+    for (int i = 0; i < ORION_FREED_RING; i++)
+        if (orion_freed[i].lo && a >= orion_freed[i].lo && a < orion_freed[i].hi)
+            return orion_freed[i].name;
+    return NULL;
+}
+
 /* Swap an EMPTY region's buffer for one that fits what the last cycle
  * actually needed. Call only at reset. Keeps need <= 3/4 of cap. */
 static void region_fit(const char *name, unsigned char **base, size_t *cap,
@@ -105,6 +137,7 @@ static void region_fit(const char *name, unsigned char **base, size_t *cap,
     while ((want / 4) * 3 < need) want *= 2;
     unsigned char *fresh = (unsigned char *)malloc(want);
     if (!fresh) return; /* keep the old buffer; spill stays slow */
+    orion_note_freed(name, *base, *cap);
     free(*base);
     *base = fresh;
     *cap = want;
@@ -1083,6 +1116,23 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                    info->ExceptionRecord->ExceptionInformation[0] ? "writing"
                                                                   : "reading",
                    bad, why);
+        /* Region-lifetime forensics. If the bad address lands in a region
+         * buffer we freed at a resize, this is a value that outlived its
+         * region — name it and prescribe persist. Even when the address is
+         * -1/near-null (the region buffer was freed AND reused, so the
+         * dangling read returns garbage rather than the old range), a resize
+         * having happened at all is the tell — surface it so the next person
+         * doesn't spend hours: this was fireplace's Renderer-in-frame-region
+         * crash exactly. */
+        const char *region = orion_region_of((uintptr_t)bad);
+        if (region)
+            crash_line("[orion]        ^ points into the %s region's buffer, freed at a resize "
+                       "— LIFETIME BUG: this value outlived its region; build it under "
+                       "orion_persist_on()", region);
+        else if (orion_region_resized && (poison || bad == 0xffffffffffffffffULL || bad < 0x1000ULL))
+            crash_line("[orion]        ^ a region was resized (buffer freed) earlier this run — "
+                       "if a struct built in the arena/frame region is read after its reset it "
+                       "dangles; build it under orion_persist_on() (see the 'region sized' line above)");
     }
     fflush(stderr);
     if (crash_tee) {
@@ -1428,10 +1478,6 @@ long long atlas_monotonic_us(void) {
     QueryPerformanceCounter(&c);
     return (long long)(c.QuadPart * 1000000 / freq.QuadPart);
 }
-/* Debug: raw pointer value as int, no dereference — .or code can log a
- * field's address to spot a -1/garbage pointer without faulting on it. */
-long long atlas_addr(void *p) { return (long long)(long long)p; }
-long long atlas_laddr(void *p) { return (long long)(long long)p; }
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
@@ -1464,10 +1510,6 @@ long long atlas_monotonic_us(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
-/* Debug: raw pointer value as int, no dereference — .or code can log a
- * field's address to spot a -1/garbage pointer without faulting on it. */
-long long atlas_addr(void *p) { return (long long)(long long)p; }
-long long atlas_laddr(void *p) { return (long long)(long long)p; }
 void __orion_sleep_ms(long long ms) {
     if (ms > 0) {
         struct timespec t = { ms / 1000, (ms % 1000) * 1000000 };
