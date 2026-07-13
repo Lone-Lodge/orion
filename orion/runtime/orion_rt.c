@@ -129,20 +129,50 @@ static const char *orion_region_of(uintptr_t a) {
 }
 
 /* Swap an EMPTY region's buffer for one that fits what the last cycle
- * actually needed. Call only at reset. Keeps need <= 3/4 of cap. */
+ * actually needed. Call only at reset.
+ *
+ * GROW when the last cycle's peak crowds the buffer (> 3/4 of cap):
+ * double until it fits, so the next cycle bumps instead of spilling.
+ *
+ * SHRINK when the buffer DWARFS the last cycle (< 1/8 of cap) and we
+ * sit above the region's floor: halve ONE step. A transient spike — a
+ * heavy render frame, a compaction — otherwise pins RSS at the
+ * high-water for the whole session (the grow-only bug: fireplace idled
+ * at 223 MB because one busy frame grew the arena to 54 MB and it never
+ * came back). One step per reset walks a 131 MB cap back to the floor
+ * within a few frames of quiet, and the 8x headroom means ordinary
+ * frame-to-frame jitter never triggers a resize (no thrash). `high`, if
+ * non-NULL, is retracted to `need` on a shrink so the mem report shows
+ * the RECENT peak, not a stale session high-water. */
 static void region_fit(const char *name, unsigned char **base, size_t *cap,
-                       size_t need) {
-    size_t want = *cap;
-    if (!*base || need <= (*cap / 4) * 3) return;
-    while ((want / 4) * 3 < need) want *= 2;
-    unsigned char *fresh = (unsigned char *)malloc(want);
-    if (!fresh) return; /* keep the old buffer; spill stays slow */
-    orion_note_freed(name, *base, *cap);
-    free(*base);
-    *base = fresh;
-    *cap = want;
-    fprintf(stderr, "%s[orion] %s region sized to %llu KB%s\n", c_dim(), name,
-            (unsigned long long)(want / 1024u), c_off());
+                       size_t *high, size_t need, size_t floor) {
+    if (!*base) return;
+    if (need > (*cap / 4) * 3) {
+        size_t want = *cap;
+        while ((want / 4) * 3 < need) want *= 2;
+        unsigned char *fresh = (unsigned char *)malloc(want);
+        if (!fresh) return; /* keep the old buffer; spill stays slow */
+        orion_note_freed(name, *base, *cap);
+        free(*base);
+        *base = fresh;
+        *cap = want;
+        fprintf(stderr, "%s[orion] %s region sized to %llu KB%s\n", c_dim(),
+                name, (unsigned long long)(want / 1024u), c_off());
+        return;
+    }
+    if (*cap > floor && need < *cap / 8) {
+        size_t want = *cap / 2;
+        if (want < floor) want = floor;
+        unsigned char *fresh = (unsigned char *)malloc(want);
+        if (!fresh) return; /* keep the old buffer; nothing lost */
+        orion_note_freed(name, *base, *cap);
+        free(*base);
+        *base = fresh;
+        *cap = want;
+        if (high) *high = need;
+        fprintf(stderr, "%s[orion] %s region sized down to %llu KB%s\n",
+                c_dim(), name, (unsigned long long)(want / 1024u), c_off());
+    }
 }
 
 /* ---- Frame arena ---------------------------------------------------
@@ -161,6 +191,7 @@ static unsigned char *arena_base = NULL;
 static size_t arena_cap = 0;
 static size_t arena_used = 0;
 static size_t arena_peak = 0; /* max used since last reset (rewind lowers used) */
+static size_t arena_high = 0; /* recent high-water (retracted on a shrink) */
 static int arena_on = 0;
 static orion_ovf *arena_ovf = NULL;
 static size_t arena_ovf_bytes = 0;
@@ -229,7 +260,7 @@ long long orion_frame_reset(void) {
     if (frame_base && frame_used > 0) {
         memset(frame_base, 0xDD, frame_used);
     }
-    region_fit("frame", &frame_base, &frame_cap, need);
+    region_fit("frame", &frame_base, &frame_cap, &frame_high, need, FRAME_START);
     frame_used = 0;
     return 1;
 }
@@ -339,7 +370,8 @@ long long orion_pool_reset(long long i) {
     if (pool_base[i] && pool_used[i] > 0) {
         memset(pool_base[i], 0xDD, pool_used[i]);
     }
-    region_fit("pool", &pool_base[i], &pool_cap[i], need);
+    region_fit("pool", &pool_base[i], &pool_cap[i], &pool_high[i], need,
+               POOL_START);
     pool_used[i] = 0;
     return 1;
 }
@@ -546,7 +578,7 @@ long long orion_file_stamp(const char *path) {
 long long orion_arena_reset(void) {
     size_t need = arena_peak + arena_ovf_bytes;
     ovf_drain(&arena_ovf, &arena_ovf_bytes);
-    region_fit("arena", &arena_base, &arena_cap, need);
+    region_fit("arena", &arena_base, &arena_cap, &arena_high, need, ARENA_START);
     arena_used = 0;
     arena_peak = 0;
     return 1;
@@ -713,7 +745,6 @@ static long long alloc_malloc = 0;
 long long orion_alloc_total(void) { return alloc_total; }
 long long orion_alloc_malloc_total(void) { return alloc_malloc; }
 
-static size_t arena_high = 0;
 long long orion_arena_high(void) { return (long long)arena_high; }
 
 /* Priority: epoch arena (innermost) > selected pool (beats persist —
