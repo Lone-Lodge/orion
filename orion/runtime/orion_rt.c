@@ -386,23 +386,6 @@ const char *orion_text_from_c(const char *s) {
     return p;
 }
 
-/* Absolute path of the running executable. Lets a self-hosted tool locate
- * its own toolchain (orbit finds orion.exe + runtime beside itself) so
- * projects never hard-code the engine path — the workspace can live in any
- * folder layout. "" on failure. host_* so the compiler auto-declares it. */
-const char *host_self_exe(void) {
-    char path[4096];
-#ifdef _WIN32
-    DWORD n = GetModuleFileNameA(NULL, path, (DWORD)sizeof path);
-    if (n == 0 || n >= sizeof path) return otx_empty.z;
-    path[n] = 0;
-#else
-    ssize_t n = readlink("/proc/self/exe", path, sizeof path - 1);
-    if (n <= 0) return otx_empty.z;
-    path[n] = 0;
-#endif
-    return orion_text_from_c(path);
-}
 
 long long orion_text_hash(const char *p) {
     long long h = ((const long long *)p)[-2];
@@ -1484,6 +1467,16 @@ const char *orion_dir_list(const char *dir) {
         return evac;
     }
 }
+/* Absolute path of the running executable — lets orbit find its own toolchain
+ * (orion.exe + runtime beside it) so projects never hard-code the engine path.
+ * Placed here, after windows.h, so GetModuleFileNameA/DWORD are in scope. */
+const char *host_self_exe(void) {
+    char path[4096];
+    DWORD n = GetModuleFileNameA(NULL, path, (DWORD)sizeof path);
+    if (n == 0 || n >= sizeof path) return otx_empty.z;
+    path[n] = 0;
+    return orion_text_from_c(path);
+}
 /* Subdirectories of `dir` (newline-separated, excludes . and ..). Lets orbit
  * scan a workspace for orbs regardless of folder layout. host_* so the
  * compiler auto-declares it. */
@@ -1620,6 +1613,15 @@ const char *orion_dir_list(const char *dir) {
         free(out);
         return evac;
     }
+}
+/* Absolute path of the running executable (POSIX mirror). unistd.h for
+ * readlink is included with the other POSIX headers. */
+const char *host_self_exe(void) {
+    char path[4096];
+    ssize_t n = readlink("/proc/self/exe", path, sizeof path - 1);
+    if (n <= 0) return otx_empty.z;
+    path[n] = 0;
+    return orion_text_from_c(path);
 }
 /* Subdirectories of `dir` (newline-separated, excludes . and ..). Lets orbit
  * scan a workspace for orbs regardless of folder layout. */
