@@ -613,25 +613,23 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         if n == 0:
             return "    {value_ref(my_id)} = getelementptr i64, ptr @orion_empty_list, i64 0"
         mut text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
+        # Box each element by the LIST's element type — the SAME source
+        # list_at reads back through. Keying off the individual element's
+        # SSA type instead desynced store from load (list_lit bitcast a
+        # double element that list_at, going by the list type, did NOT
+        # un-bitcast) and corrupted every read — a map value stored that
+        # way came back as garbage bits. list slots are i64: a ptr element
+        # is ptrtoint'd, a double stores its bits (list_at bitcasts back),
+        # everything else stores as-is.
+        elem_ll = llvm_type_of(list_elem_type(inst.type_text))
         for ai in 0..<n:
             item_id = at(inst.args, ai)
-            item_inst = at(fn_value.instructions, item_id)
-            # Authoritative SSA type, not the raw inst.type_text: a float
-            # LITERAL carries type_text "f64", but a float VARIABLE/param or
-            # arithmetic result does not — so [r, g, b] over f64 params fell
-            # through to the plain path and stored a `double` into an i64 slot
-            # (invalid IR). ssa_value_type resolves the real type either way.
-            item_ty = llvm_type_of(ssa_value_type(item_id, fn_value, module))
-            if item_ty == "ptr":
+            if elem_ll == "ptr":
                 tmp = "%v{my_id}.lp{ai}"
                 text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(item_id)} to i64"
                 text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {tmp})"
             else:
-                if item_ty == "double":
-                    # list slots are i64; a float element stores its bits and
-                    # list_at bitcasts them back. Without this a float literal
-                    # ([0.0], the typed-empty-list idiom) emitted `list_set(…,
-                    # i64 <double>)` — invalid IR clang rejected.
+                if elem_ll == "double":
                     ftmp = "%v{my_id}.lf{ai}"
                     text = "{text}\n    {ftmp} = bitcast double {value_ref(item_id)} to i64"
                     text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {ftmp})"
