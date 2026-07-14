@@ -1713,3 +1713,6 @@ long long host_os(void) { return 2; }
 #else
 long long host_os(void) { return 1; }
 #endif
+
+/* PNG sprite loader (host_image_load) — see png_min.c */
+#include "png_min.c"
