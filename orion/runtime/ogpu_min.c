@@ -36,6 +36,18 @@ WEAK long long dx_og_resize(long long w, long long h) {
     (void)w; (void)h; return 0;
 }
 WEAK void      dx_og_shutdown(void) {}
+WEAK long long dx_og_texture(const char *path) { (void)path; return -1; }
+WEAK void      dx_og_sprite(long long id, long long dx, long long dy,
+                            long long dw, long long dh, long long sx,
+                            long long sy, long long sw, long long sh,
+                            long long tint, long long blend) {
+    (void)id; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy;
+    (void)sw; (void)sh; (void)tint; (void)blend;
+}
+WEAK void      dx_og_clip(long long x, long long y, long long w, long long h) {
+    (void)x; (void)y; (void)w; (void)h;
+}
+WEAK void      dx_og_clip_none(void) {}
 
 static int g_mode = 0;   /* 0 none, 1 software, 2 d3d12 */
 static int g_pref = 0;   /* 0 auto, 1 gdi, 2 gpu */
@@ -84,6 +96,24 @@ long long og_vsync(long long on) {
 }
 
 long long og_caps(void) { return g_mode; }
+
+/* Textured sprites: only the d3d12 backend has them; software returns -1
+ * from og_texture so callers fall back (e.g. to the rect blit). */
+long long og_texture(const char *path) {
+    if (g_mode == 2) return dx_og_texture(path);
+    return -1;
+}
+void og_sprite(long long id, long long dx, long long dy, long long dw,
+               long long dh, long long sx, long long sy, long long sw,
+               long long sh, long long tint, long long blend) {
+    if (g_mode == 2) dx_og_sprite(id, dx, dy, dw, dh, sx, sy, sw, sh, tint, blend);
+}
+void og_clip(long long x, long long y, long long w, long long h) {
+    if (g_mode == 2) dx_og_clip(x, y, w, h);
+}
+void og_clip_none(void) {
+    if (g_mode == 2) dx_og_clip_none();
+}
 
 long long og_resize(long long w, long long h) {
     if (g_mode == 2) return dx_og_resize(w, h);
