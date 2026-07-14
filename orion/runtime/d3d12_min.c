@@ -66,8 +66,8 @@ static float                g_clear[4];
  * source sub-rect (atlas) + scale, and a scissor clip. Shaders are compiled
  * at runtime via a dynamically-loaded d3dcompiler (no build-script change;
  * if it is missing, sprites disable and rects still work). */
-#define MAX_TEX     256
-#define MAX_SPRITES 4096
+#define MAX_TEX     2048  /* images + one per (glyph,size); tiny glyph textures */
+#define MAX_SPRITES 8192
 typedef struct { float x, y, u, v, r, g, b, a; } TexVert; /* pos, uv, tint */
 typedef struct { int tex; int blend; int cx, cy, cw, ch; int clip; } SpriteDraw;
 
@@ -75,7 +75,8 @@ static ID3D12DescriptorHeap *g_srv_heap;   /* shader-visible SRV table */
 static UINT                  g_srv_size;
 static ID3D12Resource       *g_tex[MAX_TEX];
 static int                   g_tex_w[MAX_TEX], g_tex_h[MAX_TEX];
-static char                 *g_tex_path[MAX_TEX];
+static char                 *g_tex_path[MAX_TEX]; /* path-keyed (images) */
+static long long             g_tex_key[MAX_TEX];  /* int-keyed (glyphs), -1 = none */
 static int                   g_tex_n;
 static ID3D12RootSignature  *g_tex_rootsig;
 static ID3D12PipelineState  *g_pso_alpha;   /* SRC_ALPHA / INV_SRC_ALPHA */
@@ -559,13 +560,15 @@ static void tex_pipeline_init(void) {
         g_up_alloc, NULL, &IID_ID3D12GraphicsCommandList, (void **)&g_up_list);
     ID3D12GraphicsCommandList_Close(g_up_list);
 
+    for (int i = 0; i < MAX_TEX; i++) g_tex_key[i] = -1;
     g_tex_ok = 1;
     fprintf(stderr, "[gpu] texture pipeline ready\n");
 }
 
-/* Upload one RGBA image to a new texture, create its SRV, return the id. */
-static int tex_upload(const char *path, const unsigned char *rgba, int w, int h) {
-    if (g_tex_n >= MAX_TEX) return -1;
+/* Upload one RGBA image to a new texture, create its SRV, return the id.
+ * Caller tags the slot (path for images, key for glyphs). */
+static int tex_upload_raw(const unsigned char *rgba, int w, int h) {
+    if (g_tex_n >= MAX_TEX || w <= 0 || h <= 0) return -1;
     int id = g_tex_n;
 
     D3D12_HEAP_PROPERTIES dp = {0};
@@ -648,7 +651,8 @@ static int tex_upload(const char *path, const unsigned char *rgba, int w, int h)
 
     g_tex_w[id] = w;
     g_tex_h[id] = h;
-    g_tex_path[id] = _strdup(path);
+    g_tex_path[id] = NULL;
+    g_tex_key[id] = -1;
     g_tex_n++;
     return id;
 }
@@ -663,9 +667,37 @@ long long dx_og_texture(const char *path) {
     const unsigned char *d = (const unsigned char *)blob;
     int w = d[0] | d[1] << 8 | d[2] << 16 | d[3] << 24;
     int h = d[4] | d[5] << 8 | d[6] << 16 | d[7] << 24;
-    int id = tex_upload(path, d + 8, w, h);
+    int id = tex_upload_raw(d + 8, w, h);
+    if (id >= 0) g_tex_path[id] = _strdup(path);
     /* The pixels live on the GPU now — release the ~w*h*4 CPU copy. */
     host_image_free_cached(path);
+    return id;
+}
+
+/* Cached glyph texture by int key (gid*K+size). Returns id or -1 if not yet
+ * uploaded — the caller then rasterizes and calls dx_og_texture_mem. */
+long long dx_og_glyph_id(long long key) {
+    if (!g_tex_ok) return -1;
+    for (int i = 0; i < g_tex_n; i++)
+        if (g_tex_key[i] == key) return i;
+    return -1;
+}
+
+/* Upload an in-memory RGBA image (orion [int], one byte per element) under an
+ * int key. Used for AA glyph bitmaps. Cached: a repeat key returns its id. */
+long long dx_og_texture_mem(long long key, long long w, long long h,
+                            const long long *rgba) {
+    if (!g_tex_ok) return -1;
+    for (int i = 0; i < g_tex_n; i++)
+        if (g_tex_key[i] == key) return i;
+    long long n = w * h * 4;
+    unsigned char *packed = (unsigned char *)malloc((size_t)n);
+    if (!packed) return -1;
+    /* rgba is an orion list: [cap][len][items...]; items are i64 bytes. */
+    for (long long i = 0; i < n; i++) packed[i] = (unsigned char)rgba[2 + i];
+    int id = tex_upload_raw(packed, (int)w, (int)h);
+    free(packed);
+    if (id >= 0) g_tex_key[id] = key;
     return id;
 }
 

@@ -48,6 +48,11 @@ WEAK void      dx_og_clip(long long x, long long y, long long w, long long h) {
     (void)x; (void)y; (void)w; (void)h;
 }
 WEAK void      dx_og_clip_none(void) {}
+WEAK long long dx_og_glyph_id(long long key) { (void)key; return -1; }
+WEAK long long dx_og_texture_mem(long long key, long long w, long long h,
+                                 const long long *rgba) {
+    (void)key; (void)w; (void)h; (void)rgba; return -1;
+}
 
 static int g_mode = 0;   /* 0 none, 1 software, 2 d3d12 */
 static int g_pref = 0;   /* 0 auto, 1 gdi, 2 gpu */
@@ -113,6 +118,15 @@ void og_clip(long long x, long long y, long long w, long long h) {
 }
 void og_clip_none(void) {
     if (g_mode == 2) dx_og_clip_none();
+}
+long long og_glyph_id(long long key) {
+    if (g_mode == 2) return dx_og_glyph_id(key);
+    return -1;
+}
+long long og_texture_mem(long long key, long long w, long long h,
+                         const long long *rgba) {
+    if (g_mode == 2) return dx_og_texture_mem(key, w, h, rgba);
+    return -1;
 }
 
 long long og_resize(long long w, long long h) {
