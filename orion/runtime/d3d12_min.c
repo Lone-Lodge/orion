@@ -92,6 +92,7 @@ static int                   g_clip_x, g_clip_y, g_clip_w, g_clip_h, g_clip_on;
 
 /* host-side PNG decoder (orion_rt.c): returns [w LE32][h LE32][RGBA...]. */
 extern const char *host_image_load(const char *path);
+extern void host_image_free_cached(const char *path);
 extern long long orion_tlen_c(const char *p);
 static void tex_pipeline_init(void); /* defined below; called from init */
 static void tex_flush(UINT frame);   /* defined below; called from present */
@@ -662,7 +663,10 @@ long long dx_og_texture(const char *path) {
     const unsigned char *d = (const unsigned char *)blob;
     int w = d[0] | d[1] << 8 | d[2] << 16 | d[3] << 24;
     int h = d[4] | d[5] << 8 | d[6] << 16 | d[7] << 24;
-    return tex_upload(path, d + 8, w, h);
+    int id = tex_upload(path, d + 8, w, h);
+    /* The pixels live on the GPU now — release the ~w*h*4 CPU copy. */
+    host_image_free_cached(path);
+    return id;
 }
 
 /* Record one textured quad. src rect (sx,sy,sw,sh) in texels — 0 w/h means

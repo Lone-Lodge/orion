@@ -242,6 +242,24 @@ static void png_cache_put(const char *path, const char *blob) {
     png_cache_n++;
 }
 
+/* Drop a path's decoded RGBA from the cache and free it. Once an image is a
+ * GPU texture the CPU copy is dead weight (~w*h*4 bytes); the texture path
+ * calls this right after upload. A later host_image_load re-decodes fresh, so
+ * the (rare) game that also rect-blits the same path stays correct. The empty
+ * text (len 0, static) is never freed. */
+void host_image_free_cached(const char *path) {
+    for (int i = 0; i < png_cache_n; i++) {
+        if (strcmp(png_cache[i].path, path) == 0) {
+            if (((const long long *)png_cache[i].blob)[-1] > 0)
+                free((void *)(((char *)png_cache[i].blob) - 16));
+            free(png_cache[i].path);
+            png_cache[i] = png_cache[png_cache_n - 1];
+            png_cache_n--;
+            return;
+        }
+    }
+}
+
 /* host_image_load(path) -> Text: [w LE32][h LE32][RGBA...], or empty on fail.
  * Cached: decoded once, then the same immortal blob is returned each call. */
 static const char *png_reason = "";
