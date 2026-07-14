@@ -5,7 +5,7 @@
 ### Core language
 - `fn` / `pub fn` declarations, `extern fn` for FFI
 - `mut name = ...` (mutable bindings), `name = ...` (immutable binding / reassignment)
-- `fact name = expr` — reactive derived binding; reading `name` re-evaluates
+- `derived name = expr` — reactive derived binding; reading `name` re-evaluates
   `expr` against current state (lowered by inlining, so no runtime tick needed)
 - Type annotations on params, optional on locals. Built-in type names are
   case-insensitive: `int`, `text`/`Text`, `map`/`Map`, `list`/`List`, `bool`, `float`
@@ -13,18 +13,26 @@
 - `if cond:` block-form + `if c then a else b` expression-form
 - `for v in 0..<n:` (exclusive) and `for v in 0..=n:` (inclusive) ranges; `for v in list:`
 - `for idx, v in list:` (with-index iteration)
-- `for v with Component:` (ECS query — for entities)
 - `loop:` + `break` + `continue` (unbounded loops)
-- `match` on int/text patterns + enum-variant destructuring; exhaustiveness checked
+- `match` on int/text patterns + enum-variant destructuring; exhaustiveness
+  checked. Arms are `-> expr`, an inline assignment (`Num(v) -> total += v`),
+  or an indented block (bind locals, last expression is the arm's value —
+  like an `if` branch). Works in expression and statement position
 - `data` structs (not OOP — pure record types)
-- `enum` sum types with payload (tag + val_int + val_text)
+- `enum` sum types with per-variant payloads, incl. multiple mixed fields
+  (`Add(int, int)`, `Rel(int, text, int)`), destructured in `match`
+  (`Add(l, r) -> …`). A `data` struct can hold a `[Enum]` field, so recursive
+  structures work as an arena (`[Node]`, children referenced by index)
 - `?` operator (early-return-on-Err for sum types)
 - Method-call syntax: `text.upper()`, `list.len()`, `xs.slice(1, 3)` (desugars `x.f(a)` → `f(x, a)`)
 - String interpolation of any expression: `"{a + b}"`, `"{xs[0]}"`, `"{f(x)}"`
+- Character literals: `'+'` is the byte value `43` (an int, not a new type),
+  escapes too (`'\n'`, `'\t'`, `'\''`) — readable notation for ASCII codes
 - `xs[i]` / `m[k]` indexing and `xs[i] = v` / `m[k] = v` element assignment
 - Compound assignment: `+=`, `-=`, `*=`, `/=`; unary negation `-x`
 - `defer <expr>` — runs at block end + before any `return` (LIFO, block-scoped)
-- Contracts: `require <cond>`, `ensure <cond>` (runtime checked)
+- Contracts: `require <cond>`, `ensure <cond>` — runtime checked; a false
+  condition traps loudly (clear message + exit 70)
 - `comptime` constant folding
 
 ### Functions as values
@@ -49,20 +57,39 @@
   or bare SIGFPE
 - Using an unannotated parameter as text/list names the parameter and points
   at the fix (untyped params default to `int`)
+- **Linear `move` bindings**: `move x = e` may be read at most once; a second
+  read is a compile-time use-after-move error (the checked form of `push_mut`'s
+  alias promise). First slice — straight-line use; branch/loop paths not yet
+  analyzed (conservatively over-strict on `if` branches)
+
+### FFI + hot reload
+- `extern fn name(params) -> ret` — call C / runtime / any native symbol
+- `call_ptr(fnptr, arg)` — call a raw function pointer held as an int (e.g. one
+  from `dlsym`); distinct from `f(x)`, which assumes `f` is a closure
+- **Hot reload works**: compile gameplay code to a `.so`, `dlopen`/`dlsym` it,
+  and `call_ptr` the result — swap new code into a running program with state
+  preserved. See `examples/hot_reload/` (Orion host, no restart).
 
 ### Effects (algebraic — rare next-gen feature)
 - `effect Name: op_name: fn(params) -> ret` declarations
-- `perform Effect.op(args)` — invoke; static dispatch via `__handler_Effect_op`
-- One-shot continuations via setjmp/longjmp: `resume_int(v)`, `resume_text(v)`
+- `handle Name.op(params) -> ret:` — the handler (readable sugar; no magic name)
+- `perform Effect.op(args)` — invoke
+- One-shot continuations via setjmp/longjmp: `resume(v)` (int/text inferred)
 
-### Concurrency
-- `spawn job <expr>` + `.await` (basic), `parallel for` (footprint-checked), `scope:` block
+### Concurrency — NOT working (parsed/reserved only)
+- `spawn` / `job` / `.await` / `parallel for` / `scope:` and the ECS `for v
+  with Component:` are reserved words with **no lowering** — they fail to
+  parse or are skipped. Listed here as direction, not as features.
 
 ### Tooling
 - Self-hosting: `orion.exe` compiles its own bundle (fixpoint: stage1 == stage2)
 - LLVM IR backend via clang link
 - `orbit run / build / test` CLI
-- 108/108 smoke tests passing; 15/15 demos
+- 118/118 smoke tests passing; 21/21 demos (incl. a recursive-descent
+  arithmetic calculator, a mini-interpreter with variables, an RPN stack
+  machine on an `enum`, a safe evaluator that propagates errors with `?`,
+  an arena-based AST evaluator, and a CSV → aligned-table formatter that
+  exercises the text stdlib)
 
 ### Stdlib orbs (pure Orion)
 `text` (split/join/replace/trim/pad/upper/lower/starts_with/…),
@@ -83,17 +110,25 @@ and the compiler internals (`orion_lex` / `orion_parse` / `orion_ir` /
    (a newcomer reads `fn f(s: text)`, not the call sites), and inferring it
    would add a second way to say the same thing. The compiler now names the
    parameter and suggests the fix instead of failing cryptically.
-2. **Orb namespaces** — function names are global across `use`d orbs (a clash is a
-   clear error today, but there is no `list.sum` qualification).
-3. **Generic return-type re-typing** — an element read out of a returned generic
+2. **Generic return-type re-typing** — an element read out of a returned generic
    list (`filter(words, …)[0]`) is opaque at the call site (erasure limit).
+   Pure smart-compiling win: no new syntax, just the right element type.
+
+### Reconsidered — NOT worth building
+- **Orb namespaces** (`iter.sum(xs)`) — deliberately dropped. Both `sum(xs)`
+  and `xs.sum()` already call an orb function, so a qualified form would be a
+  *third* way to say the same thing (against "one obvious way"). Name clashes
+  across `use`d orbs are rare and already caught with a clear compile error,
+  and the flat-concatenation bundler carries no orb provenance to resolve
+  against — so it's a large change for negative KISS value.
 
 ### Next-gen game / AI
 4. **Async runtime** — effects are sync; need a scheduler + multi-shot continuations.
 5. **SIMD primitives**, **first-class tensors**.
 
 ### Niche
-6. Refinement types, distinct/newtype, macros, hot reload.
+6. Refinement types, distinct/newtype, macros.
+   (Hot reload is no longer here — it works today; see `examples/hot_reload/`.)
 
 ## Honest summary
 

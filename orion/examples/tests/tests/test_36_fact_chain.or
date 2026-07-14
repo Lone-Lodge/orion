@@ -3,8 +3,8 @@
 # `n`, so quad = 8, 12, 16 as n = 2, 3, 4. Sum = 36.
 fn main() -> int:
     mut n = 2
-    fact dbl = n + n
-    fact quad = dbl + dbl
+    derived dbl = n + n
+    derived quad = dbl + dbl
     mut sum = 0
     for i in 0..<3:
         sum = sum + quad

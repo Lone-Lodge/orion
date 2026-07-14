@@ -296,7 +296,17 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "closure_call":
         # Load fn-ptr + flag; a lambda is called fn(env, args), a plain fn-ref
         # fn(args). env is the closure list itself.
-        clos = value_ref(inst.value)
+        # The closure operand must be a ptr to the closure list. It usually is
+        # (a lambda local, a struct field), but a fn-ref reaching us as an i64 —
+        # a `Fn`-typed parameter, or an element read from a list of fn-refs —
+        # holds the pointer BITS as an integer, so recover the ptr first.
+        clos_raw = value_ref(inst.value)
+        clos_lty = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
+        mut clos = clos_raw
+        mut clos_pre = ""
+        if clos_lty != "ptr":
+            clos_pre = "    %v{my_id}.clp = inttoptr i64 {clos_raw} to ptr\n"
+            clos = "%v{my_id}.clp"
         cc_ret = llvm_type_of(inst.type_text)
         n_ca = len(inst.args)
         mut cc_args = ""
@@ -306,7 +316,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             csep = if cai == 0 then "" else ", "
             cc_args = "{cc_args}{csep}{ca_ty} {value_ref(ca_id)}"
         lam_args = if n_ca == 0 then "ptr {clos}" else "ptr {clos}, {cc_args}"
-        mut cc = "    %v{my_id}.fpi = call i64 @orion_list_at(ptr {clos}, i64 0)"
+        mut cc = "{clos_pre}    %v{my_id}.fpi = call i64 @orion_list_at(ptr {clos}, i64 0)"
         cc = "{cc}\n    %v{my_id}.flg = call i64 @orion_list_at(ptr {clos}, i64 1)"
         cc = "{cc}\n    %v{my_id}.p = inttoptr i64 %v{my_id}.fpi to ptr"
         cc = "{cc}\n    %v{my_id}.isl = icmp eq i64 %v{my_id}.flg, 1"
@@ -603,16 +613,28 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         if n == 0:
             return "    {value_ref(my_id)} = getelementptr i64, ptr @orion_empty_list, i64 0"
         mut text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
+        # Box each element by the LIST's element type — the SAME source
+        # list_at reads back through. Keying off the individual element's
+        # SSA type instead desynced store from load (list_lit bitcast a
+        # double element that list_at, going by the list type, did NOT
+        # un-bitcast) and corrupted every read — a map value stored that
+        # way came back as garbage bits. list slots are i64: a ptr element
+        # is ptrtoint'd, a double stores its bits (list_at bitcasts back),
+        # everything else stores as-is.
+        elem_ll = llvm_type_of(list_elem_type(inst.type_text))
         for ai in 0..<n:
             item_id = at(inst.args, ai)
-            item_inst = at(fn_value.instructions, item_id)
-            item_ty = llvm_type_of(item_inst.type_text)
-            if item_ty == "ptr":
+            if elem_ll == "ptr":
                 tmp = "%v{my_id}.lp{ai}"
                 text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(item_id)} to i64"
                 text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {tmp})"
             else:
-                text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {value_ref(item_id)})"
+                if elem_ll == "double":
+                    ftmp = "%v{my_id}.lf{ai}"
+                    text = "{text}\n    {ftmp} = bitcast double {value_ref(item_id)} to i64"
+                    text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {ftmp})"
+                else:
+                    text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {value_ref(item_id)})"
         result = text
 
     if op == "list_at":
@@ -630,7 +652,13 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             l2 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
             result = "{la_pre}{l1}\n{l2}"
         else:
-            result = "{la_pre}    {value_ref(my_id)} = call i64 @orion_list_at(ptr {la_src}, i64 {value_ref(inst.lhs)})"
+            if elem_ll == "double":
+                di_name = "%v{my_id}.di"
+                l1 = "    {di_name} = call i64 @orion_list_at(ptr {la_src}, i64 {value_ref(inst.lhs)})"
+                l2 = "    {value_ref(my_id)} = bitcast i64 {di_name} to double"
+                result = "{la_pre}{l1}\n{l2}"
+            else:
+                result = "{la_pre}    {value_ref(my_id)} = call i64 @orion_list_at(ptr {la_src}, i64 {value_ref(inst.lhs)})"
 
     if op == "list_len":
         ll_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
@@ -663,7 +691,13 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             l2 = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {tmp})"
             result = "{l1}\n{l2}"
         else:
-            result = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+            if val_ty == "double":
+                tmp = "%v{my_id}.pf"
+                l1 = "    {tmp} = bitcast double {value_ref(inst.lhs)} to i64"
+                l2 = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {tmp})"
+                result = "{l1}\n{l2}"
+            else:
+                result = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
     if op == "list_push_mut":
         val_inst = at(fn_value.instructions, inst.lhs)
@@ -674,7 +708,13 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             l2 = "    {value_ref(my_id)} = call ptr @orion_list_push_mut(ptr {value_ref(inst.value)}, i64 {tmp})"
             result = "{l1}\n{l2}"
         else:
-            result = "    {value_ref(my_id)} = call ptr @orion_list_push_mut(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
+            if val_ty == "double":
+                tmp = "%v{my_id}.pf"
+                l1 = "    {tmp} = bitcast double {value_ref(inst.lhs)} to i64"
+                l2 = "    {value_ref(my_id)} = call ptr @orion_list_push_mut(ptr {value_ref(inst.value)}, i64 {tmp})"
+                result = "{l1}\n{l2}"
+            else:
+                result = "    {value_ref(my_id)} = call ptr @orion_list_push_mut(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
     # SIMD-style vector ops over int lists. Lowered to elementwise runtime
     # fns (orion_vec_add/sub/mul return ptr; orion_vec_dot returns i64).
@@ -754,9 +794,16 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
             l3 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
             result = "{l1}\n{l2}\n{l3}"
         else:
-            l1 = "    call void @orion_list_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
-            l2 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
-            result = "{l1}\n{l2}"
+            if lsv_val_ty == "double":
+                tmp = "%v{my_id}.sf"
+                l1 = "    {tmp} = bitcast double {value_ref(inst.rhs)} to i64"
+                l2 = "    call void @orion_list_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {tmp})"
+                l3 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
+                result = "{l1}\n{l2}\n{l3}"
+            else:
+                l1 = "    call void @orion_list_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
+                l2 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
+                result = "{l1}\n{l2}"
 
     if op == "map_len":
         ml_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
@@ -1296,6 +1343,8 @@ fn emit_runtime() -> Text:
     text = "{text}@.msg_oob = private unnamed_addr constant [48 x i8] c\"orion: list index %lld out of range (len %lld)\\0A\\00\"\n"
     text = "{text}@.msg_divz = private unnamed_addr constant [25 x i8] c\"orion: division by zero\\0A\\00\"\n"
     text = "{text}@.msg_modz = private unnamed_addr constant [23 x i8] c\"orion: modulo by zero\\0A\\00\"\n"
+    text = "{text}@.msg_require = private unnamed_addr constant [27 x i8] c\"orion: requirement failed\\0A\\00\"\n"
+    text = "{text}@.msg_ensure = private unnamed_addr constant [29 x i8] c\"orion: postcondition failed\\0A\\00\"\n"
     text = "{text}declare void @exit(i32)\n"
     text = "{text}\n"
     text = "{text}define ptr @orion_text_concat(ptr %a, ptr %b) \{\n"
@@ -1740,6 +1789,32 @@ fn emit_runtime() -> Text:
     text = "{text}mok:\n"
     text = "{text}  %mr = srem i64 %a, %b\n"
     text = "{text}  ret i64 %mr\n"
+    text = "{text}\}\n\n"
+    # Contract checks. `require`/`ensure` evaluate a condition and trap loudly
+    # (clear message + exit 70) when it is false, instead of the old behaviour
+    # where the statement was dropped silently. Returns i64 so the emitted
+    # `call` can default its return type to i64; the value is discarded.
+    text = "{text}define i64 @orion_require(i64 %c) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %rq = icmp eq i64 %c, 0\n"
+    text = "{text}  br i1 %rq, label %rfail, label %rok\n"
+    text = "{text}rfail:\n"
+    text = "{text}  %_rp = call i32 (ptr, ...) @printf(ptr @.msg_require)\n"
+    text = "{text}  call void @exit(i32 70)\n"
+    text = "{text}  unreachable\n"
+    text = "{text}rok:\n"
+    text = "{text}  ret i64 %c\n"
+    text = "{text}\}\n\n"
+    text = "{text}define i64 @orion_ensure(i64 %c) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %eq0 = icmp eq i64 %c, 0\n"
+    text = "{text}  br i1 %eq0, label %efail, label %eok\n"
+    text = "{text}efail:\n"
+    text = "{text}  %_ep = call i32 (ptr, ...) @printf(ptr @.msg_ensure)\n"
+    text = "{text}  call void @exit(i32 70)\n"
+    text = "{text}  unreachable\n"
+    text = "{text}eok:\n"
+    text = "{text}  ret i64 %c\n"
     text = "{text}\}\n\n"
     # slice(list, lo, hi) — half-open [lo, hi), bounds clamped like the interp.
     text = "{text}define ptr @orion_list_slice(ptr %list, i64 %lo, i64 %hi) \{\n"

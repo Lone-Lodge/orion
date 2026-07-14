@@ -1,0 +1,23 @@
+# A match arm can be an indented block, not just a single expression: bind a
+# local, then the last expression is the arm's value — exactly like an `if`
+# branch. Inline arms (`-> expr`) still work. Both the scrutinee form and the
+# subjectless cond form (`match:`) support it.
+fn score(kind: int) -> int:
+    match kind:
+        1 ->
+            base = 20
+            base * 2 + 2      # 42
+        2 -> 7                # inline arm still fine
+        _ -> 0
+fn main() -> int:
+    a = score(1)              # 42
+    b = score(2)              # 7
+    n = 9
+    c = match:
+        n > 100 -> 1
+        n > 5 ->
+            step = n - 5      # 4
+            step - 4          # 0
+        else -> 99
+    # 42 + 7 - 7 + 0 = 42
+    a + b - 7 + c

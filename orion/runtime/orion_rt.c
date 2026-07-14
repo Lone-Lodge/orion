@@ -96,20 +96,96 @@ static void ovf_drain(orion_ovf **head, size_t *bytes) {
     *bytes = 0;
 }
 
+/* Region-lifetime forensics. region_fit frees a region's old buffer when
+ * it grows; a struct built in that region and read after the reset now
+ * points into freed (or reused) memory — the classic "value outlived its
+ * region" bug that is otherwise a cryptic wild-pointer crash. Remember the
+ * last few freed ranges (and the live region bounds) so the crash filter
+ * can NAME the region a bad pointer belonged to and prescribe the fix. */
+#define ORION_FREED_RING 8
+static struct {
+    uintptr_t lo, hi;
+    const char *name;
+} orion_freed[ORION_FREED_RING];
+static int orion_freed_n = 0;
+static int orion_region_resized = 0; /* any region grown+freed this run */
+
+static void orion_note_freed(const char *name, unsigned char *base, size_t cap) {
+    int i = orion_freed_n % ORION_FREED_RING;
+    orion_freed[i].lo = (uintptr_t)base;
+    orion_freed[i].hi = (uintptr_t)base + cap;
+    orion_freed[i].name = name;
+    orion_freed_n++;
+    orion_region_resized = 1;
+}
+
+/* Which region does `addr` fall in? Returns a human sentence or NULL. Checks
+ * freed ranges first (the actionable case), then the live regions. */
+static const char *orion_region_of(uintptr_t a) {
+    for (int i = 0; i < ORION_FREED_RING; i++)
+        if (orion_freed[i].lo && a >= orion_freed[i].lo && a < orion_freed[i].hi)
+            return orion_freed[i].name;
+    return NULL;
+}
+
 /* Swap an EMPTY region's buffer for one that fits what the last cycle
- * actually needed. Call only at reset. Keeps need <= 3/4 of cap. */
+ * actually needed. Call only at reset.
+ *
+ * GROW when the last cycle's peak crowds the buffer (> 3/4 of cap):
+ * double until it fits, so the next cycle bumps instead of spilling.
+ *
+ * SHRINK when the buffer DWARFS the region's recent working set and has
+ * done so for a SUSTAINED stretch: halve one step. A transient spike — a
+ * heavy render frame, a compaction — otherwise pins RSS at the
+ * high-water for the whole session (the grow-only bug: fireplace idled
+ * at 223 MB because one busy frame grew the arena to 54 MB and it never
+ * came back).
+ *
+ * The hysteresis (`streak`) is what stops thrash. Without it, a game that
+ * alternates a busy render frame (need ~700 KB) with an idle frame
+ * (need ~0) grows on the busy frame and shrinks on the idle one, every
+ * frame, forever. So a region only shrinks after `SHRINK_PATIENCE`
+ * CONSECUTIVE resets all sat under 1/4 of cap; any single healthy cycle
+ * resets the streak. A cap that matches the working set (need in the
+ * comfortable [1/4, 3/4] band) is left exactly alone. `high`, if
+ * non-NULL, is retracted to `need` on a shrink so the mem report shows
+ * the recent peak, not a stale session high-water. `streak` NULL opts a
+ * region out of shrinking (pools are ring-bounded and never spike). */
+#define SHRINK_PATIENCE 180 /* ~3 s at 60 fps of sustained low use */
 static void region_fit(const char *name, unsigned char **base, size_t *cap,
-                       size_t need) {
-    size_t want = *cap;
-    if (!*base || need <= (*cap / 4) * 3) return;
-    while ((want / 4) * 3 < need) want *= 2;
+                       size_t *high, size_t need, size_t floor, int *streak) {
+    if (!*base) return;
+    if (need > (*cap / 4) * 3) {
+        size_t want = *cap;
+        while ((want / 4) * 3 < need) want *= 2;
+        unsigned char *fresh = (unsigned char *)malloc(want);
+        if (!fresh) return; /* keep the old buffer; spill stays slow */
+        orion_note_freed(name, *base, *cap);
+        free(*base);
+        *base = fresh;
+        *cap = want;
+        if (streak) *streak = 0;
+        fprintf(stderr, "%s[orion] %s region sized to %llu KB%s\n", c_dim(),
+                name, (unsigned long long)(want / 1024u), c_off());
+        return;
+    }
+    if (!streak || *cap <= floor || need >= *cap / 4) {
+        if (streak) *streak = 0; /* healthy use — reset the patience clock */
+        return;
+    }
+    if (++(*streak) < SHRINK_PATIENCE) return;
+    size_t want = *cap / 2;
+    if (want < floor) want = floor;
     unsigned char *fresh = (unsigned char *)malloc(want);
-    if (!fresh) return; /* keep the old buffer; spill stays slow */
+    if (!fresh) return; /* keep the old buffer; nothing lost */
+    orion_note_freed(name, *base, *cap);
     free(*base);
     *base = fresh;
     *cap = want;
-    fprintf(stderr, "%s[orion] %s region sized to %llu KB%s\n", c_dim(), name,
-            (unsigned long long)(want / 1024u), c_off());
+    *streak = 0;
+    if (high) *high = need;
+    fprintf(stderr, "%s[orion] %s region sized down to %llu KB%s\n", c_dim(),
+            name, (unsigned long long)(want / 1024u), c_off());
 }
 
 /* ---- Frame arena ---------------------------------------------------
@@ -128,6 +204,8 @@ static unsigned char *arena_base = NULL;
 static size_t arena_cap = 0;
 static size_t arena_used = 0;
 static size_t arena_peak = 0; /* max used since last reset (rewind lowers used) */
+static size_t arena_high = 0; /* recent high-water (retracted on a shrink) */
+static int arena_lowstreak = 0; /* consecutive under-used resets (shrink hysteresis) */
 static int arena_on = 0;
 static orion_ovf *arena_ovf = NULL;
 static size_t arena_ovf_bytes = 0;
@@ -167,6 +245,7 @@ static unsigned char *frame_base = NULL;
 static size_t frame_cap = 0;
 static size_t frame_used = 0;
 static size_t frame_high = 0;
+static int frame_lowstreak = 0; /* shrink hysteresis, see region_fit */
 static int frame_on = 0;
 static int persist_depth = 0;
 static orion_ovf *frame_ovf = NULL;
@@ -196,7 +275,8 @@ long long orion_frame_reset(void) {
     if (frame_base && frame_used > 0) {
         memset(frame_base, 0xDD, frame_used);
     }
-    region_fit("frame", &frame_base, &frame_cap, need);
+    region_fit("frame", &frame_base, &frame_cap, &frame_high, need, FRAME_START,
+               &frame_lowstreak);
     frame_used = 0;
     return 1;
 }
@@ -306,7 +386,8 @@ long long orion_pool_reset(long long i) {
     if (pool_base[i] && pool_used[i] > 0) {
         memset(pool_base[i], 0xDD, pool_used[i]);
     }
-    region_fit("pool", &pool_base[i], &pool_cap[i], need);
+    region_fit("pool", &pool_base[i], &pool_cap[i], &pool_high[i], need,
+               POOL_START, NULL);
     pool_used[i] = 0;
     return 1;
 }
@@ -352,6 +433,7 @@ const char *orion_text_from_c(const char *s) {
     memcpy(p, s, n);
     return p;
 }
+
 
 long long orion_text_hash(const char *p) {
     long long h = ((const long long *)p)[-2];
@@ -512,7 +594,8 @@ long long orion_file_stamp(const char *path) {
 long long orion_arena_reset(void) {
     size_t need = arena_peak + arena_ovf_bytes;
     ovf_drain(&arena_ovf, &arena_ovf_bytes);
-    region_fit("arena", &arena_base, &arena_cap, need);
+    region_fit("arena", &arena_base, &arena_cap, &arena_high, need, ARENA_START,
+               &arena_lowstreak);
     arena_used = 0;
     arena_peak = 0;
     return 1;
@@ -679,7 +762,6 @@ static long long alloc_malloc = 0;
 long long orion_alloc_total(void) { return alloc_total; }
 long long orion_alloc_malloc_total(void) { return alloc_malloc; }
 
-static size_t arena_high = 0;
 long long orion_arena_high(void) { return (long long)arena_high; }
 
 /* Priority: epoch arena (innermost) > selected pool (beats persist —
@@ -851,19 +933,13 @@ void __orion_resume_text(char *value) {
 
 /* Timing primitives — backbone of the async runtime. Windows-only for now;
  * port to POSIX (clock_gettime + nanosleep) is a few extra ifdefs. */
-#ifdef _WIN32
-#include <windows.h>
-
-/* Crash forensics: on an unhandled fault, print the exception code
- * and the MODULE-RELATIVE offset (symbolizable against the link map
- * orbit emits next to the exe) before dying. Fail fast, but say
- * where. */
-/* ---- The WHY: cause breadcrumbs ----
- * The engine always knows which bundle/event/rule is executing —
- * a crash should say so. Dispatch layers drop crumbs (bounded
- * copies into static rings, zero alloc, ~20ns); the crash filter
- * prints the trail newest-first. WHAT (exception+poison), WHERE
- * (symbolized stack), WHY (this trail): the full diagnosis. */
+/* ---- The WHY: cause breadcrumbs (PORTABLE) ----
+ * The engine always knows which bundle/event/rule is executing — a crash
+ * should say so. Dispatch layers drop crumbs (bounded copies into static
+ * rings, zero alloc, ~20ns). Recording is zero-API, so it lives OUTSIDE the
+ * platform guard: the emitter calls orion_crumb / orion_crumb_rule on every
+ * platform (astra's `rule` construct does). Only the crash READER below —
+ * which prints the trail newest-first — is Windows-specific for now. */
 #define CRUMB_N 8
 static char crumb_bundle[CRUMB_N][40];
 static char crumb_event[CRUMB_N][24];
@@ -889,6 +965,14 @@ void orion_crumb(const char *bundle, const char *event, long long tick) {
 void orion_crumb_rule(const char *rule) {
     crumb_copy(crumb_rule, rule, sizeof crumb_rule);
 }
+
+#ifdef _WIN32
+#include <windows.h>
+
+/* Crash forensics: on an unhandled fault, print the exception code
+ * and the MODULE-RELATIVE offset (symbolizable against the link map
+ * orbit emits next to the exe) before dying. Fail fast, but say
+ * where. The crumb trail recorded above prints newest-first. */
 
 /* The report goes to stderr AND crash.txt — a console window dies
  * with the process, a file survives to be read (by the pilot or by
@@ -956,9 +1040,14 @@ static void crash_map_load(void) {
     }
     fclose(f);
 }
-static void crash_sym(unsigned long long off, char *out, size_t cap) {
-    snprintf(out, cap, "+0x%llx", off);
-    if (!crash_map_buf) return;
+/* Returns 1 when it resolved to a confident named symbol, 0 otherwise.
+ * A match more than 8 KB past the nearest .map symbol is almost always the
+ * WRONG function (the real one is absent from the map) — a confident-looking
+ * bogus name like "RtlUnwind+0x8630" is worse than nothing, so callers can
+ * drop those frames and show only the real trace. */
+static int crash_sym(unsigned long long off, char *out, size_t cap) {
+    snprintf(out, cap, "0x%llx", off);
+    if (!crash_map_buf) return 0;
     /* Map lines: " 0001:HHHHHHHH  name ..." — module offset is the
      * section address + 0x1000. Find the greatest base <= off. */
     unsigned long long best = 0;
@@ -981,8 +1070,38 @@ static void crash_sym(unsigned long long off, char *out, size_t cap) {
         }
         p += 6;
     }
-    if (best_name[0])
+    if (best_name[0] && (off - best) <= 0x2000ULL) {
         snprintf(out, cap, "%s+0x%llx", best_name, off - best);
+        return 1;
+    }
+    return 0;
+}
+
+/* Common Windows exception codes → a plain-language name, so the crash
+ * header reads as English instead of a bare hex code. */
+static const char *orion_exc_name(unsigned long code) {
+    switch (code) {
+        case 0xC0000005UL: return "ACCESS VIOLATION (bad pointer)";
+        case 0xC00000FDUL: return "STACK OVERFLOW (runaway recursion)";
+        case 0xC0000094UL: return "INTEGER DIVIDE BY ZERO";
+        case 0xC0000095UL: return "INTEGER OVERFLOW";
+        case 0xC000001DUL: return "ILLEGAL INSTRUCTION";
+        case 0xC0000090UL: return "FLOAT INVALID OPERATION";
+        case 0x80000003UL: return "BREAKPOINT";
+        default:           return "exception";
+    }
+}
+
+/* Games run with a build/ dir beside their exe; drop crash artifacts there
+ * so the project root stays clean. Programs with no build/ (the compiler,
+ * CLI tools) fall back to the current directory. */
+static const char *orion_artifact(const char *name, char *buf, size_t n) {
+    DWORD a = GetFileAttributesA("build");
+    if (a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY)) {
+        snprintf(buf, n, "build\\%s", name);
+        return buf;
+    }
+    return name;
 }
 
 static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
@@ -990,14 +1109,16 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
     unsigned long long at =
         (unsigned long long)info->ExceptionRecord->ExceptionAddress;
     char sym[256];
+    char artbuf[512];
     crash_map_load();
-    crash_tee = fopen("crash.txt", "w");
+    crash_tee = fopen(orion_artifact("crash.txt", artbuf, sizeof artbuf), "w");
     /* Unbuffered: the filter itself may die (nested fault in dbghelp
      * etc.) — every line must hit disk the moment it is written. */
     if (crash_tee)
         setvbuf(crash_tee, NULL, _IONBF, 0);
     crash_sym(at - base, sym, sizeof sym);
-    crash_line("[orion] FATAL: exception 0x%lx at %s",
+    crash_line("[orion] FATAL: %s  (0x%lx)  at %s",
+               orion_exc_name(info->ExceptionRecord->ExceptionCode),
                (unsigned long)info->ExceptionRecord->ExceptionCode, sym);
     crash_print_crumbs();
     /* Backtrace: scan the crashed thread's stack for return addresses
@@ -1009,9 +1130,9 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
         int printed = 0;
         if (rip >= lo && rip < hi) {
             crash_sym(rip - base, sym, sizeof sym);
-            crash_line("[orion]   #%d %s", printed, sym);
-            printed++;
+            crash_line("[orion]   at  %s", sym);
         }
+        crash_line("[orion]   call stack (nearest first):");
         /* Scan only committed stack: a shallow crash puts the stack
          * top within 512 words of rsp, and reading past it would
          * nested-fault and kill the filter mid-report. */
@@ -1022,12 +1143,16 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
             if (shi && (unsigned long long)(sp + i + 1) > shi)
                 break;
             unsigned long long v = sp[i];
-            if (v >= lo && v < hi) {
-                crash_sym(v - base, sym, sizeof sym);
+            /* Only frames that resolve to a REAL named symbol: a stack scan
+             * turns up stale return addresses and misresolved slots, and a
+             * page of bogus "RtlUnwind+0x…" lines buries the real trace. */
+            if (v >= lo && v < hi && crash_sym(v - base, sym, sizeof sym)) {
                 crash_line("[orion]   #%d %s", printed, sym);
                 printed++;
             }
         }
+        if (printed == 0)
+            crash_line("[orion]   (no named frames — see crash.dmp)");
     }
     /* Access violations carry the faulting data address; a 0xdd..dd
      * byte pattern means a read through region memory poisoned at
@@ -1040,10 +1165,36 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
         int poison = ((bad >> 8) & 0xffffffffULL) == 0xddddddddULL ||
                      (bad & 0xffffffff00ULL) == 0xdddddddd00ULL ||
                      ((bad >> 16) & 0xffffffffULL) == 0xddddddddULL;
+        const char *why;
+        if (poison)
+            why = " — 0xDD poison: memory used after its arena was reset (lifetime bug)";
+        else if (bad == 0xffffffffffffffffULL)
+            why = " — value is -1: an uninitialized field or a missing map key read as a pointer";
+        else if (bad < 0x1000ULL)
+            why = " — near-null: an unset struct field or empty/missing value";
+        else
+            why = "";
         crash_line("[orion]        %s address 0x%llx%s",
                    info->ExceptionRecord->ExceptionInformation[0] ? "writing"
                                                                   : "reading",
-                   bad, poison ? " (0xDD poison: reset region memory)" : "");
+                   bad, why);
+        /* Region-lifetime forensics. If the bad address lands in a region
+         * buffer we freed at a resize, this is a value that outlived its
+         * region — name it and prescribe persist. Even when the address is
+         * -1/near-null (the region buffer was freed AND reused, so the
+         * dangling read returns garbage rather than the old range), a resize
+         * having happened at all is the tell — surface it so the next person
+         * doesn't spend hours: this was fireplace's Renderer-in-frame-region
+         * crash exactly. */
+        const char *region = orion_region_of((uintptr_t)bad);
+        if (region)
+            crash_line("[orion]        ^ points into the %s region's buffer, freed at a resize "
+                       "— LIFETIME BUG: this value outlived its region; build it under "
+                       "orion_persist_on()", region);
+        else if (orion_region_resized && (poison || bad == 0xffffffffffffffffULL || bad < 0x1000ULL))
+            crash_line("[orion]        ^ a region was resized (buffer freed) earlier this run — "
+                       "if a struct built in the arena/frame region is read after its reset it "
+                       "dangles; build it under orion_persist_on() (see the 'region sized' line above)");
     }
     fflush(stderr);
     if (crash_tee) {
@@ -1061,7 +1212,9 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                                         void *, void *);
             MdwFn mdw = (MdwFn)GetProcAddress(dh, "MiniDumpWriteDump");
             if (mdw) {
-                HANDLE f = CreateFileA("crash.dmp", GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                char dmpbuf[512];
+                HANDLE f = CreateFileA(orion_artifact("crash.dmp", dmpbuf, sizeof dmpbuf),
+                                       GENERIC_READ | GENERIC_WRITE, 0, NULL,
                                        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
                                        NULL);
                 if (f != INVALID_HANDLE_VALUE) {
@@ -1162,6 +1315,14 @@ static void guard_install(void) {
     if (!vh) vh = AddVectoredExceptionHandler(1, orion_guard_vector);
 }
 
+/* An Orion fn-ref arrives here as a CLOSURE list [fn_addr, flag] — the
+ * compiler wraps every fn-ref value that way (flag 1 = a lambda that takes
+ * its env as a leading arg, else a plain fn-ref). The old code cast this
+ * list pointer straight to code and jumped into the list's own memory (the
+ * wild 0xAA crash the GUI hit; soak never armed the guard). Unwrap it the
+ * way closure_call does: element 0 is the real function, element 1 the flag. */
+extern long long orion_list_at(void *list, long long idx);
+
 long long sup_guard5(long long fn, long long a, long long b, long long c,
                      long long d, long long e) {
     guard_install();
@@ -1178,8 +1339,16 @@ long long sup_guard5(long long fn, long long a, long long b, long long c,
     ((unsigned long long *)guard_jb)[0] = 0;
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
-    long long r = ((long long (*)(long long, long long, long long, long long,
-                                  long long))fn)(a, b, c, d, e);
+    void *clos = (void *)fn;
+    long long real = orion_list_at(clos, 0);
+    long long lam = orion_list_at(clos, 1);
+    long long r;
+    if (lam == 1)
+        r = ((long long (*)(void *, long long, long long, long long, long long,
+                            long long))(void *)real)(clos, a, b, c, d, e);
+    else
+        r = ((long long (*)(long long, long long, long long, long long,
+                            long long))(void *)real)(a, b, c, d, e);
     guard_armed = 0;
     return r;
 }
@@ -1196,9 +1365,18 @@ long long sup_guard7(long long fn, long long a, long long b, long long c,
     ((unsigned long long *)guard_jb)[0] = 0;
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
-    long long r = ((long long (*)(long long, long long, long long, long long,
-                                  long long, long long, long long))fn)(
-        a, b, c, d, e, f, g);
+    void *clos = (void *)fn;
+    long long real = orion_list_at(clos, 0);
+    long long lam = orion_list_at(clos, 1);
+    long long r;
+    if (lam == 1)
+        r = ((long long (*)(void *, long long, long long, long long, long long,
+                            long long, long long, long long))(void *)real)(
+            clos, a, b, c, d, e, f, g);
+    else
+        r = ((long long (*)(long long, long long, long long, long long,
+                            long long, long long, long long))(void *)real)(
+            a, b, c, d, e, f, g);
     guard_armed = 0;
     return r;
 }
@@ -1337,6 +1515,47 @@ const char *orion_dir_list(const char *dir) {
         return evac;
     }
 }
+/* Absolute path of the running executable — lets orbit find its own toolchain
+ * (orion.exe + runtime beside it) so projects never hard-code the engine path.
+ * Placed here, after windows.h, so GetModuleFileNameA/DWORD are in scope. */
+const char *host_self_exe(void) {
+    char path[4096];
+    DWORD n = GetModuleFileNameA(NULL, path, (DWORD)sizeof path);
+    if (n == 0 || n >= sizeof path) return otx_empty.z;
+    path[n] = 0;
+    return orion_text_from_c(path);
+}
+/* Subdirectories of `dir` (newline-separated, excludes . and ..). Lets orbit
+ * scan a workspace for orbs regardless of folder layout. host_* so the
+ * compiler auto-declares it. */
+const char *host_subdirs(const char *dir) {
+    char pattern[1024];
+    WIN32_FIND_DATAA fd;
+    snprintf(pattern, sizeof(pattern), "%s\\*", dir);
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return otx_empty.z;
+    size_t cap = 4096, len = 0;
+    char *out = (char *)malloc(cap);
+    out[0] = 0;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
+        if (fd.cFileName[0] == '.' &&
+            (fd.cFileName[1] == 0 || (fd.cFileName[1] == '.' && fd.cFileName[2] == 0)))
+            continue;
+        size_t n = strlen(fd.cFileName);
+        if (len + n + 2 > cap) { cap *= 2; out = (char *)realloc(out, cap); }
+        if (len > 0) out[len++] = '\n';
+        memcpy(out + len, fd.cFileName, n + 1);
+        len += n;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    {
+        char *evac = orion_text_alloc((long long)len);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
+}
 long long __orion_time_now_ms(void) {
     FILETIME ft; GetSystemTimeAsFileTime(&ft);
     unsigned long long t = ((unsigned long long)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
@@ -1351,6 +1570,24 @@ long long __orion_monotonic_ms(void) {
     if (!freq.QuadPart) QueryPerformanceFrequency(&freq);
     QueryPerformanceCounter(&c);
     return (long long)(c.QuadPart * 1000 / freq.QuadPart);
+}
+/* Same QPC source in microseconds: sub-millisecond frame costs round to
+ * 0 in the ms clock, so any per-frame capability metric needs this.
+ * Named atlas_* (not orion_*) on purpose: orion_* symbols are treated as
+ * compiler builtins and skip the auto-extern-declare path, so a plain
+ * `extern fn` on an orion_-named symbol never gets its LLVM `declare`. */
+long long atlas_monotonic_us(void) {
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER c;
+    if (!freq.QuadPart) QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&c);
+    return (long long)(c.QuadPart * 1000000 / freq.QuadPart);
+}
+/* Best-effort mkdir (single dir) — games route saves under saves/. Named
+ * atlas_* so the compiler auto-declares it for a plain `extern fn`. */
+long long atlas_mkdir(const char *path) {
+    CreateDirectoryA(path, NULL);
+    return 1;
 }
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
@@ -1379,6 +1616,16 @@ long long __orion_time_now_ms(void) {
 long long __orion_monotonic_ms(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+long long atlas_monotonic_us(void) {
+    struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+/* Best-effort mkdir (single dir) — games route saves under saves/. Named
+ * atlas_* so the compiler auto-declares it for a plain `extern fn`. */
+long long atlas_mkdir(const char *path) {
+    mkdir(path, 0755);
+    return 1;
 }
 void __orion_sleep_ms(long long ms) {
     if (ms > 0) {
@@ -1415,6 +1662,46 @@ const char *orion_dir_list(const char *dir) {
         return evac;
     }
 }
+/* Absolute path of the running executable (POSIX mirror). unistd.h for
+ * readlink is included with the other POSIX headers. */
+const char *host_self_exe(void) {
+    char path[4096];
+    ssize_t n = readlink("/proc/self/exe", path, sizeof path - 1);
+    if (n <= 0) return otx_empty.z;
+    path[n] = 0;
+    return orion_text_from_c(path);
+}
+/* Subdirectories of `dir` (newline-separated, excludes . and ..). Lets orbit
+ * scan a workspace for orbs regardless of folder layout. */
+const char *host_subdirs(const char *dir) {
+    DIR *d = opendir(dir);
+    if (!d) return otx_empty.z;
+    size_t cap = 4096, len = 0;
+    char *out = (char *)malloc(cap);
+    out[0] = 0;
+    struct dirent *ent;
+    while ((ent = readdir(d))) {
+        if (ent->d_name[0] == '.' &&
+            (ent->d_name[1] == 0 || (ent->d_name[1] == '.' && ent->d_name[2] == 0)))
+            continue;
+        char full[4096];
+        struct stat st;
+        snprintf(full, sizeof(full), "%s/%s", dir, ent->d_name);
+        if (!(stat(full, &st) == 0 && S_ISDIR(st.st_mode))) continue;
+        size_t n = strlen(ent->d_name);
+        if (len + n + 2 > cap) { cap *= 2; out = (char *)realloc(out, cap); }
+        if (len > 0) out[len++] = '\n';
+        memcpy(out + len, ent->d_name, n + 1);
+        len += n;
+    }
+    closedir(d);
+    {
+        char *evac = orion_text_alloc((long long)len);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
+}
 #endif
 
 /* Host OS for the few places Orion code must branch on it (path separators,
@@ -1426,3 +1713,6 @@ long long host_os(void) { return 2; }
 #else
 long long host_os(void) { return 1; }
 #endif
+
+/* PNG sprite loader (host_image_load) — see png_min.c */
+#include "png_min.c"

@@ -1,0 +1,35 @@
+# A live-coding watch loop, in Orion. It watches plugin.or; when the source
+# changes it recompiles it to a fresh .so and hot-swaps it into this running
+# program — game state (here just `state`) carries across every reload.
+#
+# This is the whole "less editor, more live" loop in ~25 lines: the running
+# program invokes the self-hosting compiler on the changed file and rebinds the
+# result, without stopping.
+use os
+
+extern fn dlopen(path: Text, flag: int) -> int
+extern fn dlsym(handle: int, name: Text) -> int
+
+fn build_and_load(gen: int) -> int:
+    target = "plugin_gen{gen}.so"
+    run_command("bash", ["build_so.sh", "plugin.or", target])   # recompile
+    h = dlopen("./{target}", 2)                                 # load fresh code
+    dlsym(h, "tick")
+
+fn main() -> int:
+    mut state = 0
+    mut last_src = read_file("plugin.or")
+    mut gen = 0
+    mut tick = build_and_load(gen)
+    print_line("watching plugin.or ... (edit it and the running program follows)")
+    for i in 0..<10:
+        cur = read_file("plugin.or")
+        if cur != last_src:
+            last_src = cur
+            gen = gen + 1
+            tick = build_and_load(gen)
+            print_line("  * source changed -> recompiled + hot-swapped (gen {gen})")
+        state = call_ptr(tick, state)
+        print_line("tick -> state = {state}")
+        sleep_ms(300)
+    state

@@ -1,9 +1,9 @@
-# `fact` — a reactive derived binding. Reading `area` re-evaluates its
+# `derived` — a reactive derived binding. Reading `area` re-evaluates its
 # expression against the CURRENT value of `w`, so the same name yields a
 # fresh result after `w` changes. 16 (w=4) + 25 (w=5) = 41.
 fn main() -> int:
     mut w = 4
-    fact area = w * w
+    derived area = w * w
     a1 = area
     w = 5
     a2 = area

@@ -1,0 +1,33 @@
+# Hot reload, Orion-native. This program loads compiled gameplay code from a
+# shared library, runs it, then swaps in a freshly compiled version WITHOUT
+# restarting — game state survives the swap. That is the "less editor, more
+# live" loop: a change becomes visible in the running world immediately.
+#
+# The primitive that makes it work is `call_ptr(fnptr, arg)` — call a raw
+# function pointer held as an int (here, one returned by `dlsym`). A normal
+# `f(x)` assumes `f` is a closure; `call_ptr` calls loaded native code.
+#
+# See run.sh: it compiles plugin.or twice (an "edit" in between) and runs this.
+
+extern fn dlopen(path: Text, flag: int) -> int
+extern fn dlsym(handle: int, name: Text) -> int
+
+fn load_tick(path: Text) -> int:
+    h = dlopen(path, 2)                  # RTLD_NOW
+    dlsym(h, "tick")                     # the `tick` fn pointer, as an int
+
+fn main() -> int:
+    mut state = 0
+
+    tick = load_tick("./plugin_v1.so")   # gameplay code, version 1
+    for i in 0..<3:
+        state = call_ptr(tick, state)
+        print_line("v1  state = {state}")
+
+    # ---- HOT RELOAD: swap in v2, no restart, state preserved ----
+    tick2 = load_tick("./plugin_v2.so")
+    for i in 0..<3:
+        state = call_ptr(tick2, state)
+        print_line("v2  state = {state}   (behavior changed, state kept)")
+
+    state                                # 3 -> swap -> 33

@@ -14,6 +14,27 @@ use os
 # build/run/test are now pure Orion (see cli_build below) — they compile
 # with orion.exe + clang and run the native exe. No Rust interp left.
 extern fn orion_console_color() -> int
+extern fn host_self_exe() -> Text
+extern fn host_subdirs(dir: Text) -> Text
+
+# Self-locating toolchain: orbit and orion.exe ship together in <root>/dist,
+# with the runtime at <root>/runtime. Derive both from orbit's OWN path so a
+# project never has to hard-code the engine location — the workspace can sit
+# in any folder layout. Falls back to the legacy sibling default when the
+# self-path is unavailable (or a toml can still override explicitly).
+fn self_dist_dir() -> Text:
+    exe = host_self_exe()
+    if len(exe) == 0 then "" else path_parent(exe)
+
+fn default_compiler() -> Text:
+    d = self_dist_dir()
+    if len(d) > 0 and file_exists(d + "/orion.exe") then d + "/orion.exe"
+    else "../orion/dist/orion.exe"
+
+fn default_runtime() -> Text:
+    d = self_dist_dir()
+    if len(d) > 0 and is_dir(path_parent(d) + "/runtime") then path_parent(d) + "/runtime"
+    else "../orion/runtime"
 
 # ---------- console style (ANSI, tty-gated) ----------
 
@@ -321,16 +342,95 @@ fn nb_setting(lines: [Text], key: Text, fallback: Text) -> Text:
             taken = true
     found
 
-fn nb_orb_dirs(lines: [Text]) -> [Text]:
+# The `path:` orb dirs a toml names, each resolved against `base` (the dir
+# of the toml being read) so nested tomls compose — a dep written relative
+# to its own orb becomes relative to the project root as we descend. `base`
+# "" means the current project (paths already root-relative).
+fn nb_dep_dirs(lines: [Text], base: Text) -> [Text]:
     total = len(lines)
-    mut parents = []
+    mut out = []
     for index in 0..<total:
         line = at(lines, index)
         if str_contains(line, "\"path:"):
             rel = str_replace(nb_quoted(line), "path:", "")
-            parent = path_parent(rel)
-            if not list_contains(parents, parent):
-                parents = push(parents, parent)
+            dir = if base == "" then rel else base + "/" + rel
+            if not list_contains(out, dir):
+                out = push(out, dir)
+    out
+
+# Collect an orb's dir plus every orb reachable through its own Orbit.toml,
+# transitively. `acc` doubles as the visited set (a repeated dir short-
+# circuits, guarding against dependency cycles).
+fn nb_expand_orb(orb_dir: Text, acc: [Text]) -> [Text]:
+    if list_contains(acc, orb_dir):
+        acc
+    else:
+        mut out = push(acc, orb_dir)
+        toml = orb_dir + "/Orbit.toml"
+        if file_exists(toml):
+            deps = nb_dep_dirs(nb_lines(read_file(toml)), orb_dir)
+            dep_total = len(deps)
+            for d_index in 0..<dep_total:
+                out = nb_expand_orb(at(deps, d_index), out)
+        out
+
+# Orb search dirs for the native compiler. It resolves `use X` by scanning
+# these for X/lib.or, so a LIBRARY orb's own path deps must contribute too:
+# atlas_ecs `use log` has to find the log orb via atlas_ecs's Orbit.toml,
+# without the consuming executable re-declaring log. So expand the project's
+# direct deps transitively, then map each orb dir to its parent (the search
+# root) plus that root's orbs_native sibling (native backends win clashes).
+# Walk up (relatively) from the project dir to the workspace root — the dir
+# holding a `.orbit` marker. Returns the relative prefix (".", "./..",
+# "./../.." …) or "" if none. This is what frees the layout: drop `.orbit`
+# at the root and every project below it resolves orbs by NAME, wherever
+# each one sits.
+fn find_workspace_root() -> Text:
+    mut rel = "."
+    mut depth = 0
+    loop:
+        if depth > 8:
+            break
+        if file_exists(rel + "/.orbit"):
+            return rel
+        rel = rel + "/.."
+        depth = depth + 1
+    ""
+
+fn scan_noise(name: Text) -> bool:
+    name == "build" or name == "dist" or name == "target" or name == ".git" or name == "node_modules" or name == "assets" or name == "saves" or name == "docs" or name == "examples"
+
+# Every `orbs` / `orbs_native` directory under `root` (depth-bounded) — the
+# exact search dirs the compiler needs to resolve `use X` by name, so a
+# project's [orbs] can list names with no paths.
+fn scan_orb_dirs(dir: Text, depth: int, acc: [Text]) -> [Text]:
+    if depth > 3:
+        return acc
+    subs = str_split(host_subdirs(dir), "\n")
+    mut out = acc
+    for i in 0..<len(subs):
+        name = at(subs, i)
+        if len(name) > 0 and not scan_noise(name):
+            child = dir + "/" + name
+            if name == "orbs" or name == "orbs_native":
+                if not list_contains(out, child):
+                    out = push(out, child)
+            else:
+                out = scan_orb_dirs(child, depth + 1, out)
+    out
+
+fn nb_orb_dirs(lines: [Text]) -> [Text]:
+    direct = nb_dep_dirs(lines, "")
+    direct_total = len(direct)
+    mut all_orbs = []
+    for i in 0..<direct_total:
+        all_orbs = nb_expand_orb(at(direct, i), all_orbs)
+    mut parents = []
+    orb_total = len(all_orbs)
+    for j in 0..<orb_total:
+        parent = path_parent(at(all_orbs, j))
+        if not list_contains(parents, parent):
+            parents = push(parents, parent)
     mut dirs = []
     parent_total = len(parents)
     for p_index in 0..<parent_total:
@@ -340,6 +440,24 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
             dirs = push(dirs, native_sibling)
     for p2_index in 0..<parent_total:
         dirs = push(dirs, at(parents, p2_index))
+    # Layout-free resolution: when a `.orbit` workspace root is found, add
+    # every orbs dir under it so name-only deps (`atlas_app = "*"`) resolve
+    # regardless of where the project or the orbs live. Explicit path: deps
+    # above still win; this only ADDS search dirs.
+    root = find_workspace_root()
+    if len(root) > 0:
+        scanned = scan_orb_dirs(root, 0, [])
+        # Native backends win name clashes (a game wants orbs_native/atlas_render,
+        # not the wgpu orbs/atlas_render), so add every orbs_native search dir
+        # BEFORE the plain orbs ones — mirroring the path-based order above.
+        for n_index in 0..<len(scanned):
+            nd = at(scanned, n_index)
+            if str_contains(nd, "orbs_native") and not list_contains(dirs, nd):
+                dirs = push(dirs, nd)
+        for s_index in 0..<len(scanned):
+            sd = at(scanned, s_index)
+            if not str_contains(sd, "orbs_native") and not list_contains(dirs, sd):
+                dirs = push(dirs, sd)
     dirs
 
 fn nb_clang() -> Text:
@@ -428,8 +546,8 @@ fn build_native_entry(variant: Text, entry_override: Text) -> Text:
         die("orbit: no Orbit.toml in this directory")
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
-    compiler = nb_setting(lines, "compiler", "../orion/dist/orion.exe")
-    runtime = nb_setting(lines, "runtime", "../orion/runtime")
+    compiler = nb_setting(lines, "compiler", default_compiler())
+    runtime = nb_setting(lines, "runtime", default_runtime())
     if not file_exists(compiler):
         die("orbit: native compiler not found at `" + compiler + "` — set [native] compiler in Orbit.toml")
     mkdir_all("build")
@@ -461,6 +579,15 @@ fn build_native_entry(variant: Text, entry_override: Text) -> Text:
             else:
                 print(c_dim("orbit: llvm-rc failed — shipping without icon"))
     link_args = push(link_args, "-Os")
+    # Big stack (Windows default is 1 MB). The render path nests deep —
+    # astra eval recursion, render_bundle, the glyph rasterizer, all under
+    # the supervisor's setjmp frames — and overflows the 1 MB default (a
+    # "writing address 0x0" fault in a function prologue). cli_build already
+    # does this for the compiler; the game needs it just as much. Windows
+    # only: POSIX raises the stack via ulimit at run time.
+    if os_kind() == 0:
+        link_args = push(link_args, "-Xlinker")
+        link_args = push(link_args, "/STACK:67108864")
     link_args = push(link_args, "-o")
     link_args = push(link_args, exe)
     link_args = push(link_args, "-luser32")
@@ -497,8 +624,8 @@ fn cli_build(path: Text) -> Text:
         die("orbit: no Orbit.toml in this directory")
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "prog")
-    compiler = nb_setting(lines, "compiler", "../orion/dist/orion.exe")
-    runtime = nb_setting(lines, "runtime", "../orion/runtime")
+    compiler = nb_setting(lines, "compiler", default_compiler())
+    runtime = nb_setting(lines, "runtime", default_runtime())
     if not file_exists(compiler):
         die("orbit: compiler not found at `" + compiler + "` — set [native] compiler in Orbit.toml")
     mkdir_all("build")
@@ -524,7 +651,8 @@ fn cli_build(path: Text) -> Text:
         txt = str_replace(txt, "datalayout = \"e-m:w", "datalayout = \"e-m:" + mangle)
         txt = str_replace(txt, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"" + triple + "\"")
         write_file(ll, txt)
-    # /STACK is a Windows PE linker flag; POSIX raises the stack via ulimit.
+    # /STACK is a Windows PE linker flag; POSIX raises the stack via ulimit
+    # (Linux) or a link-time flag (macOS — main-thread stack is capped there).
     # -Wno-override-module silences the retargeted-triple note (no-op on Win).
     mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", "-Wno-override-module"]
     if os_kind() == 0:

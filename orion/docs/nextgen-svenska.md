@@ -129,14 +129,37 @@ Konsekvens: det finns inget footprint-pass i språket att "utöka". Att göra
 region-säkerheten statisk kräver att man **inför region-som-typ** i orion från
 grunden — en L-arc, inte en M-tweak. Den ärliga minsta första skivan nedan.
 
+### ⚠️ Verklighetskoll 2026-07-09 — region-seeden är HÅLIG idag
+
+Efter att ha grävt i koden: **region-som-typ (skiva 1 nedan) ger en hålig
+feature just nu, inte "ren infrastruktur".** Tre konkreta fynd:
+
+1. **`data Inst` har 91 konstruktions-ställen.** Ett `region`-fält måste sättas
+   på alla 91 (Orion tillåter ingen partiell struct-konstruktion). Stor,
+   mekanisk, bred ändring — inte en "seed".
+2. **Det finns ingen STATISK region-*källa* att propagera FRÅN.**
+   `orion_arena_on/off/reset` är `extern`-deklarerade men **används ingenstans**
+   i riktig kod, och `scope:` (den tänkta statiska region-gränsen) är en av de
+   **döda kulisserna** (parsar inte). Så fältet skulle alltid vara `0=okänd` —
+   inget att sätta det till, inget att kontrollera mot.
+3. Slutsats: skiva 1+2 kräver **först en statisk region-källa** (antingen en
+   annotering, eller att `scope:` blir riktig syntax som statisk arena-gräns).
+   Det är designarbete doc:et sa att vi skulle undvika — så den *ärliga* minsta
+   vägen är inte region-fältet.
+
+**Den välgrundade minnessäkerhets-skivan är istället `move`/linjära värden
+(skiva 2b nedan).** Den behöver ingen arena-inferens och ingen statisk
+region-källa: `push_mut`:s alias-löfte är idag en *människo-audit-not* (osäkrad)
+— gör det kontrollerbart med en linjär `move`-binding. Lokalt, bevisbart,
+demonstrerbart. **Rekommenderad start för Punkt 4.**
+
 ### Riktning (i skivor, minst risk först — omskattad mot verkligheten)
 
-1. **Region-som-typ, minimal seed.** Ge `data Inst` (och typkontrollens värde-
-   representation) ett `region`-fält (0=okänd, 1=frame, 2=ring, 3=persist).
-   Litterala allokeringar och `orion_arena_*`-scope sätter det; allt annat ärver.
-   Ingen ny *syntax* — bara ett fält och propagering. Detta är förutsättningen
-   för allt övrigt och den enda biten som är ren infrastruktur. Skiva: M–L.
-   *Berör:* `orion_ir` (Inst-fältet) + `orion_ast_to_ir` (propagering).
+1. **Region-som-typ, minimal seed.** *(Se verklighetskollen ovan — hålig utan en
+   statisk region-källa; börja INTE här.)* Ge `data Inst` ett `region`-fält
+   (0=okänd, 1=frame, 2=ring, 3=persist). Förutsätter en statisk region-källa
+   som inte finns än. Skiva: L (inte M–L). *Berör:* `orion_ir` (91 ställen) +
+   `orion_ast_to_ir`.
 
 2. **Statisk region-escape-check (kräver #1).** När region-fältet finns: flagga
    när ett `frame`/`ring`-värde lagras i ett `persist`-scope — det
@@ -241,7 +264,15 @@ check). Enklare kod är utfallet, inte en feature.
 Punkt 3, 5 och 2 kräver **astra**- och **atlas**-repona (koden bor där). Punkt 4
 är orion-språk och hör hemma i det här repot.
 
-**MEN:** i en web-session går kompilatorn inte att bygga eller köra. Varje
+> **✅ LÖST 2026-07-09:** Blockeraren nedan gäller inte längre.
+> `tools/seed/orion.ll` **är incheckad i git**, och
+> `tools/bootstrap_from_ll.sh` bygger `dist/orion.exe` från den på en frisk
+> klon (retargetar Windows-triplet → host, länkar med clang). Alla byggvägar
+> (`self_bootstrap.sh`, `build_orbit.sh`, `test.sh`) fungerar i web-sessionen —
+> ~10 kompilator-ändringar har fixpunkt-bevisats här den här veckan. Punkt 4 är
+> alltså byggbar och gate-bevisbar här. (Texten nedan behålls som historik.)
+
+**MEN (historik):** i en web-session går kompilatorn inte att bygga eller köra. Varje
 byggväg (`tools/build_orbit.sh`, `tools/self_bootstrap.sh`, `tools/test.sh`)
 kräver en existerande `dist/orion.exe` — men `dist/` är gitignorerad, ingen
 binär är incheckad, och Rust-bootstrappen (lodge-orion) är arkiverad/borttagen.

@@ -1,0 +1,17 @@
+# `derived` — a reactive derived binding (Minimal Orion: "beskriver en sanning").
+#
+# `derived name = expr` describes a truth, not a step. Reading `name`
+# re-evaluates `expr` in the current scope, so it always reflects the latest
+# inputs — no manual "keep it updated". Recompute-on-read; the reactive engine
+# adds recompute-only-on-change on top. (Renamed from `fact` — a newcomer can
+# guess what `derived` means.)
+#
+# Run:  orion run derived_reactive.or main   → expects 180
+
+fn main() -> int:
+    mut base = 10
+    derived doubled = base * 2   # doubled FOLLOWS base
+    a = doubled                  # base=10  → 20
+    base = 100                   # change the input...
+    b = doubled                  # ...and doubled re-reads it → 200
+    b - a                        # 200 - 20 = 180  (a snapshot would give 0)

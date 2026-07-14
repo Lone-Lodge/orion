@@ -1,11 +1,10 @@
 effect Async:
     fetch: fn(arg: int) -> int
 
-# Handler invokes resume_int — control jumps BACK to perform's caller
-# with the resumed value, bypassing the handler's normal return.
-fn __handler_Async_fetch(arg: int) -> int:
-    resume_int(99)
-    0  # unreachable after resume
+# The handler resumes with a value; control jumps BACK to perform's caller,
+# bypassing the handler's normal return.
+handle Async.fetch(arg: int) -> int:
+    resume(99)
 
 fn main() -> int:
     result = perform Async.fetch(7)
