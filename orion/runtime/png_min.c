@@ -207,25 +207,87 @@ static unsigned int png_be32(const unsigned char *p) {
 
 static int png_abs(int v) { return v < 0 ? -v : v; }
 
-/* host_image_load(path) -> Text: [w LE32][h LE32][RGBA...], or empty on fail. */
+/* An orion Text built on RAW malloc (not orion_alloc): immortal and safe to
+ * cache across frames. orion_text_alloc would route through the arena during
+ * a render and be freed at reset — a dangling cache. Layout matches: header
+ * [hash=0][len] then data then NUL. */
+static char *png_text_immortal(long long len) {
+    char *base = (char *)malloc((size_t)len + 17);
+    if (!base) return NULL;
+    ((long long *)base)[0] = 0;
+    ((long long *)base)[1] = len;
+    base[16 + len] = 0;
+    return base + 16;
+}
+
+/* Decode-once cache: sprites are static, so a PNG is inflated a single time
+ * and every later host_image_load(path) returns the same immortal blob. The
+ * game's sprite set is tiny, so a linear scan is free. */
+#define PNG_CACHE_MAX 256
+static struct { char *path; const char *blob; } png_cache[PNG_CACHE_MAX];
+static int png_cache_n = 0;
+static const char *png_cache_get(const char *path) {
+    for (int i = 0; i < png_cache_n; i++)
+        if (strcmp(png_cache[i].path, path) == 0) return png_cache[i].blob;
+    return NULL;
+}
+static void png_cache_put(const char *path, const char *blob) {
+    if (png_cache_n >= PNG_CACHE_MAX) return;
+    size_t n = strlen(path);
+    char *pc = (char *)malloc(n + 1);
+    if (!pc) return;
+    memcpy(pc, path, n + 1);
+    png_cache[png_cache_n].path = pc;
+    png_cache[png_cache_n].blob = blob;
+    png_cache_n++;
+}
+
+/* host_image_load(path) -> Text: [w LE32][h LE32][RGBA...], or empty on fail.
+ * Cached: decoded once, then the same immortal blob is returned each call. */
+static const char *png_reason = "";
+const char *host_image_load_path(const char *path);
 const char *host_image_load(const char *path) {
+    const char *hit = png_cache_get(path);
+    if (hit) return hit;
+    png_reason = "unknown";
+    const char *blob = host_image_load_path(path);
+    long long n = ((const long long *)blob)[-1];
+    if (n > 0) {
+        const unsigned char *d = (const unsigned char *)blob;
+        unsigned int w = d[0]|d[1]<<8|d[2]<<16|d[3]<<24;
+        unsigned int h = d[4]|d[5]<<8|d[6]<<16|d[7]<<24;
+        fprintf(stderr, "[png] loaded %s (%ux%u, %u px)\n", path, w, h, w * h);
+        png_cache_put(path, blob);
+    } else {
+        /* png_cache_put marks the path so this logs once, not every frame. */
+        if (!png_cache_get(path))
+            fprintf(stderr, "[png] FAILED to load %s: %s\n", path, png_reason);
+        png_cache_put(path, blob); /* cache the failure to stop per-frame spam */
+    }
+    return blob;
+}
+
+const char *host_image_load_path(const char *path) {
     FILE *f = fopen(path, "rb");
-    if (!f) return orion_text_empty();
+    if (!f) { png_reason = "cannot open file (wrong path or cwd)"; return orion_text_empty(); }
     fseek(f, 0, SEEK_END);
     long fsz = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (fsz < 8) { fclose(f); return orion_text_empty(); }
+    if (fsz < 8) { png_reason = "file too small"; fclose(f); return orion_text_empty(); }
     unsigned char *buf = (unsigned char *)malloc((size_t)fsz);
     if (!buf) { fclose(f); return orion_text_empty(); }
     if (fread(buf, 1, (size_t)fsz, f) != (size_t)fsz) {
-        fclose(f); free(buf); return orion_text_empty();
+        png_reason = "read error"; fclose(f); free(buf); return orion_text_empty();
     }
     fclose(f);
     static const unsigned char SIG[8] = {137,80,78,71,13,10,26,10};
-    if (memcmp(buf, SIG, 8) != 0) { free(buf); return orion_text_empty(); }
+    if (memcmp(buf, SIG, 8) != 0) {
+        png_reason = "not a PNG (bad signature) — only PNG is supported";
+        free(buf); return orion_text_empty();
+    }
 
     unsigned int w = 0, h = 0;
-    int bitdepth = 0, colortype = 0;
+    int bitdepth = 0, colortype = 0, interlace = 0;
     unsigned char *idat = NULL;
     size_t idatlen = 0, idatcap = 0;
     unsigned char plte[256 * 3];
@@ -238,11 +300,12 @@ const char *host_image_load(const char *path) {
         const unsigned char *ctype = buf + p + 4;
         const unsigned char *cdata = buf + p + 8;
         if (p + 12 + (size_t)clen > (size_t)fsz) break;
-        if (memcmp(ctype, "IHDR", 4) == 0 && clen >= 10) {
+        if (memcmp(ctype, "IHDR", 4) == 0 && clen >= 13) {
             w = png_be32(cdata);
             h = png_be32(cdata + 4);
             bitdepth = cdata[8];
             colortype = cdata[9];
+            interlace = cdata[12];
         } else if (memcmp(ctype, "PLTE", 4) == 0) {
             plte_n = (int)(clen / 3);
             if (plte_n > 256) plte_n = 256;
@@ -264,23 +327,37 @@ const char *host_image_load(const char *path) {
         }
         p += 12 + (size_t)clen;
     }
-    /* 8-bit depth only for now (covers Aseprite RGBA + most exports). */
-    if (!w || !h || !idat || bitdepth != 8) {
+    /* 8-bit, non-interlaced only for now (covers Aseprite RGBA + most exports). */
+    if (!w || !h || !idat) {
+        png_reason = "no IHDR/IDAT (corrupt PNG)";
+        free(buf); free(idat); return orion_text_empty();
+    }
+    if (interlace != 0) {
+        png_reason = "interlaced PNG not supported — re-export non-interlaced";
+        free(buf); free(idat); return orion_text_empty();
+    }
+    if (bitdepth != 8) {
+        png_reason = "not 8-bit — re-export as 8-bit (not 16-bit or <8-bit indexed)";
         free(buf); free(idat); return orion_text_empty();
     }
     int ch = colortype == 2 ? 3 : colortype == 6 ? 4 : colortype == 0 ? 1 :
              colortype == 4 ? 2 : colortype == 3 ? 1 : 0;
-    if (ch == 0) { free(buf); free(idat); return orion_text_empty(); }
+    if (ch == 0) {
+        png_reason = "unsupported color type";
+        free(buf); free(idat); return orion_text_empty();
+    }
 
     unsigned char *raw = NULL;
     size_t rawlen = 0;
     /* skip the 2-byte zlib header */
     if (idatlen < 2 || !png_inflate(idat + 2, idatlen - 2, &raw, &rawlen)) {
+        png_reason = "corrupt or unsupported compressed data";
         free(buf); free(idat); return orion_text_empty();
     }
     free(idat);
     size_t stride = (size_t)w * ch;
     if (rawlen < (size_t)h * (1 + stride)) {
+        png_reason = "truncated image data";
         free(buf); free(raw); return orion_text_empty();
     }
     unsigned char *px = (unsigned char *)malloc((size_t)h * stride);
@@ -310,7 +387,8 @@ const char *host_image_load(const char *path) {
     free(raw);
 
     long long total = 8 + (long long)w * h * 4;
-    char *blob = orion_text_alloc(total);
+    char *blob = png_text_immortal(total);
+    if (!blob) { free(buf); free(px); return orion_text_empty(); }
     unsigned char *o = (unsigned char *)blob;
     o[0] = w & 255; o[1] = (w >> 8) & 255; o[2] = (w >> 16) & 255; o[3] = (w >> 24) & 255;
     o[4] = h & 255; o[5] = (h >> 8) & 255; o[6] = (h >> 16) & 255; o[7] = (h >> 24) & 255;

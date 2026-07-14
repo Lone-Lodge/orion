@@ -51,6 +51,8 @@ static UINT64               g_frame_fence[FRAME_COUNT]; /* last submit per slot 
 static UINT                 g_rtv_size;
 static int                  g_width, g_height;
 static int                  g_nverts;
+static int                  g_dropped;         /* verts dropped this frame (budget hit) */
+static int                  g_overflow_warned; /* one-shot budget-exceeded notice */
 static int                  g_frame;     /* current backbuffer slot */
 static int                  g_vsync = 0; /* uncapped by default; og_vsync opts in */
 static int                  g_tearing = 0;
@@ -252,6 +254,7 @@ void dx_og_begin(long long r, long long g, long long b) {
         WaitForSingleObject(g_fence_evt, INFINITE);
     }
     g_nverts = 0;
+    g_dropped = 0;
     g_clear[0] = (float)r / 255.0f;
     g_clear[1] = (float)g / 255.0f;
     g_clear[2] = (float)b / 255.0f;
@@ -266,7 +269,7 @@ void dx_og_begin(long long r, long long g, long long b) {
  * at present is what WC memory is good at. */
 void dx_og_rect(long long x, long long y, long long w, long long h,
               long long r, long long g, long long b) {
-    if (g_nverts + 6 > MAX_VERTS) return;
+    if (g_nverts + 6 > MAX_VERTS) { g_dropped += 6; return; }
     float x0 = (float)x / (float)g_width * 2.0f - 1.0f;
     float y0 = 1.0f - (float)y / (float)g_height * 2.0f;
     float x1 = (float)(x + w) / (float)g_width * 2.0f - 1.0f;
@@ -284,6 +287,15 @@ void dx_og_rect(long long x, long long y, long long w, long long h,
 }
 
 long long dx_og_present(void) {
+    /* Silent rect drops read as "half my sprite vanished". Say it once. */
+    if (g_dropped > 0 && !g_overflow_warned) {
+        fprintf(stderr, "[gpu] rect budget exceeded: dropped ~%d rects this "
+                "frame (max %d/frame). A large or detailed sprite? Use a "
+                "smaller source PNG (pixel art, transparent background) and "
+                "scale it up, or draw fewer rects.\n",
+                g_dropped / 6, MAX_VERTS / 6);
+        g_overflow_warned = 1;
+    }
     UINT frame = (UINT)g_frame;
     if (g_nverts > 0)
         memcpy(g_vmap + (size_t)frame * MAX_VERTS, g_stage,
