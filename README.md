@@ -1,86 +1,72 @@
-# orion
+# Orion
 
-A next-gen 2026 programming language: AI-friendly, data-oriented (not OOP), self-hosting.
+A small, self-hosting programming language with an LLVM backend — **Orion
+compiles Orion**. The compiler is written in Orion, emits LLVM IR, and links to
+a native binary via clang. It's deliberately KISS: one obvious way to do a
+thing, no cryptic one-symbol operators, and a compiler that *fails loudly*
+rather than miscompiling silently.
 
-## Layout
-
-- **`orion/`** — THE Orion compiler, written in Orion. Self-hosting,
-  fixpoint-verified, emits LLVM IR → native exe. `dist/orion.exe` (~290KB)
-  is the canonical toolchain. Games built with it run native (cubsy: 279KB,
-  full atlas/astra/veil stack, no Rust at runtime).
-
-Orion is now **fully self-hosted** — there is no Rust implementation in the
-tree. The compiler builds, self-hosts, and reaches its fixpoint using only
-`dist/orion.exe` + clang (the retired Rust interpreter, lodge-orion, lives
-in git history if ever needed).
-
-## State
-
-- `orion.exe` self-compiles. Fixed-point verified (gen2 == gen3, byte-identical).
-- Cubsy runs fully native end-to-end: window, D3D12 render, astra scripts,
-  ECS, input. Compile: lex 16 / parse 16 / ir 31 / emit 62 ms.
-- Language features: sum types with payloads, `?` operator, pattern
-  destructuring, method-call syntax, `return` keyword, data structs, enums,
-  f64, multi-payload enums, extern fns, multi-orb driver.
-- Stdlib orbs: bytes, text, fs, io, time, math, random, log, hash, json, csv,
-  xml, regex, url, base64, hex, color, crypto, easing, noise, format,
-  collections, env, sysinfo, image, gpu, wgsl, net, result, option, assert.
-
-## Setup (Windows)
-
-Put `orbit` / `orion` on your PATH once — this is what makes `orbit play dev`
-work from any project dir:
-
-```powershell
-E:\lone-lodge\orion\bin\install.ps1
+```orion
+fn main() -> int:
+    xs = [3, 4, 5]
+    total = 0
+    for x in xs:
+        total = total + x
+    total            # 12
 ```
 
-It prepends this repo's `bin\` (self-locating shims → `dist\orbit.exe`) to your
-user PATH and warns if a stale `orbit` elsewhere is shadowing it. That stale
-shim is the usual cause of `The system cannot find the path specified.` — an
-old shortcut pointing at a dead dir. The shims are portable (relative to the
-repo), so cloning to any path Just Works after one `install.ps1`.
+## Quick start
 
-## Building
+The repo ships a committed seed (`tools/seed/orion.ll`), so you can build the
+compiler from scratch with just clang — no prior binary needed:
 
-```
-cd orion
-bash tools/self_bootstrap.sh    # orion.exe rebuilds itself, fixpoint-verified
-```
-
-This detects the host (Windows / Linux / Mac), retargets the emitted IR, and
-links a native `dist/orion.exe`. To hand-run the self-compile loop instead:
-
-```
-cd orion
-bash tools/bundle_orbs.sh                              # → dist/orion_self_bundled.or
-./dist/orion.exe dist/orion_self_bundled.or out.ll     # self-compile
-clang out.ll runtime/orion_rt.c -Os -o dist/orion.exe
+```bash
+bash tools/bootstrap_from_ll.sh     # seed .ll -> dist/orion.exe
+bash tools/self_bootstrap.sh        # rebuild orion.exe with itself (fixpoint)
+bash tools/build_orbit.sh           # build the project tool (dist/orbit.exe)
+bash tools/test.sh                  # run the smoke suite (118 tests)
+bash tools/demos_smoke.sh           # compile every examples/demos/*.or
 ```
 
-Bootstrap from scratch on a fresh clone (no `orion.exe` yet): the committed
-seed IR is the ONE checked-in artifact self-hosting needs —
-`bash tools/bootstrap_from_ll.sh` links `tools/seed/orion.ll` with clang into
-a working `dist/orion.exe`, then run `tools/self_bootstrap.sh`. No Rust,
-no prior binary required.
+Compile a single file:
 
-Compile a game (native) — see cubsy/build.cmd for the full recipe:
-
-```
-build        game.exe       GDI software renderer — runs GPU-less, ~27MB RAM
-build gpu    game_gpu.exe   D3D12 backend
-build ship   game_ship.exe  GDI + ALL assets embedded (config + scripts as
-                            byte arrays via runtime/tools/embed_assets.ps1) —
-                            one standalone file, zero file I/O
+```bash
+dist/orion.exe path/to/prog.or out.ll     # emit LLVM IR (Windows triple)
+# on POSIX, retarget the two header lines then clang out.ll runtime/orion_rt.c
 ```
 
-Renderer backends share the og_* API; pick at link time (gdi_min.c OR
-d3d12_min.c). Dev builds read assets from disk, so script hot reload
-works ("dev": 1 in the project json swaps changed .astra bundles live,
-parse-gated). Ship builds run from the embedded table.
+## What it can do
 
-Dev loop (interpreted, instant): `orbit run src/main.or` from the project dir.
+Closures, generics (erasure), sum types with pattern matching, algebraic
+effects with one-shot continuations, a small readable standard library,
+compile-time and runtime safety checks, character literals, `move` (linear)
+bindings, and **hot reload** (recompile gameplay code and swap it into a
+running program — see `examples/hot_reload/`).
 
-## Sibling projects (separate repos)
+Full picture: **[docs/syntax.md](docs/syntax.md)** (the whole syntax on one
+page) and **[docs/language_status.md](docs/language_status.md)** (what works,
+what's missing — honestly).
 
-`astra`, `atlas`, `skriva`, `veil` — products built ON Orion, each in its own repo at the `lone-lodge` level.
+## Repo layout
+
+| Path | What |
+|---|---|
+| `orbs/` | The compiler, stage by stage (`orion_lex` → `orion_parse` → `orion_ir` → `orion_ast_to_ir` → `orion_emit_llvm` → `orion_driver`), plus the stdlib orbs (`text`, `num`, `list`, `dict`, `iter`, `option`, `result`, …). All pure Orion. |
+| `examples/` | `demos/` (runnable programs), `tests/` (the smoke suite), `hot_reload/` (live-reload demo). |
+| `tools/` | Build + bootstrap scripts, the `orbit` project tool, and `seed/orion.ll` (the committed bootstrap seed). |
+| `runtime/` | The C runtime (`orion_rt.c`: alloc, text, lists, timing; `orion_cli.c`: process + fs). |
+| `docs/` | Syntax, status, and the Swedish design specs (`*-svenska.md`). |
+
+## How self-hosting works
+
+`orion.exe` compiles its own bundle to a native binary; running the result on
+the same source reproduces byte-identical IR (`stage1 == stage2` — the fixpoint
+check in `tools/self_bootstrap.sh`). The compiler always emits a Windows target
+triple; POSIX builds retarget the two module-header lines before clang. After a
+codegen change, regenerate the seed so a fresh clone reproduces the new
+compiler exactly:
+
+```bash
+bash tools/bundle_orbs.sh
+dist/orion.exe dist/orion_self_bundled.or tools/seed/orion.ll
+```
