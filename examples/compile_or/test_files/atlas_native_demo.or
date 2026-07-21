@@ -13,7 +13,7 @@ use veil_display
 use veil_geometry
 
 fn main() -> int:
-    app = ori_open("Atlas NATIVE - click to paint, Esc quits", 800, 600)
+    app = ori_open(ori_defaults("Atlas NATIVE - click to paint, Esc quits", 800, 600))
     if app.running == 0:
         print_line("ori_open failed")
         return 1
