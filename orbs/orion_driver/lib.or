@@ -254,6 +254,7 @@ fn drv_scope_check(module: IRModule, verbose: int) -> int:
         mut stems = slice([""], 0, 0)
         mut opens = slice([0], 0, 0)
         mut closes = slice([0], 0, 0)
+        mut depth = slice([0], 0, 0)      # running open-minus-close, in order
         for ii in 0..<len(f.instructions):
             inst = drv_inst_at(f.instructions, ii)
             if inst.op == "call":
@@ -264,11 +265,25 @@ fn drv_scope_check(module: IRModule, verbose: int) -> int:
                         stems = push_mut(stems, stem)
                         opens = push_mut(opens, 0)
                         closes = push_mut(closes, 0)
+                        depth = push_mut(depth, 0)
                         idx = len(stems) - 1
                     if drv_is_close(inst.name):
                         closes = set(closes, idx, drv_int_at(closes, idx) + 1)
+                        depth = set(depth, idx, drv_int_at(depth, idx) - 1)
                     else:
                         opens = set(opens, idx, drv_int_at(opens, idx) + 1)
+                        depth = set(depth, idx, drv_int_at(depth, idx) + 1)
+            # A return reached with a scope still open leaks it on THAT path -
+            # the exact case a whole-function open==close count cannot see (an
+            # early `return` between the open and the matching close). The
+            # final return has depth 0 in a balanced function, so only an early
+            # one trips this.
+            if inst.op == "return":
+                for si in 0..<len(stems):
+                    if drv_int_at(depth, si) > 0:
+                        bad = bad + 1
+                        if verbose == 1:
+                            print_line("    {f.name}: returns with {text_at_drv(stems, si)} still open (early return between open and close)")
         for si in 0..<len(stems):
             o = drv_int_at(opens, si)
             c = drv_int_at(closes, si)
