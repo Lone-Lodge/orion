@@ -337,8 +337,13 @@ fn drv_int_at(xs: [int], i: int) -> int:
     at(xs, i)
 
 fn drv_call_bits(callee: Text, names: [Text]) -> int:
-    if drv_name_idx(names, callee) >= 0:
-        return 0
+    # Effect prefixes are checked FIRST, before the "is it a user fn?"
+    # short-circuit. Externs are added to the module as body-less IRFns, so an
+    # effectful extern like `__orion_monotonic_ms` is IN `names` - and the old
+    # order returned 0 for it, making every time/platform/audio extern invisible
+    # to the effect closure (and so to the `deterministic` check). User fns are
+    # mangled `orb__name`, so they can never match these runtime prefixes; a name
+    # that matches a prefix is the C symbol, whatever the module also lists.
     if drv_starts(callee, "orion_audio"):
         return 8
     if drv_starts(callee, "win_") or drv_starts(callee, "og_") or drv_starts(callee, "ogpu_"):
@@ -349,6 +354,9 @@ fn drv_call_bits(callee: Text, names: [Text]) -> int:
         return 64
     if drv_starts(callee, "orion_console") or drv_starts(callee, "orion_dir") or drv_starts(callee, "orion_file") or drv_starts(callee, "orion_embedded"):
         return 2
+    # A user fn contributes its effects through the closure, not here.
+    if drv_name_idx(names, callee) >= 0:
+        return 0
     16
 
 fn drv_direct_bits(f: IRFn, names: [Text]) -> int:
@@ -385,17 +393,15 @@ fn drv_flags_text(bits: int) -> Text:
         out = out + " time"
     out
 
-fn drv_facts(module: IRModule) -> int:
+# The transitive effect bits per function: each fn's own effects unioned with
+# everything it (transitively) calls, to a fixpoint. Shared by `facts` and the
+# `deterministic` enforcement below - one closure, two readers.
+fn drv_effect_closure(module: IRModule, names: [Text]) -> [int]:
     fns = module.functions
     n = len(fns)
-    mut names = []
-    for i in 0..<n:
-        f0 = drv_fn_at(fns, i)
-        names = push_mut(names, f0.name)
     mut bits = []
     for i in 0..<n:
-        f1 = drv_fn_at(fns, i)
-        bits = push_mut(bits, drv_direct_bits(f1, names))
+        bits = push_mut(bits, drv_direct_bits(drv_fn_at(fns, i), names))
     mut pass = 0
     loop:
         if pass >= 24:
@@ -420,6 +426,66 @@ fn drv_facts(module: IRModule) -> int:
         pass = pass + 1
         if changed == 0:
             break
+    bits
+
+fn drv_module_names(module: IRModule) -> [Text]:
+    fns = module.functions
+    mut names = []
+    for i in 0..<len(fns):
+        names = push_mut(names, drv_fn_at(fns, i).name)
+    names
+
+# `deterministic fn` enforcement (the effect certificate). A fn declared
+# deterministic may not transitively touch a source of non-determinism:
+#   2 io | 4 platform | 8 audio | 64 time
+# slot/mem/extern are allowed - many deterministic ops use them, and a seeded
+# RNG is deterministic (wall-clock time, bit 64, is what breaks a replay). This
+# is the compile-time guarantee a deterministic simulation, and rollback
+# netcode, rests on: the compiler proves the fn is replayable.
+fn drv_check_deterministic(module: IRModule) -> int:
+    marked = deterministic_fn_names()
+    if len(marked) == 0:
+        return 0
+    names = drv_module_names(module)
+    bits = drv_effect_closure(module, names)
+    nd_mask = drv_or(drv_or(2, 4), drv_or(8, 64))
+    mut bad = 0
+    for i in 0..<len(marked):
+        idx = drv_name_idx(names, at(marked, i))
+        if idx >= 0:
+            eff = drv_int_at(bits, idx)
+            hit = drv_flag_and(eff, nd_mask)
+            if hit != 0:
+                bad = bad + 1
+                compile_error("orion: ERROR — `deterministic fn` " + drv_deterministic_label(at(marked, i)) + " is not deterministic: it (transitively) performs " + drv_flags_text(hit))
+    bad
+
+# `orb__name` -> a readable `name` for the error; leaves already-plain names be.
+fn drv_deterministic_label(mangled: Text) -> Text:
+    bs = bytes_from_text(mangled)
+    n = len(bs)
+    mut cut = 0 - 1
+    for i in 0..<n - 1:
+        if at(bs, i) == 95 and at(bs, i + 1) == 95:
+            cut = i + 2
+    if cut < 0 then mangled else bytes_to_text(bytes_slice(bs, cut, n))
+
+fn drv_flag_and(a: int, b: int) -> int:
+    mut r = 0
+    mut bit = 1
+    for i in 0..<40:
+        av = (a / bit) - ((a / bit) / 2) * 2
+        bv = (b / bit) - ((b / bit) / 2) * 2
+        if av == 1 and bv == 1:
+            r = r + bit
+        bit = bit * 2
+    r
+
+fn drv_facts(module: IRModule) -> int:
+    fns = module.functions
+    n = len(fns)
+    names = drv_module_names(module)
+    bits = drv_effect_closure(module, names)
     mut pure_count = 0
     for i in 0..<n:
         b = drv_int_at(bits, i)
@@ -429,7 +495,7 @@ fn drv_facts(module: IRModule) -> int:
             fl = drv_flags_text(b)
             fname = at(names, i)
             print_line("{fname}:{fl}")
-    print_line("facts: {n} fn(s), {pure_count} pure ({pass} closure passes)")
+    print_line("facts: {n} fn(s), {pure_count} pure")
     0
 
 pub fn driver_main() -> int:
@@ -463,6 +529,10 @@ pub fn driver_main() -> int:
         t3 = monotonic_ms()
         if out_path == "facts":
             return drv_facts(module)
+        # Enforce `deterministic fn` before emit: a violation is a compile
+        # error, so the existing "no output on error" path below refuses to
+        # write a binary that lies about being replayable.
+        drv_check_deterministic(module)
         llvm_text = emit_module(module)
         t4 = monotonic_ms()
         d_lex = t1 - t0

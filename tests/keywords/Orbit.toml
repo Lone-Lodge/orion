@@ -1,0 +1,6 @@
+[package]
+name = "keywords"
+version = "0.0.1"
+description = "The deterministic keyword lowers to a real compile-time certificate; pure code compiles under it"
+
+[orbs]

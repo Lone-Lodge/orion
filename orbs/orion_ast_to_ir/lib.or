@@ -1194,6 +1194,16 @@ fn otir_scope(orb: Text) -> Text:
 # function namespace any more: an orb sees its own declarations, plus exactly
 # what it imports. `main` is the one exception (the emitter looks it up by
 # name); externs are C symbols and never come through here.
+# The emitted names of every `deterministic fn` in the module just built, for
+# the driver's effect-enforcement pass. Reads the current compile epoch, so it
+# is valid immediately after ast_program_to_ir returns.
+pub fn deterministic_fn_names() -> [Text]:
+    n = slot_int_or_zero(otir_k1("detn", "count"))
+    mut out = slice([""], 0, 0)
+    for i in 0..<n:
+        out = push_mut(out, slot_get(otir_k1("deto", "{i}")))
+    out
+
 fn otir_mangle(orb: Text, name: Text, is_pub: int) -> Text:
     if name == "main":
         name
@@ -3724,6 +3734,18 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             fn_name = otir_mangle(orb_of, fn_raw, fn_pub)
             # How a call inside THIS orb finds it (step 1 of otir_resolve).
             slot_set(otir_priv_key(orb_of, fn_raw), fn_name)
+            # `comptime`/`deterministic` modifiers, recorded by the parser
+            # instead of dropped. `comptime` (compile-time evaluation) is not
+            # implemented, so reject it rather than let it silently do nothing.
+            # `deterministic` is a real guarantee - record the emitted name so
+            # the effect pass can enforce it after the whole module is built.
+            fn_mod = if has(decl, "modifier") then get(decl, "modifier") else ""
+            if fn_mod == "comptime":
+                compile_error("orion: ERROR — `comptime fn` is not supported yet (compile-time evaluation is unimplemented; remove the modifier so it does not look like it works)")
+            if fn_mod == "deterministic":
+                dn = slot_int_or_zero(otir_k1("detn", "count"))
+                slot_set(otir_k1("deto", "{dn}"), fn_name)
+                slot_set(otir_k1("detn", "count"), dn + 1)
             if text_list_has(fn_seen, fn_name):
                 compile_error("orion: ERROR — duplicate function `{fn_raw}` (defined twice in the same orb — two orbs may now each have their own)")
             fn_seen = push_mut(fn_seen, fn_name)

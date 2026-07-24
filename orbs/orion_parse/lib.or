@@ -1002,7 +1002,6 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         is_ensure = kind_here == "ident" and value_here == "ensure"
         is_return = kind_here == "ident" and value_here == "return"
         # `spawn` — entity spawning produces an entity value
-        is_spawn = kind_here == "ident" and value_here == "spawn"
         is_destroy = kind_here == "ident" and value_here == "destroy"
         # `loop:` — start an unconditional loop block.
         is_loop = kind_here == "ident" and value_here == "loop" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ":"
@@ -1689,8 +1688,15 @@ pub fn self_parse(tokens: [Map]) -> Map:
         is_handle = kind_here == "ident" and value_here == "handle"
         is_comptime = kind_here == "ident" and value_here == "comptime"
         is_deterministic = kind_here == "ident" and value_here == "deterministic"
-        # `comptime fn` / `deterministic fn` — skip the modifier and treat as fn.
+        # `comptime fn` / `deterministic fn` — the modifier used to be dropped
+        # here, so both compiled as a plain fn that did nothing the word
+        # promised. Now it is RECORDED on the fn node and acted on downstream:
+        # `deterministic` is enforced (the fn may not transitively touch io /
+        # time / platform / audio), `comptime` is rejected (not implemented, so
+        # it must not masquerade as working).
+        mut fn_modifier = ""
         if is_comptime or is_deterministic:
+            fn_modifier = if is_comptime then "comptime" else "deterministic"
             cursor = cursor + 1
             kind_here = psr_peek_kind(tokens, cursor)
             value_here = psr_peek_value(tokens, cursor)
@@ -1698,7 +1704,8 @@ pub fn self_parse(tokens: [Map]) -> Map:
             is_system = kind_here == "ident" and value_here == "system"
         if is_fn:
             decl_result = psr_parse_fn(tokens, cursor)
-            decls = push(decls, set(get_map(decl_result, "node"), "pub", if is_pub then 1 else 0))
+            fn_node = set(get_map(decl_result, "node"), "pub", if is_pub then 1 else 0)
+            decls = push(decls, set(fn_node, "modifier", fn_modifier))
             cursor = get_int(decl_result, "next")
         if is_data:
             decl_result = psr_parse_data(tokens, cursor)

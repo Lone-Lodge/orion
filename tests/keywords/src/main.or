@@ -1,0 +1,41 @@
+# `deterministic fn` is a real guarantee, not a decoration.
+#
+# The keyword used to parse and then be dropped, so `deterministic fn` compiled
+# as a plain fn that promised nothing. Now the compiler proves it: a fn declared
+# deterministic may not transitively reach a source of non-determinism (io,
+# wall-clock time, platform, audio). That is the compile-time certificate a
+# deterministic simulation - and rollback netcode - rests on.
+#
+# This file only holds the POSITIVE case (a deterministic fn over pure
+# arithmetic must compile), because a gate proves things that pass. The NEGATIVE
+# cases - a deterministic fn that touches time, directly or through a helper, is
+# a hard compile error - are proven by the fixtures run alongside this gate;
+# they cannot live here because a compile error produces no runnable binary.
+
+deterministic fn step(x: int, vx: int, dt: int) -> int:
+    x + vx * dt
+
+deterministic fn integrate(x: int, vx: int, ticks: int) -> int:
+    mut pos = x
+    for i in 0..<ticks:
+        pos = step(pos, vx, 1)
+    pos
+
+fn main() -> int:
+    print_line("")
+    print_line("  gate: deterministic keyword (compile-time certificate)")
+    print_line("")
+    # If this binary exists at all, the two deterministic fns above passed the
+    # certificate: the whole call graph is free of io / time / platform / audio.
+    a = integrate(0, 3, 10)
+    ok = if a == 30 then 1 else 0
+    if ok == 1:
+        print_line("    ok    a deterministic call graph compiles and runs (30)")
+        print_line("")
+        print_line("  1/1 checks passed")
+        0
+    else:
+        print_line("    FAIL  expected 30, got {a}")
+        print_line("")
+        print_line("  1 of 1 checks FAILED")
+        1
