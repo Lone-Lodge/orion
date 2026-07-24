@@ -885,6 +885,24 @@ fn cmd_shot():
 # emits/spawns, optionally filtered ("orbit facts score" = which
 # rules touch score).
 # usage: orbit facts [name]
+# orbit memfacts — every slot store in THIS build whose value shape has no
+# copier at the persistence boundary. Those are the sites that abort instead of
+# evacuating if the value turns out to be region-born, and the compiler knows
+# all of them statically. The build already prints the count next to its
+# timings; this names them.
+fn cmd_memfacts():
+    if not file_exists("Orbit.toml"):
+        die("orbit memfacts: no Orbit.toml in this directory")
+    lines = nb_lines(read_file("Orbit.toml"))
+    compiler = nb_setting(lines, "compiler", default_compiler())
+    if not file_exists(compiler):
+        die("orbit memfacts: compiler not found at `" + compiler + "`")
+    mut args = [resolve_path(), "memfacts"]
+    dirs = nb_orb_dirs(lines)
+    for i in 0..<len(dirs):
+        args = push(args, at(dirs, i))
+    exit_with(run_command(compiler, args))
+
 fn cmd_facts():
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
@@ -1031,7 +1049,9 @@ pub fn main():
                                                 if command == "try":
                                                     cmd_try()
                                                 else:
-                                                    if command == "facts":
+                                                    if command == "memfacts":
+                                                        cmd_memfacts()
+                                                    else if command == "facts":
                                                         cmd_facts()
                                                     else:
                                                         if command == "why":

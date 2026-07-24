@@ -564,6 +564,15 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         val_ty = llvm_type_of(val_inst.type_text)
         if val_ty == "ptr":
             code = evac_code(val_inst.type_text)
+            # STATISTIC, recorded where the fact is known. Code 0 means the
+            # boundary has no copier for this shape, so a region-born value
+            # stored here cannot be evacuated and the runtime aborts instead.
+            # Every such site is a place that CAN abort, and they are all known
+            # at compile time - so count them and be able to name them, rather
+            # than discovering one from a crash report. See memfacts_report.
+            memfact_count("stores")
+            if code == 0:
+                memfact_note(fn_value.name, val_inst.type_text)
             evp = "%v{my_id}.ev"
             tmp = "%v{my_id}.sp"
             l0 = "    {evp} = call ptr @orion_slot_evac(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.value)}, i64 {code})"
@@ -972,6 +981,61 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
 
 # --- Function and module ---
+
+# ---- memfacts: what the compiler already knows about memory safety ----
+#
+# The slot-store boundary is where a region-born pointer either gets evacuated
+# to the heap or aborts the program, and WHICH of the two is decided by a type
+# code the emitter derives right here, statically. That makes the set of
+# possible aborts a compile-time fact, not a runtime surprise - so record it.
+#
+# Kept in compiler slots rather than threaded through emit_module's signature:
+# the recording site is deep inside per-instruction emission, and this is
+# diagnostics, not semantics.
+fn memfact_count(kind: Text):
+    slot_set("emit:mf:" + kind, memfact_get(kind) + 1)
+
+fn memfact_get(kind: Text) -> int:
+    if slot_has("emit:mf:" + kind) then slot_get_int("emit:mf:" + kind) else 0
+
+fn memfact_note(fn_name: Text, type_text: Text):
+    n = memfact_get("opaque")
+    slot_set("emit:mf:opaque", n + 1)
+    slot_set("emit:mfo:{n}", fn_name + "  (" + type_text + ")")
+
+# ONE line, next to the timings, on every build. Anything longer would be
+# noise on a compile that is fine, and noise is how a real warning gets missed.
+pub fn memfacts_report():
+    stores = memfact_get("stores")
+    opaque = memfact_get("opaque")
+    if stores == 0:
+        return 0
+    if opaque == 0:
+        print_line("  memory: {stores} slot store(s), all evacuable")
+    else:
+        print_line("  memory: {stores} slot store(s), {opaque} with no copier (`orion <file> memfacts` to list)")
+    0
+
+# The sites themselves, on request: `orion <file> memfacts`.
+pub fn memfacts_list() -> int:
+    stores = memfact_get("stores")
+    opaque = memfact_get("opaque")
+    print_line("")
+    print_line("  slot-store boundary: {stores} pointer store(s), {opaque} with no copier")
+    print_line("")
+    if opaque == 0:
+        print_line("  Every pointer stored in a slot has a deep copier, so a region-born")
+        print_line("  value is evacuated to the heap rather than left to dangle.")
+    else:
+        print_line("  These shapes have no copier at the boundary. If the value is born in")
+        print_line("  the arena, frame or a pool region, the store cannot be evacuated and")
+        print_line("  the runtime aborts. Each one is therefore either wrapped in a persist")
+        print_line("  scope by hand, or a latent abort - and the compiler cannot tell which.")
+        print_line("")
+        for i in 0..<opaque:
+            print_line("    " + slot_get("emit:mfo:{i}"))
+    print_line("")
+    0
 
 # Evacuation type code for the slot-store boundary — what
 # orion_slot_evac needs to deep-copy a region-born value. 0 = no

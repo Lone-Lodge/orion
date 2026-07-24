@@ -356,6 +356,14 @@ pub fn driver_main() -> int:
         d_emit = t4 - t3
         d_total = t4 - t0
         print_line(drv_dim("  compiled {d_total} ms (lex {d_lex} | parse {d_parse} | ir {d_ir} | emit {d_emit})"))
+        # What the build knows about its own memory safety. The slot-store
+        # boundary decides evacuate-or-abort from a statically derived type
+        # code, so the set of sites that CAN abort is a compile-time fact -
+        # worth stating next to the timings rather than meeting in a crash.
+        if out_path == "memfacts":
+            memfacts_list()
+            return 0
+        memfacts_report()
         n_errors = compile_errors()
         if n_errors > 0:
             print_line(drv_red("orion: compilation FAILED with {n_errors} error(s) — no output written"))
