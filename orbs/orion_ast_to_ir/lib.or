@@ -3648,6 +3648,20 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                 fld_type = ast_type_to_ir(get(fld, "type"))
                 sep = if fi == 0 then "" else "|"
                 spec = "{spec}{sep}{fld_name}:{fld_type}"
+            # Two `data` decls of the same NAME but a different layout are a
+            # SILENT miscompile today: a type name is not a linker symbol, just a
+            # compile-time layout key, and the lookup takes the first match - so
+            # the second orb's field access reads the first orb's offsets. (One
+            # such pair exists latent in the tree: `Param` in astra_ast vs
+            # orion_ir, never co-built, but nothing stops it.) Functions were
+            # namespaced per orb; the type-string machinery is too wide to
+            # follow suit for one theoretical clash, so the safety win is to turn
+            # the silent miscompile into a clear error. An IDENTICAL redeclaration
+            # is harmless and stays legal (a copy-pasted shared shape).
+            dkey = otir_k1("dspec", struct_name)
+            if slot_has(dkey) and slot_get(dkey) != spec:
+                compile_error("orion: ERROR — data type `{struct_name}` is defined with two different layouts in this build (a type name is a global layout key, not per-orb — rename one)")
+            slot_set(dkey, spec)
             sig_scope = scope_add_data_decl(sig_scope, struct_name, spec)
         if get(decl, "kind") == "Enum":
             enum_name = get(decl, "name")
