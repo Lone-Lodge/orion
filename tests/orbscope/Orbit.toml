@@ -1,0 +1,10 @@
+[package]
+name = "orbscope"
+version = "0.0.1"
+description = "Orb visibility gate - private functions are orb-local, so two orbs may share a private name"
+
+[orbs]
+alpha = "path:orbs/alpha"
+beta = "path:orbs/beta"
+gamma = "path:orbs/gamma"
+delta = "path:orbs/delta"

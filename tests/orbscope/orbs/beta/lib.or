@@ -1,0 +1,18 @@
+# Fixture orb B. Same private names as alpha, different bodies. Each orb's
+# `pub` wrapper must reach ITS OWN private, not the other's - that is the
+# property this gate exists to prove.
+
+fn label() -> Text:
+    "beta"
+
+fn run(n: int) -> int:
+    n + 100
+
+pub fn beta_label() -> Text:
+    label()
+
+pub fn beta_run(n: int) -> int:
+    run(n)
+
+pub fn shared_label() -> Text:
+    "beta-shared"

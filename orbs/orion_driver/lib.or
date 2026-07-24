@@ -39,7 +39,12 @@ fn drv_dirname(path: Text) -> Text:
 
 # "use foo" → "foo"; anything else → "".
 fn drv_use_name(line: Text) -> Text:
-    bs = bytes_from_text(line)
+    bs0 = bytes_from_text(line)
+    # `pub use X` (a facade RE-EXPORTING X) loads X exactly like `use X` does —
+    # the visibility difference is the compiler's business, not the loader's.
+    # Missing this made a facade orb stop pulling in the orbs it re-exports.
+    is_pub_use = len(bs0) > 4 and at(bs0, 0) == 112 and at(bs0, 1) == 117 and at(bs0, 2) == 98 and at(bs0, 3) == 32
+    bs = if is_pub_use then bytes_slice(bs0, 4, len(bs0)) else bs0
     n = len(bs)
     if n < 5:
         return ""
@@ -52,7 +57,9 @@ fn drv_use_name(line: Text) -> Text:
         if i >= n:
             break
         c = at(bs, i)
-        if c == 32 or c == 13 or c == 10 or c == 35:
+        # 40 = `(`: `use text (trim)` and `use text(trim)` both name the orb
+        # `text` — the selective list is the parser's business, not the loader's.
+        if c == 32 or c == 13 or c == 10 or c == 35 or c == 40:
             break
         single = bytes_to_text(bytes_slice(bs, i, i + 1))
         name = "{name}{single}"
@@ -145,6 +152,13 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
             continue
         orb_count = orb_count + 1
         orb_bytes = orb_bytes + len(bytes_from_text(src))
+        # Stamp each chunk with its origin. The program is ONE concatenated
+        # text by the time the lexer sees it, so without this marker every
+        # function in the build looks like it came from the same place - which
+        # is exactly why the namespace was flat and two orbs could not both
+        # have a private helper of the same name.
+        q = bytes_to_text(push([], 34))
+        chunks = push(chunks, "orb " + q + name + q + "\n")
         chunks = push(chunks, src)
         chunks = push(chunks, "\n")
         deps = drv_uses_of(src)
@@ -153,6 +167,10 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
             queue = push(queue, at(deps, di))
     okb = orb_bytes / 1024
     print_line(drv_dim("  orbs {orb_count} ({okb} KB)"))
+    # The entry program is its own scope: `""` owns whatever it declares
+    # privately, so a game's local helper cannot collide with an orb's.
+    eq = bytes_to_text(push([], 34))
+    chunks = push(chunks, "orb " + eq + eq + "\n")
     chunks = push(chunks, entry_src)
     orion_text_join(chunks)
 

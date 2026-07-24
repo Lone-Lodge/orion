@@ -490,6 +490,19 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
                         compile_error("orion: ERROR at line {line}:{col} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}`, but the new value is a `{friendly_type(new_type)}`)")
+                    # Sharpened pointer-subtype rebind guard (mirrors the return
+                    # guard): two DIFFERENT concrete pointer shapes (text/list/
+                    # struct) are a real type error even though they share ptr
+                    # storage. map/fn/generic stay wildcards (kind ""), and a new
+                    # value whose static type is UNRELIABLE (slot_get/map get,
+                    # traced through phis) is skipped so the dynamic-storage idiom
+                    # never false-positives.
+                    slot_kind_rb = concrete_ptr_kind(slot_type)
+                    new_kind_rb = concrete_ptr_kind(new_type)
+                    if (not is_unreliable_ptr(current_fn, er.id)) and slot_kind_rb != "" and new_kind_rb != "" and slot_kind_rb != new_kind_rb:
+                        line_rb = if has(stmt, "line") then get_int(stmt, "line") else 0
+                        col_rb = if has(stmt, "col") then get_int(stmt, "col") else 0
+                        compile_error("orion: ERROR at line {line_rb}:{col_rb} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}` but the new value is a `{friendly_type(new_type)}`: a {new_kind_rb} where a {slot_kind_rb} was declared)")
                     # Resolve an empty list's element type from the first
                     # concrete value stored into it: `mut x = []` allocates
                     # list:i64 (no element to peek), so `x = push(x, textv)`
@@ -776,7 +789,10 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         # Not a local — zero-payload enum variant as a bare ident
         # (`Nop`), then known global fn (fn-ref), then error.
         bare_enum = find_variant_enum(scope, name)
-        fn_ret = scope_lookup_fn_ret(scope, name)
+        # Same orb-local resolution a call gets: `register_system(w, "x", f)`
+        # must find THIS orb's private `f`, and take its mangled address.
+        fn_name_res = otir_resolve(name)
+        fn_ret = scope_lookup_fn_ret(scope, fn_name_res)
         if bare_enum != "":
             vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": bare_enum}, "method": name, "args": []}
             result = ast_expr_to_ir(fn_value, scope, vc_node)
@@ -784,7 +800,7 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             # A bare fn name used as a value becomes a plain-fn closure
             # [fn_ptr, 0] — flag 0 so closure_call invokes it without an env.
             no_caps = slice([0], 0, 0)
-            pr_fnref = ir_fn_push(fn_value, ir_make_closure(name, no_caps, 0))
+            pr_fnref = ir_fn_push(fn_value, ir_make_closure(fn_name_res, no_caps, 0))
             result = ConvResult{function: pr_fnref.function, scope: scope, id: pr_fnref.id}
         if bare_enum == "" and fn_ret == "":
             # Unknown ident — likely a `{expr}` interpolation the parser
@@ -1141,8 +1157,139 @@ fn find_variant_enum(scope: Scope, callee: Text) -> Text:
         compile_error("orion: ERROR — ambiguous bare enum variant `{callee}` (defined in both `{found_enum}` and `{second_enum}`) — rename one variant or qualify the use")
     found_enum
 
+# ---- Orb visibility: a private function is ORB-LOCAL ----
+#
+# By lowering time the program is ONE concatenated text (drv_collect), so every
+# function used to live in a single flat namespace. That made a private helper
+# a public hazard: `contains_text` in atlas_ecs and in atlas_project could not
+# coexist (it broke the idle gate's build outright), and a gate's private `run`
+# collided with astra_run's pub `run`. Now the driver stamps each chunk with
+# `orb "<name>"`, and a non-pub function is EMITTED as `<orb>__<name>`.
+#
+# `pub` is therefore the orb's declared surface and stays global; everything
+# else is invisible outside its own orb, so it can neither collide with nor be
+# called from another one. `main` is exempt (the emitter looks it up by name).
+fn slot_int_or_zero(key: Text) -> int:
+    if slot_has(key) then slot_get_int(key) else 0
+
+# All these registries are keyed by compilation EPOCH (see ast_program_to_ir),
+# so a stale entry from an earlier compile in the same process can never bind.
+fn otir_k1(kind: Text, a: Text) -> Text:
+    ep = slot_int_or_zero("otir:ep")
+    "otir:{kind}:{ep}:" + a
+
+fn otir_k2(kind: Text, a: Text, b: Text) -> Text:
+    otir_k1(kind, a) + ":" + b
+
+fn otir_k3(kind: Text, a: Text, b: Text, c: Text) -> Text:
+    otir_k2(kind, a, b) + ":" + c
+
+fn otir_priv_key(orb: Text, name: Text) -> Text:
+    otir_k2("mg", orb, name)
+
+fn otir_scope(orb: Text) -> Text:
+    if orb == "" then "prog" else orb
+
+# EVERY function is emitted under its own orb's scope. There is no global
+# function namespace any more: an orb sees its own declarations, plus exactly
+# what it imports. `main` is the one exception (the emitter looks it up by
+# name); externs are C symbols and never come through here.
+fn otir_mangle(orb: Text, name: Text, is_pub: int) -> Text:
+    if name == "main":
+        name
+    else:
+        otir_scope(orb) + "__" + name
+
+# The name a callee resolves to FROM the orb currently being lowered: its own
+# private of that name if it has one, else the global (pub/extern/builtin) name.
+# Does `f` hand `target`'s exports onward? Follows ONLY `pub use` edges, so a
+# plain `use` stays private to the orb that wrote it and a facade has to say
+# out loud that it is one. Depth-capped: a re-export cycle is a typo, not a
+# reason to hang the compiler.
+fn otir_reex_reaches(f: Text, target: Text, depth: int) -> bool:
+    if slot_has(otir_k2("reex", f, target)):
+        return true
+    if depth <= 0:
+        return false
+    mut hit = false
+    for i in 0..<slot_int_or_zero(otir_k1("usen", f)):
+        g = slot_get(otir_k1("useo", f) + ":{i}")
+        if slot_has(otir_k2("reex", f, g)):
+            if otir_reex_reaches(g, target, depth - 1):
+                hit = true
+    hit
+
+# Can `orb` see `target`'s exports at all - directly, or through a facade it
+# imports?
+fn otir_sees(orb: Text, target: Text) -> bool:
+    if slot_has(otir_k2("uses", orb, target)):
+        return true
+    mut hit = false
+    for i in 0..<slot_int_or_zero(otir_k1("usen", orb)):
+        f = slot_get(otir_k1("useo", orb) + ":{i}")
+        if otir_reex_reaches(f, target, 8):
+            hit = true
+    hit
+
+# The name a call binds to, resolved AS THE CALLING ORB SEES IT:
+#   1. its own declarations (private or pub) - always win, so a local helper
+#      can shadow an imported name without anyone else noticing;
+#   2. a selective import `use P (name)` - how you say WHICH orb you mean;
+#   3. a plain `use P` where P exports it - the ordinary case;
+#   4. otherwise it is not a user function at all (builtin, extern, runtime),
+#      and passes through untouched.
+# Two imports exporting the same name is an ERROR at the call, not a silent
+# pick, and the message names the candidates. That is the whole point: an orb
+# can no longer be broken by a name chosen in an orb it never asked for.
+fn otir_resolve(name: Text) -> Text:
+    orb = if slot_has("otir:curorb") then slot_get("otir:curorb") else ""
+    mine = otir_priv_key(orb, name)
+    if slot_has(mine):
+        return slot_get(mine)
+    n_def = slot_int_or_zero(otir_k1("defn", name))
+    if n_def == 0:
+        return name
+    # EXPLICIT BEATS IMPLICIT. A name you asked for by hand (`use option
+    # (unwrap)`) outranks one that merely came along with a bare `use`, so
+    # picking a side costs one line and does not force you to enumerate
+    # everything you wanted from the other orb. Only two hand-written claims on
+    # the same name are genuinely ambiguous.
+    mut hits = 0
+    mut pick = ""
+    mut named = 0
+    mut listed = ""
+    for i in 0..<n_def:
+        p2 = slot_get(otir_k1("defo", name) + ":{i}")
+        listed = listed + " `" + p2 + "`"
+        if otir_sees(orb, p2):
+            by_name = slot_has(otir_k3("only", orb, p2, name))
+            # An import list also LIMITS: a name not on it is not visible.
+            limited = slot_has(otir_k2("onlyn", orb, p2))
+            if by_name:
+                if named == 0:
+                    hits = 0
+                named = named + 1
+                hits = hits + 1
+                pick = p2
+            else:
+                if named == 0 and not limited:
+                    hits = hits + 1
+                    pick = p2
+    if hits == 1:
+        return slot_get(otir_k2("pub", pick, name))
+    if hits > 1:
+        compile_error("orion: ERROR — `{name}` is exported by more than one orb you import ({listed} ) — say which: `use <orb> ({name})`")
+        return name
+    compile_error("orion: ERROR — `{name}` is not visible here; it is exported by{listed} — add `use` for the one you mean")
+    name
+
 fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     callee = get(node, "callee")
+    # The orb-local name is used ONLY where a global function is meant. A LOCAL
+    # binding still shadows: `double = fn(x): x * 2` must call the closure in
+    # scope even if the orb also has a private `double`, so the local lookup
+    # below keeps the raw name.
+    callee_g = otir_resolve(callee)
     mut args = get_list(node, "args")
     # Named-argument reorder: `f(y = 3, x = 5)` → positional order via the
     # `otir:param:<fn>:<name>` slots. Positional args fill in source order.
@@ -1160,7 +1307,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         for na_k in 0..<na_total:
             na_a = at(args, na_k)
             if get(na_a, "kind") == "NamedArg":
-                na_slot = slot_get_int("otir:param:" + callee + ":" + get(na_a, "name"))
+                na_slot = slot_get_int("otir:param:" + callee_g + ":" + get(na_a, "name"))
                 na_pos = set(na_pos, na_slot, get_map(na_a, "value"))
             else:
                 na_pos = set(na_pos, na_next, na_a)
@@ -1269,6 +1416,9 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_get_or = callee == "get_or"
     is_slice = callee == "slice"
     is_vec_add = callee == "vec_add"
+    is_vec_addi = callee == "vec_addi"
+    is_vec_madd = callee == "vec_madd"
+    is_par_madd = callee == "par_madd"
     is_vec_sub = callee == "vec_sub"
     is_vec_mul = callee == "vec_mul"
     is_vec_dot = callee == "vec_dot"
@@ -1459,6 +1609,23 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
         pr = ir_fn_push(b_r.function, ir_vec_add(a_r.id, b_r.id))
         result = ConvResult{function: pr.function, scope: b_r.scope, id: pr.id}
+    if is_vec_addi:
+        a_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
+        pr = ir_fn_push(b_r.function, ir_vec_addi(a_r.id, b_r.id))
+        result = ConvResult{function: pr.function, scope: b_r.scope, id: pr.id}
+    if is_vec_madd:
+        a_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
+        k_r = ast_expr_to_ir(b_r.function, b_r.scope, at(args, 2))
+        pr = ir_fn_push(k_r.function, ir_vec_madd(a_r.id, b_r.id, k_r.id))
+        result = ConvResult{function: pr.function, scope: k_r.scope, id: pr.id}
+    if is_par_madd:
+        a_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
+        k_r = ast_expr_to_ir(b_r.function, b_r.scope, at(args, 2))
+        pr = ir_fn_push(k_r.function, ir_par_madd(a_r.id, b_r.id, k_r.id))
+        result = ConvResult{function: pr.function, scope: k_r.scope, id: pr.id}
     if is_vec_sub:
         a_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
@@ -1611,7 +1778,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_addi == false) and (is_vec_madd == false) and (is_par_madd == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
     if is_resume:
         # One `resume(v)` — pick the int vs text runtime call from the value's
         # type. (There is intentionally no resume_int / resume_text; one way.)
@@ -1644,6 +1811,33 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             arg_r = ast_expr_to_ir(current_fn, current_scope, arg_node)
             current_fn = arg_r.function
             current_scope = arg_r.scope
+            # Call-arg pointer-subtype guard (direct calls only — a closure
+            # callee has no registered param types). Same rule as the return and
+            # rebind guards: a reliably-shaped arg of one concrete pointer kind
+            # (text/list/struct) passed where a DIFFERENT concrete kind is
+            # declared is a real type error even though both are ptr storage.
+            # map/fn/generic params stay wildcards; an arg whose static type is
+            # unreliable (slot_get/map get, traced through phis) is skipped so the
+            # dynamic-storage idiom never false-positives.
+            if not is_local_callee:
+                pt_key_ca = "otir:paramtype:" + callee_g + ":{arg_index}"
+                if slot_has(pt_key_ca):
+                    decl_pt_ca = slot_get(pt_key_ca)
+                    arg_ty_ca = get_value_type(current_fn, arg_r.id)
+                    decl_ck_ca = concrete_ptr_kind(decl_pt_ca)
+                    arg_ck_ca = concrete_ptr_kind(arg_ty_ca)
+                    if decl_ck_ca != "" and arg_ck_ca != "" and decl_ck_ca != arg_ck_ca and (not is_unreliable_ptr(current_fn, arg_r.id)):
+                        ca_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
+                        ca_col = if has(arg_node, "col") then get_int(arg_node, "col") else 0
+                        compile_error("orion: ERROR at line {ca_line}:{ca_col} — argument {arg_index + 1} to `{callee}` is a `{friendly_type(arg_ty_ca)}` but the parameter is declared `{friendly_type(decl_pt_ca)}` (a {arg_ck_ca} where a {decl_ck_ca} was expected)")
+                    # NB an i64-arg -> ptr-param check was TRIED here and REVERTED:
+                    # erasure means a real list value can carry the type "i64" (a
+                    # list that lost its element type through a dynamic getter or
+                    # an untyped build), so `ints_differ(x, emptyish)` false-
+                    # positived across the harness. The i64-vs-ptr bucket at call
+                    # args is unreachable until dynamic getters carry honest types
+                    # (the step-3 erasure work) - the concrete-kind check above is
+                    # the safe ceiling for the guard pattern.
             arg_ids = push(arg_ids, arg_r.id)
         if is_local_callee:
             # The local holds a closure value ([fn_ptr, flag, caps...]); call
@@ -1652,8 +1846,8 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             pr = ir_fn_push(current_fn, ir_closure_call(bound_id, arg_ids, "i64"))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
         else:
-            call_ret_type = scope_lookup_fn_ret_loc(scope, callee, node)
-            arity_key = "otir:arity:" + callee
+            call_ret_type = scope_lookup_fn_ret_loc(scope, callee_g, node)
+            arity_key = "otir:arity:" + callee_g
             if slot_has(arity_key):
                 want = slot_get_int(arity_key)
                 got = len(arg_ids)
@@ -1661,7 +1855,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     a_line = if has(node, "line") then get_int(node, "line") else 0
                     a_col = if has(node, "col") then get_int(node, "col") else 0
                     compile_error("orion: ERROR at line {a_line}:{a_col} — `{callee}` takes {want} argument(s), got {got}")
-            pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
+            pr = ir_fn_push(current_fn, ir_call(callee_g, arg_ids, call_ret_type))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
     result
 
@@ -1719,6 +1913,28 @@ fn ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if n_items > 0:
         first_id = at(item_ids, 0)
         elem_type = get_value_type(current_fn, first_id)
+    # Homogeneity guard (container construction, same rule as struct-field
+    # construction): a list literal mixing two DIFFERENT concrete pointer kinds
+    # (e.g. `[textv, Point{..}]`) is a type error - a `[T]` holds one element
+    # type. Anchor on the first reliably-shaped concrete element; flag any later
+    # reliable element of a different concrete kind. Unreliable items (slot_get/
+    # map-get) and map/fn/generic/i64 items are wildcards (skipped), so the
+    # dynamic-storage idiom and int lists never false-positive.
+    mut anchor_kind = ""
+    mut anchor_type = ""
+    for ck_i in 0..<n_items:
+        ck_id = at(item_ids, ck_i)
+        if not is_unreliable_ptr(current_fn, ck_id):
+            ck_ty = get_value_type(current_fn, ck_id)
+            ck_kind = concrete_ptr_kind(ck_ty)
+            if ck_kind != "":
+                if anchor_kind == "":
+                    anchor_kind = ck_kind
+                    anchor_type = ck_ty
+                else if ck_kind != anchor_kind:
+                    ll_line = if has(node, "line") then get_int(node, "line") else 0
+                    ll_col = if has(node, "col") then get_int(node, "col") else 0
+                    compile_error("orion: ERROR at line {ll_line}:{ll_col} — list literal mixes `{friendly_type(anchor_type)}` and `{friendly_type(ck_ty)}` elements (a list holds one element type: a {ck_kind} where a {anchor_kind} was expected)")
     pr = ir_fn_push(current_fn, ir_list_lit(item_ids, elem_type))
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
@@ -1999,6 +2215,9 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut value_ids = []
     for di in 0..<n_fields_decl:
         decl_part = at(parts, di)
+        # The field's IR type (the spec stores ast_type_to_ir output, so this is
+        # "struct:X"/"text"/"list:T"/"i64" - ready for concrete_ptr_kind).
+        decl_field_type = field_type_at(parts, di)
         decl_bs = bytes_from_text(decl_part)
         mut decl_name = ""
         mut found_colon = 0
@@ -2020,6 +2239,18 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 current_fn = val_r.function
                 current_scope = val_r.scope
                 matched_id = val_r.id
+                # Struct-field construction subtype guard (same rule as return/
+                # rebind/call-arg): a reliably-shaped field value of one concrete
+                # pointer kind (text/list/struct) where a DIFFERENT concrete kind
+                # is declared is a type error. map/fn/generic fields = wildcard;
+                # an unreliable value (slot_get/map-get) is skipped.
+                fld_val_ty = get_value_type(current_fn, matched_id)
+                fld_decl_k = concrete_ptr_kind(decl_field_type)
+                fld_val_k = concrete_ptr_kind(fld_val_ty)
+                if fld_decl_k != "" and fld_val_k != "" and fld_decl_k != fld_val_k and (not is_unreliable_ptr(current_fn, matched_id)):
+                    fc_line = if has(prov, "line") then get_int(prov, "line") else (if has(node, "line") then get_int(node, "line") else 0)
+                    fc_col = if has(prov, "col") then get_int(prov, "col") else 0
+                    compile_error("orion: ERROR at line {fc_line}:{fc_col} — field `{decl_name}` of `{struct_name}` is declared `{friendly_type(decl_field_type)}` but got a `{friendly_type(fld_val_ty)}` (a {fld_val_k} where a {fld_decl_k} was expected)")
         if matched_id == (0 - 1):
             # Field missing — default to 0
             pr_default = ir_fn_push(current_fn, ir_iconst(0))
@@ -2155,7 +2386,10 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         # __lambda_N's prologue reads it back with the right type — the env list
         # itself is i64, so a text/list/map capture must be re-typed on read.
         mc_caps = get_list(node, "caps")
-        mc_fn_name = get(node, "fn")
+        # A lifted lambda is an ordinary fn decl, so it is emitted under its
+        # orb's scope like any other; the closure must take the same name or it
+        # points at a symbol that does not exist.
+        mc_fn_name = otir_resolve(get(node, "fn"))
         mut mc_fn = fn_value
         mut mc_scope = scope
         mut mc_cap_ids = slice([0], 0, 0)
@@ -2326,13 +2560,17 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         # Pick perform_int vs perform_text based on handler's return type.
         # Defaults to int when the handler isn't declared (compile error
         # will surface elsewhere).
-        handler_ret = scope_lookup_fn_ret_loc(cur_scope, handler_name, node)
+        # A handler is an ordinary fn, so it is orb-local unless declared `pub`:
+        # resolve the synthesized `__handler_<Effect>_<op>` the same way a call
+        # resolves, or a private handler is emitted mangled and never found.
+        handler_g = otir_resolve(handler_name)
+        handler_ret = scope_lookup_fn_ret_loc(cur_scope, handler_g, node)
         use_text = handler_ret == "text"
         if use_text:
-            pr_perf = ir_fn_push(cur_fn, ir_perform_text(handler_name, arg_id))
+            pr_perf = ir_fn_push(cur_fn, ir_perform_text(handler_g, arg_id))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
         else:
-            pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_name, arg_id))
+            pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_g, arg_id))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
     any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
     if not any_match:
@@ -2395,6 +2633,49 @@ fn extract_list_elem(type_text: Text) -> Text:
             single = bytes_to_text([at(bs, ci)])
             result = "{result}{single}"
         result
+
+# The concrete pointer SHAPE for the return-type guard: "text", "list" or
+# "struct", or "" for a WILDCARD kind (map, fn, int, float, generic/unknown)
+# that the guard must not diff. All pointer shapes share i64 storage, so the
+# old i64/ptr bucket check can't tell them apart — yet returning a Text where a
+# struct is declared (or a list where a Text is) is a real, silent bug. This
+# discriminates the three concrete shapes while leaving `map` as the deliberate
+# dynamic escape (map <-> anything never triggers the guard), which is what
+# keeps the stringly-typed self-host compiler and the boxed-Map ECS compiling.
+fn concrete_ptr_kind(t: Text) -> Text:
+    if t == "text":
+        "text"
+    else if is_list_type(t):
+        "list"
+    else:
+        bs = bytes_from_text(t)
+        n = len(bs)
+        mut is_struct = false
+        if n >= 7:
+            if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
+                is_struct = true
+        if is_struct then "struct" else ""
+
+# True when a value's static type is UNRELIABLE because it came from a dynamic,
+# untyped getter: slot_get returns "text" for what is really an untyped pointer
+# (the whole slot store is dynamically typed), and map get/get_or read a dynamic
+# container. Traced through phi merges so `if slot_has(k) then slot_get(k) else
+# []` counts as unreliable. The subtype return guard skips these — only a value
+# with a trustworthy static shape (a literal, a constructor, a typed getter like
+# get_list/get_int) is worth diffing against the declared return type. Recurses
+# only into strictly-earlier value ids so it always terminates.
+fn is_unreliable_ptr(fn_value: IRFn, value_id: int) -> bool:
+    if value_id < 0:
+        false
+    else:
+        inst = at(fn_value.instructions, value_id)
+        op = inst.op
+        if op == "slot_get" or op == "map_get" or op == "map_get_or":
+            true
+        else if op == "phi":
+            (inst.lhs < value_id and is_unreliable_ptr(fn_value, inst.lhs)) or (inst.rhs < value_id and is_unreliable_ptr(fn_value, inst.rhs))
+        else:
+            false
 
 # True for `map` or a value-typed `map:<T>`.
 fn is_map_type(type_text: Text) -> bool:
@@ -2589,6 +2870,18 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         rt_body_ll = if rt_body == "i64" then "i64" else "ptr"
         if (not rt_exempt) and rt_decl_ll != rt_body_ll:
             compile_error("orion: ERROR — function `{name}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}`")
+        # Sharpened guard: among POINTER shapes, catch confusing two concrete
+        # kinds (text/list/struct). `map`/`fn`/generic stay wildcards (kind ""),
+        # the deliberate dynamic escape. And we SKIP bodies whose type is
+        # unreliable (slot_get/map get, traced through phis) — so the pervasive
+        # `-> [T]: if slot_has(k) then slot_get(k) else []` idiom is never
+        # flagged, only a value with a trustworthy static shape. This is the
+        # first real pointer-subtype typing, using info the IR already tracks.
+        decl_kind = concrete_ptr_kind(ret_type)
+        body_kind = concrete_ptr_kind(rt_body)
+        body_unreliable = is_unreliable_ptr(body_result.function, body_result.id)
+        if (not rt_exempt) and (not body_unreliable) and decl_kind != "" and body_kind != "" and decl_kind != body_kind:
+            compile_error("orion: ERROR — function `{name}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}` (a {body_kind} where a {decl_kind} was declared)")
         ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
         ret_result.function
     else:
@@ -3006,6 +3299,51 @@ fn nlam_block_has(block: Map) -> bool:
 
 
 pub fn ast_program_to_ir(program: Map) -> IRModule:
+    # New EPOCH for the private-name registry. A host can compile many programs
+    # in one process (the test runner does 118 in a row), and compiler slots
+    # outlive a single compile - so without this, one program's private `double`
+    # would still be registered when the next program used `double` as a local
+    # closure binding, and the call would resolve to a symbol from a file that
+    # is no longer being compiled.
+    slot_set("otir:ep", slot_int_or_zero("otir:ep") + 1)
+
+    # ---- Pass -2: the import graph + every orb's exports ----
+    # Recorded BEFORE anything resolves a name, because resolution asks two
+    # questions a single ordered walk cannot answer: "who exports this?" (any
+    # orb, including ones parsed later) and "did I import them?".
+    pre_decls = get_list(program, "decls")
+    pre_n = len(pre_decls)
+    mut orb_pre = ""
+    for pi in 0..<pre_n:
+        pd = at(pre_decls, pi)
+        pk = get(pd, "kind")
+        if pk == "OrbMark":
+            orb_pre = get(pd, "name")
+        if pk == "UseDecl":
+            target = get(pd, "name")
+            slot_set(otir_k2("uses", orb_pre, target), 1)
+            # Indexed too, so re-export chains can be walked (otir_reex_reaches).
+            u_n = slot_int_or_zero(otir_k1("usen", orb_pre))
+            slot_set(otir_k1("useo", orb_pre) + ":{u_n}", target)
+            slot_set(otir_k1("usen", orb_pre), u_n + 1)
+            if (if has(pd, "reexport") then get_int(pd, "reexport") else 0) == 1:
+                slot_set(otir_k2("reex", orb_pre, target), 1)
+            only_list = get_list(pd, "only")
+            if len(only_list) > 0:
+                # A list is a LIMIT, not a hint: from this orb you see these
+                # names and nothing else.
+                slot_set(otir_k2("onlyn", orb_pre, target), 1)
+            for oi in 0..<len(only_list):
+                slot_set(otir_k3("only", orb_pre, target, at(only_list, oi)), 1)
+        if pk == "Fn":
+            if (if has(pd, "pub") then get_int(pd, "pub") else 1) == 1:
+                ex_name = get(pd, "name")
+                if ex_name != "main":
+                    slot_set(otir_k2("pub", orb_pre, ex_name), otir_mangle(orb_pre, ex_name, 1))
+                    seen_n = slot_int_or_zero(otir_k1("defn", ex_name))
+                    slot_set(otir_k1("defo", ex_name) + ":{seen_n}", orb_pre)
+                    slot_set(otir_k1("defn", ex_name), seen_n + 1)
+
     # Duplicate-function guard. Two `fn name` definitions collide into one
     # LLVM symbol — most often the same helper defined in two `use`d orbs,
     # since function names are global (no orb namespaces yet). Flag it with a
@@ -3015,9 +3353,12 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     dup_decls = get_list(program, "decls")
     dup_n = len(dup_decls)
     mut seen_fn_names = slice([""], 0, 0)
+    mut orb_dup = ""
     for ddi in 0..<dup_n:
         dd = at(dup_decls, ddi)
         ddk = get(dd, "kind")
+        if ddk == "OrbMark":
+            orb_dup = get(dd, "name")
         # `trait` / `impl` / `system` parse but have no lowering. Left alone
         # they compile to nothing (trait/impl) or silently corrupt the program
         # (a `system` decl swallows the following `fn`, so `main` returns 0).
@@ -3027,13 +3368,17 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             word = if ddk == "Trait" then "trait" else if ddk == "Impl" then "impl" else "system"
             compile_error("orion: ERROR — `{word}` declarations are not supported yet (reserved for a future version; remove it)")
         if ddk == "Fn":
-            dnm = get(dd, "name")
+            # Compared under the EMITTED name: two orbs may each keep a private
+            # helper of the same name (they no longer share a symbol), so only a
+            # genuine `pub` clash is a duplicate.
+            dnm_raw = get(dd, "name")
+            dnm = otir_mangle(orb_dup, dnm_raw, if has(dd, "pub") then get_int(dd, "pub") else 1)
             mut dup_already = false
             for dsj in 0..<len(seen_fn_names):
                 if at(seen_fn_names, dsj) == dnm:
                     dup_already = true
             if dup_already:
-                compile_error("orion: ERROR — function `{dnm}` is defined more than once (two `use`d orbs may both define it — names are global, so rename one)")
+                compile_error("orion: ERROR — function `{dnm_raw}` is defined more than once in the same orb (two different orbs may each have one)")
             seen_fn_names = push(seen_fn_names, dnm)
 
     # Pass -1: `fact` inlining. Replace reads of reactive `fact` bindings
@@ -3138,8 +3483,15 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
         # Stmts seed — we need a typed empty list of stmts. Use the seed
         # decl's body stmts if it's a Block fn; otherwise we still need
         # some Stmt-typed list. Synthesize using a dummy.
+        # Lifted lambdas are appended AFTER every orb's decls, so they cannot
+        # inherit their orb from decl order like the other passes do. Stamp the
+        # origin on them (and on rewritten parents, whose rebuild would drop it)
+        # so a lambda inside an orb still resolves that orb's private helpers.
+        mut orb_lam = ""
         for d_idx in 0..<raw_total:
             decl = at(raw_decls, d_idx)
+            if get(decl, "kind") == "OrbMark":
+                orb_lam = get(decl, "name")
             if get(decl, "kind") == "Fn":
                 fn_body = get(decl, "body")
                 body_kind = get(fn_body, "kind")
@@ -3243,7 +3595,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                                 synth_stmts = push(synth_stmts, {"kind": "LetOrAssign", "name": cap_name, "value": at_call})
                             synth_stmts = push(synth_stmts, {"kind": "ExprStmt", "expr": lam_body})
                             synth_body = {"kind": "Block", "stmts": synth_stmts}
-                            synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
+                            synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body, "orb": orb_lam}
                             synth_decls = push(synth_decls, synth_decl)
                             bind_name = get(stmt, "name")
                             binding_names = push(binding_names, bind_name)
@@ -3266,9 +3618,9 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             new_stmts = push(new_stmts, get(nl, "stmt"))
                             nl_synths = get_list(nl, "synths")
                             for nsi in 0..<len(nl_synths):
-                                synth_decls = push(synth_decls, at(nl_synths, nsi))
+                                synth_decls = push(synth_decls, set(at(nl_synths, nsi), "orb", orb_lam))
                     new_body = {"kind": "Block", "stmts": new_stmts}
-                    rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body}
+                    rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body, "pub": if has(decl, "pub") then get_int(decl, "pub") else 1, "orb": orb_lam}
                     working_decls = push(working_decls, rewritten_decl)
                 if body_kind != "Block":
                     working_decls = push(working_decls, decl)
@@ -3341,13 +3693,25 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     # links last wins (bit us twice: toml/veil line_at, others).
     # Extern re-declares stay legal; that's the cross-orb convention.
     mut fn_seen = []
+    mut orb_1b = ""
     for index in 0..<total:
         decl = at(decls, index)
         decl_kind_1b = get(decl, "kind")
+        if decl_kind_1b == "OrbMark":
+            orb_1b = get(decl, "name")
         if decl_kind_1b == "Fn":
-            fn_name = get(decl, "name")
+            # A stamped origin wins over decl order: lifted lambdas sit at the
+            # end of the list but belong to the orb they were written in.
+            orb_of = if has(decl, "orb") then get(decl, "orb") else orb_1b
+            fn_raw = get(decl, "name")
+            # Compiler-synthesized decls (lambdas) carry no `pub` key; they are
+            # already uniquely named, so default them to global = today's shape.
+            fn_pub = if has(decl, "pub") then get_int(decl, "pub") else 1
+            fn_name = otir_mangle(orb_of, fn_raw, fn_pub)
+            # How a call inside THIS orb finds it (step 1 of otir_resolve).
+            slot_set(otir_priv_key(orb_of, fn_raw), fn_name)
             if text_list_has(fn_seen, fn_name):
-                compile_error("orion: ERROR — duplicate function `{fn_name}` (two orbs in this build define it; rename one)")
+                compile_error("orion: ERROR — duplicate function `{fn_raw}` (defined twice in the same orb — two orbs may now each have their own)")
             fn_seen = push_mut(fn_seen, fn_name)
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
@@ -3361,6 +3725,13 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             for fp_i in 0..<len(fn_params_list):
                 fp = at(fn_params_list, fp_i)
                 slot_set("otir:param:" + fn_name + ":" + get(fp, "name"), fp_i)
+                # Parameter-TYPE registry: `otir:paramtype:<fn>:<index>` -> the
+                # param's IR type. Lets a call site diff each arg's reliable
+                # concrete pointer shape against the declared param type (the
+                # call-arg subtype guard). Untyped params default to `int` (the
+                # engine's convention), which is a wildcard for the ptr guard.
+                fp_ty = if has(fp, "type") then ast_type_to_ir_with_scope(get(fp, "type"), sig_scope) else "int"
+                slot_set("otir:paramtype:" + fn_name + ":{fp_i}", fp_ty)
         if decl_kind_1b == "ExternFn":
             ext_name = get(decl, "name")
             ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
@@ -3372,11 +3743,19 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     # emit turns those into `declare` lines with real LLVM types.
     mut module = ir_module_new()
     mut has_main = 0
+    mut orb_2 = ""
     for index in 0..<total:
         decl = at(decls, index)
         kind = get(decl, "kind")
+        if kind == "OrbMark":
+            orb_2 = get(decl, "name")
         if kind == "Fn":
-            fn_ir = ast_fn_to_ir(decl, sig_scope)
+            fn_pub_2 = if has(decl, "pub") then get_int(decl, "pub") else 1
+            orb_of_2 = if has(decl, "orb") then get(decl, "orb") else orb_2
+            # Set per FUNCTION, not per marker: a lifted lambda is lowered from
+            # the end of the list but must still resolve names as its own orb.
+            slot_set("otir:curorb", orb_of_2)
+            fn_ir = ast_fn_to_ir(set(decl, "name", otir_mangle(orb_of_2, get(decl, "name"), fn_pub_2)), sig_scope)
             module = ir_module_add_fn(module, fn_ir)
             if fn_ir.name == "main":
                 has_main = 1

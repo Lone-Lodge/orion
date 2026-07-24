@@ -1,3 +1,5 @@
+use orion_lex
+
 # orion_self_parse — Orion parser written in Orion. STEP 4 PROOF.
 #
 # Consumes the token list produced by `self_lex` and produces an AST as
@@ -1629,6 +1631,28 @@ fn psr_skip_use(tokens: [Map], position: int) -> int:
         cursor = cursor + 1
     cursor
 
+# `use NAME` / `use NAME (a, b, c)` — the import is now RECORDED, not skipped.
+# The bare form still means "everything this orb exports", so nothing in a tree
+# has to change. The list form is how a caller says WHICH orb it means when two
+# of them export the same name (`use option (unwrap)`), which is otherwise an
+# ambiguity the compiler cannot resolve for you.
+fn psr_parse_use(tokens: [Map], position: int) -> Map:
+    name = psr_peek_value(tokens, position + 1)
+    mut cursor = position + 2
+    mut only = slice([""], 0, 0)
+    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
+        cursor = cursor + 1
+        loop:
+            if psr_peek_kind(tokens, cursor) == "eof" or psr_peek_kind(tokens, cursor) == "newline":
+                break
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ")":
+                cursor = cursor + 1
+                break
+            if psr_peek_kind(tokens, cursor) == "ident":
+                only = push(only, psr_peek_value(tokens, cursor))
+            cursor = cursor + 1
+    {"node": {"kind": "UseDecl", "name": name, "only": only}, "next": psr_skip_use(tokens, position)}
+
 pub fn self_parse(tokens: [Map]) -> Map:
     mut cursor = psr_skip_newlines(tokens, 0)
     mut decls = []
@@ -1638,8 +1662,11 @@ pub fn self_parse(tokens: [Map]) -> Map:
         if kind_here == "eof":
             break
         is_pub = kind_here == "ident" and value_here == "pub"
-        # `pub` is purely a visibility marker — we don't enforce it. Skip
-        # the keyword and re-read the next token as the actual decl.
+        # `pub` is now RECORDED on the decl (it used to be parsed and dropped:
+        # "purely a visibility marker"). ast_to_ir uses it to make non-pub
+        # functions ORB-LOCAL, so two orbs can each have a private `contains_text`
+        # without one breaking the other's build. Skip the keyword and re-read
+        # the next token as the actual decl.
         if is_pub:
             cursor = cursor + 1
             kind_here = psr_peek_kind(tokens, cursor)
@@ -1652,6 +1679,12 @@ pub fn self_parse(tokens: [Map]) -> Map:
         is_trait = kind_here == "ident" and value_here == "trait"
         is_extern = kind_here == "ident" and value_here == "extern"
         is_use = kind_here == "ident" and value_here == "use"
+        # `orb "name"` — an ORIGIN MARKER the driver injects ahead of each orb's
+        # source when it concatenates the program (drv_collect). It is not user
+        # syntax: the string form means a bare identifier `orb` can never be
+        # mistaken for it. Everything between two markers belongs to that orb,
+        # which is how ast_to_ir knows who owns a private function.
+        is_orbmark = kind_here == "ident" and value_here == "orb" and psr_peek_kind(tokens, cursor + 1) == "str"
         is_effect = kind_here == "ident" and value_here == "effect"
         is_handle = kind_here == "ident" and value_here == "handle"
         is_comptime = kind_here == "ident" and value_here == "comptime"
@@ -1665,7 +1698,7 @@ pub fn self_parse(tokens: [Map]) -> Map:
             is_system = kind_here == "ident" and value_here == "system"
         if is_fn:
             decl_result = psr_parse_fn(tokens, cursor)
-            decls = push(decls, get_map(decl_result, "node"))
+            decls = push(decls, set(get_map(decl_result, "node"), "pub", if is_pub then 1 else 0))
             cursor = get_int(decl_result, "next")
         if is_data:
             decl_result = psr_parse_data(tokens, cursor)
@@ -1703,8 +1736,16 @@ pub fn self_parse(tokens: [Map]) -> Map:
             decls = push(decls, get_map(decl_result, "node"))
             cursor = get_int(decl_result, "next")
         if is_use:
-            cursor = psr_skip_use(tokens, cursor)
-        not_recognized = not (is_fn or is_data or is_enum or is_effect or is_handle or is_system or is_impl or is_trait or is_extern or is_use)
+            # `pub use X` RE-EXPORTS: whoever imports this orb also sees X's
+            # exports. That is what makes a facade orb (`veil`, `astra`: a file
+            # of nothing but imports) work once each orb is its own namespace.
+            use_result = psr_parse_use(tokens, cursor)
+            decls = push(decls, set(get_map(use_result, "node"), "reexport", if is_pub then 1 else 0))
+            cursor = get_int(use_result, "next")
+        if is_orbmark:
+            decls = push(decls, {"kind": "OrbMark", "name": psr_peek_value(tokens, cursor + 1)})
+            cursor = cursor + 2
+        not_recognized = not (is_fn or is_data or is_enum or is_effect or is_handle or is_system or is_impl or is_trait or is_extern or is_use or is_orbmark)
         if not_recognized:
             cursor = cursor + 1
         cursor = psr_skip_newlines(tokens, cursor)

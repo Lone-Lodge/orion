@@ -1,0 +1,68 @@
+# Orb visibility gate: `pub` is an orb's surface, everything else is its own.
+#
+# Before this, every function in a build shared ONE flat namespace, so a
+# private helper was a public hazard: two orbs could not both have a
+# `contains_text` (it broke the idle gate's build outright), and this file's
+# own private `run` would collide with astra_run's `pub fn run`. Adding a
+# `use` line could break a build inside someone else's orb, which is the
+# opposite of composable.
+#
+# The gate asserts the three properties that fixes it:
+#   1. two orbs may hold private functions of the SAME name,
+#   2. each orb's own call binds to ITS private, not the other's,
+#   3. the entry program is a scope too - its private `label`/`run` shadow
+#      neither orb's.
+# The cross-orb direction (calling another orb's private is an ERROR) is not
+# assertable from inside a passing build; it is a compile failure by
+# construction, and it is what caught ois + atlas_astra reaching into
+# atlas_project's private text_at/payload_at.
+
+use beta
+use delta
+# Both alpha and beta export `shared_label`. Naming what this program wants from
+# alpha is what makes that legal - without the list the call is ambiguous and
+# the compiler says so instead of silently picking one. The list is a LIMIT too:
+# these are the only alpha names visible here.
+use alpha (alpha_label, alpha_run, shared_label)
+
+fn label() -> Text:
+    "program"
+
+fn run(n: int) -> int:
+    n - 1
+
+fn check_text(name: Text, expected: Text, actual: Text) -> int:
+    if actual == expected:
+        print_line("    ok    {name}")
+        0
+    else:
+        print_line("    FAIL  {name} -> expected `{expected}`, got `{actual}`")
+        1
+
+fn check(name: Text, expected: int, actual: int) -> int:
+    if actual == expected:
+        print_line("    ok    {name}")
+        0
+    else:
+        print_line("    FAIL  {name} -> expected {expected}, got {actual}")
+        1
+
+fn main() -> int:
+    print_line("")
+    print_line("  gate: orb visibility (private functions are orb-local)")
+    print_line("")
+    mut bad = 0
+    bad = bad + check_text("alpha's pub reaches alpha's private label", "alpha", alpha_label())
+    bad = bad + check_text("beta's pub reaches beta's private label", "beta", beta_label())
+    bad = bad + check_text("the program's own private label is untouched", "program", label())
+    bad = bad + check("alpha's private run (n*2)", 84, alpha_run(42))
+    bad = bad + check("beta's private run (n+100)", 142, beta_run(42))
+    bad = bad + check("the program's private run (n-1)", 41, run(42))
+    bad = bad + check_text("both orbs export `shared_label`; the import list picks alpha", "alpha-shared", shared_label())
+    bad = bad + check_text("delta reaches beta THROUGH gamma's `pub use`", "beta", delta_through_facade())
+    print_line("")
+    if bad == 0:
+        print_line("  8/8 checks passed")
+    else:
+        print_line("  {bad} of 8 checks FAILED")
+    bad

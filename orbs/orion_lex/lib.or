@@ -1,5 +1,4 @@
 use bytes
-use io
 
 # orion_self_lex — Orion lexer written in Orion.
 #

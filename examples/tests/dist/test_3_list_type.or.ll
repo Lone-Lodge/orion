@@ -6,6 +6,7 @@ declare i32 @puts(ptr)
 declare ptr @malloc(i64)
 declare ptr @orion_f64_literal_hex(ptr)
 declare ptr @orion_alloc(i64)
+declare ptr @orion_par_madd(ptr, ptr, i64)
 declare i64 @orion_arena_init(i64)
 declare i64 @orion_arena_on()
 declare i64 @orion_arena_off()
@@ -392,47 +393,220 @@ copy_it:
   ret ptr %out
 }
 
+define i64 @orion_map_idx_find(ptr %map, ptr %key) {
+entry:
+  %ixs = getelementptr i64, ptr %map, i64 3
+  %ixv = load i64, ptr %ixs
+  %noix = icmp eq i64 %ixv, 0
+  br i1 %noix, label %lin, label %hsh
+lin:
+  %le = load ptr, ptr %map
+  %lls = getelementptr i64, ptr %map, i64 2
+  %ll = load i64, ptr %lls
+  br label %lh
+lh:
+  %li = phi i64 [ 0, %lin ], [ %lin2, %ls ]
+  %ld = icmp sge i64 %li, %ll
+  br i1 %ld, label %lm, label %lb
+lb:
+  %lki = mul i64 %li, 2
+  %lks = getelementptr i64, ptr %le, i64 %lki
+  %lkiv = load i64, ptr %lks
+  %lkp = inttoptr i64 %lkiv to ptr
+  %lc = call i64 @orion_text_eq(ptr %lkp, ptr %key)
+  %lce = icmp ne i64 %lc, 0
+  br i1 %lce, label %lhit, label %ls
+lhit:
+  ret i64 %li
+ls:
+  %lin2 = add i64 %li, 1
+  br label %lh
+lm:
+  ret i64 -1
+hsh:
+  %ix = inttoptr i64 %ixv to ptr
+  %mks = getelementptr i64, ptr %map, i64 4
+  %mk = load i64, ptr %mks
+  %he = load ptr, ptr %map
+  %h0 = call i64 @orion_text_hash(ptr %key)
+  %hh = and i64 %h0, %mk
+  br label %ph
+ph:
+  %ps = phi i64 [ %hh, %hsh ], [ %psw, %pst ]
+  %pisl = getelementptr i64, ptr %ix, i64 %ps
+  %pv = load i64, ptr %pisl
+  %pe = icmp eq i64 %pv, 0
+  br i1 %pe, label %pm, label %pc
+pc:
+  %pos = add i64 %pv, -1
+  %pki = mul i64 %pos, 2
+  %pks = getelementptr i64, ptr %he, i64 %pki
+  %pkiv = load i64, ptr %pks
+  %pkp = inttoptr i64 %pkiv to ptr
+  %pcx = call i64 @orion_text_eq(ptr %pkp, ptr %key)
+  %pce = icmp ne i64 %pcx, 0
+  br i1 %pce, label %phit, label %pst
+phit:
+  ret i64 %pos
+pst:
+  %ps1 = add i64 %ps, 1
+  %psw = and i64 %ps1, %mk
+  br label %ph
+pm:
+  ret i64 -1
+}
+
+define void @orion_map_idx_build(ptr %map) {
+entry:
+  %bls = getelementptr i64, ptr %map, i64 2
+  %bl = load i64, ptr %bls
+  %need = mul i64 %bl, 2
+  br label %sz
+sz:
+  %isz = phi i64 [ 16, %entry ], [ %isz2, %szs ]
+  %szok = icmp sge i64 %isz, %need
+  br i1 %szok, label %al, label %szs
+szs:
+  %isz2 = mul i64 %isz, 2
+  br label %sz
+al:
+  %ib = mul i64 %isz, 8
+  %ix = call ptr @malloc(i64 %ib)
+  br label %zh
+zh:
+  %zi = phi i64 [ 0, %al ], [ %zi2, %zb ]
+  %zd = icmp sge i64 %zi, %isz
+  br i1 %zd, label %fl, label %zb
+zb:
+  %zs = getelementptr i64, ptr %ix, i64 %zi
+  store i64 0, ptr %zs
+  %zi2 = add i64 %zi, 1
+  br label %zh
+fl:
+  %mk = add i64 %isz, -1
+  %fe = load ptr, ptr %map
+  br label %fh
+fh:
+  %fi = phi i64 [ 0, %fl ], [ %fi2, %fd2 ]
+  %fdn = icmp sge i64 %fi, %bl
+  br i1 %fdn, label %si, label %fb
+fb:
+  %fki = mul i64 %fi, 2
+  %fks = getelementptr i64, ptr %fe, i64 %fki
+  %fkiv = load i64, ptr %fks
+  %fkp = inttoptr i64 %fkiv to ptr
+  %fh0 = call i64 @orion_text_hash(ptr %fkp)
+  %fhh = and i64 %fh0, %mk
+  br label %pr
+pr:
+  %prs = phi i64 [ %fhh, %fb ], [ %prw, %prc ]
+  %pri = getelementptr i64, ptr %ix, i64 %prs
+  %prv = load i64, ptr %pri
+  %pre = icmp eq i64 %prv, 0
+  br i1 %pre, label %pp, label %prc
+prc:
+  %prs1 = add i64 %prs, 1
+  %prw = and i64 %prs1, %mk
+  br label %pr
+pp:
+  %fp1 = add i64 %fi, 1
+  store i64 %fp1, ptr %pri
+  br label %fd2
+fd2:
+  %fi2 = add i64 %fi, 1
+  br label %fh
+si:
+  %ixi = ptrtoint ptr %ix to i64
+  %sixs = getelementptr i64, ptr %map, i64 3
+  store i64 %ixi, ptr %sixs
+  %smks = getelementptr i64, ptr %map, i64 4
+  store i64 %mk, ptr %smks
+  ret void
+}
+
+define void @orion_map_idx_add(ptr %map, ptr %key, i64 %posp1) {
+entry:
+  %ixs = getelementptr i64, ptr %map, i64 3
+  %ixv = load i64, ptr %ixs
+  %noix = icmp eq i64 %ixv, 0
+  br i1 %noix, label %ret, label %chk
+chk:
+  %mks = getelementptr i64, ptr %map, i64 4
+  %mk = load i64, ptr %mks
+  %isz = add i64 %mk, 1
+  %need = mul i64 %posp1, 2
+  %big = icmp sgt i64 %need, %isz
+  br i1 %big, label %rebuild, label %ins
+rebuild:
+  call void @orion_map_idx_build(ptr %map)
+  br label %ret
+ins:
+  %ix = inttoptr i64 %ixv to ptr
+  %h0 = call i64 @orion_text_hash(ptr %key)
+  %hh = and i64 %h0, %mk
+  br label %ph
+ph:
+  %ps = phi i64 [ %hh, %ins ], [ %psw, %pst ]
+  %pisl = getelementptr i64, ptr %ix, i64 %ps
+  %pv = load i64, ptr %pisl
+  %pe = icmp eq i64 %pv, 0
+  br i1 %pe, label %put, label %pst
+pst:
+  %ps1 = add i64 %ps, 1
+  %psw = and i64 %ps1, %mk
+  br label %ph
+put:
+  store i64 %posp1, ptr %pisl
+  br label %ret
+ret:
+  ret void
+}
+
 define ptr @orion_map_new_persist() {
 entry:
-  %handle = call ptr @malloc(i64 24)
+  %handle = call ptr @malloc(i64 40)
   %entries = call ptr @malloc(i64 256)
   store ptr %entries, ptr %handle
   %cap_slot = getelementptr i64, ptr %handle, i64 1
   store i64 16, ptr %cap_slot
   %len_slot = getelementptr i64, ptr %handle, i64 2
   store i64 0, ptr %len_slot
+  %ix_slot = getelementptr i64, ptr %handle, i64 3
+  store i64 0, ptr %ix_slot
+  %mk_slot = getelementptr i64, ptr %handle, i64 4
+  store i64 0, ptr %mk_slot
   ret ptr %handle
 }
 
 define void @orion_map_set_persist(ptr %map, ptr %key, i64 %val) {
 entry:
-  %entries = load ptr, ptr %map
-  %cap_slot = getelementptr i64, ptr %map, i64 1
   %len_slot = getelementptr i64, ptr %map, i64 2
-  %cap = load i64, ptr %cap_slot
   %len = load i64, ptr %len_slot
-  br label %hdr
-hdr:
-  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]
-  %done = icmp sge i64 %i, %len
-  br i1 %done, label %maybe_grow, label %check
-check:
-  %idx2 = mul i64 %i, 2
-  %k_slot = getelementptr i64, ptr %entries, i64 %idx2
-  %k_int = load i64, ptr %k_slot
-  %k_ptr = inttoptr i64 %k_int to ptr
-  %cmp = call i64 @orion_text_eq(ptr %k_ptr, ptr %key)
-  %eq = icmp ne i64 %cmp, 0
-  br i1 %eq, label %update, label %step
-step:
-  %i_next = add i64 %i, 1
-  br label %hdr
+  %big = icmp sge i64 %len, 8
+  br i1 %big, label %ens, label %findit
+ens:
+  %ixs = getelementptr i64, ptr %map, i64 3
+  %ixv = load i64, ptr %ixs
+  %noix = icmp eq i64 %ixv, 0
+  br i1 %noix, label %bld, label %findit
+bld:
+  call void @orion_map_idx_build(ptr %map)
+  br label %findit
+findit:
+  %pos = call i64 @orion_map_idx_find(ptr %map, ptr %key)
+  %found = icmp sge i64 %pos, 0
+  br i1 %found, label %update, label %maybe_grow
 update:
-  %vi = add i64 %idx2, 1
-  %v_slot = getelementptr i64, ptr %entries, i64 %vi
-  store i64 %val, ptr %v_slot
+  %ue = load ptr, ptr %map
+  %uki = mul i64 %pos, 2
+  %uvi = add i64 %uki, 1
+  %uvs = getelementptr i64, ptr %ue, i64 %uvi
+  store i64 %val, ptr %uvs
   ret void
 maybe_grow:
+  %cap_slot = getelementptr i64, ptr %map, i64 1
+  %cap = load i64, ptr %cap_slot
+  %entries = load ptr, ptr %map
   %full = icmp sge i64 %len, %cap
   br i1 %full, label %grow, label %append
 grow:
@@ -456,6 +630,7 @@ append:
   store i64 %val, ptr %app_v_slot
   %new_len = add i64 %len, 1
   store i64 %new_len, ptr %len_slot
+  call void @orion_map_idx_add(ptr %map, ptr %key_copy, i64 %new_len)
   ret void
 }
 
@@ -757,7 +932,7 @@ define ptr @orion_map_new(i64 %cap) {
 entry:
   %too_small = icmp slt i64 %cap, 4
   %cap2 = select i1 %too_small, i64 4, i64 %cap
-  %handle = call ptr @orion_alloc(i64 24)
+  %handle = call ptr @orion_alloc(i64 40)
   %entry_bytes = mul i64 %cap2, 16
   %entries = call ptr @orion_alloc(i64 %entry_bytes)
   store ptr %entries, ptr %handle
@@ -765,38 +940,42 @@ entry:
   store i64 %cap2, ptr %cap_slot
   %len_slot = getelementptr i64, ptr %handle, i64 2
   store i64 0, ptr %len_slot
+  %ixn_slot = getelementptr i64, ptr %handle, i64 3
+  store i64 0, ptr %ixn_slot
+  %mkn_slot = getelementptr i64, ptr %handle, i64 4
+  store i64 0, ptr %mkn_slot
   ret ptr %handle
 }
 
 define void @orion_map_set(ptr %map, ptr %key, i64 %val) {
 entry:
-  %entries = load ptr, ptr %map
-  %cap_slot = getelementptr i64, ptr %map, i64 1
   %len_slot = getelementptr i64, ptr %map, i64 2
-  %cap = load i64, ptr %cap_slot
   %len = load i64, ptr %len_slot
-  br label %hdr
-hdr:
-  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]
-  %done = icmp sge i64 %i, %len
-  br i1 %done, label %maybe_grow, label %check
-check:
-  %idx2 = mul i64 %i, 2
-  %k_slot = getelementptr i64, ptr %entries, i64 %idx2
-  %k_int = load i64, ptr %k_slot
-  %k_ptr = inttoptr i64 %k_int to ptr
-  %cmp = call i64 @orion_text_eq(ptr %k_ptr, ptr %key)
-  %eq = icmp ne i64 %cmp, 0
-  br i1 %eq, label %update, label %step
-step:
-  %i_next = add i64 %i, 1
-  br label %hdr
+  %big = icmp sge i64 %len, 8
+  br i1 %big, label %ens, label %findit
+ens:
+  %ixs = getelementptr i64, ptr %map, i64 3
+  %ixv = load i64, ptr %ixs
+  %noix = icmp eq i64 %ixv, 0
+  br i1 %noix, label %bld, label %findit
+bld:
+  call void @orion_map_idx_build(ptr %map)
+  br label %findit
+findit:
+  %pos = call i64 @orion_map_idx_find(ptr %map, ptr %key)
+  %found = icmp sge i64 %pos, 0
+  br i1 %found, label %update, label %maybe_grow
 update:
-  %vi = add i64 %idx2, 1
-  %v_slot = getelementptr i64, ptr %entries, i64 %vi
-  store i64 %val, ptr %v_slot
+  %ue = load ptr, ptr %map
+  %uki = mul i64 %pos, 2
+  %uvi = add i64 %uki, 1
+  %uvs = getelementptr i64, ptr %ue, i64 %uvi
+  store i64 %val, ptr %uvs
   ret void
 maybe_grow:
+  %cap_slot = getelementptr i64, ptr %map, i64 1
+  %cap = load i64, ptr %cap_slot
+  %entries = load ptr, ptr %map
   %full = icmp sge i64 %len, %cap
   br i1 %full, label %grow, label %append
 grow:
@@ -820,64 +999,32 @@ append:
   store i64 %val, ptr %app_v_slot
   %new_len = add i64 %len, 1
   store i64 %new_len, ptr %len_slot
+  call void @orion_map_idx_add(ptr %map, ptr %key_owned, i64 %new_len)
   ret void
 }
 
 define i64 @orion_map_get(ptr %map, ptr %key) {
 entry:
-  %entries = load ptr, ptr %map
-  %len_slot = getelementptr i64, ptr %map, i64 2
-  %len = load i64, ptr %len_slot
-  br label %hdr
-hdr:
-  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]
-  %done = icmp sge i64 %i, %len
-  br i1 %done, label %miss, label %body
-body:
-  %ki = mul i64 %i, 2
-  %vi = add i64 %ki, 1
-  %k_slot = getelementptr i64, ptr %entries, i64 %ki
-  %k_int = load i64, ptr %k_slot
-  %k_ptr = inttoptr i64 %k_int to ptr
-  %cmp = call i64 @orion_text_eq(ptr %k_ptr, ptr %key)
-  %eq = icmp ne i64 %cmp, 0
-  br i1 %eq, label %hit, label %step
+  %pos = call i64 @orion_map_idx_find(ptr %map, ptr %key)
+  %ok = icmp sge i64 %pos, 0
+  br i1 %ok, label %hit, label %miss
 hit:
-  %v_slot = getelementptr i64, ptr %entries, i64 %vi
-  %v = load i64, ptr %v_slot
+  %e = load ptr, ptr %map
+  %ki = mul i64 %pos, 2
+  %vi = add i64 %ki, 1
+  %vs = getelementptr i64, ptr %e, i64 %vi
+  %v = load i64, ptr %vs
   ret i64 %v
-step:
-  %i_next = add i64 %i, 1
-  br label %hdr
 miss:
   ret i64 0
 }
 
 define i64 @orion_map_has(ptr %map, ptr %key) {
 entry:
-  %entries = load ptr, ptr %map
-  %len_slot = getelementptr i64, ptr %map, i64 2
-  %len = load i64, ptr %len_slot
-  br label %hdr
-hdr:
-  %i = phi i64 [ 0, %entry ], [ %i_next, %step ]
-  %done = icmp sge i64 %i, %len
-  br i1 %done, label %miss, label %body
-body:
-  %ki = mul i64 %i, 2
-  %k_slot = getelementptr i64, ptr %entries, i64 %ki
-  %k_int = load i64, ptr %k_slot
-  %k_ptr = inttoptr i64 %k_int to ptr
-  %cmp = call i64 @orion_text_eq(ptr %k_ptr, ptr %key)
-  %eq = icmp ne i64 %cmp, 0
-  br i1 %eq, label %hit, label %step
-hit:
-  ret i64 1
-step:
-  %i_next = add i64 %i, 1
-  br label %hdr
-miss:
-  ret i64 0
+  %pos = call i64 @orion_map_idx_find(ptr %map, ptr %key)
+  %ok = icmp sge i64 %pos, 0
+  %r = zext i1 %ok to i64
+  ret i64 %r
 }
 
 define void @orion_map_set_ik(ptr %map, i64 %key, i64 %val) {
@@ -933,6 +1080,8 @@ append:
 
 define void @orion_map_remove(ptr %map, ptr %key) {
 entry:
+  %rixs = getelementptr i64, ptr %map, i64 3
+  store i64 0, ptr %rixs
   %entries = load ptr, ptr %map
   %len_slot = getelementptr i64, ptr %map, i64 2
   %len = load i64, ptr %len_slot
@@ -1224,9 +1373,89 @@ after:
   ret i64 %acc
 }
 
+define ptr @orion_vec_addi(ptr %dst, ptr %src) {
+entry:
+  %nslot = getelementptr i64, ptr %dst, i64 1
+  %n = load i64, ptr %nslot
+  %db = getelementptr i64, ptr %dst, i64 2
+  %sb = getelementptr i64, ptr %src, i64 2
+  %vend = and i64 %n, -4
+  br label %vhdr
+vhdr:
+  %vi = phi i64 [ 0, %entry ], [ %vin, %vbody ]
+  %vdone = icmp sge i64 %vi, %vend
+  br i1 %vdone, label %shdr, label %vbody
+vbody:
+  %dp = getelementptr i64, ptr %db, i64 %vi
+  %sp = getelementptr i64, ptr %sb, i64 %vi
+  %dv = load <4 x i64>, ptr %dp, align 8
+  %sv = load <4 x i64>, ptr %sp, align 8
+  %vsum = add <4 x i64> %dv, %sv
+  store <4 x i64> %vsum, ptr %dp, align 8
+  %vin = add i64 %vi, 4
+  br label %vhdr
+shdr:
+  %si = phi i64 [ %vend, %vhdr ], [ %sin, %sbody ]
+  %sdone = icmp sge i64 %si, %n
+  br i1 %sdone, label %retb, label %sbody
+sbody:
+  %sdp = getelementptr i64, ptr %db, i64 %si
+  %ssp = getelementptr i64, ptr %sb, i64 %si
+  %sa = load i64, ptr %sdp, align 8
+  %sbv = load i64, ptr %ssp, align 8
+  %sr = add i64 %sa, %sbv
+  store i64 %sr, ptr %sdp, align 8
+  %sin = add i64 %si, 1
+  br label %shdr
+retb:
+  ret ptr %dst
+}
+
+define ptr @orion_vec_madd(ptr %dst, ptr %src, i64 %k) {
+entry:
+  %nslot = getelementptr i64, ptr %dst, i64 1
+  %n = load i64, ptr %nslot
+  %db = getelementptr i64, ptr %dst, i64 2
+  %sb = getelementptr i64, ptr %src, i64 2
+  %vend = and i64 %n, -4
+  %kv0 = insertelement <4 x i64> undef, i64 %k, i32 0
+  %kv = shufflevector <4 x i64> %kv0, <4 x i64> undef, <4 x i32> zeroinitializer
+  br label %vhdr
+vhdr:
+  %vi = phi i64 [ 0, %entry ], [ %vin, %vbody ]
+  %vdone = icmp sge i64 %vi, %vend
+  br i1 %vdone, label %shdr, label %vbody
+vbody:
+  %dp = getelementptr i64, ptr %db, i64 %vi
+  %sp = getelementptr i64, ptr %sb, i64 %vi
+  %dv = load <4 x i64>, ptr %dp, align 8
+  %sv = load <4 x i64>, ptr %sp, align 8
+  %prod = mul <4 x i64> %sv, %kv
+  %msum = add <4 x i64> %dv, %prod
+  store <4 x i64> %msum, ptr %dp, align 8
+  %vin = add i64 %vi, 4
+  br label %vhdr
+shdr:
+  %si = phi i64 [ %vend, %vhdr ], [ %sin, %sbody ]
+  %sdone = icmp sge i64 %si, %n
+  br i1 %sdone, label %retb, label %sbody
+sbody:
+  %sdp = getelementptr i64, ptr %db, i64 %si
+  %ssp = getelementptr i64, ptr %sb, i64 %si
+  %ma = load i64, ptr %sdp, align 8
+  %mb = load i64, ptr %ssp, align 8
+  %mm = mul i64 %mb, %k
+  %mr = add i64 %ma, %mm
+  store i64 %mr, ptr %sdp, align 8
+  %sin = add i64 %si, 1
+  br label %shdr
+retb:
+  ret ptr %dst
+}
 
 
-define i64 @count_items(ptr %p0) {
+
+define i64 @prog__count_items(ptr %p0) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = call i64 @orion_list_len(ptr %v0)
@@ -1242,7 +1471,7 @@ entry:
     call void @orion_list_set(ptr %v3, i64 0, i64 %v0)
     call void @orion_list_set(ptr %v3, i64 1, i64 %v1)
     call void @orion_list_set(ptr %v3, i64 2, i64 %v2)
-    %v4 = call i64 @count_items(ptr %v3)
+    %v4 = call i64 @prog__count_items(ptr %v3)
     ret i64 %v4
 }
 

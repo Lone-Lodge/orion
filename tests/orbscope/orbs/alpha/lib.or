@@ -1,0 +1,21 @@
+# Fixture orb A. `label` and `run` are PRIVATE and deliberately share their
+# names with beta's - and with the entry program's. Under the old flat
+# namespace this build was impossible ("function `label` is defined more than
+# once"); each orb now owns its privates.
+
+fn label() -> Text:
+    "alpha"
+
+fn run(n: int) -> int:
+    n * 2
+
+pub fn alpha_label() -> Text:
+    label()
+
+pub fn alpha_run(n: int) -> int:
+    run(n)
+
+# Deliberately the SAME pub name beta exports. Two orbs may now both offer it;
+# a consumer that imports both says which one it means with an import list.
+pub fn shared_label() -> Text:
+    "alpha-shared"
