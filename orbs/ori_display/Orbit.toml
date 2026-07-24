@@ -1,0 +1,6 @@
+name = "ori_display"
+version = "0.0.1"
+description = "ORI (Orion Rendering Interface) - the display list: the neutral 2D render seam every backend (native gpu, web, …) consumes."
+
+[orbs]
+ori_geometry = "path:../ori_geometry"

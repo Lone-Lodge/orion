@@ -1,0 +1,12 @@
+# ori_geometry - the ORI (Orion Rendering Interface) 2D primitives.
+#
+# The neutral render-contract geometry: Point, Size, Rect. Lives in orion (the
+# shared base both atlas and veil already depend on) so the render contract is
+# not owned by any one UI block. `DrawCmd` (ori_display) is built on these.
+
+pub data Point: x: int, y: int
+pub data Size: width: int, height: int
+pub data Rect: x: int, y: int, width: int, height: int
+
+pub fn rect_contains(rect: Rect, point: Point) -> bool:
+    point.x >= rect.x and point.x < rect.x + rect.width and point.y >= rect.y and point.y < rect.y + rect.height
