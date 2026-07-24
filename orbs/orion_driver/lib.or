@@ -182,6 +182,106 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
 # effect signatures, parallel compiler passes and the B9
 # determinism certificate.
 
+# ---- Region scope balance: the static half of the memory-safety story ----
+#
+# Which region an allocation lands in is a MODE, opened and closed by explicit
+# calls. A function that opens one and does not close it leaves every LATER
+# allocation in the wrong region: an unclosed persist scope routes transient
+# values to the immortal heap, which is the one shape that is a real leak here,
+# and an unclosed pool or arena scope leaves them to die at the next reset,
+# which is a dangle. Both surface far from their cause.
+#
+# They are also visible right here, in the IR, before anything runs: count the
+# opens and the closes per mode per function.
+#
+# HONEST SCOPE: this counts, it does not trace paths. Unequal totals are always
+# wrong. EQUAL totals on divergent paths - an early `return` between the open
+# and the close - are also wrong, and this pass does NOT catch them. Said out
+# loud because a checker that appears to prove more than it does is worse than
+# no checker.
+# EXACT names, never prefixes: `orion_persist_text` is an allocation, not a mode
+# switch, and matching the prefix reported every logging helper in the tree.
+#
+# The ARENA is deliberately absent. It is not used as a balanced scope: the
+# dispatch path opens it if it is not already open and RESETS at exit rather
+# than closing ("entry only ensures the arena is ON"), so open and close counts
+# are not meant to match and demanding they do produces noise, not findings.
+fn drv_mode_stem(callee: Text) -> Text:
+    if callee == "orion_persist_on" or callee == "orion_persist_off":
+        "persist"
+    else if callee == "orion_pool_on" or callee == "orion_pool_off":
+        "pool"
+    else if drv_ends(callee, "state_alloc_on") or drv_ends(callee, "state_alloc_off"):
+        "state_alloc"
+    else if drv_ends(callee, "world_alloc_on") or drv_ends(callee, "world_alloc_off"):
+        "world_alloc"
+    else:
+        ""
+
+# A function whose own name ends in `_on`, `_off` or `_st` IS a scope primitive:
+# opening or closing is its whole job, so it is unbalanced by definition and
+# reporting it says nothing about the code that uses it.
+fn drv_is_scope_primitive(name: Text) -> bool:
+    drv_ends(name, "_on") or drv_ends(name, "_off") or drv_ends(name, "_st")
+
+fn drv_ends(t: Text, suffix: Text) -> bool:
+    bt = bytes_from_text(t)
+    bs = bytes_from_text(suffix)
+    n = len(bt)
+    m = len(bs)
+    if m > n:
+        false
+    else:
+        mut same = true
+        for i in 0..<m:
+            if at(bt, n - m + i) != at(bs, i):
+                same = false
+        same
+
+# `_off` closes, `_on` opens. orion_pool_off/orion_pool_on match the same stem,
+# and orion_pool_reset/_used/_high do not (the stem check above stops at `_o`).
+fn drv_is_close(callee: Text) -> bool:
+    drv_ends(callee, "_off")
+
+# One line per unbalanced (function, mode). Returns how many it found.
+fn drv_scope_check(module: IRModule, verbose: int) -> int:
+    fns = module.functions
+    mut bad = 0
+    for fi in 0..<len(fns):
+        f = drv_fn_at(fns, fi)
+        if drv_is_scope_primitive(f.name):
+            continue
+        mut stems = slice([""], 0, 0)
+        mut opens = slice([0], 0, 0)
+        mut closes = slice([0], 0, 0)
+        for ii in 0..<len(f.instructions):
+            inst = drv_inst_at(f.instructions, ii)
+            if inst.op == "call":
+                stem = drv_mode_stem(inst.name)
+                if stem != "":
+                    mut idx = drv_name_idx(stems, stem)
+                    if idx < 0:
+                        stems = push_mut(stems, stem)
+                        opens = push_mut(opens, 0)
+                        closes = push_mut(closes, 0)
+                        idx = len(stems) - 1
+                    if drv_is_close(inst.name):
+                        closes = set(closes, idx, drv_int_at(closes, idx) + 1)
+                    else:
+                        opens = set(opens, idx, drv_int_at(opens, idx) + 1)
+        for si in 0..<len(stems):
+            o = drv_int_at(opens, si)
+            c = drv_int_at(closes, si)
+            if o != c:
+                bad = bad + 1
+                if verbose == 1:
+                    st = text_at_drv(stems, si)
+                    print_line("    {f.name}: {st} opened {o}x, closed {c}x")
+    bad
+
+fn text_at_drv(xs: [Text], i: int) -> Text:
+    at(xs, i)
+
 fn drv_fn_at(fs: [IRFn], i: int) -> IRFn:
     at(fs, i)
 
@@ -362,8 +462,19 @@ pub fn driver_main() -> int:
         # worth stating next to the timings rather than meeting in a crash.
         if out_path == "memfacts":
             memfacts_list()
+            print_line("  region scopes: opened and closed in the same function")
+            print_line("")
+            n_bad = drv_scope_check(module, 1)
+            if n_bad == 0:
+                print_line("    every region scope in this build is balanced")
+            print_line("")
             return 0
         memfacts_report()
+        # An unbalanced region scope is a real defect, not a statistic, so it
+        # gets said on every build - but only when there is one.
+        n_unbalanced = drv_scope_check(module, 0)
+        if n_unbalanced > 0:
+            print_line(drv_red("  memory: {n_unbalanced} unbalanced region scope(s) — `orbit memfacts` to name them"))
         n_errors = compile_errors()
         if n_errors > 0:
             print_line(drv_red("orion: compilation FAILED with {n_errors} error(s) — no output written"))
