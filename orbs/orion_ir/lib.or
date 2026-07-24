@@ -314,6 +314,19 @@ pub fn ir_list_push_mut(list_id: int, val_id: int) -> Inst:
 # or i64 (vec_dot).
 pub fn ir_vec_add(a_id: int, b_id: int) -> Inst:
     Inst{op: "vec_add", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
+# In-place SIMD add: dst[i] += src[i] over the whole column, vectorized
+# <4 x i64>. Mutates and returns dst (no allocation) - the ECS system-loop
+# fast path. Distinct from vec_add, which allocates a fresh result list.
+pub fn ir_vec_addi(a_id: int, b_id: int) -> Inst:
+    Inst{op: "vec_addi", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
+# In-place SIMD multiply-add: dst[i] += src[i] * k (physics integrate,
+# pos += vel*dt in one <4 x i64> pass). Mutates and returns dst.
+pub fn ir_vec_madd(dst_id: int, src_id: int, k_id: int) -> Inst:
+    Inst{op: "vec_madd", type_text: "list", value: dst_id, lhs: src_id, rhs: k_id, name: "", args: []}
+# Multicore multiply-add: dst[i] += src[i] * k, split across CPU cores on
+# disjoint slices (deterministic). Backed by orion_par_madd in orion_rt.c.
+pub fn ir_par_madd(dst_id: int, src_id: int, k_id: int) -> Inst:
+    Inst{op: "par_madd", type_text: "list", value: dst_id, lhs: src_id, rhs: k_id, name: "", args: []}
 pub fn ir_vec_sub(a_id: int, b_id: int) -> Inst:
     Inst{op: "vec_sub", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 pub fn ir_vec_mul(a_id: int, b_id: int) -> Inst:

@@ -188,6 +188,21 @@ static void region_fit(const char *name, unsigned char **base, size_t *cap,
             name, (unsigned long long)(want / 1024u), c_off());
 }
 
+/* Thread-local allocation MODE — the foundation for running Orion systems on
+ * worker threads. A worker's mode flags default to off/-1 (its own TLS copy),
+ * so every allocation it makes falls straight through orion_alloc to malloc
+ * (thread-safe) instead of bumping a region pointer shared with the main
+ * thread. The bump regions themselves (arena/frame/pool buffers) stay
+ * single-threaded: ONLY the main thread ever turns a mode on, so only it ever
+ * touches those buffers. Single-threaded behaviour is byte-identical — the main
+ * thread is just "thread 0" with the same defaults. Stats counters (alloc_total
+ * etc.) may tear across threads; benign (profiling only, never memory safety). */
+#if defined(_WIN32) && defined(_MSC_VER) && !defined(__clang__)
+#define ORION_TLS __declspec(thread)
+#else
+#define ORION_TLS _Thread_local
+#endif
+
 /* ---- Frame arena ---------------------------------------------------
  * Every runtime allocation (lists, maps, text concat/join, structs)
  * routes through orion_alloc. Default mode = plain malloc (compilers
@@ -206,7 +221,7 @@ static size_t arena_used = 0;
 static size_t arena_peak = 0; /* max used since last reset (rewind lowers used) */
 static size_t arena_high = 0; /* recent high-water (retracted on a shrink) */
 static int arena_lowstreak = 0; /* consecutive under-used resets (shrink hysteresis) */
-static int arena_on = 0;
+static ORION_TLS int arena_on = 0;
 static orion_ovf *arena_ovf = NULL;
 static size_t arena_ovf_bytes = 0;
 
@@ -246,8 +261,8 @@ static size_t frame_cap = 0;
 static size_t frame_used = 0;
 static size_t frame_high = 0;
 static int frame_lowstreak = 0; /* shrink hysteresis, see region_fit */
-static int frame_on = 0;
-static int persist_depth = 0;
+static ORION_TLS int frame_on = 0;
+static ORION_TLS int persist_depth = 0;
 static orion_ovf *frame_ovf = NULL;
 static size_t frame_ovf_bytes = 0;
 
@@ -311,7 +326,7 @@ static orion_ovf **pool_ovf = NULL;
 static size_t *pool_ovf_bytes = NULL;
 static long long pool_count = 0;
 static long long pool_room = 0;
-static int pool_active = -1;
+static ORION_TLS int pool_active = -1;
 
 long long orion_pool_alloc(void) {
     if (pool_count == pool_room) {
@@ -422,6 +437,23 @@ long long orion_tlen_c(const char *p) { return ((const long long *)p)[-1]; }
 char *orion_text_seal(char *p) {
     ((long long *)p)[-1] = (long long)strlen(p);
     ((long long *)p)[-2] = 0;
+    return p;
+}
+
+/* Force a FRESH copy of a text into the current allocation region (pool /
+ * arena / persist). The compiler folds a bare "{t}" interpolation of a Text
+ * value to the same pointer — correct for value semantics, but it defeats a
+ * deep copy: the "copy" then shares the source's backing store. A snapshot
+ * never noticed (its source outlives it), but COMPACTION resets the source
+ * pool, so a shared text dangles. This primitive is the honest deep copy the
+ * snapshot/compaction paths need for standalone text values (type names,
+ * map keys, cell field names). Composite keys ("{ty}:eids") already allocate
+ * via concat and need no help. */
+const char *atlas_text_copy(const char *s) {
+    if (!s || !s[0]) return otx_empty.z;
+    long long n = orion_tlen_c(s);
+    char *p = orion_text_alloc(n);
+    memcpy(p, s, (size_t)n);
     return p;
 }
 
@@ -600,11 +632,17 @@ static const char *oe_map(const char *p, const char *key) {
     const long long *ent = (const long long *)(uintptr_t)h[0];
     long long cap = h[1], len = h[2];
     if (cap < 4) cap = 4;
-    long long *nh = (long long *)malloc(24);
+    /* 40-byte handle: [entries][cap][len][index][imask]. The evacuated copy
+     * starts with NO hash index (slots 3/4 = 0); it is rebuilt lazily on the
+     * next set/lookup, and its index (malloc'd) then matches this persist copy's
+     * lifetime. See orion_map_idx_build in emit_runtime. */
+    long long *nh = (long long *)malloc(40);
     long long *ne = (long long *)malloc((size_t)cap * 16);
     nh[0] = (long long)(uintptr_t)ne;
     nh[1] = cap;
     nh[2] = len;
+    nh[3] = 0;
+    nh[4] = 0;
     for (long long i = 0; i < len; i++) {
         long long k = ent[i * 2], v = ent[i * 2 + 1];
         if (oe_in_region((const void *)(uintptr_t)k))
@@ -1779,3 +1817,164 @@ long long host_os(void) { return 1; }
 
 /* PNG sprite loader (host_image_load) — see png_min.c */
 #include "png_min.c"
+
+/* --- Parallel multiply-add: dst[i] += src[i]*k, split across CPU cores.
+ * The multicore ECS system loop. Output ranges are DISJOINT (each thread owns
+ * a contiguous slice), so there are no data races and no locks, and the result
+ * is bit-identical to the serial version regardless of thread count or timing
+ * - parallel AND deterministic. List layout is [i64 len, data...]. */
+#if defined(_WIN32)
+#include <windows.h>
+#define ORION_POOL_MAX 64
+typedef struct { long long *dd; long long *sd; long long k; long long lo; long long hi; } orion_madd_task;
+/* Persistent worker pool: threads are created ONCE (lazily) and parked on an
+ * auto-reset "go" event, so per-tick dispatch costs a SetEvent + a wait, not a
+ * thread creation. Each worker owns a disjoint output slice -> no races. */
+static HANDLE orion_pool_threads[ORION_POOL_MAX];
+static HANDLE orion_pool_go[ORION_POOL_MAX];
+static HANDLE orion_pool_done[ORION_POOL_MAX];
+static orion_madd_task orion_pool_tasks[ORION_POOL_MAX];
+static long long orion_pool_n = 0;
+static DWORD WINAPI orion_pool_worker(LPVOID arg) {
+    long long idx = (long long)arg;
+    for (;;) {
+        WaitForSingleObject(orion_pool_go[idx], INFINITE);
+        orion_madd_task *t = &orion_pool_tasks[idx];
+        long long i;
+        for (i = t->lo; i < t->hi; i++) t->dd[i] += t->sd[i] * t->k;
+        SetEvent(orion_pool_done[idx]);
+    }
+}
+static void orion_pool_init(void) {
+    if (orion_pool_n != 0) return;
+    SYSTEM_INFO si; GetSystemInfo(&si);
+    long long nt = (long long)si.dwNumberOfProcessors;
+    if (nt < 1) nt = 1;
+    if (nt > ORION_POOL_MAX) nt = ORION_POOL_MAX;
+    long long i;
+    for (i = 0; i < nt; i++) {
+        orion_pool_go[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+        orion_pool_done[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+        orion_pool_threads[i] = CreateThread(NULL, 0, orion_pool_worker, (LPVOID)i, 0, NULL);
+    }
+    orion_pool_n = nt;
+}
+void *orion_par_madd(void *dstp, void *srcp, long long k) {
+    orion_pool_init();
+    long long *dst = (long long *)dstp;
+    long long *src = (long long *)srcp;
+    long long n = dst[0];
+    long long *dd = dst + 1;
+    long long *sd = src + 1;
+    long long nt = orion_pool_n;
+    if (nt > n) nt = (n > 0 ? n : 1);
+    long long chunk = (n + nt - 1) / nt;
+    HANDLE dones[ORION_POOL_MAX];
+    long long made = 0, i;
+    for (i = 0; i < nt; i++) {
+        long long lo = i * chunk;
+        long long hi = lo + chunk;
+        if (hi > n) hi = n;
+        if (lo >= hi) break;
+        orion_pool_tasks[i].dd = dd; orion_pool_tasks[i].sd = sd; orion_pool_tasks[i].k = k;
+        orion_pool_tasks[i].lo = lo; orion_pool_tasks[i].hi = hi;
+        dones[made] = orion_pool_done[i];
+        made++;
+        SetEvent(orion_pool_go[i]);
+    }
+    if (made > 0) WaitForMultipleObjects((DWORD)made, dones, TRUE, INFINITE);
+    return dstp;
+}
+#else
+void *orion_par_madd(void *dstp, void *srcp, long long k) {
+    long long *dst = (long long *)dstp;
+    long long *src = (long long *)srcp;
+    long long n = dst[0];
+    long long *dd = dst + 1, *sd = src + 1, i;
+    for (i = 0; i < n; i++) dd[i] += sd[i] * k;
+    return dstp;
+}
+#endif
+
+/* --- Parallel SYSTEM runner: run a set of Orion system closures concurrently,
+ * one per worker. A system is fn(World, dt)->int; World is a boxed struct, i.e.
+ * a single pointer (data values are heap records — see struct_cons), so the ABI
+ * is just (ptr world, i64 dt). SAFE only for a footprint BATCH: the scheduler
+ * guarantees the systems write DISJOINT columns and only READ shared world
+ * state, so there are no data races and the result is bit-identical to running
+ * the batch serially. A worker that allocates falls through orion_alloc to
+ * malloc (the alloc mode flags are thread-local and default off on a worker),
+ * so allocation is thread-safe too. Structural effects (spawn/despawn via
+ * apply_effect, which mutate shared world state) are NOT permitted inside a
+ * parallel system — those run on the main thread in their own batch.
+ *
+ * A closure is a list [fn_ptr, flag]; flag 1 = lambda taking its env first. */
+extern long long orion_list_at(void *list, long long idx);
+static long long orion_call_system(void *clos, void *world, long long dt) {
+    long long real = orion_list_at(clos, 0);
+    long long lam = orion_list_at(clos, 1);
+    if (lam == 1)
+        return ((long long (*)(void *, void *, long long))(void *)real)(clos, world, dt);
+    return ((long long (*)(void *, long long))(void *)real)(world, dt);
+}
+
+#if defined(_WIN32)
+typedef struct { void *clos; void *world; long long dt; } orion_sys_task;
+static HANDLE orion_sys_threads[ORION_POOL_MAX];
+static HANDLE orion_sys_go[ORION_POOL_MAX];
+static HANDLE orion_sys_done[ORION_POOL_MAX];
+static orion_sys_task orion_sys_tasks[ORION_POOL_MAX];
+static long long orion_sys_n = 0;
+static DWORD WINAPI orion_sys_worker(LPVOID arg) {
+    long long idx = (long long)arg;
+    for (;;) {
+        WaitForSingleObject(orion_sys_go[idx], INFINITE);
+        orion_sys_task *t = &orion_sys_tasks[idx];
+        orion_call_system(t->clos, t->world, t->dt);
+        SetEvent(orion_sys_done[idx]);
+    }
+}
+static void orion_sys_pool_init(void) {
+    if (orion_sys_n != 0) return;
+    SYSTEM_INFO si; GetSystemInfo(&si);
+    long long nt = (long long)si.dwNumberOfProcessors;
+    if (nt < 1) nt = 1;
+    if (nt > ORION_POOL_MAX) nt = ORION_POOL_MAX;
+    long long i;
+    for (i = 0; i < nt; i++) {
+        orion_sys_go[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+        orion_sys_done[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+        orion_sys_threads[i] = CreateThread(NULL, 0, orion_sys_worker, (LPVOID)i, 0, NULL);
+    }
+    orion_sys_n = nt;
+}
+/* systems = Orion [Fn] with layout [i64 len, elem0, ...]; each elem is a closure
+ * pointer. Runs min(len, cores) on workers; any surplus runs inline here (a
+ * batch is normally far smaller than the core count). Returns the count run. */
+long long atlas_par_systems(void *systems, void *world, long long dt) {
+    orion_sys_pool_init();
+    long long cnt = ((long long *)systems)[0];
+    long long nt = orion_sys_n;
+    HANDLE dones[ORION_POOL_MAX];
+    long long made = 0, i;
+    for (i = 0; i < cnt && i < nt; i++) {
+        orion_sys_tasks[i].clos = (void *)orion_list_at(systems, i);
+        orion_sys_tasks[i].world = world;
+        orion_sys_tasks[i].dt = dt;
+        dones[made++] = orion_sys_done[i];
+        SetEvent(orion_sys_go[i]);
+    }
+    for (i = nt; i < cnt; i++)
+        orion_call_system((void *)orion_list_at(systems, i), world, dt);
+    if (made > 0) WaitForMultipleObjects((DWORD)made, dones, TRUE, INFINITE);
+    return cnt;
+}
+#else
+long long atlas_par_systems(void *systems, void *world, long long dt) {
+    long long cnt = ((long long *)systems)[0];
+    long long i;
+    for (i = 0; i < cnt; i++)
+        orion_call_system((void *)orion_list_at(systems, i), world, dt);
+    return cnt;
+}
+#endif
