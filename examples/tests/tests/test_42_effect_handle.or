@@ -1,9 +1,0 @@
-# Effects with the readable handler syntax: `handle Effect.op(...)` instead of
-# a hand-written `__handler_Effect_op` magic name, and one `resume(v)` (int or
-# text inferred from v) instead of resume_int / resume_text.
-effect Random:
-    roll: fn(max: int) -> int
-handle Random.roll(max: int) -> int:
-    resume(42)
-fn main() -> int:
-    perform Random.roll(100)     # handler resumes 42

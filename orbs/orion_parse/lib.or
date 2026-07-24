@@ -362,13 +362,12 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     # here as keywords so they work in expression position.
     is_if = is_ident and value == "if"
     is_match_expr = is_ident and value == "match"
-    is_perform = is_ident and value == "perform"
     is_for = is_ident and value == "for"
     # Anonymous fn / lambda in expression position: `fn(params): body`. Reuses
     # the `fn` keyword (a newcomer who knows `fn name(n): ...` can read this),
     # and lowers to the SAME Lambda node as the older `|n| body` form.
     is_fn_lambda = is_ident and value == "fn" and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
-    is_call = is_ident and not is_if and not is_not and not is_match_expr and not is_perform and not is_for and not is_fn_lambda and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
+    is_call = is_ident and not is_if and not is_not and not is_match_expr and not is_for and not is_fn_lambda and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
     mut result = {"node": {"kind": "Error", "msg": "expected an expression"}, "next": position}
     if is_if:
         result = psr_parse_if(tokens, position)
@@ -376,33 +375,6 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         result = psr_parse_for_collect(tokens, position)
     if is_match_expr:
         result = psr_parse_match_node(tokens, position)
-    if is_perform:
-        # perform EffectName.op(args...) — invoke an effect operation
-        mut pc = position + 1
-        eff_name = psr_peek_value(tokens, pc)
-        pc = pc + 1
-        if psr_peek_kind(tokens, pc) == "symbol" and psr_peek_value(tokens, pc) == ".":
-            pc = pc + 1
-        op_name = psr_peek_value(tokens, pc)
-        pc = pc + 1
-        perf_args = []
-        mut perf_args_list = perf_args
-        if psr_peek_kind(tokens, pc) == "symbol" and psr_peek_value(tokens, pc) == "(":
-            pc = pc + 1
-            loop:
-                ak = psr_peek_kind(tokens, pc)
-                av = psr_peek_value(tokens, pc)
-                if ak == "symbol" and av == ")":
-                    pc = pc + 1
-                    break
-                if ak == "eof":
-                    break
-                a_r = psr_parse_expr(tokens, pc)
-                perf_args_list = push(perf_args_list, get_map(a_r, "node"))
-                pc = get_int(a_r, "next")
-                if psr_peek_kind(tokens, pc) == "symbol" and psr_peek_value(tokens, pc) == ",":
-                    pc = pc + 1
-        result = {"node": {"kind": "Perform", "effect": eff_name, "op": op_name, "args": perf_args_list}, "next": pc}
     if is_fn_lambda:
         # `fn(a, b): expr` — collect param idents up to `)`, skip `:`, parse body.
         # A param may carry a type: `fn(s: text): len(s)`. Types collect into a
@@ -443,7 +415,7 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         result = psr_parse_call(tokens, position, value)
     is_true = is_ident and value == "true"
     is_false = is_ident and value == "false"
-    if is_ident and not is_call and not is_if and not is_match_expr and not is_perform and not is_for and not is_fn_lambda and not is_true and not is_false:
+    if is_ident and not is_call and not is_if and not is_match_expr and not is_for and not is_fn_lambda and not is_true and not is_false:
         next_kind = psr_peek_kind(tokens, position + 1)
         next_value = psr_peek_value(tokens, position + 1)
         value_bytes = bytes_from_text(value)
@@ -945,14 +917,13 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # not a new declaration — only `fn NAME(` starts a decl. Without this,
         # the body loop breaks on the lambda and it mis-parses as a decl named `(`.
         fn_is_lambda = value_here == "fn" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "("
-        # `data` / `enum` / `system` / `impl` / `trait` NAME a thing
-        # (`data Point:`), so they only open a declaration when an ident — the
-        # name — follows. Used any other way the word is an ordinary identifier:
-        # `data = [1,2,3]`, a bare `data` return, `data[i]`. Before this, a
-        # variable named `data` made the body loop break here, silently
-        # truncating the function to `ret 0` with no error. (Sibling top-level
-        # decls are still caught by the dedent rule below.)
-        names_a_decl = value_here == "data" or value_here == "enum" or value_here == "system" or value_here == "impl" or value_here == "trait"
+        # `data` / `enum` NAME a thing (`data Point:`), so they only open a
+        # declaration when an ident — the name — follows. Used any other way the
+        # word is an ordinary identifier: `data = [1,2,3]`, a bare `data` return,
+        # `data[i]`. Before this, a variable named `data` made the body loop
+        # break here, silently truncating the function to `ret 0` with no error.
+        # (Sibling top-level decls are still caught by the dedent rule below.)
+        names_a_decl = value_here == "data" or value_here == "enum"
         named_decl_here = names_a_decl and psr_peek_kind(tokens, cursor + 1) == "ident"
         # No declaration form is `KEYWORD =`, so a decl word immediately
         # followed by `=` is an assignment to a same-named variable, not a
@@ -965,20 +936,10 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             break
         # `mut name = expr` — declare-and-mark-mutable.
         is_mut_decl = kind_here == "ident" and value_here == "mut" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
-        # `move name = expr` — a linear binding. The value may be read at most
-        # once (a checked version of push_mut's alias promise). Only the
-        # `move NAME =` shape is special; a bare `move` stays a plain identifier.
-        is_move_decl = kind_here == "ident" and value_here == "move" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
         # `mut name: Type = expr` — typed mut binding. The annotation sets the
         # slot's element type, which inference can't recover for `[]` (an empty
         # list has no element to peek). `mut`-led, so no keyword-clash risk.
         is_typed_mut_decl = kind_here == "ident" and value_here == "mut" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == ":"
-        # `derived name = expr` — a reactive derived binding. Reading `name`
-        # re-evaluates `expr` in the current scope, so it always reflects the
-        # latest values of whatever it reads. Lowered by inlining (see the
-        # derived-binding pass in orion_ast_to_ir). Only the `derived NAME =`
-        # shape is special; a bare `derived` elsewhere stays a plain identifier.
-        is_fact_decl = kind_here == "ident" and value_here == "derived" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
         # `name = expr` — either immutable let OR reassignment, decided
         # by the codegen scope tracker.
         is_let_or_assign = (not is_mut_decl) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
@@ -996,13 +957,9 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # `break` — single-token statement, only meaningful inside a loop.
         is_break = kind_here == "ident" and value_here == "break"
         is_continue = kind_here == "ident" and value_here == "continue"
-        is_defer = kind_here == "ident" and value_here == "defer"
-        is_handle = kind_here == "ident" and value_here == "handle"
         is_require = kind_here == "ident" and value_here == "require"
         is_ensure = kind_here == "ident" and value_here == "ensure"
         is_return = kind_here == "ident" and value_here == "return"
-        # `spawn` — entity spawning produces an entity value
-        is_destroy = kind_here == "ident" and value_here == "destroy"
         # `loop:` — start an unconditional loop block.
         is_loop = kind_here == "ident" and value_here == "loop" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ":"
         # Block-form `if cond:` — followed by indented body (and
@@ -1026,19 +983,6 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             tm_expr_result = psr_parse_expr(tokens, tm_after_type + 1)
             statements = push(statements, {"kind": "MutLet", "name": tm_name, "value": get_map(tm_expr_result, "node"), "decl_type": get_map(tm_type_result, "node")})
             cursor = get_int(tm_expr_result, "next")
-        if is_fact_decl:
-            fact_name = psr_peek_value(tokens, cursor + 1)
-            fact_expr_result = psr_parse_expr(tokens, cursor + 3)
-            statements = push(statements, {"kind": "Fact", "name": fact_name, "value": get_map(fact_expr_result, "node")})
-            cursor = get_int(fact_expr_result, "next")
-        if is_move_decl:
-            mv_name = psr_peek_value(tokens, cursor + 1)
-            mv_tok = at(tokens, cursor + 1)
-            mv_line = get_int(mv_tok, "line")
-            mv_col = get_int(mv_tok, "col")
-            mv_expr_result = psr_parse_expr(tokens, cursor + 3)   # past `move NAME =`
-            statements = push(statements, {"kind": "LetOrAssign", "name": mv_name, "value": get_map(mv_expr_result, "node"), "linear": 1, "line": mv_line, "col": mv_col})
-            cursor = get_int(mv_expr_result, "next")
         if is_let_or_assign:
             assign_name = value_here
             assign_tok = at(tokens, cursor)
@@ -1077,13 +1021,6 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         if is_continue:
             statements = push(statements, {"kind": "Continue"})
             cursor = cursor + 1
-        if is_defer:
-            # `defer <expr>` — register the expression to run when the
-            # enclosing fn returns. LIFO order. Lowered by collecting
-            # all Defer stmts in fn body, then injecting before each ret.
-            def_result = psr_parse_expr(tokens, cursor + 1)
-            statements = push(statements, {"kind": "Defer", "expr": get_map(def_result, "node")})
-            cursor = get_int(def_result, "next")
         if is_require:
             req_result = psr_parse_expr(tokens, cursor + 1)
             statements = push(statements, {"kind": "Require", "expr": get_map(req_result, "node")})
@@ -1096,10 +1033,6 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             ret_result = psr_parse_expr(tokens, cursor + 1)
             statements = push(statements, {"kind": "Return", "expr": get_map(ret_result, "node")})
             cursor = get_int(ret_result, "next")
-        if is_destroy:
-            destroy_result = psr_parse_expr(tokens, cursor + 1)
-            statements = push(statements, {"kind": "Destroy", "expr": get_map(destroy_result, "node")})
-            cursor = get_int(destroy_result, "next")
         if is_loop:
             inner_col = psr_peek_col(tokens, cursor + 2)
             inner_result = psr_parse_body_at(tokens, cursor + 2, inner_col)
@@ -1251,7 +1184,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                     ci = ci - 1
                 statements = push(statements, {"kind": "IfBlock", "cond": get_map(cond_probe, "node"), "then": get_map(then_body_result, "node"), "else": else_node})
                 cursor = if_cursor
-        is_plain_expr = not (is_mut_decl or is_move_decl or is_typed_mut_decl or is_fact_decl or is_let_or_assign or is_index_assign or is_break or is_continue or is_require or is_ensure or is_return or is_destroy or is_loop or is_for or is_match or actually_if_block)
+        is_plain_expr = not (is_mut_decl or is_typed_mut_decl or is_let_or_assign or is_index_assign or is_break or is_continue or is_require or is_ensure or is_return or is_loop or is_for or is_match or actually_if_block)
         if is_plain_expr:
             expr_result = psr_parse_expr(tokens, cursor)
             expr_next = get_int(expr_result, "next")
@@ -1270,95 +1203,6 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
 fn psr_parse_body(tokens: [Map], position: int) -> Map:
     body_col = psr_peek_col(tokens, position)
     psr_parse_body_at(tokens, position, body_col)
-
-# --- system decls ---
-# `system NAME(params): body` — same shape as fn but tagged as System.
-fn psr_parse_system(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
-    name = psr_peek_value(tokens, cursor)
-    cursor += 1
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
-        cursor += 1
-    params_result = psr_parse_params(tokens, cursor)
-    cursor = get_int(params_result, "next")
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-        cursor += 1
-    cursor = psr_skip_newlines(tokens, cursor)
-    body_result = psr_parse_body(tokens, cursor)
-    cursor = get_int(body_result, "next")
-    {"node": {"kind": "System", "name": name, "params": get_map(params_result, "node"), "body": get_map(body_result, "node")}, "next": cursor}
-
-# --- impl block ---
-# `impl TraitName for TypeName: body` — methods defined for type.
-fn psr_parse_impl(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
-    trait_name = psr_peek_value(tokens, cursor)
-    cursor += 1
-    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "for":
-        cursor += 1
-    for_type = psr_peek_value(tokens, cursor)
-    cursor += 1
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-        cursor += 1
-    cursor = psr_skip_newlines(tokens, cursor)
-    methods = []
-    mut method_list = methods
-    base_col = psr_peek_col(tokens, cursor)
-    loop:
-        k = psr_peek_kind(tokens, cursor)
-        col_now = psr_peek_col(tokens, cursor)
-        if k == "eof" or col_now < base_col:
-            break
-        v = psr_peek_value(tokens, cursor)
-        if k == "ident" and (v == "fn" or v == "pub"):
-            if v == "pub":
-                cursor += 1
-            fn_result = psr_parse_fn(tokens, cursor)
-            method_list = push(method_list, get_map(fn_result, "node"))
-            cursor = get_int(fn_result, "next")
-        else:
-            cursor += 1
-        cursor = psr_skip_newlines(tokens, cursor)
-    {"node": {"kind": "Impl", "trait": trait_name, "for_type": for_type, "methods": method_list}, "next": cursor}
-
-# --- trait decl ---
-# `trait NAME: method signatures` — abstract method definitions.
-fn psr_parse_trait(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
-    name = psr_peek_value(tokens, cursor)
-    cursor += 1
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-        cursor += 1
-    cursor = psr_skip_newlines(tokens, cursor)
-    methods = []
-    mut method_list = methods
-    base_col = psr_peek_col(tokens, cursor)
-    loop:
-        k = psr_peek_kind(tokens, cursor)
-        col_now = psr_peek_col(tokens, cursor)
-        if k == "eof" or col_now < base_col:
-            break
-        v = psr_peek_value(tokens, cursor)
-        if k == "ident" and v == "fn":
-            # parse a single-line signature: fn NAME(params) -> Type
-            cursor += 1
-            method_name = psr_peek_value(tokens, cursor)
-            cursor += 1
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
-                cursor += 1
-            params_r = psr_parse_params(tokens, cursor)
-            cursor = get_int(params_r, "next")
-            mut ret_node = {"kind": "Named", "name": "Unit"}
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
-                cursor += 1
-                ret_r = psr_parse_type(tokens, cursor)
-                ret_node = get_map(ret_r, "node")
-                cursor = get_int(ret_r, "next")
-            method_list = push(method_list, {"name": method_name, "params": get_map(params_r, "node"), "ret": ret_node})
-        else:
-            cursor += 1
-        cursor = psr_skip_newlines(tokens, cursor)
-    {"node": {"kind": "Trait", "name": name, "methods": method_list}, "next": cursor}
 
 # --- data decls ---
 # Form 1: `data Name: field1: Type, field2: Type, ...`  (single-line)
@@ -1400,68 +1244,6 @@ fn psr_parse_data(tokens: [Map], position: int) -> Map:
 
 # --- enum decls ---
 # `enum Name: Variant1, Variant2(int), ...` — indented block of variants
-fn psr_parse_effect(tokens: [Map], position: int) -> Map:
-    # `effect Name:` followed by indented `op_name: fn(params) -> ret` lines.
-    mut cursor = position + 1
-    name = psr_peek_value(tokens, cursor)
-    cursor += 1
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-        cursor += 1
-    cursor = psr_skip_newlines(tokens, cursor)
-    ops = []
-    mut ops_list = ops
-    first_col = psr_peek_col(tokens, cursor)
-    loop:
-        kind_here = psr_peek_kind(tokens, cursor)
-        col_here = psr_peek_col(tokens, cursor)
-        if kind_here == "eof":
-            break
-        if col_here < first_col:
-            break
-        if kind_here != "ident":
-            cursor = cursor + 1
-            cursor = psr_skip_newlines(tokens, cursor)
-        if kind_here == "ident":
-            op_name = psr_peek_value(tokens, cursor)
-            cursor = cursor + 1
-            # Expect `:` then `fn(params) -> ret`
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-                cursor = cursor + 1
-            if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "fn":
-                cursor = cursor + 1
-            params_list = []
-            mut p_list = params_list
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
-                cursor = cursor + 1
-                loop:
-                    pk = psr_peek_kind(tokens, cursor)
-                    pv = psr_peek_value(tokens, cursor)
-                    if pk == "symbol" and pv == ")":
-                        cursor = cursor + 1
-                        break
-                    if pk == "eof":
-                        break
-                    if pk == "ident":
-                        p_name = pv
-                        cursor = cursor + 1
-                        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-                            cursor = cursor + 1
-                        p_type_r = psr_parse_type(tokens, cursor)
-                        p_list = push(p_list, {"name": p_name, "type": get_map(p_type_r, "node")})
-                        cursor = get_int(p_type_r, "next")
-                    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-                        cursor = cursor + 1
-            mut ret_node = {"kind": "Named", "name": "Unit"}
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
-                cursor = cursor + 1
-                ret_r = psr_parse_type(tokens, cursor)
-                ret_node = get_map(ret_r, "node")
-                cursor = get_int(ret_r, "next")
-            ops_list = push(ops_list, {"name": op_name, "params": p_list, "ret": ret_node})
-            cursor = psr_skip_newlines(tokens, cursor)
-    {"node": {"kind": "Effect", "name": name, "ops": ops_list}, "next": cursor}
-
-
 fn psr_parse_enum(tokens: [Map], position: int) -> Map:
     mut cursor = position + 1
     name = psr_peek_value(tokens, cursor)
@@ -1566,36 +1348,6 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
         cursor = get_int(body_result, "next")
         {"node": {"kind": "Fn", "name": name, "params": get_map(params_result, "node"), "ret": return_node, "body": get_map(body_result, "node")}, "next": cursor}
 
-# `handle Effect.op(params) -> ret:` — readable sugar for an effect handler.
-# It lowers to a fn named `__handler_Effect_op`, which is exactly what
-# `perform Effect.op(...)` dispatches to. Before this you had to hand-write
-# that magic name yourself; now the coupling is explicit and guessable, and
-# the mangling is the compiler's job. Mirrors psr_parse_fn from the `(` on.
-fn psr_parse_handler(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1              # past `handle`
-    effect_name = psr_peek_value(tokens, cursor)
-    cursor += 1
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ".":
-        cursor += 1
-    op_name = psr_peek_value(tokens, cursor)
-    cursor += 1
-    name = "__handler_" + effect_name + "_" + op_name
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
-        cursor += 1
-    params_result = psr_parse_params(tokens, cursor)
-    cursor = get_int(params_result, "next")
-    mut return_node = {"kind": "Named", "name": "Unit"}
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
-        cursor += 1
-        ret_result = psr_parse_type(tokens, cursor)
-        return_node = get_map(ret_result, "node")
-        cursor = get_int(ret_result, "next")
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-        cursor += 1
-    cursor = psr_skip_newlines(tokens, cursor)
-    body_result = psr_parse_body(tokens, cursor)
-    cursor = get_int(body_result, "next")
-    {"node": {"kind": "Fn", "name": name, "params": get_map(params_result, "node"), "ret": return_node, "body": get_map(body_result, "node")}, "next": cursor}
 
 # --- top-level ---
 
@@ -1673,9 +1425,6 @@ pub fn self_parse(tokens: [Map]) -> Map:
         mut is_fn = kind_here == "ident" and value_here == "fn"
         is_data = kind_here == "ident" and value_here == "data"
         is_enum = kind_here == "ident" and value_here == "enum"
-        mut is_system = kind_here == "ident" and value_here == "system"
-        is_impl = kind_here == "ident" and value_here == "impl"
-        is_trait = kind_here == "ident" and value_here == "trait"
         is_extern = kind_here == "ident" and value_here == "extern"
         is_use = kind_here == "ident" and value_here == "use"
         # `orb "name"` — an ORIGIN MARKER the driver injects ahead of each orb's
@@ -1684,8 +1433,6 @@ pub fn self_parse(tokens: [Map]) -> Map:
         # mistaken for it. Everything between two markers belongs to that orb,
         # which is how ast_to_ir knows who owns a private function.
         is_orbmark = kind_here == "ident" and value_here == "orb" and psr_peek_kind(tokens, cursor + 1) == "str"
-        is_effect = kind_here == "ident" and value_here == "effect"
-        is_handle = kind_here == "ident" and value_here == "handle"
         is_comptime = kind_here == "ident" and value_here == "comptime"
         is_deterministic = kind_here == "ident" and value_here == "deterministic"
         # `comptime fn` / `deterministic fn` — the modifier used to be dropped
@@ -1701,7 +1448,6 @@ pub fn self_parse(tokens: [Map]) -> Map:
             kind_here = psr_peek_kind(tokens, cursor)
             value_here = psr_peek_value(tokens, cursor)
             is_fn = kind_here == "ident" and value_here == "fn"
-            is_system = kind_here == "ident" and value_here == "system"
         if is_fn:
             decl_result = psr_parse_fn(tokens, cursor)
             fn_node = set(get_map(decl_result, "node"), "pub", if is_pub then 1 else 0)
@@ -1713,26 +1459,6 @@ pub fn self_parse(tokens: [Map]) -> Map:
             cursor = get_int(decl_result, "next")
         if is_enum:
             decl_result = psr_parse_enum(tokens, cursor)
-            decls = push(decls, get_map(decl_result, "node"))
-            cursor = get_int(decl_result, "next")
-        if is_effect:
-            decl_result = psr_parse_effect(tokens, cursor)
-            decls = push(decls, get_map(decl_result, "node"))
-            cursor = get_int(decl_result, "next")
-        if is_handle:
-            decl_result = psr_parse_handler(tokens, cursor)
-            decls = push(decls, get_map(decl_result, "node"))
-            cursor = get_int(decl_result, "next")
-        if is_system:
-            decl_result = psr_parse_system(tokens, cursor)
-            decls = push(decls, get_map(decl_result, "node"))
-            cursor = get_int(decl_result, "next")
-        if is_impl:
-            decl_result = psr_parse_impl(tokens, cursor)
-            decls = push(decls, get_map(decl_result, "node"))
-            cursor = get_int(decl_result, "next")
-        if is_trait:
-            decl_result = psr_parse_trait(tokens, cursor)
             decls = push(decls, get_map(decl_result, "node"))
             cursor = get_int(decl_result, "next")
         if is_extern:
@@ -1752,7 +1478,7 @@ pub fn self_parse(tokens: [Map]) -> Map:
         if is_orbmark:
             decls = push(decls, {"kind": "OrbMark", "name": psr_peek_value(tokens, cursor + 1)})
             cursor = cursor + 2
-        not_recognized = not (is_fn or is_data or is_enum or is_effect or is_handle or is_system or is_impl or is_trait or is_extern or is_use or is_orbmark)
+        not_recognized = not (is_fn or is_data or is_enum or is_extern or is_use or is_orbmark)
         if not_recognized:
             cursor = cursor + 1
         cursor = psr_skip_newlines(tokens, cursor)

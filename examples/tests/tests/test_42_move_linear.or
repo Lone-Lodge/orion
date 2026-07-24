@@ -1,9 +1,0 @@
-# `move x = e` — a linear binding: the value may be read at most once (a checked
-# version of push_mut's "no alias" promise). A second read is a compile error
-# (use-after-move). Here `a` is consumed exactly once. MVP scope: straight-line
-# use; a value read in both branches of an if is (conservatively) flagged.
-fn consume(x: int) -> int:
-    x + 1
-fn main() -> int:
-    move a = 41
-    consume(a)          # read exactly once -> ok
