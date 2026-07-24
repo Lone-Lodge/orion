@@ -394,6 +394,39 @@ long long orion_pool_cap(long long i) {
     return (long long)pool_cap[i];
 }
 
+/* Does this i64, read as an address, point INTO pool i's live buffer?
+ *
+ * Named atlas_ rather than orion_ deliberately: the emitter skips emitting a
+ * `declare` for extern names starting with orion_, on the assumption that it
+ * emits their bodies itself. This one lives in orion_rt.c, which is linked
+ * per program, so it needs the declare.
+ *
+ * The persistence boundary is already safe: a pointer born in the arena or
+ * frame region and stored into a persistent slot is evacuated as a typed deep
+ * copy, or aborts (see orion_arena_ptr_guard / the evacuation codes). What that
+ * cannot see is a POOL-GENERATION crossing: at compaction the live state is
+ * rebuilt into the other generation and the retiring one is reset, so a value
+ * still aiming into the retiring pool is a dangle - and both sides look alike
+ * to any persistence check, because both are pools.
+ *
+ * The cell word that carries such a value is untyped, so the runtime cannot
+ * know whether it is an int or a pointer. It CAN say whether it falls inside a
+ * live pool buffer, which is enough to build a detector: after a compaction
+ * rebuild, any cell field whose value lands inside the RETIRED pool is either a
+ * pointer that was copied by bits, or an integer that coincidentally equals a
+ * heap address. The first is the bug; the second is a false positive, and the
+ * caller reports rather than assumes - which is why this returns a fact, not a
+ * verdict. A typed cell layout is what removes the question entirely.
+ *
+ * Compared against `used`, not `cap`: only the bytes actually handed out can
+ * be the target of a live pointer. */
+long long atlas_pool_holds(long long i, long long v) {
+    if (i < 0 || i >= pool_count) return 0;
+    if (!pool_base[i] || pool_used[i] == 0) return 0;
+    const unsigned char *p = (const unsigned char *)(intptr_t)v;
+    return (p >= pool_base[i] && p < pool_base[i] + pool_used[i]) ? 1 : 0;
+}
+
 long long orion_pool_reset(long long i) {
     if (i < 0 || i >= pool_count) return 0;
     size_t need = pool_used[i] + pool_ovf_bytes[i];
