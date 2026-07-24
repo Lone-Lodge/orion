@@ -3109,7 +3109,7 @@ fn nlam_capture_scan(lam_body: Map, lam_params: [Text]) -> [Text]:
     mut worklist = init_work
     mut caps = slice([""], 0, 0)
     mut seen_caps = slice([""], 0, 0)
-    loop:
+    for:
         w_n = len(worklist)
         if w_n == 0:
             break
@@ -3540,7 +3540,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             mut worklist = init_work
                             mut caps = slice([""], 0, 0)
                             mut seen_caps = slice([""], 0, 0)
-                            loop:
+                            for:
                                 w_n = len(worklist)
                                 if w_n == 0:
                                     break

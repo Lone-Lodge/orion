@@ -26,7 +26,7 @@ fn main() -> int:
     mut running = 1
     mut blocks_x = []
     mut blocks_y = []
-    loop:
+    for:
         if running == 0:
             break
         if ori_should_quit(app):

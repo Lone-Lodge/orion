@@ -29,13 +29,13 @@ fn main() -> int:
     mut my = 300
     mut blocks_x = []
     mut blocks_y = []
-    loop:
+    for:
         if running == 0:
             break
         keep = win_pump()
         if keep == 0:
             break
-        loop:
+        for:
             has_event = win_event_next()
             if has_event == 0:
                 break

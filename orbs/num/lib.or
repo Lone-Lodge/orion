@@ -30,7 +30,7 @@ pub fn sign(x: int) -> int:
 pub fn gcd(a: int, b: int) -> int:
     mut x = abs(a)
     mut y = abs(b)
-    loop:
+    for:
         if y == 0:
             break
         t = y

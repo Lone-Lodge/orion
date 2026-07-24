@@ -328,7 +328,7 @@ fn fmt_trim_trailing(line_text: Text) -> Text:
     bytes = bytes_from_text(line_text)
     byte_count = bytes_length(bytes)
     mut end_index = byte_count
-    loop:
+    for:
         if end_index <= 0:
             break
         last_byte = byte_at(bytes, end_index - 1)
@@ -487,7 +487,7 @@ fn nb_expand_orb(orb_dir: Text, acc: [Text]) -> [Text]:
 fn find_workspace_root() -> Text:
     mut rel = "."
     mut depth = 0
-    loop:
+    for:
         if depth > 8:
             break
         if file_exists(rel + "/.orbit"):

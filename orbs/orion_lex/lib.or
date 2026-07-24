@@ -58,7 +58,7 @@ fn slx_make_token(kind: Text, value: Text, line: int, col: int) -> Map:
 
 fn slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
     mut cursor = start
-    loop:
+    for:
         if cursor >= byte_count:
             break
         if not slx_is_ident_continue(byte_at(bytes, cursor)):
@@ -82,7 +82,7 @@ fn slx_keyword_kind(word: Text) -> Text:
     table_length = len(table)
     mut found = "ident"
     mut index = 0
-    loop:
+    for:
         if index >= table_length:
             break
         if at(table, index) == word:
@@ -93,7 +93,7 @@ fn slx_keyword_kind(word: Text) -> Text:
 fn slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
     mut cursor = start
     mut saw_dot = false
-    loop:
+    for:
         if cursor >= byte_count:
             break
         current = byte_at(bytes, cursor)
@@ -133,14 +133,14 @@ fn slx_int_to_text(n: int) -> Text:
         return "0"
     mut digits = bytes_zeros(0)
     mut v = n
-    loop:
+    for:
         if v <= 0:
             break
         digits = push(digits, 48 + (v % 10))
         v = v / 10
     mut out = bytes_zeros(0)
     mut i = len(digits) - 1
-    loop:
+    for:
         if i < 0:
             break
         out = push(out, at(digits, i))
@@ -186,7 +186,7 @@ fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: in
     # belongs to an interpolated expression (e.g. a map key `m["k"]`), not
     # the string terminator — so it doesn't end the literal.
     mut brace_depth = 0
-    loop:
+    for:
         if cursor >= byte_count:
             break
         current = byte_at(bytes, cursor)
@@ -329,7 +329,7 @@ fn slx_scan_op_single(first: int) -> Text:
 
 fn slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
     mut cursor = start
-    loop:
+    for:
         if cursor >= byte_count:
             break
         if slx_is_newline(byte_at(bytes, cursor)):
@@ -370,7 +370,7 @@ pub fn self_lex(source: Text) -> [Map]:
     mut cursor = 0
     mut line = 1
     mut line_start = 0
-    loop:
+    for:
         if cursor >= byte_count:
             break
         current = byte_at(bytes, cursor)

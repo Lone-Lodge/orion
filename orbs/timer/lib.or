@@ -82,7 +82,7 @@ pub fn timer_every(id: Text, period_ms: int, dt_ms: int) -> int:
     acckey = "timer:{id}:acc"
     mut acc = ts_int(acckey) + dt_ms
     mut count = 0
-    loop:
+    for:
         if acc < period_ms:
             break
         acc = acc - period_ms

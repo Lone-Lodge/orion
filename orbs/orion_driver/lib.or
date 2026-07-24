@@ -53,7 +53,7 @@ fn drv_use_name(line: Text) -> Text:
         return ""
     mut name = ""
     mut i = 4
-    loop:
+    for:
         if i >= n:
             break
         c = at(bs, i)
@@ -73,7 +73,7 @@ fn drv_uses_of(src: Text) -> [Text]:
     mut names = []
     mut line_start = 0
     mut i = 0
-    loop:
+    for:
         if i > n:
             break
         at_end = i == n
@@ -139,7 +139,7 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
     mut qi = 0
     mut orb_count = 0
     mut orb_bytes = 0
-    loop:
+    for:
         if qi >= len(queue):
             break
         name = at(queue, qi)
@@ -403,7 +403,7 @@ fn drv_effect_closure(module: IRModule, names: [Text]) -> [int]:
     for i in 0..<n:
         bits = push_mut(bits, drv_direct_bits(drv_fn_at(fns, i), names))
     mut pass = 0
-    loop:
+    for:
         if pass >= 24:
             break
         mut changed = 0

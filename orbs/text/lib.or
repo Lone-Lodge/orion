@@ -101,7 +101,7 @@ pub fn trim(t: Text) -> Text:
     n = bytes_length(tb)
     mut lo = 0
     mut hi = n
-    loop:
+    for:
         if lo >= hi:
             break
         b = byte_at(tb, lo)
@@ -109,7 +109,7 @@ pub fn trim(t: Text) -> Text:
             lo = lo + 1
         else:
             break
-    loop:
+    for:
         if hi <= lo:
             break
         b = byte_at(tb, hi - 1)
@@ -144,7 +144,7 @@ pub fn split(t: Text, sep: Text) -> [Text]:
     else:
         mut start = 0
         mut i = 0
-        loop:
+        for:
             if i > tlen - slen:
                 break
             mut matched = 1
@@ -177,7 +177,7 @@ pub fn index_of(t: Text, sub: Text) -> int:
         found = 0
     else:
         mut i = 0
-        loop:
+        for:
             if i > tlen - slen or found >= 0:
                 break
             mut matched = 1
@@ -193,7 +193,7 @@ pub fn index_of(t: Text, sub: Text) -> int:
 pub fn pad_left(t: Text, width: int, pad: Text) -> Text:
     mut out = t
     mut k = len(t)
-    loop:
+    for:
         if k >= width:
             break
         out = "{pad}{out}"
@@ -204,7 +204,7 @@ pub fn pad_left(t: Text, width: int, pad: Text) -> Text:
 pub fn pad_right(t: Text, width: int, pad: Text) -> Text:
     mut out = t
     mut k = len(t)
-    loop:
+    for:
         if k >= width:
             break
         out = "{out}{pad}"

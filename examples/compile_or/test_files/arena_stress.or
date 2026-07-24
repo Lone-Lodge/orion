@@ -16,7 +16,7 @@ fn main() -> int:
     frames = 50000
     mut peak = 0
     mut i = 0
-    loop:
+    for:
         if i >= frames:
             break
         orion_arena_reset()

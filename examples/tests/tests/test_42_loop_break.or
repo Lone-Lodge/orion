@@ -1,6 +1,6 @@
 fn main() -> int:
     mut counter = 0
-    loop:
+    for:
         if counter >= 42:
             break
         counter = counter + 1

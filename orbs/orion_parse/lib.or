@@ -83,7 +83,7 @@ fn psr_trim_ws(text: Text) -> Text:
     bs = bytes_from_text(text)
     n = bytes_length(bs)
     mut start = 0
-    loop:
+    for:
         if start >= n:
             break
         b = byte_at(bs, start)
@@ -92,7 +92,7 @@ fn psr_trim_ws(text: Text) -> Text:
             break
         start = start + 1
     mut stop = n
-    loop:
+    for:
         if stop <= start:
             break
         b = byte_at(bs, stop - 1)
@@ -122,7 +122,7 @@ fn psr_peek_value(tokens: [Map], position: int) -> Text:
 
 fn psr_skip_newlines(tokens: [Map], position: int) -> int:
     mut cursor = position
-    loop:
+    for:
         if psr_peek_kind(tokens, cursor) != "newline":
             break
         cursor += 1
@@ -204,7 +204,7 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
     arm_col = psr_peek_col(tokens, match_cursor)
     arms = []
     mut arms_list = arms
-    loop:
+    for:
         arm_kind = psr_peek_kind(tokens, match_cursor)
         arm_col_now = psr_peek_col(tokens, match_cursor)
         if arm_kind == "eof":
@@ -218,7 +218,7 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
         mut pat_binding_list = pat_bindings
         if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "(":
             match_cursor = match_cursor + 1
-            loop:
+            for:
                 bk = psr_peek_kind(tokens, match_cursor)
                 bv = psr_peek_value(tokens, match_cursor)
                 if bk == "symbol" and bv == ")":
@@ -251,7 +251,7 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
     cm_bodies = []
     mut cm_body_list = cm_bodies
     mut cm_else = {"kind": "Int", "value": "0"}
-    loop:
+    for:
         k = psr_peek_kind(tokens, cursor)
         c = psr_peek_col(tokens, cursor)
         if k == "eof":
@@ -386,7 +386,7 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         mut fl_list = fl_params
         fl_ptypes = []
         mut fl_types = fl_ptypes
-        loop:
+        for:
             fk = psr_peek_kind(tokens, fl_cursor)
             fv = psr_peek_value(tokens, fl_cursor)
             if fk == "symbol" and fv == ")":
@@ -467,7 +467,7 @@ fn psr_parse_struct_cons(tokens: [Map], position: int, type_name: Text) -> Map:
     mut cursor = position
     fields = []
     mut field_list = fields
-    loop:
+    for:
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
         is_close = kind_here == "symbol" and value_here == "\}"
@@ -523,7 +523,7 @@ fn psr_interpolate_str(raw_text: Text) -> Map:
         # Strip `\{` → `{` and `\}` → `}` so the runtime sees literal braces.
         mut plain_buf = bytes_zeros(0)
         mut pi = 0
-        loop:
+        for:
             if pi >= total_len:
                 break
             bp = byte_at(raw_bytes, pi)
@@ -547,7 +547,7 @@ fn psr_interpolate_str(raw_text: Text) -> Map:
         mut node_started = 0
         mut literal_buf = bytes_zeros(0)
         mut scan_index2 = 0
-        loop:
+        for:
             if scan_index2 >= total_len:
                 break
             current_byte = byte_at(raw_bytes, scan_index2)
@@ -576,7 +576,7 @@ fn psr_interpolate_str(raw_text: Text) -> Map:
                 # Read the ident up to `}`.
                 scan_index2 = scan_index2 + 1
                 ident_start = scan_index2
-                loop:
+                for:
                     if scan_index2 >= total_len:
                         break
                     if byte_at(raw_bytes, scan_index2) == 125:
@@ -617,7 +617,7 @@ fn psr_interpolate_str(raw_text: Text) -> Map:
 fn psr_parse_map_literal(tokens: [Map], position: int) -> Map:
     mut cursor = position + 1
     mut pairs = []
-    loop:
+    for:
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
         is_close = kind_here == "symbol" and value_here == "\}"
@@ -644,7 +644,7 @@ fn psr_parse_map_literal(tokens: [Map], position: int) -> Map:
 fn psr_parse_list_literal(tokens: [Map], position: int) -> Map:
     mut cursor = position + 1
     mut items = []
-    loop:
+    for:
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
         is_close = kind_here == "symbol" and value_here == "]"
@@ -709,7 +709,7 @@ fn psr_parse_call(tokens: [Map], position: int, callee_name: Text) -> Map:
     callee_col = get_int(callee_tok, "col")
     mut cursor = position + 2
     mut args = []
-    loop:
+    for:
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ")":
             cursor += 1
             break
@@ -760,7 +760,7 @@ fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
 fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
     mut node = current_node
     mut cursor = position
-    loop:
+    for:
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
         # `.field` — member access; may be followed by `(args)` for method call.
@@ -777,7 +777,7 @@ fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
                 cursor = cursor + 1
                 args = []
                 mut args_list = args
-                loop:
+                for:
                     arg_kind = psr_peek_kind(tokens, cursor)
                     arg_val = psr_peek_value(tokens, cursor)
                     if arg_kind == "symbol" and arg_val == ")":
@@ -819,7 +819,7 @@ fn psr_parse_expr_at(tokens: [Map], position: int, min_prec: int) -> Map:
     postfix_result = psr_parse_postfix(tokens, get_int(primary_result, "next"), get_map(primary_result, "node"))
     mut current_node = get_map(postfix_result, "node")
     mut cursor = get_int(postfix_result, "next")
-    loop:
+    for:
         op_kind = psr_peek_kind(tokens, cursor)
         op_value = psr_peek_value(tokens, cursor)
         prec = psr_op_prec(op_kind, op_value)
@@ -840,7 +840,7 @@ fn psr_parse_expr(tokens: [Map], position: int) -> Map:
 fn psr_parse_params(tokens: [Map], position: int) -> Map:
     mut cursor = position
     mut params = []
-    loop:
+    for:
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ")":
             cursor += 1
             break
@@ -878,7 +878,7 @@ fn psr_match_bracket(tokens: [Map], open_idx: int) -> int:
     mut depth = 0
     mut result = 0 - 1
     mut i = open_idx
-    loop:
+    for:
         if i >= total or result >= 0:
             break
         k = psr_peek_kind(tokens, i)
@@ -907,7 +907,7 @@ fn psr_match_bracket(tokens: [Map], open_idx: int) -> int:
 fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
     mut cursor = psr_skip_newlines(tokens, position)
     mut statements = []
-    loop:
+    for:
         cursor = psr_skip_newlines(tokens, cursor)
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
@@ -961,7 +961,11 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         is_ensure = kind_here == "ident" and value_here == "ensure"
         is_return = kind_here == "ident" and value_here == "return"
         # `loop:` — start an unconditional loop block.
-        is_loop = kind_here == "ident" and value_here == "loop" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ":"
+        # ONE loop keyword, Go-style: the modifier decides the form. `for:` is
+        # the unconditional loop, `for x in seq:` iterates, `for i, x in seq:`
+        # carries an index, `for e with C:` queries. There is no separate `loop`
+        # or `while` - `for:` with an `if ...: break` is the conditional form.
+        is_loop = kind_here == "ident" and value_here == "for" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ":"
         # Block-form `if cond:` — followed by indented body (and
         # optional else: block). Distinguished from inline `if cond
         # then ...` by looking for `:` after the condition.
@@ -1059,7 +1063,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                 for_cursor = for_cursor + 1
                 comps = []
                 mut comps_list = comps
-                loop:
+                for:
                     comp_kind = psr_peek_kind(tokens, for_cursor)
                     comp_val = psr_peek_value(tokens, for_cursor)
                     if comp_kind == "symbol" and comp_val == ":":
@@ -1137,7 +1141,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                 mut else_node = {"kind": "Block", "stmts": []}
                 mut chain_conds = []
                 mut chain_bodies = []
-                loop:
+                for:
                     if_cursor = psr_skip_newlines(tokens, if_cursor)
                     el_here = psr_peek_kind(tokens, if_cursor) == "ident" and psr_peek_value(tokens, if_cursor) == "else" and psr_peek_col(tokens, if_cursor) == if_col
                     if not el_here:
@@ -1176,7 +1180,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                 # Each link wraps in a Block — an else body is always
                 # a Block node downstream.
                 mut ci = len(chain_conds) - 1
-                loop:
+                for:
                     if ci < 0:
                         break
                     link = {"kind": "IfBlock", "cond": psr_ifchain_at(chain_conds, ci), "then": psr_ifchain_at(chain_bodies, ci), "else": else_node}
@@ -1217,7 +1221,7 @@ fn psr_parse_data(tokens: [Map], position: int) -> Map:
         cursor += 1
     fields = []
     mut field_list = fields
-    loop:
+    for:
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
         is_break = kind_here == "newline" or kind_here == "eof"
@@ -1255,7 +1259,7 @@ fn psr_parse_enum(tokens: [Map], position: int) -> Map:
     mut variant_list = variants
     # Variants are indented one level
     first_col = psr_peek_col(tokens, cursor)
-    loop:
+    for:
         kind_here = psr_peek_kind(tokens, cursor)
         col_here = psr_peek_col(tokens, cursor)
         if kind_here == "eof":
@@ -1273,7 +1277,7 @@ fn psr_parse_enum(tokens: [Map], position: int) -> Map:
             # Optional payload: `Variant(int, Text)`
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
                 cursor += 1
-                loop:
+                for:
                     payload_kind = psr_peek_kind(tokens, cursor)
                     payload_value = psr_peek_value(tokens, cursor)
                     if payload_kind == "symbol" and payload_value == ")":
@@ -1300,7 +1304,7 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
     # Real monomorphization is a future generation of the type system.
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
         cursor = cursor + 1
-        loop:
+        for:
             tp_kind = psr_peek_kind(tokens, cursor)
             tp_val = psr_peek_value(tokens, cursor)
             if tp_kind == "symbol" and tp_val == ">":
@@ -1376,7 +1380,7 @@ fn psr_parse_extern_fn(tokens: [Map], position: int) -> Map:
 # Skip `use NAME` — one line.
 fn psr_skip_use(tokens: [Map], position: int) -> int:
     mut cursor = position + 1
-    loop:
+    for:
         if psr_peek_kind(tokens, cursor) == "newline" or psr_peek_kind(tokens, cursor) == "eof":
             break
         cursor = cursor + 1
@@ -1393,7 +1397,7 @@ fn psr_parse_use(tokens: [Map], position: int) -> Map:
     mut only = slice([""], 0, 0)
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
         cursor = cursor + 1
-        loop:
+        for:
             if psr_peek_kind(tokens, cursor) == "eof" or psr_peek_kind(tokens, cursor) == "newline":
                 break
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ")":
@@ -1407,7 +1411,7 @@ fn psr_parse_use(tokens: [Map], position: int) -> Map:
 pub fn self_parse(tokens: [Map]) -> Map:
     mut cursor = psr_skip_newlines(tokens, 0)
     mut decls = []
-    loop:
+    for:
         mut kind_here = psr_peek_kind(tokens, cursor)
         mut value_here = psr_peek_value(tokens, cursor)
         if kind_here == "eof":

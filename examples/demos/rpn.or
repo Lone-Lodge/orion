@@ -25,7 +25,7 @@ fn tokenize(src: Text) -> [Token]:
     n = len(bs)
     mut toks = []
     mut i = 0
-    loop:
+    for:
         if i >= n:
             break
         b = at(bs, i)
@@ -34,7 +34,7 @@ fn tokenize(src: Text) -> [Token]:
         else:
             if is_digit(b) == 1:                # a run of digits -> Num
                 mut num = 0
-                loop:
+                for:
                     if i >= n:
                         break
                     d = at(bs, i)

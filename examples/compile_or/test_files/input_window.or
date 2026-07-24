@@ -15,13 +15,13 @@ fn main() -> int:
         return 1
     print_line("window open - click/type in it; Esc or close to exit")
     mut running = 1
-    loop:
+    for:
         if running == 0:
             break
         keep = win_pump()
         if keep == 0:
             break
-        loop:
+        for:
             has_event = win_event_next()
             if has_event == 0:
                 break

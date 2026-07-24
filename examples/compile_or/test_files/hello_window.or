@@ -10,7 +10,7 @@ fn main() -> int:
         print_line("CreateWindowExW failed")
         return 1
     print_line("Window is open. Close it to exit.")
-    loop:
+    for:
         keep = win_pump()
         if keep == 0:
             break

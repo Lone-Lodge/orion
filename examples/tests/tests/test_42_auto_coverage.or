@@ -56,7 +56,7 @@ fn main() -> int:
 
     # loop + break
     mut counter = 0
-    loop:
+    for:
         counter = counter + 1
         if counter == 3:
             break

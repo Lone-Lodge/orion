@@ -40,7 +40,7 @@ fn tokenize(src: Text) -> [Map]:
     n = len(bs)
     mut toks = []
     mut i = 0
-    loop:
+    for:
         if i >= n:
             break
         b = at(bs, i)
@@ -49,7 +49,7 @@ fn tokenize(src: Text) -> [Map]:
         else:
             if is_digit(b) == 1:            # a run of digits -> one number
                 mut num = 0
-                loop:
+                for:
                     if i >= n:
                         break
                     d = at(bs, i)
@@ -91,7 +91,7 @@ fn parse_term(toks: [Map], pos: int) -> Parsed:
     left = parse_factor(toks, pos)
     mut val = left.val
     mut i = left.next
-    loop:
+    for:
         if i >= len(toks):
             break
         k = get(at(toks, i), "kind")
@@ -113,7 +113,7 @@ fn parse_expr(toks: [Map], pos: int) -> Parsed:
     left = parse_term(toks, pos)
     mut val = left.val
     mut i = left.next
-    loop:
+    for:
         if i >= len(toks):
             break
         k = get(at(toks, i), "kind")

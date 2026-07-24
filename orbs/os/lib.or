@@ -96,7 +96,7 @@ pub fn str_contains(t: Text, sub: Text) -> bool:
     if tn < sn:
         return false
     mut i = 0
-    loop:
+    for:
         if i > tn - sn:
             break
         mut hit = true
@@ -112,7 +112,7 @@ pub fn str_trim(t: Text) -> Text:
     bs = bytes_from_text(t)
     n = len(bs)
     mut lo = 0
-    loop:
+    for:
         if lo >= n:
             break
         c = at(bs, lo)
@@ -121,7 +121,7 @@ pub fn str_trim(t: Text) -> Text:
         else:
             break
     mut hi = n
-    loop:
+    for:
         if hi <= lo:
             break
         c2 = at(bs, hi - 1)
@@ -141,7 +141,7 @@ pub fn str_split(t: Text, sep: Text) -> [Text]:
         return push(out, t)
     mut start = 0
     mut i = 0
-    loop:
+    for:
         if i > tn - sn:
             break
         mut hit = true
