@@ -427,6 +427,44 @@ long long atlas_pool_holds(long long i, long long v) {
     return (p >= pool_base[i] && p < pool_base[i] + pool_used[i]) ? 1 : 0;
 }
 
+/* Is this value a TEXT living in some pool - decided structurally, not guessed?
+ *
+ * The generation-crossing problem exists because a cell word is untyped: an
+ * int and a text pointer are the same 64 bits, so compaction cannot know which
+ * fields to deep-copy and the writer has had to declare them by hand. Declaring
+ * is something you can forget, and forgetting it was a live crash twice in one
+ * day.
+ *
+ * But a text is not shapeless. It is [hash:i64][len:i64][bytes..NUL] with the
+ * pointer aimed at the bytes, so a candidate can be CHECKED rather than assumed:
+ * it must land inside a live pool, its 16-byte header must fit inside that same
+ * pool, the length it claims must fit too, and the byte at that length must be
+ * the terminator. An integer that satisfies all four by coincidence is not a
+ * thing that happens - it would have to equal a heap address whose preceding
+ * sixteen bytes happen to encode its own exact length.
+ *
+ * That turns "declare your text fields" from a rule you must remember into a
+ * question the runtime can answer, which is the difference between a mistake
+ * being detectable and being unmakeable. Only POOL texts need this: a literal
+ * lives in rodata and a persisted text on the malloc heap, and neither is
+ * reclaimed by a generation flip, so sharing those is already safe. */
+long long atlas_any_pool_text(long long v) {
+    if (v == 0) return 0;
+    const unsigned char *p = (const unsigned char *)(intptr_t)v;
+    for (long long i = 0; i < pool_count; i++) {
+        const unsigned char *base = pool_base[i];
+        if (!base || pool_used[i] == 0) continue;
+        const unsigned char *end = base + pool_used[i];
+        if (p < base || p >= end) continue;
+        if (p - 16 < base) return 0;              /* header must fit */
+        long long len = ((const long long *)p)[-1];
+        if (len < 0 || len > (long long)(end - p) - 1) return 0;
+        if (p[len] != 0) return 0;                /* NUL where it claims */
+        return 1;
+    }
+    return 0;
+}
+
 long long orion_pool_reset(long long i) {
     if (i < 0 || i >= pool_count) return 0;
     size_t need = pool_used[i] + pool_ovf_bytes[i];
