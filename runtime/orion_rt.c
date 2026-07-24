@@ -465,6 +465,33 @@ long long atlas_any_pool_text(long long v) {
     return 0;
 }
 
+/* Is this value a non-null pointer into some live pool that is NOT a text?
+ *
+ * A pool text can be relocated across a generation flip because its shape is
+ * self-verifying (atlas_any_pool_text). A pool CONTAINER cannot: a list is
+ * [cap][len][elems] and a map [entries][cap][len][ix][mask], with no terminator,
+ * so cap/len are just plausible integers - detecting one is not certain enough
+ * to safely deep-copy it (a misread would dereference garbage). And even if it
+ * were, relocating it needs the element types the cell word has erased.
+ *
+ * So the honest move is not to relocate it silently but to SEE it at spawn. If a
+ * cell value lands inside a live pool and is not a verifiable text, it is either
+ * a container that will dangle at the next compaction, or an integer that
+ * happens to equal a live pool address - both worth a word at the point of
+ * creation rather than a wandering crash later. Reports, never aborts, never
+ * dereferences: safe even on the rare coincidental integer. */
+long long atlas_unrelocatable_pool_ptr(long long v) {
+    if (v == 0) return 0;
+    if (atlas_any_pool_text(v) == 1) return 0;
+    const unsigned char *p = (const unsigned char *)(intptr_t)v;
+    for (long long i = 0; i < pool_count; i++) {
+        const unsigned char *base = pool_base[i];
+        if (!base || pool_used[i] == 0) continue;
+        if (p >= base && p < base + pool_used[i]) return 1;
+    }
+    return 0;
+}
+
 long long orion_pool_reset(long long i) {
     if (i < 0 || i >= pool_count) return 0;
     size_t need = pool_used[i] + pool_ovf_bytes[i];
