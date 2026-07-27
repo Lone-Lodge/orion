@@ -493,6 +493,9 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "text_concat":
         result = "    {value_ref(my_id)} = call ptr @orion_text_concat(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.rhs)})"
 
+    if op == "text_join":
+        result = "    {value_ref(my_id)} = call ptr @orion_text_join(ptr {value_ref(inst.value)})"
+
     if op == "int_to_text":
         result = "    {value_ref(my_id)} = call ptr @orion_int_to_text(i64 {value_ref(inst.value)})"
 
@@ -1498,22 +1501,64 @@ fn emit_runtime() -> Text:
     text = "{text}@.msg_ensure = private unnamed_addr constant [29 x i8] c\"orion: postcondition failed\\0A\\00\"\n"
     text = "{text}declare void @exit(i32)\n"
     text = "{text}\n"
+    # Both lengths are O(1) header reads, so the copy is two memcpys.
+    # strcpy+strcat re-scanned for the terminator twice (once to find a's
+    # end, once more inside strcat) — work we already knew the answer to,
+    # and a truncation risk: the buffer is sized from tlen, so a text with
+    # an embedded NUL made strcat write past what tlen paid for.
     text = "{text}define ptr @orion_text_concat(ptr %a, ptr %b) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %la = call i64 @orion_tlen(ptr %a)\n"
     text = "{text}  %lb = call i64 @orion_tlen(ptr %b)\n"
     text = "{text}  %sum = add i64 %la, %lb\n"
     text = "{text}  %buf = call ptr @orion_text_alloc(i64 %sum)\n"
-    text = "{text}  %_1 = call ptr @strcpy(ptr %buf, ptr %a)\n"
-    text = "{text}  %_2 = call ptr @strcat(ptr %buf, ptr %b)\n"
+    text = "{text}  %_1 = call ptr @memcpy(ptr %buf, ptr %a, i64 %la)\n"
+    text = "{text}  %tail = getelementptr i8, ptr %buf, i64 %la\n"
+    text = "{text}  %_2 = call ptr @memcpy(ptr %tail, ptr %b, i64 %lb)\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
+    # Digits by hand instead of snprintf. Every `{i}` interpolation lands
+    # here, and snprintf costs a format-string parse plus a locale-aware
+    # formatter — ~100ns for what is a handful of divides. Writes the
+    # digits backwards into a 24-byte stack scratch (20 digits + sign is
+    # the i64 worst case), then allocates the EXACT length: no 31-byte
+    # over-allocation and no seal pass (text_alloc already set len and
+    # zeroed the hash). Magnitude is taken unsigned, so i64 MIN — whose
+    # negation overflows — formats correctly too.
     text = "{text}define ptr @orion_int_to_text(i64 %n) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %buf = call ptr @orion_text_alloc(i64 31)\n"
-    text = "{text}  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)\n"
-    text = "{text}  %sealed = call ptr @orion_text_seal(ptr %buf)\n"
-    text = "{text}  ret ptr %sealed\n"
+    text = "{text}  %scratch = alloca [24 x i8]\n"
+    text = "{text}  %neg = icmp slt i64 %n, 0\n"
+    text = "{text}  %flip = sub i64 0, %n\n"
+    text = "{text}  %mag = select i1 %neg, i64 %flip, i64 %n\n"
+    text = "{text}  br label %dig\n"
+    text = "{text}dig:\n"
+    text = "{text}  %w = phi i64 [ %mag, %entry ], [ %q, %dig ]\n"
+    text = "{text}  %pos = phi i64 [ 24, %entry ], [ %pos1, %dig ]\n"
+    text = "{text}  %pos1 = add i64 %pos, -1\n"
+    text = "{text}  %q = udiv i64 %w, 10\n"
+    text = "{text}  %q10 = mul i64 %q, 10\n"
+    text = "{text}  %rem = sub i64 %w, %q10\n"
+    text = "{text}  %chr = add i64 %rem, 48\n"
+    text = "{text}  %byte = trunc i64 %chr to i8\n"
+    text = "{text}  %slot = getelementptr i8, ptr %scratch, i64 %pos1\n"
+    text = "{text}  store i8 %byte, ptr %slot\n"
+    text = "{text}  %more = icmp ne i64 %q, 0\n"
+    text = "{text}  br i1 %more, label %dig, label %done\n"
+    text = "{text}done:\n"
+    text = "{text}  %ndig = sub i64 24, %pos1\n"
+    text = "{text}  %sign = zext i1 %neg to i64\n"
+    text = "{text}  %len = add i64 %ndig, %sign\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 %len)\n"
+    text = "{text}  %src = getelementptr i8, ptr %scratch, i64 %pos1\n"
+    text = "{text}  %dst = getelementptr i8, ptr %buf, i64 %sign\n"
+    text = "{text}  %_c = call ptr @memcpy(ptr %dst, ptr %src, i64 %ndig)\n"
+    text = "{text}  br i1 %neg, label %minus, label %fin\n"
+    text = "{text}minus:\n"
+    text = "{text}  store i8 45, ptr %buf\n"
+    text = "{text}  br label %fin\n"
+    text = "{text}fin:\n"
+    text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
     # slice(text, lo, hi): copy bytes [lo, hi) into a new null-terminated buffer.
     # Clamps lo/hi to [0, strlen] for safety.
