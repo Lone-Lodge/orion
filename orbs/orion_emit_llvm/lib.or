@@ -1170,11 +1170,26 @@ pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
         mut chunks = []
         chunks = push_mut(chunks, "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n")
         total = len(fn_value.instructions)
+        # HOIST allocas to the entry block. `alloca` reserves a stack slot for
+        # the whole function ONLY when it sits in the entry block — LLVM reuses
+        # that slot across the function. An alloca left inside a loop body
+        # (which is where a `mut` declared in the loop lands) executes every
+        # iteration and reserves a FRESH slot each time, so a loop over a few
+        # million items overran the stack and crashed with no diagnostic. The
+        # SSA name is the instruction index, unchanged by emit order, so moving
+        # the emission is sound: emit every alloca first (entry block), then the
+        # rest in order.
+        loop hi in 0..<total:
+            h_inst = at(fn_value.instructions, hi)
+            if h_inst.op == "alloca":
+                chunks = push_mut(chunks, emit_instruction(h_inst, hi, strings, fn_value, module))
+                chunks = push_mut(chunks, "\n")
         loop index in 0..<total:
             inst = at(fn_value.instructions, index)
-            line = emit_instruction(inst, index, strings, fn_value, module)
-            chunks = push_mut(chunks, line)
-            chunks = push_mut(chunks, "\n")
+            if inst.op != "alloca":
+                line = emit_instruction(inst, index, strings, fn_value, module)
+                chunks = push_mut(chunks, line)
+                chunks = push_mut(chunks, "\n")
         chunks = push_mut(chunks, "\}\n")
         orion_text_join(chunks)
 
