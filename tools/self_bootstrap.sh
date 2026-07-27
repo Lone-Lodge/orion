@@ -63,16 +63,22 @@ fi
 # Windows-triple, which is what the stage1==stage2 fixpoint diff compares (the
 # compiler always re-emits the Windows triple, so both sides must keep it).
 # The sed is portable across GNU and BSD sed (no in-place -i, which differ).
+# orion.exe runs UNOPTIMIZED unless we ask clang to optimize it. -O2 makes the
+# compiler itself ~1.4x faster at every compile (it is map/list heavy) and does
+# NOT change what it emits — verified: the -O2 and -O0 binaries produce byte-
+# identical .ll, so the stage1==stage2 fixpoint holds. It costs ~5s more per
+# clang link; override with OPT=-O0 for fast dev iteration.
+OPT="${OPT:--O2}"
 link_stage() {
     if [ "$RETARGET" = "1" ]; then
         # Keep a .ll extension — clang dispatches on it to detect LLVM IR.
         sed -e "2s#e-m:w#e-m:${MANGLE}#" \
             -e "3s#x86_64-pc-windows-msvc[0-9.]*#${HOST_TRIPLE}#" \
             "$1" > "$1.host.ll"
-        "$CLANG" "$1.host.ll" "$RT" $STACK_LINK -o "$2"
+        "$CLANG" $OPT "$1.host.ll" "$RT" $STACK_LINK -o "$2"
         rm -f "$1.host.ll"
     else
-        "$CLANG" "$1" "$RT" $STACK_LINK -o "$2"
+        "$CLANG" $OPT "$1" "$RT" $STACK_LINK -o "$2"
     fi
 }
 

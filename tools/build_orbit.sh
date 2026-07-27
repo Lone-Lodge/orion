@@ -43,7 +43,9 @@ if [ "$RETARGET" = "1" ]; then
 fi
 
 echo "==> link -> dist/orbit.exe"
-"$CLANG" "$LINK_LL" "$ROOT/runtime/orion_cli.c" "$ROOT/runtime/orion_rt.c" \
+# -O2 so orbit itself runs fast (override with OPT=-O0 for a quick dev build).
+OPT="${OPT:--O2}"
+"$CLANG" $OPT "$LINK_LL" "$ROOT/runtime/orion_cli.c" "$ROOT/runtime/orion_rt.c" \
     $STACK_LINK -o "$ROOT/dist/orbit.exe"
 rm -f "$ROOT/dist/orbit.ll" "$ROOT/dist/orbit.host.ll"
 echo "==> dist/orbit.exe ready ($(wc -c < "$ROOT/dist/orbit.exe") bytes)"
