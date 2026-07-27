@@ -1599,6 +1599,33 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             compile_error("orion: ERROR at {otir_where(vc_line, vc_col)} — variant `{callee}` takes {vc_want} value(s), got {vc_got}")
         vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": vc_enum}, "method": callee, "args": args}
         return ast_expr_to_ir(fn_value, scope, vc_node)
+    # Multi-part string interpolation. The parser hands the parts here as one
+    # call instead of building a left-associative `+` tree, because that tree
+    # allocated a fresh buffer per link and re-copied everything to its left:
+    # `"  {a} = call {b}(ptr {c}, i64 {d})"` cost 8 mallocs and moved the
+    # prefix 8 times. One list, one join, ONE allocation for the result.
+    # Parts are already text (Str literals and `to_text(...)` holes); a part
+    # that somehow is not converts exactly like the concat path did, so the
+    # lowering is byte-for-byte the same string.
+    if callee == "__interp_join":
+        mut ij_fn = fn_value
+        mut ij_scope = scope
+        ij_seed: [int] = []
+        mut ij_ids = ij_seed
+        loop ij_i in 0..<len(args):
+            ij_r = ast_expr_to_ir(ij_fn, ij_scope, at(args, ij_i))
+            ij_fn = ij_r.function
+            ij_scope = ij_r.scope
+            mut ij_id = ij_r.id
+            ij_ty = get_value_type(ij_fn, ij_id)
+            if ij_ty != "text":
+                ij_c = if ij_ty == "f64" then ir_fn_push(ij_fn, ir_f64_to_text(ij_id)) else ir_fn_push(ij_fn, ir_int_to_text(ij_id))
+                ij_fn = ij_c.function
+                ij_id = ij_c.id
+            ij_ids = push(ij_ids, ij_id)
+        ij_lst = ir_fn_push(ij_fn, ir_list_lit(ij_ids, "text"))
+        ij_jn = ir_fn_push(ij_lst.function, ir_text_join(ij_lst.id))
+        return ConvResult{function: ij_jn.function, scope: ij_scope, id: ij_jn.id}
     is_print_line = callee == "print_line" or callee == "println" or callee == "print"
     is_to_text = callee == "to_text"
     is_to_float = callee == "to_float"

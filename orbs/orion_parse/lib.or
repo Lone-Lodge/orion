@@ -915,6 +915,12 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
         # the ident up to `}`. Build a left-associative `+` tree.
         mut current_node = {"kind": "Str", "value": ""}
         mut node_started = 0
+        # The parts, in order, alongside the `+` tree. Three or more of them
+        # lower to one `__interp_join` call (one allocation) instead of the
+        # tree (one allocation per link, each re-copying the prefix). One and
+        # two parts keep the tree: a bare `"{t}"` must stay the SAME pointer,
+        # and a single concat already allocates only once.
+        mut parts = []
         mut literal_buf = bytes_zeros(0)
         mut scan_index2 = 0
         loop:
@@ -936,6 +942,7 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                 # Flush literal-so-far as a Str part if non-empty.
                 if bytes_length(literal_buf) > 0:
                     literal_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
+                    parts = push(parts, literal_part)
                     started_before_flush = node_started
                     if started_before_flush == 0:
                         current_node = literal_part
@@ -970,6 +977,7 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                     raw_ident = psr_stamp_pos(get_map(interp_parsed, "node"), str_line, str_col)
                 # Wrap in to_text so ints get fmt'd and strings flow through.
                 ident_node = {"kind": "Call", "callee": "to_text", "args": [raw_ident], "line": str_line, "col": str_col}
+                parts = push(parts, ident_node)
                 started_before_ident = node_started
                 if started_before_ident == 0:
                     current_node = ident_node
@@ -980,12 +988,15 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                     scan_index2 = scan_index2 + 1
         if bytes_length(literal_buf) > 0:
             tail_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
+            parts = push(parts, tail_part)
             started_before_tail = node_started
             if started_before_tail == 0:
                 current_node = tail_part
             if started_before_tail == 1:
                 current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": tail_part}
         result_node = current_node
+        if len(parts) >= 3:
+            result_node = {"kind": "Call", "callee": "__interp_join", "args": parts, "line": str_line, "col": str_col}
     result_node
 
 fn psr_parse_map_literal(tokens: [Map], position: int) -> Map:

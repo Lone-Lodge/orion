@@ -222,6 +222,15 @@ pub fn ir_const_str(text: Text) -> Inst:
 pub fn ir_text_concat(left_id: int, right_id: int) -> Inst:
     Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
+# Concatenate a LIST of text values in one shot — one allocation for the
+# whole result instead of one per pair. A `"a{b}c{d}e"` interpolation used
+# to lower to a left-associative chain of text_concat, and every link in
+# that chain allocated a buffer and re-copied everything to its left: N-1
+# mallocs and O(N^2) bytes moved for what is one string. The parser hands
+# multi-part interpolations here instead.
+pub fn ir_text_join(parts_id: int) -> Inst:
+    Inst{op: "text_join", type_text: "text", value: parts_id, lhs: 0, rhs: 0, name: "", args: []}
+
 # Convert an i64 to text — calls runtime helper.
 pub fn ir_int_to_text(value_id: int) -> Inst:
     Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
