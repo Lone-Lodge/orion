@@ -561,6 +561,13 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     # must not mutate the caller's buffer — its locals would leak into the
     # enclosing scope. One copy per block; binds inside are then O(1).
     mut current_scope = scope_copy(scope)
+    # O(1) "is this name bound / is it mut" for the statement loop below. Built
+    # once from the incoming scope, then kept in sync at the end of each
+    # iteration by adding whatever names that statement appended (any bind path,
+    # not just let/mut). current_scope only grows here — block-scoped sub-
+    # statements revert to it — so the prefix [0, nm_prev_len) never shifts.
+    mut nm_seen = build_name_index(current_scope.names)
+    mut nm_prev_len = len(current_scope.names)
     mut last_id = 0 - 1
     # Collect deferred expressions in source order. They run in LIFO order
     # at end of block (and before any return). For now defer is block-scope
@@ -624,9 +631,11 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 current_scope = scope_bind_mut_inplace(current_scope, name, ptr_id)
                 last_id = pr_store.id
             else:
-                existing_mut = scope_is_mut(current_scope, name)
+                # O(1) via the block's name index (nm_hit-1 is the slot).
+                nm_hit = if has(nm_seen, name) then get_int(nm_seen, name) else 0
+                existing_mut = if nm_hit == 0 then 0 else at(current_scope.mut_flags, nm_hit - 1)
                 if existing_mut == 1:
-                    ptr_id = scope_lookup(current_scope, name)
+                    ptr_id = at(current_scope.ids, nm_hit - 1)
                     # Type-check the rebind: the new value's type must match
                     # the slot's stored type. Mismatch → user gets a clean
                     # error instead of cryptic LLVM IR rejection.
@@ -767,6 +776,12 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
             compile_error("orion: ERROR at {otir_where(line, col)} — unhandled statement kind `{stmt_kind}` (skipping)")
+        # Keep the name index in sync: fold in whatever this statement appended
+        # to current_scope (let/mut, destructure, anything). O(1) amortized.
+        nm_now = len(current_scope.names)
+        loop nk in nm_prev_len..<nm_now:
+            nm_seen = set(nm_seen, at(current_scope.names, nk), nk + 1)
+        nm_prev_len = nm_now
     # Emit any pending deferred exprs (LIFO) at end of block — unless the
     # block already terminated via return (in which case defers ran before
     # the return).
@@ -1178,6 +1193,18 @@ fn scope_truncate(s: Scope, keep: int) -> Scope:
 # once per block (O(AST)), not once per binding.
 fn scope_copy(s: Scope) -> Scope:
     scope_truncate(s, len(s.names))
+
+# name -> (index + 1) of its MOST RECENT binding in `names` (0 / absent means
+# not bound). Lets the block statement loop answer "is this name already bound,
+# and is it mut?" in O(1) instead of a linear scan of the whole scope — the
+# difference between O(N^2) and O(N) for a function with N distinct locals.
+# Last write wins, so a shadowed name resolves to its newest slot.
+fn build_name_index(names: [Text]) -> Map:
+    mut idx = {}
+    n = len(names)
+    loop i in 0..<n:
+        idx = set(idx, at(names, i), i + 1)
+    idx
 
 fn check_branch_shadows(before: int, s: Scope, where_txt: Text, node: Map):
     total = len(s.names)
