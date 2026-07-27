@@ -1,0 +1,12 @@
+# expect: unknown identifier
+# A subjectless `match:` whose arm body has orphaned statements (a dropped `->`
+# header) used to spin the cond-arm loop forever. It must terminate with a
+# located error instead. Regression guard for a fuzzer-found hang.
+fn main() -> int:
+  n = 9
+  c = match:
+    n > 100 -> 1
+        step = n - 5
+        step - 4
+    else -> 99
+  c

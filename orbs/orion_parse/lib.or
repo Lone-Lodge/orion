@@ -436,6 +436,11 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
     mut cm_body_list = cm_bodies
     mut cm_else = {"kind": "Int", "value": "0"}
     loop:
+        # No-progress guard: a malformed arm (a `->` header dropped, an arm body
+        # that consumes nothing) left cursor where it was and spun forever — the
+        # same shape a fuzzer found in the statement, argument and parameter
+        # loops. Snapshot the cursor and break if an iteration makes no headway.
+        cond_arm_start = cursor
         k = psr_peek_kind(tokens, cursor)
         c = psr_peek_col(tokens, cursor)
         if k == "eof":
@@ -465,6 +470,8 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
         cm_body_list = push(cm_body_list, get_map(br, "node"))
         cursor = get_int(br, "next")
         cursor = psr_skip_newlines(tokens, cursor)
+        if cursor == cond_arm_start:
+            break
     cm_n = len(cm_cond_list)
     mut cm_chain = cm_else
     loop cm_i in 0..<cm_n:
