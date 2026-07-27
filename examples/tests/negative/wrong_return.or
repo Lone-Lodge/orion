@@ -1,0 +1,6 @@
+# expect: is declared to return
+fn answer() -> int:
+    "not an int"
+
+fn main() -> int:
+    answer()

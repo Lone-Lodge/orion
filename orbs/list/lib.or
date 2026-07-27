@@ -11,7 +11,7 @@
 # [0, 1, …, n-1]. Empty for n <= 0.
 pub fn range(n: int) -> [int]:
     mut out = []
-    for i in 0..<n:
+    loop i in 0..<n:
         out = push(out, i)
     out
 
@@ -19,7 +19,7 @@ pub fn range(n: int) -> [int]:
 pub fn reversed(xs: [int]) -> [int]:
     mut out = []
     n = len(xs)
-    for i in 0..<n:
+    loop i in 0..<n:
         out = push(out, at(xs, n - 1 - i))
     out
 
@@ -27,7 +27,7 @@ pub fn reversed(xs: [int]) -> [int]:
 # `contains`, which is text-substring only.)
 pub fn includes(xs: [int], v: int) -> int:
     mut found = 0
-    for i in 0..<len(xs):
+    loop i in 0..<len(xs):
         if at(xs, i) == v:
             found = 1
     found
@@ -35,7 +35,7 @@ pub fn includes(xs: [int], v: int) -> int:
 # First index of `v`, or -1 if absent.
 pub fn find(xs: [int], v: int) -> int:
     mut idx = 0 - 1
-    for i in 0..<len(xs):
+    loop i in 0..<len(xs):
         if idx < 0:
             if at(xs, i) == v:
                 idx = i
@@ -57,7 +57,7 @@ pub fn max_of(xs: [int]) -> int:
     mut best = 0
     if len(xs) > 0:
         best = at(xs, 0)
-        for i in 1..<len(xs):
+        loop i in 1..<len(xs):
             if at(xs, i) > best:
                 best = at(xs, i)
     best
@@ -66,7 +66,7 @@ pub fn min_of(xs: [int]) -> int:
     mut best = 0
     if len(xs) > 0:
         best = at(xs, 0)
-        for i in 1..<len(xs):
+        loop i in 1..<len(xs):
             if at(xs, i) < best:
                 best = at(xs, i)
     best
@@ -75,6 +75,6 @@ pub fn min_of(xs: [int]) -> int:
 pub fn avg(xs: [int]) -> int:
     n = len(xs)
     mut total = 0
-    for i in 0..<n:
+    loop i in 0..<n:
         total = total + at(xs, i)
     if n == 0 then 0 else total / n

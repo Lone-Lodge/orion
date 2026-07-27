@@ -26,7 +26,7 @@ pub fn starts_with(t: Text, prefix: Text) -> int:
     if p_len > t_len:
         result = 0
     if p_len <= t_len:
-        for ci in 0..<p_len:
+        loop ci in 0..<p_len:
             tb = byte_at(t_bytes, ci)
             pb = byte_at(p_bytes, ci)
             if tb != pb:
@@ -43,7 +43,7 @@ pub fn ends_with(t: Text, suffix: Text) -> int:
         result = 0
     if s_len <= t_len:
         offset = t_len - s_len
-        for ci in 0..<s_len:
+        loop ci in 0..<s_len:
             tb = byte_at(t_bytes, ci + offset)
             sb = byte_at(s_bytes, ci)
             if tb != sb:
@@ -54,7 +54,7 @@ pub fn ends_with(t: Text, suffix: Text) -> int:
 pub fn repeat(t: Text, n: int) -> Text:
     mut result = ""
     if n > 0:
-        for _ in 0..<n:
+        loop _ in 0..<n:
             result = "{result}{t}"
     result
 
@@ -63,7 +63,7 @@ pub fn reverse(t: Text) -> Text:
     t_bytes = bytes_from_text(t)
     n = bytes_length(t_bytes)
     mut out = bytes_zeros(0)
-    for ci in 0..<n:
+    loop ci in 0..<n:
         idx = n - 1 - ci
         out = bytes_concat(out, bytes_slice(t_bytes, idx, idx + 1))
     bytes_to_text(out)
@@ -73,7 +73,7 @@ pub fn upper(t: Text) -> Text:
     t_bytes = bytes_from_text(t)
     n = bytes_length(t_bytes)
     mut out = bytes_zeros(0)
-    for ci in 0..<n:
+    loop ci in 0..<n:
         b = byte_at(t_bytes, ci)
         mut new_b = b
         if b >= 97 and b <= 122:
@@ -86,7 +86,7 @@ pub fn lower(t: Text) -> Text:
     t_bytes = bytes_from_text(t)
     n = bytes_length(t_bytes)
     mut out = bytes_zeros(0)
-    for ci in 0..<n:
+    loop ci in 0..<n:
         b = byte_at(t_bytes, ci)
         mut new_b = b
         if b >= 65 and b <= 90:
@@ -101,7 +101,7 @@ pub fn trim(t: Text) -> Text:
     n = bytes_length(tb)
     mut lo = 0
     mut hi = n
-    for:
+    loop:
         if lo >= hi:
             break
         b = byte_at(tb, lo)
@@ -109,7 +109,7 @@ pub fn trim(t: Text) -> Text:
             lo = lo + 1
         else:
             break
-    for:
+    loop:
         if hi <= lo:
             break
         b = byte_at(tb, hi - 1)
@@ -124,7 +124,7 @@ pub fn trim(t: Text) -> Text:
 pub fn join(parts: [Text], sep: Text) -> Text:
     mut out = ""
     n = len(parts)
-    for i in 0..<n:
+    loop i in 0..<n:
         if i > 0:
             out = "{out}{sep}"
         out = "{out}{at(parts, i)}"
@@ -144,11 +144,11 @@ pub fn split(t: Text, sep: Text) -> [Text]:
     else:
         mut start = 0
         mut i = 0
-        for:
+        loop:
             if i > tlen - slen:
                 break
             mut matched = 1
-            for j in 0..<slen:
+            loop j in 0..<slen:
                 if byte_at(tb, i + j) != byte_at(sb, j):
                     matched = 0
             if matched == 1:
@@ -177,11 +177,11 @@ pub fn index_of(t: Text, sub: Text) -> int:
         found = 0
     else:
         mut i = 0
-        for:
+        loop:
             if i > tlen - slen or found >= 0:
                 break
             mut matched = 1
-            for j in 0..<slen:
+            loop j in 0..<slen:
                 if byte_at(tb, i + j) != byte_at(sb, j):
                     matched = 0
             if matched == 1:
@@ -193,7 +193,7 @@ pub fn index_of(t: Text, sub: Text) -> int:
 pub fn pad_left(t: Text, width: int, pad: Text) -> Text:
     mut out = t
     mut k = len(t)
-    for:
+    loop:
         if k >= width:
             break
         out = "{pad}{out}"
@@ -204,7 +204,7 @@ pub fn pad_left(t: Text, width: int, pad: Text) -> Text:
 pub fn pad_right(t: Text, width: int, pad: Text) -> Text:
     mut out = t
     mut k = len(t)
-    for:
+    loop:
         if k >= width:
             break
         out = "{out}{pad}"

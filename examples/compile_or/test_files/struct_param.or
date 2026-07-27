@@ -1,4 +1,4 @@
-data Vec2: x: int, y: int
+type Vec2: x: int, y: int
 
 fn len_sq(v: Vec2) -> int:
     v.x * v.x + v.y * v.y

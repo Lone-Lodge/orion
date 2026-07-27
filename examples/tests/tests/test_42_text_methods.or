@@ -10,7 +10,7 @@ fn starts_with(t: Text, prefix: Text) -> int:
     if p_len > t_len:
         result = 0
     if p_len <= t_len:
-        for ci in 0..<p_len:
+        loop ci in 0..<p_len:
             tb = byte_at(t_bytes, ci)
             pb = byte_at(p_bytes, ci)
             if tb != pb:

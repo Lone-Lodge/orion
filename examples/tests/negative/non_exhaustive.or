@@ -1,0 +1,10 @@
+# expect: non-exhaustive match on enum `Tile`
+type Tile: Empty, Wall, Loot
+
+fn cost(t: Tile) -> int:
+    match t:
+        Empty -> 0
+        Wall -> 1
+
+fn main() -> int:
+    cost(Tile.Loot)

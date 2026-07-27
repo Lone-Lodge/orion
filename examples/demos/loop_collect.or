@@ -1,0 +1,17 @@
+# `loop` as an EXPRESSION — one construct for map and filter.
+#
+# In expression position `loop x in xs [where cond]: body` collects each body
+# value into a list. In statement position the same `loop x in xs:` is a plain
+# side-effect loop. Same keyword; position decides.
+#
+#   ys = loop x in xs: x * 2            # map    → [2, 4, 6, 8]
+#   ys = loop x in xs where x > 2: x    # filter → [3, 4]
+#   loop x in xs: draw(x)               # side effect (unbound)
+#
+# Run:  orbit run loop_collect.or main   → expects 12
+
+fn main() -> int:
+    xs = [1, 2, 3, 4]
+    doubled = loop x in xs: x * 2          # [2, 4, 6, 8]
+    big     = loop x in xs where x > 2: x  # [3, 4]
+    at(doubled, 0) + at(doubled, 3) + len(big)   # 2 + 8 + 2 = 12

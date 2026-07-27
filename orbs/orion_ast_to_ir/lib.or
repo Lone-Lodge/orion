@@ -18,7 +18,7 @@ use bytes
 #   is_mut == 1 → id is a ptr (alloca) — emit load to read, store to write
 # loop_headers / loop_ends — parallel stack of enclosing loops for
 # break/continue targets. Push when entering a loop, do not pop (immutable scope).
-data Scope: names: [Text], ids: [int], mut_flags: [int], loop_headers: [Text], loop_ends: [Text], fn_sig_names: [Text], fn_sig_rets: [Text], ds_names: [Text], ds_specs: [Text], en_names: [Text], en_variants: [Text]
+type Scope: names: [Text], ids: [int], mut_flags: [int], loop_headers: [Text], loop_ends: [Text], fn_sig_names: [Text], fn_sig_rets: [Text], ds_names: [Text], ds_specs: [Text], en_names: [Text], en_variants: [Text]
 
 fn scope_empty() -> Scope:
     Scope{names: [], ids: [], mut_flags: [], loop_headers: [], loop_ends: [], fn_sig_names: [], fn_sig_rets: [], ds_names: [], ds_specs: [], en_names: [], en_variants: []}
@@ -29,13 +29,38 @@ fn scope_add_enum_decl(scope: Scope, enum_name: Text, variant_csv: Text) -> Scop
     new_vars = push(scope.en_variants, variant_csv)
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: new_names, en_variants: new_vars}
 
+# Where a bundle line really is: `path/file.or:LINE:COL`.
+#
+# By lowering time the program is ONE concatenated text (drv_collect), so a
+# token's line is its line in that concatenation — a line in no file that
+# exists on disk. Reporting it raw meant every diagnostic in a project with
+# orbs pointed hundreds of lines past the end of the file the user was editing.
+# The driver records where each chunk starts (`src:map:*`); this walks that
+# table for the last chunk starting at or before the line and subtracts.
+#
+# Falls back to the old `line N:C` when there is no map (the compiler invoked
+# on an already-bundled text), so a diagnostic never becomes worse than before.
+fn otir_where(line: int, col: int) -> Text:
+    total = if slot_has("src:map:n") then slot_get_int("src:map:n") else 0
+    mut best_at = 0
+    mut best_path = ""
+    loop i in 0..<total:
+        chunk_at = slot_get_int("src:map:{i}:at")
+        if chunk_at <= line and chunk_at > best_at:
+            best_at = chunk_at
+            best_path = slot_get("src:map:{i}:path")
+    if best_path == "":
+        "line {line}:{col}"
+    else:
+        "{best_path}:{line - best_at}:{col}"
+
 # True if the name contains '$' — synthetic "Enum$Variant" payload
 # entries in the enum tables, never real enums.
 fn contains_dollar(name: Text) -> bool:
     bs = bytes_from_text(name)
     n = len(bs)
     mut found = false
-    for i in 0..<n:
+    loop i in 0..<n:
         if at(bs, i) == 36:
             found = true
     found
@@ -47,7 +72,7 @@ fn count_spec_fields(spec: Text) -> int:
     if n == 0:
         return 0
     mut pipes = 0
-    for i in 0..<n:
+    loop i in 0..<n:
         if at(bs, i) == 124:
             pipes = pipes + 1
     pipes + 1
@@ -59,10 +84,32 @@ fn scope_lookup_variant_payloads(scope: Scope, enum_name: Text, variant: Text) -
     key = "{enum_name}${variant}"
     total = len(scope.en_names)
     mut result = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         if at(scope.en_names, index) == key:
             result = at(scope.en_variants, index)
     result
+
+# The comma-joined variant names of an enum (stored under the bare enum key).
+fn enum_variant_csv(scope: Scope, enum_name: Text) -> Text:
+    total = len(scope.en_names)
+    mut result = ""
+    loop index in 0..<total:
+        if at(scope.en_names, index) == enum_name:
+            result = at(scope.en_variants, index)
+    result
+
+# Does any variant of this enum carry a payload? A plain enumeration (all
+# zero-payload, like `Color: Red, Green, Blue`) is used as integer tags, so
+# `Color.Red` stays a tag int. A tagged union (some variant has a payload,
+# like `Opt: Some(T), None`) makes EVERY variant value a struct, so a bare
+# `Opt.None` unifies with `Opt.Some(x)`.
+fn enum_has_payloads(scope: Scope, enum_name: Text) -> bool:
+    variant_names = split_csv(enum_variant_csv(scope, enum_name))
+    mut found = false
+    loop vi in 0..<len(variant_names):
+        if len(scope_lookup_variant_payloads(scope, enum_name, at(variant_names, vi))) > 0:
+            found = true
+    found
 
 # "struct:Res" -> "Res"; anything else unchanged. Enum values carry the
 # "struct:" IR prefix (enums lower to structs), so strip it before an
@@ -84,12 +131,52 @@ fn strip_struct_prefix(t: Text) -> Text:
 fn enum_first_variant(scope: Scope, enum_name: Text) -> Text:
     total = len(scope.en_names)
     mut result = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         if at(scope.en_names, index) == enum_name and not contains_dollar(enum_name):
             names = split_csv(at(scope.en_variants, index))
             if len(names) > 0 and result == "":
                 result = at(names, 0)
     result
+
+# A match-arm payload slot is normally just a binding name (`Some(x)`). A
+# NESTED sub-pattern (`Some(Ok(x))`) is encoded by the parser as
+# "@Variant:n1,n2", so `bindings` stays a flat [Text] like every other arm
+# spec here. These three read that encoding back.
+fn is_nested_binding(enc: Text) -> bool:
+    b = bytes_from_text(enc)
+    mut nested = false
+    if len(b) > 0:
+        if at(b, 0) == 64:  # '@'
+            nested = true
+    nested
+
+fn nested_binding_variant(enc: Text) -> Text:
+    b = bytes_from_text(enc)
+    n = len(b)
+    mut out = ""
+    mut done = false
+    loop i in 1..<n:
+        c = at(b, i)
+        if c == 58:  # ':'
+            done = true
+        if not done:
+            piece = bytes_to_text([c])
+            out = "{out}{piece}"
+    out
+
+fn nested_binding_names(enc: Text) -> [Text]:
+    b = bytes_from_text(enc)
+    n = len(b)
+    mut rest = ""
+    mut past = false
+    loop i in 1..<n:
+        c = at(b, i)
+        if past:
+            piece = bytes_to_text([c])
+            rest = "{rest}{piece}"
+        if c == 58:  # ':'
+            past = true
+    split_csv(rest)
 
 # Split a comma csv into parts (payload type lists are tiny).
 fn split_csv(csv: Text) -> [Text]:
@@ -99,7 +186,7 @@ fn split_csv(csv: Text) -> [Text]:
     mut current = ""
     if n == 0:
         return parts
-    for i in 0..<n:
+    loop i in 0..<n:
         b = at(bs, i)
         if b == 44:
             parts = push(parts, current)
@@ -114,7 +201,7 @@ fn split_csv(csv: Text) -> [Text]:
 fn scope_lookup_enum_variant(scope: Scope, enum_name: Text, variant: Text) -> int:
     total = len(scope.en_names)
     mut result = 0 - 1
-    for index in 0..<total:
+    loop index in 0..<total:
         if at(scope.en_names, index) == enum_name:
             csv = at(scope.en_variants, index)
             csv_bytes = bytes_from_text(csv)
@@ -122,7 +209,7 @@ fn scope_lookup_enum_variant(scope: Scope, enum_name: Text, variant: Text) -> in
             mut current = ""
             mut found_at = 0 - 1
             mut idx_count = 0
-            for ci in 0..<n:
+            loop ci in 0..<n:
                 b = at(csv_bytes, ci)
                 if b == 44:
                     if current == variant and found_at == (0 - 1):
@@ -148,10 +235,44 @@ fn scope_add_data_decl(scope: Scope, struct_name: Text, spec: Text) -> Scope:
 fn scope_lookup_data_spec(scope: Scope, struct_name: Text) -> Text:
     total = len(scope.ds_names)
     mut result = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         if at(scope.ds_names, index) == struct_name:
             result = at(scope.ds_specs, index)
+    # Fallback: synthesized anonymous-tuple structs register their spec in a
+    # slot (they're created on the fly at lowering, not declared in scope).
+    if result == "":
+        tk = otir_k1("tupspec", struct_name)
+        if slot_has(tk):
+            result = slot_get(tk)
     result
+
+# Replace ':' with '_' so a type string like "list:i64" is a clean part of a
+# synthesized struct name ("list_i64").
+fn tuple_sanitize(t: Text) -> Text:
+    b = bytes_from_text(t)
+    n = len(b)
+    mut out = ""
+    loop i in 0..<n:
+        c = at(b, i)
+        piece = if c == 58 then "_" else bytes_to_text([c])
+        out = "{out}{piece}"
+    out
+
+# Deterministic struct name for a tuple of these element IR types, and register
+# its spec (_0:t0|_1:t1|...) so scope_lookup_data_spec (via its slot fallback)
+# and field access resolve `._0`/`._1` with the right per-slot type. The literal
+# and the `(A, B)` type produce identical names, so they interoperate.
+fn otir_tuple_register(elem_types: [Text]) -> Text:
+    n = len(elem_types)
+    mut name = "__Tup{n}"
+    loop ni in 0..<n:
+        name = "{name}_{tuple_sanitize(at(elem_types, ni))}"
+    mut spec = ""
+    loop si in 0..<n:
+        sep = if si == 0 then "" else "|"
+        spec = "{spec}{sep}_{si}:{at(elem_types, si)}"
+    slot_set(otir_k1("tupspec", name), spec)
+    name
 
 
 # Parse "name:type|name:type|..." into parallel lists.
@@ -162,7 +283,7 @@ fn int_to_text_helper(value: int) -> Text:
         digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
         mut n = if value < 0 then 0 - value else value
         mut chars = ""
-        for _ in 0..<20:
+        loop _ in 0..<20:
             if n > 0:
                 d = at(digits, n % 10)
                 chars = "{d}{chars}"
@@ -174,7 +295,7 @@ fn parse_data_spec(spec: Text) -> [Text]:
     total = len(bs)
     mut parts = []
     mut current = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         b = at(bs, index)
         if b == 124:  # '|'
             parts = push(parts, current)
@@ -192,14 +313,14 @@ fn parse_data_spec(spec: Text) -> [Text]:
 fn find_field_index(parts: [Text], field_name: Text) -> int:
     n = len(parts)
     mut result = 0 - 1
-    for index in 0..<n:
+    loop index in 0..<n:
         part = at(parts, index)
         # Split on ':' to get name
         bs = bytes_from_text(part)
         bs_n = len(bs)
         mut name_buf = ""
         mut found_colon = 0
-        for ci in 0..<bs_n:
+        loop ci in 0..<bs_n:
             b = at(bs, ci)
             if found_colon == 0:
                 if b == 58:  # ':'
@@ -223,7 +344,7 @@ fn field_type_at(parts: [Text], idx: int) -> Text:
         bs_n = len(bs)
         mut type_buf = ""
         mut found_colon = 0
-        for ci in 0..<bs_n:
+        loop ci in 0..<bs_n:
             b = at(bs, ci)
             if found_colon == 1:
                 single = bytes_to_text([b])
@@ -241,7 +362,7 @@ fn scope_add_fn_sig(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
 fn scope_lookup_fn_ret(scope: Scope, fn_name: Text) -> Text:
     total = len(scope.fn_sig_names)
     mut result = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         if at(scope.fn_sig_names, index) == fn_name:
             result = at(scope.fn_sig_rets, index)
     result
@@ -254,7 +375,7 @@ fn scope_lookup_fn_ret_loc(scope: Scope, fn_name: Text, node: Map) -> Text:
     if found == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion: ERROR at line {line}:{col} — call to unknown function `{fn_name}`")
+        compile_error("orion: ERROR at {otir_where(line, col)} — call to unknown function `{fn_name}`")
         result = "i64"
     result
 
@@ -292,7 +413,7 @@ fn scope_top_loop_end(scope: Scope) -> Text:
 fn scope_lookup(scope: Scope, name: Text) -> int:
     total = len(scope.names)
     mut result = 0 - 1
-    for index in 0..<total:
+    loop index in 0..<total:
         from_end = total - 1 - index
         candidate = at(scope.names, from_end)
         if candidate == name and result == (0 - 1):
@@ -303,7 +424,7 @@ fn scope_is_mut(scope: Scope, name: Text) -> int:
     total = len(scope.names)
     mut result = 0
     mut found = 0
-    for index in 0..<total:
+    loop index in 0..<total:
         from_end = total - 1 - index
         candidate = at(scope.names, from_end)
         if candidate == name and found == 0:
@@ -338,7 +459,7 @@ fn is_block_terminated(fn_value: IRFn) -> int:
 
 
 # --- Conversion result threading function, scope, and value id ---
-data ConvResult: function: IRFn, scope: Scope, id: int
+type ConvResult: function: IRFn, scope: Scope, id: int
 #
 # AST is Maps with "kind" field:
 #   Program: {"kind": "Program", "decls": [Fn]}
@@ -364,7 +485,7 @@ fn parse_int(text: Text) -> int:
         if first == 45:
             is_neg = true
             start = 1
-    for index in start..<total:
+    loop index in start..<total:
         b = at(byte_list, index)
         # '0' = 48, '9' = 57
         if b >= 48 and b <= 57:
@@ -390,6 +511,17 @@ fn ast_binary_to_ir(fn2: IRFn, scope: Scope, op: Text, left_id: int, right_id: i
         pr = ir_fn_push(fn2, ir_iand(left_id, right_id))
     if op == "or":
         pr = ir_fn_push(fn2, ir_ior(left_id, right_id))
+    # Bitwise: on the bits, unlike `and`/`or` which coerce to 0/1.
+    if op == "&":
+        pr = ir_fn_push(fn2, ir_bit_and(left_id, right_id))
+    if op == "|":
+        pr = ir_fn_push(fn2, ir_bit_or(left_id, right_id))
+    if op == "^":
+        pr = ir_fn_push(fn2, ir_bit_xor(left_id, right_id))
+    if op == "<<":
+        pr = ir_fn_push(fn2, ir_shl(left_id, right_id))
+    if op == ">>":
+        pr = ir_fn_push(fn2, ir_shr(left_id, right_id))
     if op == "==":
         pr = ir_fn_push(fn2, ir_icmp_eq(left_id, right_id))
     if op == "!=":
@@ -415,7 +547,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     # only — nested scope defer correctness is future work.
     init_defers = []
     mut defer_exprs = init_defers
-    for index in 0..<total_stmts:
+    loop index in 0..<total_stmts:
         stmt = at(stmts, index)
         stmt_kind = get(stmt, "kind")
         is_expr = stmt_kind == "ExprStmt"
@@ -489,7 +621,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     if slot_ll != new_ll:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion: ERROR at line {line}:{col} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}`, but the new value is a `{friendly_type(new_type)}`)")
+                        compile_error("orion: ERROR at {otir_where(line, col)} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}`, but the new value is a `{friendly_type(new_type)}`)")
                     # Sharpened pointer-subtype rebind guard (mirrors the return
                     # guard): two DIFFERENT concrete pointer shapes (text/list/
                     # struct) are a real type error even though they share ptr
@@ -502,7 +634,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     if (not is_unreliable_ptr(current_fn, er.id)) and slot_kind_rb != "" and new_kind_rb != "" and slot_kind_rb != new_kind_rb:
                         line_rb = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col_rb = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion: ERROR at line {line_rb}:{col_rb} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}` but the new value is a `{friendly_type(new_type)}`: a {new_kind_rb} where a {slot_kind_rb} was declared)")
+                        compile_error("orion: ERROR at {otir_where(line_rb, col_rb)} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}` but the new value is a `{friendly_type(new_type)}`: a {new_kind_rb} where a {slot_kind_rb} was declared)")
                     # Resolve an empty list's element type from the first
                     # concrete value stored into it: `mut x = []` allocates
                     # list:i64 (no element to peek), so `x = push(x, textv)`
@@ -515,13 +647,34 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     current_fn = pr_store.function
                     last_id = pr_store.id
                 else:
+                    # `x: T = e` — the ANNOTATION decides the type. It used to be
+                    # parsed and dropped here, so `ys: [Text] = get_list(m, k)`
+                    # looked like it fixed the element type and did nothing (the
+                    # `mut` form already worked, because a mut read loads with
+                    # the slot's annotated type). Route the value through a slot
+                    # the same way and bind the LOAD, which carries the
+                    # annotation. Only when the annotation actually refines a
+                    # pointer type - a plain `x: int = 5` needs no slot, and an
+                    # annotation that would change the machine type (ptr vs i64)
+                    # is left to the existing checks rather than reinterpreted.
+                    mut bind_id = er.id
+                    if has(stmt, "decl_type"):
+                        ann_type = ast_type_to_ir_with_scope(get_map(stmt, "decl_type"), current_scope)
+                        cur_type = get_value_type(current_fn, er.id)
+                        refines = ann_type != cur_type and is_ptr_ir_type(ann_type) and is_ptr_ir_type(cur_type)
+                        if refines:
+                            pr_ann_a = ir_fn_push(current_fn, ir_alloca(ann_type))
+                            pr_ann_s = ir_fn_push(pr_ann_a.function, ir_store(pr_ann_a.id, er.id))
+                            pr_ann_l = ir_fn_push(pr_ann_s.function, ir_load(pr_ann_a.id, ann_type))
+                            current_fn = pr_ann_l.function
+                            bind_id = pr_ann_l.id
                     if has(stmt, "linear"):
                         # `move x = e` — bind linear and (re)start its read count.
-                        current_scope = scope_bind_linear(current_scope, name, er.id)
+                        current_scope = scope_bind_linear(current_scope, name, bind_id)
                         slot_set("otir:move:" + current_fn.name + ":" + name, 0)
                     else:
-                        current_scope = scope_bind(current_scope, name, er.id)
-                    last_id = er.id
+                        current_scope = scope_bind(current_scope, name, bind_id)
+                    last_id = bind_id
         if already_done == 0 and is_if_block:
             er = ast_if_to_ir(current_fn, current_scope, stmt)
             current_fn = er.function
@@ -559,7 +712,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_scope = er.scope
             # Emit deferred exprs in LIFO order BEFORE the return.
             n_defers = len(defer_exprs)
-            for di in 0..<n_defers:
+            loop di in 0..<n_defers:
                 # Reverse: emit defer_exprs[n_defers - 1 - di]
                 rev_idx = n_defers - 1 - di
                 def_expr = at(defer_exprs, rev_idx)
@@ -593,13 +746,13 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
-            compile_error("orion: ERROR at line {line}:{col} — unhandled statement kind `{stmt_kind}` (skipping)")
+            compile_error("orion: ERROR at {otir_where(line, col)} — unhandled statement kind `{stmt_kind}` (skipping)")
     # Emit any pending deferred exprs (LIFO) at end of block — unless the
     # block already terminated via return (in which case defers ran before
     # the return).
     if is_block_terminated(current_fn) == 0:
         n_end_defers = len(defer_exprs)
-        for di in 0..<n_end_defers:
+        loop di in 0..<n_end_defers:
             rev_idx = n_end_defers - 1 - di
             def_expr = at(defer_exprs, rev_idx)
             def_r = ast_expr_to_ir(current_fn, current_scope, def_expr)
@@ -782,7 +935,7 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if move_reads >= 1:
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at line {line}:{col} — value `{name}` used after move (`move` values are linear — read exactly once; bind a plain `{name} = …` if you need to reuse it)")
+            compile_error("orion: ERROR at {otir_where(line, col)} — value `{name}` used after move (`move` values are linear — read exactly once; bind a plain `{name} = …` if you need to reuse it)")
         slot_set(move_key, move_reads + 1)
     mut result = ConvResult{function: fn_value, scope: scope, id: found_id}
     if found_id < 0:
@@ -807,7 +960,12 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             # captured as a single ident. Emit a sentinel iconst(0).
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at line {line}:{col} — unknown identifier `{name}` (interpolation may need a temp var)")
+            # `for` no longer starts a loop, so it reaches here as a bare name.
+            # Say what happened instead of "unknown identifier `for`".
+            if name == "for":
+                compile_error("orion: ERROR at {otir_where(line, col)} — `for` was retired; the loop keyword is `loop` (`loop x in xs:`, `loop:`, `loop parallel x in xs:`)")
+            if name != "for":
+                compile_error("orion: ERROR at {otir_where(line, col)} — unknown identifier `{name}` (interpolation may need a temp var)")
             pr = ir_fn_push(fn_value, ir_iconst(0))
             result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     is_real_mut = found_id >= 0 and is_mut == 1
@@ -888,7 +1046,9 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if op == "/" or op == "%":
         divz_r = get(node, "right")
         if get(divz_r, "kind") == "Int" and get(divz_r, "value") == "0":
-            compile_error("orion: ERROR — division by zero (the divisor is the literal `0`)")
+            dz_line = if has(node, "line") then get_int(node, "line") else 0
+            dz_col = if has(node, "col") then get_int(node, "col") else 0
+            compile_error("orion: ERROR at {otir_where(dz_line, dz_col)} — division by zero (the divisor is the literal `0`)")
     if op == "and":
         return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "right"), sc_int("0")))
     if op == "or":
@@ -969,7 +1129,7 @@ fn current_block(fn_value: IRFn) -> Text:
     total = len(insts)
     mut found = "entry"
     mut done = 0
-    for index in 0..<total:
+    loop index in 0..<total:
         if done == 0:
             from_end = total - 1 - index
             inst = at(insts, from_end)
@@ -992,16 +1152,17 @@ fn scope_truncate(s: Scope, keep: int) -> Scope:
 
 fn check_branch_shadows(before: int, s: Scope, where_txt: Text, node: Map):
     total = len(s.names)
-    for i in before..<total:
+    loop i in before..<total:
         nm = at(s.names, i)
         if at(s.mut_flags, i) == 0:
             mut outer = 0
-            for j in 0..<before:
+            loop j in 0..<before:
                 if at(s.names, j) == nm:
                     outer = 1
             if outer == 1:
                 line = if has(node, "line") then get_int(node, "line") else 0
-                compile_error("orion: ERROR at line {line} — `{nm}` is reassigned inside a {where_txt}; immutable rebinding cannot cross a block boundary (declare it `mut`, or use an if-expression)")
+                col = if has(node, "col") then get_int(node, "col") else 0
+                compile_error("orion: ERROR at {otir_where(line, col)} — `{nm}` is reassigned inside a {where_txt}; immutable rebinding cannot cross a block boundary (declare it `mut`, or use an if-expression)")
 
 fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     cond_node = get(node, "cond")
@@ -1125,7 +1286,7 @@ fn coerce_f64(r: ConvResult) -> ConvResult:
 fn text_list_has(xs: [Text], needle: Text) -> bool:
     n = len(xs)
     mut found = false
-    for i in 0..<n:
+    loop i in 0..<n:
         if at(xs, i) == needle:
             found = true
     found
@@ -1143,7 +1304,7 @@ fn find_variant_enum(scope: Scope, callee: Text) -> Text:
     n_enums = len(scope.en_names)
     mut found_enum = ""
     mut second_enum = ""
-    for ei in 0..<n_enums:
+    loop ei in 0..<n_enums:
         en_name = at(scope.en_names, ei)
         if not contains_dollar(en_name):
             if en_name != found_enum:
@@ -1184,6 +1345,18 @@ fn otir_k2(kind: Text, a: Text, b: Text) -> Text:
 fn otir_k3(kind: Text, a: Text, b: Text, c: Text) -> Text:
     otir_k2(kind, a, b) + ":" + c
 
+# Register a declaration's generic type variables under a fresh generation
+# stamp so their names lower to opaque i64 slots while THIS decl's field /
+# payload / signature types are converted, and a previous decl's `T` can't
+# leak in. Used by generic `type`/`data`/`enum` and (inline) by fns.
+fn otir_bind_tyvars(decl: Map) -> int:
+    g = slot_int_or_zero("otir:tvgen") + 1
+    slot_set("otir:tvgen", g)
+    gens = if has(decl, "generics") then get_list(decl, "generics") else []
+    loop gi in 0..<len(gens):
+        slot_set(otir_k1("tv", at(gens, gi)), g)
+    g
+
 fn otir_priv_key(orb: Text, name: Text) -> Text:
     otir_k2("mg", orb, name)
 
@@ -1200,7 +1373,7 @@ fn otir_scope(orb: Text) -> Text:
 pub fn deterministic_fn_names() -> [Text]:
     n = slot_int_or_zero(otir_k1("detn", "count"))
     mut out = slice([""], 0, 0)
-    for i in 0..<n:
+    loop i in 0..<n:
         out = push_mut(out, slot_get(otir_k1("deto", "{i}")))
     out
 
@@ -1222,7 +1395,7 @@ fn otir_reex_reaches(f: Text, target: Text, depth: int) -> bool:
     if depth <= 0:
         return false
     mut hit = false
-    for i in 0..<slot_int_or_zero(otir_k1("usen", f)):
+    loop i in 0..<slot_int_or_zero(otir_k1("usen", f)):
         g = slot_get(otir_k1("useo", f) + ":{i}")
         if slot_has(otir_k2("reex", f, g)):
             if otir_reex_reaches(g, target, depth - 1):
@@ -1235,7 +1408,7 @@ fn otir_sees(orb: Text, target: Text) -> bool:
     if slot_has(otir_k2("uses", orb, target)):
         return true
     mut hit = false
-    for i in 0..<slot_int_or_zero(otir_k1("usen", orb)):
+    loop i in 0..<slot_int_or_zero(otir_k1("usen", orb)):
         f = slot_get(otir_k1("useo", orb) + ":{i}")
         if otir_reex_reaches(f, target, 8):
             hit = true
@@ -1268,7 +1441,7 @@ fn otir_resolve(name: Text) -> Text:
     mut pick = ""
     mut named = 0
     mut listed = ""
-    for i in 0..<n_def:
+    loop i in 0..<n_def:
         p2 = slot_get(otir_k1("defo", name) + ":{i}")
         listed = listed + " `" + p2 + "`"
         if otir_sees(orb, p2):
@@ -1293,6 +1466,28 @@ fn otir_resolve(name: Text) -> Text:
     compile_error("orion: ERROR — `{name}` is not visible here; it is exported by{listed} — add `use` for the one you mean")
     name
 
+# How many arguments a BUILTIN needs before it starts indexing them. -1 means
+# "not a builtin we check". User functions have their own arity check via the
+# `otir:arity:` registry; builtins had none, so a truncated call (`push(` at end
+# of file, which the parser accepts as zero arguments) reached a branch that
+# read `args[0]` and tripped the compiler's own runtime guard:
+# "list index 1 out of range (len 1)" — an internal trap where a diagnostic
+# belongs. A fuzzer found it in the second run.
+fn builtin_min_args(callee: Text) -> int:
+    one = callee == "len" or callee == "print_line" or callee == "print" or callee == "println" or callee == "to_text" or callee == "to_int" or callee == "to_float" or callee == "bytes_from_text" or callee == "bytes_to_text" or callee == "bytes_zeros" or callee == "bytes_length" or callee == "map_keys" or callee == "map_values" or callee == "slot_get" or callee == "slot_has" or callee == "slot_get_int" or callee == "file_read" or callee == "argv" or callee == "resume" or callee == "parse_int"
+    two = callee == "at" or callee == "get" or callee == "get_int" or callee == "get_map" or callee == "get_list" or callee == "get_text_list" or callee == "get_int_list" or callee == "has" or callee == "push" or callee == "push_mut" or callee == "contains" or callee == "map_remove" or callee == "byte_at" or callee == "bytes_concat" or callee == "slot_set" or callee == "file_write" or callee == "call_ptr" or callee == "par_run" or callee == "vec_add" or callee == "vec_sub" or callee == "vec_mul" or callee == "vec_dot"
+    three = callee == "set" or callee == "slice" or callee == "get_or" or callee == "bytes_slice" or callee == "vec_madd" or callee == "vec_addi"
+    if three:
+        3
+    else:
+        if two:
+            2
+        else:
+            if one:
+                1
+            else:
+                0 - 1
+
 fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     callee = get(node, "callee")
     # The orb-local name is used ONLY where a global function is meant. A LOCAL
@@ -1301,20 +1496,28 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     # below keeps the raw name.
     callee_g = otir_resolve(callee)
     mut args = get_list(node, "args")
+    # Builtin arity, checked BEFORE anything indexes the argument list.
+    bmin = builtin_min_args(callee)
+    if bmin > 0 and len(args) < bmin:
+        ba_line = if has(node, "line") then get_int(node, "line") else 0
+        ba_col = if has(node, "col") then get_int(node, "col") else 0
+        compile_error("orion: ERROR at {otir_where(ba_line, ba_col)} — `{callee}` takes {bmin} argument(s), got {len(args)}")
+        pr_bad = ir_fn_push(fn_value, ir_iconst(0))
+        return ConvResult{function: pr_bad.function, scope: scope, id: pr_bad.id}
     # Named-argument reorder: `f(y = 3, x = 5)` → positional order via the
     # `otir:param:<fn>:<name>` slots. Positional args fill in source order.
     mut na_has = 0
-    for na_i in 0..<len(args):
+    loop na_i in 0..<len(args):
         if get(at(args, na_i), "kind") == "NamedArg":
             na_has = 1
     if na_has == 1:
         na_total = len(args)
         na_seed = []
         mut na_pos = na_seed
-        for na_j in 0..<na_total:
+        loop na_j in 0..<na_total:
             na_pos = push(na_pos, {"kind": "Int", "value": "0"})
         mut na_next = 0
-        for na_k in 0..<na_total:
+        loop na_k in 0..<na_total:
             na_a = at(args, na_k)
             if get(na_a, "kind") == "NamedArg":
                 na_slot = slot_get_int("otir:param:" + callee_g + ":" + get(na_a, "name"))
@@ -1337,7 +1540,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if vc_got != vc_want:
             vc_line = if has(node, "line") then get_int(node, "line") else 0
             vc_col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at line {vc_line}:{vc_col} — variant `{callee}` takes {vc_want} value(s), got {vc_got}")
+            compile_error("orion: ERROR at {otir_where(vc_line, vc_col)} — variant `{callee}` takes {vc_want} value(s), got {vc_got}")
         vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": vc_enum}, "method": callee, "args": args}
         return ast_expr_to_ir(fn_value, scope, vc_node)
     is_print_line = callee == "print_line" or callee == "println" or callee == "print"
@@ -1429,6 +1632,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_vec_addi = callee == "vec_addi"
     is_vec_madd = callee == "vec_madd"
     is_par_madd = callee == "par_madd"
+    is_par_run = callee == "par_run"
     is_vec_sub = callee == "vec_sub"
     is_vec_mul = callee == "vec_mul"
     is_vec_dot = callee == "vec_dot"
@@ -1456,6 +1660,13 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_get_int = callee == "get_int"
     is_get_map = callee == "get_map"
     is_get_list = callee == "get_list"
+    # A `Map` holds anything, so `get_list(m, k)` has to pick ONE element type
+    # and it picks `map` — right for the compiler's own AST walking, silently
+    # wrong for a list of texts (`len` on an element became a MAP length: no
+    # error, a wrong number). These say which one you are reading, so the answer
+    # is honest without an annotation. Same lowering, different element type.
+    is_get_text_list = callee == "get_text_list"
+    is_get_int_list = callee == "get_int_list"
     if is_at:
         list_node = at(args, 0)
         idx_node = at(args, 1)
@@ -1497,8 +1708,21 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
         else:
             if is_map_type(arg_type):
-                pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
-                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+                # `dyn` = an element read from an UNANNOTATED `get_list`: taking a
+                # map length here is the documented silent-wrong-answer (it would
+                # read a Text's bytes as a map header). Refuse and point at the fix
+                # — annotating the read. A genuine `Map` (`m: Map`, `size(m)`) is
+                # typed `map`, not `dyn`, so `len(m)` still works.
+                if arg_type == "dyn":
+                    dyn_who = if get(arg_node, "kind") == "Ident" then "`" + get(arg_node, "name") + "`" else "this value"
+                    dyn_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
+                    dyn_col = if has(arg_node, "col") then get_int(arg_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
+                    compile_error("orion: ERROR at {otir_where(dyn_line, dyn_col)} — len({dyn_who}) reads from an untyped map (`get_list` with no annotation), so its element type is unknown — this would take a MAP length even if the value is a Text. Annotate the read: `ys: [Text] = get_list(m, k)` (or `[int]` / `[Map]`)")
+                    pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
+                    result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+                else:
+                    pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
+                    result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
             else:
                 if is_list_type(arg_type):
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
@@ -1510,7 +1734,12 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     # `fn f(s): len(s)` treats `s` as int. Name it and point at
                     # the fix — annotate the param — instead of a cryptic message.
                     len_who = if get(arg_node, "kind") == "Ident" then "`" + get(arg_node, "name") + "`" else "this value"
-                    compile_error("orion: ERROR — len({len_who}) but {len_who} is `{friendly_type(arg_type)}`, not text or a list. If it is an unannotated parameter, add a type (e.g. `s: text` or `s: [int]`) — untyped params default to `int`.")
+                    # Point at the argument (an Ident carries its line/col; the
+                    # bare `len(...)` call node does not). A fuzzer flagged this
+                    # message as UNLOCATED — every diagnostic must name a place.
+                    len_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
+                    len_col = if has(arg_node, "col") then get_int(arg_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
+                    compile_error("orion: ERROR at {otir_where(len_line, len_col)} — len({len_who}) but {len_who} is `{friendly_type(arg_type)}`, not text or a list. If it is an unannotated parameter, add a type (e.g. `s: text` or `s: [int]`) — untyped params default to `int`.")
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
@@ -1636,6 +1865,14 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         k_r = ast_expr_to_ir(b_r.function, b_r.scope, at(args, 2))
         pr = ir_fn_push(k_r.function, ir_par_madd(a_r.id, b_r.id, k_r.id))
         result = ConvResult{function: pr.function, scope: k_r.scope, id: pr.id}
+    if is_par_run:
+        # `par_run(closures, arg)` — run each closure(arg) on a worker thread,
+        # return the sum of results. Real OS-thread parallelism (orion_rt.c),
+        # deterministic. Lowered as a plain call to the runtime symbol.
+        prun_a = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        prun_b = ast_expr_to_ir(prun_a.function, prun_a.scope, at(args, 1))
+        pr = ir_fn_push(prun_b.function, ir_call("orion_par_run", [prun_a.id, prun_b.id], "i64"))
+        result = ConvResult{function: pr.function, scope: prun_b.scope, id: pr.id}
     if is_vec_sub:
         a_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
@@ -1781,14 +2018,19 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "map"))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    if is_get_list:
+    if is_get_list or is_get_text_list or is_get_int_list:
         map_node = at(args, 0)
         key_node = at(args, 1)
         map_r = ast_expr_to_ir(fn_value, scope, map_node)
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
-        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, "list:map"))
+        # Precedence: the named reader says it outright; otherwise a TYPED map
+        # (`Map<[Text]>` -> `map:list:text`) knows; otherwise the historic
+        # default, a list of maps, which is what AST walking wants.
+        gl_declared = extract_map_val(get_value_type(key_r.function, map_r.id))
+        gl_elem = if is_get_text_list then "list:text" else (if is_get_int_list then "list:i64" else (if is_list_type(gl_declared) then gl_declared else "list:dyn"))
+        pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, gl_elem))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_vec_add == false) and (is_vec_addi == false) and (is_vec_madd == false) and (is_par_madd == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
+    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_get_text_list == false) and (is_get_int_list == false) and (is_vec_add == false) and (is_vec_addi == false) and (is_vec_madd == false) and (is_par_madd == false) and (is_par_run == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
     if is_resume:
         # One `resume(v)` — pick the int vs text runtime call from the value's
         # type. (There is intentionally no resume_int / resume_text; one way.)
@@ -1816,7 +2058,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         mut current_fn = fn_value
         mut current_scope = scope
         mut arg_ids = []
-        for arg_index in 0..<total_args:
+        loop arg_index in 0..<total_args:
             arg_node = at(args, arg_index)
             arg_r = ast_expr_to_ir(current_fn, current_scope, arg_node)
             current_fn = arg_r.function
@@ -1839,7 +2081,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     if decl_ck_ca != "" and arg_ck_ca != "" and decl_ck_ca != arg_ck_ca and (not is_unreliable_ptr(current_fn, arg_r.id)):
                         ca_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
                         ca_col = if has(arg_node, "col") then get_int(arg_node, "col") else 0
-                        compile_error("orion: ERROR at line {ca_line}:{ca_col} — argument {arg_index + 1} to `{callee}` is a `{friendly_type(arg_ty_ca)}` but the parameter is declared `{friendly_type(decl_pt_ca)}` (a {arg_ck_ca} where a {decl_ck_ca} was expected)")
+                        compile_error("orion: ERROR at {otir_where(ca_line, ca_col)} — argument {arg_index + 1} to `{callee}` is a `{friendly_type(arg_ty_ca)}` but the parameter is declared `{friendly_type(decl_pt_ca)}` (a {arg_ck_ca} where a {decl_ck_ca} was expected)")
                     # NB an i64-arg -> ptr-param check was TRIED here and REVERTED:
                     # erasure means a real list value can carry the type "i64" (a
                     # list that lost its element type through a dynamic getter or
@@ -1856,7 +2098,15 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             pr = ir_fn_push(current_fn, ir_closure_call(bound_id, arg_ids, "i64"))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
         else:
-            call_ret_type = scope_lookup_fn_ret_loc(scope, callee_g, node)
+            erased_ret_type = scope_lookup_fn_ret_loc(scope, callee_g, node)
+            # Re-type a generic result from the ACTUAL argument types. `[T]` in
+            # a signature is erased to `list:i64` in the body, but at the call
+            # site the argument says what T is, so the result no longer loses
+            # its element type (`at(filter(words, p), 0)` is a text again).
+            mut call_arg_types = slice([""], 0, 0)
+            loop cat_i in 0..<len(arg_ids):
+                call_arg_types = push(call_arg_types, get_value_type(current_fn, at(arg_ids, cat_i)))
+            call_ret_type = otir_call_ret_generic(callee_g, call_arg_types, erased_ret_type)
             arity_key = "otir:arity:" + callee_g
             if slot_has(arity_key):
                 want = slot_get_int(arity_key)
@@ -1864,9 +2114,23 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 if got != want:
                     a_line = if has(node, "line") then get_int(node, "line") else 0
                     a_col = if has(node, "col") then get_int(node, "col") else 0
-                    compile_error("orion: ERROR at line {a_line}:{a_col} — `{callee}` takes {want} argument(s), got {got}")
-            pr = ir_fn_push(current_fn, ir_call(callee_g, arg_ids, call_ret_type))
-            result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+                    compile_error("orion: ERROR at {otir_where(a_line, a_col)} — `{callee}` takes {want} argument(s), got {got}")
+            # The CALLEE's machine signature is the erased one: `[T]` returns a
+            # pointer either way (so the refined `list:text` can be stamped
+            # straight on the call), but a bare `-> T` returns an i64 slot. When
+            # the refinement turns that slot into a pointer type, the call must
+            # keep returning i64 and the POINTER-ness is recovered right after,
+            # the same way a closure capture is re-typed. Emitting the call with
+            # a ptr type instead would contradict the definition and clang
+            # rejects the module ("defined with type i64 but expected ptr").
+            retype_needed = erased_ret_type == "i64" and is_ptr_ir_type(call_ret_type)
+            call_emit_type = if retype_needed then "i64" else call_ret_type
+            pr = ir_fn_push(current_fn, ir_call(callee_g, arg_ids, call_emit_type))
+            if retype_needed:
+                pr_rt = ir_fn_push(pr.function, ir_int_to_ptr(pr.id, call_ret_type))
+                result = ConvResult{function: pr_rt.function, scope: current_scope, id: pr_rt.id}
+            else:
+                result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
     result
 
 fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
@@ -1875,6 +2139,13 @@ fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if op == "not":
         pr = ir_fn_push(operand_r.function, ir_inot(operand_r.id))
         ConvResult{function: pr.function, scope: operand_r.scope, id: pr.id}
+    else if op == "bnot":
+        # `~x` is `x ^ -1`: flip every bit. (`not x` is the LOGICAL one and
+        # coerces to 0/1 — two different operators, and they used to give the
+        # same answer because `~` had no lowering at all.)
+        pr_ones = ir_fn_push(operand_r.function, ir_iconst(0 - 1))
+        pr_x = ir_fn_push(pr_ones.function, ir_bit_xor(operand_r.id, pr_ones.id))
+        ConvResult{function: pr_x.function, scope: operand_r.scope, id: pr_x.id}
     else:
         if op == "neg":
             # -x → 0 - x. Dispatch on the operand type: an f64 operand must
@@ -1912,7 +2183,7 @@ fn ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut current_fn = fn_value
     mut current_scope = scope
     mut item_ids = []
-    for index in 0..<n_items:
+    loop index in 0..<n_items:
         item_node = at(items, index)
         item_r = ast_expr_to_ir(current_fn, current_scope, item_node)
         current_fn = item_r.function
@@ -1932,7 +2203,7 @@ fn ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     # dynamic-storage idiom and int lists never false-positive.
     mut anchor_kind = ""
     mut anchor_type = ""
-    for ck_i in 0..<n_items:
+    loop ck_i in 0..<n_items:
         ck_id = at(item_ids, ck_i)
         if not is_unreliable_ptr(current_fn, ck_id):
             ck_ty = get_value_type(current_fn, ck_id)
@@ -1944,9 +2215,124 @@ fn ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 else if ck_kind != anchor_kind:
                     ll_line = if has(node, "line") then get_int(node, "line") else 0
                     ll_col = if has(node, "col") then get_int(node, "col") else 0
-                    compile_error("orion: ERROR at line {ll_line}:{ll_col} — list literal mixes `{friendly_type(anchor_type)}` and `{friendly_type(ck_ty)}` elements (a list holds one element type: a {ck_kind} where a {anchor_kind} was expected)")
+                    compile_error("orion: ERROR at {otir_where(ll_line, ll_col)} — list literal mixes `{friendly_type(anchor_type)}` and `{friendly_type(ck_ty)}` elements (a list holds one element type: a {ck_kind} where a {anchor_kind} was expected)")
     pr = ir_fn_push(current_fn, ir_list_lit(item_ids, elem_type))
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+
+
+# Lower a nested sub-pattern in a payload slot (`Some(Ok(x))`). `inner_id`
+# holds that slot — itself an enum struct. Test its tag against the
+# sub-variant and, on a match, bind the sub-pattern's names to ITS payload
+# slots (retyped from the inner variant's spec). A failed test falls through
+# to `next_lbl`, the next arm's test — the same shape a guard uses.
+fn otir_lower_nested_pat(fn_value: IRFn, scope: Scope, enc: Text, inner_id: int, inner_type: Text, next_lbl: Text, cont_lbl: Text) -> ConvResult:
+    mut current_fn = fn_value
+    mut current_scope = scope
+    inner_enum = strip_struct_prefix(inner_type)
+    sub_variant = nested_binding_variant(enc)
+    sub_names = nested_binding_names(enc)
+    v_idx = scope_lookup_enum_variant(scope, inner_enum, sub_variant)
+    if v_idx < 0:
+        compile_error("orion: ERROR — nested pattern `{sub_variant}(…)` — `{sub_variant}` is not a variant of `{inner_enum}`")
+    sub_want = variant_payload_count(scope, inner_enum, sub_variant)
+    if len(sub_names) != sub_want:
+        compile_error("orion: ERROR — nested pattern `{sub_variant}` binds {len(sub_names)} value(s) but the variant carries {sub_want}")
+    pr_tag = ir_fn_push(current_fn, ir_field_load(inner_id, 0, "i64"))
+    current_fn = pr_tag.function
+    pr_pat = ir_fn_push(current_fn, ir_iconst(v_idx))
+    current_fn = pr_pat.function
+    pr_eq = ir_fn_push(current_fn, ir_icmp_eq(pr_tag.id, pr_pat.id))
+    current_fn = pr_eq.function
+    pr_br = ir_fn_push(current_fn, ir_br_if(pr_eq.id, cont_lbl, next_lbl))
+    current_fn = pr_br.function
+    pr_lbl = ir_fn_push(current_fn, ir_label(cont_lbl))
+    current_fn = pr_lbl.function
+    sub_types = split_csv(scope_lookup_variant_payloads(scope, inner_enum, sub_variant))
+    n_sub_types = len(sub_types)
+    loop si in 0..<len(sub_names):
+        st = if si < n_sub_types then at(sub_types, si) else "i64"
+        pr_slot = ir_fn_push(current_fn, ir_field_load(inner_id, 1 + si, st))
+        current_fn = pr_slot.function
+        current_scope = scope_bind(current_scope, at(sub_names, si), pr_slot.id)
+    ConvResult{function: current_fn, scope: current_scope, id: inner_id}
+
+
+# Does this arm carry a nested sub-pattern? Such an arm matches only PART of
+# its variant, so it counts toward coverage only together with its siblings.
+fn arm_has_nested(arm: Map) -> bool:
+    binds = if has(arm, "bindings") then get_list(arm, "bindings") else []
+    mut nested = false
+    loop bi in 0..<len(binds):
+        if is_nested_binding(at(binds, bi)):
+            nested = true
+    nested
+
+
+# The sub-variant an arm's single nested slot names (`Some(Ok(x))` -> "Ok").
+# An arm nesting in more than one slot is a conjunction, so it covers nothing
+# on its own — report "" and let it need a sibling or a wildcard.
+fn otir_arm_nested_sub(arm: Map) -> Text:
+    binds = if has(arm, "bindings") then get_list(arm, "bindings") else []
+    mut sub = ""
+    mut count = 0
+    loop bi in 0..<len(binds):
+        if is_nested_binding(at(binds, bi)):
+            count = count + 1
+            sub = nested_binding_variant(at(binds, bi))
+    if count == 1 then sub else ""
+
+
+fn csv_has(csv: Text, name: Text) -> bool:
+    parts = split_csv(csv)
+    mut found = false
+    loop i in 0..<len(parts):
+        if at(parts, i) == name:
+            found = true
+    found
+
+
+# Do these nested sub-variants together cover the payload enum of `variant`?
+# `Some(Ok(x))` + `Some(Bad(m))` covers `Some` because Ok|Bad IS all of Res.
+# Only a single-slot payload whose type is an enum can be covered this way.
+fn otir_subs_cover(scope: Scope, en: Text, variant: Text, subs_seen: Text) -> bool:
+    payloads = split_csv(scope_lookup_variant_payloads(scope, en, variant))
+    mut covers = false
+    if len(payloads) == 1:
+        inner_enum = strip_struct_prefix(at(payloads, 0))
+        inner_csv = enum_variant_csv(scope, inner_enum)
+        inner_names = split_csv(inner_csv)
+        if len(inner_names) > 0:
+            mut all_seen = true
+            loop ii in 0..<len(inner_names):
+                if not csv_has(subs_seen, at(inner_names, ii)):
+                    all_seen = false
+            covers = all_seen
+    covers
+
+
+# How many variants of `en` do these arms cover? A plain variant arm covers
+# its variant outright; nested arms cover theirs only together (see above).
+# Guarded arms cover nothing — their condition can fail at runtime.
+fn otir_covered_variants(scope: Scope, arms: [Map], en: Text) -> int:
+    v_names = split_csv(enum_variant_csv(scope, en))
+    mut covered = 0
+    loop vi in 0..<len(v_names):
+        vn = at(v_names, vi)
+        mut full = false
+        mut subs_seen = ""
+        loop ai in 0..<len(arms):
+            arm = at(arms, ai)
+            arm_hits = get(arm, "pat_kind") == "ident" and get(arm, "pattern") == vn and not has(arm, "guard")
+            if arm_hits and arm_has_nested(arm):
+                sub_here = otir_arm_nested_sub(arm)
+                subs_seen = "{subs_seen},{sub_here}"
+            if arm_hits and not arm_has_nested(arm):
+                full = true
+        if not full:
+            full = otir_subs_cover(scope, en, vn, subs_seen)
+        if full:
+            covered = covered + 1
+    covered
 
 
 # `match scrutinee: <pattern> -> <body>, ..., _ -> <default>`
@@ -1978,7 +2364,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     # guessing i64. Fallback: first-arm Str heuristic, then i64.
     mut result_type = "i64"
     mut probed = false
-    for pai in 0..<n_arms:
+    loop pai in 0..<n_arms:
         arm_probe = at(arms, pai)
         if get(arm_probe, "pat_kind") == "ident" and get(arm_probe, "pattern") == "_" and not probed:
             wc_r = ast_expr_to_ir(scrut_r.function, scrut_r.scope, get(arm_probe, "body"))
@@ -2006,23 +2392,43 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             mut fa_enum = ""
             if first_pk == "ident" and first_pat != "_":
                 n_enums_p = len(scope.en_names)
-                for ei in 0..<n_enums_p:
+                loop ei in 0..<n_enums_p:
                     en_name_p = at(scope.en_names, ei)
                     if not contains_dollar(en_name_p):
                         if scope_lookup_enum_variant(scope, en_name_p, first_pat) >= 0 and fa_enum == "":
                             fa_enum = en_name_p
-            if fa_enum != "" and len(first_binds) > 0:
+            # A tuple pattern binds fields 0..n from the scrutinee's tuple spec.
+            # Typing them from the spec (not an i64 dummy) is what lets a body
+            # like `(n, s) -> n + len(s)` probe at all: with the dummy, `len(s)`
+            # saw an int and aborted the whole compile from inside the probe.
+            fa_is_tuple = first_pk == "tuple" and len(first_binds) > 0
+            if fa_is_tuple:
+                tup_parts_p = parse_data_spec(scope_lookup_data_spec(scope, strip_struct_prefix(scrut_type)))
+                loop tbi in 0..<len(first_binds):
+                    tt_p = field_type_at(tup_parts_p, tbi)
+                    pr_tf = ir_fn_push(probe_fn, ir_field_load(scrut_id, tbi, tt_p))
+                    probe_fn = pr_tf.function
+                    probe_scope = scope_bind(probe_scope, at(first_binds, tbi), pr_tf.id)
+            if fa_enum != "" and len(first_binds) > 0 and not fa_is_tuple:
                 payload_types_p = split_csv(scope_lookup_variant_payloads(scope, fa_enum, first_pat))
                 n_pt_p = len(payload_types_p)
-                for bpi in 0..<len(first_binds):
+                loop bpi in 0..<len(first_binds):
                     bt_p = if bpi < n_pt_p then at(payload_types_p, bpi) else "i64"
                     pr_pl = ir_fn_push(probe_fn, ir_field_load(scrut_id, 1 + bpi, bt_p))
                     probe_fn = pr_pl.function
-                    probe_scope = scope_bind(probe_scope, at(first_binds, bpi), pr_pl.id)
-            else:
+                    # Nested slot: bind the SUB-names (typed), not the slot —
+                    # a body like `Some(Ok(x)) -> x` names `x`, never the slot.
+                    # The probe's emissions (branches included) are sliced away.
+                    if is_nested_binding(at(first_binds, bpi)):
+                        np_r = otir_lower_nested_pat(probe_fn, probe_scope, at(first_binds, bpi), pr_pl.id, bt_p, "probe_next", "probe_cont{bpi}")
+                        probe_fn = np_r.function
+                        probe_scope = np_r.scope
+                    else:
+                        probe_scope = scope_bind(probe_scope, at(first_binds, bpi), pr_pl.id)
+            if fa_enum == "" and not fa_is_tuple:
                 pr_dummy = ir_fn_push(probe_fn, ir_iconst(0))
                 probe_fn = pr_dummy.function
-                for bpi in 0..<len(first_binds):
+                loop bpi in 0..<len(first_binds):
                     probe_scope = scope_bind(probe_scope, at(first_binds, bpi), pr_dummy.id)
             fa_r = ast_expr_to_ir(probe_fn, probe_scope, get(first_arm, "body"))
             if fa_r.id >= 0:
@@ -2043,41 +2449,51 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut has_wildcard = false
     mut matched_count = 0
     mut matched_enum = ""
-    for chk_idx in 0..<n_arms:
+    loop chk_idx in 0..<n_arms:
         chk_arm = at(arms, chk_idx)
         chk_pk = get(chk_arm, "pat_kind")
         chk_pv = get(chk_arm, "pattern")
-        if chk_pk == "ident" and chk_pv == "_":
+        chk_guarded = has(chk_arm, "guard")
+        if chk_pk == "ident" and chk_pv == "_" and not chk_guarded:
             has_wildcard = true
-        if chk_pk == "ident" and chk_pv != "_":
+        if chk_pk == "ident" and chk_pv != "_" and not chk_guarded:
             n_enums_chk = len(scope.en_names)
-            for ei in 0..<n_enums_chk:
+            mut chk_is_variant = false
+            loop ei in 0..<n_enums_chk:
                 en_name_chk = at(scope.en_names, ei)
                 v_idx_chk = scope_lookup_enum_variant(scope, en_name_chk, chk_pv)
                 if v_idx_chk >= 0:
                     matched_count = matched_count + 1
                     matched_enum = en_name_chk
+                    chk_is_variant = true
+            # A non-variant bare ident is a binding pattern — covers everything.
+            if not chk_is_variant:
+                has_wildcard = true
     if not has_wildcard and matched_enum != "":
         # Look up total variants for this enum (CSV — comma count + 1).
         en_total = len(scope.en_names)
         mut total_variants = 0
-        for ei2 in 0..<en_total:
+        loop ei2 in 0..<en_total:
             if at(scope.en_names, ei2) == matched_enum:
                 csv = at(scope.en_variants, ei2)
                 csv_bytes = bytes_from_text(csv)
                 total_variants = 1
                 csv_len = len(csv_bytes)
-                for ci in 0..<csv_len:
+                loop ci in 0..<csv_len:
                     if at(csv_bytes, ci) == 44:
                         total_variants = total_variants + 1
-        if matched_count < total_variants:
+        # Real coverage, not an arm count: nested arms cover their variant only
+        # together (`Some(Ok(x))` + `Some(Bad(m))` covers `Some`), and two arms
+        # naming the SAME variant must not count twice.
+        covered_variants = otir_covered_variants(scope, arms, matched_enum)
+        if covered_variants < total_variants:
             mline = if has(node, "line") then get_int(node, "line") else 0
             mcol = if has(node, "col") then get_int(node, "col") else 0
-            missing = total_variants - matched_count
-            compile_error("orion: ERROR at line {mline}:{mcol} — non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
+            missing = total_variants - covered_variants
+            compile_error("orion: ERROR at {otir_where(mline, mcol)} — non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
 
     mut arm_index = 0
-    for arm_idx in 0..<n_arms:
+    loop arm_idx in 0..<n_arms:
         arm = at(arms, arm_idx)
         pat_kind = get(arm, "pat_kind")
         pat_value = get(arm, "pattern")
@@ -2086,6 +2502,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
         body_lbl = "match_{n}_arm_{arm_index}_body"
         next_lbl = "match_{n}_arm_{arm_index}_next"
+        guard_lbl = "match_{n}_arm_{arm_index}_guard"
         arm_index = arm_index + 1
 
         # Flat dispatch — deep nested if/else inside this for-loop
@@ -2102,7 +2519,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if (not is_wildcard) and pat_kind == "ident":
             # Try every enum looking for this variant name.
             n_enums = len(scope.en_names)
-            for ei in 0..<n_enums:
+            loop ei in 0..<n_enums:
                 en_name = at(scope.en_names, ei)
                 if not contains_dollar(en_name):
                     v_idx = scope_lookup_enum_variant(scope, en_name, pat_value)
@@ -2110,6 +2527,12 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                         variant_idx = v_idx
                         variant_enum = en_name
         is_variant = variant_idx >= 0
+        # A non-`_`, non-variant ident pattern is a BINDING pattern: it matches
+        # anything (irrefutable) and binds the whole scrutinee to that name.
+        # This is what makes a guard on a scalar work: `x if x > 0 -> ...`.
+        is_binding_pat = (not is_wildcard) and pat_kind == "ident" and (not is_variant)
+        # A tuple pattern `(a, b) -> ...` is irrefutable and binds each field.
+        is_tuple_pat_arm = pat_kind == "tuple"
 
         # Phase 1: emit pat (skip for wildcard).
         do_int_pat = (not is_wildcard) and pat_kind == "int"
@@ -2129,13 +2552,20 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_fn = pr_pat.function
             pat_id = pr_pat.id
 
-        # Phase 2: emit icmp + branch (skip for wildcard).
-        do_cmp = not is_wildcard
+        # Phase 2: emit icmp + branch (skip for wildcard, binding, and tuple
+        # patterns — all irrefutable).
+        do_cmp = (not is_wildcard) and (not is_binding_pat) and (not is_tuple_pat_arm)
+        # A PLAIN enum (no variant carries a payload) lowers to a bare integer
+        # tag — `Color.Red` IS 0, there is no struct. Reading field 0 off it
+        # dereferences the tag as a pointer (tag 2 -> address 0x2), which is why
+        # `match` on such an enum segfaulted. Compare the value itself instead.
+        # A TAGGED union really is a struct, so it keeps the tag load.
+        do_tagged_variant = do_variant_pat and enum_has_payloads(scope, variant_enum)
         do_text_cmp = do_cmp and scrut_type == "text" and not do_variant_pat
-        do_int_cmp = do_cmp and scrut_type != "text" and not do_variant_pat
+        do_int_cmp = do_cmp and scrut_type != "text" and not do_tagged_variant
         # Variant: load scrut.tag (field 0) then compare.
         mut eq_id = 0 - 1
-        if do_variant_pat:
+        if do_tagged_variant:
             pr_load_tag = ir_fn_push(current_fn, ir_field_load(scrut_id, 0, "i64"))
             current_fn = pr_load_tag.function
             pr_eq = ir_fn_push(current_fn, ir_icmp_eq(pr_load_tag.id, pat_id))
@@ -2170,12 +2600,45 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             payload_csv = scope_lookup_variant_payloads(scope, variant_enum, pat_value)
             payload_types = split_csv(payload_csv)
             n_payload_types = len(payload_types)
-            for abi in 0..<n_arm_bindings:
+            loop abi in 0..<n_arm_bindings:
                 bind_name = at(bindings, abi)
                 bind_type = if abi < n_payload_types then at(payload_types, abi) else "i64"
                 pr_load_val = ir_fn_push(current_fn, ir_field_load(scrut_id, 1 + abi, bind_type))
                 current_fn = pr_load_val.function
-                body_scope = scope_bind(body_scope, bind_name, pr_load_val.id)
+                # A nested sub-pattern tests the slot's own tag and binds its
+                # names; a plain slot just binds the whole payload.
+                if is_nested_binding(bind_name):
+                    nest_r = otir_lower_nested_pat(current_fn, body_scope, bind_name, pr_load_val.id, bind_type, next_lbl, "{body_lbl}_nest{abi}")
+                    current_fn = nest_r.function
+                    body_scope = nest_r.scope
+                else:
+                    body_scope = scope_bind(body_scope, bind_name, pr_load_val.id)
+
+        # A binding pattern (`x -> ...`) binds the whole scrutinee.
+        if is_binding_pat:
+            body_scope = scope_bind(body_scope, pat_value, scrut_id)
+        # A tuple pattern (`(a, b) -> ...`) binds each field. Reuse the proven
+        # field-access path: bind the scrutinee to a temp, then lower `temp._i`
+        # per binding (so each field keeps its real type from the tuple spec).
+        if is_tuple_pat_arm:
+            body_scope = scope_bind(body_scope, "__tup_scrut", scrut_id)
+            loop tpi in 0..<n_arm_bindings:
+                tf_node = {"kind": "Field", "object": {"kind": "Ident", "name": "__tup_scrut"}, "field": "_{tpi}"}
+                tf_r = ast_expr_to_ir(current_fn, body_scope, tf_node)
+                current_fn = tf_r.function
+                body_scope = scope_bind(tf_r.scope, at(bindings, tpi), tf_r.id)
+
+        # Phase 2c: guard. `Pattern if COND -> body` matches only when COND is
+        # also true (evaluated with the arm's bindings in scope). A failed guard
+        # falls through to the next arm's test.
+        if has(arm, "guard"):
+            guard_r = ast_expr_to_ir(current_fn, body_scope, get(arm, "guard"))
+            current_fn = guard_r.function
+            body_scope = guard_r.scope
+            pr_gbr = ir_fn_push(current_fn, ir_br_if(guard_r.id, guard_lbl, next_lbl))
+            current_fn = pr_gbr.function
+            pr_glbl = ir_fn_push(current_fn, ir_label(guard_lbl))
+            current_fn = pr_glbl.function
 
         # Phase 3: body — emit for both wildcard and pattern arms.
         arm_before = len(body_scope.names)
@@ -2184,13 +2647,32 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         current_fn = body_r.function
         # Arm-locals (payload binds included) die with the arm.
         current_scope = scope_truncate(body_r.scope, arm_start_names)
-        pr_store = ir_fn_push(current_fn, ir_store(result_ptr_id, body_r.id))
-        current_fn = pr_store.function
-        pr_br_end = ir_fn_push(current_fn, ir_br(end_lbl))
-        current_fn = pr_br_end.function
+        # A diverging arm (break/continue/return) already branched away, so its
+        # block is terminated and `body_r.id` is not a real value. Storing it or
+        # branching to `end` after a terminator was the bug that crashed on
+        # `_ -> break` inside a loop. Only store + branch for arms that fall off
+        # the end normally.
+        # An arm can also produce NO VALUE without diverging: a body block whose
+        # last statement is a statement-form `if` (or a loop) yields id -1. That
+        # is what `if let P(x) = e:` desugars to when its body is an `if` block,
+        # and storing -1 walked the instruction list backwards:
+        # "list index -1 out of range". Store a zero for the value the arm does
+        # not have, so the match still has a defined result.
+        if is_block_terminated(current_fn) == 0:
+            mut arm_value_id = body_r.id
+            if arm_value_id < 0:
+                pr_void = ir_fn_push(current_fn, ir_iconst(0))
+                current_fn = pr_void.function
+                arm_value_id = pr_void.id
+            pr_store = ir_fn_push(current_fn, ir_store(result_ptr_id, arm_value_id))
+            current_fn = pr_store.function
+            pr_br_end = ir_fn_push(current_fn, ir_br(end_lbl))
+            current_fn = pr_br_end.function
 
-        # Phase 4: next-arm-test label (skip for wildcard).
-        if do_cmp:
+        # Phase 4: next-arm-test label. Emitted for a compared arm, and also
+        # for a guarded arm (a failed guard branches here) even if it's a
+        # wildcard that otherwise skips the compare.
+        if do_cmp or has(arm, "guard"):
             pr_next_lbl = ir_fn_push(current_fn, ir_label(next_lbl))
             current_fn = pr_next_lbl.function
 
@@ -2208,6 +2690,28 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     ConvResult{function: pr_load.function, scope: scrut_r.scope, id: pr_load.id}
 
 
+# `(a, b, ...)` — a tuple. Lower each element (once), then build an anonymous
+# struct whose shape is derived from the element IR types. Because the fields
+# carry their real per-slot types, a heterogeneous tuple like `(1, "hi")` keeps
+# `_0` as int and `_1` as text (unlike the old homogeneous list lowering).
+fn ast_tuple_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    items = get_list(node, "items")
+    n_items = len(items)
+    mut current_fn = fn_value
+    mut current_scope = scope
+    mut item_ids = []
+    elem_types = slice([""], 0, 0)
+    mut elem_type_list = elem_types
+    loop ti in 0..<n_items:
+        it_r = ast_expr_to_ir(current_fn, current_scope, at(items, ti))
+        current_fn = it_r.function
+        current_scope = it_r.scope
+        item_ids = push(item_ids, it_r.id)
+        elem_type_list = push(elem_type_list, get_value_type(current_fn, it_r.id))
+    tup_name = otir_tuple_register(elem_type_list)
+    pr = ir_fn_push(current_fn, ir_struct_cons(tup_name, n_items, item_ids))
+    ConvResult{function: pr.function, scope: current_scope, id: pr.id}
+
 fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     struct_name = get(node, "name")
     fields = get_list(node, "fields")
@@ -2215,7 +2719,7 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if spec == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion: ERROR at line {line}:{col} — unknown data type `{struct_name}`")
+        compile_error("orion: ERROR at {otir_where(line, col)} — unknown data type `{struct_name}`")
     parts = parse_data_spec(spec)
     n_fields_decl = len(parts)
     n_provided = len(fields)
@@ -2223,7 +2727,7 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut current_fn = fn_value
     mut current_scope = scope
     mut value_ids = []
-    for di in 0..<n_fields_decl:
+    loop di in 0..<n_fields_decl:
         decl_part = at(parts, di)
         # The field's IR type (the spec stores ast_type_to_ir output, so this is
         # "struct:X"/"text"/"list:T"/"i64" - ready for concrete_ptr_kind).
@@ -2232,7 +2736,7 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         mut decl_name = ""
         mut found_colon = 0
         decl_bs_n = len(decl_bs)
-        for ci in 0..<decl_bs_n:
+        loop ci in 0..<decl_bs_n:
             b = at(decl_bs, ci)
             if found_colon == 0:
                 if b == 58:
@@ -2242,7 +2746,7 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     decl_name = "{decl_name}{single}"
         # Search provided fields for decl_name.
         mut matched_id = 0 - 1
-        for pi in 0..<n_provided:
+        loop pi in 0..<n_provided:
             prov = at(fields, pi)
             if get(prov, "name") == decl_name and matched_id == (0 - 1):
                 val_r = ast_expr_to_ir(current_fn, current_scope, get(prov, "value"))
@@ -2260,12 +2764,20 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 if fld_decl_k != "" and fld_val_k != "" and fld_decl_k != fld_val_k and (not is_unreliable_ptr(current_fn, matched_id)):
                     fc_line = if has(prov, "line") then get_int(prov, "line") else (if has(node, "line") then get_int(node, "line") else 0)
                     fc_col = if has(prov, "col") then get_int(prov, "col") else 0
-                    compile_error("orion: ERROR at line {fc_line}:{fc_col} — field `{decl_name}` of `{struct_name}` is declared `{friendly_type(decl_field_type)}` but got a `{friendly_type(fld_val_ty)}` (a {fld_val_k} where a {fld_decl_k} was expected)")
+                    compile_error("orion: ERROR at {otir_where(fc_line, fc_col)} — field `{decl_name}` of `{struct_name}` is declared `{friendly_type(decl_field_type)}` but got a `{friendly_type(fld_val_ty)}` (a {fld_val_k} where a {fld_decl_k} was expected)")
         if matched_id == (0 - 1):
-            # Field missing — default to 0
-            pr_default = ir_fn_push(current_fn, ir_iconst(0))
-            current_fn = pr_default.function
-            matched_id = pr_default.id
+            # Field not written explicitly. With `{..source, ...}` read it from
+            # the spread source (`source.field`); otherwise default to 0.
+            if has(node, "spread"):
+                sp_field_node = {"kind": "Field", "object": get(node, "spread"), "field": decl_name}
+                sp_r = ast_expr_to_ir(current_fn, current_scope, sp_field_node)
+                current_fn = sp_r.function
+                current_scope = sp_r.scope
+                matched_id = sp_r.id
+            else:
+                pr_default = ir_fn_push(current_fn, ir_iconst(0))
+                current_fn = pr_default.function
+                matched_id = pr_default.id
         value_ids = push(value_ids, matched_id)
     pr = ir_fn_push(current_fn, ir_struct_cons(struct_name, n_fields_decl, value_ids))
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
@@ -2283,9 +2795,30 @@ fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         obj_name = get(obj_node, "name")
         var_idx = scope_lookup_enum_variant(scope, obj_name, field_name)
         if var_idx >= 0:
-            pr = ir_fn_push(fn_value, ir_iconst(var_idx))
             handled_enum = true
-            enum_result = ConvResult{function: pr.function, scope: scope, id: pr.id}
+            if enum_has_payloads(scope, obj_name):
+                # Tagged union: `EnumName.Variant` used as a VALUE (no `(...)`)
+                # builds the full struct (tag + zeroed payload slots), typed
+                # struct:Enum — exactly like the `Variant(args)` MethodCall path.
+                # Emitting a bare tag int here was the bug that made `Opt.None`
+                # type as `int` and clash with `Opt.Some`.
+                ev_want = variant_payload_count(scope, obj_name, field_name)
+                if ev_want > 0:
+                    ev_line = if has(node, "line") then get_int(node, "line") else 0
+                    ev_col = if has(node, "col") then get_int(node, "col") else 0
+                    compile_error("orion: ERROR at {otir_where(ev_line, ev_col)} — variant `{field_name}` takes {ev_want} value(s), got 0 (add `(...)`)")
+                ev_spec = scope_lookup_data_spec(scope, obj_name)
+                ev_slots = count_spec_fields(ev_spec) - 1
+                mut ev_fields = [{"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(var_idx)}}]
+                loop evi in 0..<ev_slots:
+                    ev_fields = push(ev_fields, {"name": "p{evi}", "value": {"kind": "Int", "value": "0"}})
+                ev_cons = {"kind": "StructCons", "name": obj_name, "fields": ev_fields}
+                enum_result = ast_struct_cons_to_ir(fn_value, scope, ev_cons)
+            else:
+                # Plain enumeration (all zero-payload): the variant IS its
+                # integer tag, usable in arithmetic (`Color.Red + Color.Blue`).
+                pr = ir_fn_push(fn_value, ir_iconst(var_idx))
+                enum_result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     mut result = enum_result
     if not handled_enum:
         obj_r = ast_expr_to_ir(fn_value, scope, obj_node)
@@ -2294,7 +2827,7 @@ fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         obj_bytes = bytes_from_text(obj_type)
         n = len(obj_bytes)
         mut past_colon = 0
-        for ci in 0..<n:
+        loop ci in 0..<n:
             b = at(obj_bytes, ci)
             if past_colon == 1:
                 single = bytes_to_text([b])
@@ -2309,7 +2842,7 @@ fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if field_idx < 0:
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at line {line}:{col} — `{struct_name}` has no field `{field_name}`")
+            compile_error("orion: ERROR at {otir_where(line, col)} — `{struct_name}` has no field `{field_name}`")
         pr_load = ir_fn_push(obj_r.function, ir_field_load(obj_r.id, field_idx, field_type))
         result = ConvResult{function: pr_load.function, scope: obj_r.scope, id: pr_load.id}
     result
@@ -2321,7 +2854,7 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     mut current_fn = fn_value
     mut current_scope = scope
     mut pair_ids = []
-    for index in 0..<n_pairs:
+    loop index in 0..<n_pairs:
         pair = at(pairs, index)
         key_text = get(pair, "key")
         val_node = get(pair, "value")
@@ -2381,6 +2914,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_if = kind == "If"
     is_unary = kind == "Unary"
     is_list_lit = kind == "ListLit"
+    is_tuple = kind == "Tuple"
     is_map_lit = kind == "MapLit"
     is_match = kind == "Match"
     is_struct_cons = kind == "StructCons"
@@ -2403,7 +2937,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         mut mc_fn = fn_value
         mut mc_scope = scope
         mut mc_cap_ids = slice([0], 0, 0)
-        for mci in 0..<len(mc_caps):
+        loop mci in 0..<len(mc_caps):
             mc_cap_r = ast_expr_to_ir(mc_fn, mc_scope, at(mc_caps, mci))
             mc_fn = mc_cap_r.function
             mc_scope = mc_cap_r.scope
@@ -2421,6 +2955,8 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         result = ast_str_to_ir(fn_value, scope, node)
     if is_list_lit:
         result = ast_list_lit_to_ir(fn_value, scope, node)
+    if is_tuple:
+        result = ast_tuple_to_ir(fn_value, scope, node)
     if is_map_lit:
         result = ast_map_lit_to_ir(fn_value, scope, node)
     if is_match:
@@ -2467,24 +3003,35 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             if ec_got != ec_want:
                 ec_line = if has(node, "line") then get_int(node, "line") else 0
                 ec_col = if has(node, "col") then get_int(node, "col") else 0
-                compile_error("orion: ERROR at line {ec_line}:{ec_col} — variant `{method}` takes {ec_want} value(s), got {ec_got}")
-            # Positional payload slots: arg i → field p{i}. Unused slots
-            # up to the enum's synthesized width pad with zero (the width
-            # comes from the registered ds spec's field count - 1).
-            spec = scope_lookup_data_spec(scope, enum_name)
-            n_slots = count_spec_fields(spec) - 1
-            zero_int = {"kind": "Int", "value": "0"}
-            mut cons_fields = [{"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(variant_idx)}}]
-            n_cargs = len(m_args)
-            for pfi in 0..<n_slots:
-                pf_val = if pfi < n_cargs then at(m_args, pfi) else zero_int
-                cons_fields = push(cons_fields, {"name": "p{pfi}", "value": pf_val})
-            cons_node = {"kind": "StructCons", "name": enum_name, "fields": cons_fields}
-            result = ast_struct_cons_to_ir(fn_value, scope, cons_node)
+                compile_error("orion: ERROR at {otir_where(ec_line, ec_col)} — variant `{method}` takes {ec_want} value(s), got {ec_got}")
+            # A PLAIN enum (no variant carries a payload) IS its tag int — that
+            # is what `Enum.Variant` lowers to in ast_field_to_ir. This path is
+            # also where a BARE variant ident lands (`ORI` desugars to a
+            # zero-arg `Seam.ORI` method call), and it used to build a struct
+            # regardless, so the two spellings of one value had two different
+            # runtime representations: a struct here, an int there. Emit the tag.
+            ec_plain = not enum_has_payloads(scope, enum_name)
+            if ec_plain:
+                pr_tag = ir_fn_push(fn_value, ir_iconst(variant_idx))
+                result = ConvResult{function: pr_tag.function, scope: scope, id: pr_tag.id}
+            if not ec_plain:
+                # Positional payload slots: arg i → field p{i}. Unused slots
+                # up to the enum's synthesized width pad with zero (the width
+                # comes from the registered ds spec's field count - 1).
+                spec = scope_lookup_data_spec(scope, enum_name)
+                n_slots = count_spec_fields(spec) - 1
+                zero_int = {"kind": "Int", "value": "0"}
+                mut cons_fields = [{"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(variant_idx)}}]
+                n_cargs = len(m_args)
+                loop pfi in 0..<n_slots:
+                    pf_val = if pfi < n_cargs then at(m_args, pfi) else zero_int
+                    cons_fields = push(cons_fields, {"name": "p{pfi}", "value": pf_val})
+                cons_node = {"kind": "StructCons", "name": enum_name, "fields": cons_fields}
+                result = ast_struct_cons_to_ir(fn_value, scope, cons_node)
         else:
             mut new_args_list = [receiver]
             n_m_args = len(m_args)
-            for ami in 0..<n_m_args:
+            loop ami in 0..<n_m_args:
                 new_args_list = push(new_args_list, at(m_args, ami))
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
@@ -2548,25 +3095,22 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         n_pa = len(perf_args)
         mut cur_fn = fn_value
         mut cur_scope = scope
-        # For MVP: single i64 arg. If 0 args we synthesize 0; if multiple
-        # we use the first and drop the rest (TODO: multi-arg perform).
-        mut arg_id = 0 - 1
-        if n_pa == 0:
-            pr_zero = ir_fn_push(cur_fn, ir_iconst(0))
-            cur_fn = pr_zero.function
-            arg_id = pr_zero.id
-        if n_pa > 0:
-            arg_node = at(perf_args, 0)
+        # EVERY argument is lowered and passed. This used to keep the first and
+        # evaluate-then-drop the rest, so `perform Math.add(40, 2)` handed the
+        # handler one argument and read register garbage for the other: it
+        # returned 248 instead of 42, with no error.
+        mut perf_arg_ids = slice([0], 0, 0)
+        loop pi in 0..<n_pa:
+            arg_node = at(perf_args, pi)
             arg_r = ast_expr_to_ir(cur_fn, cur_scope, arg_node)
             cur_fn = arg_r.function
             cur_scope = arg_r.scope
-            arg_id = arg_r.id
-        # Evaluate (and drop) any extra args for side effects.
-        for pi in 1..<n_pa:
-            extra_node = at(perf_args, pi)
-            extra_r = ast_expr_to_ir(cur_fn, cur_scope, extra_node)
-            cur_fn = extra_r.function
-            cur_scope = extra_r.scope
+            perf_arg_ids = push(perf_arg_ids, arg_r.id)
+        # The runtime casts the handler to one of five arities (0..4).
+        if n_pa > 4:
+            pf_line = if has(node, "line") then get_int(node, "line") else 0
+            pf_col = if has(node, "col") then get_int(node, "col") else 0
+            compile_error("orion: ERROR at {otir_where(pf_line, pf_col)} — `perform {effect_name}.{op_name}` passes {n_pa} arguments; an effect operation takes at most 4")
         # Pick perform_int vs perform_text based on handler's return type.
         # Defaults to int when the handler isn't declared (compile error
         # will surface elsewhere).
@@ -2575,18 +3119,45 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         # resolves, or a private handler is emitted mangled and never found.
         handler_g = otir_resolve(handler_name)
         handler_ret = scope_lookup_fn_ret_loc(cur_scope, handler_g, node)
+        # Arity against the HANDLER's declared parameters. A mismatch is the
+        # same silent-garbage class as above (the handler reads a parameter that
+        # was never passed), and the registry is already there for calls.
+        pf_arity_key = "otir:arity:" + handler_g
+        if slot_has(pf_arity_key):
+            pf_want = slot_get_int(pf_arity_key)
+            if n_pa != pf_want:
+                pfa_line = if has(node, "line") then get_int(node, "line") else 0
+                pfa_col = if has(node, "col") then get_int(node, "col") else 0
+                compile_error("orion: ERROR at {otir_where(pfa_line, pfa_col)} — `{effect_name}.{op_name}` is handled with {pf_want} parameter(s), got {n_pa}")
         use_text = handler_ret == "text"
         if use_text:
-            pr_perf = ir_fn_push(cur_fn, ir_perform_text(handler_g, arg_id))
+            pr_perf = ir_fn_push(cur_fn, ir_perform_text(handler_g, perf_arg_ids))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
         else:
-            pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_g, arg_id))
+            pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_g, perf_arg_ids))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
-    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
+    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_tuple or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion: ERROR at line {line}:{col} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
+        # A parser `Error` node means the token was not the start of anything the
+        # language has. Say WHICH token: "unhandled AST node kind `Error`" named
+        # a compiler internal, so `x |> f` and `|x| x + 1` (neither is Orion
+        # syntax) both reported the same thing, at line 0:0.
+        found = if has(node, "found") then get(node, "found") else ""
+        # A parser Error may carry its own explanation (`why`); that is more
+        # specific than the generic "not valid here" and wins.
+        why = if has(node, "why") then get(node, "why") else ""
+        if kind == "Error" and why != "":
+            compile_error("orion: ERROR at {otir_where(line, col)} — {why}")
+        if kind == "Error" and why == "":
+            # The hint has to fit the token. Naming the pipe and the lambda for
+            # every unexpected byte (a stray `:`, say) is noise that sends the
+            # reader looking in the wrong place.
+            hint = if found == "|" then " (Orion has one lambda form, `fn(x): body`, and no pipe operator)" else (if found == ":" then " (a match arm is `Pattern -> value`; `:` opens a block after `if`/`loop`/`fn`)" else "")
+            compile_error("orion: ERROR at {otir_where(line, col)} — `{found}` is not valid here, an expression was expected{hint}")
+        if kind != "Error":
+            compile_error("orion: ERROR at {otir_where(line, col)} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
         pr_fallback = ir_fn_push(fn_value, ir_iconst(0))
         result = ConvResult{function: pr_fallback.function, scope: scope, id: pr_fallback.id}
     result
@@ -2639,10 +3210,129 @@ fn extract_list_elem(type_text: Text) -> Text:
         "i64"
     else:
         mut result = ""
-        for ci in 5..<n:
+        loop ci in 5..<n:
             single = bytes_to_text([at(bs, ci)])
             result = "{result}{single}"
         result
+
+# ---- generic call-site instantiation (types only) ---------------------
+#
+# Generics are ERASED: inside `fn filter<T>(xs: [T], pred: fn) -> [T]` the type
+# var lowers to an i64 slot, and the declared return `[T]` lowers with it. So a
+# call site got `list:i64` back and every element read out of the result was an
+# int: `at(filter(words, p), 0)` produced an int where the text was, and `len`
+# on it failed. Erasure is right for CODE (one body serves every T), but the
+# call site knows more than the body does: it can see the actual argument types.
+#
+# So: bind each type var by matching the DECLARED source types against the
+# ACTUAL argument IR types, then re-type the call's result. Types only, no new
+# code and no new syntax - the runtime representation is unchanged (a list of
+# text pointers and a list of ints are both i64 slots), this just stops the
+# compiler from forgetting which one it is.
+#
+# Source types are recorded as text by the signature pass: "T", "[T]", "int".
+
+# Render an AST type node the way the instantiation matcher reads it.
+fn type_src_text(type_node: Map) -> Text:
+    kind = get(type_node, "kind")
+    if kind == "List":
+        inner = type_src_text(get(type_node, "elem"))
+        "[{inner}]"
+    else:
+        if kind == "Named":
+            get(type_node, "name")
+        else:
+            ""
+
+# Index of `name` in the type-var list, or -1.
+fn tv_slot(gens: [Text], name: Text) -> int:
+    mut found = 0 - 1
+    loop i in 0..<len(gens):
+        if at(gens, i) == name:
+            found = i
+    found
+
+# "[X]" -> "X"; anything else -> "".
+fn strip_brackets(s: Text) -> Text:
+    bs = bytes_from_text(s)
+    n = len(bs)
+    mut wrapped = false
+    if n >= 3:
+        if at(bs, 0) == 91 and at(bs, n - 1) == 93:
+            wrapped = true
+    if not wrapped:
+        ""
+    else:
+        mut inner = ""
+        loop ci in 1..<(n - 1):
+            inner = inner + bytes_to_text([at(bs, ci)])
+        inner
+
+# Match one declared source type against one actual IR type, binding type vars.
+# `binds` is parallel to `gens`; "" means still unbound. First binding wins.
+fn tv_unify(src: Text, actual: Text, gens: [Text], binds: [Text]) -> [Text]:
+    mut out = binds
+    inner_src = strip_brackets(src)
+    if inner_src != "":
+        # `[X]` against `list:E` - recurse on the element.
+        if is_list_type(actual):
+            out = tv_unify(inner_src, extract_list_elem(actual), gens, out)
+    else:
+        slot = tv_slot(gens, src)
+        if slot >= 0:
+            if at(out, slot) == "":
+                out = set(out, slot, actual)
+    out
+
+# Substitute bound type vars into a declared source type, producing an IR type.
+# "" means "nothing to substitute" - the caller keeps the erased type.
+fn tv_subst(src: Text, gens: [Text], binds: [Text]) -> Text:
+    inner_src = strip_brackets(src)
+    if inner_src != "":
+        inner_ir = tv_subst(inner_src, gens, binds)
+        if inner_ir == "":
+            ""
+        else:
+            "list:{inner_ir}"
+    else:
+        slot = tv_slot(gens, src)
+        if slot < 0:
+            ""
+        else:
+            at(binds, slot)
+
+# Is this IR type pointer-shaped in the emitted module? (An i64 slot holding a
+# refined pointer type needs an explicit re-type; a refined `int`/`f64` does not
+# and must not get one.)
+fn is_ptr_ir_type(t: Text) -> bool:
+    if t == "text" or t == "fn":
+        true
+    else:
+        if is_list_type(t) or is_map_type(t):
+            true
+        else:
+            strip_struct_prefix(t) != t
+
+# The result type of a call to a generic fn, given the actual argument types.
+# Returns the erased type unchanged for a non-generic callee, for a return type
+# that names no type var, or when the arguments do not pin the var down.
+fn otir_call_ret_generic(fn_name: Text, arg_types: [Text], erased_ret: Text) -> Text:
+    gen_key = "otir:gen:" + fn_name
+    ret_key = "otir:rsrc:" + fn_name
+    mut out = erased_ret
+    if slot_has(gen_key) and slot_has(ret_key):
+        gens = split_csv(slot_get(gen_key))
+        mut binds = slice([""], 0, 0)
+        loop gi in 0..<len(gens):
+            binds = push(binds, "")
+        loop ai in 0..<len(arg_types):
+            p_key = "otir:psrc:" + fn_name + ":{ai}"
+            if slot_has(p_key):
+                binds = tv_unify(slot_get(p_key), at(arg_types, ai), gens, binds)
+        instantiated = tv_subst(slot_get(ret_key), gens, binds)
+        if instantiated != "":
+            out = instantiated
+    out
 
 # The concrete pointer SHAPE for the return-type guard: "text", "list" or
 # "struct", or "" for a WILDCARD kind (map, fn, int, float, generic/unknown)
@@ -2689,7 +3379,14 @@ fn is_unreliable_ptr(fn_value: IRFn, value_id: int) -> bool:
 
 # True for `map` or a value-typed `map:<T>`.
 fn is_map_type(type_text: Text) -> bool:
-    if type_text == "map":
+    # `dyn` is the element type of an UNANNOTATED `get_list(m, k)`: the map is
+    # dynamic, so the compiler cannot know what its values are. It behaves like
+    # `map` everywhere (so reading it back as a map still works, and the whole
+    # AST-walking machinery is untouched) EXCEPT that `len` on it refuses rather
+    # than silently doing a MAP length on what might be a text — the one place
+    # the ambiguity produces a wrong answer. Annotating the read (`ys: [Text] =
+    # get_list(m, k)`) resolves it.
+    if type_text == "map" or type_text == "dyn":
         true
     else:
         bs = bytes_from_text(type_text)
@@ -2712,13 +3409,30 @@ fn extract_map_val(type_text: Text) -> Text:
         "text"
     else:
         mut result = ""
-        for ci in 4..<n:
+        loop ci in 4..<n:
             single = bytes_to_text([at(bs, ci)])
             result = "{result}{single}"
         result
 
 # Render an internal type name in the user's terms for error messages:
 # i64 -> int, f64 -> float, list:T -> [T], struct:Foo -> Foo, void -> nothing.
+# `prog__broken` -> `broken`. Function names are mangled with their orb so two
+# orbs can each keep a private helper of the same name; that prefix is the
+# compiler's business, and printing it in a diagnostic shows the reader a name
+# that appears nowhere in their file.
+fn friendly_fn_name(n: Text) -> Text:
+    b = bytes_from_text(n)
+    total = len(b)
+    mut cut = 0
+    loop i in 0..<total:
+        if i + 1 < total:
+            if at(b, i) == 95 and at(b, i + 1) == 95:
+                cut = i + 2
+    if cut == 0:
+        n
+    else:
+        bytes_to_text(bytes_slice(b, cut, total))
+
 fn friendly_type(t: Text) -> Text:
     if t == "i64":
         "int"
@@ -2740,7 +3454,7 @@ fn friendly_type(t: Text) -> Text:
                 is_struct = true
         if is_struct:
             mut r = ""
-            for fi in 7..<fn2:
+            loop fi in 7..<fn2:
                 # Temp var, NOT `[at(fb, fi)]` inline: a list literal inside a
                 # `{...}` interpolation trips older self-host compilers during
                 # bootstrap (the interpolation splitter mis-tokenizes the `[`
@@ -2759,6 +3473,19 @@ fn ast_type_to_ir(type_node: Map) -> Text:
     # key is a null ptr natively, and strcmp(null) segfaults.
     if kind == "Range":
         return "i64"
+    # `fn(T) -> R` — a spelled-out function type. Erases to the same "fn"
+    # ptr as a bare `fn`; the signature lives in the AST for typeck only.
+    if kind == "FnType":
+        return "fn"
+    # `(A, B, ...)` — a tuple type. Same synthesized anon-struct as the tuple
+    # literal, so `(int, Text)` and `(1, "hi")` share a representation.
+    if kind == "TupleType":
+        tt_elems = get_list(type_node, "elems")
+        tt_types = slice([""], 0, 0)
+        mut tt_type_list = tt_types
+        loop tti in 0..<len(tt_elems):
+            tt_type_list = push(tt_type_list, ast_type_to_ir(at(tt_elems, tti)))
+        return "struct:{otir_tuple_register(tt_type_list)}"
     if not has(type_node, "name"):
         if kind != "List":
             return "i64"
@@ -2768,11 +3495,26 @@ fn ast_type_to_ir(type_node: Map) -> Text:
         "list:{elem}"
     else:
         name = get(type_node, "name")
+        # Generic type variable (`T` in `type Result<T, E>: ...`) lowers to an
+        # opaque pointer-sized slot (i64), same as fn generics. Registered via
+        # the tvgen counter (see otir_bind_tyvars).
+        tv_gen_nc = slot_int_or_zero("otir:tvgen")
+        if tv_gen_nc > 0 and slot_int_or_zero(otir_k1("tv", name)) == tv_gen_nc:
+            return "i64"
         if name == "Text" or name == "text":
             "text"
         else:
             if name == "Map" or name == "map":
-                "map"
+                # `Map<T>` — the VALUE type, carried as `map:T`. A bare `Map`
+                # holds anything, which is why reading out of one had to guess
+                # (and guessed `map`, so a text element got a map's length). The
+                # IR already understood `map:T` and `get` already read it; there
+                # was just no way to SAY it in source.
+                m_args = if has(type_node, "args") then get_list(type_node, "args") else []
+                if len(m_args) == 1:
+                    "map:{ast_type_to_ir(at(m_args, 0))}"
+                else:
+                    "map"
             else if name == "List" or name == "list":
                 "list"
             else:
@@ -2803,6 +3545,15 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
     # Same Range/missing-name guards as ast_type_to_ir.
     if kind == "Range":
         return "i64"
+    if kind == "FnType":
+        return "fn"
+    if kind == "TupleType":
+        tt_elems = get_list(type_node, "elems")
+        tt_types = slice([""], 0, 0)
+        mut tt_type_list = tt_types
+        loop tti in 0..<len(tt_elems):
+            tt_type_list = push(tt_type_list, ast_type_to_ir_with_scope(at(tt_elems, tti), scope))
+        return "struct:{otir_tuple_register(tt_type_list)}"
     if not has(type_node, "name"):
         if kind != "List":
             return "i64"
@@ -2813,11 +3564,29 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
         "list:{elem_type}"
     else:
         name = get(type_node, "name")
+        # A generic type variable (`T` in `fn first<T>(...)`) lowers to an
+        # opaque pointer-sized slot (i64). Registered per-fn via a generation
+        # counter (see ast_fn_to_ir) so a stale `T` from an earlier fn can't
+        # match here. Checked before the struct fallback, which would otherwise
+        # turn a capitalised `T` into `struct:T`.
+        tv_generation = slot_int_or_zero("otir:tvgen")
+        if tv_generation > 0 and slot_int_or_zero(otir_k1("tv", name)) == tv_generation:
+            return "i64"
+        # A `type Name = T` alias (registered in ast_program_to_ir's pre-pass)
+        # resolves to its target's IR type string.
+        alias_key = otir_k1("tyalias", name)
+        if slot_has(alias_key):
+            return slot_get(alias_key)
         if name == "Text" or name == "text":
             "text"
         else:
             if name == "Map" or name == "map":
-                "map"
+                # `Map<T>` -> `map:T`, the value type. See ast_type_to_ir.
+                ms_args = if has(type_node, "args") then get_list(type_node, "args") else []
+                if len(ms_args) == 1:
+                    "map:{ast_type_to_ir_with_scope(at(ms_args, 0), scope)}"
+                else:
+                    "map"
             else if name == "List" or name == "list":
                 "list"
             else:
@@ -2830,7 +3599,7 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
                         ds_names = scope.ds_names
                         n_structs = len(ds_names)
                         mut is_struct = false
-                        for si in 0..<n_structs:
+                        loop si in 0..<n_structs:
                             if at(ds_names, si) == name:
                                 is_struct = true
                         if is_struct then "struct:{name}" else "i64"
@@ -2838,13 +3607,27 @@ fn ast_type_to_ir_with_scope(type_node: Map, scope: Scope) -> Text:
 
 pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
     name = get(ast_fn, "name")
+    # Where this fn was declared, for the whole-program checks below. Without it
+    # they printed a message with nothing to point at.
+    fn_at_line = if has(ast_fn, "line") then get_int(ast_fn, "line") else 0
+    fn_at_col = if has(ast_fn, "col") then get_int(ast_fn, "col") else 0
+    # Register this fn's generic type variables so `T`/`U` in the signature
+    # and body lower to opaque i64 slots (operation-passing generics) rather
+    # than being mistaken for struct types. A per-fn generation stamp means a
+    # previous fn's `T` never leaks into this one. See the type-var check in
+    # ast_type_to_ir_with_scope.
+    tv_gen = slot_int_or_zero("otir:tvgen") + 1
+    slot_set("otir:tvgen", tv_gen)
+    fn_generics = if has(ast_fn, "generics") then get_list(ast_fn, "generics") else []
+    loop gi in 0..<len(fn_generics):
+        slot_set(otir_k1("tv", at(fn_generics, gi)), tv_gen)
     ret_type_node = get(ast_fn, "ret")
     ret_type = ast_type_to_ir_with_scope(ret_type_node, initial_scope)
     mut fn_value = ir_fn_new(name, ret_type)
     params = get_list(ast_fn, "params")
     n_params = len(params)
     mut scope = initial_scope
-    for index in 0..<n_params:
+    loop index in 0..<n_params:
         param = at(params, index)
         param_name = get(param, "name")
         param_type_node = get(param, "type")
@@ -2861,7 +3644,7 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
     # are a separate ExternFn node and never reach here; short-form `= expr`
     # fns carry a one-statement block, so neither is affected.
     if get(body, "kind") == "Block" and len(get_list(body, "stmts")) == 0:
-        compile_error("orion: ERROR — function `{name}` has an empty body (add a body, or check for a keyword used as a variable name)")
+        compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} — function `{friendly_fn_name(name)}` has an empty body (add a body, or check for a keyword used as a variable name)")
     body_result = ast_expr_to_ir(fn_value, scope, body)
     # Return-type guard: the tail expression's storage shape (i64 vs pointer)
     # must match the declared return type. Catches `fn f() -> int: "hello"`
@@ -2879,7 +3662,7 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         rt_decl_ll = if ret_type == "i64" then "i64" else "ptr"
         rt_body_ll = if rt_body == "i64" then "i64" else "ptr"
         if (not rt_exempt) and rt_decl_ll != rt_body_ll:
-            compile_error("orion: ERROR — function `{name}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}`")
+            compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} — function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}`")
         # Sharpened guard: among POINTER shapes, catch confusing two concrete
         # kinds (text/list/struct). `map`/`fn`/generic stay wildcards (kind ""),
         # the deliberate dynamic escape. And we SKIP bodies whose type is
@@ -2891,208 +3674,294 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         body_kind = concrete_ptr_kind(rt_body)
         body_unreliable = is_unreliable_ptr(body_result.function, body_result.id)
         if (not rt_exempt) and (not body_unreliable) and decl_kind != "" and body_kind != "" and decl_kind != body_kind:
-            compile_error("orion: ERROR — function `{name}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}` (a {body_kind} where a {decl_kind} was declared)")
+            compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} — function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}` (a {body_kind} where a {decl_kind} was declared)")
         ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
         ret_result.function
     else:
         body_result.function
 
 
-# ---- `fact` inlining (reactive derived bindings) ---------------------
-# `fact name = expr` re-evaluates `expr` on EVERY read. We lower it by
-# INLINING: each later reference to `name` is replaced by the defining
-# expression, so the value is recomputed at each use site — exactly the
-# re-evaluate-on-read semantics. The Fact stmt itself emits no code.
+# ---- `defer` as an AST rewrite ---------------------------------------
 #
-# Substituted subtrees are ALIASED, not deep-copied: lowering treats the
-# AST as read-only, and emitting the same subtree at N read sites is the
-# intended N-times re-evaluation (linear in read count). `fact` bodies are
-# "one thought per line", so nesting blow-up stays negligible in practice.
+# `defer E` runs E at the end of its block, and before ANY `return` that leaves
+# it, in LIFO order. The lowering collected Defer statements inside the function
+# body's statement loop and replayed them there, which covered the block end and
+# a top-level return — but a `return` inside an `if` or a loop is lowered by its
+# own nested statement loop, which knew nothing about the outer list. So
 #
-# The whole pass is gated behind fact_block_has() so it is a strict no-op
-# on fact-free code (the entire compiler bundle + existing tests) — the AST
-# comes through byte-identical, which keeps self-bootstrap safe.
+#     fn f(x: int) -> int:
+#         defer cleanup()
+#         if x > 0:
+#             return 1        # cleanup() never ran
+#
+# skipped the deferred call silently. Doing it as an AST rewrite instead means
+# the nested `return` is right there in the tree: every return gets the visible
+# defers spliced in ahead of it, innermost first, and each block ends with its
+# own. Nothing is left for the lowering to special-case.
 
-fn fact_find(names: [Text], target: Text) -> int:
+fn defer_concat(a: [Map], b: [Map]) -> [Map]:
+    mut out = slice(a, 0, len(a))
+    loop i in 0..<len(b):
+        out = push(out, at(b, i))
+    out
+
+# Append `items` in REVERSE as plain expression statements: last registered runs
+# first, which is what LIFO means for a defer.
+fn defer_append_reverse(out: [Map], items: [Map]) -> [Map]:
+    mut acc = out
+    n = len(items)
+    loop i in 0..<n:
+        acc = push(acc, {"kind": "ExprStmt", "expr": at(items, n - 1 - i)})
+    acc
+
+fn defer_rewrite_else(node: Map, visible: [Map]) -> Map:
+    kind = get(node, "kind")
+    if kind == "Block":
+        defer_rewrite_block(node, visible)
+    else:
+        if kind == "IfBlock":
+            defer_rewrite_stmt(node, visible)
+        else:
+            node
+
+fn defer_rewrite_stmt(s: Map, visible: [Map]) -> Map:
+    kind = get(s, "kind")
+    mut out = s
+    if kind == "IfBlock":
+        out = set(out, "then", defer_rewrite_block(get(s, "then"), visible))
+        out = set(out, "else", defer_rewrite_else(get(s, "else"), visible))
+    if kind == "Loop" or kind == "ForRange" or kind == "ForIn":
+        out = set(out, "body", defer_rewrite_block(get(s, "body"), visible))
+    if kind == "Match":
+        arms = get_list(s, "arms")
+        mut new_arms = slice(arms, 0, 0)
+        loop ai in 0..<len(arms):
+            arm = at(arms, ai)
+            body = get_map(arm, "body")
+            new_body = if get(body, "kind") == "Block" then defer_rewrite_block(body, visible) else body
+            new_arms = push(new_arms, set(arm, "body", new_body))
+        out = set(out, "arms", new_arms)
+    out
+
+# A fresh name per splice site, so nesting cannot shadow.
+fn defer_tmp_name() -> Text:
+    n = slot_int_or_zero(otir_k1("defret", "n"))
+    slot_set(otir_k1("defret", "n"), n + 1)
+    "__defer_v{n}"
+
+fn defer_rewrite_block(block: Map, inherited: [Map]) -> Map:
+    stmts = get_list(block, "stmts")
+    n = len(stmts)
+    mut mine = slice(stmts, 0, 0)
+    mut out = slice(stmts, 0, 0)
+    loop i in 0..<n:
+        s = at(stmts, i)
+        k = get(s, "kind")
+        if k == "Defer":
+            mine = push(mine, get_map(s, "expr"))
+        else:
+            visible = defer_concat(inherited, mine)
+            is_last = i == n - 1
+            # The RETURN VALUE is computed first, then the defers run, then the
+            # saved value is returned. `defer close(f)` before `return read(f)`
+            # must not close the handle the return expression is about to read —
+            # splicing the defers ahead of the return did exactly that.
+            if k == "Return" and len(visible) > 0:
+                tmp = defer_tmp_name()
+                out = push(out, {"kind": "LetOrAssign", "name": tmp, "value": get_map(s, "expr")})
+                out = defer_append_reverse(out, visible)
+                out = push(out, {"kind": "Return", "expr": {"kind": "Ident", "name": tmp}})
+            else:
+                # The last expression of a block IS its value, so the same
+                # save-then-run applies at the block end: appending the defers
+                # after it would make a deferred call the block's value.
+                if k == "ExprStmt" and is_last and len(mine) > 0:
+                    tmp2 = defer_tmp_name()
+                    out = push(out, {"kind": "LetOrAssign", "name": tmp2, "value": get_map(s, "expr")})
+                    out = defer_append_reverse(out, mine)
+                    out = push(out, {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": tmp2}})
+                else:
+                    out = push(out, defer_rewrite_stmt(s, visible))
+    # Only if the value-preserving path above did not already do it: a block that
+    # does not end in an expression just runs its defers last.
+    tail_kind = if n > 0 then get(at(stmts, n - 1), "kind") else ""
+    already = tail_kind == "ExprStmt" and len(mine) > 0
+    defer_out = if already then out else defer_append_reverse(out, mine)
+    set(block, "stmts", defer_out)
+
+# True if any statement anywhere under this block is a `defer` (gate the pass so
+# a defer-free program's AST comes through untouched).
+fn defer_block_has(block: Map) -> bool:
+    stmts = get_list(block, "stmts")
+    mut found = false
+    loop i in 0..<len(stmts):
+        s = at(stmts, i)
+        k = get(s, "kind")
+        if k == "Defer":
+            found = true
+        if k == "IfBlock":
+            if defer_block_has(get(s, "then")):
+                found = true
+            if get(get(s, "else"), "kind") == "Block":
+                if defer_block_has(get_map(s, "else")):
+                    found = true
+        if k == "Loop" or k == "ForRange" or k == "ForIn":
+            if defer_block_has(get(s, "body")):
+                found = true
+    found
+
+# ---- name substitution over an AST subtree ---------------------------
+# Replace every READ of a name with a given expression node, everywhere a name
+# can be read (expressions, call args, list items, map pairs, match arms, loop
+# headers, nested blocks). One user today: the `const` pass, which substitutes
+# each constant's defining expression at its read sites and then drops the
+# declarations.
+#
+# Substituted subtrees are ALIASED, not deep-copied: lowering treats the AST as
+# read-only, and emitting the same subtree at N read sites is intended (a
+# constant's expression is folded per use).
+#
+# (These were the `fact_rw_*` helpers, named after the reactive `fact` binding
+# they were written for. That keyword is gone; the mechanism is not.)
+
+fn subst_find(names: [Text], target: Text) -> int:
     mut found = 0 - 1
     n = len(names)
-    for i in 0..<n:
+    loop i in 0..<n:
         if at(names, i) == target:
             found = i
     found
 
 # Rewrite a list of expression nodes (call args, list items, ...).
-fn fact_rw_list(items: [Map], names: [Text], exprs: [Map]) -> [Map]:
+fn subst_list(items: [Map], names: [Text], exprs: [Map]) -> [Map]:
     mut out = slice(items, 0, 0)
     n = len(items)
-    for i in 0..<n:
-        out = push(out, fact_rw_expr(at(items, i), names, exprs))
+    loop i in 0..<n:
+        out = push(out, subst_expr(at(items, i), names, exprs))
     out
 
 # Rewrite the `value` field of each entry (MapLit pairs, StructCons fields).
-fn fact_rw_pairs(pairs: [Map], names: [Text], exprs: [Map]) -> [Map]:
+fn subst_pairs(pairs: [Map], names: [Text], exprs: [Map]) -> [Map]:
     mut out = slice(pairs, 0, 0)
     n = len(pairs)
-    for i in 0..<n:
+    loop i in 0..<n:
         p = at(pairs, i)
-        out = push(out, set(p, "value", fact_rw_expr(get(p, "value"), names, exprs)))
+        out = push(out, set(p, "value", subst_expr(get(p, "value"), names, exprs)))
     out
 
 # Rewrite the `body` expression of each match arm.
-fn fact_rw_arms(arms: [Map], names: [Text], exprs: [Map]) -> [Map]:
+fn subst_arms(arms: [Map], names: [Text], exprs: [Map]) -> [Map]:
     mut out = slice(arms, 0, 0)
     n = len(arms)
-    for i in 0..<n:
+    loop i in 0..<n:
         a = at(arms, i)
-        out = push(out, set(a, "body", fact_rw_expr(get(a, "body"), names, exprs)))
+        out = push(out, set(a, "body", subst_expr(get(a, "body"), names, exprs)))
     out
 
 # Rewrite one expression node: substitute fact idents, recurse into children.
-fn fact_rw_expr(node: Map, names: [Text], exprs: [Map]) -> Map:
+fn subst_expr(node: Map, names: [Text], exprs: [Map]) -> Map:
     kind = get(node, "kind")
     mut out = node
     if kind == "Ident":
-        idx = fact_find(names, get(node, "name"))
+        idx = subst_find(names, get(node, "name"))
         if idx >= 0:
             out = at(exprs, idx)
     if kind == "Binary":
-        out = set(out, "left", fact_rw_expr(get(node, "left"), names, exprs))
-        out = set(out, "right", fact_rw_expr(get(node, "right"), names, exprs))
+        out = set(out, "left", subst_expr(get(node, "left"), names, exprs))
+        out = set(out, "right", subst_expr(get(node, "right"), names, exprs))
     if kind == "Unary":
-        out = set(out, "operand", fact_rw_expr(get(node, "operand"), names, exprs))
+        out = set(out, "operand", subst_expr(get(node, "operand"), names, exprs))
     if kind == "Call":
-        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+        out = set(out, "args", subst_list(get_list(node, "args"), names, exprs))
     if kind == "Perform":
-        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+        out = set(out, "args", subst_list(get_list(node, "args"), names, exprs))
     if kind == "MethodCall":
-        out = set(out, "receiver", fact_rw_expr(get(node, "receiver"), names, exprs))
-        out = set(out, "args", fact_rw_list(get_list(node, "args"), names, exprs))
+        out = set(out, "receiver", subst_expr(get(node, "receiver"), names, exprs))
+        out = set(out, "args", subst_list(get_list(node, "args"), names, exprs))
     if kind == "Field":
-        out = set(out, "object", fact_rw_expr(get(node, "object"), names, exprs))
+        out = set(out, "object", subst_expr(get(node, "object"), names, exprs))
     if kind == "Index":
-        out = set(out, "object", fact_rw_expr(get(node, "object"), names, exprs))
-        out = set(out, "index", fact_rw_expr(get(node, "index"), names, exprs))
+        out = set(out, "object", subst_expr(get(node, "object"), names, exprs))
+        out = set(out, "index", subst_expr(get(node, "index"), names, exprs))
     if kind == "Question":
-        out = set(out, "inner", fact_rw_expr(get(node, "inner"), names, exprs))
+        out = set(out, "inner", subst_expr(get(node, "inner"), names, exprs))
     if kind == "If":
-        out = set(out, "cond", fact_rw_expr(get(node, "cond"), names, exprs))
-        out = set(out, "then", fact_rw_expr(get(node, "then"), names, exprs))
-        out = set(out, "else", fact_rw_expr(get(node, "else"), names, exprs))
+        out = set(out, "cond", subst_expr(get(node, "cond"), names, exprs))
+        out = set(out, "then", subst_expr(get(node, "then"), names, exprs))
+        out = set(out, "else", subst_expr(get(node, "else"), names, exprs))
     if kind == "ListLit":
-        out = set(out, "items", fact_rw_list(get_list(node, "items"), names, exprs))
+        out = set(out, "items", subst_list(get_list(node, "items"), names, exprs))
+    if kind == "Tuple":
+        out = set(out, "items", subst_list(get_list(node, "items"), names, exprs))
     if kind == "NamedArg":
-        out = set(out, "value", fact_rw_expr(get(node, "value"), names, exprs))
+        out = set(out, "value", subst_expr(get(node, "value"), names, exprs))
     if kind == "MapLit":
-        out = set(out, "pairs", fact_rw_pairs(get_list(node, "pairs"), names, exprs))
+        out = set(out, "pairs", subst_pairs(get_list(node, "pairs"), names, exprs))
     if kind == "StructCons":
-        out = set(out, "fields", fact_rw_pairs(get_list(node, "fields"), names, exprs))
+        out = set(out, "fields", subst_pairs(get_list(node, "fields"), names, exprs))
     if kind == "Match":
-        out = set(out, "scrutinee", fact_rw_expr(get(node, "scrutinee"), names, exprs))
-        out = set(out, "arms", fact_rw_arms(get_list(node, "arms"), names, exprs))
+        out = set(out, "scrutinee", subst_expr(get(node, "scrutinee"), names, exprs))
+        out = set(out, "arms", subst_arms(get_list(node, "arms"), names, exprs))
     out
 
 # An IfBlock's else is either a Block or a chained IfBlock (else-if ladder).
-fn fact_rw_else(node: Map, names: [Text], exprs: [Map]) -> Map:
+fn subst_else(node: Map, names: [Text], exprs: [Map]) -> Map:
     kind = get(node, "kind")
     mut out = node
     if kind == "Block":
-        out = fact_rw_block(node, names, exprs)
+        out = subst_block(node, names, exprs)
     if kind == "IfBlock":
-        out = fact_rw_stmt(node, names, exprs)
+        out = subst_stmt(node, names, exprs)
     out
 
 # Rewrite one statement: fix up its expression fields + nested blocks.
-fn fact_rw_stmt(s: Map, names: [Text], exprs: [Map]) -> Map:
+fn subst_stmt(s: Map, names: [Text], exprs: [Map]) -> Map:
     kind = get(s, "kind")
     mut out = s
     if kind == "MutLet":
-        out = set(out, "value", fact_rw_expr(get(s, "value"), names, exprs))
+        out = set(out, "value", subst_expr(get(s, "value"), names, exprs))
     if kind == "LetOrAssign":
-        out = set(out, "value", fact_rw_expr(get(s, "value"), names, exprs))
+        out = set(out, "value", subst_expr(get(s, "value"), names, exprs))
     if kind == "ExprStmt":
-        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+        out = set(out, "expr", subst_expr(get(s, "expr"), names, exprs))
     if kind == "Return":
-        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+        out = set(out, "expr", subst_expr(get(s, "expr"), names, exprs))
     if kind == "Require":
-        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+        out = set(out, "expr", subst_expr(get(s, "expr"), names, exprs))
     if kind == "Ensure":
-        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+        out = set(out, "expr", subst_expr(get(s, "expr"), names, exprs))
     if kind == "Defer":
-        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
-    if kind == "Destroy":
-        out = set(out, "expr", fact_rw_expr(get(s, "expr"), names, exprs))
+        out = set(out, "expr", subst_expr(get(s, "expr"), names, exprs))
+    # (A `Destroy` branch used to sit here. The parser emits no such statement —
+    # `destroy` was an ECS word that never had syntax — so it was unreachable.
+    # Found by diffing the kinds this file HANDLES against the kinds the parser
+    # EMITS, which is the same check that found `defer` had gone missing.)
     if kind == "Loop":
-        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+        out = set(out, "body", subst_block(get(s, "body"), names, exprs))
     if kind == "ForRange":
-        out = set(out, "low", fact_rw_expr(get(s, "low"), names, exprs))
-        out = set(out, "high", fact_rw_expr(get(s, "high"), names, exprs))
-        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+        out = set(out, "low", subst_expr(get(s, "low"), names, exprs))
+        out = set(out, "high", subst_expr(get(s, "high"), names, exprs))
+        out = set(out, "body", subst_block(get(s, "body"), names, exprs))
     if kind == "ForIn":
-        out = set(out, "iter", fact_rw_expr(get(s, "iter"), names, exprs))
-        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
-    if kind == "ForWith":
-        out = set(out, "body", fact_rw_block(get(s, "body"), names, exprs))
+        out = set(out, "iter", subst_expr(get(s, "iter"), names, exprs))
+        out = set(out, "body", subst_block(get(s, "body"), names, exprs))
     if kind == "IfBlock":
-        out = set(out, "cond", fact_rw_expr(get(s, "cond"), names, exprs))
-        out = set(out, "then", fact_rw_block(get(s, "then"), names, exprs))
-        out = set(out, "else", fact_rw_else(get(s, "else"), names, exprs))
+        out = set(out, "cond", subst_expr(get(s, "cond"), names, exprs))
+        out = set(out, "then", subst_block(get(s, "then"), names, exprs))
+        out = set(out, "else", subst_else(get(s, "else"), names, exprs))
     if kind == "Match":
-        out = set(out, "scrutinee", fact_rw_expr(get(s, "scrutinee"), names, exprs))
-        out = set(out, "arms", fact_rw_arms(get(s, "arms"), names, exprs))
+        out = set(out, "scrutinee", subst_expr(get(s, "scrutinee"), names, exprs))
+        out = set(out, "arms", subst_arms(get(s, "arms"), names, exprs))
     out
 
-# Rewrite a Block. Facts declared in it extend the binding env for the
-# statements that follow (and for nested blocks); the Fact stmt is dropped.
-fn fact_rw_block(block: Map, names: [Text], exprs: [Map]) -> Map:
+# Rewrite every statement in a Block.
+fn subst_block(block: Map, names: [Text], exprs: [Map]) -> Map:
     stmts = get_list(block, "stmts")
     n = len(stmts)
     mut out = slice(stmts, 0, 0)
-    mut cur_names = names
-    mut cur_exprs = exprs
-    for i in 0..<n:
-        s = at(stmts, i)
-        if get(s, "kind") == "Fact":
-            rhs = fact_rw_expr(get(s, "value"), cur_names, cur_exprs)
-            cur_names = push(cur_names, get(s, "name"))
-            cur_exprs = push(cur_exprs, rhs)
-        else:
-            out = push(out, fact_rw_stmt(s, cur_names, cur_exprs))
+    loop i in 0..<n:
+        out = push(out, subst_stmt(at(stmts, i), names, exprs))
     set(block, "stmts", out)
-
-# Does this else-node (Block or ladder IfBlock) contain any `fact`?
-fn fact_else_has(node: Map) -> bool:
-    kind = get(node, "kind")
-    mut found = false
-    if kind == "Block":
-        if fact_block_has(node):
-            found = true
-    if kind == "IfBlock":
-        if fact_block_has(get(node, "then")):
-            found = true
-        if fact_else_has(get(node, "else")):
-            found = true
-    found
-
-# Recursively: does this block (or a nested block) declare any `fact`?
-# Gates the whole pass so fact-free programs are untouched.
-fn fact_block_has(block: Map) -> bool:
-    stmts = get_list(block, "stmts")
-    n = len(stmts)
-    mut found = false
-    for i in 0..<n:
-        s = at(stmts, i)
-        k = get(s, "kind")
-        if k == "Fact":
-            found = true
-        if k == "Loop" or k == "ForRange" or k == "ForIn" or k == "ForWith":
-            if fact_block_has(get(s, "body")):
-                found = true
-        if k == "IfBlock":
-            if fact_block_has(get(s, "then")):
-                found = true
-            if fact_else_has(get(s, "else")):
-                found = true
-    found
 
 
 
@@ -3103,13 +3972,23 @@ fn fact_block_has(block: Map) -> bool:
 # never collides with the main lift's `__lambda`), and only walks the node
 # kinds a call-arg lambda actually reaches.
 
-fn nlam_capture_scan(lam_body: Map, lam_params: [Text]) -> [Text]:
-    n_lp = len(lam_params)
-    init_work = [lam_body]
+fn nlam_names_has(names: [Text], name: Text) -> bool:
+    mut found = false
+    loop i in 0..<len(names):
+        if at(names, i) == name:
+            found = true
+    found
+
+
+# Every Ident an EXPRESSION reads that `bound` does not already cover. This
+# is the whole capture set for an expression-bodied lambda, and the
+# per-statement half of the block walk below. A nested Lambda is NOT
+# descended into — its own lift computes its captures.
+fn nlam_expr_caps(node: Map, bound: [Text], caps: [Text]) -> [Text]:
+    init_work = [node]
     mut worklist = init_work
-    mut caps = slice([""], 0, 0)
-    mut seen_caps = slice([""], 0, 0)
-    for:
+    mut out = caps
+    loop:
         w_n = len(worklist)
         if w_n == 0:
             break
@@ -3118,17 +3997,8 @@ fn nlam_capture_scan(lam_body: Map, lam_params: [Text]) -> [Text]:
         ck = get(cur, "kind")
         if ck == "Ident":
             cn = get(cur, "name")
-            mut is_param = false
-            for lp_w in 0..<n_lp:
-                if at(lam_params, lp_w) == cn:
-                    is_param = true
-            mut already = false
-            for sc in 0..<len(seen_caps):
-                if at(seen_caps, sc) == cn:
-                    already = true
-            if not is_param and not already:
-                caps = push(caps, cn)
-                seen_caps = push(seen_caps, cn)
+            if not nlam_names_has(bound, cn) and not nlam_names_has(out, cn):
+                out = push(out, cn)
         if ck == "Binary":
             worklist = push(worklist, get(cur, "left"))
             worklist = push(worklist, get(cur, "right"))
@@ -3136,13 +4006,116 @@ fn nlam_capture_scan(lam_body: Map, lam_params: [Text]) -> [Text]:
             worklist = push(worklist, get(cur, "operand"))
         if ck == "Call":
             call_args = get_list(cur, "args")
-            for cai in 0..<len(call_args):
+            loop cai in 0..<len(call_args):
                 worklist = push(worklist, at(call_args, cai))
         if ck == "If":
             worklist = push(worklist, get(cur, "cond"))
             worklist = push(worklist, get(cur, "then"))
             worklist = push(worklist, get(cur, "else"))
+        # Without these, a capture hiding behind a field access, an index, or
+        # a method call reads as a free variable and the closure breaks.
+        if ck == "Field":
+            worklist = push(worklist, get(cur, "object"))
+        if ck == "Index":
+            worklist = push(worklist, get(cur, "object"))
+            worklist = push(worklist, get(cur, "index"))
+        if ck == "MethodCall":
+            worklist = push(worklist, get(cur, "receiver"))
+            mc_args = get_list(cur, "args")
+            loop mci in 0..<len(mc_args):
+                worklist = push(worklist, at(mc_args, mci))
+        if ck == "ListLit" or ck == "Tuple":
+            l_items = get_list(cur, "items")
+            loop li in 0..<len(l_items):
+                worklist = push(worklist, at(l_items, li))
+        if ck == "MapLit":
+            m_pairs = get_list(cur, "pairs")
+            loop mpi in 0..<len(m_pairs):
+                worklist = push(worklist, get(at(m_pairs, mpi), "value"))
+        if ck == "StructCons":
+            s_fields = get_list(cur, "fields")
+            loop sfi in 0..<len(s_fields):
+                worklist = push(worklist, get(at(s_fields, sfi), "value"))
+        if ck == "Question":
+            worklist = push(worklist, get(cur, "inner"))
+        if ck == "Block":
+            blk_r = nlam_block_caps(cur, bound, out)
+            out = get_list(blk_r, "caps")
+        if ck == "Match":
+            worklist = push(worklist, get(cur, "scrutinee"))
+            ms_arms = get_list(cur, "arms")
+            loop mai in 0..<len(ms_arms):
+                m_arm = at(ms_arms, mai)
+                mut arm_bound = bound
+                arm_binds = if has(m_arm, "bindings") then get_list(m_arm, "bindings") else []
+                loop abi in 0..<len(arm_binds):
+                    arm_bound = push(arm_bound, at(arm_binds, abi))
+                out = nlam_expr_caps(get(m_arm, "body"), arm_bound, out)
+    out
+
+
+# A BLOCK body (what `loop parallel:` hands a lambda) walked IN ORDER: a name
+# is a capture when it is read before the block binds it. `xs[i] = v`
+# desugars to `xs = set(xs, i, v)`, so the read on the right makes `xs` a
+# capture even though the statement also binds that name — which is exactly
+# what lets a parallel body write into a shared list. A name the block binds
+# first (`total = 0`) is a local, so it is not captured.
+fn nlam_block_caps(block: Map, bound: [Text], caps: [Text]) -> Map:
+    stmts = get_list(block, "stmts")
+    mut b = bound
+    mut c = caps
+    loop si in 0..<len(stmts):
+        st = at(stmts, si)
+        sk = get(st, "kind")
+        if sk == "MutLet" or sk == "LetOrAssign":
+            c = nlam_expr_caps(get(st, "value"), b, c)
+            b = push(b, get(st, "name"))
+        if sk == "ExprStmt" or sk == "Return" or sk == "Require" or sk == "Ensure" or sk == "Defer":
+            c = nlam_expr_caps(get(st, "expr"), b, c)
+        if sk == "If" or sk == "Match":
+            c = nlam_expr_caps(st, b, c)
+        if sk == "IfBlock":
+            c = nlam_expr_caps(get(st, "cond"), b, c)
+            then_r = nlam_block_caps(get(st, "then"), b, c)
+            c = get_list(then_r, "caps")
+            els = get(st, "else")
+            if get(els, "kind") == "Block":
+                else_r = nlam_block_caps(els, b, c)
+                c = get_list(else_r, "caps")
+            if get(els, "kind") == "IfBlock":
+                chain_r = nlam_block_caps({"kind": "Block", "stmts": push([], els)}, b, c)
+                c = get_list(chain_r, "caps")
+        if sk == "ForRange":
+            c = nlam_expr_caps(get(st, "low"), b, c)
+            c = nlam_expr_caps(get(st, "high"), b, c)
+            fr_r = nlam_block_caps(get(st, "body"), push(b, get(st, "var")), c)
+            c = get_list(fr_r, "caps")
+        if sk == "ForIn":
+            c = nlam_expr_caps(get(st, "iter"), b, c)
+            mut in_bound = push(b, get(st, "var"))
+            if has(st, "index_var"):
+                in_bound = push(in_bound, get(st, "index_var"))
+            fi_r = nlam_block_caps(get(st, "body"), in_bound, c)
+            c = get_list(fi_r, "caps")
+        if sk == "Loop":
+            lp_r = nlam_block_caps(get(st, "body"), b, c)
+            c = get_list(lp_r, "caps")
+    {"bound": b, "caps": c}
+
+
+fn nlam_capture_scan(lam_body: Map, lam_params: [Text]) -> [Text]:
+    mut bound = slice([""], 0, 0)
+    loop bp in 0..<len(lam_params):
+        bound = push(bound, at(lam_params, bp))
+    empty_caps = slice([""], 0, 0)
+    mut caps = empty_caps
+    if get(lam_body, "kind") == "Block":
+        blk_r = nlam_block_caps(lam_body, bound, empty_caps)
+        caps = get_list(blk_r, "caps")
+    else:
+        caps = nlam_expr_caps(lam_body, bound, empty_caps)
     caps
+
 
 # Synthesize a __nlambda_N fn for `lam`; return {closure: MakeClosure, decl: Fn}.
 fn nlam_synth(lam: Map) -> Map:
@@ -3153,7 +4126,7 @@ fn nlam_synth(lam: Map) -> Map:
     n_caps = len(caps)
     mut typed_params = slice([lam], 0, 0)
     typed_params = push(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
-    for pi in 0..<n_lp:
+    loop pi in 0..<n_lp:
         mut p_ty = {"kind": "Named", "name": "int"}
         if has(lam, "param_types"):
             p_ty = at(get_list(lam, "param_types"), pi)
@@ -3162,16 +4135,23 @@ fn nlam_synth(lam: Map) -> Map:
     slot_set("otir:nlam_ctr", ctr + 1)
     synth_name = "__nlambda_{ctr}"
     mut synth_stmts = slice([lam_body], 0, 0)
-    for ci in 0..<n_caps:
+    loop ci in 0..<n_caps:
         cap_slot = 2 + ci
         at_call = {"kind": "Call", "callee": "at", "args": [{"kind": "Ident", "name": "__env"}, {"kind": "Int", "value": "{cap_slot}"}]}
         synth_stmts = push(synth_stmts, {"kind": "LetOrAssign", "name": at(caps, ci), "value": at_call})
     synth_stmts = push(synth_stmts, {"kind": "ExprStmt", "expr": lam_body})
     synth_body = {"kind": "Block", "stmts": synth_stmts}
-    synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body}
+    # The hoisted function inherits the LAMBDA's position: a return-type
+    # complaint about `__nlambda_3` is unreadable without it, and printed
+    # `at line 0:0`.
+    synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body, "line": if has(lam, "line") then get_int(lam, "line") else 0, "col": if has(lam, "col") then get_int(lam, "col") else 0}
     mut cap_nodes = slice([lam], 0, 0)
-    for cj in 0..<n_caps:
-        cap_nodes = push(cap_nodes, {"kind": "Ident", "name": at(caps, cj)})
+    loop cj in 0..<n_caps:
+        # The capture reference at the CLOSURE-CONSTRUCTION site. Without a
+        # position, an error about a free variable inside a lambda (an
+        # undefined name, say) reported `line 0:0` — the lambda's own position
+        # is the honest answer.
+        cap_nodes = push(cap_nodes, {"kind": "Ident", "name": at(caps, cj), "line": if has(lam, "line") then get_int(lam, "line") else 0, "col": if has(lam, "col") then get_int(lam, "col") else 0})
     closure = {"kind": "MakeClosure", "fn": synth_name, "caps": cap_nodes, "is_lambda": 1}
     {"closure": closure, "decl": synth_decl}
 
@@ -3187,11 +4167,11 @@ fn nlam_lift(node: Map) -> Map:
     if kind == "Call":
         args = get_list(node, "args")
         mut new_args = slice(args, 0, 0)
-        for i in 0..<len(args):
+        loop i in 0..<len(args):
             ar = nlam_lift(at(args, i))
             new_args = push(new_args, get(ar, "node"))
             ars = get_list(ar, "synths")
-            for j in 0..<len(ars):
+            loop j in 0..<len(ars):
                 synths = push(synths, at(ars, j))
         out = set(out, "args", new_args)
     if kind == "Binary":
@@ -3199,9 +4179,9 @@ fn nlam_lift(node: Map) -> Map:
         rr = nlam_lift(get(node, "right"))
         out = set(out, "left", get(lr, "node"))
         out = set(out, "right", get(rr, "node"))
-        for j in 0..<len(get_list(lr, "synths")):
+        loop j in 0..<len(get_list(lr, "synths")):
             synths = push(synths, at(get_list(lr, "synths"), j))
-        for j in 0..<len(get_list(rr, "synths")):
+        loop j in 0..<len(get_list(rr, "synths")):
             synths = push(synths, at(get_list(rr, "synths"), j))
     {"node": out, "synths": synths}
 
@@ -3213,7 +4193,7 @@ fn nlam_lift_stmt(stmt: Map) -> Map:
     mut fld = ""
     if kind == "MutLet" or kind == "LetOrAssign":
         fld = "value"
-    if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer" or kind == "Destroy":
+    if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer":
         fld = "expr"
     if fld != "":
         r = nlam_lift(get(stmt, fld))
@@ -3221,7 +4201,7 @@ fn nlam_lift_stmt(stmt: Map) -> Map:
         synths = get_list(r, "synths")
     # Recurse into nested block bodies so a lambda inside a for/loop/if body
     # (e.g. `for i in ...: g = fn(n): n + i`) is lifted too.
-    if kind == "Loop" or kind == "ForRange" or kind == "ForIn" or kind == "ForWith":
+    if kind == "Loop" or kind == "ForRange" or kind == "ForIn":
         br = nlam_lift_block(get(stmt, "body"))
         out = set(out, "body", get(br, "block"))
         synths = get_list(br, "synths")
@@ -3234,13 +4214,13 @@ fn nlam_lift_stmt(stmt: Map) -> Map:
             er = nlam_lift_block(els)
             out = set(out, "else", get(er, "block"))
             ersyn = get_list(er, "synths")
-            for ej in 0..<len(ersyn):
+            loop ej in 0..<len(ersyn):
                 ifsyn = push(ifsyn, at(ersyn, ej))
         if get(els, "kind") == "IfBlock":
             er2 = nlam_lift_stmt(els)
             out = set(out, "else", get(er2, "stmt"))
             ersyn2 = get_list(er2, "synths")
-            for ej2 in 0..<len(ersyn2):
+            loop ej2 in 0..<len(ersyn2):
                 ifsyn = push(ifsyn, at(ersyn2, ej2))
         synths = ifsyn
     {"stmt": out, "synths": synths}
@@ -3250,11 +4230,11 @@ fn nlam_lift_block(block: Map) -> Map:
     stmts = get_list(block, "stmts")
     mut out_stmts = slice(stmts, 0, 0)
     mut synths = slice([block], 0, 0)
-    for i in 0..<len(stmts):
+    loop i in 0..<len(stmts):
         r = nlam_lift_stmt(at(stmts, i))
         out_stmts = push(out_stmts, get(r, "stmt"))
         rs = get_list(r, "synths")
-        for j in 0..<len(rs):
+        loop j in 0..<len(rs):
             synths = push(synths, at(rs, j))
     {"block": set(block, "stmts", out_stmts), "synths": synths}
 
@@ -3266,7 +4246,7 @@ fn nlam_has(node: Map) -> bool:
         found = true
     if kind == "Call":
         args = get_list(node, "args")
-        for i in 0..<len(args):
+        loop i in 0..<len(args):
             if nlam_has(at(args, i)):
                 found = true
     if kind == "Binary":
@@ -3282,9 +4262,9 @@ fn nlam_stmt_has(stmt: Map) -> bool:
     mut found = false
     if kind == "MutLet" or kind == "LetOrAssign":
         found = nlam_has(get(stmt, "value"))
-    if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer" or kind == "Destroy":
+    if kind == "ExprStmt" or kind == "Return" or kind == "Require" or kind == "Ensure" or kind == "Defer":
         found = nlam_has(get(stmt, "expr"))
-    if kind == "Loop" or kind == "ForRange" or kind == "ForIn" or kind == "ForWith":
+    if kind == "Loop" or kind == "ForRange" or kind == "ForIn":
         if nlam_block_has(get(stmt, "body")):
             found = true
     if kind == "IfBlock":
@@ -3302,7 +4282,7 @@ fn nlam_stmt_has(stmt: Map) -> bool:
 fn nlam_block_has(block: Map) -> bool:
     stmts = get_list(block, "stmts")
     mut found = false
-    for i in 0..<len(stmts):
+    loop i in 0..<len(stmts):
         if nlam_stmt_has(at(stmts, i)):
             found = true
     found
@@ -3324,11 +4304,15 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     pre_decls = get_list(program, "decls")
     pre_n = len(pre_decls)
     mut orb_pre = ""
-    for pi in 0..<pre_n:
+    loop pi in 0..<pre_n:
         pd = at(pre_decls, pi)
         pk = get(pd, "kind")
         if pk == "OrbMark":
             orb_pre = get(pd, "name")
+        # `type Name = T` — pre-resolve the target to its IR type string and
+        # stash it. A later `x: Name` looks this up in ast_type_to_ir_with_scope.
+        if pk == "TypeAlias":
+            slot_set(otir_k1("tyalias", get(pd, "name")), ast_type_to_ir(get(pd, "target")))
         if pk == "UseDecl":
             target = get(pd, "name")
             slot_set(otir_k2("uses", orb_pre, target), 1)
@@ -3343,7 +4327,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                 # A list is a LIMIT, not a hint: from this orb you see these
                 # names and nothing else.
                 slot_set(otir_k2("onlyn", orb_pre, target), 1)
-            for oi in 0..<len(only_list):
+            loop oi in 0..<len(only_list):
                 slot_set(otir_k3("only", orb_pre, target, at(only_list, oi)), 1)
         if pk == "Fn":
             if (if has(pd, "pub") then get_int(pd, "pub") else 1) == 1:
@@ -3364,19 +4348,16 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     dup_n = len(dup_decls)
     mut seen_fn_names = slice([""], 0, 0)
     mut orb_dup = ""
-    for ddi in 0..<dup_n:
+    loop ddi in 0..<dup_n:
         dd = at(dup_decls, ddi)
         ddk = get(dd, "kind")
         if ddk == "OrbMark":
             orb_dup = get(dd, "name")
-        # `trait` / `impl` / `system` parse but have no lowering. Left alone
-        # they compile to nothing (trait/impl) or silently corrupt the program
-        # (a `system` decl swallows the following `fn`, so `main` returns 0).
-        # Reject them loudly instead of miscompiling — they're reserved for a
-        # future generation, not usable today.
-        if ddk == "Trait" or ddk == "Impl" or ddk == "System":
-            word = if ddk == "Trait" then "trait" else if ddk == "Impl" then "impl" else "system"
-            compile_error("orion: ERROR — `{word}` declarations are not supported yet (reserved for a future version; remove it)")
+        # (`trait` / `impl` / `system` used to be rejected here, keyed on decl
+        # kinds `Trait`/`Impl`/`System`. The parser stopped emitting those kinds,
+        # so the check went dead and the promised "not supported yet" error
+        # silently became "function `prog__(` has an empty body". They are now
+        # caught in the parser as an `Unsupported` decl, WITH a source location.)
         if ddk == "Fn":
             # Compared under the EMITTED name: two orbs may each keep a private
             # helper of the same name (they no longer share a symbol), so only a
@@ -3384,56 +4365,91 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             dnm_raw = get(dd, "name")
             dnm = otir_mangle(orb_dup, dnm_raw, if has(dd, "pub") then get_int(dd, "pub") else 1)
             mut dup_already = false
-            for dsj in 0..<len(seen_fn_names):
+            loop dsj in 0..<len(seen_fn_names):
                 if at(seen_fn_names, dsj) == dnm:
                     dup_already = true
             if dup_already:
-                compile_error("orion: ERROR — function `{dnm_raw}` is defined more than once in the same orb (two different orbs may each have one)")
+                dd_line = if has(dd, "line") then get_int(dd, "line") else 0
+                dd_col = if has(dd, "col") then get_int(dd, "col") else 0
+                compile_error("orion: ERROR at {otir_where(dd_line, dd_col)} — function `{dnm_raw}` is defined more than once in the same orb (two different orbs may each have one)")
             seen_fn_names = push(seen_fn_names, dnm)
 
-    # Pass -1: `fact` inlining. Replace reads of reactive `fact` bindings
-    # with their defining expression so they recompute on each read. Gated
-    # by a prescan — no facts means the decls pass through untouched.
-    raw_decls_src = get_list(program, "decls")
-    rd_src_n = len(raw_decls_src)
-    mut any_fact = false
-    for fi in 0..<rd_src_n:
-        fd = at(raw_decls_src, fi)
-        fdk = get(fd, "kind")
-        if fdk == "Fn" or fdk == "System":
-            if fact_block_has(get(fd, "body")):
-                any_fact = true
-    mut fact_decls = raw_decls_src
-    if any_fact:
-        mut rewritten = slice(raw_decls_src, 0, 0)
-        for fi2 in 0..<rd_src_n:
-            mut fd2 = at(raw_decls_src, fi2)
-            fd2k = get(fd2, "kind")
-            if fd2k == "Fn" or fd2k == "System":
-                fb2 = get(fd2, "body")
-                e_names = slice([""], 0, 0)
-                e_exprs = slice(get_list(fb2, "stmts"), 0, 0)
-                fd2 = set(fd2, "body", fact_rw_block(fb2, e_names, e_exprs))
-            rewritten = push(rewritten, fd2)
-        fact_decls = rewritten
-    program_facted = set(program, "decls", fact_decls)
+    # Pass -1.7: `const NAME = expr` inlining. Collect const name->value, then
+    # substitute reads across every fn/system body (reusing the fact rewriter),
+    # and drop the const decls (they need no runtime storage). Runs BEFORE the
+    # fact pass so a fact RHS that reads a const sees the value. A const may not
+    # reference another const (the substitution is single-pass). Const-free
+    # programs are untouched.
+    cn_src = get_list(program, "decls")
+    cn_total = len(cn_src)
+    const_names = slice([""], 0, 0)
+    mut const_name_list = const_names
+    const_exprs = slice([{"kind": "Int", "value": "0"}], 0, 0)
+    mut const_expr_list = const_exprs
+    loop cni in 0..<cn_total:
+        cnd = at(cn_src, cni)
+        if get(cnd, "kind") == "Const":
+            const_name_list = push(const_name_list, get(cnd, "name"))
+            const_expr_list = push(const_expr_list, get(cnd, "value"))
+    mut program_const = program
+    if len(const_name_list) > 0:
+        mut cn_out = slice(cn_src, 0, 0)
+        loop cnj in 0..<cn_total:
+            mut cnd2 = at(cn_src, cnj)
+            cnk = get(cnd2, "kind")
+            if cnk != "Const":
+                # (`or cnk == "System"` used to be here. The parser emits no
+                # System decl — the keyword is gone — so the test could only
+                # ever answer false.)
+                if cnk == "Fn":
+                    cnd2 = set(cnd2, "body", subst_block(get(cnd2, "body"), const_name_list, const_expr_list))
+                cn_out = push(cn_out, cnd2)
+        program_const = set(program, "decls", cn_out)
+
+    # (Pass -1 was `fact` inlining: reads of a reactive `fact` binding replaced
+    # by its defining expression. The `fact` keyword is gone from the parser, so
+    # no AST can contain a Fact statement and the pass could never rewrite
+    # anything — it only walked every function body on every compile to decide
+    # that. Removed; the substitution machinery it shared with the const pass
+    # lives on as `subst_*`.)
+
+    # Pass -1: `defer`. Splice each block's deferred expressions in before every
+    # `return` that leaves it (LIFO) and at its end, then drop the Defer
+    # statements. Gated by a prescan, so a program without `defer` is untouched.
+    mut defer_decls = get_list(program_const, "decls")
+    mut any_defer = false
+    loop dfi in 0..<len(defer_decls):
+        dfd = at(defer_decls, dfi)
+        if get(dfd, "kind") == "Fn":
+            if defer_block_has(get(dfd, "body")):
+                any_defer = true
+    if any_defer:
+        mut df_out = slice(defer_decls, 0, 0)
+        loop dfj in 0..<len(defer_decls):
+            mut dfd2 = at(defer_decls, dfj)
+            if get(dfd2, "kind") == "Fn":
+                no_defers = slice([{}], 0, 0)
+                dfd2 = set(dfd2, "body", defer_rewrite_block(get_map(dfd2, "body"), no_defers))
+            df_out = push(df_out, dfd2)
+        defer_decls = df_out
+    program_const = set(program_const, "decls", defer_decls)
 
     # Pass 0: lambda lift. For each `name = |params| body` LetOrAssign at
     # top of a fn body, hoist as synthesized __lambda_N global fn. We
     # pre-scan for any Lambda — if none, take the early-return path that
     # leaves decls unmodified (avoids if/else type-mismatch on empty-list
     # initialization, which broke the bundle build before).
-    raw_decls = get_list(program_facted, "decls")
+    raw_decls = get_list(program_const, "decls")
     raw_total = len(raw_decls)
     mut has_any_lambda = false
-    for sc_idx in 0..<raw_total:
+    loop sc_idx in 0..<raw_total:
         sc_decl = at(raw_decls, sc_idx)
         if get(sc_decl, "kind") == "Fn":
             sc_body = get(sc_decl, "body")
             if get(sc_body, "kind") == "Block":
                 sc_stmts = get_list(sc_body, "stmts")
                 sc_n = len(sc_stmts)
-                for sc_s in 0..<sc_n:
+                loop sc_s in 0..<sc_n:
                     sc_stmt = at(sc_stmts, sc_s)
                     sc_kind = get(sc_stmt, "kind")
                     if sc_kind == "LetOrAssign" or sc_kind == "MutLet":
@@ -3449,14 +4465,14 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     # closures need more wiring than this minimal lift can offer today).
     # This is best-effort: shallow walk of lambda body looking for idents.
     mut captures_warned = false
-    for cs_idx in 0..<raw_total:
+    loop cs_idx in 0..<raw_total:
         cs_decl = at(raw_decls, cs_idx)
         if get(cs_decl, "kind") == "Fn":
             cs_body = get(cs_decl, "body")
             if get(cs_body, "kind") == "Block":
                 cs_stmts = get_list(cs_body, "stmts")
                 cs_n = len(cs_stmts)
-                for cs_s in 0..<cs_n:
+                loop cs_s in 0..<cs_n:
                     cs_stmt = at(cs_stmts, cs_s)
                     cs_kind = get(cs_stmt, "kind")
                     if cs_kind == "LetOrAssign" or cs_kind == "MutLet":
@@ -3473,7 +4489,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                                     cs_l_name = get(cs_left, "name")
                                     mut found_in_params = false
                                     nlp_x = len(cs_lp)
-                                    for ix in 0..<nlp_x:
+                                    loop ix in 0..<nlp_x:
                                         if at(cs_lp, ix) == cs_l_name:
                                             found_in_params = true
                                     if not found_in_params and not captures_warned:
@@ -3498,7 +4514,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
         # origin on them (and on rewritten parents, whose rebuild would drop it)
         # so a lambda inside an orb still resolves that orb's private helpers.
         mut orb_lam = ""
-        for d_idx in 0..<raw_total:
+        loop d_idx in 0..<raw_total:
             decl = at(raw_decls, d_idx)
             if get(decl, "kind") == "OrbMark":
                 orb_lam = get(decl, "name")
@@ -3513,7 +4529,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                     new_stmts = slice(new_stmts, 0, 0)
                     mut binding_names = slice([""], 0, 0)
                     mut binding_caps = slice([""], 0, 0)
-                    for s_idx in 0..<n_stmts:
+                    loop s_idx in 0..<n_stmts:
                         stmt = at(old_stmts, s_idx)
                         stmt_kind = get(stmt, "kind")
                         mut is_let_lambda = false
@@ -3530,6 +4546,9 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                         is_lambda_stmt = is_let_lambda or is_expr_lambda
                         if is_lambda_stmt:
                             lam = if is_let_lambda then get(stmt, "value") else get(stmt, "expr")
+                            # Position for the capture references built below.
+                            lam_line = if has(lam, "line") then get_int(lam, "line") else 0
+                            lam_col = if has(lam, "col") then get_int(lam, "col") else 0
                             lam_params = get_list(lam, "params")
                             n_lp = len(lam_params)
                             lam_body = get(lam, "body")
@@ -3540,7 +4559,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             mut worklist = init_work
                             mut caps = slice([""], 0, 0)
                             mut seen_caps = slice([""], 0, 0)
-                            for:
+                            loop:
                                 w_n = len(worklist)
                                 if w_n == 0:
                                     break
@@ -3550,12 +4569,12 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                                 if ck == "Ident":
                                     cn = get(cur, "name")
                                     mut is_param = false
-                                    for lp_w in 0..<n_lp:
+                                    loop lp_w in 0..<n_lp:
                                         if at(lam_params, lp_w) == cn:
                                             is_param = true
                                     mut already = false
                                     n_seen = len(seen_caps)
-                                    for sc in 0..<n_seen:
+                                    loop sc in 0..<n_seen:
                                         if at(seen_caps, sc) == cn:
                                             already = true
                                     # Skip global fn names (heuristic: don't
@@ -3573,7 +4592,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                                 if ck == "Call":
                                     call_args = get_list(cur, "args")
                                     n_ca = len(call_args)
-                                    for cai in 0..<n_ca:
+                                    loop cai in 0..<n_ca:
                                         worklist = push(worklist, at(call_args, cai))
                                 if ck == "If":
                                     worklist = push(worklist, get(cur, "cond"))
@@ -3587,7 +4606,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             mut typed_params = init_typed
                             typed_params = slice(typed_params, 0, 0)
                             typed_params = push(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
-                            for pi in 0..<n_lp:
+                            loop pi in 0..<n_lp:
                                 p_name = at(lam_params, pi)
                                 mut p_ty = {"kind": "Named", "name": "int"}
                                 if has(lam, "param_types"):
@@ -3598,21 +4617,24 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             # Prologue: cap_i = at(__env, 2 + i)  (slots 0/1 are
                             # the fn-ptr and the is_lambda flag).
                             mut synth_stmts = slice([lam_body], 0, 0)
-                            for ci in 0..<n_caps:
+                            loop ci in 0..<n_caps:
                                 cap_name = at(caps, ci)
                                 cap_slot = 2 + ci
                                 at_call = {"kind": "Call", "callee": "at", "args": [{"kind": "Ident", "name": "__env"}, {"kind": "Int", "value": "{cap_slot}"}]}
                                 synth_stmts = push(synth_stmts, {"kind": "LetOrAssign", "name": cap_name, "value": at_call})
                             synth_stmts = push(synth_stmts, {"kind": "ExprStmt", "expr": lam_body})
                             synth_body = {"kind": "Block", "stmts": synth_stmts}
-                            synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body, "orb": orb_lam}
+                            synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body, "orb": orb_lam, "line": lam_line, "col": lam_col}
                             synth_decls = push(synth_decls, synth_decl)
                             bind_name = get(stmt, "name")
                             binding_names = push(binding_names, bind_name)
                             # The binding value builds the closure: [ptr, 1, caps].
                             mut cap_nodes = slice([lam_body], 0, 0)
-                            for cj in 0..<n_caps:
-                                cap_nodes = push(cap_nodes, {"kind": "Ident", "name": at(caps, cj)})
+                            loop cj in 0..<n_caps:
+                                # The capture reference at the CLOSURE-CONSTRUCTION
+                                # site. Without a position, an error about a free
+                                # variable inside a lambda reported `line 0:0`.
+                                cap_nodes = push(cap_nodes, {"kind": "Ident", "name": at(caps, cj), "line": lam_line, "col": lam_col})
                             new_value = {"kind": "MakeClosure", "fn": synth_name, "caps": cap_nodes, "is_lambda": 1}
                             if is_let_lambda:
                                 new_stmts = push(new_stmts, {"kind": stmt_kind, "name": bind_name, "value": new_value})
@@ -3627,17 +4649,29 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                             nl = nlam_lift_stmt(stmt)
                             new_stmts = push(new_stmts, get(nl, "stmt"))
                             nl_synths = get_list(nl, "synths")
-                            for nsi in 0..<len(nl_synths):
+                            loop nsi in 0..<len(nl_synths):
                                 synth_decls = push(synth_decls, set(at(nl_synths, nsi), "orb", orb_lam))
                     new_body = {"kind": "Block", "stmts": new_stmts}
-                    rewritten_decl = {"kind": "Fn", "name": get(decl, "name"), "params": get_list(decl, "params"), "ret": get(decl, "ret"), "body": new_body, "pub": if has(decl, "pub") then get_int(decl, "pub") else 1, "orb": orb_lam}
+                    # SET the changed fields on the ORIGINAL decl. Rebuilding it
+                    # from a literal listed six fields and silently dropped every
+                    # other one — `generics`, `generics_csv`, `modifier`,
+                    # positions. This pass touches every function with a block
+                    # body whenever the program contains ANY lambda, so a single
+                    # closure anywhere erased the generic signatures for the
+                    # WHOLE program and call-site instantiation quietly stopped
+                    # working (`at(filter(words, p), 0)` went back to being an
+                    # int). A rebuild that enumerates fields is a list that goes
+                    # stale the next time one is added.
+                    mut rewritten_decl = set(decl, "body", new_body)
+                    rewritten_decl = set(rewritten_decl, "pub", if has(decl, "pub") then get_int(decl, "pub") else 1)
+                    rewritten_decl = set(rewritten_decl, "orb", orb_lam)
                     working_decls = push(working_decls, rewritten_decl)
                 if body_kind != "Block":
                     working_decls = push(working_decls, decl)
             if get(decl, "kind") != "Fn":
                 working_decls = push(working_decls, decl)
         n_synth = len(synth_decls)
-        for sy_i in 0..<n_synth:
+        loop sy_i in 0..<n_synth:
             working_decls = push(working_decls, at(synth_decls, sy_i))
         decls = working_decls
     total = len(decls)
@@ -3645,14 +4679,16 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     # fn ret types like `-> Inst` correctly become "struct:Inst" not "i64",
     # and `EnumName.Variant` expressions resolve to variant indices.
     mut sig_scope = scope_empty()
-    for index in 0..<total:
+    loop index in 0..<total:
         decl = at(decls, index)
         if get(decl, "kind") == "Data":
             struct_name = get(decl, "name")
+            # Bind generic type vars so `T` in a field type lowers to i64.
+            otir_bind_tyvars(decl)
             data_fields = get_list(decl, "fields")
             n_df = len(data_fields)
             mut spec = ""
-            for fi in 0..<n_df:
+            loop fi in 0..<n_df:
                 fld = at(data_fields, fi)
                 fld_name = get(fld, "name")
                 fld_type = ast_type_to_ir(get(fld, "type"))
@@ -3675,11 +4711,13 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             sig_scope = scope_add_data_decl(sig_scope, struct_name, spec)
         if get(decl, "kind") == "Enum":
             enum_name = get(decl, "name")
+            # Bind generic type vars so `T` in a variant payload lowers to i64.
+            otir_bind_tyvars(decl)
             variants = get_list(decl, "variants")
             n_vars = len(variants)
             mut csv = ""
             mut max_payloads = 0
-            for vi in 0..<n_vars:
+            loop vi in 0..<n_vars:
                 v = at(variants, vi)
                 v_name = get(v, "name")
                 sep = if vi == 0 then "" else ","
@@ -3692,7 +4730,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                 if n_pl > max_payloads:
                     max_payloads = n_pl
                 mut pl_csv = ""
-                for pli in 0..<n_pl:
+                loop pli in 0..<n_pl:
                     pl_sep = if pli == 0 then "" else ","
                     pl_type = ast_type_to_ir(at(v_payloads, pli))
                     pl_csv = "{pl_csv}{pl_sep}{pl_type}"
@@ -3706,7 +4744,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             if max_payloads < 2:
                 max_payloads = 2
             mut union_spec = "tag:int"
-            for si in 0..<max_payloads:
+            loop si in 0..<max_payloads:
                 union_spec = "{union_spec}|p{si}:int"
             sig_scope = scope_add_data_decl(sig_scope, enum_name, union_spec)
     # Pass 1b: collect fn signatures, now with struct-aware ret types.
@@ -3718,7 +4756,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     # Extern re-declares stay legal; that's the cross-orb convention.
     mut fn_seen = []
     mut orb_1b = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         decl = at(decls, index)
         decl_kind_1b = get(decl, "kind")
         if decl_kind_1b == "OrbMark":
@@ -3741,13 +4779,17 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             # the effect pass can enforce it after the whole module is built.
             fn_mod = if has(decl, "modifier") then get(decl, "modifier") else ""
             if fn_mod == "comptime":
-                compile_error("orion: ERROR — `comptime fn` is not supported yet (compile-time evaluation is unimplemented; remove the modifier so it does not look like it works)")
+                ct_line = if has(decl, "mod_line") then get_int(decl, "mod_line") else 0
+                ct_col = if has(decl, "mod_col") then get_int(decl, "mod_col") else 0
+                compile_error("orion: ERROR at {otir_where(ct_line, ct_col)} — `comptime` was cut; it never evaluated anything at compile time. A folded constant is `const NAME = expr` (or a bare top-level `NAME = expr`)")
             if fn_mod == "deterministic":
                 dn = slot_int_or_zero(otir_k1("detn", "count"))
                 slot_set(otir_k1("deto", "{dn}"), fn_name)
                 slot_set(otir_k1("detn", "count"), dn + 1)
             if text_list_has(fn_seen, fn_name):
-                compile_error("orion: ERROR — duplicate function `{fn_raw}` (defined twice in the same orb — two orbs may now each have their own)")
+                dcl_line = if has(decl, "line") then get_int(decl, "line") else 0
+                dcl_col = if has(decl, "col") then get_int(decl, "col") else 0
+                compile_error("orion: ERROR at {otir_where(dcl_line, dcl_col)} — duplicate function `{fn_raw}` (defined twice in the same orb — two orbs may now each have their own)")
             fn_seen = push_mut(fn_seen, fn_name)
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
@@ -3758,7 +4800,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             # Parameter-position registry: `otir:param:<fn>:<name>` -> index,
             # so a named argument `f(x = 5)` can be reordered to its slot.
             fn_params_list = get_list(decl, "params")
-            for fp_i in 0..<len(fn_params_list):
+            loop fp_i in 0..<len(fn_params_list):
                 fp = at(fn_params_list, fp_i)
                 slot_set("otir:param:" + fn_name + ":" + get(fp, "name"), fp_i)
                 # Parameter-TYPE registry: `otir:paramtype:<fn>:<index>` -> the
@@ -3768,6 +4810,23 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
                 # engine's convention), which is a wildcard for the ptr guard.
                 fp_ty = if has(fp, "type") then ast_type_to_ir_with_scope(get(fp, "type"), sig_scope) else "int"
                 slot_set("otir:paramtype:" + fn_name + ":{fp_i}", fp_ty)
+                # SOURCE form of the same type ("[T]", "T", "int"), for generic
+                # call-site instantiation: the IR form above is already erased,
+                # so it cannot say WHICH type var a parameter carries.
+                if has(fp, "type"):
+                    slot_set("otir:psrc:" + fn_name + ":{fp_i}", type_src_text(get(fp, "type")))
+            # Generic fns record their type-var names + the source form of the
+            # return type. A call site binds the vars from its actual argument
+            # types and re-types the result (otir_call_ret_generic).
+            # The parser hands over the type-var names as one Text (see
+            # psr_parse_fn): reading them out of the `generics` LIST here would
+            # take the element type from a map value, which is typed
+            # list-of-map whatever it holds.
+            gen_csv = if has(decl, "generics_csv") then get(decl, "generics_csv") else ""
+            if gen_csv != "":
+                slot_set("otir:gen:" + fn_name, gen_csv)
+                if has(decl, "ret"):
+                    slot_set("otir:rsrc:" + fn_name, type_src_text(get(decl, "ret")))
         if decl_kind_1b == "ExternFn":
             ext_name = get(decl, "name")
             ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
@@ -3780,11 +4839,21 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     mut module = ir_module_new()
     mut has_main = 0
     mut orb_2 = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         decl = at(decls, index)
         kind = get(decl, "kind")
         if kind == "OrbMark":
             orb_2 = get(decl, "name")
+        if kind == "Retired":
+            rt_word = get(decl, "word")
+            rt_line = get_int(decl, "line")
+            rt_col = get_int(decl, "col")
+            compile_error("orion: ERROR at {otir_where(rt_line, rt_col)} — `{rt_word}` was retired; `type` declares every type now (`type Name: field: T` for a product, `type Name:` + indented variants for a sum)")
+        if kind == "Unsupported":
+            us_word = get(decl, "word")
+            us_line = get_int(decl, "line")
+            us_col = get_int(decl, "col")
+            compile_error("orion: ERROR at {otir_where(us_line, us_col)} — `{us_word}` is reserved but not implemented; there is no lowering for it (use plain functions over `type` values, and pass behaviour as fn args)")
         if kind == "Fn":
             fn_pub_2 = if has(decl, "pub") then get_int(decl, "pub") else 1
             orb_of_2 = if has(decl, "orb") then get(decl, "orb") else orb_2
@@ -3800,7 +4869,7 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             mut ext_fn = ir_fn_new(get(decl, "name"), ext_ret2)
             ext_params = get_list(decl, "params")
             n_ext_params = len(ext_params)
-            for epi in 0..<n_ext_params:
+            loop epi in 0..<n_ext_params:
                 ep = at(ext_params, epi)
                 ep_type = ast_type_to_ir_with_scope(get(ep, "type"), sig_scope)
                 ext_fn = ir_fn_add_param(ext_fn, get(ep, "name"), ep_type)
@@ -3811,5 +4880,3 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
         ret = ir_fn_push(zero.function, ir_return(zero.id))
         module = ir_module_add_fn(module, ret.function)
     module
-
-

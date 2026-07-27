@@ -28,7 +28,7 @@ fn drv_dirname(path: Text) -> Text:
     bs = bytes_from_text(path)
     n = len(bs)
     mut last_sep = 0 - 1
-    for i in 0..<n:
+    loop i in 0..<n:
         c = at(bs, i)
         if c == 47 or c == 92:
             last_sep = i
@@ -53,7 +53,7 @@ fn drv_use_name(line: Text) -> Text:
         return ""
     mut name = ""
     mut i = 4
-    for:
+    loop:
         if i >= n:
             break
         c = at(bs, i)
@@ -73,7 +73,7 @@ fn drv_uses_of(src: Text) -> [Text]:
     mut names = []
     mut line_start = 0
     mut i = 0
-    for:
+    loop:
         if i > n:
             break
         at_end = i == n
@@ -81,10 +81,20 @@ fn drv_uses_of(src: Text) -> [Text]:
         if not at_end:
             is_nl = at(bs, i) == 10
         if at_end or is_nl:
-            line = bytes_to_text(bytes_slice(bs, line_start, i))
-            name = drv_use_name(line)
-            if name != "":
-                names = push(names, name)
+            # A `use` / `pub use` line begins with `u` (117) or `p` (112) at
+            # column 0 — that is exactly what drv_use_name requires. Peek that
+            # one byte straight out of `bs` and only materialise a Text (a slice
+            # + a to_text, and a third byte list inside drv_use_name) for the
+            # rare lines that could name an orb. Before this, EVERY line of the
+            # entry allocated three times just to be told it wasn't a `use`,
+            # which exhausted the heap on a multi-megabyte source and crashed
+            # the compiler before it printed a single diagnostic.
+            first = if line_start < i then at(bs, line_start) else -1
+            if first == 117 or first == 112:
+                line = bytes_to_text(bytes_slice(bs, line_start, i))
+                name = drv_use_name(line)
+                if name != "":
+                    names = push(names, name)
             line_start = i + 1
         if at_end:
             break
@@ -94,7 +104,7 @@ fn drv_uses_of(src: Text) -> [Text]:
 fn drv_list_has(items: [Text], needle: Text) -> bool:
     n = len(items)
     mut found = false
-    for i in 0..<n:
+    loop i in 0..<n:
         if at(items, i) == needle:
             found = true
     found
@@ -104,7 +114,7 @@ fn drv_list_has(items: [Text], needle: Text) -> bool:
 fn drv_resolve(name: Text, roots: [Text]) -> Text:
     n = len(roots)
     mut src = ""
-    for i in 0..<n:
+    loop i in 0..<n:
         if src == "":
             root = at(roots, i)
             candidate = "{root}{name}/lib.or"
@@ -113,7 +123,59 @@ fn drv_resolve(name: Text, roots: [Text]) -> Text:
                 src = attempt
     src
 
+# Which PATH an orb resolved from. Same search as drv_resolve, but it answers
+# where the text came from instead of what it was, which is what an error
+# message needs: without it a diagnostic can only name a line in the
+# concatenated program, i.e. a line in no file that exists on disk.
+fn drv_resolve_path(name: Text, roots: [Text]) -> Text:
+    n = len(roots)
+    mut path = ""
+    loop i in 0..<n:
+        if path == "":
+            root = at(roots, i)
+            candidate = "{root}{name}/lib.or"
+            if file_read(candidate) != "":
+                path = candidate
+    path
+
+fn drv_count_lines(s: Text) -> int:
+    b = bytes_from_text(s)
+    n = len(b)
+    mut count = 0
+    loop i in 0..<n:
+        if at(b, i) == 10:
+            count = count + 1
+    count
+
+# Record one chunk of the concatenated program: the bundle line its `orb`
+# marker sits on, and the file it came from. `otir_where` (orion_ast_to_ir)
+# reads these back to turn a bundle line into `file:line:col`.
+fn drv_map_chunk(index: int, marker_line: int, path: Text):
+    slot_set("src:map:{index}:at", marker_line)
+    slot_set("src:map:{index}:path", orion_persist_text(path))
+    slot_set("src:map:n", index + 1)
+
 extern fn orion_console_color() -> int
+# Slot-stored text must outlive the transient allocation it was built in.
+extern fn orion_persist_text(s: Text) -> Text
+extern fn orion_os_private_kb() -> int
+
+# `PERF` row on demand: any argument equal to `--perf`, or ORION_PERF=1 in the
+# environment via the `perf` output-path suffix. Kept opt-in so normal builds
+# print the human line only.
+fn drv_want_perf() -> bool:
+    mut want = false
+    loop ai in 1..<argc():
+        if argv(ai) == "--perf":
+            want = true
+    want
+
+fn drv_total_insts(m: IRModule) -> int:
+    mut total = 0
+    loop fi in 0..<len(m.functions):
+        f = at(m.functions, fi)
+        total = total + len(f.instructions)
+    total
 
 fn drv_sty(code: Text, s: Text) -> Text:
     if orion_console_color() == 1:
@@ -128,18 +190,99 @@ fn drv_dim(s: Text) -> Text:
 fn drv_red(s: Text) -> Text:
     drv_sty("31;1", s)
 
+# ---- `symbols`: the compiler's own index, for tools --------------------
+#
+# One row per declaration, tab-free and line-oriented so a client can read it
+# without a parser:
+#
+#   TYPE Point|x:int,y:int
+#   SUM Tile|Empty,Wall,Loot
+#   FN area|p:Point|int
+#   EFFECT Random|roll
+#   CONST LIMIT
+#
+# Types are printed as WRITTEN (source form), because that is what a completion
+# list or a hover has to show. The alternative — letting the editor re-derive
+# this from the text — is how the previous language server ended up describing a
+# language that no longer existed.
+
+fn drv_type_name(t: Map) -> Text:
+    kind = get(t, "kind")
+    if kind == "List":
+        inner = drv_type_name(get_map(t, "elem"))
+        "[{inner}]"
+    else:
+        if kind == "Named":
+            base = get(t, "name")
+            targs = if has(t, "args") then get_list(t, "args") else []
+            if len(targs) == 0:
+                base
+            else:
+                mut acc = ""
+                loop ai in 0..<len(targs):
+                    sep = if ai == 0 then "" else ","
+                    acc = "{acc}{sep}{drv_type_name(at(targs, ai))}"
+                "{base}<{acc}>"
+        else:
+            if kind == "FnType":
+                "fn"
+            else:
+                "?"
+
+fn drv_symbols(ast: Map) -> int:
+    decls = get_list(ast, "decls")
+    mut orb_now = ""
+    loop di in 0..<len(decls):
+        d = at(decls, di)
+        k = get(d, "kind")
+        if k == "OrbMark":
+            orb_now = get(d, "name")
+        if k == "Fn":
+            params = get_list(d, "params")
+            mut psig = ""
+            loop pi in 0..<len(params):
+                p = at(params, pi)
+                sep = if pi == 0 then "" else ","
+                pty = if has(p, "type") then drv_type_name(get_map(p, "type")) else "int"
+                psig = "{psig}{sep}{get(p, \"name\")}:{pty}"
+            rty = if has(d, "ret") then drv_type_name(get_map(d, "ret")) else "?"
+            print_line("FN {get(d, \"name\")}|{psig}|{rty}|{orb_now}")
+        if k == "Data":
+            fields = get_list(d, "fields")
+            mut fsig = ""
+            loop fi in 0..<len(fields):
+                f = at(fields, fi)
+                sep2 = if fi == 0 then "" else ","
+                fty = if has(f, "type") then drv_type_name(get_map(f, "type")) else "?"
+                fsig = "{fsig}{sep2}{get(f, \"name\")}:{fty}"
+            print_line("TYPE {get(d, \"name\")}|{fsig}|{orb_now}")
+        if k == "Enum":
+            variants = get_list(d, "variants")
+            mut vsig = ""
+            loop vi in 0..<len(variants):
+                sep3 = if vi == 0 then "" else ","
+                vsig = "{vsig}{sep3}{get(at(variants, vi), \"name\")}"
+            print_line("SUM {get(d, \"name\")}|{vsig}|{orb_now}")
+        if k == "Const":
+            print_line("CONST {get(d, \"name\")}||{orb_now}")
+    0
+
 # Discover the whole use-graph from the entry source; return the
 # combined program text (orbs in discovery order, entry last).
 # Quiet by design: one dim summary line instead of a line per orb —
 # unresolved `use` means builtin, which is the normal case, not news.
-fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
+pub fn drv_collect(entry_src: Text, roots: [Text], entry_path: Text) -> Text:
     mut queue = drv_uses_of(entry_src)
     mut loaded_names = []
     mut chunks = []
     mut qi = 0
     mut orb_count = 0
     mut orb_bytes = 0
-    for:
+    # Bundle line the NEXT chunk's `orb` marker will land on (1-based, like the
+    # lexer). Each chunk costs: 1 marker line + the source's lines + 1 blank.
+    mut line_at = 1
+    mut map_n = 0
+    loop:
         if qi >= len(queue):
             break
         name = at(queue, qi)
@@ -147,9 +290,13 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
         if drv_list_has(loaded_names, name):
             continue
         loaded_names = push(loaded_names, name)
-        src = drv_resolve(name, roots)
+        path = drv_resolve_path(name, roots)
+        src = if path == "" then "" else file_read(path)
         if src == "":
             continue
+        drv_map_chunk(map_n, line_at, path)
+        map_n = map_n + 1
+        line_at = line_at + drv_count_lines(src) + 2
         orb_count = orb_count + 1
         orb_bytes = orb_bytes + len(bytes_from_text(src))
         # Stamp each chunk with its origin. The program is ONE concatenated
@@ -163,13 +310,14 @@ fn drv_collect(entry_src: Text, roots: [Text]) -> Text:
         chunks = push(chunks, "\n")
         deps = drv_uses_of(src)
         n_deps = len(deps)
-        for di in 0..<n_deps:
+        loop di in 0..<n_deps:
             queue = push(queue, at(deps, di))
     okb = orb_bytes / 1024
     print_line(drv_dim("  orbs {orb_count} ({okb} KB)"))
     # The entry program is its own scope: `""` owns whatever it declares
     # privately, so a game's local helper cannot collide with an orb's.
     eq = bytes_to_text(push([], 34))
+    drv_map_chunk(map_n, line_at, entry_path)
     chunks = push(chunks, "orb " + eq + eq + "\n")
     chunks = push(chunks, entry_src)
     orion_text_join(chunks)
@@ -233,7 +381,7 @@ fn drv_ends(t: Text, suffix: Text) -> bool:
         false
     else:
         mut same = true
-        for i in 0..<m:
+        loop i in 0..<m:
             if at(bt, n - m + i) != at(bs, i):
                 same = false
         same
@@ -247,7 +395,7 @@ fn drv_is_close(callee: Text) -> bool:
 fn drv_scope_check(module: IRModule, verbose: int) -> int:
     fns = module.functions
     mut bad = 0
-    for fi in 0..<len(fns):
+    loop fi in 0..<len(fns):
         f = drv_fn_at(fns, fi)
         if drv_is_scope_primitive(f.name):
             continue
@@ -255,7 +403,7 @@ fn drv_scope_check(module: IRModule, verbose: int) -> int:
         mut opens = slice([0], 0, 0)
         mut closes = slice([0], 0, 0)
         mut depth = slice([0], 0, 0)      # running open-minus-close, in order
-        for ii in 0..<len(f.instructions):
+        loop ii in 0..<len(f.instructions):
             inst = drv_inst_at(f.instructions, ii)
             if inst.op == "call":
                 stem = drv_mode_stem(inst.name)
@@ -279,12 +427,12 @@ fn drv_scope_check(module: IRModule, verbose: int) -> int:
             # final return has depth 0 in a balanced function, so only an early
             # one trips this.
             if inst.op == "return":
-                for si in 0..<len(stems):
+                loop si in 0..<len(stems):
                     if drv_int_at(depth, si) > 0:
                         bad = bad + 1
                         if verbose == 1:
                             print_line("    {f.name}: returns with {text_at_drv(stems, si)} still open (early return between open and close)")
-        for si in 0..<len(stems):
+        loop si in 0..<len(stems):
             o = drv_int_at(opens, si)
             c = drv_int_at(closes, si)
             if o != c:
@@ -309,7 +457,7 @@ fn drv_starts(t: Text, p: Text) -> bool:
     pn = len(pb)
     if len(tb) < pn:
         return false
-    for i in 0..<pn:
+    loop i in 0..<pn:
         if at(tb, i) != at(pb, i):
             return false
     true
@@ -320,7 +468,7 @@ fn drv_flag(x: int, f: int) -> bool:
 fn drv_or(a: int, b: int) -> int:
     mut out = a
     mut f = 1
-    for i in 0..<8:
+    loop i in 0..<8:
         if drv_flag(b, f) and not drv_flag(out, f):
             out = out + f
         f = f * 2
@@ -328,7 +476,7 @@ fn drv_or(a: int, b: int) -> int:
 
 fn drv_name_idx(names: [Text], name: Text) -> int:
     n = len(names)
-    for i in 0..<n:
+    loop i in 0..<n:
         if at(names, i) == name:
             return i
     0 - 1
@@ -362,7 +510,7 @@ fn drv_call_bits(callee: Text, names: [Text]) -> int:
 fn drv_direct_bits(f: IRFn, names: [Text]) -> int:
     mut bits = 0
     n = len(f.instructions)
-    for i in 0..<n:
+    loop i in 0..<n:
         inst = drv_inst_at(f.instructions, i)
         op = inst.op
         if op == "slot_set" or op == "slot_get" or op == "slot_has" or op == "slot_get_int":
@@ -400,20 +548,20 @@ fn drv_effect_closure(module: IRModule, names: [Text]) -> [int]:
     fns = module.functions
     n = len(fns)
     mut bits = []
-    for i in 0..<n:
+    loop i in 0..<n:
         bits = push_mut(bits, drv_direct_bits(drv_fn_at(fns, i), names))
     mut pass = 0
-    for:
+    loop:
         if pass >= 24:
             break
         mut changed = 0
         mut next = []
-        for i in 0..<n:
+        loop i in 0..<n:
             f2 = drv_fn_at(fns, i)
             cur = drv_int_at(bits, i)
             mut acc = cur
             ni = len(f2.instructions)
-            for j in 0..<ni:
+            loop j in 0..<ni:
                 inst = drv_inst_at(f2.instructions, j)
                 if inst.op == "call":
                     idx = drv_name_idx(names, inst.name)
@@ -431,7 +579,7 @@ fn drv_effect_closure(module: IRModule, names: [Text]) -> [int]:
 fn drv_module_names(module: IRModule) -> [Text]:
     fns = module.functions
     mut names = []
-    for i in 0..<len(fns):
+    loop i in 0..<len(fns):
         names = push_mut(names, drv_fn_at(fns, i).name)
     names
 
@@ -450,7 +598,7 @@ fn drv_check_deterministic(module: IRModule) -> int:
     bits = drv_effect_closure(module, names)
     nd_mask = drv_or(drv_or(2, 4), drv_or(8, 64))
     mut bad = 0
-    for i in 0..<len(marked):
+    loop i in 0..<len(marked):
         idx = drv_name_idx(names, at(marked, i))
         if idx >= 0:
             eff = drv_int_at(bits, idx)
@@ -465,7 +613,7 @@ fn drv_deterministic_label(mangled: Text) -> Text:
     bs = bytes_from_text(mangled)
     n = len(bs)
     mut cut = 0 - 1
-    for i in 0..<n - 1:
+    loop i in 0..<n - 1:
         if at(bs, i) == 95 and at(bs, i + 1) == 95:
             cut = i + 2
     if cut < 0 then mangled else bytes_to_text(bytes_slice(bs, cut, n))
@@ -473,7 +621,7 @@ fn drv_deterministic_label(mangled: Text) -> Text:
 fn drv_flag_and(a: int, b: int) -> int:
     mut r = 0
     mut bit = 1
-    for i in 0..<40:
+    loop i in 0..<40:
         av = (a / bit) - ((a / bit) / 2) * 2
         bv = (b / bit) - ((b / bit) / 2) * 2
         if av == 1 and bv == 1:
@@ -487,7 +635,7 @@ fn drv_facts(module: IRModule) -> int:
     names = drv_module_names(module)
     bits = drv_effect_closure(module, names)
     mut pure_count = 0
-    for i in 0..<n:
+    loop i in 0..<n:
         b = drv_int_at(bits, i)
         if b == 0:
             pure_count = pure_count + 1
@@ -511,7 +659,7 @@ pub fn driver_main() -> int:
             return 0 - 1
         base = drv_dirname(in_path)
         mut roots = []
-        for ai in 3..<argc():
+        loop ai in 3..<argc():
             extra = argv(ai)
             roots = push(roots, "{extra}/")
         roots = push(roots, "{base}/orbs/")
@@ -519,11 +667,17 @@ pub fn driver_main() -> int:
         roots = push(roots, "{base}/../../orbs/")
         roots = push(roots, "orbs/")
         roots = push(roots, "../orbs/")
-        src = drv_collect(entry_src, roots)
+        src = drv_collect(entry_src, roots, in_path)
         t0 = monotonic_ms()
         tokens = self_lex(src)
         t1 = monotonic_ms()
         ast = self_parse(tokens)
+        # BEFORE lowering: `ast_program_to_ir` mangles function names in place
+        # (`area` -> `prog__area`) and drops the const declarations once it has
+        # folded them, so asking it afterwards gives a tool the compiler's
+        # internal names instead of the ones the user typed.
+        if out_path == "symbols":
+            return drv_symbols(ast)
         t2 = monotonic_ms()
         module = ast_program_to_ir(ast)
         t3 = monotonic_ms()
@@ -541,6 +695,18 @@ pub fn driver_main() -> int:
         d_emit = t4 - t3
         d_total = t4 - t0
         print_line(drv_dim("  compiled {d_total} ms (lex {d_lex} | parse {d_parse} | ir {d_ir} | emit {d_emit})"))
+        # One machine-readable line for tracking compile performance over time.
+        # `tools/compile_bench.sh` parses it and diffs against a checked-in
+        # baseline, so a slowdown shows up as a number instead of a feeling.
+        # Off by default: the row is only useful to a tool, so it needs asking.
+        if drv_want_perf():
+            src_bytes = len(bytes_from_text(src))
+            src_lines = drv_count_lines(src) + 1
+            n_fns = len(module.functions)
+            n_insts = drv_total_insts(module)
+            kb = orion_os_private_kb()
+            per_kloc = if src_lines > 0 then d_total * 1000 / src_lines else 0
+            print_line("PERF total_ms={d_total} lex_ms={d_lex} parse_ms={d_parse} ir_ms={d_ir} emit_ms={d_emit} bytes={src_bytes} lines={src_lines} fns={n_fns} insts={n_insts} rss_kb={kb} ms_per_kloc={per_kloc}")
         # What the build knows about its own memory safety. The slot-store
         # boundary decides evacuate-or-abort from a statically derived type
         # code, so the set of sites that CAN abort is a compile-time fact -

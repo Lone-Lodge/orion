@@ -62,7 +62,7 @@ fn c_red(s: Text) -> Text:
 fn args_after(start_index: int) -> [Text]:
     total = arg_count()
     mut collected = []
-    for index in start_index..<total:
+    loop index in start_index..<total:
         collected = push(collected, arg(index))
     collected
 
@@ -82,7 +82,7 @@ fn nb_int(t: Text, fallback: int) -> int:
     if n == 0:
         return fallback
     mut v = 0
-    for i in 0..<n:
+    loop i in 0..<n:
         c = at(bs, i)
         if c >= 48 and c <= 57:
             v = v * 10 + (c - 48)
@@ -118,7 +118,7 @@ fn die(message: Text):
 fn list_contains(haystack: [Text], needle: Text) -> bool:
     total = len(haystack)
     mut found = false
-    for index in 0..<total:
+    loop index in 0..<total:
         if at(haystack, index) == needle:
             found = true
     found
@@ -134,7 +134,7 @@ fn scan_template_dirs(dir: Text, depth: int, acc: [Text]) -> [Text]:
         return acc
     subs = str_split(host_subdirs(dir), "\n")
     mut out = acc
-    for i in 0..<len(subs):
+    loop i in 0..<len(subs):
         name = at(subs, i)
         if len(name) > 0 and not scan_noise(name):
             child = dir + "/" + name
@@ -150,7 +150,7 @@ fn find_template(kind: Text) -> Text:
     if len(root) == 0:
         return ""
     dirs = scan_template_dirs(root, 0, [])
-    for i in 0..<len(dirs):
+    loop i in 0..<len(dirs):
         candidate = at(dirs, i) + "/" + kind
         if is_dir(candidate):
             return candidate
@@ -166,7 +166,7 @@ fn copy_template(src_dir: Text, dst_dir: Text, name: Text, packages: Text):
     # scan_orb_dirs relies on, since list_dir does not report subdirs.
     entries = list_dir(src_dir)
     entry_count = len(entries)
-    for index in 0..<entry_count:
+    loop index in 0..<entry_count:
         entry = at(entries, index)
         src = path_join(src_dir, entry)
         dst = path_join(dst_dir, str_replace(entry, "__NAME__", name))
@@ -174,7 +174,7 @@ fn copy_template(src_dir: Text, dst_dir: Text, name: Text, packages: Text):
             copy_template_file(src, dst, name, packages)
     subs = str_split(host_subdirs(src_dir), "\n")
     sub_count = len(subs)
-    for sub_index in 0..<sub_count:
+    loop sub_index in 0..<sub_count:
         sub = at(subs, sub_index)
         if len(sub) > 0:
             copy_template(src_dir + "/" + sub, path_join(dst_dir, str_replace(sub, "__NAME__", name)), name, packages)
@@ -328,7 +328,7 @@ fn fmt_trim_trailing(line_text: Text) -> Text:
     bytes = bytes_from_text(line_text)
     byte_count = bytes_length(bytes)
     mut end_index = byte_count
-    for:
+    loop:
         if end_index <= 0:
             break
         last_byte = byte_at(bytes, end_index - 1)
@@ -346,7 +346,7 @@ fn fmt_normalize(text: Text) -> Text:
     raw_lines = str_split(text, "\n")
     line_count = len(raw_lines)
     mut normalized_lines = []
-    for index in 0..<line_count:
+    loop index in 0..<line_count:
         raw_line = at(raw_lines, index)
         without_tabs = fmt_expand_tabs(raw_line)
         stripped = fmt_trim_trailing(without_tabs)
@@ -355,7 +355,7 @@ fn fmt_normalize(text: Text) -> Text:
     collapsed = []
     mut output_lines = collapsed
     mut last_was_blank = false
-    for index in 0..<line_count:
+    loop index in 0..<line_count:
         current_line = at(normalized_lines, index)
         is_blank = current_line == ""
         keep = not (is_blank and last_was_blank)
@@ -366,7 +366,7 @@ fn fmt_normalize(text: Text) -> Text:
     final_count = len(output_lines)
     if final_count > 0 and at(output_lines, final_count - 1) == "":
         mut trimmed = []
-        for index in 0..<(final_count - 1):
+        loop index in 0..<(final_count - 1):
             trimmed = push(trimmed, at(output_lines, index))
         output_lines = trimmed
     str_join(output_lines, "\n") + "\n"
@@ -377,7 +377,7 @@ fn fmt_normalize(text: Text) -> Text:
 fn fmt_walk(directory: Text):
     entries = list_dir(directory)
     entry_count = len(entries)
-    for index in 0..<entry_count:
+    loop index in 0..<entry_count:
         entry_name = at(entries, index)
         full_path = path_join(directory, entry_name)
         is_directory_entry = is_dir(full_path)
@@ -434,7 +434,7 @@ fn nb_setting(lines: [Text], key: Text, fallback: Text) -> Text:
     total = len(lines)
     mut found = fallback
     mut taken = false
-    for index in 0..<total:
+    loop index in 0..<total:
         line = str_trim(at(lines, index))
         if not taken and str_starts_with(line, key + " ="):
             found = nb_quoted(line)
@@ -448,7 +448,7 @@ fn nb_setting(lines: [Text], key: Text, fallback: Text) -> Text:
 fn nb_dep_dirs(lines: [Text], base: Text) -> [Text]:
     total = len(lines)
     mut out = []
-    for index in 0..<total:
+    loop index in 0..<total:
         line = at(lines, index)
         if str_contains(line, "\"path:"):
             rel = str_replace(nb_quoted(line), "path:", "")
@@ -469,7 +469,7 @@ fn nb_expand_orb(orb_dir: Text, acc: [Text]) -> [Text]:
         if file_exists(toml):
             deps = nb_dep_dirs(nb_lines(read_file(toml)), orb_dir)
             dep_total = len(deps)
-            for d_index in 0..<dep_total:
+            loop d_index in 0..<dep_total:
                 out = nb_expand_orb(at(deps, d_index), out)
         out
 
@@ -487,7 +487,7 @@ fn nb_expand_orb(orb_dir: Text, acc: [Text]) -> [Text]:
 fn find_workspace_root() -> Text:
     mut rel = "."
     mut depth = 0
-    for:
+    loop:
         if depth > 8:
             break
         if file_exists(rel + "/.orbit"):
@@ -507,7 +507,7 @@ fn scan_orb_dirs(dir: Text, depth: int, acc: [Text]) -> [Text]:
         return acc
     subs = str_split(host_subdirs(dir), "\n")
     mut out = acc
-    for i in 0..<len(subs):
+    loop i in 0..<len(subs):
         name = at(subs, i)
         if len(name) > 0 and not scan_noise(name):
             child = dir + "/" + name
@@ -522,22 +522,22 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
     direct = nb_dep_dirs(lines, "")
     direct_total = len(direct)
     mut all_orbs = []
-    for i in 0..<direct_total:
+    loop i in 0..<direct_total:
         all_orbs = nb_expand_orb(at(direct, i), all_orbs)
     mut parents = []
     orb_total = len(all_orbs)
-    for j in 0..<orb_total:
+    loop j in 0..<orb_total:
         parent = path_parent(at(all_orbs, j))
         if not list_contains(parents, parent):
             parents = push(parents, parent)
     mut dirs = []
     parent_total = len(parents)
-    for p_index in 0..<parent_total:
+    loop p_index in 0..<parent_total:
         parent = at(parents, p_index)
         native_sibling = path_parent(parent) + "/orbs_native"
         if is_dir(native_sibling) and not list_contains(dirs, native_sibling):
             dirs = push(dirs, native_sibling)
-    for p2_index in 0..<parent_total:
+    loop p2_index in 0..<parent_total:
         dirs = push(dirs, at(parents, p2_index))
     # Layout-free resolution: when a `.orbit` workspace root is found, add
     # every orbs dir under it so name-only deps (`atlas_app = "*"`) resolve
@@ -549,11 +549,11 @@ fn nb_orb_dirs(lines: [Text]) -> [Text]:
         # Native backends win name clashes (a game wants orbs_native/atlas_render,
         # not the wgpu orbs/atlas_render), so add every orbs_native search dir
         # BEFORE the plain orbs ones — mirroring the path-based order above.
-        for n_index in 0..<len(scanned):
+        loop n_index in 0..<len(scanned):
             nd = at(scanned, n_index)
             if str_contains(nd, "orbs_native") and not list_contains(dirs, nd):
                 dirs = push(dirs, nd)
-        for s_index in 0..<len(scanned):
+        loop s_index in 0..<len(scanned):
             sd = at(scanned, s_index)
             if not str_contains(sd, "orbs_native") and not list_contains(dirs, sd):
                 dirs = push(dirs, sd)
@@ -579,7 +579,7 @@ fn nb_add_astra(joined: Text, dir: Text) -> Text:
     if is_dir(dir):
         files = list_dir(dir)
         total = len(files)
-        for index in 0..<total:
+        loop index in 0..<total:
             file = at(files, index)
             if str_ends_with(file, ".astra"):
                 out = out + "," + dir + "/" + file
@@ -589,7 +589,7 @@ fn nb_split_spaces(joined: Text) -> [Text]:
     pieces = str_split(joined, " ")
     total = len(pieces)
     mut out = []
-    for index in 0..<total:
+    loop index in 0..<total:
         piece = at(pieces, index)
         if piece != "":
             out = push(out, piece)
@@ -601,7 +601,7 @@ fn nb_ship_files(name: Text) -> Text:
     if is_dir("features"):
         subs = list_dir("features")
         sub_total = len(subs)
-        for s_index in 0..<sub_total:
+        loop s_index in 0..<sub_total:
             sub = at(subs, s_index)
             if is_dir("features/" + sub):
                 joined = nb_add_astra(joined, "features/" + sub)
@@ -610,12 +610,12 @@ fn nb_ship_files(name: Text) -> Text:
     if pkgs != "":
         roots = nb_split_spaces(pkgs)
         root_total = len(roots)
-        for r_index in 0..<root_total:
+        loop r_index in 0..<root_total:
             joined = nb_add_astra(joined, at(roots, r_index))
     if is_dir("sounds"):
         wavs = list_dir("sounds")
         wav_total = len(wavs)
-        for w_index in 0..<wav_total:
+        loop w_index in 0..<wav_total:
             wav = at(wavs, w_index)
             if str_ends_with(wav, ".wav"):
                 joined = joined + ",sounds/" + wav
@@ -677,7 +677,7 @@ fn build_native_entry(variant: Text, entry_override: Text) -> Text:
     mut compile_args = [entry, ll]
     dirs = nb_orb_dirs(lines)
     dir_total = len(dirs)
-    for d_index in 0..<dir_total:
+    loop d_index in 0..<dir_total:
         compile_args = push(compile_args, at(dirs, d_index))
     if run_command(compiler, compile_args) != 0:
         die("orbit: native compile failed")
@@ -689,8 +689,8 @@ fn build_native_entry(variant: Text, entry_override: Text) -> Text:
     cfiles = platform_c_files(runtime, target)
     if len(cfiles) == 0:
         die("orbit: no GUI backend for " + target_name(target) + " yet — build on Windows, or add runtime/*_min.c backends for " + target_name(target) + " (see BUILD.md)")
-    mut link_args = [ll, runtime + "/orion_rt.c"]
-    for cf_index in 0..<len(cfiles):
+    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/net_min.c"]
+    loop cf_index in 0..<len(cfiles):
         link_args = push(link_args, at(cfiles, cf_index))
     if variant == "ship":
         embed_rc = run_command("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", runtime + "/tools/embed_assets.ps1", "-Out", "build/scripts_embed.c", "-Files", nb_ship_files(name)])
@@ -767,7 +767,7 @@ fn cli_build(path: Text) -> Text:
     mut compile_args = [path, ll]
     dirs = nb_orb_dirs(lines)
     dir_total = len(dirs)
-    for d_index in 0..<dir_total:
+    loop d_index in 0..<dir_total:
         compile_args = push(compile_args, at(dirs, d_index))
     if run_command(compiler, compile_args) != 0:
         return ""
@@ -787,7 +787,7 @@ fn cli_build(path: Text) -> Text:
     # /STACK is a Windows PE linker flag; POSIX raises the stack via ulimit
     # (Linux) or a link-time flag (macOS — main-thread stack is capped there).
     # -Wno-override-module silences the retargeted-triple note (no-op on Win).
-    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", "-Wno-override-module"]
+    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-Wno-override-module"]
     if os_kind() == 0:
         link_args = push(link_args, "-Xlinker")
         link_args = push(link_args, "/STACK:67108864")
@@ -821,10 +821,10 @@ fn __os_orbit_stdlib_orbs() -> [Text]:
         lines = nb_lines(read_file("Orbit.toml"))
         dirs = nb_orb_dirs(lines)
         dir_total = len(dirs)
-        for i in 0..<dir_total:
+        loop i in 0..<dir_total:
             entries = list_dir(at(dirs, i))
             ent_total = len(entries)
-            for j in 0..<ent_total:
+            loop j in 0..<ent_total:
                 nm = at(entries, j)
                 if nm != "":
                     out = push(out, nm)
@@ -899,7 +899,7 @@ fn cmd_memfacts():
         die("orbit memfacts: compiler not found at `" + compiler + "`")
     mut args = [resolve_path(), "memfacts"]
     dirs = nb_orb_dirs(lines)
-    for i in 0..<len(dirs):
+    loop i in 0..<len(dirs):
         args = push(args, at(dirs, i))
     exit_with(run_command(compiler, args))
 

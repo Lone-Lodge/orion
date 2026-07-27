@@ -14,7 +14,7 @@
 # When orion-self gets true sum types with payloads, this becomes
 # `enum Option: Some(T), None` natively.
 
-data Option: has: int, value: int
+type Option: has: int, value: int
 
 pub fn Some(v: int) -> Option:
     Option{has: 1, value: v}

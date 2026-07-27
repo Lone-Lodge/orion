@@ -1,0 +1,18 @@
+# `if let Pattern(binds) = expr:` [`else:`] binds and branches without a full
+# match. Desugars to a two-arm match (pattern -> body, `_` -> else), so match
+# lowering and exhaustiveness are untouched. Covers matching and non-matching.
+type Shape:
+    Circle(int)
+    Rect(int, int)
+
+fn main() -> int:
+    mut total = 0
+    if let Circle(r) = Shape.Circle(6):
+        total = r * r          # matches -> 36
+    else:
+        total = 999
+    if let Circle(r) = Shape.Rect(5, 2):
+        total = total + 999    # not taken (it is a Rect)
+    else:
+        total = total + 10     # 36 + 10 == 46
+    total

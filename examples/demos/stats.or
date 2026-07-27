@@ -14,7 +14,7 @@ fn main() -> int:
 
     # Parse each piece into an int.
     mut xs = []
-    for i in 0..<len(raw):
+    loop i in 0..<len(raw):
         xs = push(xs, parse(at(raw, i)))
 
     n = len(xs)

@@ -2,8 +2,8 @@
 # Exercises every syntactic construct used in orbs/.
 # DO NOT hand-edit — regenerate with the script.
 
-enum SumStatus: Ok(int), Err(int)
-data CovObj: field: int, name: Text
+type SumStatus: Ok(int), Err(int)
+type CovObj: field: int, name: Text
 
 fn double_int(x: int) -> int:
     x + x
@@ -31,13 +31,13 @@ fn main() -> int:
 
     # ─── control flow ───────────────────────────────────────────────
     mut sum_range = 0
-    for index in 0..<5:
+    loop index in 0..<5:
         sum_range = sum_range + index
     if sum_range == 10: total = total + 1
 
     items = [1, 2, 3, 4]
     mut sum_list = 0
-    for item in items:
+    loop item in items:
         sum_list = sum_list + item
     if sum_list == 10: total = total + 1
 
@@ -56,7 +56,7 @@ fn main() -> int:
 
     # loop + break
     mut counter = 0
-    for:
+    loop:
         counter = counter + 1
         if counter == 3:
             break

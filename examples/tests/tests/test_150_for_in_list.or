@@ -1,6 +1,6 @@
 fn main() -> int:
     nums = [10, 20, 30, 40, 50]
     mut total = 0
-    for x in nums:
+    loop x in nums:
         total = total + x
     total

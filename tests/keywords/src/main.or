@@ -17,7 +17,7 @@ deterministic fn step(x: int, vx: int, dt: int) -> int:
 
 deterministic fn integrate(x: int, vx: int, ticks: int) -> int:
     mut pos = x
-    for i in 0..<ticks:
+    loop i in 0..<ticks:
         pos = step(pos, vx, 1)
     pos
 

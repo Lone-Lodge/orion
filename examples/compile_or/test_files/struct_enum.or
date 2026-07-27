@@ -1,6 +1,6 @@
-data Point: x: int, y: int
+type Point: x: int, y: int
 
-enum Color:
+type Color:
     Red
     Green
     Blue

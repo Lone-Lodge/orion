@@ -1,7 +1,7 @@
 fn repeat(t: Text, n: int) -> Text:
     mut result = ""
     if n > 0:
-        for _ in 0..<n:
+        loop _ in 0..<n:
             result = "{result}{t}"
     result
 
@@ -9,7 +9,7 @@ fn upper(t: Text) -> Text:
     t_bytes = bytes_from_text(t)
     n = bytes_length(t_bytes)
     mut out = bytes_zeros(0)
-    for ci in 0..<n:
+    loop ci in 0..<n:
         b = byte_at(t_bytes, ci)
         mut new_b = b
         if b >= 97 and b <= 122:

@@ -17,15 +17,15 @@ PATTERNS=$(grep -rohE '\{[a-z_][a-z_0-9]*(\.[a-z_][a-z_0-9]*)?\}|\{[a-z_]+\([a-z
     | sort -u | head -30)
 
 # ─── 2. enum/data patterns ──────────────────────────────────────────────
-HAS_ENUM=$(grep -l "^enum " orbs/ -r --include="*.or" 2>/dev/null | head -1)
-HAS_DATA=$(grep -l "^data " orbs/ -r --include="*.or" 2>/dev/null | head -1)
+HAS_ENUM=$(grep -l "^type " orbs/ -r --include="*.or" 2>/dev/null | head -1)
+HAS_DATA=$(grep -l "^pub type " orbs/ -r --include="*.or" 2>/dev/null | head -1)
 
 # ─── 3. control flow ────────────────────────────────────────────────────
 HAS_MATCH=$(grep -lE "^[[:space:]]*match " orbs/ -r --include="*.or" 2>/dev/null | head -1)
 HAS_LOOP=$(grep -lE "^[[:space:]]*loop:" orbs/ -r --include="*.or" 2>/dev/null | head -1)
 HAS_BREAK=$(grep -lE "^[[:space:]]*break" orbs/ -r --include="*.or" 2>/dev/null | head -1)
-HAS_FORRANGE=$(grep -lE "for [a-z_]+ in [0-9]+\.\.<" orbs/ -r --include="*.or" 2>/dev/null | head -1)
-HAS_FORIN=$(grep -lE "for [a-z_]+ in [a-z_]+:" orbs/ -r --include="*.or" 2>/dev/null | head -1)
+HAS_FORRANGE=$(grep -lE "loop [a-z_]+ in [0-9]+\.\.<" orbs/ -r --include="*.or" 2>/dev/null | head -1)
+HAS_FORIN=$(grep -lE "loop [a-z_]+ in [a-z_]+:" orbs/ -r --include="*.or" 2>/dev/null | head -1)
 HAS_INLINE_IF=$(grep -lE "if .+ then .+ else " orbs/ -r --include="*.or" 2>/dev/null | head -1)
 
 # ─── 4. mut/types ───────────────────────────────────────────────────────
@@ -37,8 +37,8 @@ cat > "$OUT" <<'HEADER'
 # Exercises every syntactic construct used in orbs/.
 # DO NOT hand-edit — regenerate with the script.
 
-enum SumStatus: Ok, Err
-data CovObj: field: int, name: Text
+type SumStatus: Ok(int), Err(int)
+type CovObj: field: int, name: Text
 
 fn double_int(x: int) -> int:
     x + x
@@ -66,13 +66,13 @@ fn main() -> int:
 
     # ─── control flow ───────────────────────────────────────────────
     mut sum_range = 0
-    for index in 0..<5:
+    loop index in 0..<5:
         sum_range = sum_range + index
     if sum_range == 10: total = total + 1
 
     items = [1, 2, 3, 4]
     mut sum_list = 0
-    for item in items:
+    loop item in items:
         sum_list = sum_list + item
     if sum_list == 10: total = total + 1
 

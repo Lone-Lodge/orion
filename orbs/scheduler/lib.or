@@ -12,7 +12,7 @@
 # event-loop pattern that composes with the existing setjmp/longjmp
 # continuations + the async timer queue.
 
-data Task: deadline_ms: int, fn_id: int, payload: int
+type Task: deadline_ms: int, fn_id: int, payload: int
 
 pub fn task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
     Task{deadline_ms: monotonic_ms() + fire_in_ms, fn_id: fn_id, payload: payload}
@@ -45,7 +45,7 @@ pub fn await_next(tasks: [Task]):
     if n == 0:
         return
     mut earliest = at(tasks, 0).deadline_ms
-    for i in 1..<n:
+    loop i in 1..<n:
         d = at(tasks, i).deadline_ms
         if d < earliest:
             earliest = d

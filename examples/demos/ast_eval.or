@@ -14,12 +14,12 @@
 # Num holds a literal; Neg holds one child index; the binaries hold two child
 # indices. `eval(arena, i)` matches on `arena[i]` and recurses into the kids.
 
-enum Node: Num(int), Neg(int), Add(int, int), Sub(int, int), Mul(int, int), Div(int, int)
+type Node: Num(int), Neg(int), Add(int, int), Sub(int, int), Mul(int, int), Div(int, int)
 
 # A parse step returns the growing arena, the index of the node it produced,
 # and the next unconsumed token. Value semantics mean the arena is threaded
 # through by return value rather than mutated in place.
-data PR: arena: [Node], idx: int, next: int
+type PR: arena: [Node], idx: int, next: int
 
 fn tok(kind: Text, val: int) -> Map:
     {"kind": kind, "val": val}
@@ -34,7 +34,7 @@ fn tokenize(src: Text) -> [Map]:
     n = len(bs)
     mut toks = []
     mut i = 0
-    for:
+    loop:
         if i >= n:
             break
         b = at(bs, i)
@@ -43,7 +43,7 @@ fn tokenize(src: Text) -> [Map]:
         else:
             if is_digit(b) == 1:
                 mut num = 0
-                for:
+                loop:
                     if i >= n:
                         break
                     d = at(bs, i)
@@ -91,7 +91,7 @@ fn parse_term(toks: [Map], pos: int, arena: [Node]) -> PR:
     mut a = left.arena
     mut node_i = left.idx
     mut i = left.next
-    for:
+    loop:
         if i >= len(toks):
             break
         k = get(at(toks, i), "kind")
@@ -110,7 +110,7 @@ fn parse_expr(toks: [Map], pos: int, arena: [Node]) -> PR:
     mut a = left.arena
     mut node_i = left.idx
     mut i = left.next
-    for:
+    loop:
         if i >= len(toks):
             break
         k = get(at(toks, i), "kind")

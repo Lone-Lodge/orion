@@ -59,6 +59,20 @@ static const char *c_dim(void) { return orion_console_color() ? "\x1b[2m" : ""; 
 static const char *c_red(void) { return orion_console_color() ? "\x1b[31;1m" : ""; }
 static const char *c_off(void) { return orion_console_color() ? "\x1b[0m" : ""; }
 
+/* ---- Parser recursion guard ------------------------------------------
+ * The compiler's parser is recursive descent: nested parens, unary runs,
+ * calls and indented blocks each add a native stack frame. On adversarial
+ * input (tens of thousands deep) that overran the linked stack and the
+ * compiler died with a raw SIGSEGV / ACCESS VIOLATION and no diagnostic —
+ * exactly the failure the fuzzer exists to catch. The parser now bumps
+ * this counter at each recursion chokepoint and refuses past a limit with
+ * a located `ERROR` instead of crashing. Compilation is single-threaded,
+ * so a plain global needs no atomics; `defer psr_depth_drop()` balances
+ * every bump, and a fresh process starts it at zero. */
+static long long psr_depth_level = 0;
+long long psr_depth_bump(void) { psr_depth_level += 1; return psr_depth_level; }
+long long psr_depth_drop(void) { if (psr_depth_level > 0) psr_depth_level -= 1; return psr_depth_level; }
+
 /* ---- Adaptive regions ------------------------------------------------
  * Regions (arena, frame, pools) start SMALL and the runtime sizes
  * them: at a reset the region is empty by definition, so the backing
@@ -1083,6 +1097,40 @@ const char *orion_f64_literal_hex(const char *s) {
 static jmp_buf *current_k = NULL;
 static long long resume_value = 0;
 
+/* Call the handler with N arguments (0..4). Every Orion value is a 64-bit
+ * word - an int or a pointer - so one word-typed entry point serves every
+ * parameter shape; the cast per arity is what makes the call ABI-correct.
+ *
+ * This exists because `perform Effect.op(a, b)` used to lower to the
+ * single-argument entry below: the second argument was evaluated and then
+ * DROPPED, so the handler read whatever happened to be in the register.
+ * `perform Math.add(40, 2)` returned 248. Silently. */
+static long long orion_call_handler_n(void *h, long long n,
+                                      long long a0, long long a1,
+                                      long long a2, long long a3) {
+    if (n <= 0) return ((long long (*)(void))h)();
+    if (n == 1) return ((long long (*)(long long))h)(a0);
+    if (n == 2) return ((long long (*)(long long, long long))h)(a0, a1);
+    if (n == 3) return ((long long (*)(long long, long long, long long))h)(a0, a1, a2);
+    return ((long long (*)(long long, long long, long long, long long))h)(a0, a1, a2, a3);
+}
+
+long long __orion_perform_int_n(void *handler, long long n,
+                                long long a0, long long a1,
+                                long long a2, long long a3) {
+    jmp_buf jb;
+    jmp_buf *old_k = current_k;
+    current_k = &jb;
+    long long ret;
+    if (setjmp(jb) == 0) {
+        ret = orion_call_handler_n(handler, n, a0, a1, a2, a3);
+    } else {
+        ret = resume_value;
+    }
+    current_k = old_k;
+    return ret;
+}
+
 /* Call handler with arg. If handler returns normally, that's the result.
  * If handler invokes __orion_resume_int, longjmp lands back here and we
  * return the resumed value instead. */
@@ -1118,6 +1166,23 @@ char *__orion_perform_text(char *(*handler)(char *), char *arg) {
     char *ret;
     if (setjmp(jb) == 0) {
         ret = handler(arg);
+    } else {
+        ret = resume_text_value;
+    }
+    current_k = old_k;
+    return ret;
+}
+
+/* Text-returning handler, N word-sized arguments (see the int version). */
+char *__orion_perform_text_n(void *handler, long long n,
+                             long long a0, long long a1,
+                             long long a2, long long a3) {
+    jmp_buf jb;
+    jmp_buf *old_k = current_k;
+    current_k = &jb;
+    char *ret;
+    if (setjmp(jb) == 0) {
+        ret = (char *)(intptr_t)orion_call_handler_n(handler, n, a0, a1, a2, a3);
     } else {
         ret = resume_text_value;
     }
@@ -1520,7 +1585,11 @@ static void guard_install(void) {
  * list pointer straight to code and jumped into the list's own memory (the
  * wild 0xAA crash the GUI hit; soak never armed the guard). Unwrap it the
  * way closure_call does: element 0 is the real function, element 1 the flag. */
-extern long long orion_list_at(void *list, long long idx);
+/* Same reason as orion_closure_slot below: reading the closure slots directly
+ * keeps this file linkable on its own. */
+static long long orion_guard_slot(void *clos, long long i) {
+    return ((long long *)clos)[2 + i];
+}
 
 long long sup_guard5(long long fn, long long a, long long b, long long c,
                      long long d, long long e) {
@@ -1539,8 +1608,8 @@ long long sup_guard5(long long fn, long long a, long long b, long long c,
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
     void *clos = (void *)fn;
-    long long real = orion_list_at(clos, 0);
-    long long lam = orion_list_at(clos, 1);
+    long long real = orion_guard_slot(clos, 0);
+    long long lam = orion_guard_slot(clos, 1);
     long long r;
     if (lam == 1)
         r = ((long long (*)(void *, long long, long long, long long, long long,
@@ -1565,8 +1634,8 @@ long long sup_guard7(long long fn, long long a, long long b, long long c,
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
     void *clos = (void *)fn;
-    long long real = orion_list_at(clos, 0);
-    long long lam = orion_list_at(clos, 1);
+    long long real = orion_guard_slot(clos, 0);
+    long long lam = orion_guard_slot(clos, 1);
     long long r;
     if (lam == 1)
         r = ((long long (*)(void *, long long, long long, long long, long long,
@@ -2007,10 +2076,15 @@ void *orion_par_madd(void *dstp, void *srcp, long long k) {
  * parallel system — those run on the main thread in their own batch.
  *
  * A closure is a list [fn_ptr, flag]; flag 1 = lambda taking its env first. */
-extern long long orion_list_at(void *list, long long idx);
+/* List element i, read directly: the compiler emits its own `orion_list_at`
+ * into every module it compiles, so referencing that symbol from here made
+ * orion_rt.c impossible to link on its own. Layout is [cap, len, data…]. */
+static long long orion_rt_list_at(void *list, long long idx) {
+    return ((long long *)list)[2 + idx];
+}
 static long long orion_call_system(void *clos, void *world, long long dt) {
-    long long real = orion_list_at(clos, 0);
-    long long lam = orion_list_at(clos, 1);
+    long long real = orion_guard_slot(clos, 0);
+    long long lam = orion_guard_slot(clos, 1);
     if (lam == 1)
         return ((long long (*)(void *, void *, long long))(void *)real)(clos, world, dt);
     return ((long long (*)(void *, long long))(void *)real)(world, dt);
@@ -2056,14 +2130,14 @@ long long atlas_par_systems(void *systems, void *world, long long dt) {
     HANDLE dones[ORION_POOL_MAX];
     long long made = 0, i;
     for (i = 0; i < cnt && i < nt; i++) {
-        orion_sys_tasks[i].clos = (void *)orion_list_at(systems, i);
+        orion_sys_tasks[i].clos = (void *)orion_rt_list_at(systems, i);
         orion_sys_tasks[i].world = world;
         orion_sys_tasks[i].dt = dt;
         dones[made++] = orion_sys_done[i];
         SetEvent(orion_sys_go[i]);
     }
     for (i = nt; i < cnt; i++)
-        orion_call_system((void *)orion_list_at(systems, i), world, dt);
+        orion_call_system((void *)orion_rt_list_at(systems, i), world, dt);
     if (made > 0) WaitForMultipleObjects((DWORD)made, dones, TRUE, INFINITE);
     return cnt;
 }
@@ -2072,7 +2146,618 @@ long long atlas_par_systems(void *systems, void *world, long long dt) {
     long long cnt = ((long long *)systems)[0];
     long long i;
     for (i = 0; i < cnt; i++)
-        orion_call_system((void *)orion_list_at(systems, i), world, dt);
+        orion_call_system((void *)orion_rt_list_at(systems, i), world, dt);
     return cnt;
 }
 #endif
+
+/* --- General parallel run: call each closure(arg) on a worker and return the
+ * SUM of their results. A closure is [fn_ptr, flag] (flag 1 = lambda taking
+ * its env first). Each worker writes ONLY its own task's result slot, so there
+ * are no data races, and the reduction (sum) is order-independent -> the result
+ * is deterministic regardless of thread count/timing. Surplus beyond the core
+ * count runs inline on the calling thread. Exposed to Orion via `extern fn`. */
+/* A closure is a list: [cap, len, fn_ptr, flag, captures…], so slot i of the
+ * DATA starts at word 2. Reading it directly keeps this file self-contained —
+ * calling the compiler-emitted `orion_list_at` made orion_rt.c unlinkable on
+ * its own, which broke every pure-C harness that links just the runtime
+ * (tools/region_shrink_test.sh died with "undefined symbol: orion_list_at"). */
+static long long orion_closure_slot(void *clos, long long i) {
+    return ((long long *)clos)[2 + i];
+}
+
+static long long orion_call_one(void *clos, long long arg) {
+    long long real = orion_closure_slot(clos, 0);
+    long long lam = orion_closure_slot(clos, 1);
+    if (lam == 1)
+        return ((long long (*)(void *, long long))(void *)real)(clos, arg);
+    return ((long long (*)(long long))(void *)real)(arg);
+}
+#if defined(_WIN32)
+typedef struct { void *clos; long long arg; long long result; } orion_run_task;
+static HANDLE orion_run_threads[ORION_POOL_MAX];
+static HANDLE orion_run_go[ORION_POOL_MAX];
+static HANDLE orion_run_done[ORION_POOL_MAX];
+static orion_run_task orion_run_tasks[ORION_POOL_MAX];
+static long long orion_run_n = 0;
+static DWORD WINAPI orion_run_worker(LPVOID a) {
+    long long idx = (long long)a;
+    for (;;) {
+        WaitForSingleObject(orion_run_go[idx], INFINITE);
+        orion_run_task *t = &orion_run_tasks[idx];
+        t->result = orion_call_one(t->clos, t->arg);
+        SetEvent(orion_run_done[idx]);
+    }
+}
+static void orion_run_pool_init(void) {
+    if (orion_run_n != 0) return;
+    SYSTEM_INFO si; GetSystemInfo(&si);
+    long long nt = (long long)si.dwNumberOfProcessors;
+    if (nt < 1) nt = 1;
+    if (nt > ORION_POOL_MAX) nt = ORION_POOL_MAX;
+    long long i;
+    for (i = 0; i < nt; i++) {
+        orion_run_go[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+        orion_run_done[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+        orion_run_threads[i] = CreateThread(NULL, 0, orion_run_worker, (LPVOID)i, 0, NULL);
+    }
+    orion_run_n = nt;
+}
+long long orion_par_run(void *closures, long long arg) {
+    orion_run_pool_init();
+    /* List layout is [cap, len, data...] — slot 1, not slot 0. Reading cap
+     * here worked only for a literal list (cap == len); a pushed-into list
+     * (what `loop parallel:` builds) grows cap past len, and the extra
+     * iterations ran off the end into the bounds trap. */
+    long long cnt = ((long long *)closures)[1];
+    long long nt = orion_run_n;
+    HANDLE dones[ORION_POOL_MAX];
+    long long made = 0, i, sum = 0;
+    for (i = 0; i < cnt && i < nt; i++) {
+        orion_run_tasks[i].clos = (void *)orion_rt_list_at(closures, i);
+        orion_run_tasks[i].arg = arg;
+        dones[made++] = orion_run_done[i];
+        SetEvent(orion_run_go[i]);
+    }
+    for (i = nt; i < cnt; i++)
+        sum += orion_call_one((void *)orion_rt_list_at(closures, i), arg);
+    if (made > 0) WaitForMultipleObjects((DWORD)made, dones, TRUE, INFINITE);
+    for (i = 0; i < cnt && i < nt; i++) sum += orion_run_tasks[i].result;
+    return sum;
+}
+#else
+long long orion_par_run(void *closures, long long arg) {
+    long long cnt = ((long long *)closures)[1];  /* [cap, len, data...] */
+    long long i, sum = 0;
+    for (i = 0; i < cnt; i++)
+        sum += orion_call_one((void *)orion_rt_list_at(closures, i), arg);
+    return sum;
+}
+#endif
+
+/* ---- Blocking stdio: what a language server needs -------------------
+ * `orion_console_readline` above is the opposite of this: non-blocking,
+ * interactive, keystroke-echoing, for a dev console polled once a frame.
+ * A Language Server speaks a framed protocol over a pipe and must BLOCK
+ * until the next header line / the exact body length arrives, and must
+ * write bytes with no newline appended (`print_line` uses puts).
+ */
+/* One line, terminator stripped. A BLANK line comes back as "\n" and "" means
+ * end of stream: the caller has to tell those apart, because in a framed
+ * protocol the blank line is what ends the header block. (Returning "" for both
+ * made the server read the end of the headers as EOF and answer nothing.) */
+const char *orion_stdin_line(void) {
+    char buf[8192];
+    if (!fgets(buf, (int)sizeof(buf), stdin)) return orion_text_empty();
+    size_t n = strlen(buf);
+    while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r')) n--;
+    if (n == 0) {
+        char *nl = orion_text_alloc(1);
+        nl[0] = '\n';
+        nl[1] = 0;
+        return nl;
+    }
+    char *out = orion_text_alloc((long long)n);
+    memcpy(out, buf, n);
+    out[n] = 0;
+    return out;
+}
+
+const char *orion_stdin_read(long long want) {
+    if (want <= 0) return orion_text_empty();
+    char *out = orion_text_alloc(want);
+    long long got = 0;
+    while (got < want) {
+        size_t r = fread(out + got, 1, (size_t)(want - got), stdin);
+        if (r == 0) break;
+        got += (long long)r;
+    }
+    out[got] = 0;
+    ((long long *)out)[-1] = got;
+    return out;
+}
+
+long long orion_stdout_write(const char *s) {
+    long long n = orion_tlen_c(s);
+    if (n > 0) fwrite(s, 1, (size_t)n, stdout);
+    fflush(stdout);
+    return n;
+}
+
+/* stderr, for server-side logging that must not corrupt the protocol
+ * stream on stdout. */
+long long orion_stderr_line(const char *s) {
+    fprintf(stderr, "%s\n", s);
+    fflush(stderr);
+    return 0;
+}
+
+/* ---- Async: stackful coroutines + a cooperative scheduler ------------
+ *
+ * `orbs/async` and `orbs/scheduler` both said the same thing in a comment: a
+ * real scheduler needs "libco (or Windows fibers) for stack switching" and that
+ * was "future work". Until then a task could not SUSPEND: the effect machinery
+ * is one-shot setjmp/longjmp, which can resume a continuation but cannot park
+ * one and come back to it later. So `async` was timers and `scheduler` was a
+ * deadline queue that ran each task to completion — cooperative in name only.
+ *
+ * This is the missing layer. Every task gets its own stack (a Windows fiber, or
+ * a ucontext elsewhere), so `orion_task_yield()` parks mid-computation and the
+ * scheduler picks it up where it left off. Cooperative and single-threaded on
+ * purpose: `par_run` / `loop parallel:` is the parallel primitive, this is the
+ * concurrency one, and keeping them separate keeps both explainable.
+ *
+ * Where no stack switching exists at all, spawn RUNS the closure immediately
+ * and yield is a no-op: results stay correct for tasks that never yield, and a
+ * task that does yield simply does not interleave. That is stated out loud
+ * rather than pretending to suspend.
+ */
+#define ORION_MAX_TASKS 256
+#define ORION_TASK_STACK (256 * 1024)
+
+/* 0 = free, 1 = ready, 2 = running, 3 = done, 4 = sleeping until `wake_ms` */
+typedef struct {
+    void *stack_ctx;
+    void *clos;
+    long long arg;
+    long long result;
+    long long wake_ms;
+    int state;
+} orion_task_slot;
+
+static orion_task_slot orion_tasks[ORION_MAX_TASKS];
+static int orion_task_current = -1;
+static int orion_task_live = 0;
+
+static int orion_task_alloc(void *clos, long long arg) {
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state == 0) {
+            orion_tasks[i].clos = clos;
+            orion_tasks[i].arg = arg;
+            orion_tasks[i].result = 0;
+            orion_tasks[i].state = 1;
+            orion_tasks[i].wake_ms = 0;
+            orion_tasks[i].stack_ctx = NULL;
+            orion_task_live++;
+            return i;
+        }
+    }
+    return -1;
+}
+
+#if defined(_WIN32)
+static void *orion_sched_fiber = NULL;
+
+/* Forward decls: the multi-shot machinery lives further down but the task entry
+ * is where a replay has to land. */
+typedef struct orion_ms_slot_s orion_ms_slot_fwd;
+long long orion_ms_replay_wanted(int idx);
+void orion_ms_do_replay(int idx);
+void *orion_ms_handler_of(int idx);
+void orion_ms_set_base(int idx, char *base);
+
+static void __stdcall orion_task_entry(void *param) {
+    int idx = (int)(long long)param;
+    /* The high end of this task's live stack, remembered for the multi-shot
+     * snapshot: everything the task pushes lives below it. */
+    orion_ms_set_base(idx, (char *)&idx);
+    orion_tasks[idx].result = orion_call_one(orion_tasks[idx].clos, orion_tasks[idx].arg);
+    orion_tasks[idx].state = 3;
+    /* A fiber must never return. Park, and give control to whoever is owed it:
+     * a handler waiting for this continuation's result, otherwise the
+     * scheduler. A REPLAY request jumps back to the captured perform point —
+     * the stack has already been restored under us. */
+    for (;;) {
+        void *back = orion_ms_handler_of(idx);
+        if (back) SwitchToFiber(back); else SwitchToFiber(orion_sched_fiber);
+        if (orion_ms_replay_wanted(idx)) orion_ms_do_replay(idx);
+    }
+}
+
+long long orion_task_spawn(void *clos, long long arg) {
+    if (!orion_sched_fiber) {
+        orion_sched_fiber = ConvertThreadToFiber(NULL);
+        if (!orion_sched_fiber) orion_sched_fiber = GetCurrentFiber();
+    }
+    int idx = orion_task_alloc(clos, arg);
+    if (idx < 0) return -1;
+    orion_tasks[idx].stack_ctx = CreateFiber(ORION_TASK_STACK, orion_task_entry, (void *)(long long)idx);
+    if (!orion_tasks[idx].stack_ctx) {
+        orion_tasks[idx].state = 0;
+        orion_task_live--;
+        return -1;
+    }
+    return idx;
+}
+
+long long orion_task_yield(void) {
+    int me = orion_task_current;
+    if (me < 0) return 0;              /* not inside a task: nothing to park */
+    orion_tasks[me].state = 1;
+    SwitchToFiber(orion_sched_fiber);
+    return 1;
+}
+
+/* Wake every sleeper whose deadline has passed. Returns the shortest remaining
+ * wait in ms, or -1 when nobody is sleeping. */
+static long long orion_sched_wake_due(void) {
+    long long now = __orion_monotonic_ms();
+    long long soonest = -1;
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 4) continue;
+        if (orion_tasks[i].wake_ms <= now) {
+            orion_tasks[i].state = 1;
+        } else {
+            long long left = orion_tasks[i].wake_ms - now;
+            if (soonest < 0 || left < soonest) soonest = left;
+        }
+    }
+    return soonest;
+}
+
+/* Run ready tasks round-robin until `until_idx` is done (or, with -1, until
+ * nothing is ready). Returns the number of switches performed.
+ *
+ * A SLEEPING task does not hold the scheduler: when nothing is runnable but a
+ * timer is pending, this sleeps ONCE for the shortest remaining wait and then
+ * wakes whoever is due. That is what makes N tasks each waiting 100ms finish in
+ * ~100ms instead of N*100ms — with plain `sleep_ms` inside a task, the whole
+ * scheduler was parked in the OS. */
+static long long orion_sched_drive(int until_idx) {
+    long long switches = 0;
+    for (;;) {
+        if (until_idx >= 0 && orion_tasks[until_idx].state == 3) break;
+        orion_sched_wake_due();
+        int ran = 0;
+        for (int i = 0; i < ORION_MAX_TASKS; i++) {
+            if (orion_tasks[i].state != 1) continue;
+            orion_task_current = i;
+            orion_tasks[i].state = 2;
+            SwitchToFiber(orion_tasks[i].stack_ctx);
+            orion_task_current = -1;
+            ran = 1;
+            switches++;
+            if (until_idx >= 0 && orion_tasks[until_idx].state == 3) break;
+        }
+        if (!ran) {
+            long long wait = orion_sched_wake_due();
+            if (wait <= 0) break;      /* nothing runnable, no timers: stop */
+            __orion_sleep_ms(wait);
+        }
+    }
+    return switches;
+}
+
+/* Park the current task until `ms` from now. Outside a task this is an ordinary
+ * blocking sleep, so the same call is correct in both places. */
+long long orion_task_sleep(long long ms) {
+    int me = orion_task_current;
+    if (me < 0) {
+        __orion_sleep_ms(ms);
+        return 0;
+    }
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].state = 4;
+    SwitchToFiber(orion_sched_fiber);
+    return 1;
+}
+
+static void orion_task_release(int idx) {
+    if (orion_tasks[idx].stack_ctx) DeleteFiber(orion_tasks[idx].stack_ctx);
+    orion_tasks[idx].stack_ctx = NULL;
+    orion_tasks[idx].state = 0;
+    orion_task_live--;
+}
+
+#else
+#include <ucontext.h>
+static ucontext_t orion_sched_ctx;
+static ucontext_t orion_task_ctx[ORION_MAX_TASKS];
+static char *orion_task_stack[ORION_MAX_TASKS];
+static int orion_entry_idx = -1;
+
+static void orion_task_entry(void) {
+    int idx = orion_entry_idx;
+    orion_tasks[idx].result = orion_call_one(orion_tasks[idx].clos, orion_tasks[idx].arg);
+    orion_tasks[idx].state = 3;
+    swapcontext(&orion_task_ctx[idx], &orion_sched_ctx);
+}
+
+long long orion_task_spawn(void *clos, long long arg) {
+    int idx = orion_task_alloc(clos, arg);
+    if (idx < 0) return -1;
+    orion_task_stack[idx] = (char *)malloc(ORION_TASK_STACK);
+    if (!orion_task_stack[idx]) {
+        orion_tasks[idx].state = 0;
+        orion_task_live--;
+        return -1;
+    }
+    getcontext(&orion_task_ctx[idx]);
+    orion_task_ctx[idx].uc_stack.ss_sp = orion_task_stack[idx];
+    orion_task_ctx[idx].uc_stack.ss_size = ORION_TASK_STACK;
+    orion_task_ctx[idx].uc_link = &orion_sched_ctx;
+    orion_entry_idx = idx;
+    makecontext(&orion_task_ctx[idx], orion_task_entry, 0);
+    return idx;
+}
+
+long long orion_task_yield(void) {
+    int me = orion_task_current;
+    if (me < 0) return 0;
+    orion_tasks[me].state = 1;
+    swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
+    return 1;
+}
+
+static long long orion_sched_wake_due(void) {
+    long long now = __orion_monotonic_ms();
+    long long soonest = -1;
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 4) continue;
+        if (orion_tasks[i].wake_ms <= now) {
+            orion_tasks[i].state = 1;
+        } else {
+            long long left = orion_tasks[i].wake_ms - now;
+            if (soonest < 0 || left < soonest) soonest = left;
+        }
+    }
+    return soonest;
+}
+
+static long long orion_sched_drive(int until_idx) {
+    long long switches = 0;
+    for (;;) {
+        if (until_idx >= 0 && orion_tasks[until_idx].state == 3) break;
+        orion_sched_wake_due();
+        int ran = 0;
+        for (int i = 0; i < ORION_MAX_TASKS; i++) {
+            if (orion_tasks[i].state != 1) continue;
+            orion_task_current = i;
+            orion_tasks[i].state = 2;
+            orion_entry_idx = i;
+            swapcontext(&orion_sched_ctx, &orion_task_ctx[i]);
+            orion_task_current = -1;
+            ran = 1;
+            switches++;
+            if (until_idx >= 0 && orion_tasks[until_idx].state == 3) break;
+        }
+        if (!ran) {
+            long long wait = orion_sched_wake_due();
+            if (wait <= 0) break;
+            __orion_sleep_ms(wait);
+        }
+    }
+    return switches;
+}
+
+long long orion_task_sleep(long long ms) {
+    int me = orion_task_current;
+    if (me < 0) {
+        __orion_sleep_ms(ms);
+        return 0;
+    }
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].state = 4;
+    swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
+    return 1;
+}
+
+static void orion_task_release(int idx) {
+    free(orion_task_stack[idx]);
+    orion_task_stack[idx] = NULL;
+    orion_tasks[idx].state = 0;
+    orion_task_live--;
+}
+#endif
+
+/* Drive until this task finishes, then take its result. A task is awaited
+ * exactly once; awaiting a finished or unknown id yields 0 rather than
+ * corrupting the table. */
+long long orion_task_await(long long id) {
+    if (id < 0 || id >= ORION_MAX_TASKS) return 0;
+    int idx = (int)id;
+    if (orion_tasks[idx].state == 0) return 0;
+    orion_sched_drive(idx);
+    long long r = orion_tasks[idx].result;
+    if (orion_tasks[idx].state == 3) orion_task_release(idx);
+    return r;
+}
+
+/* Run every ready task to completion; returns how many finished. Results are
+ * still collected with await. */
+long long orion_task_run_all(void) {
+    orion_sched_drive(-1);
+    long long done = 0;
+    for (int i = 0; i < ORION_MAX_TASKS; i++)
+        if (orion_tasks[i].state == 3) done++;
+    return done;
+}
+
+long long orion_task_state(long long id) {
+    if (id < 0 || id >= ORION_MAX_TASKS) return 0;
+    return orion_tasks[(int)id].state;
+}
+
+long long orion_task_live_count(void) { return orion_task_live; }
+
+/* ---- Delimited continuations: the handler survives the resume --------
+ *
+ * `resume(v)` in an ordinary `handle` block is a longjmp: control leaves for
+ * the perform site and the handler's frame is GONE. So a handler can never do
+ * anything after the continuation runs — not clean up, not inspect the result,
+ * and certainly not resume a second time.
+ *
+ * Here the handler runs on ITS OWN FIBER, so it survives:
+ *
+ *   1. capture — snapshot the task's live stack from the perform point up to
+ *                its base, and setjmp;
+ *   2. handle  — switch to a fresh fiber and run the handler there;
+ *   3. resume  — hand control back to the task and RETURN ITS RESULT to the
+ *                handler when the rest of the task finishes.
+ *
+ * `resume_with(v)` therefore returns a value, which one-shot `resume` cannot.
+ * The continuation is delimited by the TASK.
+ *
+ * A SECOND resume is refused, loudly. Replaying would mean putting the task's
+ * stack back as it was at the perform point, and that invalidates the context
+ * the OS parked the fiber at: the switch then lands on a stack whose saved
+ * frame no longer describes it. That was measured, not assumed — the first
+ * resume returns correctly, the second faulted at the switch. Getting past it
+ * needs a context switcher of our own or per-resume stack copies with full
+ * pointer relocation, and neither belongs in a half-built state.
+ *
+ * WINDOWS ONLY for now (fibers). Elsewhere this reports -1 rather than
+ * pretending: an untested ucontext version of something this delicate would be
+ * worse than an honest refusal.
+ */
+typedef struct {
+    jmp_buf ctx;
+    char *lo;
+    size_t len;
+    char *snap;
+    size_t snap_cap;
+    void *handler_fiber;
+    void *handler_clos;
+    long long handler_arg;
+    long long handler_result;
+    long long resume_in;
+    int resume_pending;
+    int ran_once;
+    int replay;
+    int active;
+} orion_ms_slot;
+
+static orion_ms_slot orion_ms[ORION_MAX_TASKS];
+static char *orion_task_base[ORION_MAX_TASKS];
+static int orion_ms_serving = -1;   /* which task the running handler serves */
+
+#if defined(_WIN32)
+static void __stdcall orion_ms_handler_entry(void *param) {
+    int idx = (int)(long long)param;
+    orion_ms_serving = idx;
+    orion_ms[idx].handler_result = orion_call_one(orion_ms[idx].handler_clos, orion_ms[idx].handler_arg);
+    orion_ms_serving = -1;
+    /* The handler is done. If it never resumed, the task is still parked at the
+     * perform point and must come back with the handler's own value. If it did
+     * resume, the task already finished, so hand control to the scheduler. */
+    int resumed = orion_ms[idx].ran_once;
+    orion_ms[idx].handler_fiber = NULL;
+    orion_ms[idx].active = 0;
+    if (!resumed) {
+        /* Never resumed: the task is still parked at the perform point and the
+         * handler's value is what that point yields. */
+        SwitchToFiber(orion_tasks[idx].stack_ctx);
+    } else {
+        /* It resumed, so the continuation already ran and the task is done. In
+         * a delimited handler the HANDLER's value is the value of the handled
+         * computation, so it replaces the continuation's own result: the
+         * handler is the outer expression, not a callback. */
+        orion_tasks[idx].result = orion_ms[idx].handler_result;
+    }
+    for (;;) SwitchToFiber(orion_sched_fiber);
+}
+
+/* Called from INSIDE a task: run `handler` with `arg`, letting it resume this
+ * point any number of times. Returns whatever the perform site should see. */
+long long orion_ms_perform(void *handler_clos, long long arg) {
+    int idx = orion_task_current;
+    if (idx < 0) return orion_call_one(handler_clos, arg);   /* not in a task */
+    volatile char marker = 0;
+    orion_ms_slot *m = &orion_ms[idx];
+    m->lo = (char *)&marker;
+    if (orion_task_base[idx] <= m->lo) return orion_call_one(handler_clos, arg);
+    m->len = (size_t)(orion_task_base[idx] - m->lo);
+    if (m->len > m->snap_cap) {
+        free(m->snap);
+        m->snap = (char *)malloc(m->len);
+        m->snap_cap = m->snap ? m->len : 0;
+        if (!m->snap) return orion_call_one(handler_clos, arg);
+    }
+    memcpy(m->snap, m->lo, m->len);
+    m->handler_clos = handler_clos;
+    m->handler_arg = arg;
+    m->ran_once = 0;
+    m->replay = 0;
+    m->resume_pending = 0;
+    m->active = 1;
+    if (setjmp(m->ctx) == 0) {
+        m->handler_fiber = CreateFiber(ORION_TASK_STACK, orion_ms_handler_entry, (void *)(long long)idx);
+        if (!m->handler_fiber) { m->active = 0; return orion_call_one(handler_clos, arg); }
+        SwitchToFiber(m->handler_fiber);
+        /* Back without a longjmp: either the first resume, or the handler
+         * finished without resuming at all. */
+        if (m->resume_pending) { m->resume_pending = 0; return m->resume_in; }
+        return m->handler_result;
+    }
+    /* Back via longjmp: a LATER resume replayed the snapshot. */
+    m->resume_pending = 0;
+    return m->resume_in;
+}
+
+/* Called from inside a handler started by orion_ms_perform. Runs the rest of
+ * the task with `v` and returns what the task produced. */
+long long orion_ms_resume(long long v) {
+    int idx = orion_ms_serving;
+    if (idx < 0 || !orion_ms[idx].active) return 0;
+    orion_ms_slot *m = &orion_ms[idx];
+    if (m->ran_once) {
+        /* ONE resume per capture. A second one would have to put the task's
+         * stack back the way it was at the perform point — and restoring it
+         * invalidates the very context the OS parked that fiber at, so the
+         * switch lands on a stack whose saved frame no longer describes it.
+         * (Measured, not assumed: the first resume works and returns the
+         * continuation's result; the second faulted at the switch.)
+         *
+         * Doing better needs a context switcher of our own, or per-resume stack
+         * COPIES with every frame pointer relocated. Neither is something to
+         * half-build, so this says no instead of corrupting the process. */
+        fprintf(stderr, "orion: resume_with called twice for one `ask` — the continuation is one-shot (see orbs/async)\n");
+        return -1;
+    }
+    m->resume_in = v;
+    m->resume_pending = 1;
+    m->ran_once = 1;
+    orion_tasks[idx].state = 2;
+    SwitchToFiber(orion_tasks[idx].stack_ctx);
+    orion_ms_serving = idx;
+    return orion_tasks[idx].result;
+}
+
+long long orion_ms_supported(void) { return 1; }
+#else
+long long orion_ms_perform(void *handler_clos, long long arg) {
+    (void)handler_clos; (void)arg;
+    return -1;
+}
+long long orion_ms_resume(long long v) { (void)v; return -1; }
+long long orion_ms_supported(void) { return 0; }
+#endif
+
+/* Accessors the task entry needs (it is defined above this block). */
+void orion_ms_set_base(int idx, char *base) { orion_task_base[idx] = base; }
+void *orion_ms_handler_of(int idx) { return orion_ms[idx].handler_fiber; }
+long long orion_ms_replay_wanted(int idx) { return orion_ms[idx].replay ? 1 : 0; }
+void orion_ms_do_replay(int idx) {
+    orion_ms[idx].replay = 0;
+    longjmp(orion_ms[idx].ctx, 1);
+}

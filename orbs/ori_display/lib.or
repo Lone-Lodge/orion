@@ -13,7 +13,7 @@
 
 use ori_geometry
 
-pub enum DrawCmd:
+pub type DrawCmd:
     DrawRect(Rect, Text, int)
     # Filled rounded rectangle: rect, colour, corner radius (px), src eid.
     # Backends fill it as horizontal og_rect spans with circular corner
@@ -35,7 +35,7 @@ pub enum DrawCmd:
     # the tint/blend strings (same palette as DrawText/DrawRect colours).
     DrawImage(Point, Text, int, int, Text, Text, int)
 
-pub data DisplayList: commands: [DrawCmd]
+pub type DisplayList: commands: [DrawCmd]
 
 pub fn empty_list() -> DisplayList:
     DisplayList{commands: []}

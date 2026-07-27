@@ -26,14 +26,14 @@ fn main() -> int:
     mut running = 1
     mut blocks_x = []
     mut blocks_y = []
-    for:
+    loop:
         if running == 0:
             break
         if ori_should_quit(app):
             break
         events = ori_pump(app)
         n_ev = len(events)
-        for i in 0..<n_ev:
+        loop i in 0..<n_ev:
             ev = at(events, i)
             if ev.kind == "mouse_down":
                 blocks_x = push(blocks_x, to_int(ev.x))
@@ -47,7 +47,7 @@ fn main() -> int:
         mut display = empty_list()
         display = push_cmd(display, DrawRect(Rect{x: 40, y: 40, width: 720, height: 520}, "panel", 0))
         n_b = len(blocks_x)
-        for bi in 0..<n_b:
+        loop bi in 0..<n_b:
             bx = (at(blocks_x, bi) / 40) * 40
             by = (at(blocks_y, bi) / 40) * 40
             display = push_cmd(display, DrawRect(Rect{x: bx, y: by, width: 36, height: 36}, "magenta", 0))

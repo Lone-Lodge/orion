@@ -1,5 +1,5 @@
 fn main() -> int:
     mut total = 0
-    for i in 1..=5:
+    loop i in 1..=5:
         total = total + i
     total

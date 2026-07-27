@@ -58,42 +58,94 @@ fn slx_make_token(kind: Text, value: Text, line: int, col: int) -> Map:
 
 fn slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
     mut cursor = start
-    for:
+    loop:
         if cursor >= byte_count:
             break
         if not slx_is_ident_continue(byte_at(bytes, cursor)):
             break
         cursor += 1
     text_value = bytes_to_text(bytes_slice(bytes, start, cursor))
-    # Keep keywords as `ident` so the existing parser checks (which
-    # compare value strings) continue to work. The keyword table is
-    # still useful — `slx_keyword_kind` can be queried by the parser
-    # to skip the per-statement string comparisons.
+    # Every word lexes as `ident`. The PARSER decides what is a keyword, by
+    # comparing the value in the position where that keyword is meaningful,
+    # which is what lets `type`, `loop` or `data` also be ordinary variable
+    # names elsewhere.
+    #
+    # There used to be a `slx_keyword_table` / `slx_keyword_kind` pair here,
+    # kept "in case the parser wants to skip its string comparisons". Nothing
+    # ever called it, so it drifted into a second, WRONG answer to "what is a
+    # keyword": it listed `data`/`enum`/`for` (retired), 15 words with no
+    # implementation (trait, impl, system, with, spawn, destroy, scope, job,
+    # raw, frame, before, after, as, none, self) and was missing 8 real ones
+    # (type, const, effect, handle, perform, defer, move, let). A dead list
+    # that looks authoritative is worse than no list: deleted. The parser is
+    # the single source of truth, and `tools/negative_test.sh` is where a
+    # reserved-but-unimplemented word gets its behaviour pinned.
     {"token": slx_make_token("ident", text_value, line, col), "next": cursor}
 
-# The keyword table — pairs of (word, kind). Sequential lookup keeps
-# the fn flat (Orion's parser dislikes deeply-nested if/else chains).
-fn slx_keyword_table() -> [Text]:
-    ["fn", "kw_fn", "data", "kw_data", "enum", "kw_enum", "trait", "kw_trait", "impl", "kw_impl", "system", "kw_system", "use", "kw_use", "pub", "kw_pub", "mut", "kw_mut", "if", "kw_if", "else", "kw_else", "for", "kw_for", "in", "kw_in", "with", "kw_with", "where", "kw_where", "loop", "kw_loop", "break", "kw_break", "continue", "kw_continue", "match", "kw_match", "true", "kw_true", "false", "kw_false", "and", "kw_and", "or", "kw_or", "not", "kw_not", "extern", "kw_extern", "comptime", "kw_comptime", "deterministic", "kw_deterministic", "parallel", "kw_parallel", "spawn", "kw_spawn", "destroy", "kw_destroy", "require", "kw_require", "ensure", "kw_ensure", "scope", "kw_scope", "job", "kw_job", "raw", "kw_raw", "frame", "kw_frame", "before", "kw_before", "after", "kw_after", "as", "kw_as", "return", "kw_return", "none", "kw_none", "self", "kw_self"]
+fn slx_hex_digit(c: int) -> int:
+    if c >= 48 and c <= 57:
+        c - 48
+    else:
+        if c >= 97 and c <= 102:
+            c - 87
+        else:
+            if c >= 65 and c <= 70:
+                c - 55
+            else:
+                0 - 1
 
-# Map a word to a token kind. `ident` means "not a keyword".
-fn slx_keyword_kind(word: Text) -> Text:
-    table = slx_keyword_table()
-    table_length = len(table)
-    mut found = "ident"
-    mut index = 0
-    for:
-        if index >= table_length:
+# `0x1F`, `0b1010`, `0o17` — a leading 0 plus a base marker. Returns the token
+# and the new cursor, or next == start when this is not a based literal.
+#
+# These did not lex at all: `0x81` came out as the number 0 followed by an
+# identifier `x81`, so a mask like `& 0xFF` was a syntax error two tokens later.
+# Real in-tree code uses them (atlas_ws builds WebSocket frame headers), and the
+# editor grammar highlighted them, which made the gap look like a bug in the
+# file rather than in the lexer.
+fn slx_scan_based(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
+    if start + 2 >= byte_count:
+        return {"token": slx_make_token("int", "0", line, col), "next": start}
+    if byte_at(bytes, start) != 48:
+        return {"token": slx_make_token("int", "0", line, col), "next": start}
+    marker = byte_at(bytes, start + 1)
+    mut base = 0
+    if marker == 120 or marker == 88:
+        base = 16
+    if marker == 98 or marker == 66:
+        base = 2
+    if marker == 111 or marker == 79:
+        base = 8
+    if base == 0:
+        return {"token": slx_make_token("int", "0", line, col), "next": start}
+    mut cursor = start + 2
+    mut value = 0
+    mut digits = 0
+    loop:
+        if cursor >= byte_count:
             break
-        if at(table, index) == word:
-            found = at(table, index + 1)
-        index += 2
-    found
+        c = byte_at(bytes, cursor)
+        if c == 95:
+            cursor = cursor + 1
+            continue
+        d = slx_hex_digit(c)
+        if d < 0 or d >= base:
+            break
+        value = value * base + d
+        digits = digits + 1
+        cursor = cursor + 1
+    if digits == 0:
+        return {"token": slx_make_token("int", "0", line, col), "next": start}
+    # Emitted as a decimal int token: the parser and every later stage only ever
+    # see the VALUE, so no base survives past here.
+    {"token": slx_make_token("int", "{value}", line, col), "next": cursor}
 
 fn slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
+    based = slx_scan_based(bytes, start, byte_count, line, col)
+    if get_int(based, "next") > start:
+        return based
     mut cursor = start
     mut saw_dot = false
-    for:
+    loop:
         if cursor >= byte_count:
             break
         current = byte_at(bytes, cursor)
@@ -133,14 +185,14 @@ fn slx_int_to_text(n: int) -> Text:
         return "0"
     mut digits = bytes_zeros(0)
     mut v = n
-    for:
+    loop:
         if v <= 0:
             break
         digits = push(digits, 48 + (v % 10))
         v = v / 10
     mut out = bytes_zeros(0)
     mut i = len(digits) - 1
-    for:
+    loop:
         if i < 0:
             break
         out = push(out, at(digits, i))
@@ -186,7 +238,7 @@ fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: in
     # belongs to an interpolated expression (e.g. a map key `m["k"]`), not
     # the string terminator — so it doesn't end the literal.
     mut brace_depth = 0
-    for:
+    loop:
         if cursor >= byte_count:
             break
         current = byte_at(bytes, cursor)
@@ -220,7 +272,13 @@ fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: in
             buffer = push(buffer, current)
             cursor += 1
     text_value = bytes_to_text(buffer)
-    {"token": slx_make_token("str", text_value, line, col), "next": cursor, "closed": closed}
+    # `holes` = interpolation braces still open at the end of the literal. The
+    # scanner already counts them; carrying the count out is what lets the
+    # parser reject `"{{"` with a message. (Before, the unterminated hole was
+    # handed to the expression parser as a bare `{`, which the map-literal loop
+    # then spun on forever.)
+    str_token = set(slx_make_token("str", text_value, line, col), "holes", brace_depth)
+    {"token": str_token, "next": cursor, "closed": closed}
 
 # --- multi-char symbol detection ---
 
@@ -267,6 +325,14 @@ fn slx_scan_op_short(first: int, second: int) -> Text:
         result = "*="
     if first == 47 and second == 61:
         result = "/="
+    # Bit shifts. `syntax.md` listed `<<` and `>>` among the operators, and the
+    # other four (`&` `|` `^` `~`) really did work — these two never lexed at
+    # all, so `plen >> 8` came out as `>` `>` and died as "not valid here". Real
+    # code hit it: atlas_ws builds WebSocket frame headers with shifts.
+    if first == 60 and second == 60:
+        result = "<<"
+    if first == 62 and second == 62:
+        result = ">>"
     if result == "":
         result = slx_scan_op_single(first)
     result
@@ -323,13 +389,18 @@ fn slx_scan_op_single(first: int) -> Text:
         result_text = "^"
     if first == 37:
         result_text = "%"
+    # `~` (126) was missing from this table entirely, so it lexed as nothing and
+    # `~x` came through as a bare `x`: the operator vanished before the parser
+    # ever saw it, and `~12` answered 12.
+    if first == 126:
+        result_text = "~"
     result_text
 
 # --- comment skip ---
 
 fn slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
     mut cursor = start
-    for:
+    loop:
         if cursor >= byte_count:
             break
         if slx_is_newline(byte_at(bytes, cursor)):
@@ -370,7 +441,7 @@ pub fn self_lex(source: Text) -> [Map]:
     mut cursor = 0
     mut line = 1
     mut line_start = 0
-    for:
+    loop:
         if cursor >= byte_count:
             break
         current = byte_at(bytes, cursor)

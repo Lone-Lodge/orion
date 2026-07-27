@@ -4,6 +4,7 @@ use orion_ir
 use orion_ast_to_ir
 use orion_emit_llvm
 use os
+use orion_driver
 
 # Orion test runner — LLVM backend.
 #
@@ -24,7 +25,7 @@ fn parse_expected(filename: Text) -> int:
         start = 5
     mut value = 0
     mut done = 0
-    for index in start..<total:
+    loop index in start..<total:
         if done == 0:
             ch = at(b, index)
             if ch >= 48 and ch <= 57:
@@ -40,7 +41,13 @@ fn parse_expected(filename: Text) -> int:
 # clang_path / mangle / host_triple are host-specific (see main): the compiler
 # always emits a Windows triple, so off Windows we retarget the IR here.
 fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clang_path: Text, mangle: Text, host_triple: Text) -> int:
-    src = read_file(src_path)
+    raw = read_file(src_path)
+    # Resolve `use` the way the real driver does. The runner used to lex the file
+    # as-is, so a test could only touch the compiler's own orbs: `use async` or
+    # `use iter` was an "unknown function" error, and every stdlib change had to
+    # be proven by hand outside the suite. Same collector as `orion.exe`, so a
+    # test sees exactly what a normal build sees.
+    src = drv_collect(raw, ["../../orbs/", "orbs/"], src_path)
     tokens = self_lex(src)
     ast = self_parse(tokens)
     # Reject empty/garbage AST. A Program with 0 decls means the input
@@ -116,7 +123,7 @@ fn main() -> int:
     # .exe's, exit=0 happens to match parse_expected()=0, and we get a
     # silent false pass. Filter at the source.
     mut files = []
-    for raw_index in 0..<raw_total:
+    loop raw_index in 0..<raw_total:
         raw_name = at(raw_files, raw_index)
         name_bytes = bytes_from_text(raw_name)
         name_len = len(name_bytes)
@@ -150,7 +157,7 @@ fn main() -> int:
     print_line("  {c_dim}──────────────────────────────────────────────{c_off}")
     print_line("")
 
-    for file_index in 0..<total_tests:
+    loop file_index in 0..<total_tests:
         filename = at(files, file_index)
         src_path = "tests/{filename}"
         ll_path = "dist/{filename}.ll"

@@ -28,7 +28,7 @@ fn tok(kind: Text, val: int) -> Map:
 # The result of parsing a sub-expression: its value and the index of the
 # next unconsumed token. Threading `next` is how recursive descent walks
 # the token list without a mutable cursor shared across functions.
-data Parsed: val: int, next: int
+type Parsed: val: int, next: int
 
 fn is_digit(b: int) -> int:
     if b >= '0' and b <= '9' then 1 else 0
@@ -40,7 +40,7 @@ fn tokenize(src: Text) -> [Map]:
     n = len(bs)
     mut toks = []
     mut i = 0
-    for:
+    loop:
         if i >= n:
             break
         b = at(bs, i)
@@ -49,7 +49,7 @@ fn tokenize(src: Text) -> [Map]:
         else:
             if is_digit(b) == 1:            # a run of digits -> one number
                 mut num = 0
-                for:
+                loop:
                     if i >= n:
                         break
                     d = at(bs, i)
@@ -91,7 +91,7 @@ fn parse_term(toks: [Map], pos: int) -> Parsed:
     left = parse_factor(toks, pos)
     mut val = left.val
     mut i = left.next
-    for:
+    loop:
         if i >= len(toks):
             break
         k = get(at(toks, i), "kind")
@@ -113,7 +113,7 @@ fn parse_expr(toks: [Map], pos: int) -> Parsed:
     left = parse_term(toks, pos)
     mut val = left.val
     mut i = left.next
-    for:
+    loop:
         if i >= len(toks):
             break
         k = get(at(toks, i), "kind")

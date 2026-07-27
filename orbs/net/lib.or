@@ -1,0 +1,34 @@
+# net — minimal blocking TCP, client and server.
+#
+# Handles are plain ints: a socket is >= 0, every failure is -1. Backed by
+# runtime/net_min.c (Winsock on Windows, BSD sockets elsewhere; WSAStartup is
+# lazy so a program that opens no socket never touches Winsock). Blocking only
+# for now — `loop parallel` / spawn give you concurrency where you need it.
+#
+#   c = connect("example.com", 80)
+#   send(c, "GET / HTTP/1.0\r\n\r\n")
+#   reply = recv(c, 4096)
+#   close(c)
+#
+#   s = listen(8080)                 # 0 picks an ephemeral port (local_port reads it back)
+#   client = accept(s)               # blocks until someone connects
+#   msg = recv(client, 4096)
+
+extern fn net_connect(host: Text, port: int) -> int
+extern fn net_send(sock: int, data: Text) -> int
+extern fn net_recv(sock: int, maxlen: int) -> Text
+extern fn net_close(sock: int) -> int
+extern fn net_listen(port: int) -> int
+extern fn net_accept(server: int) -> int
+extern fn net_local_port(server: int) -> int
+
+# --- client ---
+pub fn connect(host: Text, port: int) -> int = net_connect(host, port)
+pub fn send(sock: int, data: Text) -> int = net_send(sock, data)
+pub fn recv(sock: int, maxlen: int) -> Text = net_recv(sock, maxlen)
+pub fn close(sock: int) -> int = net_close(sock)
+
+# --- server ---
+pub fn listen(port: int) -> int = net_listen(port)
+pub fn accept(server: int) -> int = net_accept(server)
+pub fn local_port(server: int) -> int = net_local_port(server)

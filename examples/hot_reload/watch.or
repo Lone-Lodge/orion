@@ -22,7 +22,7 @@ fn main() -> int:
     mut gen = 0
     mut tick = build_and_load(gen)
     print_line("watching plugin.or ... (edit it and the running program follows)")
-    for i in 0..<10:
+    loop i in 0..<10:
         cur = read_file("plugin.or")
         if cur != last_src:
             last_src = cur

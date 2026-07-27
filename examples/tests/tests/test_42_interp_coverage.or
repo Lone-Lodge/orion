@@ -8,7 +8,7 @@
 #   - Fn call w/ field arg:   {fn(obj.field)}  ← was a bug
 #   - Multiple in one string
 
-data Obj: field: int, name: Text
+type Obj: field: int, name: Text
 
 fn double_int(x: int) -> int:
     x + x

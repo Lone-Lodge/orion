@@ -16,14 +16,14 @@ fn main() -> int:
     frames = 50000
     mut peak = 0
     mut i = 0
-    for:
+    loop:
         if i >= frames:
             break
         orion_arena_reset()
         orion_arena_on()
         # ~transient frame work: entity packing, draw lists, debug text
         mut draws = []
-        for r in 0..<100:
+        loop r in 0..<100:
             draws = push(draws, r * 7)
         msg = "frame {i} draws {len(draws)} score {i}"
         m = {"x": i, "y": i * 2, "label": msg}

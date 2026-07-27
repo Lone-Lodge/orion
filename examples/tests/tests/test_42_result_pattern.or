@@ -1,4 +1,4 @@
-data Result: ok: int, value: int, err: Text
+type Result: ok: int, value: int, err: Text
 
 fn Ok(v: int) -> Result:
     Result{ok: 1, value: v, err: ""}

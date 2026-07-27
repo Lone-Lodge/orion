@@ -11,7 +11,7 @@ fn count_due(timers: [int]) -> int:
     n = len(timers)
     now = monotonic_ms()
     mut count = 0
-    for i in 0..<n:
+    loop i in 0..<n:
         if at(timers, i) <= now:
             count = count + 1
     count

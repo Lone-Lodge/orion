@@ -14,7 +14,8 @@ set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RT="$ROOT/runtime/orion_rt.c"
-CC="${CC:-cc}"
+CC="${CC:-C:/Program Files/LLVM/bin/clang.exe}"
+[ -x "$CC" ] || CC="$(command -v clang || command -v cc || echo cc)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 

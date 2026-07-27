@@ -1,0 +1,23 @@
+# `type` is the one type-declaration keyword now: inline fields = product,
+# indented variants = sum, `= T` = alias. And a bare top-level `NAME = expr`
+# is a constant, no keyword. (`data`/`enum`/`const` still work as aliases.)
+type Point: x: int, y: int
+
+type Shape:
+    Circle(int)
+    Rect(int, int)
+
+type Meters = int
+
+BASE = 30
+
+fn area(s: Shape) -> int:
+    match s:
+        Circle(r) -> r * r
+        Rect(w, h) -> w * h
+
+fn main() -> int:
+    p = Point{x: 2, y: 3}
+    mut d: Meters = 5
+    a = area(Shape.Rect(4, 3))   # 12
+    a + p.x + BASE - d           # 12 + 2 + 30 - 5 == 39

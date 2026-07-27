@@ -63,7 +63,7 @@ pub fn next_due(timers: [int]) -> int:
     if n == 0:
         return 0 - 1
     mut best = at(timers, 0)
-    for i in 1..<n:
+    loop i in 1..<n:
         d = at(timers, i)
         if d < best:
             best = d
@@ -74,7 +74,7 @@ pub fn count_due(timers: [int]) -> int:
     n = len(timers)
     now = monotonic_ms()
     mut count = 0
-    for i in 0..<n:
+    loop i in 0..<n:
         if at(timers, i) <= now:
             count = count + 1
     count
@@ -85,3 +85,112 @@ pub fn wait_next(timers: [int]):
     nd = next_due(timers)
     if nd > 0:
         sleep_until(nd)
+
+# ---- tasks: real suspension, one stack each ---------------------------
+#
+# The comment at the top of this orb used to end with "A real preemptive
+# scheduler with non-blocking I/O is future work (libco + IOCP/epoll
+# bindings)", and everything above is what you get without stack switching:
+# timers. A task could not PARK mid-computation, because the effect machinery is
+# one-shot setjmp/longjmp — it resumes a continuation, it cannot come back to
+# one later.
+#
+# These four give every task its own stack (Windows fibers, ucontext elsewhere),
+# so `yield_now()` suspends and the scheduler resumes exactly where it stopped.
+# Cooperative and single-threaded on purpose: `loop parallel:` is the parallel
+# primitive, this is the concurrency one.
+#
+#     t1 = spawn(worker, 10)        # a closure + one int argument
+#     t2 = spawn(worker, 20)
+#     a = await(t1)                 # drives the scheduler until t1 finishes
+#     b = await(t2)
+#
+# and inside a worker:
+#
+#     fn worker(n: int) -> int:
+#         mut total = 0
+#         loop i in 0..<n:
+#             total += i
+#             yield_now()           # another task gets a turn here
+#         total
+#
+# A task is awaited ONCE (awaiting it again gives 0 — its stack is gone).
+# Where the platform has no stack switching, spawn runs the closure right away
+# and yield_now() does nothing: a non-yielding task still gives the same answer.
+extern fn orion_task_spawn(f: fn, arg: int) -> int
+extern fn orion_task_await(id: int) -> int
+extern fn orion_task_yield() -> int
+extern fn orion_task_run_all() -> int
+extern fn orion_task_state(id: int) -> int
+extern fn orion_task_live_count() -> int
+
+# Start a task. Returns its id, or -1 if the task table is full (256).
+pub fn spawn(f: fn, arg: int) -> int = orion_task_spawn(f, arg)
+
+# Run the scheduler until this task finishes, then take its result.
+pub fn await(id: int) -> int = orion_task_await(id)
+
+# Give the scheduler a turn. No-op outside a task.
+pub fn yield_now() -> int = orion_task_yield()
+
+# Drive every ready task to completion; returns how many are finished.
+pub fn run_all() -> int = orion_task_run_all()
+
+# 0 = no such task, 1 = ready, 2 = running, 3 = finished (result not taken yet).
+pub fn task_state(id: int) -> int = orion_task_state(id)
+
+pub fn task_count() -> int = orion_task_live_count()
+
+pub fn is_done(id: int) -> bool = orion_task_state(id) == 3
+
+extern fn orion_task_sleep(ms: int) -> int
+
+# Wait `ms` WITHOUT holding the scheduler. Inside a task this parks it and lets
+# the others run; the scheduler makes one real OS sleep for the shortest pending
+# deadline and wakes whoever is due. Outside a task it is an ordinary sleep, so
+# the same call is right in both places.
+#
+# This is the difference between concurrency and a queue: with `sleep_ms` inside
+# a task, ten tasks each waiting 100 ms took a second, because the first one
+# parked the whole scheduler in the OS.
+pub fn sleep_task(ms: int) -> int = orion_task_sleep(ms)
+
+# ---- delimited continuations: the handler survives the resume ---------
+#
+# `resume(v)` in a `handle` block is a longjmp: control leaves for the perform
+# site and the handler frame is GONE, so a handler can never act AFTER the
+# continuation runs. Here the handler runs on its own stack (a fiber), so it
+# survives and `resume_with` RETURNS the continuation result.
+#
+#     fn body(seed: int) -> int:
+#         x = ask(decide, seed)    # the handler decides what x is
+#         x * 10                   # the rest of the task: the continuation
+#
+#     fn decide(seed: int) -> int:
+#         answer = resume_with(4)  # runs the rest of the task with x = 4
+#         answer + 2               # ...and gets 40 back, so this returns 42
+#
+# The continuation is delimited by the TASK, which is the delimiter a top-level
+# `handle` does not have.
+#
+# ONE resume per `ask`. A second one is refused with a message rather than a
+# crash: replaying would mean restoring the task's stack to the perform point,
+# and that invalidates the context the OS parked the fiber at (measured — the
+# first resume returns correctly, the second faults at the switch). Real
+# multi-shot needs a context switcher of our own, or per-resume stack copies
+# with every frame pointer relocated. Neither is worth half-building.
+#
+# Windows only for now (fibers). `resumable_ok()` answers whether it is real
+# here; elsewhere `ask` returns -1 rather than pretending.
+extern fn orion_ms_perform(f: fn, arg: int) -> int
+extern fn orion_ms_resume(v: int) -> int
+extern fn orion_ms_supported() -> int
+
+# Inside a task: hand control to `handler`, which may resume this point once and
+# then keep working. Returns the handler's value, or the resumed value.
+pub fn ask(handler: fn, arg: int) -> int = orion_ms_perform(handler, arg)
+
+# Inside such a handler: run the rest of the task with `v`, and get its result.
+pub fn resume_with(v: int) -> int = orion_ms_resume(v)
+
+pub fn resumable_ok() -> bool = orion_ms_supported() == 1

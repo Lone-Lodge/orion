@@ -1,11 +1,11 @@
 # An inline match arm body can be an assignment (a side-effecting arm),
 # not only an expression: `Num(v) -> total += v`. The enum payload (`v`,
 # `o`) binds in the arm. Used as a statement inside a loop.
-enum Token: Num(int), Op(int)
+type Token: Num(int), Op(int)
 fn main() -> int:
     toks = [Token.Num(10), Token.Op(2), Token.Num(30)]
     mut total = 0
-    for t in toks:
+    loop t in toks:
         match t:
             Num(v) -> total = total + v      # inline assignment arm
             Op(o) -> total = total + o

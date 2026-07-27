@@ -22,20 +22,20 @@
 # An IR instruction. All fields present; unused ones zero/empty.
 # - name: fn name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
-data Inst: op: Text, type_text: Text, value: int, lhs: int, rhs: int, name: Text, args: [int]
+type Inst: op: Text, type_text: Text, value: int, lhs: int, rhs: int, name: Text, args: [int]
 
 # A function parameter.
-data Param: name: Text, type_text: Text
+type Param: name: Text, type_text: Text
 
 # A function: name, return type, params, and a list of instructions.
-data IRFn: name: Text, return_type: Text, params: [Param], instructions: [Inst]
+type IRFn: name: Text, return_type: Text, params: [Param], instructions: [Inst]
 
 # A module is a list of functions.
-data IRModule: functions: [IRFn]
+type IRModule: functions: [IRFn]
 
 # Result of pushing an instruction: the updated function + the new
 # instruction's SSA value id.
-data PushResult: function: IRFn, id: int
+type PushResult: function: IRFn, id: int
 
 
 # --- Value types (Text constants) ---
@@ -105,6 +105,25 @@ pub fn ir_idiv(lhs: int, rhs: int) -> Inst:
 
 pub fn ir_imod(lhs: int, rhs: int) -> Inst:
     Inst{op: "imod", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+
+# Bitwise, on the BITS (distinct from `and`/`or`, which coerce to 0/1). These
+# had no lowering at all: the parser dropped the operator and the program kept
+# the left operand, so `12 & 10` answered 12.
+pub fn ir_bit_and(lhs: int, rhs: int) -> Inst:
+    Inst{op: "bit_and", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+
+pub fn ir_bit_or(lhs: int, rhs: int) -> Inst:
+    Inst{op: "bit_or", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+
+pub fn ir_bit_xor(lhs: int, rhs: int) -> Inst:
+    Inst{op: "bit_xor", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+
+pub fn ir_shl(lhs: int, rhs: int) -> Inst:
+    Inst{op: "shl", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+
+# Arithmetic shift right: ints are signed, so the sign bit is preserved.
+pub fn ir_shr(lhs: int, rhs: int) -> Inst:
+    Inst{op: "shr", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical and/or: each operand is coerced to 0/1 (any nonzero → 1),
 # then bitwise AND/OR. Result is 0 or 1.
@@ -524,15 +543,16 @@ pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
             "{prefix}{op}.{inst.type_text} {lhs_ref}, {rhs_ref}"
 
 # Effects: perform with one-shot continuation via setjmp/longjmp.
-# `perform Effect.op(arg)` lowers to this. emit_llvm wraps the call in
-# setjmp dance so the handler can `resume_int(value)` to come back.
-# For now: single i64 arg, i64 return. Generalize later.
-pub fn ir_perform_int(handler_name: Text, arg_id: int) -> Inst:
-    Inst{op: "perform_int", type_text: "i64", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
+# `perform Effect.op(a, b)` lowers to this; emit wraps the handler call in the
+# setjmp dance so `resume(v)` can come back with a value. EVERY argument rides
+# in `args` (up to the runtime's 4): they used to be squeezed into the single
+# `lhs` slot, so a second argument was evaluated and then dropped.
+pub fn ir_perform_int(handler_name: Text, arg_ids: [int]) -> Inst:
+    Inst{op: "perform_int", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: handler_name, args: arg_ids}
 
 
-pub fn ir_perform_text(handler_name: Text, arg_id: int) -> Inst:
-    Inst{op: "perform_text", type_text: "text", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
+pub fn ir_perform_text(handler_name: Text, arg_ids: [int]) -> Inst:
+    Inst{op: "perform_text", type_text: "text", value: 0, lhs: 0, rhs: 0, name: handler_name, args: arg_ids}
 
 
 # First-class fn reference — produces a ptr-typed SSA value holding
@@ -572,7 +592,7 @@ pub fn ir_int_to_ptr(src_id: int, type_text: Text) -> Inst:
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:
     mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
-    for idx in 0..<total:
+    loop idx in 0..<total:
         inst = at(fn_value.instructions, idx)
         line = ir_dump_instruction(inst, idx)
         text = "{text}    {line}\n"
@@ -581,9 +601,7 @@ pub fn ir_dump_fn(fn_value: IRFn) -> Text:
 pub fn ir_dump_module(module: IRModule) -> Text:
     mut text = "; orion_ir module dump\n"
     total = len(module.functions)
-    for idx in 0..<total:
+    loop idx in 0..<total:
         fn_value = at(module.functions, idx)
         text = "{text}{ir_dump_fn(fn_value)}\n"
     text
-
-

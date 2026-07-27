@@ -1,0 +1,7 @@
+# expect: `data` was retired
+# `type` is the one type-declaration keyword: this product used to be `data`.
+data Point: x: int, y: int
+
+fn main() -> int:
+    p = Point{x: 1, y: 2}
+    p.x + p.y

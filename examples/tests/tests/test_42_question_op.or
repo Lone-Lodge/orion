@@ -1,4 +1,4 @@
-enum Result: Ok(int), Err(Text)
+type Result: Ok(int), Err(Text)
 
 fn safe_div(a: int, b: int) -> Result:
     if b == 0:

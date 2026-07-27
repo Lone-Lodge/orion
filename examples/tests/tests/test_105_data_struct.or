@@ -1,4 +1,4 @@
-data Player: name: Text, hp: int, level: int
+type Player: name: Text, hp: int, level: int
 
 fn main() -> int:
     p = Player{name: "Hero", hp: 100, level: 5}

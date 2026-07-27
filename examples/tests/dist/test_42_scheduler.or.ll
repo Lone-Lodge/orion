@@ -5,6 +5,7 @@ declare i32 @printf(ptr, ...)
 declare i32 @puts(ptr)
 declare ptr @malloc(i64)
 declare ptr @orion_f64_literal_hex(ptr)
+declare i64 @orion_par_run(ptr, i64)
 declare ptr @orion_alloc(i64)
 declare ptr @orion_par_madd(ptr, ptr, i64)
 declare i64 @orion_arena_init(i64)
@@ -46,6 +47,20 @@ declare ptr @orion_embedded_list()
 declare ptr @orion_dir_list(ptr)
 declare ptr @orion_dir_subdirs(ptr)
 declare ptr @orion_console_readline()
+declare i64 @orion_task_spawn(ptr, i64)
+declare i64 @orion_task_await(i64)
+declare i64 @orion_task_yield()
+declare i64 @orion_task_run_all()
+declare i64 @orion_task_state(i64)
+declare i64 @orion_task_live_count()
+declare i64 @orion_task_sleep(i64)
+declare i64 @orion_ms_perform(ptr, i64)
+declare i64 @orion_ms_resume(i64)
+declare i64 @orion_ms_supported()
+declare ptr @orion_stdin_line()
+declare ptr @orion_stdin_read(i64)
+declare i64 @orion_stdout_write(ptr)
+declare i64 @orion_stderr_line(ptr)
 declare ptr @orion_key_copy(ptr)
 declare i64 @orion_file_stamp(ptr)
 declare i64 @orion_audio_init()
@@ -195,6 +210,8 @@ declare i64 @__orion_perform_int(ptr, i64)
 declare void @__orion_resume_int(i64)
 declare ptr @__orion_perform_text(ptr, ptr)
 declare void @__orion_resume_text(ptr)
+declare i64 @__orion_perform_int_n(ptr, i64, i64, i64, i64, i64)
+declare ptr @__orion_perform_text_n(ptr, i64, i64, i64, i64, i64)
 declare i64 @__orion_time_now_ms()
 declare i64 @__orion_monotonic_ms()
 declare void @__orion_sleep_ms(i64)
@@ -375,6 +392,8 @@ after:
 @orion_slots = global ptr null
 
 @orion_empty_list = constant [2 x i64] zeroinitializer
+
+@.str_empty_h = constant [3 x i64] [i64 5381, i64 0, i64 0]
 
 define ptr @orion_persist_text(ptr %s) {
 entry:

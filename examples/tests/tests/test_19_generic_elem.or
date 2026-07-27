@@ -1,0 +1,33 @@
+# A generic result keeps its element type at the CALL SITE.
+#
+# Inside `fn take<T>(xs: [T], n: int) -> [T]` the type var erases to an i64 slot,
+# which is right (one body serves every T). It used to leak out though: the CALL
+# got `list:i64` back, so an element read out of the result was an int and
+# `len(at(kept, 0))` was a compile error ("`first` is `int`, not text or a
+# list"). The call site knows what the body cannot - the argument says T = Text.
+#
+# The runtime representation never changed: a list of text pointers and a list
+# of ints are both i64 slots. This is only the compiler no longer forgetting
+# which one it holds.
+
+fn take<T>(xs: [T], n: int) -> [T]:
+    mut out = slice(xs, 0, 0)
+    loop i in 0..<n:
+        out = push(out, at(xs, i))
+    out
+
+fn first_of<T>(xs: [T]) -> T:
+    at(xs, 0)
+
+fn sum_two(xs: [int]) -> int:
+    at(xs, 0) + at(xs, 1)
+
+fn main() -> int:
+    words = ["hi", "hello", "howdy"]
+    kept = take(words, 2)
+    a = len(at(kept, 0))     # 2   ("hi")     needs T = Text
+    b = len(first_of(words)) # 2   bare `-> T` instantiates too
+    # A concrete [int] argument still yields an int list.
+    nums = [7, 8, 9]
+    c = sum_two(take(nums, 2))   # 15
+    a + b + c                    # 2 + 2 + 15 == 19

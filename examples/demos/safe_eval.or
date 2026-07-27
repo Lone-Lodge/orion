@@ -13,8 +13,8 @@
 # `?` is exercised in a spot the tests don't reach: inside a `for` loop, inside
 # a `match` arm — the short-circuit still returns straight out of `eval`.
 
-enum Token: Num(int), Op(text)
-enum Eval:  Ok(int), Err(text)
+type Token: Num(int), Op(text)
+type Eval:  Ok(int), Err(text)
 
 fn is_digit(b: int) -> int:
     if b >= '0' and b <= '9' then 1 else 0
@@ -26,7 +26,7 @@ fn tokenize(src: Text) -> [Token]:
     n = len(bs)
     mut toks = []
     mut i = 0
-    for:
+    loop:
         if i >= n:
             break
         b = at(bs, i)
@@ -35,7 +35,7 @@ fn tokenize(src: Text) -> [Token]:
         else:
             if is_digit(b) == 1:
                 mut num = 0
-                for:
+                loop:
                     if i >= n:
                         break
                     d = at(bs, i)
@@ -67,7 +67,7 @@ fn apply(op: Text, a: int, b: int) -> Eval:
 
 fn eval(toks: [Token]) -> Eval:
     mut stack = []
-    for t in toks:
+    loop t in toks:
         match t:
             Num(v) -> stack = push(stack, v)
             Op(o) ->

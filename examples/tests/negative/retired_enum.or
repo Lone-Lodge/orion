@@ -1,0 +1,8 @@
+# expect: `enum` was retired
+# `type Tile: Empty, Wall` is the sum form now.
+enum Tile: Empty, Wall
+
+fn main() -> int:
+    match Tile.Wall:
+        Empty -> 0
+        Wall -> 1

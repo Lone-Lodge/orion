@@ -1,4 +1,4 @@
-data Vec2: x: int, y: int
+type Vec2: x: int, y: int
 
 fn make_vec(x: int, y: int) -> Vec2:
     Vec2{x: x, y: y}

@@ -1,0 +1,15 @@
+# Generic type declarations `<T, E>` and generic type application in a type
+# position (`Result<int, Text>`). Erasure-based: all instantiations share one
+# representation, so `T`/`E` in payloads lower to opaque i64 slots.
+type Result<T, E>:
+    Ok(T)
+    Err(E)
+
+fn divide(a: int, b: int) -> Result<int, Text>:
+    if b == 0 then Result.Err("div by zero") else Result.Ok(a / b)
+
+fn main() -> int:
+    r = divide(90, 2)
+    match r:
+        Ok(v)  -> v     # 45
+        Err(m) -> 0

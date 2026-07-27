@@ -69,7 +69,7 @@ pub fn str_starts_with(t: Text, p: Text) -> bool:
     pn = len(pb)
     if len(tb) < pn:
         return false
-    for i in 0..<pn:
+    loop i in 0..<pn:
         if at(tb, i) != at(pb, i):
             return false
     true
@@ -81,7 +81,7 @@ pub fn str_ends_with(t: Text, p: Text) -> bool:
     pn = len(pb)
     if tn < pn:
         return false
-    for i in 0..<pn:
+    loop i in 0..<pn:
         if at(tb, tn - pn + i) != at(pb, i):
             return false
     true
@@ -96,11 +96,11 @@ pub fn str_contains(t: Text, sub: Text) -> bool:
     if tn < sn:
         return false
     mut i = 0
-    for:
+    loop:
         if i > tn - sn:
             break
         mut hit = true
-        for j in 0..<sn:
+        loop j in 0..<sn:
             if at(tb, i + j) != at(sb, j):
                 hit = false
         if hit:
@@ -112,7 +112,7 @@ pub fn str_trim(t: Text) -> Text:
     bs = bytes_from_text(t)
     n = len(bs)
     mut lo = 0
-    for:
+    loop:
         if lo >= n:
             break
         c = at(bs, lo)
@@ -121,7 +121,7 @@ pub fn str_trim(t: Text) -> Text:
         else:
             break
     mut hi = n
-    for:
+    loop:
         if hi <= lo:
             break
         c2 = at(bs, hi - 1)
@@ -141,11 +141,11 @@ pub fn str_split(t: Text, sep: Text) -> [Text]:
         return push(out, t)
     mut start = 0
     mut i = 0
-    for:
+    loop:
         if i > tn - sn:
             break
         mut hit = true
-        for j in 0..<sn:
+        loop j in 0..<sn:
             if at(tb, i + j) != at(sb, j):
                 hit = false
         if hit:
@@ -160,7 +160,7 @@ pub fn str_split(t: Text, sep: Text) -> [Text]:
 pub fn str_join(parts: [Text], sep: Text) -> Text:
     n = len(parts)
     mut out = ""
-    for i in 0..<n:
+    loop i in 0..<n:
         if i == 0:
             out = at(parts, i)
         else:
@@ -176,7 +176,7 @@ pub fn path_parent(p: Text) -> Text:
     bs = bytes_from_text(p)
     n = len(bs)
     mut last_sep = 0 - 1
-    for i in 0..<n:
+    loop i in 0..<n:
         c = at(bs, i)
         if c == 47 or c == 92:
             last_sep = i

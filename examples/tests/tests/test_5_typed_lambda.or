@@ -3,7 +3,7 @@
 # the param carries its real type through the lambda-lift.
 fn each_len(xs: [Text], f: fn) -> [int]:
     mut out = []
-    for i in 0..<len(xs):
+    loop i in 0..<len(xs):
         out = push(out, f(at(xs, i)))
     out
 

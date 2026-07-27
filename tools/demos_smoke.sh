@@ -23,7 +23,11 @@ case "$(uname -s 2>/dev/null || echo Linux)" in
     MINGW*|MSYS*|CYGWIN*|Windows*) MANGLE=""; TRIPLE="" ;;
     *) MANGLE="e"; TRIPLE="x86_64-unknown-linux-gnu" ;;
 esac
-CLANG="$(command -v clang || echo clang)"
+# Same resolution as bootstrap/build_orbit: on Windows clang lives in Program
+# Files and is not on PATH, which made every demo report LINK while compiling
+# perfectly well.
+CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
+[ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
 
 pass=0; fail=0
 for f in "$ROOT"/examples/demos/*.or; do

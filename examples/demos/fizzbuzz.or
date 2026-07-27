@@ -16,7 +16,7 @@ fn line(n: int) -> Text:
 
 fn main() -> int:
     mut both = 0
-    for n in 1..=20:
+    loop n in 1..=20:
         print_line("{n}: {line(n)}")
         if n % 15 == 0:
             both = both + 1

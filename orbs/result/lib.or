@@ -15,7 +15,7 @@
 # When orion-self gets true sum types with payloads, this orb can be replaced
 # with `enum Result: Ok(int), Err(Text)` for free.
 
-data Result: ok: int, value: int, err: Text
+type Result: ok: int, value: int, err: Text
 
 # Construct a success result.
 pub fn Ok(v: int) -> Result:

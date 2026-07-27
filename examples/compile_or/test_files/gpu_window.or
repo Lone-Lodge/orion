@@ -29,13 +29,13 @@ fn main() -> int:
     mut my = 300
     mut blocks_x = []
     mut blocks_y = []
-    for:
+    loop:
         if running == 0:
             break
         keep = win_pump()
         if keep == 0:
             break
-        for:
+        loop:
             has_event = win_event_next()
             if has_event == 0:
                 break
@@ -57,7 +57,7 @@ fn main() -> int:
         og_rect(40, 40, 720, 520, 40, 44, 56)
         # placed blocks (grid-snapped 40px)
         n = len(blocks_x)
-        for i in 0..<n:
+        loop i in 0..<n:
             bx = at(blocks_x, i)
             by = at(blocks_y, i)
             sx = (bx / 40) * 40

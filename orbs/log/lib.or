@@ -134,7 +134,7 @@ pub fn log_dump():
     header = ldim("log tail ({count} of {n})")
     print_line("  {header}")
     start = n - count
-    for j in start..<n:
+    loop j in start..<n:
         i = j - (j / 128) * 128
         line = ring_line(i)
         print_line("  {line}")

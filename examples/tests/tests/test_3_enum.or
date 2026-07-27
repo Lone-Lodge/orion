@@ -1,4 +1,4 @@
-enum Color: Red, Green, Blue
+type Color: Red, Green, Blue
 
 fn main() -> int:
     a = Color.Red

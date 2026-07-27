@@ -15,7 +15,7 @@ fn main() -> int:
     big = to_float(7)
     print_line(big)
     mut acc = 0.0
-    for i in 0..<4:
+    loop i in 0..<4:
         acc = acc + 0.25
     print_line(acc)
     if sum > 0.3 or sum < 0.3:

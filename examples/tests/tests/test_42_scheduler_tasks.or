@@ -1,4 +1,4 @@
-data Task: deadline_ms: int, fn_id: int, payload: int
+type Task: deadline_ms: int, fn_id: int, payload: int
 
 fn task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
     Task{deadline_ms: monotonic_ms() + fire_in_ms, fn_id: fn_id, payload: payload}

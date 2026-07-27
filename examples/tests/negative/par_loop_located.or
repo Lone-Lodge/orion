@@ -1,0 +1,19 @@
+# expect: par_loop_located.or:17:4 — unknown identifier `ii`
+# Not a hang and not a wrong answer: a REFUSAL THAT SAID NOTHING USEFUL.
+# `loop parallel:` desugars to one synthesized closure per iteration, and the
+# hoisting pass stamps each capture reference with the LAMBDA's position. The
+# desugarer built that Lambda node without one, so every free variable inside a
+# parallel loop reported `at line 0:0` — a location in no file on disk.
+#
+# tools/fuzz.sh found it by typing a letter twice. The fix is one position on
+# one node; this file exists so it stays there.
+#
+# The location is the `loop` HEADER, not the offending line: the capture scan
+# collects names, not references, so the closest true position it has is the
+# lambda's. The name is in the message, which is what makes it findable.
+
+fn main() -> int:
+    mut out = [0, 0, 0]
+    loop parallel i in 0..<3:
+        out[i] = ii * 2
+    1

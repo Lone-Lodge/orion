@@ -30,7 +30,7 @@ pub fn sign(x: int) -> int:
 pub fn gcd(a: int, b: int) -> int:
     mut x = abs(a)
     mut y = abs(b)
-    for:
+    loop:
         if y == 0:
             break
         t = y
@@ -53,7 +53,7 @@ pub fn parse(t: Text) -> int:
         if byte_at(b, 0) == 45:
             neg = 1
             start = 1
-    for i in start..<total:
+    loop i in start..<total:
         d = byte_at(b, i)
         if d >= 48 and d <= 57:
             value = value * 10 + (d - 48)
@@ -64,7 +64,7 @@ pub fn parse(t: Text) -> int:
 pub fn ipow(base: int, exp: int) -> int:
     mut result = 1
     if exp >= 0:
-        for _ in 0..<exp:
+        loop _ in 0..<exp:
             result = result * base
     else:
         result = 0

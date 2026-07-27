@@ -1,4 +1,4 @@
-data Inst: value: int, kind: Text
+type Inst: value: int, kind: Text
 
 fn value_ref(x: int) -> Text:
     "v{x}"

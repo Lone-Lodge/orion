@@ -5,7 +5,7 @@ fn ap(f: fn, x: int) -> int:
     f(x)
 fn main() -> int:
     mut s = 0
-    for i in 0..<3:
+    loop i in 0..<3:
         g = fn(n): n + i
         s = s + ap(g, 10)
     s

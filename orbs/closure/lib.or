@@ -18,7 +18,7 @@
 # sugar (`c(x)` calling a Closure value transparently) needs a parser
 # change to detect Closure type at the call site — future work.
 
-data Closure: env: [int], fn_id: int
+type Closure: env: [int], fn_id: int
 
 # Build a closure: pair of captured environment + fn id (the caller's
 # private id used by dispatch — a fn name doesn't fit in an int).

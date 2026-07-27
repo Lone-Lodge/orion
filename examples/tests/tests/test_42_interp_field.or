@@ -1,4 +1,4 @@
-data Point: x: int, y: int
+type Point: x: int, y: int
 
 fn main() -> int:
     p = Point{x: 18, y: 24}

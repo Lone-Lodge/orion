@@ -17,7 +17,7 @@ fn int_to_text(value: int) -> Text:
         digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
         mut n = if value < 0 then 0 - value else value
         mut chars = ""
-        for _ in 0..<20:
+        loop _ in 0..<20:
             if n > 0:
                 d = at(digits, n % 10)
                 chars = "{d}{chars}"
@@ -26,7 +26,7 @@ fn int_to_text(value: int) -> Text:
 
 
 fn main() -> int:
-    input = "E:/lone-lodge/orion/dist/orion_self_bundled.or"
+    input = "../../dist/orion_self_bundled.or"
     print_line("Reading {input}")
     src = read_file(input)
     src_bytes = bytes_from_text(src)

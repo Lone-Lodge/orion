@@ -22,20 +22,20 @@
 # An IR instruction. All fields present; unused ones zero/empty.
 # - name: fn name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
-data Inst: op: Text, type_text: Text, value: int, lhs: int, rhs: int, name: Text, args: [int]
+type Inst: op: Text, type_text: Text, value: int, lhs: int, rhs: int, name: Text, args: [int]
 
 # A function parameter.
-data Param: name: Text, type_text: Text
+type Param: name: Text, type_text: Text
 
 # A function: name, return type, params, and a list of instructions.
-data IRFn: name: Text, return_type: Text, params: [Param], instructions: [Inst]
+type IRFn: name: Text, return_type: Text, params: [Param], instructions: [Inst]
 
 # A module is a list of functions.
-data IRModule: functions: [IRFn]
+type IRModule: functions: [IRFn]
 
 # Result of pushing an instruction: the updated function + the new
 # instruction's SSA value id.
-data PushResult: function: IRFn, id: int
+type PushResult: function: IRFn, id: int
 
 
 # --- Value types (Text constants) ---
@@ -352,7 +352,7 @@ pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
 pub fn ir_dump_fn(fn_value: IRFn) -> Text:
     mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
-    for idx in 0..<total:
+    loop idx in 0..<total:
         inst = at(fn_value.instructions, idx)
         line = ir_dump_instruction(inst, idx)
         text = "{text}    {line}\n"
@@ -361,7 +361,7 @@ pub fn ir_dump_fn(fn_value: IRFn) -> Text:
 pub fn ir_dump_module(module: IRModule) -> Text:
     mut text = "; orion_ir module dump\n"
     total = len(module.functions)
-    for idx in 0..<total:
+    loop idx in 0..<total:
         fn_value = at(module.functions, idx)
         text = "{text}{ir_dump_fn(fn_value)}\n"
     text
@@ -397,7 +397,7 @@ fn llvm_escape(text: Text) -> Text:
     bs = bytes_from_text(text)
     total = len(bs)
     mut result = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         b = at(bs, index)
         needs_escape = b == 34 or b == 92 or b < 32 or b > 126
         if needs_escape:
@@ -417,7 +417,7 @@ fn llvm_escape(text: Text) -> Text:
 fn string_list_index(strings: [Text], target: Text) -> int:
     total = len(strings)
     mut found = 0 - 1
-    for index in 0..<total:
+    loop index in 0..<total:
         if at(strings, index) == target and found == (0 - 1):
             found = index
     found
@@ -428,10 +428,10 @@ fn string_list_index(strings: [Text], target: Text) -> int:
 fn collect_strings(module: IRModule) -> [Text]:
     n_fns = len(module.functions)
     mut result = []
-    for fi in 0..<n_fns:
+    loop fi in 0..<n_fns:
         fn_value = at(module.functions, fi)
         n_insts = len(fn_value.instructions)
-        for ii in 0..<n_insts:
+        loop ii in 0..<n_insts:
             inst = at(fn_value.instructions, ii)
             is_str_op = inst.op == "print_str" or inst.op == "const_str"
             if is_str_op:
@@ -447,7 +447,7 @@ fn split_pipe(text: Text) -> [Text]:
     total = len(bs)
     mut parts = []
     mut current = ""
-    for index in 0..<total:
+    loop index in 0..<total:
         ch = at(bs, index)
         if ch == 124:  # '|'
             parts = push(parts, current)
@@ -480,7 +480,7 @@ fn icmp_cc(op: Text) -> Text:
 fn find_fn_return_type(module: IRModule, fn_name: Text) -> Text:
     n = len(module.functions)
     mut result = "i64"
-    for index in 0..<n:
+    loop index in 0..<n:
         f = at(module.functions, index)
         if f.name == fn_name:
             result = f.return_type
@@ -524,7 +524,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "call":
         n_args = len(inst.args)
         mut arg_text = ""
-        for ai in 0..<n_args:
+        loop ai in 0..<n_args:
             arg_id = at(inst.args, ai)
             arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
             sep = if ai == 0 then "" else ", "
@@ -710,7 +710,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "list_lit":
         n = len(inst.args)
         mut text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
-        for ai in 0..<n:
+        loop ai in 0..<n:
             item_id = at(inst.args, ai)
             item_inst = at(fn_value.instructions, item_id)
             item_ty = llvm_type_of(item_inst.type_text)
@@ -755,7 +755,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         n_total = len(inst.args)
         n_pairs = n_total / 2
         mut text = "    {value_ref(my_id)} = call ptr @orion_map_new(i64 {n_pairs})"
-        for pi in 0..<n_pairs:
+        loop pi in 0..<n_pairs:
             key_id = at(inst.args, pi * 2)
             val_id = at(inst.args, pi * 2 + 1)
             val_inst = at(fn_value.instructions, val_id)
@@ -788,7 +788,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         n_fields = inst.value
         bytes_needed = n_fields * 8
         mut text2 = "    {value_ref(my_id)} = call ptr @malloc(i64 {bytes_needed})"
-        for fi in 0..<n_fields:
+        loop fi in 0..<n_fields:
             val_id = at(inst.args, fi)
             val_inst = at(fn_value.instructions, val_id)
             val_ty = llvm_type_of(val_inst.type_text)
@@ -873,7 +873,7 @@ fn list_elem_type(list_type: Text) -> Text:
     else:
         # Extract bytes 5..n
         mut result = ""
-        for index in 5..<n:
+        loop index in 5..<n:
             single = bytes_to_text([at(bs, index)])
             result = "{result}{single}"
         result
@@ -882,7 +882,7 @@ fn list_elem_type(list_type: Text) -> Text:
 fn emit_param_list(params: [Param]) -> Text:
     n = len(params)
     mut result = ""
-    for index in 0..<n:
+    loop index in 0..<n:
         sep = if index == 0 then "" else ", "
         ty = llvm_type_of(at(params, index).type_text)
         result = "{result}{sep}{ty} %p{index}"
@@ -904,7 +904,7 @@ pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
         emit_name = if is_user_main then "orion_main" else name
         mut text = "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n"
         total = len(fn_value.instructions)
-        for index in 0..<total:
+        loop index in 0..<total:
             inst = at(fn_value.instructions, index)
             line = emit_instruction(inst, index, strings, fn_value, module)
             text = "{text}{line}\n"
@@ -1336,11 +1336,11 @@ pub fn emit_module(module: IRModule) -> Text:
     # Emit one global per distinct string literal in the module.
     strings = collect_strings(module)
     n_strings = len(strings)
-    for index in 0..<n_strings:
+    loop index in 0..<n_strings:
         text = "{text}{emit_string_global(at(strings, index), index)}\n"
     text = "{text}\n"
     total = len(module.functions)
-    for index in 0..<total:
+    loop index in 0..<total:
         fn_value = at(module.functions, index)
         text = "{text}{emit_fn(fn_value, strings, module)}\n"
     # Wrapper @main: stash argc/argv to globals so argc()/argv(i) can read

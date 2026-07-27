@@ -1,7 +1,7 @@
 fn main() -> int:
     vals = [10, 20, 30, 5]
     mut sum = 0
-    for idx, v in vals:
+    loop idx, v in vals:
         if idx == 3:
             sum = sum + v
         else:

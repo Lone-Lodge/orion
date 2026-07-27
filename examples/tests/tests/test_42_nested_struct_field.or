@@ -1,5 +1,5 @@
-data Point: x: int, y: int
-data Line: start: Point, end: Point
+type Point: x: int, y: int
+type Line: start: Point, end: Point
 
 fn main() -> int:
     p1 = Point{x: 1, y: 2}

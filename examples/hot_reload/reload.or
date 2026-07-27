@@ -20,13 +20,13 @@ fn main() -> int:
     mut state = 0
 
     tick = load_tick("./plugin_v1.so")   # gameplay code, version 1
-    for i in 0..<3:
+    loop i in 0..<3:
         state = call_ptr(tick, state)
         print_line("v1  state = {state}")
 
     # ---- HOT RELOAD: swap in v2, no restart, state preserved ----
     tick2 = load_tick("./plugin_v2.so")
-    for i in 0..<3:
+    loop i in 0..<3:
         state = call_ptr(tick2, state)
         print_line("v2  state = {state}   (behavior changed, state kept)")
 

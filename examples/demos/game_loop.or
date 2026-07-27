@@ -13,9 +13,9 @@
 
 # ---- Sum types -------------------------------------------------------
 
-enum Tile: Empty, Wall, Loot, Trap
+type Tile: Empty, Wall, Loot, Trap
 
-enum Outcome: Ok, Err
+type Outcome: Ok, Err
 
 # ---- Effects ---------------------------------------------------------
 

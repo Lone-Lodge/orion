@@ -1,6 +1,6 @@
 fn main() -> int:
     mut n = 0
-    for:
+    loop:
         if n >= 5:
             break
         n = n + 1

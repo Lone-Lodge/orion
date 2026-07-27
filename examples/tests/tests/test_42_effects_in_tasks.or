@@ -1,0 +1,35 @@
+# Effects and tasks compose: `perform` inside a task, across a yield.
+#
+# Worth pinning because the two mechanisms are built on different machinery that
+# could easily fight: an effect is setjmp/longjmp (the handler's `resume` jumps
+# back to the perform site), while a task is a separate STACK the scheduler
+# switches to. A perform inside a task captures its jump target on the task's
+# own stack, and the scheduler may switch stacks between two performs in the
+# same task — which is exactly what this does.
+#
+# One-shot stays one-shot: `resume(v)` returns to the perform site once. Multi-
+# shot (resuming the same continuation twice) would need the continuation's
+# stack to be COPIED, and that is not something to fake — it is not implemented,
+# and nothing here pretends otherwise.
+use async
+
+effect Ask:
+    n: fn(x: int) -> int
+
+handle Ask.n(x: int) -> int:
+    resume(x * 10)
+
+fn body(seed: int) -> int:
+    a = perform Ask.n(seed)      # 10 * seed
+    yield_now()                  # the other task runs between the two performs
+    b = perform Ask.n(seed + 1)  # 10 * (seed + 1)
+    a + b
+
+fn main() -> int:
+    t1 = spawn(body, 1)          # 10 + 20 = 30
+    t2 = spawn(body, 3)          # 30 + 40 = 70
+    r1 = await(t1)
+    r2 = await(t2)
+    print_line("t1={r1} t2={r2}")
+    ok = if r1 == 30 and r2 == 70 then 1 else 0
+    ok * 42

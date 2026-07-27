@@ -17,7 +17,7 @@ fn int_to_text(value: int) -> Text:
         digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
         mut n = if value < 0 then 0 - value else value
         mut chars = ""
-        for _ in 0..<20:
+        loop _ in 0..<20:
             if n > 0:
                 d = at(digits, n % 10)
                 chars = "{d}{chars}"
@@ -27,7 +27,7 @@ fn int_to_text(value: int) -> Text:
 
 fn spaces(count: int) -> Text:
     mut result = ""
-    for _ in 0..<count:
+    loop _ in 0..<count:
         result = "{result} "
     result
 
@@ -82,7 +82,7 @@ pub fn compile_file(input: Text, output: Text):
     d_ir = elapsed(t_ir)
     n_fns = len(module.functions)
     mut total_insts = 0
-    for fi in 0..<n_fns:
+    loop fi in 0..<n_fns:
         f = at(module.functions, fi)
         total_insts = total_insts + len(f.instructions)
     report_row("ir", int_to_text(n_fns) + " fns, " + int_to_text(total_insts) + " insts", d_ir)

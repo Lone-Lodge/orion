@@ -1,9 +1,12 @@
 #!/bin/bash
-# smoke_all_orbs — compile each orb individually as a fast smoke.
-# If all 5 pass, we know the language layer + grammar is correct.
-# Total time: ~10 min sequential (vs 5h for bundle).
+# smoke_all_orbs — compile a compiler orb on its own, with a small driver, as a
+# fast check that the language layer still swallows it. Two orbs today
+# (orion_ir, orion_lex); the header used to claim five.
 #
-# Each orb gets its own driver that exercises core patterns.
+# Each driver must exit 42. Say what you are asserting: the lex driver used to
+# encode its expectation as `len(toks) * 14`, which stopped meaning "3 tokens"
+# the moment the lexer started emitting newline/eof tokens, and then reported
+# exit 70 — indistinguishable at a glance from Orion's runtime trap code.
 
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -65,7 +68,11 @@ DRIVER=$(cat <<'EOF'
 fn main() -> int:
     src = "42 + 0"
     toks = self_lex(src)
-    len(toks) * 14
+    first = at(toks, 0)
+    # `42` `+` `0` plus the newline/eof the lexer appends. Assert the shape that
+    # matters (an int token first, at least the three real ones), not a count.
+    ok = if len(toks) >= 3 and get(first, "value") == "42" and get(first, "kind") == "int" then 1 else 0
+    ok * 42
 EOF
 )
 if compile_orb "orion_lex" "$DRIVER" "orion_lex"; then mut_pass=$((mut_pass+1)); else mut_fail=$((mut_fail+1)); fi

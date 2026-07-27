@@ -1,4 +1,4 @@
-enum Effect:
+type Effect:
     Spawn(Map)
     SetResource(Text, int)
     Relate(int, Text, int)

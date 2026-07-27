@@ -1,5 +1,5 @@
-data Item: name: Text, value: int
-data Bag: items: [Item]
+type Item: name: Text, value: int
+type Bag: items: [Item]
 
 fn main() -> int:
     a = Item{name: "alpha", value: 21}

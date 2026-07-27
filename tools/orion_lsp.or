@@ -1,0 +1,11 @@
+# orion-lsp — entry point. The server itself is `orbs/orion_lsp`.
+#
+# Build:  bash tools/build_lsp.sh   ->  dist/orion-lsp.exe
+# Run:    orion-lsp.exe [orion.exe-path] [orbs-root]
+#
+# stdout carries the protocol, so anything this program wants to say goes to
+# stderr (see orion_stderr_line in the orb).
+use orion_lsp
+
+fn main() -> int:
+    lsp_serve()

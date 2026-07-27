@@ -1,0 +1,29 @@
+# A waiting task must not hold the scheduler.
+#
+# `sleep_ms` inside a task parks the whole process in the OS: eight tasks each
+# waiting 50 ms took 400 ms, one after another, which makes the scheduler a
+# queue rather than concurrency. `sleep_task` parks the TASK — the scheduler
+# makes one real sleep for the shortest pending deadline and wakes whoever is
+# due — so the same eight waits overlap and finish in about 50 ms.
+#
+# The margin is deliberately wide (200 ms): concurrent is ~50, serial is ~400,
+# so this distinguishes the two without being a stopwatch test.
+use async
+
+fn napper(id: int) -> int:
+    sleep_task(50)
+    id
+
+fn main() -> int:
+    t0 = monotonic_ms()
+    mut ids = slice([0], 0, 0)
+    loop i in 0..<8:
+        ids = push(ids, spawn(napper, i + 1))
+    mut sum = 0
+    loop j in 0..<len(ids):
+        sum = sum + await(at(ids, j))
+    elapsed = monotonic_ms() - t0
+    print_line("8 tasks x 50ms: {elapsed} ms, sum={sum}")
+    overlapped = if elapsed < 200 then 1 else 0     # serial would be ~400
+    all_ran = if sum == 36 then 1 else 0            # 1+2+…+8
+    overlapped * 22 + all_ran * 22                  # 22 + 22 == 44

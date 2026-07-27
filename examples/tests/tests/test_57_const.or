@@ -1,0 +1,10 @@
+# `const NAME = expr` — a compile-time constant, inlined at every read site
+# across all function bodies (not just where it's declared). No runtime slot.
+const TEN = 10
+const SEVEN = 7
+
+fn scaled(n: int) -> int:
+    n * TEN
+
+fn main() -> int:
+    scaled(5) + SEVEN   # 50 + 7 == 57

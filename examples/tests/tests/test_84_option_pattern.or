@@ -1,4 +1,4 @@
-data Option: has: int, value: int
+type Option: has: int, value: int
 
 fn Some(v: int) -> Option:
     Option{has: 1, value: v}
@@ -9,7 +9,7 @@ fn None() -> Option:
 fn find_in_list(xs: [int], target: int) -> Option:
     mut idx = 0
     mut found = None()
-    for x in xs:
+    loop x in xs:
         if x == target:
             found = Some(idx)
         idx = idx + 1

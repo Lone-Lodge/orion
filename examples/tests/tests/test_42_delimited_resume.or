@@ -1,0 +1,42 @@
+# A handler that SURVIVES its own resume.
+#
+# `resume(v)` in a `handle` block is a longjmp: control leaves for the perform
+# site and the handler's frame is gone, so a handler can never do anything after
+# the continuation runs — not inspect the result, not clean up, not decide
+# anything based on how it went.
+#
+# `ask`/`resume_with` run the handler on its OWN stack (a fiber), so it lives
+# through the switch and `resume_with` RETURNS what the rest of the task
+# produced. The continuation is delimited by the task; the handler's own value
+# is the value of the whole handled computation, which is what makes it an outer
+# expression rather than a callback.
+#
+# ONE resume per `ask`, and that limit is enforced, not hoped for: a second call
+# is refused with a message instead of faulting. Replaying would mean restoring
+# the task's stack to the perform point, which invalidates the context the OS
+# parked that fiber at.
+use async
+
+fn decide(seed: int) -> int:
+    answer = resume_with(seed + 3)   # rest of the task runs with x = 4
+    answer + 2                       # gets 40 back -> the whole thing is 42
+
+fn body(seed: int) -> int:
+    x = ask(decide, seed)
+    x * 10                           # the continuation
+
+# A handler that never resumes: its value is what the perform site yields, and
+# the rest of the task still runs from there.
+fn refuse(seed: int) -> int:
+    7
+
+fn quiet(seed: int) -> int:
+    x = ask(refuse, seed)
+    x + 1                            # 8
+
+fn main() -> int:
+    a = await(spawn(body, 1))        # 42
+    b = await(spawn(quiet, 0))       # 8
+    print_line("resumed={a} not_resumed={b} supported={resumable_ok()}")
+    ok = if a == 42 and b == 8 then 1 else 0
+    ok * 42

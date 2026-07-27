@@ -1,6 +1,6 @@
 fn sum_list(xs: [int]) -> int:
     mut total = 0
-    for x in xs:
+    loop x in xs:
         total = total + x
     total
 

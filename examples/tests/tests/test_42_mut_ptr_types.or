@@ -8,6 +8,6 @@ fn main() -> int:
     things = push(things, 21)
     things = push(things, 21)
     mut total = 0
-    for x in things:
+    loop x in things:
         total = total + x
     total
