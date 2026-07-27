@@ -391,6 +391,25 @@ fn scope_bind_mut(scope: Scope, name: Text, ptr_id: int) -> Scope:
     new_flags = push(scope.mut_flags, 1)
     Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
+# IN-PLACE binds for the ONE hot path: the linear statement sequence inside a
+# block. `scope_bind`'s immutable copy made a function with N locals O(N^2) to
+# lower. These append with push_mut instead (O(1) amortized). Safe ONLY because
+# ast_block_to_ir gives every block its OWN scope copy up front, so growing the
+# buffer never touches the caller or a sibling branch. Loop variables, pattern
+# binds and branch locals still use the immutable `scope_bind` above (they hand
+# their scope to code that must see it unchanged), so this is the sole mutator.
+fn scope_bind_inplace(scope: Scope, name: Text, id: int) -> Scope:
+    new_names = push_mut(scope.names, name)
+    new_ids = push_mut(scope.ids, id)
+    new_flags = push_mut(scope.mut_flags, 0)
+    Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
+fn scope_bind_mut_inplace(scope: Scope, name: Text, ptr_id: int) -> Scope:
+    new_names = push_mut(scope.names, name)
+    new_ids = push_mut(scope.ids, ptr_id)
+    new_flags = push_mut(scope.mut_flags, 1)
+    Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
+
 
 fn scope_add_fn_sig_keep_data(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
     new_names = push(scope.fn_sig_names, fn_name)
@@ -415,21 +434,19 @@ fn scope_lookup(scope: Scope, name: Text) -> int:
     mut result = 0 - 1
     loop index in 0..<total:
         from_end = total - 1 - index
-        candidate = at(scope.names, from_end)
-        if candidate == name and result == (0 - 1):
+        if at(scope.names, from_end) == name:
             result = at(scope.ids, from_end)
+            break
     result
 
 fn scope_is_mut(scope: Scope, name: Text) -> int:
     total = len(scope.names)
     mut result = 0
-    mut found = 0
     loop index in 0..<total:
         from_end = total - 1 - index
-        candidate = at(scope.names, from_end)
-        if candidate == name and found == 0:
+        if at(scope.names, from_end) == name:
             result = at(scope.mut_flags, from_end)
-            found = 1
+            break
     result
 
 # A `move x = e` binding: linear (immutable), flag 2. Distinct from mut (1) so
@@ -540,7 +557,10 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     stmts = get_list(node, "stmts")
     total_stmts = len(stmts)
     mut current_fn = fn_value
-    mut current_scope = scope
+    # Own copy: bindings here append in place (see scope_bind), so the block
+    # must not mutate the caller's buffer — its locals would leak into the
+    # enclosing scope. One copy per block; binds inside are then O(1).
+    mut current_scope = scope_copy(scope)
     mut last_id = 0 - 1
     # Collect deferred expressions in source order. They run in LIFO order
     # at end of block (and before any return). For now defer is block-scope
@@ -601,7 +621,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 ptr_id = pr_alloca.id
                 pr_store = ir_fn_push(pr_alloca.function, ir_store(ptr_id, er.id))
                 current_fn = pr_store.function
-                current_scope = scope_bind_mut(current_scope, name, ptr_id)
+                current_scope = scope_bind_mut_inplace(current_scope, name, ptr_id)
                 last_id = pr_store.id
             else:
                 existing_mut = scope_is_mut(current_scope, name)
@@ -673,7 +693,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                         current_scope = scope_bind_linear(current_scope, name, bind_id)
                         slot_set("otir:move:" + current_fn.name + ":" + name, 0)
                     else:
-                        current_scope = scope_bind(current_scope, name, bind_id)
+                        current_scope = scope_bind_inplace(current_scope, name, bind_id)
                     last_id = bind_id
         if already_done == 0 and is_if_block:
             er = ast_if_to_ir(current_fn, current_scope, stmt)
@@ -1149,6 +1169,15 @@ fn current_block(fn_value: IRFn) -> Text:
 #    the author's intent silently dies — demand `mut` instead.
 fn scope_truncate(s: Scope, keep: int) -> Scope:
     Scope{names: slice(s.names, 0, keep), ids: slice(s.ids, 0, keep), mut_flags: slice(s.mut_flags, 0, keep), loop_headers: s.loop_headers, loop_ends: s.loop_ends, fn_sig_names: s.fn_sig_names, fn_sig_rets: s.fn_sig_rets, ds_names: s.ds_names, ds_specs: s.ds_specs, en_names: s.en_names, en_variants: s.en_variants}
+
+# A private copy of the var-binding lists. Since scope_bind now appends IN
+# PLACE (push_mut, so N locals is O(N) not O(N^2)), a block must NOT share its
+# parent's buffer — its bindings would leak out and a later block would see
+# them (a previous loop's `i` re-flagged in the next). Each block starts from
+# its own copy, so it may grow freely without touching the caller; the copy is
+# once per block (O(AST)), not once per binding.
+fn scope_copy(s: Scope) -> Scope:
+    scope_truncate(s, len(s.names))
 
 fn check_branch_shadows(before: int, s: Scope, where_txt: Text, node: Map):
     total = len(s.names)
