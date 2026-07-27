@@ -81,7 +81,7 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clan
     # (tests only assert exit codes, so optimization buys nothing here).
     # -Wno-override-module: silence clang's note that our retargeted triple
     # differs from its own default (harmless; no-op on Windows).
-    args = [ll_path, rt_obj, "-O0", "-Wno-override-module", "-o", exe_path]
+    args = [ll_path, rt_obj, "-O2", "-Wno-override-module", "-o", exe_path]
     exit_code = run_command(clang_path, args)
     if exit_code == 0 then 1 else 0
 

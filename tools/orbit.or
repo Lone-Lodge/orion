@@ -787,7 +787,7 @@ fn cli_build(path: Text) -> Text:
     # /STACK is a Windows PE linker flag; POSIX raises the stack via ulimit
     # (Linux) or a link-time flag (macOS — main-thread stack is capped there).
     # -Wno-override-module silences the retargeted-triple note (no-op on Win).
-    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-Wno-override-module"]
+    mut link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module"]
     if os_kind() == 0:
         link_args = push(link_args, "-Xlinker")
         link_args = push(link_args, "/STACK:67108864")
