@@ -73,15 +73,25 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clan
     # only the two module-header lines, never a same-looking byte sequence
     # inside a program string constant (that would change the constant's
     # length and desync its LLVM array-size prefix).
-    if mangle != "w":
-        llvm_text = str_replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
-        llvm_text = str_replace(llvm_text, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
+    #
+    # The retargeted text goes to a SEPARATE file. ll_path is tracked in git —
+    # it is the compiler's own output, which CI diffs against a fresh build —
+    # and rewriting it in place made every one of the 151 committed .ll files
+    # differ by exactly those two header lines on any non-Windows host. The
+    # artifact must be what the compiler emitted, the same on every machine;
+    # the host-specific copy is scratch, so it is scratch on disk too.
     write_file(ll_path, llvm_text)
+    mut link_path = ll_path
+    if mangle != "w":
+        retargeted = str_replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
+        host_text = str_replace(retargeted, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
+        link_path = "{ll_path}.host.ll"
+        write_file(link_path, host_text)
     # Link the pre-built runtime object; -O0 skips the LLVM opt pipeline
     # (tests only assert exit codes, so optimization buys nothing here).
     # -Wno-override-module: silence clang's note that our retargeted triple
     # differs from its own default (harmless; no-op on Windows).
-    args = [ll_path, rt_obj, "-O2", "-Wno-override-module", "-o", exe_path]
+    args = [link_path, rt_obj, "-O2", "-Wno-override-module", "-o", exe_path]
     exit_code = run_command(clang_path, args)
     if exit_code == 0 then 1 else 0
 

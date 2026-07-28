@@ -1676,11 +1676,6 @@ const char *sup_rule_name(void) {
  * redirected stdin (an agent driving a running game through a pipe)
  * drains available bytes via PeekNamedPipe. Zero alloc when idle. */
 #include <conio.h>
-static const char *crl_seal(char *out) {
-    ((long long *)out)[-2] = 0;
-    ((long long *)out)[-1] = (long long)strlen(out);
-    return out;
-}
 const char *orion_console_readline(void) {
     static char buf[512];
     static size_t blen = 0;
@@ -1694,7 +1689,7 @@ const char *orion_console_readline(void) {
                 buf[blen] = 0;
                 memcpy(out, buf, blen + 1);
                 blen = 0;
-                if (out[0] != 0) return crl_seal(out);
+                if (out[0] != 0) return orion_text_seal(out);
                 continue;
             }
             if (c == 8) {
@@ -1723,7 +1718,7 @@ const char *orion_console_readline(void) {
             buf[blen] = 0;
             memcpy(out, buf, blen + 1);
             blen = 0;
-            if (out[0] != 0) return crl_seal(out);
+            if (out[0] != 0) return orion_text_seal(out);
             continue;
         }
         if (c != '\r') buf[blen++] = c;
@@ -1980,6 +1975,86 @@ const char *host_subdirs(const char *dir) {
         free(out);
         return evac;
     }
+}
+
+/* Same contract as the Windows one above it: newline-joined subdirectory
+ * names, one level. It skips EVERY dot-entry, not just . and .. — the callers
+ * are looking for project directories and have no use for .git or .vscode.
+ *
+ * This had no POSIX half at all, so the LSP referenced a symbol that only
+ * existed on Windows and did not link on Linux. Nothing caught it, because
+ * nothing built the LSP anywhere else. */
+const char *orion_dir_subdirs(const char *dir) {
+    DIR *d = opendir(dir);
+    if (!d) return otx_empty.z;
+    size_t cap = 1024, len = 0;
+    char *out = (char *)malloc(cap);
+    out[0] = 0;
+    struct dirent *ent;
+    while ((ent = readdir(d))) {
+        if (ent->d_name[0] == '.') continue;
+        char full[4096];
+        struct stat st;
+        snprintf(full, sizeof(full), "%s/%s", dir, ent->d_name);
+        if (!(stat(full, &st) == 0 && S_ISDIR(st.st_mode))) continue;
+        size_t n = strlen(ent->d_name);
+        if (len + n + 2 > cap) { cap *= 2; out = (char *)realloc(out, cap); }
+        if (len > 0) out[len++] = '\n';
+        memcpy(out + len, ent->d_name, n + 1);
+        len += n;
+    }
+    closedir(d);
+    /* Evacuate into the scope allocator and free the growth buffer — the raw
+     * malloc would leak one listing per call, the way the Windows half used
+     * to before the soak ledger caught it. */
+    {
+        char *evac = orion_text_alloc((long long)len);
+        memcpy(evac, out, len + 1);
+        free(out);
+        return evac;
+    }
+}
+
+/* POSIX half of the console poll. Same contract as the Windows one: never
+ * blocks, returns an empty text until a whole line has arrived.
+ *
+ * REDIRECTED stdin only — an agent or a script driving a running program
+ * through a pipe, which is the case that matters and the case that can be
+ * tested. On an interactive terminal this returns empty and does nothing,
+ * deliberately: keystroke-at-a-time input needs raw termios, and a half-right
+ * version of that leaves the user's shell in cbreak mode when the program
+ * dies. Better a feature that plainly is not there yet than one that breaks
+ * the terminal it was supposed to read.
+ *
+ * It exists at all because the compiler DECLARES this symbol in every module
+ * it emits. Windows-only definition meant any program that actually called it
+ * failed at the linker on Linux with no hint as to why. */
+#include <unistd.h>
+#include <sys/select.h>
+const char *orion_console_readline(void) {
+    static char buf[512];
+    static size_t blen = 0;
+    static char out_raw[512 + 16];
+    char *out = out_raw + 16;
+    if (isatty(0)) return otx_empty.z;
+    for (;;) {
+        fd_set r;
+        struct timeval zero = {0, 0};
+        FD_ZERO(&r);
+        FD_SET(0, &r);
+        if (select(1, &r, NULL, NULL, &zero) <= 0) break;
+        char c;
+        if (read(0, &c, 1) != 1) break;
+        if (c == '\n') {
+            buf[blen] = 0;
+            memcpy(out, buf, blen + 1);
+            blen = 0;
+            if (out[0] != 0) return orion_text_seal(out);
+            continue;
+        }
+        if (c != '\r' && blen < 511) buf[blen++] = c;
+    }
+    return otx_empty.z;
 }
 #endif
 
