@@ -36,6 +36,22 @@ fn default_runtime() -> Text:
     if len(d) > 0 and is_dir(path_parent(d) + "/runtime") then path_parent(d) + "/runtime"
     else "../orion/runtime"
 
+fn default_orbs() -> Text:
+    d = self_dist_dir()
+    if len(d) > 0 and is_dir(path_parent(d) + "/orbs") then path_parent(d) + "/orbs"
+    else "../orion/orbs"
+
+# `dir/hello.or` -> `dir/hello`. Keeps the directory, so building a file that
+# is not in the working directory puts the exe beside its source rather than
+# underfoot.
+fn path_drop_or(p: Text) -> Text:
+    bs = bytes_from_text(p)
+    n = len(bs)
+    if n > 3 and at(bs, n - 3) == 46 and at(bs, n - 2) == 111 and at(bs, n - 1) == 114:
+        bytes_to_text(bytes_slice(bs, 0, n - 3))
+    else:
+        p
+
 # ---------- console style (ANSI, tty-gated) ----------
 
 fn sty(code: Text, s: Text) -> Text:
@@ -94,7 +110,21 @@ fn usage():
     title = c_bold("orbit")
     subtitle = c_dim("Orion's project tool")
     eprint("{title}  {subtitle}")
-    eprint("usage: orbit <new|add|build|run|dev|test|fmt|native|play|soak|try|facts> ...")
+    eprint("usage: orbit <command> [file.or] ...")
+    eprint("")
+    # The four a newcomer needs, before the fourteen they do not. This list
+    # used to open with `dev`, `shot`, `soak` and `facts`, which answer
+    # questions nobody has on their first day, while the single-file path was
+    # not here at all -- it did not exist.
+    eprint(c_bold("  getting started"))
+    eprint("  run [file.or] [args...]     " + c_dim("compile and run. `orbit run hello.or` needs no project"))
+    eprint("  build [file.or]             " + c_dim("compile and link to an exe beside the source"))
+    eprint("  new <name>                  " + c_dim("scaffold a project"))
+    eprint("  test                        " + c_dim("run the project's tests"))
+    eprint("  add <orb>                   " + c_dim("add a library to Orbit.toml"))
+    eprint("  fmt                         " + c_dim("format the sources in place"))
+    eprint("")
+    eprint(c_bold("  projects and games"))
     eprint("  dev [dev|bench|off]         " + c_dim("build fresh + reference-check + launch (the one command)"))
     eprint("  shot [out.bmp]              " + c_dim("headless one-frame render to a BMP (no window)"))
     eprint("  native [gpu|ship]           " + c_dim("compile + link a native exe into build/"))
@@ -287,10 +317,14 @@ fn resolve_path() -> Text:
 
 fn cmd_build():
     path = resolve_path()
-    if __os_orbit_build(path):
-        print(path + ": ok — built with no errors")
-    else:
+    exe = cli_build(path)
+    if exe == "":
         exit_with(1)
+    else:
+        # Say what was produced and where. "built with no errors" left you to
+        # guess the filename, which for a single file is the one thing you
+        # actually wanted to know.
+        print(c_bold(exe) + " " + c_green("ok"))
 
 fn cmd_run():
     # `orbit run [file.or] [fn] [args...]` — file defaults to src/main.or,
@@ -753,22 +787,58 @@ fn build_native_entry(variant: Text, entry_override: Text) -> Text:
 # cubsy, the bundle smoke all do). 64MB stack: `orbit run` on the compiler
 # bundle recurses deep; harmless for small programs.
 fn cli_build(path: Text) -> Text:
-    if not file_exists("Orbit.toml"):
-        die("orbit: no Orbit.toml in this directory")
-    lines = nb_lines(read_file("Orbit.toml"))
-    name = nb_setting(lines, "name", "prog")
-    compiler = nb_setting(lines, "compiler", default_compiler())
-    runtime = nb_setting(lines, "runtime", default_runtime())
+    # STANDALONE: one .or file, no project around it. Everything Orbit.toml
+    # supplies here is derivable without it -- the name from the file, the
+    # compiler and runtime and orbs from where this exe sits -- so requiring
+    # the file bought nothing and cost a newcomer the whole single-file path.
+    # Without this, the only way to run one program was to invoke the compiler
+    # by hand, pass it an output .ll, pass it an orb root, and then write out
+    # the clang line yourself. That was the first thing the guide had to show.
+    #
+    # Artifacts land beside the source (hello.or -> hello.exe), not in a build/
+    # directory conjured in someone's working directory.
+    standalone = not file_exists("Orbit.toml")
+    mut name = "prog"
+    mut compiler = default_compiler()
+    mut runtime = default_runtime()
+    mut ll = ""
+    mut exe = ""
+    mut dirs = []
+    if standalone:
+        if not str_ends_with(path, ".or"):
+            die("orbit: `" + path + "` is not a .or file, and there is no Orbit.toml here")
+        if not file_exists(path):
+            die("orbit: no such file `" + path + "`")
+        # Keep a separator in the path. run_command hands the exe to
+        # CreateProcessA, which resolves a bare relative name against the
+        # CALLING exe's directory (dist/, where orbit lives) rather than the
+        # working directory -- so a just-built `hello.exe` was compiled, then
+        # reported as not found. `./hello` becomes `.\hello.exe`, which is
+        # plainly cwd-relative. os/lib.or documents the same trap.
+        bare = path_drop_or(path)
+        stem = if path_parent(bare) == "." then "./" + bare else bare
+        ll = stem + ".ll"
+        exe = stem + if os_kind() == 0 then ".exe" else ""
+        dirs = [default_orbs()]
+    else:
+        lines = nb_lines(read_file("Orbit.toml"))
+        name = nb_setting(lines, "name", "prog")
+        compiler = nb_setting(lines, "compiler", default_compiler())
+        runtime = nb_setting(lines, "runtime", default_runtime())
+        mkdir_all("build")
+        ll = "build/" + name + "_cli.ll"
+        exe = "build/" + name + "_cli.exe"
+        dirs = nb_orb_dirs(lines)
     if not file_exists(compiler):
         die("orbit: compiler not found at `" + compiler + "` — set [native] compiler in Orbit.toml")
-    mkdir_all("build")
-    ll = "build/" + name + "_cli.ll"
-    exe = "build/" + name + "_cli.exe"
     mut compile_args = [path, ll]
-    dirs = nb_orb_dirs(lines)
     dir_total = len(dirs)
     loop d_index in 0..<dir_total:
         compile_args = push(compile_args, at(dirs, d_index))
+    # Running one file should show the PROGRAM's output, not three lines about
+    # how its compilation went. Diagnostics and failures still print.
+    if standalone:
+        compile_args = push(compile_args, "--quiet")
     if run_command(compiler, compile_args) != 0:
         return ""
     # The compiler always emits a Windows triple (effect ABI). Off Windows,

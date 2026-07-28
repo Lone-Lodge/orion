@@ -170,6 +170,25 @@ fn drv_want_perf() -> bool:
             want = true
     want
 
+# `--quiet` drops the progress chatter -- the orb count, the timing line and
+# the written path -- and keeps everything that means something: diagnostics,
+# the unbalanced-region warning, the failure summary. `orbit run` sets it, so
+# running a program shows the PROGRAM's output and not three lines about how
+# its compilation went.
+fn drv_want_quiet() -> bool:
+    mut want = false
+    loop ai in 1..<argc():
+        if argv(ai) == "--quiet":
+            want = true
+    want
+
+# A flag is not a directory. Orb roots were taken from every argument at index
+# 3 and up, so `--perf` quietly became a search path named `--perf/` that could
+# never resolve. Harmless by luck, wrong by construction.
+fn drv_is_flag(a: Text) -> bool:
+    bs = bytes_from_text(a)
+    len(bs) >= 2 and at(bs, 0) == 45 and at(bs, 1) == 45
+
 fn drv_total_insts(m: IRModule) -> int:
     mut total = 0
     loop fi in 0..<len(m.functions):
@@ -313,7 +332,8 @@ pub fn drv_collect(entry_src: Text, roots: [Text], entry_path: Text) -> Text:
         loop di in 0..<n_deps:
             queue = push(queue, at(deps, di))
     okb = orb_bytes / 1024
-    print_line(drv_dim("  orbs {orb_count} ({okb} KB)"))
+    if not drv_want_quiet():
+        print_line(drv_dim("  orbs {orb_count} ({okb} KB)"))
     # The entry program is its own scope: `""` owns whatever it declares
     # privately, so a game's local helper cannot collide with an orb's.
     eq = bytes_to_text(push([], 34))
@@ -661,7 +681,8 @@ pub fn driver_main() -> int:
         mut roots = []
         loop ai in 3..<argc():
             extra = argv(ai)
-            roots = push(roots, "{extra}/")
+            if not drv_is_flag(extra):
+                roots = push(roots, "{extra}/")
         roots = push(roots, "{base}/orbs/")
         roots = push(roots, "{base}/../orbs/")
         roots = push(roots, "{base}/../../orbs/")
@@ -694,7 +715,8 @@ pub fn driver_main() -> int:
         d_ir = t3 - t2
         d_emit = t4 - t3
         d_total = t4 - t0
-        print_line(drv_dim("  compiled {d_total} ms (lex {d_lex} | parse {d_parse} | ir {d_ir} | emit {d_emit})"))
+        if not drv_want_quiet():
+            print_line(drv_dim("  compiled {d_total} ms (lex {d_lex} | parse {d_parse} | ir {d_ir} | emit {d_emit})"))
         # One machine-readable line for tracking compile performance over time.
         # `tools/compile_bench.sh` parses it and diffs against a checked-in
         # baseline, so a slowdown shows up as a number instead of a feeling.
@@ -733,7 +755,8 @@ pub fn driver_main() -> int:
         else:
             ok = file_write(out_path, llvm_text)
             if ok == 1:
-                print_line(drv_dim("  {out_path}"))
+                if not drv_want_quiet():
+                    print_line(drv_dim("  {out_path}"))
                 0
             else:
                 print_line(drv_red("write failed"))

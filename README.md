@@ -36,12 +36,13 @@ treat them as untested rather than supported.
 Then compile a program:
 
 ```sh
-dist/orion.exe hello.or hello.ll orbs
-clang hello.ll runtime/orion_rt.c -o hello
+orbit run hello.or          # compile, link, run
+orbit build hello.or        # leaves ./hello beside the source
 ```
 
-For anything larger than one file, use the project tool: `orbit new myapp`,
-then `orbit run`, `orbit build`, `orbit test`.
+No project file, no output path to name, no clang line to write. For something
+larger, `orbit new myapp` scaffolds a project and the same `run`, `build` and
+`test` work inside it.
 
 ## Check it
 

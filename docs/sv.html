@@ -56,18 +56,18 @@ som resten av repot.</p>
 
 <p>Bygg och k&ouml;r:</p>
 
-<pre><code>dist/orion.exe hello.or hello.ll orbs
-clang hello.ll runtime/orion_rt.c -o hello
-./hello
+<pre><code>orbit run hello.or
 </code></pre>
 
 <p>Ett blocks v&auml;rde &auml;r dess sista uttryck, s&aring; n&aring;got
 <code>return</code> beh&ouml;vs inte &mdash; men det finns f&ouml;r att
 l&auml;mna tidigt. Det <code>main</code> returnerar blir processens exitkod.</p>
 
-<p>F&ouml;r n&aring;got st&ouml;rre &auml;n en fil finns <code>orbit</code>:
-<code>orbit new myapp</code>, sedan <code>orbit run</code>,
-<code>orbit build</code>, <code>orbit test</code>.</p>
+<p>Inget projekt, ingen konfiguration, ingen utdatas&ouml;kv&auml;g att namnge.
+<code>orbit build hello.or</code> l&auml;mnar en k&ouml;rbar <code>hello</code> bredvid
+k&auml;llan. F&ouml;r n&aring;got st&ouml;rre skapar <code>orbit new myapp</code> ett
+projekt, och samma <code>run</code>, <code>build</code> och <code>test</code>
+fungerar d&auml;r inne.</p>
 
 <h2 id="names">2. Namn</h2>
 

@@ -55,18 +55,17 @@ build says so.</p>
 
 <p>Build and run it:</p>
 
-<pre><code>dist/orion.exe hello.or hello.ll orbs
-clang hello.ll runtime/orion_rt.c -o hello
-./hello
+<pre><code>orbit run hello.or
 </code></pre>
 
 <p>A block's value is its last expression, so no <code>return</code> is needed
 &mdash; though <code>return</code> exists for leaving early. What
 <code>main</code> returns becomes the process exit code.</p>
 
-<p>For anything larger than one file there is <code>orbit</code>:
-<code>orbit new myapp</code>, then <code>orbit run</code>,
-<code>orbit build</code>, <code>orbit test</code>.</p>
+<p>No project, no config, no output path to name. <code>orbit build hello.or</code>
+leaves a <code>hello</code> executable beside the source. For something larger,
+<code>orbit new myapp</code> scaffolds a project and the same <code>run</code>,
+<code>build</code> and <code>test</code> work inside it.</p>
 
 <h2 id="names">2. Names</h2>
 
