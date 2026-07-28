@@ -232,17 +232,46 @@ entry:
   %lb = call i64 @orion_tlen(ptr %b)
   %sum = add i64 %la, %lb
   %buf = call ptr @orion_text_alloc(i64 %sum)
-  %_1 = call ptr @strcpy(ptr %buf, ptr %a)
-  %_2 = call ptr @strcat(ptr %buf, ptr %b)
+  %_1 = call ptr @memcpy(ptr %buf, ptr %a, i64 %la)
+  %tail = getelementptr i8, ptr %buf, i64 %la
+  %_2 = call ptr @memcpy(ptr %tail, ptr %b, i64 %lb)
   ret ptr %buf
 }
 
 define ptr @orion_int_to_text(i64 %n) {
 entry:
-  %buf = call ptr @orion_text_alloc(i64 31)
-  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)
-  %sealed = call ptr @orion_text_seal(ptr %buf)
-  ret ptr %sealed
+  %scratch = alloca [24 x i8]
+  %neg = icmp slt i64 %n, 0
+  %flip = sub i64 0, %n
+  %mag = select i1 %neg, i64 %flip, i64 %n
+  br label %dig
+dig:
+  %w = phi i64 [ %mag, %entry ], [ %q, %dig ]
+  %pos = phi i64 [ 24, %entry ], [ %pos1, %dig ]
+  %pos1 = add i64 %pos, -1
+  %q = udiv i64 %w, 10
+  %q10 = mul i64 %q, 10
+  %rem = sub i64 %w, %q10
+  %chr = add i64 %rem, 48
+  %byte = trunc i64 %chr to i8
+  %slot = getelementptr i8, ptr %scratch, i64 %pos1
+  store i8 %byte, ptr %slot
+  %more = icmp ne i64 %q, 0
+  br i1 %more, label %dig, label %done
+done:
+  %ndig = sub i64 24, %pos1
+  %sign = zext i1 %neg to i64
+  %len = add i64 %ndig, %sign
+  %buf = call ptr @orion_text_alloc(i64 %len)
+  %src = getelementptr i8, ptr %scratch, i64 %pos1
+  %dst = getelementptr i8, ptr %buf, i64 %sign
+  %_c = call ptr @memcpy(ptr %dst, ptr %src, i64 %ndig)
+  br i1 %neg, label %minus, label %fin
+minus:
+  store i8 45, ptr %buf
+  br label %fin
+fin:
+  ret ptr %buf
 }
 
 declare ptr @memcpy(ptr, ptr, i64)
@@ -1495,10 +1524,10 @@ retb:
 
 define i64 @json__jsn_ws(ptr %p0, i64 %p1) {
 entry:
+    %v3 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = call i64 @orion_list_len(ptr %v0)
-    %v3 = alloca i64, align 8
     store i64 %v1, ptr %v3
     %v4 = add i64 0, 0
     br label %loop_5_header
@@ -1571,12 +1600,12 @@ loop_5_end:
 
 define i64 @json__jsn_str_end(ptr %p0, i64 %p1) {
 entry:
+    %v5 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = call i64 @orion_list_len(ptr %v0)
     %v3 = add i64 0, 1
     %v4 = add i64 %v1, %v3
-    %v5 = alloca i64, align 8
     store i64 %v4, ptr %v5
     %v6 = add i64 0, 0
     br label %loop_7_header
@@ -1637,14 +1666,14 @@ loop_7_end:
 
 define i64 @json__jsn_has_escape(ptr %p0, i64 %p1, i64 %p2) {
 entry:
+    %v4 = alloca i64, align 8
+    %v6 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = add i64 0, %p2
     %v3 = add i64 0, 0
-    %v4 = alloca i64, align 8
     store i64 %v3, ptr %v4
     %v5 = add i64 0, 0
-    %v6 = alloca i64, align 8
     store i64 %v1, ptr %v6
     %v7 = add i64 0, 0
     br label %loop_8_header
@@ -1769,6 +1798,8 @@ if_13_merge:
 
 define ptr @json__jsn_unescape(ptr %p0, i64 %p1, i64 %p2) {
 entry:
+    %v8 = alloca ptr, align 8
+    %v10 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = add i64 0, %p2
@@ -1778,10 +1809,8 @@ entry:
     %v5 = add i64 0, 0
     %v6 = add i64 0, 0
     %v7 = call ptr @orion_list_slice(ptr %v4, i64 %v5, i64 %v6)
-    %v8 = alloca ptr, align 8
     store ptr %v7, ptr %v8
     %v9 = add i64 0, 0
-    %v10 = alloca i64, align 8
     store i64 %v1, ptr %v10
     %v11 = add i64 0, 0
     br label %loop_12_header
@@ -2244,14 +2273,15 @@ if_5_merge:
 
 define ptr @json__jsn_number(ptr %p0, i64 %p1) {
 entry:
+    %v3 = alloca i64, align 8
+    %v6 = alloca i64, align 8
+    %v25 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = call i64 @orion_list_len(ptr %v0)
-    %v3 = alloca i64, align 8
     store i64 %v1, ptr %v3
     %v4 = add i64 0, 0
     %v5 = add i64 0, 0
-    %v6 = alloca i64, align 8
     store i64 %v5, ptr %v6
     %v7 = add i64 0, 0
     %v8 = load i64, ptr %v3
@@ -2275,7 +2305,6 @@ if_12_else:
     br label %if_12_merge
 if_12_merge:
     %v24 = add i64 0, 0
-    %v25 = alloca i64, align 8
     store i64 %v24, ptr %v25
     %v26 = add i64 0, 0
     br label %loop_27_header
@@ -2456,16 +2485,16 @@ if_157_merge:
 
 define ptr @json__jsn_object(ptr %p0, i64 %p1) {
 entry:
+    %v4 = alloca ptr, align 8
+    %v8 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = call i64 @orion_list_len(ptr %v0)
     %v3 = call ptr @orion_map_new(i64 0)
-    %v4 = alloca ptr, align 8
     store ptr %v3, ptr %v4
     %v5 = add i64 0, 0
     %v6 = add i64 0, 1
     %v7 = add i64 %v1, %v6
-    %v8 = alloca i64, align 8
     store i64 %v7, ptr %v8
     %v9 = add i64 0, 0
     br label %loop_10_header
@@ -2602,16 +2631,16 @@ loop_10_end:
 
 define ptr @json__jsn_array(ptr %p0, i64 %p1) {
 entry:
+    %v4 = alloca ptr, align 8
+    %v8 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = call i64 @orion_list_len(ptr %v0)
     %v3 = getelementptr i64, ptr @orion_empty_list, i64 0
-    %v4 = alloca ptr, align 8
     store ptr %v3, ptr %v4
     %v5 = add i64 0, 0
     %v6 = add i64 0, 1
     %v7 = add i64 %v1, %v6
-    %v8 = alloca i64, align 8
     store i64 %v7, ptr %v8
     %v9 = add i64 0, 0
     br label %loop_10_header
@@ -2796,6 +2825,8 @@ entry:
 
 define ptr @json__json_escape(ptr %p0) {
 entry:
+    %v8 = alloca ptr, align 8
+    %v11 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = call ptr @orion_bytes_from_text(ptr %v0)
     %v2 = call i64 @orion_list_len(ptr %v1)
@@ -2805,11 +2836,9 @@ entry:
     %v5 = add i64 0, 0
     %v6 = add i64 0, 0
     %v7 = call ptr @orion_list_slice(ptr %v4, i64 %v5, i64 %v6)
-    %v8 = alloca ptr, align 8
     store ptr %v7, ptr %v8
     %v9 = add i64 0, 0
     %v10 = add i64 0, 0
-    %v11 = alloca i64, align 8
     store i64 %v10, ptr %v11
     %v12 = add i64 0, 0
     br label %for_10_header
@@ -3023,6 +3052,8 @@ entry:
 
 define i64 @text__starts_with(ptr %p0, ptr %p1) {
 entry:
+    %v7 = alloca i64, align 8
+    %v22 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = getelementptr i8, ptr %p1, i64 0
     %v2 = call ptr @orion_bytes_from_text(ptr %v0)
@@ -3030,7 +3061,6 @@ entry:
     %v4 = call i64 @orion_list_len(ptr %v2)
     %v5 = call i64 @orion_list_len(ptr %v3)
     %v6 = add i64 0, 1
-    %v7 = alloca i64, align 8
     store i64 %v6, ptr %v7
     %v8 = add i64 0, 0
     %v9.b = icmp sgt i64 %v5, %v4
@@ -3051,7 +3081,6 @@ if_10_merge:
     br i1 %v19.cb, label %if_19_then, label %if_19_else
 if_19_then:
     %v21 = add i64 0, 0
-    %v22 = alloca i64, align 8
     store i64 %v21, ptr %v22
     %v23 = add i64 0, 0
     br label %for_21_header
@@ -3094,6 +3123,8 @@ if_19_merge:
 
 define i64 @text__ends_with(ptr %p0, ptr %p1) {
 entry:
+    %v7 = alloca i64, align 8
+    %v23 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = getelementptr i8, ptr %p1, i64 0
     %v2 = call ptr @orion_bytes_from_text(ptr %v0)
@@ -3101,7 +3132,6 @@ entry:
     %v4 = call i64 @orion_list_len(ptr %v2)
     %v5 = call i64 @orion_list_len(ptr %v3)
     %v6 = add i64 0, 1
-    %v7 = alloca i64, align 8
     store i64 %v6, ptr %v7
     %v8 = add i64 0, 0
     %v9.b = icmp sgt i64 %v5, %v4
@@ -3123,7 +3153,6 @@ if_10_merge:
 if_19_then:
     %v21 = sub i64 %v4, %v5
     %v22 = add i64 0, 0
-    %v23 = alloca i64, align 8
     store i64 %v22, ptr %v23
     %v24 = add i64 0, 0
     br label %for_22_header
@@ -3167,10 +3196,11 @@ if_19_merge:
 
 define ptr @text__repeat(ptr %p0, i64 %p1) {
 entry:
+    %v3 = alloca ptr, align 8
+    %v10 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = getelementptr i8, ptr @.str_2, i64 16
-    %v3 = alloca ptr, align 8
     store ptr %v2, ptr %v3
     %v4 = add i64 0, 0
     %v5 = add i64 0, 0
@@ -3180,7 +3210,6 @@ entry:
     br i1 %v7.cb, label %if_7_then, label %if_7_else
 if_7_then:
     %v9 = add i64 0, 0
-    %v10 = alloca i64, align 8
     store i64 %v9, ptr %v10
     %v11 = add i64 0, 0
     br label %for_9_header
@@ -3213,16 +3242,16 @@ if_7_merge:
 
 define ptr @text__reverse(ptr %p0) {
 entry:
+    %v5 = alloca ptr, align 8
+    %v8 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = call ptr @orion_bytes_from_text(ptr %v0)
     %v2 = call i64 @orion_list_len(ptr %v1)
     %v3 = add i64 0, 0
     %v4 = call ptr @orion_bytes_zeros(i64 %v3)
-    %v5 = alloca ptr, align 8
     store ptr %v4, ptr %v5
     %v6 = add i64 0, 0
     %v7 = add i64 0, 0
-    %v8 = alloca i64, align 8
     store i64 %v7, ptr %v8
     %v9 = add i64 0, 0
     br label %for_7_header
@@ -3258,16 +3287,17 @@ for_7_end:
 
 define ptr @text__upper(ptr %p0) {
 entry:
+    %v5 = alloca ptr, align 8
+    %v8 = alloca i64, align 8
+    %v17 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = call ptr @orion_bytes_from_text(ptr %v0)
     %v2 = call i64 @orion_list_len(ptr %v1)
     %v3 = add i64 0, 0
     %v4 = call ptr @orion_bytes_zeros(i64 %v3)
-    %v5 = alloca ptr, align 8
     store ptr %v4, ptr %v5
     %v6 = add i64 0, 0
     %v7 = add i64 0, 0
-    %v8 = alloca i64, align 8
     store i64 %v7, ptr %v8
     %v9 = add i64 0, 0
     br label %for_7_header
@@ -3279,7 +3309,6 @@ for_7_header:
     br i1 %v14.cb, label %for_7_body, label %for_7_end
 for_7_body:
     %v16 = call i64 @orion_list_at(ptr %v1, i64 %v12)
-    %v17 = alloca i64, align 8
     store i64 %v16, ptr %v17
     %v18 = add i64 0, 0
     %v19 = add i64 0, 97
@@ -3330,16 +3359,17 @@ for_7_end:
 
 define ptr @text__lower(ptr %p0) {
 entry:
+    %v5 = alloca ptr, align 8
+    %v8 = alloca i64, align 8
+    %v17 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = call ptr @orion_bytes_from_text(ptr %v0)
     %v2 = call i64 @orion_list_len(ptr %v1)
     %v3 = add i64 0, 0
     %v4 = call ptr @orion_bytes_zeros(i64 %v3)
-    %v5 = alloca ptr, align 8
     store ptr %v4, ptr %v5
     %v6 = add i64 0, 0
     %v7 = add i64 0, 0
-    %v8 = alloca i64, align 8
     store i64 %v7, ptr %v8
     %v9 = add i64 0, 0
     br label %for_7_header
@@ -3351,7 +3381,6 @@ for_7_header:
     br i1 %v14.cb, label %for_7_body, label %for_7_end
 for_7_body:
     %v16 = call i64 @orion_list_at(ptr %v1, i64 %v12)
-    %v17 = alloca i64, align 8
     store i64 %v16, ptr %v17
     %v18 = add i64 0, 0
     %v19 = add i64 0, 65
@@ -3402,14 +3431,14 @@ for_7_end:
 
 define ptr @text__trim(ptr %p0) {
 entry:
+    %v4 = alloca i64, align 8
+    %v6 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = call ptr @orion_bytes_from_text(ptr %v0)
     %v2 = call i64 @orion_list_len(ptr %v1)
     %v3 = add i64 0, 0
-    %v4 = alloca i64, align 8
     store i64 %v3, ptr %v4
     %v5 = add i64 0, 0
-    %v6 = alloca i64, align 8
     store i64 %v2, ptr %v6
     %v7 = add i64 0, 0
     br label %loop_8_header
@@ -3553,15 +3582,15 @@ loop_62_end:
 
 define ptr @text__join(ptr %p0, ptr %p1) {
 entry:
+    %v3 = alloca ptr, align 8
+    %v7 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = getelementptr i8, ptr %p1, i64 0
     %v2 = getelementptr i8, ptr @.str_2, i64 16
-    %v3 = alloca ptr, align 8
     store ptr %v2, ptr %v3
     %v4 = add i64 0, 0
     %v5 = call i64 @orion_list_len(ptr %v0)
     %v6 = add i64 0, 0
-    %v7 = alloca i64, align 8
     store i64 %v6, ptr %v7
     %v8 = add i64 0, 0
     br label %for_6_header
@@ -3606,6 +3635,11 @@ for_6_end:
 
 define ptr @text__split(ptr %p0, ptr %p1) {
 entry:
+    %v7 = alloca ptr, align 8
+    %v19 = alloca i64, align 8
+    %v22 = alloca i64, align 8
+    %v36 = alloca i64, align 8
+    %v39 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = getelementptr i8, ptr %p1, i64 0
     %v2 = call ptr @orion_bytes_from_text(ptr %v0)
@@ -3613,7 +3647,6 @@ entry:
     %v4 = call i64 @orion_list_len(ptr %v2)
     %v5 = call i64 @orion_list_len(ptr %v3)
     %v6 = getelementptr i64, ptr @orion_empty_list, i64 0
-    %v7 = alloca ptr, align 8
     store ptr %v6, ptr %v7
     %v8 = add i64 0, 0
     %v9 = add i64 0, 0
@@ -3630,11 +3663,9 @@ if_11_then:
     br label %if_11_merge
 if_11_else:
     %v18 = add i64 0, 0
-    %v19 = alloca i64, align 8
     store i64 %v18, ptr %v19
     %v20 = add i64 0, 0
     %v21 = add i64 0, 0
-    %v22 = alloca i64, align 8
     store i64 %v21, ptr %v22
     %v23 = add i64 0, 0
     br label %loop_24_header
@@ -3651,11 +3682,9 @@ if_29_else:
     br label %if_29_merge
 if_29_merge:
     %v35 = add i64 0, 1
-    %v36 = alloca i64, align 8
     store i64 %v35, ptr %v36
     %v37 = add i64 0, 0
     %v38 = add i64 0, 0
-    %v39 = alloca i64, align 8
     store i64 %v38, ptr %v39
     %v40 = add i64 0, 0
     br label %for_38_header
@@ -3752,6 +3781,10 @@ entry:
 
 define i64 @text__index_of(ptr %p0, ptr %p1) {
 entry:
+    %v9 = alloca i64, align 8
+    %v20 = alloca i64, align 8
+    %v44 = alloca i64, align 8
+    %v47 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = getelementptr i8, ptr %p1, i64 0
     %v2 = call ptr @orion_bytes_from_text(ptr %v0)
@@ -3761,7 +3794,6 @@ entry:
     %v6 = add i64 0, 0
     %v7 = add i64 0, 1
     %v8 = sub i64 %v6, %v7
-    %v9 = alloca i64, align 8
     store i64 %v8, ptr %v9
     %v10 = add i64 0, 0
     %v11 = add i64 0, 0
@@ -3776,7 +3808,6 @@ if_13_then:
     br label %if_13_merge
 if_13_else:
     %v19 = add i64 0, 0
-    %v20 = alloca i64, align 8
     store i64 %v19, ptr %v20
     %v21 = add i64 0, 0
     br label %loop_22_header
@@ -3805,11 +3836,9 @@ if_37_else:
     br label %if_37_merge
 if_37_merge:
     %v43 = add i64 0, 1
-    %v44 = alloca i64, align 8
     store i64 %v43, ptr %v44
     %v45 = add i64 0, 0
     %v46 = add i64 0, 0
-    %v47 = alloca i64, align 8
     store i64 %v46, ptr %v47
     %v48 = add i64 0, 0
     br label %for_46_header
@@ -3873,14 +3902,14 @@ if_13_merge:
 
 define ptr @text__pad_left(ptr %p0, i64 %p1, ptr %p2) {
 entry:
+    %v3 = alloca ptr, align 8
+    %v6 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = getelementptr i8, ptr %p2, i64 0
-    %v3 = alloca ptr, align 8
     store ptr %v0, ptr %v3
     %v4 = add i64 0, 0
     %v5 = call i64 @orion_tlen(ptr %v0)
-    %v6 = alloca i64, align 8
     store i64 %v5, ptr %v6
     %v7 = add i64 0, 0
     br label %loop_8_header
@@ -3912,14 +3941,14 @@ loop_8_end:
 
 define ptr @text__pad_right(ptr %p0, i64 %p1, ptr %p2) {
 entry:
+    %v3 = alloca ptr, align 8
+    %v6 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
     %v2 = getelementptr i8, ptr %p2, i64 0
-    %v3 = alloca ptr, align 8
     store ptr %v0, ptr %v3
     %v4 = add i64 0, 0
     %v5 = call i64 @orion_tlen(ptr %v0)
-    %v6 = alloca i64, align 8
     store i64 %v5, ptr %v6
     %v7 = add i64 0, 0
     br label %loop_8_header

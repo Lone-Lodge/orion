@@ -232,17 +232,46 @@ entry:
   %lb = call i64 @orion_tlen(ptr %b)
   %sum = add i64 %la, %lb
   %buf = call ptr @orion_text_alloc(i64 %sum)
-  %_1 = call ptr @strcpy(ptr %buf, ptr %a)
-  %_2 = call ptr @strcat(ptr %buf, ptr %b)
+  %_1 = call ptr @memcpy(ptr %buf, ptr %a, i64 %la)
+  %tail = getelementptr i8, ptr %buf, i64 %la
+  %_2 = call ptr @memcpy(ptr %tail, ptr %b, i64 %lb)
   ret ptr %buf
 }
 
 define ptr @orion_int_to_text(i64 %n) {
 entry:
-  %buf = call ptr @orion_text_alloc(i64 31)
-  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)
-  %sealed = call ptr @orion_text_seal(ptr %buf)
-  ret ptr %sealed
+  %scratch = alloca [24 x i8]
+  %neg = icmp slt i64 %n, 0
+  %flip = sub i64 0, %n
+  %mag = select i1 %neg, i64 %flip, i64 %n
+  br label %dig
+dig:
+  %w = phi i64 [ %mag, %entry ], [ %q, %dig ]
+  %pos = phi i64 [ 24, %entry ], [ %pos1, %dig ]
+  %pos1 = add i64 %pos, -1
+  %q = udiv i64 %w, 10
+  %q10 = mul i64 %q, 10
+  %rem = sub i64 %w, %q10
+  %chr = add i64 %rem, 48
+  %byte = trunc i64 %chr to i8
+  %slot = getelementptr i8, ptr %scratch, i64 %pos1
+  store i8 %byte, ptr %slot
+  %more = icmp ne i64 %q, 0
+  br i1 %more, label %dig, label %done
+done:
+  %ndig = sub i64 24, %pos1
+  %sign = zext i1 %neg to i64
+  %len = add i64 %ndig, %sign
+  %buf = call ptr @orion_text_alloc(i64 %len)
+  %src = getelementptr i8, ptr %scratch, i64 %pos1
+  %dst = getelementptr i8, ptr %buf, i64 %sign
+  %_c = call ptr @memcpy(ptr %dst, ptr %src, i64 %ndig)
+  br i1 %neg, label %minus, label %fin
+minus:
+  store i8 45, ptr %buf
+  br label %fin
+fin:
+  ret ptr %buf
 }
 
 declare ptr @memcpy(ptr, ptr, i64)
@@ -1488,9 +1517,15 @@ entry:
     %v4 = getelementptr i8, ptr @.str_0, i64 16
     %v5 = call i64 @orion_list_len(ptr %v3)
     %v6 = call ptr @orion_int_to_text(i64 %v5)
-    %v7 = call ptr @orion_text_concat(ptr %v4, ptr %v6)
-    %v8 = getelementptr i8, ptr @.str_1, i64 16
-    %v9 = call ptr @orion_text_concat(ptr %v7, ptr %v8)
+    %v7 = getelementptr i8, ptr @.str_1, i64 16
+    %v8 = call ptr @orion_list_new(i64 3)
+    %v8.lp0 = ptrtoint ptr %v4 to i64
+    call void @orion_list_set(ptr %v8, i64 0, i64 %v8.lp0)
+    %v8.lp1 = ptrtoint ptr %v6 to i64
+    call void @orion_list_set(ptr %v8, i64 1, i64 %v8.lp1)
+    %v8.lp2 = ptrtoint ptr %v7 to i64
+    call void @orion_list_set(ptr %v8, i64 2, i64 %v8.lp2)
+    %v9 = call ptr @orion_text_join(ptr %v8)
     call i32 @puts(ptr %v9)
     %v10 = add i64 0, 0
     %v11 = add i64 0, 0

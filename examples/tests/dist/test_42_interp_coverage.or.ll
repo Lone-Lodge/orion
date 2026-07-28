@@ -232,17 +232,46 @@ entry:
   %lb = call i64 @orion_tlen(ptr %b)
   %sum = add i64 %la, %lb
   %buf = call ptr @orion_text_alloc(i64 %sum)
-  %_1 = call ptr @strcpy(ptr %buf, ptr %a)
-  %_2 = call ptr @strcat(ptr %buf, ptr %b)
+  %_1 = call ptr @memcpy(ptr %buf, ptr %a, i64 %la)
+  %tail = getelementptr i8, ptr %buf, i64 %la
+  %_2 = call ptr @memcpy(ptr %tail, ptr %b, i64 %lb)
   ret ptr %buf
 }
 
 define ptr @orion_int_to_text(i64 %n) {
 entry:
-  %buf = call ptr @orion_text_alloc(i64 31)
-  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)
-  %sealed = call ptr @orion_text_seal(ptr %buf)
-  ret ptr %sealed
+  %scratch = alloca [24 x i8]
+  %neg = icmp slt i64 %n, 0
+  %flip = sub i64 0, %n
+  %mag = select i1 %neg, i64 %flip, i64 %n
+  br label %dig
+dig:
+  %w = phi i64 [ %mag, %entry ], [ %q, %dig ]
+  %pos = phi i64 [ 24, %entry ], [ %pos1, %dig ]
+  %pos1 = add i64 %pos, -1
+  %q = udiv i64 %w, 10
+  %q10 = mul i64 %q, 10
+  %rem = sub i64 %w, %q10
+  %chr = add i64 %rem, 48
+  %byte = trunc i64 %chr to i8
+  %slot = getelementptr i8, ptr %scratch, i64 %pos1
+  store i8 %byte, ptr %slot
+  %more = icmp ne i64 %q, 0
+  br i1 %more, label %dig, label %done
+done:
+  %ndig = sub i64 24, %pos1
+  %sign = zext i1 %neg to i64
+  %len = add i64 %ndig, %sign
+  %buf = call ptr @orion_text_alloc(i64 %len)
+  %src = getelementptr i8, ptr %scratch, i64 %pos1
+  %dst = getelementptr i8, ptr %buf, i64 %sign
+  %_c = call ptr @memcpy(ptr %dst, ptr %src, i64 %ndig)
+  br i1 %neg, label %minus, label %fin
+minus:
+  store i8 45, ptr %buf
+  br label %fin
+fin:
+  ret ptr %buf
 }
 
 declare ptr @memcpy(ptr, ptr, i64)
@@ -1542,98 +1571,107 @@ entry:
     %v23 = call ptr @orion_text_concat(ptr %v20, ptr %v22)
     %v24 = getelementptr i8, ptr @.str_7, i64 16
     %v25 = call ptr @orion_int_to_text(i64 %v3)
-    %v26 = call ptr @orion_text_concat(ptr %v24, ptr %v25)
-    %v27 = getelementptr i8, ptr @.str_8, i64 16
-    %v28 = call ptr @orion_text_concat(ptr %v26, ptr %v27)
-    %v29.slot = getelementptr i64, ptr %v2, i64 0
-    %v29 = load i64, ptr %v29.slot
-    %v30 = call ptr @orion_int_to_text(i64 %v29)
-    %v31 = call ptr @orion_text_concat(ptr %v28, ptr %v30)
-    %v32 = getelementptr i8, ptr @.str_9, i64 16
-    %v33 = call ptr @orion_text_concat(ptr %v31, ptr %v32)
-    %v34 = call i64 @prog__double_int(i64 %v3)
-    %v35 = call ptr @orion_int_to_text(i64 %v34)
-    %v36 = call ptr @orion_text_concat(ptr %v33, ptr %v35)
-    %v37 = getelementptr i8, ptr @.str_10, i64 16
-    %v38 = call i64 @orion_text_contains(ptr %v6, ptr %v37)
-    %v39.n = icmp eq i64 %v38, 0
-    %v39 = zext i1 %v39.n to i64
-    %v40.cb = icmp ne i64 %v39, 0
-    br i1 %v40.cb, label %if_40_then, label %if_40_else
-if_40_then:
-    %v42 = add i64 0, 0
-    br label %if_40_merge
-if_40_else:
-    %v45 = getelementptr i8, ptr @.str_11, i64 16
-    %v46 = call i64 @orion_text_contains(ptr %v10, ptr %v45)
-    %v47.n = icmp eq i64 %v46, 0
-    %v47 = zext i1 %v47.n to i64
-    %v48.cb = icmp ne i64 %v47, 0
-    br i1 %v48.cb, label %if_48_then, label %if_48_else
-if_48_then:
-    %v50 = add i64 0, 0
-    br label %if_48_merge
-if_48_else:
-    %v53 = getelementptr i8, ptr @.str_12, i64 16
-    %v54 = call i64 @orion_text_contains(ptr %v14, ptr %v53)
-    %v55.n = icmp eq i64 %v54, 0
-    %v55 = zext i1 %v55.n to i64
-    %v56.cb = icmp ne i64 %v55, 0
-    br i1 %v56.cb, label %if_56_then, label %if_56_else
-if_56_then:
-    %v58 = add i64 0, 0
-    br label %if_56_merge
-if_56_else:
-    %v61 = getelementptr i8, ptr @.str_13, i64 16
-    %v62 = call i64 @orion_text_contains(ptr %v19, ptr %v61)
-    %v63.n = icmp eq i64 %v62, 0
-    %v63 = zext i1 %v63.n to i64
-    %v64.cb = icmp ne i64 %v63, 0
-    br i1 %v64.cb, label %if_64_then, label %if_64_else
-if_64_then:
-    %v66 = add i64 0, 0
-    br label %if_64_merge
-if_64_else:
-    %v69 = getelementptr i8, ptr @.str_14, i64 16
-    %v70 = call i64 @orion_text_contains(ptr %v23, ptr %v69)
-    %v71.n = icmp eq i64 %v70, 0
-    %v71 = zext i1 %v71.n to i64
-    %v72.cb = icmp ne i64 %v71, 0
-    br i1 %v72.cb, label %if_72_then, label %if_72_else
-if_72_then:
-    %v74 = add i64 0, 0
-    br label %if_72_merge
-if_72_else:
-    %v77 = getelementptr i8, ptr @.str_15, i64 16
-    %v78 = call i64 @orion_text_contains(ptr %v36, ptr %v77)
-    %v79.n = icmp eq i64 %v78, 0
-    %v79 = zext i1 %v79.n to i64
-    %v80.cb = icmp ne i64 %v79, 0
-    br i1 %v80.cb, label %if_80_then, label %if_80_else
-if_80_then:
-    %v82 = add i64 0, 0
-    br label %if_80_merge
-if_80_else:
-    %v85 = add i64 0, 42
-    br label %if_80_merge
-if_80_merge:
-    %v88 = phi i64 [ %v82, %if_80_then ], [ %v85, %if_80_else ]
-    br label %if_72_merge
-if_72_merge:
-    %v91 = phi i64 [ %v74, %if_72_then ], [ %v88, %if_80_merge ]
-    br label %if_64_merge
-if_64_merge:
-    %v94 = phi i64 [ %v66, %if_64_then ], [ %v91, %if_72_merge ]
-    br label %if_56_merge
-if_56_merge:
-    %v97 = phi i64 [ %v58, %if_56_then ], [ %v94, %if_64_merge ]
-    br label %if_48_merge
-if_48_merge:
-    %v100 = phi i64 [ %v50, %if_48_then ], [ %v97, %if_56_merge ]
-    br label %if_40_merge
-if_40_merge:
-    %v103 = phi i64 [ %v42, %if_40_then ], [ %v100, %if_48_merge ]
-    ret i64 %v103
+    %v26 = getelementptr i8, ptr @.str_8, i64 16
+    %v27.slot = getelementptr i64, ptr %v2, i64 0
+    %v27 = load i64, ptr %v27.slot
+    %v28 = call ptr @orion_int_to_text(i64 %v27)
+    %v29 = getelementptr i8, ptr @.str_9, i64 16
+    %v30 = call i64 @prog__double_int(i64 %v3)
+    %v31 = call ptr @orion_int_to_text(i64 %v30)
+    %v32 = call ptr @orion_list_new(i64 6)
+    %v32.lp0 = ptrtoint ptr %v24 to i64
+    call void @orion_list_set(ptr %v32, i64 0, i64 %v32.lp0)
+    %v32.lp1 = ptrtoint ptr %v25 to i64
+    call void @orion_list_set(ptr %v32, i64 1, i64 %v32.lp1)
+    %v32.lp2 = ptrtoint ptr %v26 to i64
+    call void @orion_list_set(ptr %v32, i64 2, i64 %v32.lp2)
+    %v32.lp3 = ptrtoint ptr %v28 to i64
+    call void @orion_list_set(ptr %v32, i64 3, i64 %v32.lp3)
+    %v32.lp4 = ptrtoint ptr %v29 to i64
+    call void @orion_list_set(ptr %v32, i64 4, i64 %v32.lp4)
+    %v32.lp5 = ptrtoint ptr %v31 to i64
+    call void @orion_list_set(ptr %v32, i64 5, i64 %v32.lp5)
+    %v33 = call ptr @orion_text_join(ptr %v32)
+    %v34 = getelementptr i8, ptr @.str_10, i64 16
+    %v35 = call i64 @orion_text_contains(ptr %v6, ptr %v34)
+    %v36.n = icmp eq i64 %v35, 0
+    %v36 = zext i1 %v36.n to i64
+    %v37.cb = icmp ne i64 %v36, 0
+    br i1 %v37.cb, label %if_37_then, label %if_37_else
+if_37_then:
+    %v39 = add i64 0, 0
+    br label %if_37_merge
+if_37_else:
+    %v42 = getelementptr i8, ptr @.str_11, i64 16
+    %v43 = call i64 @orion_text_contains(ptr %v10, ptr %v42)
+    %v44.n = icmp eq i64 %v43, 0
+    %v44 = zext i1 %v44.n to i64
+    %v45.cb = icmp ne i64 %v44, 0
+    br i1 %v45.cb, label %if_45_then, label %if_45_else
+if_45_then:
+    %v47 = add i64 0, 0
+    br label %if_45_merge
+if_45_else:
+    %v50 = getelementptr i8, ptr @.str_12, i64 16
+    %v51 = call i64 @orion_text_contains(ptr %v14, ptr %v50)
+    %v52.n = icmp eq i64 %v51, 0
+    %v52 = zext i1 %v52.n to i64
+    %v53.cb = icmp ne i64 %v52, 0
+    br i1 %v53.cb, label %if_53_then, label %if_53_else
+if_53_then:
+    %v55 = add i64 0, 0
+    br label %if_53_merge
+if_53_else:
+    %v58 = getelementptr i8, ptr @.str_13, i64 16
+    %v59 = call i64 @orion_text_contains(ptr %v19, ptr %v58)
+    %v60.n = icmp eq i64 %v59, 0
+    %v60 = zext i1 %v60.n to i64
+    %v61.cb = icmp ne i64 %v60, 0
+    br i1 %v61.cb, label %if_61_then, label %if_61_else
+if_61_then:
+    %v63 = add i64 0, 0
+    br label %if_61_merge
+if_61_else:
+    %v66 = getelementptr i8, ptr @.str_14, i64 16
+    %v67 = call i64 @orion_text_contains(ptr %v23, ptr %v66)
+    %v68.n = icmp eq i64 %v67, 0
+    %v68 = zext i1 %v68.n to i64
+    %v69.cb = icmp ne i64 %v68, 0
+    br i1 %v69.cb, label %if_69_then, label %if_69_else
+if_69_then:
+    %v71 = add i64 0, 0
+    br label %if_69_merge
+if_69_else:
+    %v74 = getelementptr i8, ptr @.str_15, i64 16
+    %v75 = call i64 @orion_text_contains(ptr %v33, ptr %v74)
+    %v76.n = icmp eq i64 %v75, 0
+    %v76 = zext i1 %v76.n to i64
+    %v77.cb = icmp ne i64 %v76, 0
+    br i1 %v77.cb, label %if_77_then, label %if_77_else
+if_77_then:
+    %v79 = add i64 0, 0
+    br label %if_77_merge
+if_77_else:
+    %v82 = add i64 0, 42
+    br label %if_77_merge
+if_77_merge:
+    %v85 = phi i64 [ %v79, %if_77_then ], [ %v82, %if_77_else ]
+    br label %if_69_merge
+if_69_merge:
+    %v88 = phi i64 [ %v71, %if_69_then ], [ %v85, %if_77_merge ]
+    br label %if_61_merge
+if_61_merge:
+    %v91 = phi i64 [ %v63, %if_61_then ], [ %v88, %if_69_merge ]
+    br label %if_53_merge
+if_53_merge:
+    %v94 = phi i64 [ %v55, %if_53_then ], [ %v91, %if_61_merge ]
+    br label %if_45_merge
+if_45_merge:
+    %v97 = phi i64 [ %v47, %if_45_then ], [ %v94, %if_53_merge ]
+    br label %if_37_merge
+if_37_merge:
+    %v100 = phi i64 [ %v39, %if_37_then ], [ %v97, %if_45_merge ]
+    ret i64 %v100
 }
 
 @orion_argc = global i64 0

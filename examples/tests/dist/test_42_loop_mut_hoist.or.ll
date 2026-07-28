@@ -1503,52 +1503,57 @@ retb:
 
 
 
-define i64 @prog__apply(ptr %p0, i64 %p1) {
-entry:
-    %v0 = getelementptr i8, ptr %p0, i64 0
-    %v1 = add i64 0, %p1
-    %v2.fpi = call i64 @orion_list_at(ptr %v0, i64 0)
-    %v2.flg = call i64 @orion_list_at(ptr %v0, i64 1)
-    %v2.p = inttoptr i64 %v2.fpi to ptr
-    %v2.isl = icmp eq i64 %v2.flg, 1
-    br i1 %v2.isl, label %clam2, label %cpln2
-clam2:
-    %v2.r1 = call i64 %v2.p(ptr %v0, i64 %v1)
-    br label %cmrg2
-cpln2:
-    %v2.r2 = call i64 %v2.p(i64 %v1)
-    br label %cmrg2
-cmrg2:
-    %v2 = phi i64 [ %v2.r1, %clam2 ], [ %v2.r2, %cpln2 ]
-    ret i64 %v2
-}
-
 define i64 @orion_main() {
 entry:
-    %v0 = add i64 0, 10
-    %v1 = add i64 0, 3
-    %v2 = call ptr @orion_list_new(i64 4)
-    %v2.fp = ptrtoint ptr @prog____lambda_0 to i64
-    call void @orion_list_set(ptr %v2, i64 0, i64 %v2.fp)
-    call void @orion_list_set(ptr %v2, i64 1, i64 1)
-    call void @orion_list_set(ptr %v2, i64 2, i64 %v1)
-    call void @orion_list_set(ptr %v2, i64 3, i64 %v0)
-    %v3 = add i64 0, 5
-    %v4 = call i64 @prog__apply(ptr %v2, i64 %v3)
-    ret i64 %v4
-}
-
-define i64 @prog____lambda_0(ptr %p0, i64 %p1) {
-entry:
-    %v0 = getelementptr i8, ptr %p0, i64 0
-    %v1 = add i64 0, %p1
-    %v2 = add i64 0, 2
-    %v3 = call i64 @orion_list_at(ptr %v0, i64 %v2)
-    %v4 = add i64 0, 3
-    %v5 = call i64 @orion_list_at(ptr %v0, i64 %v4)
-    %v6 = add i64 %v5, %v3
-    %v7 = add i64 %v6, %v1
-    ret i64 %v7
+    %v1 = alloca i64, align 8
+    %v5 = alloca i64, align 8
+    %v14 = alloca i64, align 8
+    %v0 = add i64 0, 0
+    store i64 %v0, ptr %v1
+    %v2 = add i64 0, 0
+    %v3 = add i64 0, 0
+    %v4 = add i64 0, 5000000
+    store i64 %v3, ptr %v5
+    %v6 = add i64 0, 0
+    br label %for_3_header
+for_3_header:
+    %v9 = load i64, ptr %v5
+    %v10.b = icmp slt i64 %v9, %v4
+    %v10 = zext i1 %v10.b to i64
+    %v11.cb = icmp ne i64 %v10, 0
+    br i1 %v11.cb, label %for_3_body, label %for_3_end
+for_3_body:
+    %v13 = add i64 0, 1
+    store i64 %v13, ptr %v14
+    %v15 = add i64 0, 0
+    %v16 = load i64, ptr %v1
+    %v17 = load i64, ptr %v14
+    %v18 = add i64 %v16, %v17
+    store i64 %v18, ptr %v1
+    %v19 = add i64 0, 0
+    br label %for_3_step
+for_3_step:
+    %v22 = add i64 0, 1
+    %v23 = add i64 %v9, %v22
+    store i64 %v23, ptr %v5
+    %v24 = add i64 0, 0
+    br label %for_3_header
+for_3_end:
+    %v27 = load i64, ptr %v1
+    %v28 = add i64 0, 5000000
+    %v29.b = icmp eq i64 %v27, %v28
+    %v29 = zext i1 %v29.b to i64
+    %v30.cb = icmp ne i64 %v29, 0
+    br i1 %v30.cb, label %if_30_then, label %if_30_else
+if_30_then:
+    %v32 = add i64 0, 42
+    br label %if_30_merge
+if_30_else:
+    %v35 = add i64 0, 1
+    br label %if_30_merge
+if_30_merge:
+    %v38 = phi i64 [ %v32, %if_30_then ], [ %v35, %if_30_else ]
+    ret i64 %v38
 }
 
 @orion_argc = global i64 0

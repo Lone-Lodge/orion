@@ -232,17 +232,46 @@ entry:
   %lb = call i64 @orion_tlen(ptr %b)
   %sum = add i64 %la, %lb
   %buf = call ptr @orion_text_alloc(i64 %sum)
-  %_1 = call ptr @strcpy(ptr %buf, ptr %a)
-  %_2 = call ptr @strcat(ptr %buf, ptr %b)
+  %_1 = call ptr @memcpy(ptr %buf, ptr %a, i64 %la)
+  %tail = getelementptr i8, ptr %buf, i64 %la
+  %_2 = call ptr @memcpy(ptr %tail, ptr %b, i64 %lb)
   ret ptr %buf
 }
 
 define ptr @orion_int_to_text(i64 %n) {
 entry:
-  %buf = call ptr @orion_text_alloc(i64 31)
-  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)
-  %sealed = call ptr @orion_text_seal(ptr %buf)
-  ret ptr %sealed
+  %scratch = alloca [24 x i8]
+  %neg = icmp slt i64 %n, 0
+  %flip = sub i64 0, %n
+  %mag = select i1 %neg, i64 %flip, i64 %n
+  br label %dig
+dig:
+  %w = phi i64 [ %mag, %entry ], [ %q, %dig ]
+  %pos = phi i64 [ 24, %entry ], [ %pos1, %dig ]
+  %pos1 = add i64 %pos, -1
+  %q = udiv i64 %w, 10
+  %q10 = mul i64 %q, 10
+  %rem = sub i64 %w, %q10
+  %chr = add i64 %rem, 48
+  %byte = trunc i64 %chr to i8
+  %slot = getelementptr i8, ptr %scratch, i64 %pos1
+  store i8 %byte, ptr %slot
+  %more = icmp ne i64 %q, 0
+  br i1 %more, label %dig, label %done
+done:
+  %ndig = sub i64 24, %pos1
+  %sign = zext i1 %neg to i64
+  %len = add i64 %ndig, %sign
+  %buf = call ptr @orion_text_alloc(i64 %len)
+  %src = getelementptr i8, ptr %scratch, i64 %pos1
+  %dst = getelementptr i8, ptr %buf, i64 %sign
+  %_c = call ptr @memcpy(ptr %dst, ptr %src, i64 %ndig)
+  br i1 %neg, label %minus, label %fin
+minus:
+  store i8 45, ptr %buf
+  br label %fin
+fin:
+  ret ptr %buf
 }
 
 declare ptr @memcpy(ptr, ptr, i64)
@@ -1480,12 +1509,12 @@ retb:
 
 define i64 @prog__from_if_let(ptr %p0) {
 entry:
+    %v2 = alloca i64, align 8
+    %v4 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, 0
-    %v2 = alloca i64, align 8
     store i64 %v1, ptr %v2
     %v3 = add i64 0, 0
-    %v4 = alloca i64, align 8
     %v5 = add i64 0, 0
     %v6.slot = getelementptr i64, ptr %v0, i64 0
     %v6 = load i64, ptr %v6.slot
@@ -1528,12 +1557,12 @@ match_4_end:
 
 define i64 @prog__from_match(ptr %p0) {
 entry:
+    %v2 = alloca i64, align 8
+    %v4 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, 0
-    %v2 = alloca i64, align 8
     store i64 %v1, ptr %v2
     %v3 = add i64 0, 0
-    %v4 = alloca i64, align 8
     %v5 = add i64 0, 0
     %v6.slot = getelementptr i64, ptr %v0, i64 0
     %v6 = load i64, ptr %v6.slot
@@ -1591,12 +1620,13 @@ match_4_end:
 
 define i64 @prog__from_loop_arm(ptr %p0) {
 entry:
+    %v2 = alloca i64, align 8
+    %v4 = alloca i64, align 8
+    %v12 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, 0
-    %v2 = alloca i64, align 8
     store i64 %v1, ptr %v2
     %v3 = add i64 0, 0
-    %v4 = alloca i64, align 8
     %v5 = add i64 0, 0
     %v6.slot = getelementptr i64, ptr %v0, i64 0
     %v6 = load i64, ptr %v6.slot
@@ -1608,7 +1638,6 @@ match_4_arm_0_body:
     %v10.slot = getelementptr i64, ptr %v0, i64 1
     %v10 = load i64, ptr %v10.slot
     %v11 = add i64 0, 0
-    %v12 = alloca i64, align 8
     store i64 %v11, ptr %v12
     %v13 = add i64 0, 0
     br label %for_11_header
@@ -1709,27 +1738,38 @@ entry:
     %v19 = call i64 @prog__from_loop_arm(ptr %v18)
     %v20 = getelementptr i8, ptr @.str_0, i64 16
     %v21 = call ptr @orion_int_to_text(i64 %v4)
-    %v22 = call ptr @orion_text_concat(ptr %v20, ptr %v21)
-    %v23 = getelementptr i8, ptr @.str_1, i64 16
-    %v24 = call ptr @orion_text_concat(ptr %v22, ptr %v23)
-    %v25 = call ptr @orion_int_to_text(i64 %v9)
-    %v26 = call ptr @orion_text_concat(ptr %v24, ptr %v25)
-    %v27 = getelementptr i8, ptr @.str_2, i64 16
-    %v28 = call ptr @orion_text_concat(ptr %v26, ptr %v27)
-    %v29 = call ptr @orion_int_to_text(i64 %v14)
-    %v30 = call ptr @orion_text_concat(ptr %v28, ptr %v29)
-    %v31 = getelementptr i8, ptr @.str_3, i64 16
-    %v32 = call ptr @orion_text_concat(ptr %v30, ptr %v31)
-    %v33 = call ptr @orion_int_to_text(i64 %v19)
-    %v34 = call ptr @orion_text_concat(ptr %v32, ptr %v33)
-    call i32 @puts(ptr %v34)
-    %v35 = add i64 0, 0
-    %v36 = add i64 %v4, %v9
-    %v37 = add i64 %v36, %v14
-    %v38 = add i64 %v37, %v19
-    %v39 = add i64 0, 5
-    %v40 = add i64 %v38, %v39
-    ret i64 %v40
+    %v22 = getelementptr i8, ptr @.str_1, i64 16
+    %v23 = call ptr @orion_int_to_text(i64 %v9)
+    %v24 = getelementptr i8, ptr @.str_2, i64 16
+    %v25 = call ptr @orion_int_to_text(i64 %v14)
+    %v26 = getelementptr i8, ptr @.str_3, i64 16
+    %v27 = call ptr @orion_int_to_text(i64 %v19)
+    %v28 = call ptr @orion_list_new(i64 8)
+    %v28.lp0 = ptrtoint ptr %v20 to i64
+    call void @orion_list_set(ptr %v28, i64 0, i64 %v28.lp0)
+    %v28.lp1 = ptrtoint ptr %v21 to i64
+    call void @orion_list_set(ptr %v28, i64 1, i64 %v28.lp1)
+    %v28.lp2 = ptrtoint ptr %v22 to i64
+    call void @orion_list_set(ptr %v28, i64 2, i64 %v28.lp2)
+    %v28.lp3 = ptrtoint ptr %v23 to i64
+    call void @orion_list_set(ptr %v28, i64 3, i64 %v28.lp3)
+    %v28.lp4 = ptrtoint ptr %v24 to i64
+    call void @orion_list_set(ptr %v28, i64 4, i64 %v28.lp4)
+    %v28.lp5 = ptrtoint ptr %v25 to i64
+    call void @orion_list_set(ptr %v28, i64 5, i64 %v28.lp5)
+    %v28.lp6 = ptrtoint ptr %v26 to i64
+    call void @orion_list_set(ptr %v28, i64 6, i64 %v28.lp6)
+    %v28.lp7 = ptrtoint ptr %v27 to i64
+    call void @orion_list_set(ptr %v28, i64 7, i64 %v28.lp7)
+    %v29 = call ptr @orion_text_join(ptr %v28)
+    call i32 @puts(ptr %v29)
+    %v30 = add i64 0, 0
+    %v31 = add i64 %v4, %v9
+    %v32 = add i64 %v31, %v14
+    %v33 = add i64 %v32, %v19
+    %v34 = add i64 0, 5
+    %v35 = add i64 %v33, %v34
+    ret i64 %v35
 }
 
 @orion_argc = global i64 0
