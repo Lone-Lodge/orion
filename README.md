@@ -89,3 +89,9 @@ Known gaps, stated plainly rather than left to be discovered:
   `resumable_ok()` reports 0 and `ask` refuses rather than pretending.
 - Interactive terminal input (`orion_console_readline`) works on Windows and
   through a pipe anywhere; on a POSIX TTY it returns nothing.
+
+## License
+
+Orion is licensed under the Apache License, Version 2.0. Copyright 2026 Lone
+Lodge. See [LICENSE](LICENSE) for the full text and [NOTICE](NOTICE) for
+attribution.
