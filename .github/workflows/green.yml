@@ -1,0 +1,102 @@
+# green.yml — the suite the repo already had, run somewhere that is not the
+# author's laptop.
+#
+# The first job is the one that matters: it starts from a bare checkout with no
+# binary, exactly like someone else's first clone. That is the case that broke
+# silently before (the committed seed had rotted past the compiler source and
+# nobody noticed, because everyday work reuses the dist/orion.exe you already
+# have). seed_check runs first so a stale seed says so in one line instead of
+# failing deep inside stage 1 of the bootstrap.
+#
+# Ubuntu is the honest fresh-clone signal: it also exercises the retarget path
+# (the compiler always emits a Windows triple, so POSIX hosts rewrite the module
+# header before clang links it) which nobody runs by hand. Windows is where the
+# work happens, so it is here as the no-surprises job.
+
+name: green
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# A second push supersedes an in-flight run on the same ref.
+concurrency:
+  group: green-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      # One red platform must not hide the other's result.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    defaults:
+      run:
+        # Windows runners have Git Bash; every tool here is a bash script.
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: toolchain
+        run: |
+          clang --version
+          uname -s
+
+      # Before anything else: can a stranger build this at all?
+      - name: seed builds the compiler
+        run: bash tools/seed_check.sh
+
+      # seed -> self-compile -> fixpoint -> orbit -> 151 smoke tests.
+      - name: bootstrap from the seed
+        run: bash tools/bootstrap.sh
+
+      - name: negative (errors that must stay errors)
+        run: bash tools/negative_test.sh
+
+      - name: demos
+        run: bash tools/demos_smoke.sh
+
+      - name: feature combinations
+        run: bash tools/combo_test.sh
+
+      - name: workspace layout resolution
+        run: bash tools/test_workspace.sh
+
+      - name: lsp
+        run: |
+          bash tools/build_lsp.sh
+          bash tools/lsp_test.sh
+
+      - name: arena region shrink
+        run: bash tools/region_shrink_test.sh
+
+      # Both benches compare against a checked-in baseline and fail past 25%.
+      # Runner hardware is noisier than a laptop, so a red here is a hint to
+      # look, not proof on its own -- the thresholds are deliberately loose.
+      - name: compiler speed
+        run: bash tools/compile_bench.sh
+
+      - name: generated-code speed
+        run: bash tools/runtime_bench.sh
+
+      # The tracked .ll under examples/tests/dist is the compiler's own output,
+      # so a codegen change that forgets to regenerate it shows up here as a
+      # diff. Informational: the suite above is the real gate.
+      - name: committed IR still matches what the compiler emits
+        if: always()
+        run: |
+          if ! git diff --quiet -- examples/tests/dist; then
+            echo "::warning::committed IR under examples/tests/dist differs from this build's output"
+            git diff --stat -- examples/tests/dist | tail -5
+          else
+            echo "committed IR matches"
+          fi
