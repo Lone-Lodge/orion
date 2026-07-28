@@ -11,3 +11,6 @@ out.ll
 *.pdb
 *.dmp
 build/crash.*
+
+# scratch a test writes into the runner dir
+*.tmp

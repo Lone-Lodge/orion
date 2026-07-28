@@ -1230,6 +1230,23 @@ void orion_crumb_rule(const char *rule) {
     crumb_copy(crumb_rule, rule, sizeof crumb_rule);
 }
 
+/* Word i of a list's DATA. A list is [cap, len, data…], so the data starts at
+ * word 2; a closure is a list too ([fn_ptr, flag, captures…]), which is why
+ * the guard, the parallel driver and the closure caller all want this one
+ * read. Reading it here rather than calling the compiler-emitted
+ * `orion_list_at` keeps orion_rt.c linkable ON ITS OWN, which every pure-C
+ * harness depends on (tools/region_shrink_test.sh died with "undefined symbol:
+ * orion_list_at" when it did not).
+ *
+ * It lives ABOVE the _WIN32 block on purpose. There used to be three identical
+ * copies of it, and the one the parallel system driver called was the copy
+ * inside `#ifdef _WIN32` — so on Linux and Mac that call had no declaration
+ * and no definition, and the runtime did not compile at all. Nothing caught
+ * it, because the only machine that ever built it was Windows. */
+static long long orion_rt_slot(void *p, long long i) {
+    return ((long long *)p)[2 + i];
+}
+
 #ifdef _WIN32
 #include <windows.h>
 
@@ -1585,12 +1602,6 @@ static void guard_install(void) {
  * list pointer straight to code and jumped into the list's own memory (the
  * wild 0xAA crash the GUI hit; soak never armed the guard). Unwrap it the
  * way closure_call does: element 0 is the real function, element 1 the flag. */
-/* Same reason as orion_closure_slot below: reading the closure slots directly
- * keeps this file linkable on its own. */
-static long long orion_guard_slot(void *clos, long long i) {
-    return ((long long *)clos)[2 + i];
-}
-
 long long sup_guard5(long long fn, long long a, long long b, long long c,
                      long long d, long long e) {
     guard_install();
@@ -1608,8 +1619,8 @@ long long sup_guard5(long long fn, long long a, long long b, long long c,
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
     void *clos = (void *)fn;
-    long long real = orion_guard_slot(clos, 0);
-    long long lam = orion_guard_slot(clos, 1);
+    long long real = orion_rt_slot(clos, 0);
+    long long lam = orion_rt_slot(clos, 1);
     long long r;
     if (lam == 1)
         r = ((long long (*)(void *, long long, long long, long long, long long,
@@ -1634,8 +1645,8 @@ long long sup_guard7(long long fn, long long a, long long b, long long c,
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
     void *clos = (void *)fn;
-    long long real = orion_guard_slot(clos, 0);
-    long long lam = orion_guard_slot(clos, 1);
+    long long real = orion_rt_slot(clos, 0);
+    long long lam = orion_rt_slot(clos, 1);
     long long r;
     if (lam == 1)
         r = ((long long (*)(void *, long long, long long, long long, long long,
@@ -2076,15 +2087,9 @@ void *orion_par_madd(void *dstp, void *srcp, long long k) {
  * parallel system — those run on the main thread in their own batch.
  *
  * A closure is a list [fn_ptr, flag]; flag 1 = lambda taking its env first. */
-/* List element i, read directly: the compiler emits its own `orion_list_at`
- * into every module it compiles, so referencing that symbol from here made
- * orion_rt.c impossible to link on its own. Layout is [cap, len, data…]. */
-static long long orion_rt_list_at(void *list, long long idx) {
-    return ((long long *)list)[2 + idx];
-}
 static long long orion_call_system(void *clos, void *world, long long dt) {
-    long long real = orion_guard_slot(clos, 0);
-    long long lam = orion_guard_slot(clos, 1);
+    long long real = orion_rt_slot(clos, 0);
+    long long lam = orion_rt_slot(clos, 1);
     if (lam == 1)
         return ((long long (*)(void *, void *, long long))(void *)real)(clos, world, dt);
     return ((long long (*)(void *, long long))(void *)real)(world, dt);
@@ -2130,14 +2135,14 @@ long long atlas_par_systems(void *systems, void *world, long long dt) {
     HANDLE dones[ORION_POOL_MAX];
     long long made = 0, i;
     for (i = 0; i < cnt && i < nt; i++) {
-        orion_sys_tasks[i].clos = (void *)orion_rt_list_at(systems, i);
+        orion_sys_tasks[i].clos = (void *)orion_rt_slot(systems, i);
         orion_sys_tasks[i].world = world;
         orion_sys_tasks[i].dt = dt;
         dones[made++] = orion_sys_done[i];
         SetEvent(orion_sys_go[i]);
     }
     for (i = nt; i < cnt; i++)
-        orion_call_system((void *)orion_rt_list_at(systems, i), world, dt);
+        orion_call_system((void *)orion_rt_slot(systems, i), world, dt);
     if (made > 0) WaitForMultipleObjects((DWORD)made, dones, TRUE, INFINITE);
     return cnt;
 }
@@ -2146,7 +2151,7 @@ long long atlas_par_systems(void *systems, void *world, long long dt) {
     long long cnt = ((long long *)systems)[0];
     long long i;
     for (i = 0; i < cnt; i++)
-        orion_call_system((void *)orion_rt_list_at(systems, i), world, dt);
+        orion_call_system((void *)orion_rt_slot(systems, i), world, dt);
     return cnt;
 }
 #endif
@@ -2157,18 +2162,9 @@ long long atlas_par_systems(void *systems, void *world, long long dt) {
  * are no data races, and the reduction (sum) is order-independent -> the result
  * is deterministic regardless of thread count/timing. Surplus beyond the core
  * count runs inline on the calling thread. Exposed to Orion via `extern fn`. */
-/* A closure is a list: [cap, len, fn_ptr, flag, captures…], so slot i of the
- * DATA starts at word 2. Reading it directly keeps this file self-contained —
- * calling the compiler-emitted `orion_list_at` made orion_rt.c unlinkable on
- * its own, which broke every pure-C harness that links just the runtime
- * (tools/region_shrink_test.sh died with "undefined symbol: orion_list_at"). */
-static long long orion_closure_slot(void *clos, long long i) {
-    return ((long long *)clos)[2 + i];
-}
-
 static long long orion_call_one(void *clos, long long arg) {
-    long long real = orion_closure_slot(clos, 0);
-    long long lam = orion_closure_slot(clos, 1);
+    long long real = orion_rt_slot(clos, 0);
+    long long lam = orion_rt_slot(clos, 1);
     if (lam == 1)
         return ((long long (*)(void *, long long))(void *)real)(clos, arg);
     return ((long long (*)(long long))(void *)real)(arg);
@@ -2214,13 +2210,13 @@ long long orion_par_run(void *closures, long long arg) {
     HANDLE dones[ORION_POOL_MAX];
     long long made = 0, i, sum = 0;
     for (i = 0; i < cnt && i < nt; i++) {
-        orion_run_tasks[i].clos = (void *)orion_rt_list_at(closures, i);
+        orion_run_tasks[i].clos = (void *)orion_rt_slot(closures, i);
         orion_run_tasks[i].arg = arg;
         dones[made++] = orion_run_done[i];
         SetEvent(orion_run_go[i]);
     }
     for (i = nt; i < cnt; i++)
-        sum += orion_call_one((void *)orion_rt_list_at(closures, i), arg);
+        sum += orion_call_one((void *)orion_rt_slot(closures, i), arg);
     if (made > 0) WaitForMultipleObjects((DWORD)made, dones, TRUE, INFINITE);
     for (i = 0; i < cnt && i < nt; i++) sum += orion_run_tasks[i].result;
     return sum;
@@ -2230,7 +2226,7 @@ long long orion_par_run(void *closures, long long arg) {
     long long cnt = ((long long *)closures)[1];  /* [cap, len, data...] */
     long long i, sum = 0;
     for (i = 0; i < cnt; i++)
-        sum += orion_call_one((void *)orion_rt_list_at(closures, i), arg);
+        sum += orion_call_one((void *)orion_rt_slot(closures, i), arg);
     return sum;
 }
 #endif

@@ -1502,7 +1502,7 @@ retb:
 }
 
 
-@.str_0 = private unnamed_addr constant [44 x i8] c"\26\CA\FC\09\00\00\00\00\1B\00\00\00\00\00\00\00/tmp/orion_smoke_driver.txt\00", align 8
+@.str_0 = private unnamed_addr constant [42 x i8] c"\F0\08\BE\29\00\00\00\00\19\00\00\00\00\00\00\00dist/driver_roundtrip.tmp\00", align 8
 @.str_1 = private unnamed_addr constant [26 x i8] c"\B7\FC\BE\03\00\00\00\00\09\00\00\00\00\00\00\00marker-42\00", align 8
 
 define i64 @orion_main() {
