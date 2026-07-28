@@ -385,12 +385,6 @@ fn scope_bind(scope: Scope, name: Text, id: int) -> Scope:
     new_flags = push(scope.mut_flags, 0)
     Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
-fn scope_bind_mut(scope: Scope, name: Text, ptr_id: int) -> Scope:
-    new_names = push(scope.names, name)
-    new_ids = push(scope.ids, ptr_id)
-    new_flags = push(scope.mut_flags, 1)
-    Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
-
 # IN-PLACE binds for the ONE hot path: the linear statement sequence inside a
 # block. `scope_bind`'s immutable copy made a function with N locals O(N^2) to
 # lower. These append with push_mut instead (O(1) amortized). Safe ONLY because
@@ -410,11 +404,6 @@ fn scope_bind_mut_inplace(scope: Scope, name: Text, ptr_id: int) -> Scope:
     new_flags = push_mut(scope.mut_flags, 1)
     Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
-
-fn scope_add_fn_sig_keep_data(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
-    new_names = push(scope.fn_sig_names, fn_name)
-    new_rets = push(scope.fn_sig_rets, ret_type)
-    Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
 fn scope_push_loop(scope: Scope, header_lbl: Text, end_lbl: Text) -> Scope:
     new_headers = push(scope.loop_headers, header_lbl)
