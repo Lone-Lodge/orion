@@ -106,6 +106,42 @@ h2 {
     color: var(--dim);
 }
 
+/* Jump list. Static, never sticky: a bar pinned to the top is the usual way
+ * a focused link ends up hidden behind something while tabbing, which is
+ * exactly what 2.4.11 and 2.4.12 are about. Ten links do not need to follow
+ * you down the page.
+ *
+ * A real <ol> because the sections are numbered and read in order; the
+ * numbers come from the list, so the link text alone still says where it
+ * goes (2.4.9). */
+.toc {
+    max-width: 42rem;
+    margin: 0 auto 2.5rem;
+    padding: 1rem 1.25rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+}
+.toc-h {
+    border-top: none;
+    padding-top: 0;
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+}
+.toc ol {
+    margin: 0;
+    padding-left: 1.5rem;
+    /* Two columns where there is room, one where there is not. No media
+     * query needed, and it reflows at 320px and at 200% zoom (1.4.10). */
+    columns: 2;
+    column-gap: 2rem;
+}
+.toc li { margin-bottom: 0.5rem; break-inside: avoid; }
+.toc .toc-last { margin-bottom: 0.75rem; }
+
+/* A heading that has just been jumped to should not sit flush against the
+ * viewport edge, and the anchor must clear any future sticky header. */
+h2[id] { scroll-margin-top: 1rem; }
+
 /* AAA 1.4.8: paragraph spacing at least 1.5x the line height. */
 p { margin: 0 0 1.25rem; }
 

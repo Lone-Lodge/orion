@@ -22,6 +22,22 @@
 </ul>
 </header>
 
+<nav class="toc" aria-labelledby="toc-h">
+<h2 class="toc-h" id="toc-h">On this page</h2>
+<ol>
+<li><a href="#hello">Hello</a></li>
+<li><a href="#names">Names</a></li>
+<li><a href="#text">Text</a></li>
+<li><a href="#branching">Branching</a></li>
+<li><a href="#loops">Loops</a></li>
+<li><a href="#lists">Lists and maps</a></li>
+<li><a href="#types">Types</a></li>
+<li><a href="#functions">Functions, lambdas, orbs</a></li>
+<li><a href="#errors">When it goes wrong</a></li>
+<li class="toc-last"><a href="#next">Where to go next</a></li>
+</ol>
+</nav>
+
 <main id="guide">
 
 <p>Orion compiles to LLVM IR and then to a native binary. Indentation makes
@@ -30,7 +46,7 @@ is a whole program, and every one of them is compiled by
 <code>tools/docs_check.sh</code> &mdash; if a sample here stops working, the
 build says so.</p>
 
-<h2>1. Hello</h2>
+<h2 id="hello">1. Hello</h2>
 
 <pre><code data-or>fn main() -&gt; int:
     print_line("hello")
@@ -52,7 +68,7 @@ clang hello.ll runtime/orion_rt.c -o hello
 <code>orbit new myapp</code>, then <code>orbit run</code>,
 <code>orbit build</code>, <code>orbit test</code>.</p>
 
-<h2>2. Names</h2>
+<h2 id="names">2. Names</h2>
 
 <pre><code data-or>fn main() -&gt; int:
     x = 41            <span class="c"># bound once</span>
@@ -66,7 +82,7 @@ clang hello.ll runtime/orion_rt.c -o hello
 to reassign, and the compiler holds you to it. Types are inferred; write one
 when you want it checked, as in <code>mut n: int = 0</code>.</p>
 
-<h2>3. Text</h2>
+<h2 id="text">3. Text</h2>
 
 <pre><code data-or>fn main() -&gt; int:
     name = "world"
@@ -81,7 +97,7 @@ any expression, not just a name. Escape a real brace as <code>\{</code>. Three
 or more parts compile to a single join, so building a line in a loop does not
 quietly cost you one allocation per piece.</p>
 
-<h2>4. Branching</h2>
+<h2 id="branching">4. Branching</h2>
 
 <pre><code data-or>fn classify(n: int) -&gt; Text:
     match:
@@ -101,7 +117,7 @@ true arm wins. It is what you use instead of <code>else if</code>.
 <code>if c then a else b</code> is the one-line form; the indented
 <code>if c:</code> / <code>else:</code> is the block form.</p>
 
-<h2>5. Loops</h2>
+<h2 id="loops">5. Loops</h2>
 
 <pre><code data-or>fn main() -&gt; int:
     mut sum = 0
@@ -122,25 +138,23 @@ is where map and filter come from &mdash; <code>where</code> is the filter.
 <code>0..&lt;5</code> excludes the end, <code>1..=3</code> includes it, and a
 bare <code>loop:</code> runs until <code>break</code>.</p>
 
-<h2>6. Lists and maps</h2>
+<h2 id="lists">6. Lists and maps</h2>
 
 <pre><code data-or>fn main() -&gt; int:
     xs = [10, 20, 30]
     ys = push(xs, 40)          <span class="c"># push returns a new list</span>
     m = {"a": 1, "b": 2}
-    b = get(m, "b")
-    has_z = has(m, "z")
-    print_line("first={at(xs, 0)} len={len(ys)} b={b} has_z={has_z}")
-    at(xs, 0)
+    print_line("first={xs[0]} len={len(ys)} b={get(m, "b")}")
+    xs[0] + len(ys)
 </code></pre>
 
 <p><code>push</code> copies. That keeps value semantics unconditional, and it
 means <code>x = push(x, v)</code> in a tight loop is quadratic &mdash; for a
 hot accumulator, <code>push_mut</code> is the audited way to append in place.
-<code>at</code>, <code>len</code>, <code>get</code> and <code>has</code> are
-built in and need no import.</p>
+Index with <code>xs[0]</code>; <code>at</code>, <code>len</code>, <code>get</code>
+and <code>has</code> are the function forms, all built in and needing no import.</p>
 
-<h2>7. Types</h2>
+<h2 id="types">7. Types</h2>
 
 <pre><code data-or>type Player: name: Text, hp: int
 
@@ -166,7 +180,7 @@ checked for exhaustiveness. <code>_</code> is the catch-all pattern, and
 <code>if let Circle(r) = s:</code> handles the single-case check without a
 full match.</p>
 
-<h2>8. Functions, lambdas, orbs</h2>
+<h2 id="functions">8. Functions, lambdas, orbs</h2>
 
 <pre><code data-or>use text
 use iter
@@ -185,7 +199,7 @@ lambda is <code>fn(params): body</code> and closes over what it needs. Any
 function can also be called method-style, so <code>trim(s)</code> and
 <code>s.trim()</code> are the same call.</p>
 
-<h2>9. When it goes wrong</h2>
+<h2 id="errors">9. When it goes wrong</h2>
 
 <pre><code data-or>type Result: Ok(int), Err(Text)
 
@@ -214,7 +228,7 @@ good case or returns the bad one to your caller. <code>require</code> and
 <code>defer</code> runs at block end, last registered first, and before any
 <code>return</code>.</p>
 
-<h2>Where to go next</h2>
+<h2 id="next">Where to go next</h2>
 
 <ul>
 <li><code>examples/demos/</code> &mdash; 21 runnable programs, one idea each.</li>
