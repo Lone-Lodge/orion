@@ -4380,6 +4380,16 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
     # is no longer being compiled.
     slot_set("otir:ep", slot_int_or_zero("otir:ep") + 1)
 
+    # Same reason, one slot the epoch bump missed: the hoisted-lambda counter.
+    # It only ever went up, so `__nlambda_N` for a given lambda depended on how
+    # many lambdas the PROCESS had lowered before it — which, in the test
+    # runner, is decided by the order list_dir happens to return the test files
+    # in. Windows and Linux hand back different orders, so the same source
+    # emitted differently-named symbols on the two hosts and the committed IR
+    # could not match on both. A module's symbol names must depend on that
+    # module and nothing else.
+    slot_set("otir:nlam_ctr", 0)
+
     # ---- Pass -2: the import graph + every orb's exports ----
     # Recorded BEFORE anything resolves a name, because resolution asks two
     # questions a single ordered walk cannot answer: "who exports this?" (any

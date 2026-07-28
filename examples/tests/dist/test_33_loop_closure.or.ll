@@ -1543,7 +1543,7 @@ for_3_header:
     br i1 %v11.cb, label %for_3_body, label %for_3_end
 for_3_body:
     %v13 = call ptr @orion_list_new(i64 3)
-    %v13.fp = ptrtoint ptr @prog____nlambda_1 to i64
+    %v13.fp = ptrtoint ptr @prog____nlambda_0 to i64
     call void @orion_list_set(ptr %v13, i64 0, i64 %v13.fp)
     call void @orion_list_set(ptr %v13, i64 1, i64 1)
     call void @orion_list_set(ptr %v13, i64 2, i64 %v9)
@@ -1565,7 +1565,7 @@ for_3_end:
     ret i64 %v26
 }
 
-define i64 @prog____nlambda_1(ptr %p0, i64 %p1) {
+define i64 @prog____nlambda_0(ptr %p0, i64 %p1) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1

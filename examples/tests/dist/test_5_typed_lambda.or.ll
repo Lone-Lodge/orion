@@ -1567,7 +1567,7 @@ entry:
     %v2.lp1 = ptrtoint ptr %v1 to i64
     call void @orion_list_set(ptr %v2, i64 1, i64 %v2.lp1)
     %v3 = call ptr @orion_list_new(i64 2)
-    %v3.fp = ptrtoint ptr @prog____nlambda_3 to i64
+    %v3.fp = ptrtoint ptr @prog____nlambda_0 to i64
     call void @orion_list_set(ptr %v3, i64 0, i64 %v3.fp)
     call void @orion_list_set(ptr %v3, i64 1, i64 1)
     %v4 = call ptr @prog__each_len(ptr %v2, ptr %v3)
@@ -1579,7 +1579,7 @@ entry:
     ret i64 %v9
 }
 
-define i64 @prog____nlambda_3(ptr %p0, ptr %p1) {
+define i64 @prog____nlambda_0(ptr %p0, ptr %p1) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = getelementptr i8, ptr %p1, i64 0
