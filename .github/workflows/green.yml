@@ -76,6 +76,12 @@ jobs:
           bash tools/build_lsp.sh
           bash tools/lsp_test.sh
 
+      # A documented feature that no longer exists fails exactly like a stale
+      # seed: it reads fine and nobody runs it. Every sample in the Field Guide
+      # is a whole program, and this compiles all of them.
+      - name: field guide samples compile
+        run: bash tools/docs_check.sh
+
       - name: arena region shrink
         run: bash tools/region_shrink_test.sh
 

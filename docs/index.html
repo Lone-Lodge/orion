@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orion Field Guide</title>
+<meta name="description" content="Everything you need to write Orion, on one page. Nine complete programs, each one compiled by the test suite.">
+<link rel="alternate" hreflang="en" href="index.html">
+<link rel="alternate" hreflang="sv" href="sv.html">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#guide">Skip to the guide</a>
+
+<header>
+<h1>Orion Field Guide</h1>
+<p class="lede">Everything you need to write Orion, on one page. Ten minutes, nine programs.</p>
+<ul class="langs">
+<li><a href="index.html" hreflang="en" aria-current="page">English</a></li>
+<li><a href="sv.html" hreflang="sv" lang="sv">Svenska</a></li>
+</ul>
+</header>
+
+<main id="guide">
+
+<p>Orion compiles to LLVM IR and then to a native binary. Indentation makes
+blocks. There is no null and there are no exceptions. Every code block below
+is a whole program, and every one of them is compiled by
+<code>tools/docs_check.sh</code> &mdash; if a sample here stops working, the
+build says so.</p>
+
+<h2>1. Hello</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    print_line("hello")
+    0
+</code></pre>
+
+<p>Build and run it:</p>
+
+<pre><code>dist/orion.exe hello.or hello.ll orbs
+clang hello.ll runtime/orion_rt.c -o hello
+./hello
+</code></pre>
+
+<p>A block's value is its last expression, so no <code>return</code> is needed
+&mdash; though <code>return</code> exists for leaving early. What
+<code>main</code> returns becomes the process exit code.</p>
+
+<p>For anything larger than one file there is <code>orbit</code>:
+<code>orbit new myapp</code>, then <code>orbit run</code>,
+<code>orbit build</code>, <code>orbit test</code>.</p>
+
+<h2>2. Names</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    x = 41            <span class="c"># bound once</span>
+    mut total = 0     <span class="c"># this one changes</span>
+    total = total + x
+    total += 1
+    total
+</code></pre>
+
+<p>Plain <code>=</code> binds a new name. <code>mut</code> marks one you mean
+to reassign, and the compiler holds you to it. Types are inferred; write one
+when you want it checked, as in <code>mut n: int = 0</code>.</p>
+
+<h2>3. Text</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    name = "world"
+    n = 3
+    print_line("hello {name}, {n} times, {n * 2} in total")
+    print_line("a literal brace: \{ and \}")
+    0
+</code></pre>
+
+<p>Every string literal is an interpolation. A hole <code>{...}</code> takes
+any expression, not just a name. Escape a real brace as <code>\{</code>. Three
+or more parts compile to a single join, so building a line in a loop does not
+quietly cost you one allocation per piece.</p>
+
+<h2>4. Branching</h2>
+
+<pre><code data-or>fn classify(n: int) -&gt; Text:
+    match:
+        n &lt; 0:  "negative"
+        n == 0: "zero"
+        else:   "positive"
+
+fn main() -&gt; int:
+    print_line(classify(0 - 5))
+    label = if 1 == 1 then "yes" else "no"
+    print_line(label)
+    0
+</code></pre>
+
+<p><code>match:</code> with no subject is a chain of conditions and the first
+true arm wins. It is what you use instead of <code>else if</code>.
+<code>if c then a else b</code> is the one-line form; the indented
+<code>if c:</code> / <code>else:</code> is the block form.</p>
+
+<h2>5. Loops</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    mut sum = 0
+    loop i in 0..&lt;5:                          <span class="c"># 0 1 2 3 4</span>
+        sum += i
+    loop i in 1..=3:                          <span class="c"># 1 2 3</span>
+        sum += i
+    doubled = loop x in [1, 2, 3]: x * 2      <span class="c"># [2, 4, 6]</span>
+    big = loop x in [1, 2, 3] where x &gt; 1: x  <span class="c"># [2, 3]</span>
+    loop:
+        break
+    sum + len(doubled) + len(big)
+</code></pre>
+
+<p><code>loop</code> is the only iteration keyword. In statement position it
+loops; in expression position it collects each body value into a list, which
+is where map and filter come from &mdash; <code>where</code> is the filter.
+<code>0..&lt;5</code> excludes the end, <code>1..=3</code> includes it, and a
+bare <code>loop:</code> runs until <code>break</code>.</p>
+
+<h2>6. Lists and maps</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    xs = [10, 20, 30]
+    ys = push(xs, 40)          <span class="c"># push returns a new list</span>
+    m = {"a": 1, "b": 2}
+    b = get(m, "b")
+    has_z = has(m, "z")
+    print_line("first={at(xs, 0)} len={len(ys)} b={b} has_z={has_z}")
+    at(xs, 0)
+</code></pre>
+
+<p><code>push</code> copies. That keeps value semantics unconditional, and it
+means <code>x = push(x, v)</code> in a tight loop is quadratic &mdash; for a
+hot accumulator, <code>push_mut</code> is the audited way to append in place.
+<code>at</code>, <code>len</code>, <code>get</code> and <code>has</code> are
+built in and need no import.</p>
+
+<h2>7. Types</h2>
+
+<pre><code data-or>type Player: name: Text, hp: int
+
+type Shape:
+    Circle(int)
+    Rect(int, int)
+
+fn area(s: Shape) -&gt; int:
+    match s:
+        Circle(r) -&gt; 3 * r * r
+        Rect(w, h) -&gt; w * h
+
+fn main() -&gt; int:
+    p = Player{name: "Hero", hp: 100}
+    print_line("{p.name} has {p.hp} hp")
+    area(Shape.Rect(6, 7))
+</code></pre>
+
+<p>One keyword for both shapes. Fields on a line make a record, reached with
+<code>p.name</code>. Variants make a sum type, built as
+<code>Shape.Rect(6, 7)</code> and read by <code>match</code>, which is
+checked for exhaustiveness. <code>_</code> is the catch-all pattern, and
+<code>if let Circle(r) = s:</code> handles the single-case check without a
+full match.</p>
+
+<h2>8. Functions, lambdas, orbs</h2>
+
+<pre><code data-or>use text
+use iter
+
+fn main() -&gt; int:
+    words = split("alpha,beta,gamma", ",")
+    lengths = loop w in words: len(w)
+    double = fn(x): x * 2
+    print_line("words={len(words)} letters={sum(lengths)}")
+    double(21)
+</code></pre>
+
+<p>A library is an <em>orb</em>: <code>use text</code> brings one in, and
+<code>pub fn</code> is what an orb exports. Each orb is its own namespace. A
+lambda is <code>fn(params): body</code> and closes over what it needs. Any
+function can also be called method-style, so <code>trim(s)</code> and
+<code>s.trim()</code> are the same call.</p>
+
+<h2>9. When it goes wrong</h2>
+
+<pre><code data-or>type Result: Ok(int), Err(Text)
+
+fn safe_div(a: int, b: int) -&gt; Result:
+    if b == 0:
+        Result.Err("divide by zero")
+    else:
+        Result.Ok(a / b)
+
+fn calc(x: int) -&gt; Result:
+    v = safe_div(84, x)?      <span class="c"># unwrap, or return the Err</span>
+    Result.Ok(v * 2)
+
+fn main() -&gt; int:
+    require 1 == 1            <span class="c"># traps if false</span>
+    defer print_line("cleanup runs last")
+    match calc(2):
+        Ok(v) -&gt; v
+        Err(_) -&gt; 0
+</code></pre>
+
+<p>There is no null to forget to check and no exception to forget to catch.
+Failure is a value: give it a variant, and <code>?</code> either unwraps the
+good case or returns the bad one to your caller. <code>require</code> and
+<code>ensure</code> are runtime contracts that trap on a false condition.
+<code>defer</code> runs at block end, last registered first, and before any
+<code>return</code>.</p>
+
+<h2>Where to go next</h2>
+
+<ul>
+<li><code>examples/demos/</code> &mdash; 21 runnable programs, one idea each.</li>
+<li><code>examples/tests/tests/</code> &mdash; 151 tests, one feature each, all green on Linux and Windows.</li>
+<li><code>orbs/</code> &mdash; the libraries: text, list, num, iter, json, net, async, result, option.</li>
+<li><code>tools/bootstrap.sh</code> &mdash; a bare checkout to a working compiler: the seed builds it, then it builds itself to a fixpoint.</li>
+</ul>
+
+</main>
+
+<footer>
+<p>Orion is written in Orion. The compiler compiles itself.
+<a href="https://github.com/Lone-Lodge/orion">Source on GitHub</a>.</p>
+</footer>
+
+</body>
+</html>

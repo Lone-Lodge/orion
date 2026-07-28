@@ -1,0 +1,177 @@
+/* Orion Field Guide — one stylesheet, no build step, no dependencies.
+ *
+ * Target is WCAG 2.2 Level AAA, which mostly decides the colours for us:
+ * body text needs 7:1 against its background, and that has to hold in both
+ * light and dark. Every pair below is computed, not eyeballed:
+ *
+ *   light   text #1a1a1a on #ffffff   17.4:1
+ *           text #1a1a1a on #f4f5f7   15.9:1   (code)
+ *           dim  #41475a on #f4f5f7    8.4:1   (comments)
+ *           link #14418f on #ffffff    9.6:1
+ *   dark    text #e8eaf0 on #12141a   15.3:1
+ *           text #e8eaf0 on #1b1e26   13.9:1   (code)
+ *           dim  #a8b0c4 on #1b1e26    7.7:1   (comments)
+ *           link #9fc3ff on #12141a   10.3:1
+ *
+ * Code is deliberately NOT syntax-highlighted beyond dimming comments. A full
+ * highlight palette is where AAA contrast dies: five hues that all clear 7:1
+ * against the same background stop being distinguishable from each other.
+ * Two tones say everything a short guide needs.
+ */
+
+:root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --code-bg: #f4f5f7;
+    --dim: #41475a;
+    --link: #14418f;
+    --rule: #c3c7d1;
+    --focus: #14418f;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #12141a;
+        --fg: #e8eaf0;
+        --code-bg: #1b1e26;
+        --dim: #a8b0c4;
+        --link: #9fc3ff;
+        --rule: #3a4050;
+        --focus: #9fc3ff;
+    }
+}
+
+/* AAA 1.4.12: the reader may override spacing. Everything below is in
+ * relative units so nothing collapses when they do, or at 200% zoom. */
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 2rem 1.25rem 6rem;
+    background: var(--bg);
+    color: var(--fg);
+    font: 1.0625rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    /* AAA 1.4.8: no justified text, and no more than 80 characters a line. */
+    text-align: left;
+}
+
+/* One column, centred, capped at reading width. */
+main, header, footer { max-width: 42rem; margin-inline: auto; }
+
+/* AAA 2.4.1: a way past the header for keyboard and screen-reader users.
+ * Visible the moment it has focus rather than hidden outright. */
+.skip {
+    position: absolute;
+    left: -100vw;
+}
+.skip:focus {
+    position: static;
+    display: inline-block;
+    margin-bottom: 1rem;
+}
+
+/* AAA 2.4.7 / 2.4.11: focus is never removed and never obscured. */
+a:focus-visible,
+:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+h1 {
+    font-size: 1.875rem;
+    line-height: 1.25;
+    margin: 0 0 0.25rem;
+}
+
+h2 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+    margin: 2.75rem 0 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+}
+
+.lede {
+    margin: 0 0 1.5rem;
+    color: var(--dim);
+}
+
+/* AAA 1.4.8: paragraph spacing at least 1.5x the line height. */
+p { margin: 0 0 1.25rem; }
+
+ul { margin: 0 0 1.25rem; padding-left: 1.5rem; }
+li { margin-bottom: 0.5rem; }
+
+/* Links carry an underline, so they are not distinguished by colour alone
+ * (1.4.1). Thick enough to survive a low-contrast display. */
+a {
+    color: var(--link);
+    text-decoration-line: underline;
+    text-decoration-thickness: 0.09em;
+    text-underline-offset: 0.16em;
+}
+
+/* Language switcher. aria-current marks the active one; the parenthesised
+ * label is there so it does not read as colour-only either. */
+.langs {
+    margin: 0 0 2rem;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.9375rem;
+}
+.langs li { margin: 0; }
+.langs [aria-current="page"] {
+    color: var(--fg);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+pre {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0.875rem 1rem;
+    /* Long lines scroll here rather than forcing the page sideways (1.4.10).
+     * Keyboard-reachable so it is not a scroll trap. */
+    overflow-x: auto;
+    margin: 0 0 1.25rem;
+}
+
+code, pre, kbd {
+    font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.9375rem;
+}
+
+pre code { background: none; padding: 0; }
+
+/* Inline code needs a hint of a box, not a colour change. */
+:not(pre) > code {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.05em 0.3em;
+}
+
+/* The only thing the code colouring does. */
+.c { color: var(--dim); }
+
+footer {
+    margin-top: 3.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--dim);
+    font-size: 0.9375rem;
+}
+
+/* Nothing here animates, but say so explicitly for anything added later. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
