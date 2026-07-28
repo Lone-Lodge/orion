@@ -1,0 +1,3 @@
+name = "beta"
+version = "0.0.1"
+description = "gate fixture - exports beta_label, keeps a private label/run with the SAME names as alpha"

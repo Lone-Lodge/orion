@@ -1,0 +1,43 @@
+extern fn orion_arena_on() -> int
+extern fn orion_arena_off() -> int
+extern fn orion_arena_reset() -> int
+extern fn orion_arena_used() -> int
+
+# Arena stress: 50k simulated frames, each allocating ~40KB of
+# transients (lists, interpolated text, maps) = ~2GB total churn.
+# With the arena reset per frame, RSS stays ~flat at the arena size.
+# Without it (malloc passthrough) this would leak ~2GB.
+
+fn main() -> int:
+    # Persistent state: pre-sized OUTSIDE arena mode, mutated in place
+    # during frames (set never allocates; push_mut within capacity
+    # never allocates).
+    mut score_history = orion_arena_used()
+    frames = 50000
+    mut peak = 0
+    mut i = 0
+    loop:
+        if i >= frames:
+            break
+        orion_arena_reset()
+        orion_arena_on()
+        # ~transient frame work: entity packing, draw lists, debug text
+        mut draws = []
+        loop r in 0..<100:
+            draws = push(draws, r * 7)
+        msg = "frame {i} draws {len(draws)} score {i}"
+        m = {"x": i, "y": i * 2, "label": msg}
+        consumed = get_int(m, "x") + len(msg)
+        used = orion_arena_used()
+        if used > peak:
+            peak = used
+        orion_arena_off()
+        i = i + 1
+    print_line("frames: {frames}")
+    print_line("peak arena bytes per frame: {peak}")
+    if peak < 1000000:
+        print_line("ARENA OK - flat memory under 2GB of churn")
+        0
+    else:
+        print_line("ARENA SUSPICIOUS - peak too high")
+        1

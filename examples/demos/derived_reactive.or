@@ -1,0 +1,19 @@
+# Recompute vs snapshot.
+#
+# `derived name = expr` (once a keyword here) was retired from the language
+# core — reactivity belongs to the library layer, not the syntax. What it
+# stood for is expressible directly, and more honestly: a truth you re-read is
+# a FUNCTION of its inputs, a snapshot is a binding. The difference is visible
+# below, and it is the whole point the keyword used to make.
+#
+# Run:  orion run derived_reactive.or main   → expects 180
+
+fn doubled(base: int) -> int:
+    base * 2
+
+fn main() -> int:
+    mut base = 10
+    a = doubled(base)     # snapshot taken at base=10 → 20
+    base = 100            # change the input...
+    b = doubled(base)     # ...and re-reading follows it → 200
+    b - a                 # 200 - 20 = 180  (two snapshots would give 0)

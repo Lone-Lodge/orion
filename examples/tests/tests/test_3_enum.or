@@ -1,0 +1,7 @@
+type Color: Red, Green, Blue
+
+fn main() -> int:
+    a = Color.Red
+    b = Color.Green
+    c = Color.Blue
+    a + b + c

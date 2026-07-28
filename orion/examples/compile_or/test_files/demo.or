@@ -1,6 +1,0 @@
-fn main() -> int:
-    threshold = 30
-    bonus = 12
-    # 30 + 12 = 42 from then-branch (captures bonus)
-    classify = |y| if y > threshold then y + bonus else 0
-    classify(31)

@@ -1,0 +1,28 @@
+name = "tests"
+version = "0.1.0"
+
+# Self-hosted: orbit compiles this with orion.exe + clang (no lodge-orion).
+compiler = "../../dist/orion.exe"
+runtime = "../../runtime"
+
+[orbs]
+orion_lex = "path:../../orbs/orion_lex"
+orion_parse = "path:../../orbs/orion_parse"
+orion_ir = "path:../../orbs/orion_ir"
+orion_ast_to_ir = "path:../../orbs/orion_ast_to_ir"
+orion_emit_llvm = "path:../../orbs/orion_emit_llvm"
+os = "path:../../orbs/os"
+orion_driver = "path:../../orbs/orion_driver"
+# The stdlib, so the suite can test it too. A test that says `use async` or
+# `use iter` could not compile here before — which is why the async scheduler and
+# the generic-element fix both had to be proven by hand instead of by the suite.
+# An orb costs nothing until a test actually uses it.
+async = "path:../../orbs/async"
+iter = "path:../../orbs/iter"
+text = "path:../../orbs/text"
+num = "path:../../orbs/num"
+list = "path:../../orbs/list"
+dict = "path:../../orbs/dict"
+json = "path:../../orbs/json"
+result = "path:../../orbs/result"
+option = "path:../../orbs/option"

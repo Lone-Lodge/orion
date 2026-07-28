@@ -1,0 +1,20 @@
+# Algebraic effects end to end: `effect` declares the operations, `handle`
+# defines one (an ordinary fn under a synthesized name), `perform` invokes it
+# as an expression, and `resume(v)` comes back to the perform site with v.
+# Both the int and the text continuation are exercised.
+effect Random:
+    roll: fn(max: int) -> int
+
+effect Log:
+    msg: fn(text: Text) -> Text
+
+handle Random.roll(max: int) -> int:
+    resume(max / 5)
+
+handle Log.msg(message: Text) -> Text:
+    resume("ok")
+
+fn main() -> int:
+    r = perform Random.roll(100)     # 20
+    s = perform Log.msg("hello")     # "ok"
+    r + len(s) * 11                  # 20 + 2*11 == 42

@@ -1,0 +1,32 @@
+# Tasks SUSPEND and resume where they stopped.
+#
+# The point is not that the answers come out right (they would with no scheduler
+# at all, if each task simply ran to completion). The point is the interleaving:
+# each task records its id, yields, and the other one must get the turn. Every
+# task has its own stack — Windows fibers, ucontext elsewhere — which is the
+# thing `orbs/async` and `orbs/scheduler` both listed as "future work".
+#
+# 111222 would mean spawn ran each task to completion. 121212 means they really
+# parked mid-loop and were resumed.
+use async
+
+fn tick(id: int) -> int:
+    mut count = 0
+    loop i in 0..<3:
+        prev = if slot_has("trace") then slot_get_int("trace") else 0
+        slot_set("trace", prev * 10 + id)
+        yield_now()
+        count = count + 1
+    count
+
+fn main() -> int:
+    t1 = spawn(tick, 1)
+    t2 = spawn(tick, 2)
+    a = await(t1)
+    b = await(t2)
+    trace = if slot_has("trace") then slot_get_int("trace") else 0
+    print_line("trace={trace} loops={a}+{b}")
+    interleaved = if trace == 121212 then 1 else 0
+    both_ran = if a == 3 and b == 3 then 1 else 0
+    # 20 for interleaving, 20 for both completing, 2 for the ids being distinct.
+    interleaved * 20 + both_ran * 20 + 2

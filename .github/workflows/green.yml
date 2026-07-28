@@ -1,0 +1,119 @@
+# green.yml — the suite the repo already had, run somewhere that is not the
+# author's laptop.
+#
+# The first job is the one that matters: it starts from a bare checkout with no
+# binary, exactly like someone else's first clone. That is the case that broke
+# silently before (the committed seed had rotted past the compiler source and
+# nobody noticed, because everyday work reuses the dist/orion.exe you already
+# have). seed_check runs first so a stale seed says so in one line instead of
+# failing deep inside stage 1 of the bootstrap.
+#
+# Ubuntu is the honest fresh-clone signal: it also exercises the retarget path
+# (the compiler always emits a Windows triple, so POSIX hosts rewrite the module
+# header before clang links it) which nobody runs by hand. Windows is where the
+# work happens, so it is here as the no-surprises job.
+
+name: green
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# A second push supersedes an in-flight run on the same ref.
+concurrency:
+  group: green-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      # One red platform must not hide the other's result.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    defaults:
+      run:
+        # Windows runners have Git Bash; every tool here is a bash script.
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: toolchain
+        run: |
+          clang --version
+          uname -s
+
+      # Before anything else: can a stranger build this at all?
+      - name: seed builds the compiler
+        run: bash tools/seed_check.sh
+
+      # seed -> self-compile -> fixpoint -> orbit -> 151 smoke tests.
+      - name: bootstrap from the seed
+        run: bash tools/bootstrap.sh
+
+      - name: negative (errors that must stay errors)
+        run: bash tools/negative_test.sh
+
+      - name: demos
+        run: bash tools/demos_smoke.sh
+
+      - name: feature combinations
+        run: bash tools/combo_test.sh
+
+      - name: workspace layout resolution
+        run: bash tools/test_workspace.sh
+
+      - name: lsp
+        run: |
+          bash tools/build_lsp.sh
+          bash tools/lsp_test.sh
+
+      # A documented feature that no longer exists fails exactly like a stale
+      # seed: it reads fine and nobody runs it. Every sample in the Field Guide
+      # is a whole program, and this compiles all of them.
+      - name: field guide samples compile
+        run: bash tools/docs_check.sh
+
+      # Everything above this line asks whether the compiler crashes, refuses
+      # correctly, or runs fast. This asks whether a valid program still gives
+      # the RIGHT ANSWER when something that cannot matter is changed. Every
+      # wrong-answer bug found so far lived in that gap.
+      - name: valid programs still answer correctly
+        run: bash tools/value_check.sh
+
+      - name: arena region shrink
+        run: bash tools/region_shrink_test.sh
+
+      # GATE=0: report the numbers, do not fail on them. Both baselines are wall
+      # clock recorded on one machine, and a runner is simply a different, slower
+      # machine -- best-of-3 does not fix that. Gating on it would mean a red
+      # build for hardware, and a gate that cries wolf gets ignored. The benches
+      # still gate where the baseline was recorded; here they are a trend line.
+      - name: compiler speed (reported)
+        env: { GATE: '0' }
+        run: bash tools/compile_bench.sh
+
+      - name: generated-code speed (reported)
+        env: { GATE: '0' }
+        run: bash tools/runtime_bench.sh
+
+      # The tracked .ll under examples/tests/dist is the compiler's own output,
+      # so a codegen change that forgets to regenerate it shows up here as a
+      # diff. Informational: the suite above is the real gate.
+      - name: committed IR still matches what the compiler emits
+        if: always()
+        run: |
+          if ! git diff --quiet -- examples/tests/dist; then
+            echo "::warning::committed IR under examples/tests/dist differs from this build's output"
+            git diff --stat -- examples/tests/dist | tail -5
+          else
+            echo "committed IR matches"
+          fi

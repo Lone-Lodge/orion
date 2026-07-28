@@ -1,0 +1,143 @@
+# log — leveled, categorized console logging. Pure Orion, language-
+# level orb: usable by astra, atlas, games and tools alike. The only
+# runtime hooks are orion_console_color (tty probe, fallback arm in
+# the interp) and orion_persist_text (identity in the interp).
+#
+#   error("cubsy", "no tray slot {i}")     always visible, red
+#   warn("reload", "kept old bundle")      yellow
+#   info("project", "scripts reloaded")    default ceiling
+#   debug("ecs", "packed {n} entities")    hidden until raised
+#
+# Levels: error 0, warn 1, info 2, debug 3. A category shows a line
+# when line-level <= category ceiling; default ceiling is info(2).
+# Ceilings live in slots and can be flipped at RUNTIME — per category
+# or globally — by the game, the dev console, or an agent:
+#
+#   log_set_default(3)            # everything, everywhere
+#   log_set_level("ecs", 3)       # just one subsystem
+#
+# Styling rides the same tty-gated ANSI as the rest of the engine —
+# redirected output stays plain. Message interpolation happens at the
+# call site and lands in the frame region: a suppressed line costs
+# one transient text + a slot probe, never permanent heap.
+#
+# FLIGHT RECORDER: log_ring_on() keeps the last 128 lines (plain
+# text) so log_dump() can replay the recent past — wire it to a dev
+# key and the exit path next to the mem ledger. Ring copies persist
+# (~100B a line, dev-only, visible in the session ledger like every
+# other byte).
+
+pub extern fn orion_console_color() -> int
+pub extern fn orion_persist_text(s: Text) -> Text
+
+# Local styling fragments (a shared con orb is the day-two refactor).
+fn lsty(code: Text, s: Text) -> Text:
+    if orion_console_color() == 1:
+        e = bytes_to_text(push([], 27))
+        "{e}[{code}m{s}{e}[0m"
+    else:
+        s
+
+fn ldim(s: Text) -> Text:
+    lsty("2", s)
+
+fn lred(s: Text) -> Text:
+    lsty("31;1", s)
+
+fn lyellow(s: Text) -> Text:
+    lsty("33", s)
+
+fn lcyan(s: Text) -> Text:
+    lsty("36", s)
+
+# ---- Ceilings ----
+
+pub fn log_set_default(level: int):
+    slot_set("log:lvl:*", level)
+
+pub fn log_set_level(cat: Text, level: int):
+    slot_set("log:lvl:" + cat, level)
+
+fn ceiling_of(cat: Text) -> int:
+    k = "log:lvl:" + cat
+    if slot_has(k):
+        slot_get_int(k)
+    else:
+        if slot_has("log:lvl:*") then slot_get_int("log:lvl:*") else 2
+
+# ---- Emit ----
+
+pub fn error(cat: Text, msg: Text):
+    if ceiling_of(cat) >= 0:
+        emit_line(0, cat, msg)
+
+pub fn warn(cat: Text, msg: Text):
+    if ceiling_of(cat) >= 1:
+        emit_line(1, cat, msg)
+
+pub fn info(cat: Text, msg: Text):
+    if ceiling_of(cat) >= 2:
+        emit_line(2, cat, msg)
+
+pub fn debug(cat: Text, msg: Text):
+    if ceiling_of(cat) >= 3:
+        emit_line(3, cat, msg)
+
+fn emit_line(level: int, cat: Text, msg: Text):
+    tag = level_tag(level)
+    c = ldim(cat)
+    print_line("  {tag} {c}  {msg}")
+    ring_push(level_name(level), cat, msg)
+
+fn level_tag(level: int) -> Text:
+    if level == 0:
+        lred("error")
+    else:
+        if level == 1:
+            lyellow(" warn")
+        else:
+            if level == 2:
+                lcyan(" info")
+            else:
+                ldim("debug")
+
+fn level_name(level: int) -> Text:
+    if level == 0:
+        "error"
+    else:
+        if level == 1:
+            " warn"
+        else:
+            if level == 2:
+                " info"
+            else:
+                "debug"
+
+# ---- Flight recorder ----
+
+pub fn log_ring_on():
+    slot_set("log:ring:on", 1)
+
+fn ring_active() -> bool:
+    slot_has("log:ring:on") and slot_get_int("log:ring:on") == 1
+
+fn ring_push(lvl: Text, cat: Text, msg: Text):
+    if ring_active():
+        n = if slot_has("log:ring:n") then slot_get_int("log:ring:n") else 0
+        i = n - (n / 128) * 128
+        slot_set("log:ring:{i}", orion_persist_text("{lvl} {cat}  {msg}"))
+        slot_set("log:ring:n", n + 1)
+
+pub fn log_dump():
+    n = if slot_has("log:ring:n") then slot_get_int("log:ring:n") else 0
+    count = if n < 128 then n else 128
+    header = ldim("log tail ({count} of {n})")
+    print_line("  {header}")
+    start = n - count
+    loop j in start..<n:
+        i = j - (j / 128) * 128
+        line = ring_line(i)
+        print_line("  {line}")
+
+fn ring_line(i: int) -> Text:
+    if slot_has("log:ring:{i}") then slot_get("log:ring:{i}") else ""

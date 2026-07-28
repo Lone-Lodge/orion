@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer orb (subtle ring) -->
+  <circle cx="16" cy="16" r="13" stroke="#3a4154" stroke-width="1.4" fill="none" opacity="0.55"/>
+  <!-- Orion's belt: three stars arranged diagonally -->
+  <circle cx="9.5" cy="22.5" r="2.1" fill="#1f2433"/>
+  <circle cx="16" cy="16" r="2.3" fill="#0e1320"/>
+  <circle cx="22.5" cy="9.5" r="2.1" fill="#1f2433"/>
+  <!-- Faint glow on the center star -->
+  <circle cx="16" cy="16" r="4" fill="#0e1320" opacity="0.1"/>
+</svg>

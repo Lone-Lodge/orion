@@ -1,0 +1,7 @@
+# expect: is not valid here, an expression was expected
+# Orion has no pipe operator. The old message was "unhandled AST node kind
+# `Error`" at line 0:0, which named a compiler internal at no location.
+fn inc(x: int) -> int: x + 1
+
+fn main() -> int:
+    41 |> inc

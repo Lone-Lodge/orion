@@ -1,0 +1,35 @@
+# option — Option<T>-style for representing maybe-values.
+#
+# Idiomatic usage:
+#   m = find_user(42)
+#   if is_some(m):
+#       print_line("found {m.value}")
+#   else:
+#       print_line("not found")
+#
+# Or with unwrap_or:
+#   user = find_user(42)
+#   id = unwrap_or(user, 0)
+#
+# When orion-self gets true sum types with payloads, this becomes
+# `enum Option: Some(T), None` natively.
+
+type Option: has: int, value: int
+
+pub fn Some(v: int) -> Option:
+    Option{has: 1, value: v}
+
+pub fn None() -> Option:
+    Option{has: 0, value: 0}
+
+pub fn is_some(o: Option) -> int:
+    o.has
+
+pub fn is_none(o: Option) -> int:
+    if o.has == 1 then 0 else 1
+
+pub fn unwrap(o: Option) -> int:
+    o.value
+
+pub fn unwrap_or(o: Option, default: int) -> int:
+    if o.has == 1 then o.value else default

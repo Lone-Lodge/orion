@@ -1,0 +1,44 @@
+# ori_display - the ORI (Orion Rendering Interface) display list.
+#
+# The universal 2D render seam every backend (native gpu via `ori`, web via
+# `veil_web`, …) consumes. One enum: each variant is one drawing primitive.
+# Neutral home in orion so the render contract is not owned by any one UI block.
+#
+# Colours are CSS-style strings ("#1d1433", "rgba(46,125,224,0.35)") - each
+# backend parses its own. Text/icon carry a pixel size.
+# EVERY variant ends in a trailing PROVENANCE tag (its final int): the entity
+# (or rule) id that produced the command, 0 = untagged. This is what makes the
+# display list ADDRESSABLE - an edit-mode hit-tests a pixel, reads the tag, and
+# knows which spawn line in which script to rewrite.
+
+use ori_geometry
+
+pub type DrawCmd:
+    DrawRect(Rect, Text, int)
+    # Filled rounded rectangle: rect, colour, corner radius (px), src eid.
+    # Backends fill it as horizontal og_rect spans with circular corner
+    # insets - the chrome primitive for hover cells, chips, and cards.
+    DrawRoundRect(Rect, Text, int, int)
+    DrawText(Point, Text, Text, int, int)
+    # point, icon name, pixel size, src eid.
+    DrawIcon(Point, Text, int, int)
+    # path data, colour, src eid.
+    DrawPath(Text, Text, int)
+    # A pixel-art sprite: top-left Point, image path, integer scale, src
+    # eid. The rect-only backends blit it as og_rect runs (see
+    # atlas_sprite); no GPU texture needed.
+    DrawSprite(Point, Text, int, int)
+    # A textured image quad (the modern path): top-left Point, image path,
+    # dest width, dest height, tint ("#rrggbb"/"#rrggbbaa" or a named colour;
+    # ""=none), blend ("alpha" default, "add" for glow), src eid. Drawn as
+    # ONE GPU-sampled quad - any size, scaled, blended. The renderer resolves
+    # the tint/blend strings (same palette as DrawText/DrawRect colours).
+    DrawImage(Point, Text, int, int, Text, Text, int)
+
+pub type DisplayList: commands: [DrawCmd]
+
+pub fn empty_list() -> DisplayList:
+    DisplayList{commands: []}
+
+pub fn push_cmd(list: DisplayList, cmd: DrawCmd) -> DisplayList:
+    DisplayList{commands: push(list.commands, cmd)}

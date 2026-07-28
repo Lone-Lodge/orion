@@ -1,0 +1,23 @@
+# Nested patterns: a payload slot can itself be a variant pattern, so
+# `Some(Ok(x))` destructures two levels in one arm. A nested arm matches only
+# part of its variant, so it falls through to the next arm when the inner tag
+# differs (here `Some(Bad(m))`), and it never counts as full coverage.
+type Res:
+    Ok(int)
+    Bad(Text)
+
+type Opt:
+    Some(Res)
+    None
+
+fn score(v: Opt) -> int:
+    match v:
+        Some(Ok(n)) -> n
+        Some(Bad(m)) -> len(m)
+        None -> 100
+
+fn main() -> int:
+    good = score(Opt.Some(Res.Ok(35)))     # 35
+    bad = score(Opt.Some(Res.Bad("abcde")))  # 5
+    empty = score(Opt.None)                # 100
+    good + bad + (empty - 98)              # 35 + 5 + 2 == 42

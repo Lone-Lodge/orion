@@ -1,0 +1,8 @@
+# Tuple patterns in match: `(a, b) -> ...` destructures a tuple, binding each
+# field with its real type (heterogeneous: n is int, s is text).
+fn describe(p: (int, Text)) -> int:
+    match p:
+        (n, s) -> n + len(s)
+
+fn main() -> int:
+    describe((37, "abcde"))    # 37 + 5 == 42

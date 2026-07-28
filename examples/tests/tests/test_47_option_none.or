@@ -1,0 +1,19 @@
+# Zero-payload variant `Opt.None` used as a VALUE now types as its enum, so
+# `Some(x) | None` works as a return type and in both if-expression branches.
+# Combined with generic `Opt<T>` and `if let`.
+type Opt<T>:
+    Some(T)
+    None
+
+fn find(k: int) -> Opt<int>:
+    if k > 0 then Opt.Some(k * 10) else Opt.None
+
+fn main() -> int:
+    mut total = 0
+    if let Some(v) = find(4):
+        total = v            # Some(40) -> 40
+    if let Some(v) = find(0):
+        total = total + 99   # not taken (None)
+    else:
+        total = total + 7    # 40 + 7 == 47
+    total

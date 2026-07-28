@@ -1,0 +1,637 @@
+# orion_lsp — a Language Server for Orion, written in Orion.
+#
+# The editor used to talk to `orion-lsp.exe`, a binary built from the Rust crate
+# that was deleted when the compiler became self-hosted (`extension.js` still
+# said "cargo build --release --bin orion-lsp"). It had no source left in the
+# tree and knew a language from before `type`, `loop`, effects and the retired
+# keywords: an editor confidently underlining correct code. This replaces it
+# with something that lives in the tree, builds with everything else, and gets
+# its diagnostics from THE COMPILER rather than a second, drifting model of the
+# grammar.
+#
+# What it serves: diagnostics (on open / change / save), document symbols
+# (outline), go-to-definition, hover, and DECLARATION-BASED completion — every
+# `fn`/`type`/`effect`/`const` in the document and in the orbs it can see, plus
+# the keywords. It does not filter by what would type-check at the cursor,
+# because the compiler does not expose scope-aware types; that limit is stated in
+# the completion section rather than implied by a confident-looking list.
+#
+# Protocol framing is `Content-Length: N\r\n\r\n<json>` over stdin/stdout, so
+# stdout is RESERVED for protocol traffic — logging goes to stderr.
+
+use json
+use text
+use os
+use num
+
+extern fn orion_stdin_line() -> Text
+extern fn orion_stdin_read(n: int) -> Text
+extern fn orion_stdout_write(s: Text) -> int
+extern fn orion_stderr_line(s: Text) -> int
+extern fn orion_persist_text(s: Text) -> Text
+extern fn orion_dir_subdirs(dir: Text) -> Text
+
+# ---- transport ----
+
+# One message, or "" at EOF. `orion_stdin_line` returns "\n" for a blank line
+# and "" only at end of stream, which is what lets the header block end.
+fn lsp_read_message() -> Text:
+    mut content_len = 0
+    mut eof = false
+    loop:
+        line = orion_stdin_line()
+        if line == "":
+            eof = true
+            break
+        if line == "\n":
+            break
+        if starts_with(line, "Content-Length:") == 1:
+            rest = trim(slice_from(line, 15))
+            content_len = parse(rest)
+    if eof or content_len <= 0:
+        ""
+    else:
+        orion_stdin_read(content_len)
+
+fn slice_from(t: Text, from: int) -> Text:
+    b = bytes_from_text(t)
+    n = len(b)
+    if from >= n:
+        ""
+    else:
+        bytes_to_text(bytes_slice(b, from, n))
+
+fn lsp_send(body: Text) -> int:
+    n = len(body)
+    orion_stdout_write("Content-Length: {n}\r\n\r\n{body}")
+
+fn lsp_respond(id: int, result_json: Text) -> int:
+    lsp_send("\{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":{result_json}\}")
+
+fn lsp_notify(method: Text, params_json: Text) -> int:
+    lsp_send("\{\"jsonrpc\":\"2.0\",\"method\":\"{method}\",\"params\":{params_json}\}")
+
+# ---- uri <-> path ----
+
+fn hexv(c: int) -> int:
+    if c >= 48 and c <= 57:
+        c - 48
+    else:
+        if c >= 97 and c <= 102:
+            c - 87
+        else:
+            if c >= 65 and c <= 70:
+                c - 55
+            else:
+                0
+
+# `file:///c%3A/x/y.or` -> `c:/x/y.or`. Percent-decoding matters on Windows:
+# the drive colon always arrives as %3A.
+pub fn uri_to_path(uri: Text) -> Text:
+    # Strip the scheme only. The leading `/` STAYS unless what follows is a
+    # Windows drive (`/c:/…`): dropping it unconditionally turned every POSIX
+    # absolute path into a relative one, and the server then wrote its check
+    # file somewhere that did not exist and reported no diagnostics at all.
+    after_scheme = if starts_with(uri, "file://") == 1 then slice_from(uri, 7) else uri
+    ab = bytes_from_text(after_scheme)
+    drive_form = len(ab) >= 3 and at(ab, 0) == 47 and (at(ab, 2) == 58 or (len(ab) >= 5 and at(ab, 2) == 37))
+    stripped = if drive_form then slice_from(after_scheme, 1) else after_scheme
+    b = bytes_from_text(stripped)
+    n = len(b)
+    mut out = slice([0], 0, 0)
+    mut i = 0
+    loop:
+        if i >= n:
+            break
+        c = at(b, i)
+        if c == 37 and i + 2 < n:
+            out = push(out, hexv(at(b, i + 1)) * 16 + hexv(at(b, i + 2)))
+            i = i + 3
+        else:
+            out = push(out, c)
+            i = i + 1
+    bytes_to_text(out)
+
+fn dirname_of(path: Text) -> Text:
+    b = bytes_from_text(path)
+    n = len(b)
+    mut cut = 0 - 1
+    loop i in 0..<n:
+        c = at(b, i)
+        if c == 47 or c == 92:
+            cut = i
+    if cut < 0:
+        "."
+    else:
+        bytes_to_text(bytes_slice(b, 0, cut))
+
+# ---- document store ----
+# Slots are the process-global store the compiler itself uses. Text handed to
+# one has to outlive the message it arrived in, hence orion_persist_text.
+
+fn doc_set(uri: Text, body: Text):
+    slot_set("lsp:doc:" + uri, orion_persist_text(body))
+
+fn doc_get(uri: Text) -> Text:
+    if slot_has("lsp:doc:" + uri) then slot_get("lsp:doc:" + uri) else ""
+
+# ---- diagnostics ----
+#
+# The compiler is the authority. Write the in-editor buffer to a sibling file
+# (so relative `use` roots still resolve), compile it, and translate its own
+# `path:line:col — message` output. Nothing here re-implements a grammar.
+
+fn lsp_compiler() -> Text:
+    if slot_has("lsp:orion") then slot_get("lsp:orion") else "orion.exe"
+
+fn lsp_orbs() -> Text:
+    if slot_has("lsp:orbs") then slot_get("lsp:orbs") else ""
+
+fn diag_json_of(line_no: int, col: int, msg: Text) -> Text:
+    zero_line = if line_no > 0 then line_no - 1 else 0
+    "\{\"range\":\{\"start\":\{\"line\":{zero_line},\"character\":{col}\},\"end\":\{\"line\":{zero_line},\"character\":{col + 1}\}\},\"severity\":1,\"source\":\"orion\",\"message\":\"{json_escape(msg)}\"\}"
+
+# `orion: ERROR at C:/x/y.or:12:8 — message` -> the pieces. Returns line 0 when
+# the diagnostic is not for `want_file` (an error inside an orb belongs to that
+# orb's file, not to the document being edited).
+fn diag_parse(raw: Text, want_file: Text) -> Map:
+    marker = " ERROR at "
+    mi = index_of(raw, marker)
+    if mi < 0:
+        {"line": 0, "col": 0, "msg": ""}
+    else:
+        after = slice_from(raw, mi + 10)
+        sep = index_of(after, " — ")
+        if sep < 0:
+            {"line": 0, "col": 0, "msg": ""}
+        else:
+            loc = bytes_to_text(bytes_slice(bytes_from_text(after), 0, sep))
+            msg = slice_from(after, sep + 5)
+            parts = split(loc, ":")
+            np = len(parts)
+            if np < 2:
+                {"line": 0, "col": 0, "msg": ""}
+            else:
+                # A Windows path carries its own colon (`C:/…`), so the LINE and
+                # COLUMN are always the last two fields, never fields 1 and 2.
+                col_txt = at(parts, np - 1)
+                line_txt = at(parts, np - 2)
+                file_txt = join(slice(parts, 0, np - 2), ":")
+                same = ends_with(file_txt, want_file) == 1
+                if same:
+                    {"line": parse(line_txt), "col": parse(col_txt), "msg": msg}
+                else:
+                    {"line": 0, "col": 0, "msg": ""}
+
+fn lsp_publish(uri: Text, diags: Text):
+    lsp_notify("textDocument/publishDiagnostics", "\{\"uri\":\"{json_escape(uri)}\",\"diagnostics\":[{diags}]\}")
+
+pub fn lsp_diagnose(uri: Text):
+    path = uri_to_path(uri)
+    body = doc_get(uri)
+    dir = dirname_of(path)
+    check_name = ".orion-lsp-check.or"
+    tmp = "{dir}/{check_name}"
+    out_ll = "{dir}/.orion-lsp-check.ll"
+    write_file(tmp, body)
+    args = if lsp_orbs() == "" then [tmp, out_ll] else [tmp, out_ll, lsp_orbs()]
+    out = capture_stdout(lsp_compiler(), args)
+    remove_file(tmp)
+    remove_file(out_ll)
+    rows = lines(out)
+    mut diags = ""
+    mut count = 0
+    loop ri in 0..<len(rows):
+        row = at(rows, ri)
+        if index_of(row, " ERROR at ") >= 0:
+            d = diag_parse(row, check_name)
+            if get_int(d, "line") > 0:
+                sep2 = if count == 0 then "" else ","
+                diags = diags + sep2 + diag_json_of(get_int(d, "line"), get_int(d, "col"), get(d, "msg"))
+                count = count + 1
+    lsp_publish(uri, diags)
+
+# ---- symbols ----
+# LSP SymbolKind: Function 12, Struct 23, Enum 10, Constant 14, Interface 11.
+
+fn sym_of_line(row: Text) -> Map:
+    t = trim(row)
+    body = if starts_with(t, "pub ") == 1 then slice_from(t, 4) else t
+    mut kind = 0
+    mut skip = 0
+    if starts_with(body, "fn ") == 1:
+        kind = 12
+        skip = 3
+    if starts_with(body, "type ") == 1:
+        kind = 23
+        skip = 5
+    if starts_with(body, "effect ") == 1:
+        kind = 11
+        skip = 7
+    if starts_with(body, "const ") == 1:
+        kind = 14
+        skip = 6
+    if starts_with(body, "handle ") == 1:
+        kind = 12
+        skip = 7
+    if kind == 0:
+        {"name": "", "kind": 0}
+    else:
+        rest = slice_from(body, skip)
+        mut name = ""
+        rb = bytes_from_text(rest)
+        mut i = 0
+        loop:
+            if i >= len(rb):
+                break
+            c = at(rb, i)
+            ok = (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 95 or c == 46
+            if not ok:
+                break
+            i = i + 1
+        name = bytes_to_text(bytes_slice(rb, 0, i))
+        {"name": name, "kind": kind}
+
+pub fn lsp_symbols_json(uri: Text) -> Text:
+    rows = lines(doc_get(uri))
+    mut out = ""
+    mut count = 0
+    loop ri in 0..<len(rows):
+        s = sym_of_line(at(rows, ri))
+        nm = get(s, "name")
+        if nm != "":
+            k = get_int(s, "kind")
+            sep = if count == 0 then "" else ","
+            out = out + sep + "\{\"name\":\"{json_escape(nm)}\",\"kind\":{k},\"range\":\{\"start\":\{\"line\":{ri},\"character\":0\},\"end\":\{\"line\":{ri},\"character\":1\}\},\"selectionRange\":\{\"start\":\{\"line\":{ri},\"character\":0\},\"end\":\{\"line\":{ri},\"character\":1\}\}\}"
+            count = count + 1
+    "[{out}]"
+
+# ---- word under cursor, definition, hover ----
+
+fn is_word_byte(c: int) -> bool:
+    (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 95
+
+pub fn word_at(uri: Text, line_no: int, character: int) -> Text:
+    rows = lines(doc_get(uri))
+    if line_no >= len(rows):
+        ""
+    else:
+        row = at(rows, line_no)
+        b = bytes_from_text(row)
+        n = len(b)
+        if n == 0 or character > n:
+            ""
+        else:
+            mut lo = if character >= n then n - 1 else character
+            loop:
+                if lo <= 0:
+                    break
+                if is_word_byte(at(b, lo - 1)):
+                    lo = lo - 1
+                else:
+                    break
+            mut hi = lo
+            loop:
+                if hi >= n:
+                    break
+                if is_word_byte(at(b, hi)):
+                    hi = hi + 1
+                else:
+                    break
+            bytes_to_text(bytes_slice(b, lo, hi))
+
+# Line index of `NAME`'s declaration in `body`, or -1.
+fn decl_line_in(body: Text, name: Text) -> int:
+    rows = lines(body)
+    mut found = 0 - 1
+    loop ri in 0..<len(rows):
+        if found < 0:
+            s = sym_of_line(at(rows, ri))
+            if get(s, "name") == name:
+                found = ri
+    found
+
+# Search the open document, then every other open document, then each orb's
+# lib.or under the configured orbs root.
+fn find_decl(uri: Text, name: Text) -> Map:
+    here = decl_line_in(doc_get(uri), name)
+    if here >= 0:
+        {"uri": uri, "line": here}
+    else:
+        mut r_uri = ""
+        mut r_line = 0 - 1
+        root = lsp_orbs()
+        if root != "":
+            names = split(orion_dir_subdirs(root), "\n")
+            loop ni in 0..<len(names):
+                orb = at(names, ni)
+                if r_line < 0 and orb != "":
+                    cand = "{root}/{orb}/lib.or"
+                    src = file_read(cand)
+                    if src != "":
+                        ln = decl_line_in(src, name)
+                        if ln >= 0:
+                            r_line = ln
+                            r_uri = "file:///{cand}"
+        {"uri": r_uri, "line": r_line}
+
+pub fn lsp_definition_json(uri: Text, line_no: int, character: int) -> Text:
+    name = word_at(uri, line_no, character)
+    if name == "":
+        "null"
+    else:
+        d = find_decl(uri, name)
+        if get_int(d, "line") < 0:
+            "null"
+        else:
+            du = get(d, "uri")
+            dl = get_int(d, "line")
+            "\{\"uri\":\"{json_escape(du)}\",\"range\":\{\"start\":\{\"line\":{dl},\"character\":0\},\"end\":\{\"line\":{dl},\"character\":1\}\}\}"
+
+pub fn lsp_hover_json(uri: Text, line_no: int, character: int) -> Text:
+    name = word_at(uri, line_no, character)
+    if name == "":
+        "null"
+    else:
+        d = find_decl(uri, name)
+        dl = get_int(d, "line")
+        if dl < 0:
+            "null"
+        else:
+            src = if get(d, "uri") == uri then doc_get(uri) else file_read(uri_to_path(get(d, "uri")))
+            rows = lines(src)
+            decl = if dl < len(rows) then trim(at(rows, dl)) else name
+            "\{\"contents\":\{\"kind\":\"markdown\",\"value\":\"```orion\\n{json_escape(decl)}\\n```\"\}\}"
+
+# ---- capabilities + dispatch ----
+
+fn caps_json() -> Text:
+    "\{\"capabilities\":\{\"textDocumentSync\":1,\"documentSymbolProvider\":true,\"definitionProvider\":true,\"hoverProvider\":true,\"completionProvider\":\{\}\},\"serverInfo\":\{\"name\":\"orion-lsp\",\"version\":\"1.0.0\"\}\}"
+
+# ---- completion ----
+#
+# DECLARATION-BASED, not type-aware: every `fn` / `type` / `effect` / `const` in
+# the open document and in the orbs it can see, plus the language's keywords and
+# builtins. It does not know which of those would type-check at the cursor,
+# because the compiler does not hand out scope-aware type information — and that
+# is stated here rather than implied by a confident-looking list. Names you can
+# actually write beat a shorter list that pretends to be smarter.
+#
+# CompletionItemKind: 3 Function, 22 Struct, 8 Interface, 21 Constant, 14 Keyword.
+fn compl_item(name: Text, kind: int, detail: Text) -> Text:
+    "\{\"label\":\"{json_escape(name)}\",\"kind\":{kind},\"detail\":\"{json_escape(detail)}\"\}"
+
+fn compl_kind_of(sym_kind: int) -> int:
+    if sym_kind == 12:
+        3
+    else:
+        if sym_kind == 23:
+            22
+        else:
+            if sym_kind == 11:
+                8
+            else:
+                21
+
+fn compl_from_source(src: Text, origin: Text, seen: Text, out: Text) -> Map:
+    rows = lines(src)
+    mut acc = out
+    mut mark = seen
+    loop ri in 0..<len(rows):
+        s = sym_of_line(at(rows, ri))
+        nm = get(s, "name")
+        if nm != "":
+            key = "|{nm}|"
+            if index_of(mark, key) < 0:
+                mark = mark + key
+                sep = if acc == "" then "" else ","
+                acc = acc + sep + compl_item(nm, compl_kind_of(get_int(s, "kind")), origin)
+    {"out": acc, "seen": mark}
+
+# ---- type-aware completion after `x.` ----
+#
+# `x.f(a)` IS `f(x, a)` in this language, so "what can I write after the dot"
+# has an exact answer: the FIELDS of x's type, plus every function whose first
+# parameter is that type. Both come from the compiler (`orion <file> symbols`),
+# not from a pattern matcher over the source — a second model of the grammar is
+# what made the previous language server describe a language that no longer
+# existed.
+#
+# What is still not known: the type of an arbitrary expression. `x` is resolved
+# when it is a parameter of the enclosing function, or a `name: Type =` binding,
+# or a `Type{…}` construction. Otherwise this falls back to the full list rather
+# than guessing.
+
+fn sym_rows(uri: Text) -> [Text]:
+    path = uri_to_path(uri)
+    dir = dirname_of(path)
+    tmp = "{dir}/.orion-lsp-syms.or"
+    write_file(tmp, doc_get(uri))
+    args = if lsp_orbs() == "" then [tmp, "symbols"] else [tmp, "symbols", lsp_orbs()]
+    out = capture_stdout(lsp_compiler(), args)
+    remove_file(tmp)
+    lines(out)
+
+# The word immediately before a trailing `.` on this line, or "".
+pub fn receiver_before_dot(uri: Text, line_no: int, character: int) -> Text:
+    rows = lines(doc_get(uri))
+    if line_no >= len(rows):
+        ""
+    else:
+        row = at(rows, line_no)
+        b = bytes_from_text(row)
+        n = len(b)
+        cut = if character > n then n else character
+        if cut < 1:
+            ""
+        else:
+            if at(b, cut - 1) != 46:
+                ""
+            else:
+                mut lo = cut - 1
+                loop:
+                    if lo <= 0:
+                        break
+                    if is_word_byte(at(b, lo - 1)):
+                        lo = lo - 1
+                    else:
+                        break
+                bytes_to_text(bytes_slice(b, lo, cut - 1))
+
+# Declared type of `name` as seen from `line_no`: a parameter of the enclosing
+# function, a `name: Type =` binding, or `name = Type{…}`.
+pub fn type_of_local(uri: Text, name: Text, line_no: int) -> Text:
+    rows = lines(doc_get(uri))
+    mut found = ""
+    # Walk UP from the cursor: the nearest binding wins, and the enclosing `fn`
+    # line ends the search (its parameter list is the last place to look).
+    mut i = if line_no >= len(rows) then len(rows) - 1 else line_no
+    loop:
+        if i < 0 or found != "":
+            break
+        row = at(rows, i)
+        t = trim(row)
+        # `name: Type = …`
+        pat_ann = "{name}: "
+        if starts_with(t, pat_ann) == 1 and index_of(t, " = ") > 0:
+            rest = slice_from(t, len(pat_ann))
+            eq = index_of(rest, " = ")
+            found = trim(bytes_to_text(bytes_slice(bytes_from_text(rest), 0, eq)))
+        # `name = Type{…}`
+        pat_cons = "{name} = "
+        if found == "" and starts_with(t, pat_cons) == 1:
+            rhs = slice_from(t, len(pat_cons))
+            brace = index_of(rhs, "\{")
+            if brace > 0:
+                found = trim(bytes_to_text(bytes_slice(bytes_from_text(rhs), 0, brace)))
+        # A parameter of the enclosing fn: `fn f(name: Type, …)`
+        if found == "" and starts_with(t, "fn ") == 1 or starts_with(t, "pub fn ") == 1:
+            marker = "{name}: "
+            at_p = index_of(t, marker)
+            if at_p > 0:
+                after = slice_from(t, at_p + len(marker))
+                ab = bytes_from_text(after)
+                mut e = 0
+                loop:
+                    if e >= len(ab):
+                        break
+                    c = at(ab, e)
+                    stop = c == 44 or c == 41 or c == 32
+                    if stop:
+                        break
+                    e = e + 1
+                found = bytes_to_text(bytes_slice(ab, 0, e))
+            break
+        i = i - 1
+    found
+
+# Fields of `type_name` + every fn whose FIRST parameter is that type.
+fn members_of(rows: [Text], type_name: Text) -> Text:
+    mut acc = ""
+    loop ri in 0..<len(rows):
+        row = at(rows, ri)
+        parts = split(row, "|")
+        if len(parts) >= 3:
+            head = at(parts, 0)
+            if starts_with(head, "TYPE ") == 1:
+                if slice_from(head, 5) == type_name:
+                    fields = split(at(parts, 1), ",")
+                    loop fi in 0..<len(fields):
+                        f = at(fields, fi)
+                        colon = index_of(f, ":")
+                        if colon > 0:
+                            fname = bytes_to_text(bytes_slice(bytes_from_text(f), 0, colon))
+                            fty = slice_from(f, colon + 1)
+                            sep = if acc == "" then "" else ","
+                            acc = acc + sep + compl_item(fname, 5, "field: {fty}")
+            if starts_with(head, "FN ") == 1:
+                ps = at(parts, 1)
+                first_colon = index_of(ps, ":")
+                if first_colon > 0:
+                    rest = slice_from(ps, first_colon + 1)
+                    comma = index_of(rest, ",")
+                    p1ty = if comma > 0 then bytes_to_text(bytes_slice(bytes_from_text(rest), 0, comma)) else rest
+                    if p1ty == type_name:
+                        fname2 = slice_from(head, 3)
+                        sep2 = if acc == "" then "" else ","
+                        acc = acc + sep2 + compl_item(fname2, 2, "{type_name}.{fname2}() -> {at(parts, 2)}")
+    acc
+
+pub fn lsp_completion_json(uri: Text, line_no: int, character: int) -> Text:
+    # After `x.` the answer is exact, so give THAT and nothing else: the fields
+    # of x's type plus the functions that take it first. Returning the whole
+    # program's names here would bury the four that apply.
+    recv = receiver_before_dot(uri, line_no, character)
+    if recv != "":
+        rty = type_of_local(uri, recv, line_no)
+        if rty != "":
+            members = members_of(sym_rows(uri), rty)
+            if members != "":
+                return "\{\"isIncomplete\":false,\"items\":[{members}]\}"
+    # The document first (its own names are the likeliest), then the orbs.
+    r1 = compl_from_source(doc_get(uri), "this file", "", "")
+    mut acc = get(r1, "out")
+    mut seen = get(r1, "seen")
+    root = lsp_orbs()
+    if root != "":
+        names = split(orion_dir_subdirs(root), "\n")
+        loop ni in 0..<len(names):
+            orb = at(names, ni)
+            if orb != "":
+                src = file_read("{root}/{orb}/lib.or")
+                if src != "":
+                    r2 = compl_from_source(src, "orb {orb}", seen, acc)
+                    acc = get(r2, "out")
+                    seen = get(r2, "seen")
+    # Keywords last: short, always valid, and they should not push declarations
+    # out of the top of the list.
+    kws = ["fn", "pub", "type", "const", "mut", "if", "then", "else", "match", "loop", "parallel", "break", "continue", "return", "require", "ensure", "defer", "effect", "handle", "perform", "resume", "use", "extern", "deterministic", "and", "or", "not", "in", "where", "true", "false"]
+    loop ki in 0..<len(kws):
+        kw = at(kws, ki)
+        sep2 = if acc == "" then "" else ","
+        acc = acc + sep2 + compl_item(kw, 14, "keyword")
+    "\{\"isIncomplete\":false,\"items\":[{acc}]\}"
+
+fn handle(msg: Text) -> int:
+    root = json_parse(msg)
+    method = json_text(root, "method")
+    id = json_int(root, "id")
+    params = json_obj(root, "params")
+    td = json_obj(params, "textDocument")
+    uri = json_text(td, "uri")
+    mut done = 0
+    if method == "initialize":
+        # The client may pass the compiler + orbs root through initializationOptions.
+        opts = json_obj(params, "initializationOptions")
+        if json_text(opts, "compiler") != "":
+            slot_set("lsp:orion", orion_persist_text(json_text(opts, "compiler")))
+        if json_text(opts, "orbs") != "":
+            slot_set("lsp:orbs", orion_persist_text(json_text(opts, "orbs")))
+        lsp_respond(id, caps_json())
+    if method == "shutdown":
+        lsp_respond(id, "null")
+    if method == "exit":
+        done = 1
+    if method == "textDocument/didOpen":
+        doc_set(uri, json_text(td, "text"))
+        lsp_diagnose(uri)
+    if method == "textDocument/didChange":
+        changes = json_list(params, "contentChanges")
+        if len(changes) > 0:
+            last = at(changes, len(changes) - 1)
+            doc_set(uri, json_text(last, "text"))
+            lsp_diagnose(uri)
+    if method == "textDocument/didSave":
+        if json_text(params, "text") != "":
+            doc_set(uri, json_text(params, "text"))
+        lsp_diagnose(uri)
+    if method == "textDocument/didClose":
+        lsp_publish(uri, "")
+    if method == "textDocument/documentSymbol":
+        lsp_respond(id, lsp_symbols_json(uri))
+    if method == "textDocument/definition":
+        pos = json_obj(params, "position")
+        lsp_respond(id, lsp_definition_json(uri, json_int(pos, "line"), json_int(pos, "character")))
+    if method == "textDocument/hover":
+        pos2 = json_obj(params, "position")
+        lsp_respond(id, lsp_hover_json(uri, json_int(pos2, "line"), json_int(pos2, "character")))
+    if method == "textDocument/completion":
+        pos3 = json_obj(params, "position")
+        lsp_respond(id, lsp_completion_json(uri, json_int(pos3, "line"), json_int(pos3, "character")))
+    done
+
+pub fn lsp_serve() -> int:
+    # argv: [exe, orion-compiler-path, orbs-root]. Both are optional; the client
+    # can also send them in initializationOptions.
+    if argc() >= 2:
+        slot_set("lsp:orion", orion_persist_text(argv(1)))
+    if argc() >= 3:
+        slot_set("lsp:orbs", orion_persist_text(argv(2)))
+    orion_stderr_line("orion-lsp: ready")
+    loop:
+        msg = lsp_read_message()
+        if msg == "":
+            break
+        if handle(msg) == 1:
+            break
+    0

@@ -1,0 +1,13 @@
+fn main() -> int:
+    vals = [10, 20, 30, 5]
+    mut sum = 0
+    loop idx, v in vals:
+        if idx == 3:
+            sum = sum + v
+        else:
+            sum = sum + v - idx
+    # idx=0 v=10 → sum=10
+    # idx=1 v=20 → sum=10+19=29
+    # idx=2 v=30 → sum=29+28=57
+    # idx=3 v=5  → sum=57+5=62
+    sum - 20

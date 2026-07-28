@@ -1,0 +1,6 @@
+fn main() -> int:
+    nums = [10, 20, 30, 40, 50]
+    mut total = 0
+    loop i in 0..<len(nums):
+        total = total + at(nums, i)
+    total

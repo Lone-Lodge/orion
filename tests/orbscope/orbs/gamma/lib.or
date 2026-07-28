@@ -1,0 +1,3 @@
+# A facade orb: no code, only re-exports. `pub use` is what makes that work -
+# a plain `use` would keep beta to itself and delta would see nothing.
+pub use beta

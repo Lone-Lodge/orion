@@ -1,0 +1,134 @@
+{
+	"name": "orion",
+	"displayName": "Orion",
+	"description": "Orion language support — LSP (hover, go-to-definition, outline, diagnostics), syntax highlighting, snippets, and orbit CLI commands for build/run/test.",
+	"version": "0.1.0",
+	"publisher": "lonelodge",
+	"private": true,
+	"engines": {
+		"vscode": "^1.75.0"
+	},
+	"categories": [
+		"Programming Languages"
+	],
+	"activationEvents": [
+		"onLanguage:orion",
+		"onStartupFinished",
+		"workspaceContains:**/*.or",
+		"workspaceContains:Orbit.toml"
+	],
+	"main": "./extension.js",
+	"contributes": {
+		"languages": [
+			{
+				"id": "orion",
+				"aliases": [
+					"Orion",
+					"orion"
+				],
+				"extensions": [
+					".or",
+					".orion"
+				],
+				"configuration": "./language-configuration.json",
+				"icon": {
+					"light": "./icons/orion-light.svg",
+					"dark": "./icons/orion-dark.svg"
+				}
+			}
+		],
+		"grammars": [
+			{
+				"language": "orion",
+				"scopeName": "source.orion",
+				"path": "./syntaxes/orion.tmLanguage.json"
+			}
+		],
+		"snippets": [
+			{
+				"language": "orion",
+				"path": "./snippets/orion.code-snippets"
+			}
+		],
+		"commands": [
+			{
+				"command": "orion.build",
+				"title": "Orion: build project (orbit build)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.run",
+				"title": "Orion: run project (orbit run)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.test",
+				"title": "Orion: run tests (orbit test)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.fmt",
+				"title": "Orion: format project (orbit fmt)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.new",
+				"title": "Orion: scaffold new project (orbit new)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.addOrb",
+				"title": "Orion: add an orb dependency (orbit add)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.runCurrentFile",
+				"title": "Orion: run current file",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.restartServer",
+				"title": "Orion: restart language server",
+				"category": "Orion"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "orion.test",
+				"key": "ctrl+shift+t",
+				"mac": "cmd+shift+t",
+				"when": "editorLangId == orion"
+			},
+			{
+				"command": "orion.runCurrentFile",
+				"key": "ctrl+shift+r",
+				"mac": "cmd+shift+r",
+				"when": "editorLangId == orion"
+			}
+		],
+		"configuration": {
+			"type": "object",
+			"title": "Orion",
+			"properties": {
+				"orion.server.path": {
+					"type": "string",
+					"default": "",
+					"description": "Absolute path to the orion-lsp binary. If empty, falls back to the binary bundled with this extension, then to <workspace>/target/{release,debug}/orion-lsp, then to PATH."
+				},
+				"orion.orbit.path": {
+					"type": "string",
+					"default": "orbit",
+					"description": "Command to invoke the orbit CLI. Defaults to `orbit` on PATH; set to an absolute path if your binary lives elsewhere."
+				}
+			}
+		}
+	},
+	"dependencies": {
+		"vscode-languageclient": "^9.0.1"
+	},
+	"__metadata": {
+		"installedTimestamp": 1782300356768,
+		"targetPlatform": "undefined",
+		"size": 3215483
+	}
+}

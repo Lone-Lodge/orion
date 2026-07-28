@@ -1,0 +1,306 @@
+# json — parse and build JSON. Written for the language server, which speaks
+# JSON-RPC over a pipe, but there is nothing LSP-specific here.
+#
+# Values map onto Orion's own dynamic shapes: an object is a `Map`, an array is
+# a list, a string is `Text`, a number and a bool are ints, null is 0. That is
+# exactly how the compiler's own AST is carried around, so nothing new is
+# needed to hold a parsed document.
+#
+# PERFORMANCE IS PART OF THE CONTRACT: a `didChange` notification carries the
+# WHOLE document, so a 100 KB file arrives as one JSON string. Every scan here
+# is single-pass and every string is cut with one `bytes_slice`; the only
+# byte-at-a-time path is unescaping, and that runs only for strings that
+# actually contain a backslash. Building text with `result = result + one_byte`
+# would be quadratic and is deliberately avoided.
+
+# --- scanning helpers ---
+
+fn jsn_ws(b: [int], start: int) -> int:
+    n = len(b)
+    mut i = start
+    loop:
+        if i >= n:
+            break
+        c = at(b, i)
+        # space, tab, newline, carriage return
+        if c == 32 or c == 9 or c == 10 or c == 13:
+            i = i + 1
+        else:
+            break
+    i
+
+# Index just past the string that starts at the opening quote `start`.
+fn jsn_str_end(b: [int], start: int) -> int:
+    n = len(b)
+    mut i = start + 1
+    loop:
+        if i >= n:
+            break
+        c = at(b, i)
+        if c == 92:
+            i = i + 2
+        else:
+            if c == 34:
+                i = i + 1
+                break
+            i = i + 1
+    i
+
+fn jsn_has_escape(b: [int], from: int, to: int) -> bool:
+    mut found = false
+    mut i = from
+    loop:
+        if i >= to:
+            break
+        if at(b, i) == 92:
+            found = true
+            break
+        i = i + 1
+    found
+
+fn jsn_hex_val(c: int) -> int:
+    if c >= 48 and c <= 57:
+        c - 48
+    else:
+        if c >= 97 and c <= 102:
+            c - 87
+        else:
+            if c >= 65 and c <= 70:
+                c - 55
+            else:
+                0
+
+# The bytes between the quotes, with escapes resolved. `\uXXXX` is encoded as
+# UTF-8 (the BMP range; a surrogate pair is passed through as replacement
+# bytes rather than silently truncating the document).
+fn jsn_unescape(b: [int], from: int, to: int) -> Text:
+    mut out = slice([0], 0, 0)
+    mut i = from
+    loop:
+        if i >= to:
+            break
+        c = at(b, i)
+        if c != 92:
+            out = push(out, c)
+            i = i + 1
+        else:
+            if i + 1 >= to:
+                i = i + 1
+            else:
+                e = at(b, i + 1)
+                i = i + 2
+                if e == 110:
+                    out = push(out, 10)
+                if e == 114:
+                    out = push(out, 13)
+                if e == 116:
+                    out = push(out, 9)
+                if e == 98:
+                    out = push(out, 8)
+                if e == 102:
+                    out = push(out, 12)
+                if e == 34:
+                    out = push(out, 34)
+                if e == 92:
+                    out = push(out, 92)
+                if e == 47:
+                    out = push(out, 47)
+                if e == 117:
+                    if i + 3 < to:
+                        cp = jsn_hex_val(at(b, i)) * 4096 + jsn_hex_val(at(b, i + 1)) * 256 + jsn_hex_val(at(b, i + 2)) * 16 + jsn_hex_val(at(b, i + 3))
+                        i = i + 4
+                        if cp < 128:
+                            out = push(out, cp)
+                        else:
+                            if cp < 2048:
+                                out = push(out, 192 + cp / 64)
+                                out = push(out, 128 + cp - (cp / 64) * 64)
+                            else:
+                                hi = cp / 4096
+                                mid = (cp - hi * 4096) / 64
+                                lo = cp - hi * 4096 - mid * 64
+                                out = push(out, 224 + hi)
+                                out = push(out, 128 + mid)
+                                out = push(out, 128 + lo)
+    bytes_to_text(out)
+
+# --- values ---
+# Every parser returns {"v": value, "i": index-just-past}. The caller knows
+# which shape it asked for and reads "v" with the matching typed getter.
+
+fn jsn_value(b: [int], start: int) -> Map:
+    i = jsn_ws(b, start)
+    n = len(b)
+    if i >= n:
+        {"v": 0, "i": i}
+    else:
+        c = at(b, i)
+        if c == 123:
+            jsn_object(b, i)
+        else:
+            if c == 91:
+                jsn_array(b, i)
+            else:
+                if c == 34:
+                    e = jsn_str_end(b, i)
+                    raw_from = i + 1
+                    raw_to = e - 1
+                    txt = if jsn_has_escape(b, raw_from, raw_to) then jsn_unescape(b, raw_from, raw_to) else bytes_to_text(bytes_slice(b, raw_from, raw_to))
+                    {"v": txt, "i": e}
+                else:
+                    if c == 116:
+                        {"v": 1, "i": i + 4}
+                    else:
+                        if c == 102:
+                            {"v": 0, "i": i + 5}
+                        else:
+                            if c == 110:
+                                {"v": 0, "i": i + 4}
+                            else:
+                                jsn_number(b, i)
+
+fn jsn_number(b: [int], start: int) -> Map:
+    n = len(b)
+    mut i = start
+    mut neg = false
+    if at(b, i) == 45:
+        neg = true
+        i = i + 1
+    mut v = 0
+    loop:
+        if i >= n:
+            break
+        c = at(b, i)
+        if c >= 48 and c <= 57:
+            v = v * 10 + (c - 48)
+            i = i + 1
+        else:
+            break
+    # A fraction or exponent is consumed and dropped: LSP integers (line,
+    # character, id) are what this is for, and silently keeping a truncated
+    # float would be worse than not carrying one.
+    loop:
+        if i >= n:
+            break
+        c2 = at(b, i)
+        if c2 == 46 or c2 == 101 or c2 == 69 or c2 == 43 or (c2 >= 48 and c2 <= 57):
+            i = i + 1
+        else:
+            if c2 == 45:
+                i = i + 1
+            else:
+                break
+    {"v": if neg then 0 - v else v, "i": i}
+
+fn jsn_object(b: [int], start: int) -> Map:
+    n = len(b)
+    mut out = {}
+    mut i = start + 1
+    loop:
+        i = jsn_ws(b, i)
+        if i >= n:
+            break
+        c = at(b, i)
+        if c == 125:
+            i = i + 1
+            break
+        if c == 44:
+            i = i + 1
+            continue
+        if c != 34:
+            i = i + 1
+            continue
+        key_end = jsn_str_end(b, i)
+        key = bytes_to_text(bytes_slice(b, i + 1, key_end - 1))
+        i = jsn_ws(b, key_end)
+        if i < n:
+            if at(b, i) == 58:
+                i = i + 1
+        vr = jsn_value(b, i)
+        out = set(out, key, get(vr, "v"))
+        i = get_int(vr, "i")
+    {"v": out, "i": i}
+
+fn jsn_array(b: [int], start: int) -> Map:
+    n = len(b)
+    mut items = []
+    mut i = start + 1
+    loop:
+        i = jsn_ws(b, i)
+        if i >= n:
+            break
+        c = at(b, i)
+        if c == 93:
+            i = i + 1
+            break
+        if c == 44:
+            i = i + 1
+            continue
+        vr = jsn_value(b, i)
+        items = push(items, get(vr, "v"))
+        i = get_int(vr, "i")
+    {"v": items, "i": i}
+
+# --- public surface ---
+
+pub fn json_parse(src: Text) -> Map:
+    b = bytes_from_text(src)
+    r = jsn_value(b, 0)
+    get_map(r, "v")
+
+pub fn json_obj(o: Map, key: Text) -> Map:
+    if has(o, key) then get_map(o, key) else {}
+
+pub fn json_text(o: Map, key: Text) -> Text:
+    if has(o, key) then get(o, key) else ""
+
+pub fn json_int(o: Map, key: Text) -> int:
+    if has(o, key) then get_int(o, key) else 0
+
+pub fn json_list(o: Map, key: Text) -> [Map]:
+    if has(o, key) then get_list(o, key) else []
+
+pub fn json_has(o: Map, key: Text) -> bool:
+    has(o, key)
+
+# Escape a Text for embedding in JSON output. Single pass; the byte list is
+# turned into text once at the end.
+pub fn json_escape(s: Text) -> Text:
+    b = bytes_from_text(s)
+    n = len(b)
+    mut out = slice([0], 0, 0)
+    loop i in 0..<n:
+        c = at(b, i)
+        if c == 34:
+            out = push(out, 92)
+            out = push(out, 34)
+        else:
+            if c == 92:
+                out = push(out, 92)
+                out = push(out, 92)
+            else:
+                if c == 10:
+                    out = push(out, 92)
+                    out = push(out, 110)
+                else:
+                    if c == 13:
+                        out = push(out, 92)
+                        out = push(out, 114)
+                    else:
+                        if c == 9:
+                            out = push(out, 92)
+                            out = push(out, 116)
+                        else:
+                            if c < 32:
+                                # Control byte: \u00XX
+                                hexd = "0123456789abcdef"
+                                hb = bytes_from_text(hexd)
+                                out = push(out, 92)
+                                out = push(out, 117)
+                                out = push(out, 48)
+                                out = push(out, 48)
+                                out = push(out, at(hb, c / 16))
+                                out = push(out, at(hb, c - (c / 16) * 16))
+                            else:
+                                out = push(out, c)
+    bytes_to_text(out)

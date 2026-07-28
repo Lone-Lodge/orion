@@ -1,0 +1,229 @@
+/* Orion Field Guide — one stylesheet, no build step, no dependencies.
+ *
+ * Warm neutrals on paper, terracotta for links. The palette used to be cool
+ * greys with a blue link, which is the web's default and reads as such.
+ *
+ * The accent is where accessibility and taste actually collide. A bright
+ * terracotta (#d97757) is 4.0:1 on this paper -- fine for AA, nowhere near the
+ * 7:1 that AAA wants for body-size text. So light mode uses the same hue taken
+ * down to a deep rust, and dark mode the same hue lifted to a warm peach. Same
+ * colour, opposite ends, both legible.
+ *
+ * Target is WCAG 2.2 Level AAA: 7:1 for text, 3:1 for borders, in both themes.
+ * These are not eyeballed and not on trust either -- tools/docs_check.sh reads
+ * this palette and recomputes every pair, so a colour that drifts below its
+ * threshold fails the build:
+ *
+ *   light   text #24231f on #faf9f5   14.9:1
+ *           text #24231f on #f0eee6   13.5:1   (code)
+ *           dim  #4a443b on #f0eee6    8.3:1   (comments)
+ *           link #7d3319 on #faf9f5    8.5:1
+ *           rule #847d70 on #f0eee6    3.5:1   (borders)
+ *   dark    text #ebe8e1 on #232220   13.0:1
+ *           text #ebe8e1 on #2c2a27   11.7:1   (code)
+ *           dim  #c6c0b5 on #2c2a27    7.9:1   (comments)
+ *           link #efab90 on #232220    8.3:1
+ *           rule #817a6f on #2c2a27    3.4:1   (borders)
+ *
+ * The border is the one that needs watching. It started at 1.7:1, invisible on
+ * a poor screen, and in light mode the border is the only thing separating a
+ * code block from the page: the two backgrounds differ by about 1.05:1.
+ *
+ * Code is deliberately NOT syntax-highlighted beyond dimming comments. A full
+ * highlight palette is where AAA contrast dies: five hues that all clear 7:1
+ * against the same background stop being distinguishable from each other.
+ * Two tones say everything a short guide needs.
+ */
+
+:root {
+    color-scheme: light dark;
+    --bg: #faf9f5;
+    --fg: #24231f;
+    --code-bg: #f0eee6;
+    --dim: #4a443b;
+    --link: #7d3319;
+    --rule: #847d70;
+    --focus: #7d3319;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #232220;
+        --fg: #ebe8e1;
+        --code-bg: #2c2a27;
+        --dim: #c6c0b5;
+        --link: #efab90;
+        --rule: #817a6f;
+        --focus: #efab90;
+    }
+}
+
+/* AAA 1.4.12: the reader may override spacing. Everything below is in
+ * relative units so nothing collapses when they do, or at 200% zoom. */
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 2rem 1.25rem 6rem;
+    background: var(--bg);
+    color: var(--fg);
+    font: 1.0625rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    /* AAA 1.4.8: no justified text, and no more than 80 characters a line. */
+    text-align: left;
+}
+
+/* One column, centred, capped at reading width. */
+main, header, footer { max-width: 42rem; margin-inline: auto; }
+
+/* AAA 2.4.1: a way past the header for keyboard and screen-reader users.
+ * Visible the moment it has focus rather than hidden outright. */
+.skip {
+    position: absolute;
+    left: -100vw;
+}
+.skip:focus {
+    position: static;
+    display: inline-block;
+    margin-bottom: 1rem;
+}
+
+/* AAA 2.4.7 / 2.4.11: focus is never removed and never obscured. */
+a:focus-visible,
+:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+h1 {
+    font-size: 1.875rem;
+    line-height: 1.25;
+    margin: 0 0 0.25rem;
+}
+
+h2 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+    margin: 2.75rem 0 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+}
+
+.lede {
+    margin: 0 0 1.5rem;
+    color: var(--dim);
+}
+
+/* Jump list. Static, never sticky: a bar pinned to the top is the usual way
+ * a focused link ends up hidden behind something while tabbing, which is
+ * exactly what 2.4.11 and 2.4.12 are about. Ten links do not need to follow
+ * you down the page.
+ *
+ * A real <ol> because the sections are numbered and read in order; the
+ * numbers come from the list, so the link text alone still says where it
+ * goes (2.4.9). */
+.toc {
+    max-width: 42rem;
+    margin: 0 auto 2.5rem;
+    padding: 1rem 1.25rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+}
+.toc-h {
+    border-top: none;
+    padding-top: 0;
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+}
+.toc ol {
+    margin: 0;
+    padding-left: 1.5rem;
+    /* Two columns where there is room, one where there is not. No media
+     * query needed, and it reflows at 320px and at 200% zoom (1.4.10). */
+    columns: 2;
+    column-gap: 2rem;
+}
+.toc li { margin-bottom: 0.5rem; break-inside: avoid; }
+.toc .toc-last { margin-bottom: 0.75rem; }
+
+/* A heading that has just been jumped to should not sit flush against the
+ * viewport edge, and the anchor must clear any future sticky header. */
+h2[id] { scroll-margin-top: 1rem; }
+
+/* AAA 1.4.8: paragraph spacing at least 1.5x the line height. */
+p { margin: 0 0 1.25rem; }
+
+ul { margin: 0 0 1.25rem; padding-left: 1.5rem; }
+li { margin-bottom: 0.5rem; }
+
+/* Links carry an underline, so they are not distinguished by colour alone
+ * (1.4.1). Thick enough to survive a low-contrast display. */
+a {
+    color: var(--link);
+    text-decoration-line: underline;
+    text-decoration-thickness: 0.09em;
+    text-underline-offset: 0.16em;
+}
+
+/* Language switcher. aria-current marks the active one; the parenthesised
+ * label is there so it does not read as colour-only either. */
+.langs {
+    margin: 0 0 2rem;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.9375rem;
+}
+.langs li { margin: 0; }
+.langs [aria-current="page"] {
+    color: var(--fg);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+pre {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0.875rem 1rem;
+    /* Long lines scroll here rather than forcing the page sideways (1.4.10).
+     * Keyboard-reachable so it is not a scroll trap. */
+    overflow-x: auto;
+    margin: 0 0 1.25rem;
+}
+
+code, pre, kbd {
+    font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.9375rem;
+}
+
+pre code { background: none; padding: 0; }
+
+/* Inline code needs a hint of a box, not a colour change. */
+:not(pre) > code {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.05em 0.3em;
+}
+
+/* The only thing the code colouring does. */
+.c { color: var(--dim); }
+
+footer {
+    margin-top: 3.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--dim);
+    font-size: 0.9375rem;
+}
+
+/* Nothing here animates, but say so explicitly for anything added later. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

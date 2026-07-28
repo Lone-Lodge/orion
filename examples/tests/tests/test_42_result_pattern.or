@@ -1,0 +1,24 @@
+type Result: ok: int, value: int, err: Text
+
+fn Ok(v: int) -> Result:
+    Result{ok: 1, value: v, err: ""}
+
+fn Err(msg: Text) -> Result:
+    Result{ok: 0, value: 0, err: msg}
+
+fn safe_div(a: int, b: int) -> Result:
+    if b == 0:
+        Err("div by zero")
+    else:
+        Ok(a / b)
+
+fn unwrap_or(r: Result, default: int) -> int:
+    if r.ok == 1 then r.value else default
+
+fn main() -> int:
+    good = safe_div(84, 2)
+    bad = safe_div(100, 0)
+    a = unwrap_or(good, 0)
+    b = unwrap_or(bad, 0)
+    # 42 + 0 = 42
+    a + b

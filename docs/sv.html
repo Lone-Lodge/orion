@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orion Field Guide</title>
+<meta name="description" content="Allt du beh&ouml;ver f&ouml;r att skriva Orion, p&aring; en sida. Tolv hela program, vart och ett kompilerat av bygget.">
+<link rel="alternate" hreflang="en" href="index.html">
+<link rel="alternate" hreflang="sv" href="sv.html">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#guide">Hoppa till guiden</a>
+
+<header>
+<h1>Orion Field Guide</h1>
+<p class="lede">Allt du beh&ouml;ver f&ouml;r att skriva Orion, p&aring; en sida. Femton minuter, tolv program.</p>
+<ul class="langs">
+<li><a href="index.html" hreflang="en" lang="en">English</a></li>
+<li><a href="sv.html" hreflang="sv" aria-current="page">Svenska</a></li>
+</ul>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+<h2 class="toc-h" id="toc-h">P&aring; den h&auml;r sidan</h2>
+<ol>
+<li><a href="#hello">Hej</a></li>
+<li><a href="#names">Namn</a></li>
+<li><a href="#text">Text</a></li>
+<li><a href="#branching">F&ouml;rgrening</a></li>
+<li><a href="#loops">Loopar</a></li>
+<li><a href="#lists">Listor och mappar</a></li>
+<li><a href="#types">Typer</a></li>
+<li><a href="#functions">Funktioner, lambdor, orbs</a></li>
+<li><a href="#errors">N&auml;r det g&aring;r fel</a></li>
+<li><a href="#io">Prata med omv&auml;rlden</a></li>
+<li><a href="#more">Tv&aring; saker v&auml;rda att veta finns</a></li>
+<li class="toc-last"><a href="#next">Vidare h&auml;rifr&aring;n</a></li>
+</ol>
+</nav>
+
+<main id="guide">
+
+<p>Orion kompilerar till LLVM IR och d&auml;refter till en nativ bin&auml;r.
+Indentering g&ouml;r block. Det finns ingen null och inga undantag. Varje
+kodblock nedan &auml;r ett helt program, och alla kompileras av
+<code>tools/docs_check.sh</code> &mdash; slutar ett exempel h&auml;r fungera
+s&auml;ger bygget ifr&aring;n. Kommentarerna i koden &auml;r p&aring; engelska,
+som resten av repot.</p>
+
+<h2 id="hello">1. Hej</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    print_line("hello")
+    0
+</code></pre>
+
+<p>Bygg och k&ouml;r:</p>
+
+<pre><code>orbit run hello.or
+</code></pre>
+
+<p>Ett blocks v&auml;rde &auml;r dess sista uttryck, s&aring; n&aring;got
+<code>return</code> beh&ouml;vs inte &mdash; men det finns f&ouml;r att
+l&auml;mna tidigt. Det <code>main</code> returnerar blir processens exitkod.</p>
+
+<p>Inget projekt, ingen konfiguration, ingen utdatas&ouml;kv&auml;g att namnge.
+<code>orbit build hello.or</code> l&auml;mnar en k&ouml;rbar <code>hello</code> bredvid
+k&auml;llan. F&ouml;r n&aring;got st&ouml;rre skapar <code>orbit new myapp</code> ett
+projekt, och samma <code>run</code>, <code>build</code> och <code>test</code>
+fungerar d&auml;r inne.</p>
+
+<h2 id="names">2. Namn</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    x = 41            <span class="c"># bound once</span>
+    mut total = 0     <span class="c"># this one changes</span>
+    total = total + x
+    total += 1
+    ready = true      <span class="c"># bool: true / false, with and / or / not</span>
+    ratio = 1.5       <span class="c"># float</span>
+    if ready and not (ratio &gt; 2.0) then total else 0
+</code></pre>
+
+<p>Ett vanligt <code>=</code> binder ett nytt namn. <code>mut</code> markerar
+ett du t&auml;nker skriva om, och kompilatorn h&aring;ller dig till det. Typer
+h&auml;rleds; skriv ut en n&auml;r du vill ha den kontrollerad, som i
+<code>mut n: int = 0</code>. Typerna du f&aring;r gratis &auml;r <code>int</code>,
+<code>float</code>, <code>bool</code> och <code>Text</code>.
+<code>const LIMIT = 10</code> namnger en konstant och
+<code>type Meters = int</code> namnger en befintlig typ.</p>
+
+<h2 id="text">3. Text</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    name = "world"
+    n = 3
+    print_line("hello {name}, {n} times, {n * 2} in total")
+    print_line("a literal brace: \{ and \}")
+    0
+</code></pre>
+
+<p>Varje str&auml;ngliteral &auml;r en interpolation. Ett h&aring;l
+<code>{...}</code> tar vilket uttryck som helst, inte bara ett namn. En riktig
+klammer skrivs <code>\{</code>. Tre eller fler delar blir en enda join, s&aring;
+att bygga en rad i en loop kostar dig inte tyst en allokering per bit.</p>
+
+<h2 id="branching">4. F&ouml;rgrening</h2>
+
+<pre><code data-or>fn classify(n: int) -&gt; Text:
+    match:
+        n &lt; 0:  "negative"
+        n == 0: "zero"
+        else:   "positive"
+
+fn main() -&gt; int:
+    print_line(classify(0 - 5))
+    label = if 1 == 1 then "yes" else "no"
+    print_line(label)
+    0
+</code></pre>
+
+<p><code>match:</code> utan subjekt &auml;r en kedja av villkor d&auml;r
+f&ouml;rsta sanna armen vinner. Det &auml;r vad du anv&auml;nder i st&auml;llet
+f&ouml;r <code>else if</code>. <code>if c then a else b</code> &auml;r
+enradsformen; den indenterade <code>if c:</code> / <code>else:</code> &auml;r
+blockformen.</p>
+
+<h2 id="loops">5. Loopar</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    mut sum = 0
+    loop i in 0..&lt;5:                          <span class="c"># 0 1 2 3 4</span>
+        sum += i
+    loop i in 1..=3:                          <span class="c"># 1 2 3</span>
+        sum += i
+    doubled = loop x in [1, 2, 3]: x * 2      <span class="c"># [2, 4, 6]</span>
+    big = loop x in [1, 2, 3] where x &gt; 1: x  <span class="c"># [2, 3]</span>
+    loop:
+        break
+    sum + len(doubled) + len(big)
+</code></pre>
+
+<p><code>loop</code> &auml;r det enda iterationsordet. I satsposition loopar
+det; i uttrycksposition samlar det varje kroppsv&auml;rde i en lista, och
+d&auml;rifr&aring;n kommer map och filter &mdash; <code>where</code> &auml;r
+filtret. <code>0..&lt;5</code> utesluter slutet, <code>1..=3</code> inkluderar
+det, och ett naket <code>loop:</code> g&aring;r tills <code>break</code>.</p>
+
+<h2 id="lists">6. Listor och mappar</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    xs = [10, 20, 30]
+    ys = push(xs, 40)          <span class="c"># push returns a new list</span>
+    m = {"a": 1, "b": 2}
+    print_line("first={xs[0]} len={len(ys)} b={get(m, "b")}")
+    xs[0] + len(ys)
+</code></pre>
+
+<p><code>push</code> kopierar. Det h&aring;ller v&auml;rdesemantiken
+ovillkorlig, och det betyder att <code>x = push(x, v)</code> i en t&auml;t loop
+&auml;r kvadratisk &mdash; f&ouml;r en het ackumulator &auml;r
+<code>push_mut</code> den auditerade v&auml;gen att l&auml;gga till p&aring;
+plats. Indexera med <code>xs[0]</code>; <code>at</code>, <code>len</code>,
+<code>get</code> och <code>has</code> &auml;r funktionsformerna, alla inbyggda
+och utan import.</p>
+
+<h2 id="types">7. Typer</h2>
+
+<pre><code data-or>type Player: name: Text, hp: int
+
+type Shape:
+    Circle(int)
+    Rect(int, int)
+
+fn area(s: Shape) -&gt; int:
+    match s:
+        Circle(r) -&gt; 3 * r * r
+        Rect(w, h) -&gt; w * h
+
+fn divmod(a: int, b: int) -&gt; (int, int):
+    (a / b, a % b)
+
+fn main() -&gt; int:
+    p = Player{name: "Hero", hp: 100}
+    q, r = divmod(17, 5)
+    print_line("{p.name} has {p.hp} hp; 17/5 is {q} rem {r}")
+    area(Shape.Rect(6, 7))
+</code></pre>
+
+<p>Ett nyckelord f&ouml;r b&aring;da formerna. F&auml;lt p&aring; en rad ger en
+post, som n&aring;s med <code>p.name</code>. Varianter ger en summatyp, som
+byggs <code>Shape.Rect(6, 7)</code> och l&auml;ses med <code>match</code>, som
+kontrolleras f&ouml;r utt&ouml;mmande t&auml;ckning. <code>_</code> &auml;r
+uppsamlingsm&ouml;nstret, och <code>if let Circle(r) = s:</code> tar
+enfallskontrollen utan en hel match.</p>
+
+<p>En tupel <code>(a, b)</code> &auml;r en anonym struct, s&aring; varje plats
+beh&aring;ller sin egen typ och <code>(int, Text)</code> &auml;r ett riktigt par.
+S&aring; returnerar en funktion mer &auml;n en sak, och
+<code>q, r = divmod(17, 5)</code> plockar is&auml;r dem. Tupelm&ouml;nster
+fungerar i <code>match</code> ocks&aring;.</p>
+
+<h2 id="functions">8. Funktioner, lambdor, orbs</h2>
+
+<pre><code data-or>use text
+use iter
+
+fn main() -&gt; int:
+    words = split("alpha,beta,gamma", ",")
+    lengths = loop w in words: len(w)
+    double = fn(x): x * 2
+    print_line("words={len(words)} letters={sum(lengths)}")
+    double(21)
+</code></pre>
+
+<p>Ett bibliotek &auml;r en <em>orb</em>: <code>use text</code> tar in en, och
+<code>pub fn</code> &auml;r vad en orb exporterar. Varje orb &auml;r sin egen
+namnrymd. En lambda &auml;r <code>fn(params): body</code> och f&aring;ngar det
+den beh&ouml;ver. Varje funktion kan ocks&aring; anropas metodstil, s&aring;
+<code>trim(s)</code> och <code>s.trim()</code> &auml;r samma anrop.</p>
+
+<h2 id="errors">9. N&auml;r det g&aring;r fel</h2>
+
+<pre><code data-or>type Res&lt;T&gt;:
+    Ok(T)
+    Err(Text)
+
+fn safe_div(a: int, b: int) -&gt; Res&lt;int&gt;:
+    if b == 0:
+        Res.Err("divide by zero")
+    else:
+        Res.Ok(a / b)
+
+fn calc(x: int) -&gt; Res&lt;int&gt;:
+    v = safe_div(84, x)?      <span class="c"># unwrap, or return the Err</span>
+    Res.Ok(v * 2)
+
+fn main() -&gt; int:
+    require 1 == 1            <span class="c"># traps if false</span>
+    defer print_line("cleanup runs last")
+    match calc(2):
+        Ok(v) -&gt; v
+        Err(_) -&gt; 0
+</code></pre>
+
+<p>Det finns ingen null att gl&ouml;mma kontrollera och inget undantag att
+gl&ouml;mma f&aring;nga. Fel &auml;r ett v&auml;rde: ge det en variant, s&aring;
+packar <code>?</code> antingen upp det goda fallet eller skickar det
+d&aring;liga vidare till din anropare. Typer tar parametrar, s&aring; en enda
+<code>Res&lt;T&gt;</code> t&auml;cker varje nyttolast i st&auml;llet f&ouml;r en per typ. <code>require</code> och
+<code>ensure</code> &auml;r kontrakt som kontrolleras vid k&ouml;rning och
+sm&auml;ller p&aring; ett falskt villkor. <code>defer</code> k&ouml;rs vid
+blockets slut, senast registrerad f&ouml;rst, och f&ouml;re varje
+<code>return</code>.</p>
+
+<h2 id="io">10. Prata med omv&auml;rlden</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    who = if argc() &gt; 1 then argv(1) else "world"
+    print_line("hello {who}")
+    file_write("greeting.txt", "hello {who}")
+    back = file_read("greeting.txt")
+    len(back)
+</code></pre>
+
+<p><code>argc</code> och <code>argv</code> &auml;r kommandoraden,
+<code>print_line</code> &auml;r stdout, och <code>file_read</code> och
+<code>file_write</code> flyttar hela filer &aring;t g&aring;ngen. Allt inbyggt,
+ingen import. Beh&ouml;ver du mer har <code>os</code>-orben
+<code>run_command</code>, <code>mkdir_all</code>, <code>file_exists</code>.</p>
+
+<h2 id="more">11. Tv&aring; saker v&auml;rda att veta finns</h2>
+
+<p>Ingen av dem beh&ouml;vs f&ouml;rsta dagen. En guide som aldrig n&auml;mner
+dem d&ouml;ljer spr&aring;kets mest intressanta id&eacute;er, s&aring; h&auml;r
+&auml;r de, n&auml;mnda snarare &auml;n utl&auml;rda.</p>
+
+<p><strong>Effekter</strong> l&aring;ter en funktion be om n&aring;got utan att
+veta vem som svarar. <code>perform</code> st&auml;ller fr&aring;gan,
+<code>handle</code> besvarar den, och <code>resume</code> g&aring;r tillbaka
+dit den st&auml;lldes.</p>
+
+<pre><code data-or>effect Log:
+    msg: fn(line: Text) -&gt; Text
+
+handle Log.msg(line: Text) -&gt; Text:
+    print_line("log: {line}")
+    resume("ok")
+
+fn work() -&gt; int:
+    perform Log.msg("starting")
+    42
+
+fn main() -&gt; int:
+    work()
+</code></pre>
+
+<p><strong>Parallellism</strong> &auml;r riktiga OS-tr&aring;dar, och
+deterministisk: varje arbetare skriver bara sin egen plats och summeringen &auml;r
+oberoende av ordning, s&aring; svaret h&auml;nger inte p&aring; tajming.</p>
+
+<pre><code data-or>fn double(x: int) -&gt; int:
+    x * 2
+
+fn main() -&gt; int:
+    workers = [double, double, double]
+    par_run(workers, 7)     <span class="c"># 3 threads, 3 x 14 == 42</span>
+</code></pre>
+
+<p>Hanterare som &ouml;verlever sin egen resume (<code>ask</code> och
+<code>resume_with</code>) &auml;r Windows-bara tills vidare; annars rapporterar
+<code>resumable_ok()</code> 0 och <code>ask</code> v&auml;grar i st&auml;llet
+f&ouml;r att l&aring;tsas. De, plus uppgifter med <code>spawn</code> och
+<code>await</code>, finns i <code>examples/tests/tests/</code> som
+<code>test_42_effects</code>, <code>test_42_parallel</code> och
+<code>test_42_delimited_resume</code>.</p>
+
+<h2 id="next">Vidare h&auml;rifr&aring;n</h2>
+
+<ul>
+<li><code>examples/demos/</code> &mdash; 21 k&ouml;rbara program, en id&eacute; var.</li>
+<li><code>examples/tests/tests/</code> &mdash; 151 tester, en funktion var, alla gr&ouml;na p&aring; Linux och Windows.</li>
+<li><code>orbs/</code> &mdash; biblioteken: text, list, num, iter, json, net, async, result, option.</li>
+<li><code>tools/bootstrap.sh</code> &mdash; fr&aring;n bar checkout till fungerande kompilator: seeden bygger den, sedan bygger den sig sj&auml;lv till en fixpunkt.</li>
+</ul>
+
+</main>
+
+<footer>
+<p>Orion &auml;r skrivet i Orion. Kompilatorn kompilerar sig sj&auml;lv.
+<a href="https://github.com/Lone-Lodge/orion">K&auml;llkod p&aring; GitHub</a>.</p>
+</footer>
+
+</body>
+</html>

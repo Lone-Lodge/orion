@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orion Field Guide</title>
+<meta name="description" content="Everything you need to write Orion, on one page. Twelve complete programs, every one compiled by the build.">
+<link rel="alternate" hreflang="en" href="index.html">
+<link rel="alternate" hreflang="sv" href="sv.html">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#guide">Skip to the guide</a>
+
+<header>
+<h1>Orion Field Guide</h1>
+<p class="lede">Everything you need to write Orion, on one page. Fifteen minutes, twelve programs.</p>
+<ul class="langs">
+<li><a href="index.html" hreflang="en" aria-current="page">English</a></li>
+<li><a href="sv.html" hreflang="sv" lang="sv">Svenska</a></li>
+</ul>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+<h2 class="toc-h" id="toc-h">On this page</h2>
+<ol>
+<li><a href="#hello">Hello</a></li>
+<li><a href="#names">Names</a></li>
+<li><a href="#text">Text</a></li>
+<li><a href="#branching">Branching</a></li>
+<li><a href="#loops">Loops</a></li>
+<li><a href="#lists">Lists and maps</a></li>
+<li><a href="#types">Types</a></li>
+<li><a href="#functions">Functions, lambdas, orbs</a></li>
+<li><a href="#errors">When it goes wrong</a></li>
+<li><a href="#io">Talking to the outside</a></li>
+<li><a href="#more">Two things worth knowing exist</a></li>
+<li class="toc-last"><a href="#next">Where to go next</a></li>
+</ol>
+</nav>
+
+<main id="guide">
+
+<p>Orion compiles to LLVM IR and then to a native binary. Indentation makes
+blocks. There is no null and there are no exceptions. Every code block below
+is a whole program, and every one of them is compiled by
+<code>tools/docs_check.sh</code> &mdash; if a sample here stops working, the
+build says so.</p>
+
+<h2 id="hello">1. Hello</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    print_line("hello")
+    0
+</code></pre>
+
+<p>Build and run it:</p>
+
+<pre><code>orbit run hello.or
+</code></pre>
+
+<p>A block's value is its last expression, so no <code>return</code> is needed
+&mdash; though <code>return</code> exists for leaving early. What
+<code>main</code> returns becomes the process exit code.</p>
+
+<p>No project, no config, no output path to name. <code>orbit build hello.or</code>
+leaves a <code>hello</code> executable beside the source. For something larger,
+<code>orbit new myapp</code> scaffolds a project and the same <code>run</code>,
+<code>build</code> and <code>test</code> work inside it.</p>
+
+<h2 id="names">2. Names</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    x = 41            <span class="c"># bound once</span>
+    mut total = 0     <span class="c"># this one changes</span>
+    total = total + x
+    total += 1
+    ready = true      <span class="c"># bool: true / false, with and / or / not</span>
+    ratio = 1.5       <span class="c"># float</span>
+    if ready and not (ratio &gt; 2.0) then total else 0
+</code></pre>
+
+<p>Plain <code>=</code> binds a new name. <code>mut</code> marks one you mean
+to reassign, and the compiler holds you to it. Types are inferred; write one
+when you want it checked, as in <code>mut n: int = 0</code>. The types you get
+for free are <code>int</code>, <code>float</code>, <code>bool</code> and
+<code>Text</code>. <code>const LIMIT = 10</code> names a compile-time constant
+and <code>type Meters = int</code> names an existing type.</p>
+
+<h2 id="text">3. Text</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    name = "world"
+    n = 3
+    print_line("hello {name}, {n} times, {n * 2} in total")
+    print_line("a literal brace: \{ and \}")
+    0
+</code></pre>
+
+<p>Every string literal is an interpolation. A hole <code>{...}</code> takes
+any expression, not just a name. Escape a real brace as <code>\{</code>. Three
+or more parts compile to a single join, so building a line in a loop does not
+quietly cost you one allocation per piece.</p>
+
+<h2 id="branching">4. Branching</h2>
+
+<pre><code data-or>fn classify(n: int) -&gt; Text:
+    match:
+        n &lt; 0:  "negative"
+        n == 0: "zero"
+        else:   "positive"
+
+fn main() -&gt; int:
+    print_line(classify(0 - 5))
+    label = if 1 == 1 then "yes" else "no"
+    print_line(label)
+    0
+</code></pre>
+
+<p><code>match:</code> with no subject is a chain of conditions and the first
+true arm wins. It is what you use instead of <code>else if</code>.
+<code>if c then a else b</code> is the one-line form; the indented
+<code>if c:</code> / <code>else:</code> is the block form.</p>
+
+<h2 id="loops">5. Loops</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    mut sum = 0
+    loop i in 0..&lt;5:                          <span class="c"># 0 1 2 3 4</span>
+        sum += i
+    loop i in 1..=3:                          <span class="c"># 1 2 3</span>
+        sum += i
+    doubled = loop x in [1, 2, 3]: x * 2      <span class="c"># [2, 4, 6]</span>
+    big = loop x in [1, 2, 3] where x &gt; 1: x  <span class="c"># [2, 3]</span>
+    loop:
+        break
+    sum + len(doubled) + len(big)
+</code></pre>
+
+<p><code>loop</code> is the only iteration keyword. In statement position it
+loops; in expression position it collects each body value into a list, which
+is where map and filter come from &mdash; <code>where</code> is the filter.
+<code>0..&lt;5</code> excludes the end, <code>1..=3</code> includes it, and a
+bare <code>loop:</code> runs until <code>break</code>.</p>
+
+<h2 id="lists">6. Lists and maps</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    xs = [10, 20, 30]
+    ys = push(xs, 40)          <span class="c"># push returns a new list</span>
+    m = {"a": 1, "b": 2}
+    print_line("first={xs[0]} len={len(ys)} b={get(m, "b")}")
+    xs[0] + len(ys)
+</code></pre>
+
+<p><code>push</code> copies. That keeps value semantics unconditional, and it
+means <code>x = push(x, v)</code> in a tight loop is quadratic &mdash; for a
+hot accumulator, <code>push_mut</code> is the audited way to append in place.
+Index with <code>xs[0]</code>; <code>at</code>, <code>len</code>, <code>get</code>
+and <code>has</code> are the function forms, all built in and needing no import.</p>
+
+<h2 id="types">7. Types</h2>
+
+<pre><code data-or>type Player: name: Text, hp: int
+
+type Shape:
+    Circle(int)
+    Rect(int, int)
+
+fn area(s: Shape) -&gt; int:
+    match s:
+        Circle(r) -&gt; 3 * r * r
+        Rect(w, h) -&gt; w * h
+
+fn divmod(a: int, b: int) -&gt; (int, int):
+    (a / b, a % b)
+
+fn main() -&gt; int:
+    p = Player{name: "Hero", hp: 100}
+    q, r = divmod(17, 5)
+    print_line("{p.name} has {p.hp} hp; 17/5 is {q} rem {r}")
+    area(Shape.Rect(6, 7))
+</code></pre>
+
+<p>One keyword for both shapes. Fields on a line make a record, reached with
+<code>p.name</code>. Variants make a sum type, built as
+<code>Shape.Rect(6, 7)</code> and read by <code>match</code>, which is
+checked for exhaustiveness. <code>_</code> is the catch-all pattern, and
+<code>if let Circle(r) = s:</code> handles the single-case check without a
+full match.</p>
+
+<p>A tuple <code>(a, b)</code> is an anonymous struct, so its slots keep their
+own types and <code>(int, Text)</code> is a real pair. That is how a function
+returns more than one thing, and <code>q, r = divmod(17, 5)</code> takes them
+apart. Tuple patterns work in <code>match</code> too.</p>
+
+<h2 id="functions">8. Functions, lambdas, orbs</h2>
+
+<pre><code data-or>use text
+use iter
+
+fn main() -&gt; int:
+    words = split("alpha,beta,gamma", ",")
+    lengths = loop w in words: len(w)
+    double = fn(x): x * 2
+    print_line("words={len(words)} letters={sum(lengths)}")
+    double(21)
+</code></pre>
+
+<p>A library is an <em>orb</em>: <code>use text</code> brings one in, and
+<code>pub fn</code> is what an orb exports. Each orb is its own namespace. A
+lambda is <code>fn(params): body</code> and closes over what it needs. Any
+function can also be called method-style, so <code>trim(s)</code> and
+<code>s.trim()</code> are the same call.</p>
+
+<h2 id="errors">9. When it goes wrong</h2>
+
+<pre><code data-or>type Res&lt;T&gt;:
+    Ok(T)
+    Err(Text)
+
+fn safe_div(a: int, b: int) -&gt; Res&lt;int&gt;:
+    if b == 0:
+        Res.Err("divide by zero")
+    else:
+        Res.Ok(a / b)
+
+fn calc(x: int) -&gt; Res&lt;int&gt;:
+    v = safe_div(84, x)?      <span class="c"># unwrap, or return the Err</span>
+    Res.Ok(v * 2)
+
+fn main() -&gt; int:
+    require 1 == 1            <span class="c"># traps if false</span>
+    defer print_line("cleanup runs last")
+    match calc(2):
+        Ok(v) -&gt; v
+        Err(_) -&gt; 0
+</code></pre>
+
+<p>There is no null to forget to check and no exception to forget to catch.
+Failure is a value: give it a variant, and <code>?</code> either unwraps the
+good case or returns the bad one to your caller. Types take parameters, so one
+<code>Res&lt;T&gt;</code> covers every payload rather than one per type. <code>require</code> and
+<code>ensure</code> are runtime contracts that trap on a false condition.
+<code>defer</code> runs at block end, last registered first, and before any
+<code>return</code>.</p>
+
+<h2 id="io">10. Talking to the outside</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    who = if argc() &gt; 1 then argv(1) else "world"
+    print_line("hello {who}")
+    file_write("greeting.txt", "hello {who}")
+    back = file_read("greeting.txt")
+    len(back)
+</code></pre>
+
+<p><code>argc</code> and <code>argv</code> are the command line,
+<code>print_line</code> is stdout, and <code>file_read</code> and
+<code>file_write</code> move whole files at a time. All built in, no import.
+For more than that the <code>os</code> orb has <code>run_command</code>,
+<code>mkdir_all</code>, <code>file_exists</code>.</p>
+
+<h2 id="more">11. Two things worth knowing exist</h2>
+
+<p>Neither is needed on your first day. A guide that never mentions them hides
+the most interesting ideas in the language, so here they are, named rather
+than taught.</p>
+
+<p><strong>Effects</strong> let a function ask for something without knowing
+who answers. <code>perform</code> raises the request, <code>handle</code>
+answers it, and <code>resume</code> goes back to where it was asked.</p>
+
+<pre><code data-or>effect Log:
+    msg: fn(line: Text) -&gt; Text
+
+handle Log.msg(line: Text) -&gt; Text:
+    print_line("log: {line}")
+    resume("ok")
+
+fn work() -&gt; int:
+    perform Log.msg("starting")
+    42
+
+fn main() -&gt; int:
+    work()
+</code></pre>
+
+<p><strong>Parallelism</strong> is real OS threads, and deterministic: each
+worker writes only its own slot and the reduction is order-independent, so the
+answer does not depend on timing.</p>
+
+<pre><code data-or>fn double(x: int) -&gt; int:
+    x * 2
+
+fn main() -&gt; int:
+    workers = [double, double, double]
+    par_run(workers, 7)     <span class="c"># 3 threads, 3 x 14 == 42</span>
+</code></pre>
+
+<p>Handlers that outlive their own resume (<code>ask</code> and
+<code>resume_with</code>) are Windows-only for now; elsewhere
+<code>resumable_ok()</code> reports 0 and <code>ask</code> refuses rather than
+pretending. Those, plus tasks with <code>spawn</code> and <code>await</code>,
+live in <code>examples/tests/tests/</code> as <code>test_42_effects</code>,
+<code>test_42_parallel</code> and <code>test_42_delimited_resume</code>.</p>
+
+<h2 id="next">Where to go next</h2>
+
+<ul>
+<li><code>examples/demos/</code> &mdash; 21 runnable programs, one idea each.</li>
+<li><code>examples/tests/tests/</code> &mdash; 151 tests, one feature each, all green on Linux and Windows.</li>
+<li><code>orbs/</code> &mdash; the libraries: text, list, num, iter, json, net, async, result, option.</li>
+<li><code>tools/bootstrap.sh</code> &mdash; a bare checkout to a working compiler: the seed builds it, then it builds itself to a fixpoint.</li>
+</ul>
+
+</main>
+
+<footer>
+<p>Orion is written in Orion. The compiler compiles itself.
+<a href="https://github.com/Lone-Lodge/orion">Source on GitHub</a>.</p>
+</footer>
+
+</body>
+</html>

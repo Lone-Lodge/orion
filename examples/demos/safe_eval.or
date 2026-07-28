@@ -1,0 +1,104 @@
+# safe_eval — an RPN evaluator that REPORTS errors instead of guessing.
+#
+# Build: orion.exe examples/demos/safe_eval.or out.ll orbs
+#
+# Where rpn.or substitutes 0 on a bad divide, this one models fallibility
+# honestly with a sum type and propagates failures with the `?` operator:
+#   - `enum Eval: Ok(int), Err(Text)` — a result is a value OR a message
+#   - `apply` returns Err on divide-by-zero / unknown operator
+#   - `expr?` unwraps Ok to the int, or early-returns the Err up the stack
+#   - stack underflow and leftover operands are errors too
+#   - `match` on the result at the top reports Ok / Err
+#
+# `?` is exercised in a spot the tests don't reach: inside a `for` loop, inside
+# a `match` arm — the short-circuit still returns straight out of `eval`.
+
+type Token: Num(int), Op(text)
+type Eval:  Ok(int), Err(text)
+
+fn is_digit(b: int) -> int:
+    if b >= '0' and b <= '9' then 1 else 0
+
+# ---- Tokenizer -------------------------------------------------------
+
+fn tokenize(src: Text) -> [Token]:
+    bs = bytes_from_text(src)
+    n = len(bs)
+    mut toks = []
+    mut i = 0
+    loop:
+        if i >= n:
+            break
+        b = at(bs, i)
+        if b == ' ':
+            i = i + 1
+        else:
+            if is_digit(b) == 1:
+                mut num = 0
+                loop:
+                    if i >= n:
+                        break
+                    d = at(bs, i)
+                    if is_digit(d) == 0:
+                        break
+                    num = num * 10 + (d - '0')
+                    i = i + 1
+                toks = push(toks, Token.Num(num))
+            else:
+                toks = push(toks, Token.Op(bytes_to_text(push([], b))))
+                i = i + 1
+    toks
+
+# ---- A fallible operator ---------------------------------------------
+
+fn apply(op: Text, a: int, b: int) -> Eval:
+    match op:
+        "+" -> Eval.Ok(a + b)
+        "-" -> Eval.Ok(a - b)
+        "*" -> Eval.Ok(a * b)
+        "/" ->
+            if b == 0:
+                Eval.Err("division by zero")
+            else:
+                Eval.Ok(a / b)
+        _ -> Eval.Err("unknown operator '{op}'")
+
+# ---- Evaluator: errors bubble up via `?` -----------------------------
+
+fn eval(toks: [Token]) -> Eval:
+    mut stack = []
+    loop t in toks:
+        match t:
+            Num(v) -> stack = push(stack, v)
+            Op(o) ->
+                if len(stack) < 2:
+                    return Eval.Err("stack underflow at '{o}'")
+                top = len(stack)
+                b = at(stack, top - 1)
+                a = at(stack, top - 2)
+                stack = slice(stack, 0, top - 2)
+                val = apply(o, a, b)?           # unwrap Ok, or return the Err
+                stack = push(stack, val)
+    if len(stack) != 1:
+        return Eval.Err("expected one result, stack has {len(stack)}")
+    Eval.Ok(at(stack, 0))
+
+fn run(src: Text) -> int:
+    match eval(tokenize(src)):
+        Ok(v) ->
+            print_line("{src}   =>  {v}")
+            v
+        Err(m) ->
+            print_line("{src}   =>  error: {m}")
+            0
+
+# ---- Main ------------------------------------------------------------
+
+fn main() -> int:
+    a = run("3 4 + 5 *")        # ok:  (3 + 4) * 5 = 35
+    run("10 0 /")               # err: division by zero
+    run("1 +")                  # err: stack underflow
+    run("2 3 4 +")              # err: leftover operands
+    b = run("40 2 +")           # ok:  42
+    # only the two OK runs contribute; the errors returned 0
+    a + b - 35

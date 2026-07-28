@@ -1,0 +1,8 @@
+# runtime_bench baseline: case best_ms ops
+# best of 3 runs; regenerate with: bash tools/runtime_bench.sh --update
+concat 104 2500000
+int_to_text 101 2500000
+interp 96 750000
+list_at 4 10000000
+map_get 63 10000000
+push_mut 7 2000000

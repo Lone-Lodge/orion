@@ -1,53 +1,19 @@
-# orion — the fully self-hosted Orion compiler (written in Orion).
-# Other lone-lodge projects live in sibling dirs with their own repos.
-
-# === Sibling projects (their own repos) ===
-astra/
-atlas/
-skriva/
-veil/
-
-# === Build artifacts ===
-**/target/
-**/dist/
-**/node_modules/
-**/.cargo/
-**/.rustup/
-
-# === Generated files ===
+# Build artifacts — everything here is generated, never committed.
+/dist/
+out.ll
+*.o
 *.exe
-*.dll
-*.obj
-*.ll
+# stray emitted IR (the committed bootstrap seed lives at tools/seed/orion.ll)
+/*.ll
+
+# Debug/crash artifacts (never source). Existing tracked build outputs like
+# examples/tests/dist/*.ll are left as-is — this only stops genuine junk.
 *.pdb
-*.lib
-*.exp
+*.dmp
+build/crash.*
 
-# Bootstrap seed — the ONE checked-in binary self-hosting needs (see
-# orion/tools/seed/README.md). Excepted from *.exe so a fresh clone can
-# bootstrap without lodge-orion. The .ll is the platform-neutral seed:
-# compile it with clang + orion_rt.c to link an orion.exe for ANY OS.
-!orion/tools/seed/orion.exe
-!orion/tools/seed/orion.ll
+# scratch a test writes into the runner dir
+*.tmp
 
-# === IDE / OS ===
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-*.swp
-*~
-
-# === Scratch / temp ===
-scratchpad/
-*.log
-nul
-
-# === Lock files we don't track (regenerate from manifests) ===
-Cargo.lock
-
-# Copilot agent worktrees (transient)
-copilot-worktrees/
-
-# Native-compile smoke-test output
-orion-self/examples/compile_or/hello_output.txt
+# host-retargeted scratch copies (the tracked .ll is the compiler output)
+*.host.ll

@@ -1,0 +1,28 @@
+type Task: deadline_ms: int, fn_id: int, payload: int
+
+fn task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
+    Task{deadline_ms: monotonic_ms() + fire_in_ms, fn_id: fn_id, payload: payload}
+
+fn task_due(t: Task) -> int:
+    now = monotonic_ms()
+    if t.deadline_ms <= now then 1 else 0
+
+# Hand-written dispatcher — fn_id 0 doubles payload, fn_id 1 negates.
+fn dispatch(t: Task) -> int:
+    fid = t.fn_id
+    if fid == 0:
+        t.payload + t.payload
+    else:
+        0 - t.payload
+
+fn main() -> int:
+    a = task_new(10, 0, 21)
+    b = task_new(25, 1, 50)
+    sleep_ms(40)
+    # Both should be due.
+    a_ok = task_due(a)
+    b_ok = task_due(b)
+    a_result = dispatch(a)
+    b_result = dispatch(b)
+    # 42 = a_result (21+21) AND both fired.
+    if a_ok == 1 and b_ok == 1 then a_result else 0

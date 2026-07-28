@@ -1,0 +1,31 @@
+fn is_empty(t: Text) -> int:
+    if len(t) == 0 then 1 else 0
+
+fn starts_with(t: Text, prefix: Text) -> int:
+    t_bytes = bytes_from_text(t)
+    p_bytes = bytes_from_text(prefix)
+    t_len = bytes_length(t_bytes)
+    p_len = bytes_length(p_bytes)
+    mut result = 1
+    if p_len > t_len:
+        result = 0
+    if p_len <= t_len:
+        loop ci in 0..<p_len:
+            tb = byte_at(t_bytes, ci)
+            pb = byte_at(p_bytes, ci)
+            if tb != pb:
+                result = 0
+    result
+
+fn main() -> int:
+    msg = "hello world"
+    empty = ""
+
+    # Method-call syntax for all
+    e1 = empty.is_empty()
+    e2 = msg.is_empty()
+    sw = msg.starts_with("hello")
+    sw_no = msg.starts_with("world")
+
+    # 1 + 0 + 1 + 0 = 2  ×  21 = 42
+    (e1 + e2 + sw + sw_no) * 21

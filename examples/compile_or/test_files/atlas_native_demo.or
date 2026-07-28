@@ -1,0 +1,59 @@
+# THE STACK TEST: a cubsy-shaped main loop through the ori orb +
+# veil DisplayList — compiled natively, zero lodge-orion. Orb
+# shadowing supplies native window/gpu.
+#
+#   orion test_files/atlas_native_demo.or out.ll \
+#       ../../atlas/orbs_native ../../atlas/orbs ../../veil/orbs
+#   clang out.ll runtime/orion_rt.c runtime/win32_min.c \
+#       runtime/d3d12_min.c -Os -o demo.exe -luser32 -lgdi32 \
+#       -ld3d12 -ldxgi -ld3dcompiler
+
+use ori
+use veil_display
+use veil_geometry
+
+fn main() -> int:
+    app = ori_open(ori_defaults("Atlas NATIVE - click to paint, Esc quits", 800, 600))
+    if app.running == 0:
+        print_line("ori_open failed")
+        return 1
+    renderer = build_renderer(app.device, 800, 600)
+    if renderer.ok == 0:
+        print_line("renderer failed")
+        return 1
+    print_line("atlas native stack up")
+
+    mut running = 1
+    mut blocks_x = []
+    mut blocks_y = []
+    loop:
+        if running == 0:
+            break
+        if ori_should_quit(app):
+            break
+        events = ori_pump(app)
+        n_ev = len(events)
+        loop i in 0..<n_ev:
+            ev = at(events, i)
+            if ev.kind == "mouse_down":
+                blocks_x = push(blocks_x, to_int(ev.x))
+                blocks_y = push(blocks_y, to_int(ev.y))
+            if ev.kind == "key_down":
+                if ev.key == 27:
+                    running = 0
+
+        # DrawRect's third arg is the `src` provenance int (a real game
+        # threads its entity id); this demo has no entities, so 0 = no source.
+        mut display = empty_list()
+        display = push_cmd(display, DrawRect(Rect{x: 40, y: 40, width: 720, height: 520}, "panel", 0))
+        n_b = len(blocks_x)
+        loop bi in 0..<n_b:
+            bx = (at(blocks_x, bi) / 40) * 40
+            by = (at(blocks_y, bi) / 40) * 40
+            display = push_cmd(display, DrawRect(Rect{x: bx, y: by, width: 36, height: 36}, "magenta", 0))
+        ori_raster(renderer, display)
+        ori_frame_sleep()
+
+    ori_close(app)
+    print_line("bye")
+    0

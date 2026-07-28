@@ -1,0 +1,6 @@
+# Note what is NOT here: `use beta`. delta only knows the facade, and that is
+# enough precisely because gamma re-exports.
+use gamma
+
+pub fn delta_through_facade() -> Text:
+    beta_label()

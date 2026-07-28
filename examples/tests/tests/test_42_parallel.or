@@ -1,0 +1,9 @@
+# `par_run(closures, arg)` is a first-class builtin: run each closure(arg) on a
+# worker thread and sum the results. Real OS-thread parallelism (Windows pool),
+# deterministic (each worker writes only its own slot; sum is order-independent).
+fn dbl(x: int) -> int:
+    x * 2
+
+fn main() -> int:
+    fs = [dbl, dbl, dbl]
+    par_run(fs, 7)    # 3 workers, each dbl(7) == 14, sum == 42

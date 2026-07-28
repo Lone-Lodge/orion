@@ -1,0 +1,30 @@
+# The json orb: parse, nested access, escapes, arrays, round-trip.
+#
+# A literal `{` in an Orion string opens an INTERPOLATION hole, so JSON in
+# source has to be written `\{`. That is also the bug this test's existence
+# uncovered: `"{{"` used to hang the compiler forever instead of saying so.
+use json
+use text
+
+fn main() -> int:
+    src = "\{\"id\":7,\"method\":\"textDocument/didOpen\",\"ok\":true,\"nested\":\{\"deep\":\{\"n\":42\}\},\"items\":[\{\"a\":1\},\{\"a\":2\}],\"esc\":\"tab\\there\\nline\"\}"
+    root = json_parse(src)
+
+    id = json_int(root, "id")                                 # 7
+    m = json_text(root, "method")                             # 20 bytes
+    ok = json_int(root, "ok")                                 # true -> 1
+    deep = json_int(json_obj(json_obj(root, "nested"), "deep"), "n")   # 42
+    items = json_list(root, "items")
+    second = json_int(at(items, 1), "a")                      # 2
+    esc = json_text(root, "esc")                              # escapes resolved
+
+    # A tab and a newline came back as ONE byte each, not two.
+    tab_ok = if index_of(esc, "tab\there") == 0 then 1 else 0
+    # Re-escaping restores the two-character forms.
+    back = json_escape(esc)
+    round_ok = if index_of(back, "\\t") >= 0 and index_of(back, "\\n") >= 0 then 1 else 0
+    # A missing key is empty/zero, never a crash.
+    missing = json_int(root, "nope") + len(json_text(root, "nope"))
+
+    id + len(m) + ok + deep + second + tab_ok + round_ok + missing
+    # 7 + 20 + 1 + 42 + 2 + 1 + 1 + 0 == 74

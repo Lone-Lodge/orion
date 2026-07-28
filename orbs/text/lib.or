@@ -1,0 +1,216 @@
+# text — common text helpers callable via method-call syntax.
+#
+# Once you `use text`, you get:
+#   msg.is_empty()
+#   msg.starts_with("hello")
+#   msg.ends_with("!")
+#   msg.byte_count()
+#   split("a,b,c", ",")   ->  ["a", "b", "c"]
+#   join(parts, ", ")     ->  "a, b, c"
+#
+# All thanks to MethodCall desugar: `msg.starts_with("x")` lowers to
+# `starts_with(msg, "x")`.
+
+pub fn is_empty(t: Text) -> int:
+    if len(t) == 0 then 1 else 0
+
+pub fn byte_count(t: Text) -> int:
+    bytes_length(bytes_from_text(t))
+
+pub fn starts_with(t: Text, prefix: Text) -> int:
+    t_bytes = bytes_from_text(t)
+    p_bytes = bytes_from_text(prefix)
+    t_len = bytes_length(t_bytes)
+    p_len = bytes_length(p_bytes)
+    mut result = 1
+    if p_len > t_len:
+        result = 0
+    if p_len <= t_len:
+        loop ci in 0..<p_len:
+            tb = byte_at(t_bytes, ci)
+            pb = byte_at(p_bytes, ci)
+            if tb != pb:
+                result = 0
+    result
+
+pub fn ends_with(t: Text, suffix: Text) -> int:
+    t_bytes = bytes_from_text(t)
+    s_bytes = bytes_from_text(suffix)
+    t_len = bytes_length(t_bytes)
+    s_len = bytes_length(s_bytes)
+    mut result = 1
+    if s_len > t_len:
+        result = 0
+    if s_len <= t_len:
+        offset = t_len - s_len
+        loop ci in 0..<s_len:
+            tb = byte_at(t_bytes, ci + offset)
+            sb = byte_at(s_bytes, ci)
+            if tb != sb:
+                result = 0
+    result
+
+# Repeat `t` `n` times. Returns "" if n <= 0.
+pub fn repeat(t: Text, n: int) -> Text:
+    mut result = ""
+    if n > 0:
+        loop _ in 0..<n:
+            result = "{result}{t}"
+    result
+
+# Reverse the bytes (ASCII-safe only).
+pub fn reverse(t: Text) -> Text:
+    t_bytes = bytes_from_text(t)
+    n = bytes_length(t_bytes)
+    mut out = bytes_zeros(0)
+    loop ci in 0..<n:
+        idx = n - 1 - ci
+        out = bytes_concat(out, bytes_slice(t_bytes, idx, idx + 1))
+    bytes_to_text(out)
+
+# Convert ASCII letters to upper case (in place, ASCII only).
+pub fn upper(t: Text) -> Text:
+    t_bytes = bytes_from_text(t)
+    n = bytes_length(t_bytes)
+    mut out = bytes_zeros(0)
+    loop ci in 0..<n:
+        b = byte_at(t_bytes, ci)
+        mut new_b = b
+        if b >= 97 and b <= 122:
+            new_b = b - 32
+        out = bytes_concat(out, [new_b])
+    bytes_to_text(out)
+
+# Convert ASCII letters to lower case.
+pub fn lower(t: Text) -> Text:
+    t_bytes = bytes_from_text(t)
+    n = bytes_length(t_bytes)
+    mut out = bytes_zeros(0)
+    loop ci in 0..<n:
+        b = byte_at(t_bytes, ci)
+        mut new_b = b
+        if b >= 65 and b <= 90:
+            new_b = b + 32
+        out = bytes_concat(out, [new_b])
+    bytes_to_text(out)
+
+# Remove leading and trailing ASCII whitespace (space, tab, newline, CR).
+#   trim("  hi  ")  ->  "hi"
+pub fn trim(t: Text) -> Text:
+    tb = bytes_from_text(t)
+    n = bytes_length(tb)
+    mut lo = 0
+    mut hi = n
+    loop:
+        if lo >= hi:
+            break
+        b = byte_at(tb, lo)
+        if b == 32 or b == 9 or b == 10 or b == 13:
+            lo = lo + 1
+        else:
+            break
+    loop:
+        if hi <= lo:
+            break
+        b = byte_at(tb, hi - 1)
+        if b == 32 or b == 9 or b == 10 or b == 13:
+            hi = hi - 1
+        else:
+            break
+    bytes_to_text(bytes_slice(tb, lo, hi))
+
+# Join a list of pieces with `sep` between them.
+#   join(["a", "b", "c"], "-")  ->  "a-b-c"
+pub fn join(parts: [Text], sep: Text) -> Text:
+    mut out = ""
+    n = len(parts)
+    loop i in 0..<n:
+        if i > 0:
+            out = "{out}{sep}"
+        out = "{out}{at(parts, i)}"
+    out
+
+# Split `t` on every occurrence of `sep`, returning the pieces.
+#   split("a,b,c", ",")  ->  ["a", "b", "c"]
+# An empty `sep` yields the whole string as a single piece.
+pub fn split(t: Text, sep: Text) -> [Text]:
+    tb = bytes_from_text(t)
+    sb = bytes_from_text(sep)
+    tlen = bytes_length(tb)
+    slen = bytes_length(sb)
+    mut out = []
+    if slen == 0:
+        out = push(out, t)
+    else:
+        mut start = 0
+        mut i = 0
+        loop:
+            if i > tlen - slen:
+                break
+            mut matched = 1
+            loop j in 0..<slen:
+                if byte_at(tb, i + j) != byte_at(sb, j):
+                    matched = 0
+            if matched == 1:
+                out = push(out, bytes_to_text(bytes_slice(tb, start, i)))
+                i = i + slen
+                start = i
+            else:
+                i = i + 1
+        out = push(out, bytes_to_text(bytes_slice(tb, start, tlen)))
+    out
+
+# Replace every occurrence of `from` with `to` — split on `from`, rejoin
+# with `to`. An empty `from` returns `t` unchanged.
+#   replace("a,b,c", ",", "; ")  ->  "a; b; c"
+pub fn replace(t: Text, from: Text, to: Text) -> Text:
+    join(split(t, from), to)
+
+# First byte index of `sub` in `t`, or -1 if absent. Empty `sub` -> 0.
+pub fn index_of(t: Text, sub: Text) -> int:
+    tb = bytes_from_text(t)
+    sb = bytes_from_text(sub)
+    tlen = bytes_length(tb)
+    slen = bytes_length(sb)
+    mut found = 0 - 1
+    if slen == 0:
+        found = 0
+    else:
+        mut i = 0
+        loop:
+            if i > tlen - slen or found >= 0:
+                break
+            mut matched = 1
+            loop j in 0..<slen:
+                if byte_at(tb, i + j) != byte_at(sb, j):
+                    matched = 0
+            if matched == 1:
+                found = i
+            i = i + 1
+    found
+
+# Pad `t` on the left with `pad` until it is at least `width` bytes wide.
+pub fn pad_left(t: Text, width: int, pad: Text) -> Text:
+    mut out = t
+    mut k = len(t)
+    loop:
+        if k >= width:
+            break
+        out = "{pad}{out}"
+        k = k + 1
+    out
+
+# Pad `t` on the right with `pad` until it is at least `width` bytes wide.
+pub fn pad_right(t: Text, width: int, pad: Text) -> Text:
+    mut out = t
+    mut k = len(t)
+    loop:
+        if k >= width:
+            break
+        out = "{out}{pad}"
+        k = k + 1
+    out
+
+# Split `t` into lines on '\n'.
+pub fn lines(t: Text) -> [Text]:
+    split(t, "\n")

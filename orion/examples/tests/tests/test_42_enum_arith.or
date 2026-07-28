@@ -1,8 +1,0 @@
-enum Status: Idle, Active, Done, Cancelled, Failed
-
-fn main() -> int:
-    # Status.Idle=0, Active=1, Done=2, Cancelled=3, Failed=4
-    # 1 + 2 + 3 + 4 + 4*8 = 42
-    a = Status.Active + Status.Done + Status.Cancelled
-    b = Status.Failed * 8
-    a + b + 4

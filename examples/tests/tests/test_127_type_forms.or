@@ -1,0 +1,28 @@
+# The two `type` forms the corpus migration depends on.
+#
+# 1. An inline sum separated by COMMAS. Every hand-written enum in the tree is
+#    spelled this way; the inline-sum parser only continued on `|`, so under
+#    `type` it kept the first variant and dropped the rest.
+# 2. A product written over several LINES. That block used to dispatch to the
+#    enum parser (an "enum" whose variants were the field names) because the
+#    dispatch looked only at the newline, not at whether the first body entry
+#    is a field.
+type Tile: Empty, Wall, Loot
+
+type Box:
+    w: int
+    h: int
+    label: Text
+
+fn cost(t: Tile) -> int:
+    match t:
+        Empty -> 1
+        Wall -> 10
+        Loot -> 100
+
+fn main() -> int:
+    b = Box{w: 3, h: 4, label: "crate"}
+    area = b.w * b.h                      # 12
+    # Loot is the THIRD variant: it only resolves if commas continued the sum.
+    c = cost(Tile.Loot) + cost(Tile.Wall) # 110
+    area + c + len(b.label)               # 12 + 110 + 5 == 127
