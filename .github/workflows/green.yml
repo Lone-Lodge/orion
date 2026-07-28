@@ -79,13 +79,17 @@ jobs:
       - name: arena region shrink
         run: bash tools/region_shrink_test.sh
 
-      # Both benches compare against a checked-in baseline and fail past 25%.
-      # Runner hardware is noisier than a laptop, so a red here is a hint to
-      # look, not proof on its own -- the thresholds are deliberately loose.
-      - name: compiler speed
+      # GATE=0: report the numbers, do not fail on them. Both baselines are wall
+      # clock recorded on one machine, and a runner is simply a different, slower
+      # machine -- best-of-3 does not fix that. Gating on it would mean a red
+      # build for hardware, and a gate that cries wolf gets ignored. The benches
+      # still gate where the baseline was recorded; here they are a trend line.
+      - name: compiler speed (reported)
+        env: { GATE: '0' }
         run: bash tools/compile_bench.sh
 
-      - name: generated-code speed
+      - name: generated-code speed (reported)
+        env: { GATE: '0' }
         run: bash tools/runtime_bench.sh
 
       # The tracked .ll under examples/tests/dist is the compiler's own output,

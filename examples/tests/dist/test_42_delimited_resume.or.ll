@@ -1896,34 +1896,62 @@ entry:
     %v16 = call ptr @orion_text_join(ptr %v15)
     call i32 @puts(ptr %v16)
     %v17 = add i64 0, 0
-    %v18 = add i64 0, 42
-    %v19.b = icmp eq i64 %v3, %v18
-    %v19 = zext i1 %v19.b to i64
-    %v20.cb = icmp ne i64 %v19, 0
-    br i1 %v20.cb, label %if_20_then, label %if_20_else
-if_20_then:
-    %v22 = add i64 0, 8
-    %v23.b = icmp eq i64 %v7, %v22
-    %v23 = zext i1 %v23.b to i64
-    br label %if_20_merge
-if_20_else:
+    %v18 = call i64 @async__resumable_ok()
+    %v19 = add i64 0, 1
+    %v20.b = icmp eq i64 %v18, %v19
+    %v20 = zext i1 %v20.b to i64
+    %v21.cb = icmp ne i64 %v20, 0
+    br i1 %v21.cb, label %if_21_then, label %if_21_else
+if_21_then:
+    %v23 = add i64 0, 42
+    br label %if_21_merge
+if_21_else:
     %v26 = add i64 0, 0
-    br label %if_20_merge
-if_20_merge:
-    %v29 = phi i64 [ %v23, %if_20_then ], [ %v26, %if_20_else ]
-    %v30.cb = icmp ne i64 %v29, 0
-    br i1 %v30.cb, label %if_30_then, label %if_30_else
-if_30_then:
-    %v32 = add i64 0, 1
-    br label %if_30_merge
-if_30_else:
-    %v35 = add i64 0, 0
-    br label %if_30_merge
-if_30_merge:
-    %v38 = phi i64 [ %v32, %if_30_then ], [ %v35, %if_30_else ]
-    %v39 = add i64 0, 42
-    %v40 = mul i64 %v38, %v39
-    ret i64 %v40
+    %v27 = add i64 0, 10
+    %v28 = sub i64 %v26, %v27
+    br label %if_21_merge
+if_21_merge:
+    %v31 = phi i64 [ %v23, %if_21_then ], [ %v28, %if_21_else ]
+    %v32 = call i64 @async__resumable_ok()
+    %v33 = add i64 0, 1
+    %v34.b = icmp eq i64 %v32, %v33
+    %v34 = zext i1 %v34.b to i64
+    %v35.cb = icmp ne i64 %v34, 0
+    br i1 %v35.cb, label %if_35_then, label %if_35_else
+if_35_then:
+    %v37 = add i64 0, 8
+    br label %if_35_merge
+if_35_else:
+    %v40 = add i64 0, 0
+    br label %if_35_merge
+if_35_merge:
+    %v43 = phi i64 [ %v37, %if_35_then ], [ %v40, %if_35_else ]
+    %v44.b = icmp eq i64 %v3, %v31
+    %v44 = zext i1 %v44.b to i64
+    %v45.cb = icmp ne i64 %v44, 0
+    br i1 %v45.cb, label %if_45_then, label %if_45_else
+if_45_then:
+    %v47.b = icmp eq i64 %v7, %v43
+    %v47 = zext i1 %v47.b to i64
+    br label %if_45_merge
+if_45_else:
+    %v50 = add i64 0, 0
+    br label %if_45_merge
+if_45_merge:
+    %v53 = phi i64 [ %v47, %if_45_then ], [ %v50, %if_45_else ]
+    %v54.cb = icmp ne i64 %v53, 0
+    br i1 %v54.cb, label %if_54_then, label %if_54_else
+if_54_then:
+    %v56 = add i64 0, 1
+    br label %if_54_merge
+if_54_else:
+    %v59 = add i64 0, 0
+    br label %if_54_merge
+if_54_merge:
+    %v62 = phi i64 [ %v56, %if_54_then ], [ %v59, %if_54_else ]
+    %v63 = add i64 0, 42
+    %v64 = mul i64 %v62, %v63
+    ret i64 %v64
 }
 
 @orion_argc = global i64 0

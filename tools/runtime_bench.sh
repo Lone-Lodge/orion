@@ -20,6 +20,9 @@ SRC="$ROOT/examples/bench/runtime.or"
 BASELINE="$ROOT/tools/runtime_baseline.txt"
 REPS="${REPS:-3}"
 THRESHOLD="${THRESHOLD:-25}"
+# GATE=0 reports without failing. Same reason as compile_bench.sh: the baseline
+# is wall clock from one machine and cannot judge another one.
+GATE="${GATE:-1}"
 CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
 UPDATE=0
@@ -94,6 +97,10 @@ done < "$BASELINE"
 echo
 if [ "$regressions" = "0" ]; then
     echo "  runtime perf: no regressions over ${THRESHOLD}%"
+elif [ "$GATE" = "0" ]; then
+    echo "  runtime perf: $regressions case(s) over ${THRESHOLD}% (reported, not gated:"
+    echo "                the baseline belongs to another machine)"
+    exit 0
 else
     echo "  runtime perf: $regressions case(s) slower than the baseline"
 fi

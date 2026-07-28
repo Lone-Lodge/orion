@@ -20,6 +20,14 @@ ORION="$ROOT/dist/orion.exe"
 BASELINE="$ROOT/tools/compile_baseline.txt"
 REPS="${REPS:-3}"
 THRESHOLD="${THRESHOLD:-25}"
+# GATE=0 prints the numbers and exits 0. The baseline is wall clock recorded on
+# one specific machine, so it can only judge THAT machine — a CI runner is
+# simply slower, and best-of-N does not fix a slower box (measured: `interp` 25
+# ms on the author's laptop, 40 ms on a GitHub Windows runner, both best of 3,
+# neither one a regression). Comparing across hosts turns a gate into a coin
+# flip, and a gate that cries wolf gets ignored, which is worse than no gate.
+# So CI reports and the machine that owns the baseline enforces.
+GATE="${GATE:-1}"
 UPDATE=0
 [ "${1:-}" = "--update" ] && UPDATE=1
 [ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
@@ -115,6 +123,10 @@ rm -rf "$TMP"
 echo
 if [ "$regressions" = "0" ]; then
     echo "  compile perf: no regressions over ${THRESHOLD}%"
+elif [ "$GATE" = "0" ]; then
+    echo "  compile perf: $regressions case(s) over ${THRESHOLD}% (reported, not gated:"
+    echo "                the baseline belongs to another machine)"
+    exit 0
 else
     echo "  compile perf: $regressions case(s) slower than the baseline"
 fi
