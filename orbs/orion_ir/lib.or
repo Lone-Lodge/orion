@@ -7,14 +7,6 @@
 #   - Typed: every value has a type (i64, ptr, bool, void).
 #
 # Pipeline: lex → parse → AST → IR → orion_emit_llvm → .ll → clang → .exe
-#
-# Today supports: ints, arith (+ - * / %), comparisons, and/or/not,
-# branches (if/else via br + phi), function calls, recursion,
-# typed params (int + Text), strings + interpolation + concat + cmp,
-# for-range, for-in-list, loop + break/continue, int lists with
-# at/len iteration.
-#
-# Roadmap: maps, text lists, struct types.
 
 
 # --- Typed data structures ---
