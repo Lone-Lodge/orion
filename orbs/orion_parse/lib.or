@@ -508,7 +508,7 @@ fn psr_parse_for_collect(tokens: [Map], position: int) -> Map:
     mut fc_inner = fc_assign
     if fc_has_where:
         fc_inner = {"kind": "IfBlock", "cond": fc_filter, "then": {"kind": "Block", "stmts": push([], fc_assign)}, "else": {"kind": "Block", "stmts": []}}
-    fc_forin = {"kind": "ForIn", "var": fc_var, "index_var": "", "iter": fc_iter, "body": {"kind": "Block", "stmts": push([], fc_inner)}}
+    fc_forin = {"kind": "ForIn", "var": fc_var, "index_var": "", "iter": fc_iter, "body": {"kind": "Block", "stmts": push([], fc_inner)}, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}
     fc_mutlet = {"kind": "MutLet", "name": "__fc", "value": {"kind": "ListLit", "items": []}}
     fc_ret = {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": "__fc"}}
     fc_stmts = push(push(push([], fc_mutlet), fc_forin), fc_ret)
@@ -562,7 +562,7 @@ fn psr_parse_par_loop(tokens: [Map], position: int) -> Map:
     pl_push = {"kind": "Call", "callee": "push", "args": [{"kind": "Ident", "name": pl_name}, pl_lambda]}
     pl_assign = {"kind": "LetOrAssign", "name": pl_name, "value": pl_push}
     pl_inner = {"kind": "Block", "stmts": push([], pl_assign)}
-    mut pl_loop = {"kind": "ForIn", "var": pl_var, "index_var": "", "iter": pl_low, "body": pl_inner}
+    mut pl_loop = {"kind": "ForIn", "var": pl_var, "index_var": "", "iter": pl_low, "body": pl_inner, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}
     if pl_is_range:
         pl_loop = {"kind": "ForRange", "var": pl_var, "low": pl_low, "high": pl_high, "inclusive": if pl_range_op == "..=" then 1 else 0, "body": pl_inner}
     pl_mutlet = {"kind": "MutLet", "name": pl_name, "value": {"kind": "ListLit", "items": []}}
@@ -1687,7 +1687,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                     for_cursor = for_cursor + 1
                 for_body_col = psr_peek_col(tokens, for_cursor)
                 for_body_result = psr_parse_body_at(tokens, for_cursor, for_body_col)
-                statements = push_mut(statements, {"kind": "ForIn", "var": for_var_name, "index_var": for_index_name, "iter": get_map(low_result, "node"), "body": get_map(for_body_result, "node")})
+                statements = push_mut(statements, {"kind": "ForIn", "var": for_var_name, "index_var": for_index_name, "iter": get_map(low_result, "node"), "body": get_map(for_body_result, "node"), "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
                 cursor = get_int(for_body_result, "next")
         if is_match:
             # Delegate to shared helper so match can also be used as an expression.

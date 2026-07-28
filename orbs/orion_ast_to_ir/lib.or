@@ -839,6 +839,25 @@ fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
     iter_r = ast_expr_to_ir(fn_value, scope, iter_node)
     list_id = iter_r.id
+
+    # `loop x in e` walks a LIST: it reads e's header as [cap, len, data…] and
+    # indexes from there. Anything else was lowered exactly the same way and
+    # read whatever those slots happened to hold. A map with two entries
+    # counted four, because it walked the flat key/value storage. A Text took
+    # its first bytes as a length and indexed off the end into an access
+    # violation. Both compiled without a word of complaint, which is the worst
+    # of the three possible behaviours.
+    #
+    # So refuse, and say where to go. What iterating text or a map should MEAN
+    # is a design question — bytes or characters, keys or pairs — and answering
+    # it silently by reinterpreting a header is how the crash got here.
+    fin_iter_type = get_value_type(iter_r.function, list_id)
+    if not is_list_type(fin_iter_type):
+        fin_who = if get(iter_node, "kind") == "Ident" then "`{get(iter_node, "name")}`" else "that value"
+        fin_line = if has(iter_node, "line") then get_int(iter_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
+        fin_col = if has(iter_node, "col") then get_int(iter_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
+        compile_error("orion: ERROR at {otir_where(fin_line, fin_col)} — cannot loop over {fin_who}: it is `{friendly_type(fin_iter_type)}`, and `loop ... in` walks a list. For text, walk its bytes: `loop b in bytes_from_text(s)`. For a map, `use dict` and walk `keys(m)`. If it is an unannotated parameter, add a type (e.g. `xs: [int]`) — untyped params default to `int`.")
+
     pr_len = ir_fn_push(iter_r.function, ir_list_len(list_id))
     len_id = pr_len.id
 
