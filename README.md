@@ -1,9 +1,10 @@
 # Orion
 
 A small, indentation-structured language that compiles to LLVM IR and then to a
-native binary. No null, no exceptions; memory comes from scoped regions that
-are checked for balance before anything runs. The compiler is written in Orion
-and compiles itself.
+native binary. No null, no exceptions, no garbage collector: allocation goes
+through an arena the compiler checks for balanced scopes before anything runs.
+You do not write regions yourself; there is no such keyword. The compiler is
+written in Orion and compiles itself.
 
 **[Read the Field Guide](docs/index.html)** — everything you need to write
 Orion, on one page, in ten minutes. ([svenska](docs/sv.html))
