@@ -74,12 +74,17 @@ leaves a <code>hello</code> executable beside the source. For something larger,
     mut total = 0     <span class="c"># this one changes</span>
     total = total + x
     total += 1
-    total
+    ready = true      <span class="c"># bool: true / false, with and / or / not</span>
+    ratio = 1.5       <span class="c"># float</span>
+    if ready and not (ratio &gt; 2.0) then total else 0
 </code></pre>
 
 <p>Plain <code>=</code> binds a new name. <code>mut</code> marks one you mean
 to reassign, and the compiler holds you to it. Types are inferred; write one
-when you want it checked, as in <code>mut n: int = 0</code>.</p>
+when you want it checked, as in <code>mut n: int = 0</code>. The types you get
+for free are <code>int</code>, <code>float</code>, <code>bool</code> and
+<code>Text</code>. <code>const LIMIT = 10</code> names a compile-time constant
+and <code>type Meters = int</code> names an existing type.</p>
 
 <h2 id="text">3. Text</h2>
 
@@ -166,9 +171,13 @@ fn area(s: Shape) -&gt; int:
         Circle(r) -&gt; 3 * r * r
         Rect(w, h) -&gt; w * h
 
+fn divmod(a: int, b: int) -&gt; (int, int):
+    (a / b, a % b)
+
 fn main() -&gt; int:
     p = Player{name: "Hero", hp: 100}
-    print_line("{p.name} has {p.hp} hp")
+    q, r = divmod(17, 5)
+    print_line("{p.name} has {p.hp} hp; 17/5 is {q} rem {r}")
     area(Shape.Rect(6, 7))
 </code></pre>
 
@@ -178,6 +187,11 @@ fn main() -&gt; int:
 checked for exhaustiveness. <code>_</code> is the catch-all pattern, and
 <code>if let Circle(r) = s:</code> handles the single-case check without a
 full match.</p>
+
+<p>A tuple <code>(a, b)</code> is an anonymous struct, so its slots keep their
+own types and <code>(int, Text)</code> is a real pair. That is how a function
+returns more than one thing, and <code>q, r = divmod(17, 5)</code> takes them
+apart. Tuple patterns work in <code>match</code> too.</p>
 
 <h2 id="functions">8. Functions, lambdas, orbs</h2>
 
@@ -200,17 +214,19 @@ function can also be called method-style, so <code>trim(s)</code> and
 
 <h2 id="errors">9. When it goes wrong</h2>
 
-<pre><code data-or>type Result: Ok(int), Err(Text)
+<pre><code data-or>type Res&lt;T&gt;:
+    Ok(T)
+    Err(Text)
 
-fn safe_div(a: int, b: int) -&gt; Result:
+fn safe_div(a: int, b: int) -&gt; Res&lt;int&gt;:
     if b == 0:
-        Result.Err("divide by zero")
+        Res.Err("divide by zero")
     else:
-        Result.Ok(a / b)
+        Res.Ok(a / b)
 
-fn calc(x: int) -&gt; Result:
+fn calc(x: int) -&gt; Res&lt;int&gt;:
     v = safe_div(84, x)?      <span class="c"># unwrap, or return the Err</span>
-    Result.Ok(v * 2)
+    Res.Ok(v * 2)
 
 fn main() -&gt; int:
     require 1 == 1            <span class="c"># traps if false</span>
@@ -222,7 +238,8 @@ fn main() -&gt; int:
 
 <p>There is no null to forget to check and no exception to forget to catch.
 Failure is a value: give it a variant, and <code>?</code> either unwraps the
-good case or returns the bad one to your caller. <code>require</code> and
+good case or returns the bad one to your caller. Types take parameters, so one
+<code>Res&lt;T&gt;</code> covers every payload rather than one per type. <code>require</code> and
 <code>ensure</code> are runtime contracts that trap on a false condition.
 <code>defer</code> runs at block end, last registered first, and before any
 <code>return</code>.</p>

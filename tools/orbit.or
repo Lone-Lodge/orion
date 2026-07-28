@@ -335,8 +335,7 @@ fn cmd_run():
     fname_index = if has_path then 3 else 2
     fname = if arg_count() <= fname_index then "main" else arg(fname_index)
     rest = args_after(fname_index + 1)
-    if not __os_orbit_run(path, fname, rest):
-        exit_with(1)
+    exit_with(__os_orbit_run(path, fname, rest))
 
 fn cmd_test():
     path = resolve_path()
@@ -871,11 +870,16 @@ fn cli_build(path: Text) -> Text:
 fn __os_orbit_build(path: Text) -> bool:
     cli_build(path) != ""
 
-fn __os_orbit_run(path: Text, fname: Text, args: [Text]) -> bool:
+# Returns the PROGRAM's exit code, not a pass/fail. Every Orion main returns an
+# int, and the guide says that int becomes the process exit code -- but this
+# collapsed anything non-zero to 1, so the one promise the language makes about
+# main stopped being true the moment you ran it through the tool. 1 stays
+# reserved for "the build itself failed".
+fn __os_orbit_run(path: Text, fname: Text, args: [Text]) -> int:
     exe = cli_build(path)
     if exe == "":
-        return false
-    run_command(exe, args) == 0
+        return 1
+    run_command(exe, args)
 
 fn __os_orbit_test(path: Text) -> int:
     exe = cli_build(path)
@@ -1069,7 +1073,7 @@ fn cmd_play():
 fn play_interp():
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
-    if not __os_orbit_run(entry_path(name), "main", []):
+    if __os_orbit_run(entry_path(name), "main", []) != 0:
         exit_with(1)
 
 fn play_native(mode: Text):

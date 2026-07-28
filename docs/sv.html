@@ -76,13 +76,18 @@ fungerar d&auml;r inne.</p>
     mut total = 0     <span class="c"># this one changes</span>
     total = total + x
     total += 1
-    total
+    ready = true      <span class="c"># bool: true / false, with and / or / not</span>
+    ratio = 1.5       <span class="c"># float</span>
+    if ready and not (ratio &gt; 2.0) then total else 0
 </code></pre>
 
 <p>Ett vanligt <code>=</code> binder ett nytt namn. <code>mut</code> markerar
 ett du t&auml;nker skriva om, och kompilatorn h&aring;ller dig till det. Typer
 h&auml;rleds; skriv ut en n&auml;r du vill ha den kontrollerad, som i
-<code>mut n: int = 0</code>.</p>
+<code>mut n: int = 0</code>. Typerna du f&aring;r gratis &auml;r <code>int</code>,
+<code>float</code>, <code>bool</code> och <code>Text</code>.
+<code>const LIMIT = 10</code> namnger en konstant och
+<code>type Meters = int</code> namnger en befintlig typ.</p>
 
 <h2 id="text">3. Text</h2>
 
@@ -172,9 +177,13 @@ fn area(s: Shape) -&gt; int:
         Circle(r) -&gt; 3 * r * r
         Rect(w, h) -&gt; w * h
 
+fn divmod(a: int, b: int) -&gt; (int, int):
+    (a / b, a % b)
+
 fn main() -&gt; int:
     p = Player{name: "Hero", hp: 100}
-    print_line("{p.name} has {p.hp} hp")
+    q, r = divmod(17, 5)
+    print_line("{p.name} has {p.hp} hp; 17/5 is {q} rem {r}")
     area(Shape.Rect(6, 7))
 </code></pre>
 
@@ -184,6 +193,12 @@ byggs <code>Shape.Rect(6, 7)</code> och l&auml;ses med <code>match</code>, som
 kontrolleras f&ouml;r utt&ouml;mmande t&auml;ckning. <code>_</code> &auml;r
 uppsamlingsm&ouml;nstret, och <code>if let Circle(r) = s:</code> tar
 enfallskontrollen utan en hel match.</p>
+
+<p>En tupel <code>(a, b)</code> &auml;r en anonym struct, s&aring; varje plats
+beh&aring;ller sin egen typ och <code>(int, Text)</code> &auml;r ett riktigt par.
+S&aring; returnerar en funktion mer &auml;n en sak, och
+<code>q, r = divmod(17, 5)</code> plockar is&auml;r dem. Tupelm&ouml;nster
+fungerar i <code>match</code> ocks&aring;.</p>
 
 <h2 id="functions">8. Funktioner, lambdor, orbs</h2>
 
@@ -206,17 +221,19 @@ den beh&ouml;ver. Varje funktion kan ocks&aring; anropas metodstil, s&aring;
 
 <h2 id="errors">9. N&auml;r det g&aring;r fel</h2>
 
-<pre><code data-or>type Result: Ok(int), Err(Text)
+<pre><code data-or>type Res&lt;T&gt;:
+    Ok(T)
+    Err(Text)
 
-fn safe_div(a: int, b: int) -&gt; Result:
+fn safe_div(a: int, b: int) -&gt; Res&lt;int&gt;:
     if b == 0:
-        Result.Err("divide by zero")
+        Res.Err("divide by zero")
     else:
-        Result.Ok(a / b)
+        Res.Ok(a / b)
 
-fn calc(x: int) -&gt; Result:
+fn calc(x: int) -&gt; Res&lt;int&gt;:
     v = safe_div(84, x)?      <span class="c"># unwrap, or return the Err</span>
-    Result.Ok(v * 2)
+    Res.Ok(v * 2)
 
 fn main() -&gt; int:
     require 1 == 1            <span class="c"># traps if false</span>
@@ -229,7 +246,8 @@ fn main() -&gt; int:
 <p>Det finns ingen null att gl&ouml;mma kontrollera och inget undantag att
 gl&ouml;mma f&aring;nga. Fel &auml;r ett v&auml;rde: ge det en variant, s&aring;
 packar <code>?</code> antingen upp det goda fallet eller skickar det
-d&aring;liga vidare till din anropare. <code>require</code> och
+d&aring;liga vidare till din anropare. Typer tar parametrar, s&aring; en enda
+<code>Res&lt;T&gt;</code> t&auml;cker varje nyttolast i st&auml;llet f&ouml;r en per typ. <code>require</code> och
 <code>ensure</code> &auml;r kontrakt som kontrolleras vid k&ouml;rning och
 sm&auml;ller p&aring; ett falskt villkor. <code>defer</code> k&ouml;rs vid
 blockets slut, senast registrerad f&ouml;rst, och f&ouml;re varje
