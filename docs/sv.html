@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Orion Field Guide</title>
-<meta name="description" content="Allt du beh&ouml;ver f&ouml;r att skriva Orion, p&aring; en sida. Nio hela program, vart och ett kompilerat av bygget.">
+<meta name="description" content="Allt du beh&ouml;ver f&ouml;r att skriva Orion, p&aring; en sida. Tolv hela program, vart och ett kompilerat av bygget.">
 <link rel="alternate" hreflang="en" href="index.html">
 <link rel="alternate" hreflang="sv" href="sv.html">
 <link rel="stylesheet" href="style.css">
@@ -15,7 +15,7 @@
 
 <header>
 <h1>Orion Field Guide</h1>
-<p class="lede">Allt du beh&ouml;ver f&ouml;r att skriva Orion, p&aring; en sida. Tio minuter, nio program.</p>
+<p class="lede">Allt du beh&ouml;ver f&ouml;r att skriva Orion, p&aring; en sida. Femton minuter, tolv program.</p>
 <ul class="langs">
 <li><a href="index.html" hreflang="en" lang="en">English</a></li>
 <li><a href="sv.html" hreflang="sv" aria-current="page">Svenska</a></li>
@@ -34,6 +34,8 @@
 <li><a href="#types">Typer</a></li>
 <li><a href="#functions">Funktioner, lambdor, orbs</a></li>
 <li><a href="#errors">N&auml;r det g&aring;r fel</a></li>
+<li><a href="#io">Prata med omv&auml;rlden</a></li>
+<li><a href="#more">Tv&aring; saker v&auml;rda att veta finns</a></li>
 <li class="toc-last"><a href="#next">Vidare h&auml;rifr&aring;n</a></li>
 </ol>
 </nav>
@@ -252,6 +254,68 @@ d&aring;liga vidare till din anropare. Typer tar parametrar, s&aring; en enda
 sm&auml;ller p&aring; ett falskt villkor. <code>defer</code> k&ouml;rs vid
 blockets slut, senast registrerad f&ouml;rst, och f&ouml;re varje
 <code>return</code>.</p>
+
+<h2 id="io">10. Prata med omv&auml;rlden</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    who = if argc() &gt; 1 then argv(1) else "world"
+    print_line("hello {who}")
+    file_write("greeting.txt", "hello {who}")
+    back = file_read("greeting.txt")
+    len(back)
+</code></pre>
+
+<p><code>argc</code> och <code>argv</code> &auml;r kommandoraden,
+<code>print_line</code> &auml;r stdout, och <code>file_read</code> och
+<code>file_write</code> flyttar hela filer &aring;t g&aring;ngen. Allt inbyggt,
+ingen import. Beh&ouml;ver du mer har <code>os</code>-orben
+<code>run_command</code>, <code>mkdir_all</code>, <code>file_exists</code>.</p>
+
+<h2 id="more">11. Tv&aring; saker v&auml;rda att veta finns</h2>
+
+<p>Ingen av dem beh&ouml;vs f&ouml;rsta dagen. En guide som aldrig n&auml;mner
+dem d&ouml;ljer spr&aring;kets mest intressanta id&eacute;er, s&aring; h&auml;r
+&auml;r de, n&auml;mnda snarare &auml;n utl&auml;rda.</p>
+
+<p><strong>Effekter</strong> l&aring;ter en funktion be om n&aring;got utan att
+veta vem som svarar. <code>perform</code> st&auml;ller fr&aring;gan,
+<code>handle</code> besvarar den, och <code>resume</code> g&aring;r tillbaka
+dit den st&auml;lldes.</p>
+
+<pre><code data-or>effect Log:
+    msg: fn(line: Text) -&gt; Text
+
+handle Log.msg(line: Text) -&gt; Text:
+    print_line("log: {line}")
+    resume("ok")
+
+fn work() -&gt; int:
+    perform Log.msg("starting")
+    42
+
+fn main() -&gt; int:
+    work()
+</code></pre>
+
+<p><strong>Parallellism</strong> &auml;r riktiga OS-tr&aring;dar, och
+deterministisk: varje arbetare skriver bara sin egen plats och summeringen &auml;r
+oberoende av ordning, s&aring; svaret h&auml;nger inte p&aring; tajming.</p>
+
+<pre><code data-or>fn double(x: int) -&gt; int:
+    x * 2
+
+fn main() -&gt; int:
+    workers = [double, double, double]
+    par_run(workers, 7)     <span class="c"># 3 threads, 3 x 14 == 42</span>
+</code></pre>
+
+<p>Hanterare som &ouml;verlever sin egen resume (<code>ask</code> och
+<code>resume_with</code>) &auml;r Windows-bara tills vidare; annars rapporterar
+<code>resumable_ok()</code> 0 och <code>ask</code> v&auml;grar i st&auml;llet
+f&ouml;r att l&aring;tsas. De, plus uppgifter med <code>spawn</code> och
+<code>await</code>, finns i <code>examples/tests/tests/</code> som
+<code>test_42_effects</code>, <code>test_42_parallel</code> och
+<code>test_42_delimited_resume</code>.</p>
 
 <h2 id="next">Vidare h&auml;rifr&aring;n</h2>
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Orion Field Guide</title>
-<meta name="description" content="Everything you need to write Orion, on one page. Nine complete programs, each one compiled by the test suite.">
+<meta name="description" content="Everything you need to write Orion, on one page. Twelve complete programs, every one compiled by the build.">
 <link rel="alternate" hreflang="en" href="index.html">
 <link rel="alternate" hreflang="sv" href="sv.html">
 <link rel="stylesheet" href="style.css">
@@ -15,7 +15,7 @@
 
 <header>
 <h1>Orion Field Guide</h1>
-<p class="lede">Everything you need to write Orion, on one page. Ten minutes, nine programs.</p>
+<p class="lede">Everything you need to write Orion, on one page. Fifteen minutes, twelve programs.</p>
 <ul class="langs">
 <li><a href="index.html" hreflang="en" aria-current="page">English</a></li>
 <li><a href="sv.html" hreflang="sv" lang="sv">Svenska</a></li>
@@ -34,6 +34,8 @@
 <li><a href="#types">Types</a></li>
 <li><a href="#functions">Functions, lambdas, orbs</a></li>
 <li><a href="#errors">When it goes wrong</a></li>
+<li><a href="#io">Talking to the outside</a></li>
+<li><a href="#more">Two things worth knowing exist</a></li>
 <li class="toc-last"><a href="#next">Where to go next</a></li>
 </ol>
 </nav>
@@ -243,6 +245,66 @@ good case or returns the bad one to your caller. Types take parameters, so one
 <code>ensure</code> are runtime contracts that trap on a false condition.
 <code>defer</code> runs at block end, last registered first, and before any
 <code>return</code>.</p>
+
+<h2 id="io">10. Talking to the outside</h2>
+
+<pre><code data-or>fn main() -&gt; int:
+    who = if argc() &gt; 1 then argv(1) else "world"
+    print_line("hello {who}")
+    file_write("greeting.txt", "hello {who}")
+    back = file_read("greeting.txt")
+    len(back)
+</code></pre>
+
+<p><code>argc</code> and <code>argv</code> are the command line,
+<code>print_line</code> is stdout, and <code>file_read</code> and
+<code>file_write</code> move whole files at a time. All built in, no import.
+For more than that the <code>os</code> orb has <code>run_command</code>,
+<code>mkdir_all</code>, <code>file_exists</code>.</p>
+
+<h2 id="more">11. Two things worth knowing exist</h2>
+
+<p>Neither is needed on your first day. A guide that never mentions them hides
+the most interesting ideas in the language, so here they are, named rather
+than taught.</p>
+
+<p><strong>Effects</strong> let a function ask for something without knowing
+who answers. <code>perform</code> raises the request, <code>handle</code>
+answers it, and <code>resume</code> goes back to where it was asked.</p>
+
+<pre><code data-or>effect Log:
+    msg: fn(line: Text) -&gt; Text
+
+handle Log.msg(line: Text) -&gt; Text:
+    print_line("log: {line}")
+    resume("ok")
+
+fn work() -&gt; int:
+    perform Log.msg("starting")
+    42
+
+fn main() -&gt; int:
+    work()
+</code></pre>
+
+<p><strong>Parallelism</strong> is real OS threads, and deterministic: each
+worker writes only its own slot and the reduction is order-independent, so the
+answer does not depend on timing.</p>
+
+<pre><code data-or>fn double(x: int) -&gt; int:
+    x * 2
+
+fn main() -&gt; int:
+    workers = [double, double, double]
+    par_run(workers, 7)     <span class="c"># 3 threads, 3 x 14 == 42</span>
+</code></pre>
+
+<p>Handlers that outlive their own resume (<code>ask</code> and
+<code>resume_with</code>) are Windows-only for now; elsewhere
+<code>resumable_ok()</code> reports 0 and <code>ask</code> refuses rather than
+pretending. Those, plus tasks with <code>spawn</code> and <code>await</code>,
+live in <code>examples/tests/tests/</code> as <code>test_42_effects</code>,
+<code>test_42_parallel</code> and <code>test_42_delimited_resume</code>.</p>
 
 <h2 id="next">Where to go next</h2>
 
