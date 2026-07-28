@@ -82,6 +82,13 @@ jobs:
       - name: field guide samples compile
         run: bash tools/docs_check.sh
 
+      # Everything above this line asks whether the compiler crashes, refuses
+      # correctly, or runs fast. This asks whether a valid program still gives
+      # the RIGHT ANSWER when something that cannot matter is changed. Every
+      # wrong-answer bug found so far lived in that gap.
+      - name: valid programs still answer correctly
+        run: bash tools/value_check.sh
+
       - name: arena region shrink
         run: bash tools/region_shrink_test.sh
 

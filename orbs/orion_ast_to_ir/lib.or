@@ -3866,6 +3866,33 @@ fn defer_tmp_name() -> Text:
 fn defer_is_tail_value(k: Text) -> bool:
     k == "ExprStmt" or k == "Match"
 
+# A tail `if c: ... else: ...` produces the block's value too, but unlike a
+# `match` it is NOT an expression -- `y = if c: a else: b` does not parse -- so
+# it cannot be hoisted into a temp the way the other two are.
+#
+# Push the pending defers INTO each branch instead, as ordinary Defer
+# statements at the front. Each branch then ends in its own value, and the
+# existing rewrite gives that branch the save-then-run treatment. An `else` that
+# is itself an IfBlock is an else-if chain, so walk it. An EMPTY else still gets
+# them: the defers have to run whichever way the condition went.
+fn defer_prepend(block: Map, defers: [Map]) -> Map:
+    stmts = get_list(block, "stmts")
+    mut out = slice(stmts, 0, 0)
+    loop i in 0..<len(defers):
+        out = push(out, {"kind": "Defer", "expr": at(defers, i)})
+    loop j in 0..<len(stmts):
+        out = push(out, at(stmts, j))
+    set(block, "stmts", out)
+
+fn defer_tail_ifblock(s: Map, defers: [Map], inherited: [Map]) -> Map:
+    mut out = set(s, "then", defer_rewrite_block(defer_prepend(get_map(s, "then"), defers), inherited))
+    els = get_map(s, "else")
+    if get(els, "kind") == "Block":
+        out = set(out, "else", defer_rewrite_block(defer_prepend(els, defers), inherited))
+    else:
+        out = set(out, "else", defer_tail_ifblock(els, defers, inherited))
+    out
+
 fn defer_rewrite_block(block: Map, inherited: [Map]) -> Map:
     stmts = get_list(block, "stmts")
     n = len(stmts)
@@ -3892,7 +3919,9 @@ fn defer_rewrite_block(block: Map, inherited: [Map]) -> Map:
                 # The last expression of a block IS its value, so the same
                 # save-then-run applies at the block end: appending the defers
                 # after it would make a deferred call the block's value.
-                if defer_is_tail_value(k) and is_last and len(mine) > 0:
+                if k == "IfBlock" and is_last and len(mine) > 0:
+                    out = push(out, defer_tail_ifblock(s, mine, inherited))
+                else if defer_is_tail_value(k) and is_last and len(mine) > 0:
                     tmp2 = defer_tmp_name()
                     # An ExprStmt wraps its expression; a tail `match` IS the
                     # value-producing node.
@@ -3905,7 +3934,10 @@ fn defer_rewrite_block(block: Map, inherited: [Map]) -> Map:
     # Only if the value-preserving path above did not already do it: a block that
     # does not end in an expression just runs its defers last.
     tail_kind = if n > 0 then get(at(stmts, n - 1), "kind") else ""
-    already = defer_is_tail_value(tail_kind) and len(mine) > 0
+    # `already` must also cover the IfBlock branch above, which pushed the
+    # defers down into the branches. Appending them again here would run them
+    # twice and make the second copy the block's value.
+    already = (defer_is_tail_value(tail_kind) or tail_kind == "IfBlock") and len(mine) > 0
     defer_out = if already then out else defer_append_reverse(out, mine)
     set(block, "stmts", defer_out)
 

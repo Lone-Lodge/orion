@@ -48,6 +48,19 @@ fn tail_match() -> int:
         1 -> 84
         _ -> 0
 
+# A tail if/else is the block's value too, and unlike a match it is NOT an
+# expression -- `y = if c: a else: b` does not parse -- so it cannot be hoisted
+# into a temp. The defers are pushed into each branch instead. Before that, a
+# defer above a tail if/else returned the deferred call's value (0) rather than
+# the branch's.
+fn tail_if() -> int:
+    defer note(6)
+    x = 18
+    if x == 18:
+        84
+    else:
+        0
+
 fn main() -> int:
     v1 = block_end()
     t1 = if slot_has("trace") then slot_get_int("trace") else 0
@@ -64,9 +77,14 @@ fn main() -> int:
     v4 = tail_match()
     t4 = if slot_has("trace") then slot_get_int("trace") else 0
 
-    print_line("block_end {t1}/{v1}  nested {t2}/{v2}  loop {t3}/{v3}  tailmatch {t4}/{v4}")
+    slot_set("trace", 0)
+    v5 = tail_if()
+    t5 = if slot_has("trace") then slot_get_int("trace") else 0
+
+    print_line("block_end {t1}/{v1}  nested {t2}/{v2}  loop {t3}/{v3}  tailmatch {t4}/{v4}  tailif {t5}/{v5}")
     ok1 = if t1 == 321 and v1 == 3 then 1 else 0     # LIFO after the body
     ok2 = if t2 == 87 and v2 == 8 then 1 else 0      # value first, then defer
     ok3 = if t3 == 444 and v3 == 3 then 1 else 0     # once per iteration
     ok4 = if t4 == 5 and v4 == 84 then 1 else 0      # the match value survives
-    ok1 * 16 + ok2 * 10 + ok3 * 6 + ok4 * 6          # 16 + 10 + 6 + 6 == 38
+    ok5 = if t5 == 6 and v5 == 84 then 1 else 0      # branch value survives, defer ran
+    ok1 * 14 + ok2 * 10 + ok3 * 6 + ok4 * 4 + ok5 * 4   # 14 + 10 + 6 + 4 + 4 == 38
