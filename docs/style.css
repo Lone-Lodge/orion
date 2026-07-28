@@ -1,17 +1,25 @@
 /* Orion Field Guide — one stylesheet, no build step, no dependencies.
  *
  * Target is WCAG 2.2 Level AAA, which mostly decides the colours for us:
- * body text needs 7:1 against its background, and that has to hold in both
- * light and dark. Every pair below is computed, not eyeballed:
+ * body text needs 7:1 against its background and borders need 3:1, in both
+ * light and dark. These are not eyeballed and they are not on trust either --
+ * tools/docs_check.sh reads this palette and recomputes every pair, so a
+ * colour that drifts below its threshold fails the build:
  *
  *   light   text #1a1a1a on #ffffff   17.4:1
  *           text #1a1a1a on #f4f5f7   15.9:1   (code)
  *           dim  #41475a on #f4f5f7    8.4:1   (comments)
  *           link #14418f on #ffffff    9.6:1
+ *           rule #7a7e88 on #f4f5f7    3.7:1   (borders)
  *   dark    text #e8eaf0 on #12141a   15.3:1
  *           text #e8eaf0 on #1b1e26   13.9:1   (code)
  *           dim  #a8b0c4 on #1b1e26    7.7:1   (comments)
  *           link #9fc3ff on #12141a   10.3:1
+ *           rule #686e7a on #1b1e26    3.3:1   (borders)
+ *
+ * The border was the one that needed fixing. It started at 1.7:1, which is
+ * invisible on a poor screen, and in light mode the border is the only thing
+ * that separates a code block from the page: the backgrounds differ by 1.06:1.
  *
  * Code is deliberately NOT syntax-highlighted beyond dimming comments. A full
  * highlight palette is where AAA contrast dies: five hues that all clear 7:1
@@ -26,7 +34,7 @@
     --code-bg: #f4f5f7;
     --dim: #41475a;
     --link: #14418f;
-    --rule: #c3c7d1;
+    --rule: #7a7e88;
     --focus: #14418f;
 }
 
@@ -37,7 +45,7 @@
         --code-bg: #1b1e26;
         --dim: #a8b0c4;
         --link: #9fc3ff;
-        --rule: #3a4050;
+        --rule: #686e7a;
         --focus: #9fc3ff;
     }
 }

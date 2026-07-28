@@ -94,9 +94,66 @@ for f in "$WORK/$(echo "$PAGES" | awk '{print $1}' | sed 's/\.html//')"/*.or; do
     fi
 done
 
+# --- contrast -------------------------------------------------------------
+# The guide claims WCAG 2.2 AAA, and a claim nobody measures is decoration.
+# Read the palette straight out of style.css and check every pair that carries
+# meaning: 7:1 for text, 3:1 for the borders that separate code from prose.
+# The first value of each variable is the light theme, the second the dark one,
+# which is how the file is laid out.
+#
+# Done in awk on purpose. This repo builds with clang and nothing else, and a
+# contrast check is not worth a second language runtime.
+echo
+awk '
+    function hexv(s,   i, c, n, d) {
+        n = 0
+        for (i = 1; i <= length(s); i++) {
+            c = tolower(substr(s, i, 1))
+            d = index("0123456789abcdef", c) - 1
+            n = n * 16 + d
+        }
+        return n
+    }
+    function lin(c) { c = c / 255; return (c <= 0.03928) ? c / 12.92 : ((c + 0.055) / 1.055) ^ 2.4 }
+    function lum(h) { return 0.2126 * lin(hexv(substr(h, 2, 2))) \
+                          + 0.7152 * lin(hexv(substr(h, 4, 2))) \
+                          + 0.0722 * lin(hexv(substr(h, 6, 2))) }
+    function ratio(a, b,   x, y, hi, lo) {
+        x = lum(a); y = lum(b)
+        hi = (x > y) ? x : y; lo = (x > y) ? y : x
+        return (hi + 0.05) / (lo + 0.05)
+    }
+    function check(label, fg, bg, need,   r) {
+        if (fg == "" || bg == "") { printf "  MISSING  %s\n", label; bad++; return }
+        r = ratio(fg, bg)
+        printf "  %-7s %-16s %5.2f:1  (needs %d)\n", (r >= need ? "ok" : "FAIL"), label, r, need
+        if (r < need) bad++
+    }
+    /--[a-z-]+: *#[0-9a-fA-F]{6}/ {
+        name = $0; sub(/^[^-]*--/, "", name); sub(/:.*$/, "", name)
+        val = $0; sub(/^[^#]*#/, "#", val); sub(/[^0-9a-fA-F#].*$/, "", val)
+        if (!(name in light)) light[name] = val; else if (!(name in dark)) dark[name] = val
+    }
+    END {
+        check("light body",      light["fg"],   light["bg"],      7)
+        check("light code",      light["fg"],   light["code-bg"], 7)
+        check("light comment",   light["dim"],  light["code-bg"], 7)
+        check("light link",      light["link"], light["bg"],      7)
+        check("light rule/page", light["rule"], light["bg"],      3)
+        check("light rule/code", light["rule"], light["code-bg"], 3)
+        check("dark body",       dark["fg"],    dark["bg"],       7)
+        check("dark code",       dark["fg"],    dark["code-bg"],  7)
+        check("dark comment",    dark["dim"],   dark["code-bg"],  7)
+        check("dark link",       dark["link"],  dark["bg"],       7)
+        check("dark rule/page",  dark["rule"],  dark["bg"],       3)
+        check("dark rule/code",  dark["rule"],  dark["code-bg"],  3)
+        exit (bad > 0)
+    }
+' "$ROOT/docs/style.css" || fail=$((fail + 1))
+
 echo
 if [ "$fail" = "0" ]; then
-    echo "  docs: $count sample(s) compile, translations agree"
+    echo "  docs: $count sample(s) compile, translations agree, contrast is AAA"
     rm -rf "$WORK"
     exit 0
 fi

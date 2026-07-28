@@ -5,9 +5,12 @@ native binary. No null, no exceptions; memory comes from scoped regions that
 are checked for balance before anything runs. The compiler is written in Orion
 and compiles itself.
 
-**[Read the Field Guide](https://lone-lodge.github.io/orion/)** — everything you
-need to write Orion, on one page, in ten minutes.
-([svenska](https://lone-lodge.github.io/orion/sv.html))
+**[Read the Field Guide](docs/index.html)** — everything you need to write
+Orion, on one page, in ten minutes. ([svenska](docs/sv.html))
+
+It is a plain HTML page: clone and open `docs/index.html`, no server needed.
+Not published yet — GitHub Pages needs the repository to be public, or the
+organisation to be on a paid plan.
 
 ```
 fn main() -> int:
