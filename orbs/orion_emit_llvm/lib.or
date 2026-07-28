@@ -1,15 +1,12 @@
 use orion_ir
 use bytes
 
-# orion_emit_llvm — emit LLVM IR text from typed IR (orion_ir).
+# orion_emit_llvm — the backend: typed IR (orion_ir) in, LLVM IR text out.
 #
-# Pipeline: orion_ir → orion_emit_llvm → .ll file → clang → .exe
-#
-# Supports today: ints + arith + cmp + logic, branches (br/phi),
-# typed params, calls with proper return-type lookup, alloca/load/store
-# for mut vars, strings (literals + concat + cmp + interpolation),
-# int lists (literal + at + len), print_int/print_text/print_str.
-# Inline runtime helpers: text_concat, int_to_text, list_new/at/set/len.
+# Pipeline: orion_ir -> orion_emit_llvm -> .ll -> clang -> .exe. It always emits
+# a Windows target triple; POSIX hosts retarget the module header before clang
+# links. The last stage, so an IR op it has no lowering for is a compile error,
+# not a silently wrong module.
 
 
 # --- Helpers ---

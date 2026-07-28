@@ -1,5 +1,9 @@
 use orion_lex
 
+# orion_parse — the parser: tokens in, an AST out. Recursive descent, one pass,
+# each node tagged with a source line for later diagnostics. Stage two of the
+# pipeline: lex -> parse -> lower -> emit.
+
 # Recursion-depth guard (defined in runtime/orion_rt.c). Recursive descent
 # adds one native frame per nested paren / unary op / call / indented block;
 # tens of thousands deep overran the linked stack and crashed the compiler

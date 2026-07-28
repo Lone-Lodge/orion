@@ -1,15 +1,11 @@
 use orion_ir
 use bytes
 
-# orion_ast_to_ir — walk Orion AST and emit typed IR.
-#
-# Today: ints, arith (+ - * / %), comparisons, and/or/not,
-# if/else (expr + stmt), locals (let/mut), text (literals,
-# interpolation, concat, cmp via strcmp), int lists with
-# at/len/iteration, for-range, for-in, loop + break/continue,
-# typed fn params (int + Text + [int]), recursion, mutual recursion.
-#
-# Roadmap: maps, text lists, struct types.
+# orion_ast_to_ir — lowering: the AST in, typed IR (orion_ir) out. The
+# compiler's largest stage. Names resolve, types are checked, and the
+# desugarings run here as ordered AST passes (const folding, defer, lambda
+# lift) before the tree is shaped into IR. Diagnostics carry a source line, and
+# a reported error stops output downstream.
 
 
 # --- Symbol table ---
