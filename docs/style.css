@@ -1,25 +1,33 @@
 /* Orion Field Guide — one stylesheet, no build step, no dependencies.
  *
- * Target is WCAG 2.2 Level AAA, which mostly decides the colours for us:
- * body text needs 7:1 against its background and borders need 3:1, in both
- * light and dark. These are not eyeballed and they are not on trust either --
- * tools/docs_check.sh reads this palette and recomputes every pair, so a
- * colour that drifts below its threshold fails the build:
+ * Warm neutrals on paper, terracotta for links. The palette used to be cool
+ * greys with a blue link, which is the web's default and reads as such.
  *
- *   light   text #1a1a1a on #ffffff   17.4:1
- *           text #1a1a1a on #f4f5f7   15.9:1   (code)
- *           dim  #41475a on #f4f5f7    8.4:1   (comments)
- *           link #14418f on #ffffff    9.6:1
- *           rule #7a7e88 on #f4f5f7    3.7:1   (borders)
- *   dark    text #e8eaf0 on #12141a   15.3:1
- *           text #e8eaf0 on #1b1e26   13.9:1   (code)
- *           dim  #a8b0c4 on #1b1e26    7.7:1   (comments)
- *           link #9fc3ff on #12141a   10.3:1
- *           rule #686e7a on #1b1e26    3.3:1   (borders)
+ * The accent is where accessibility and taste actually collide. A bright
+ * terracotta (#d97757) is 4.0:1 on this paper -- fine for AA, nowhere near the
+ * 7:1 that AAA wants for body-size text. So light mode uses the same hue taken
+ * down to a deep rust, and dark mode the same hue lifted to a warm peach. Same
+ * colour, opposite ends, both legible.
  *
- * The border was the one that needed fixing. It started at 1.7:1, which is
- * invisible on a poor screen, and in light mode the border is the only thing
- * that separates a code block from the page: the backgrounds differ by 1.06:1.
+ * Target is WCAG 2.2 Level AAA: 7:1 for text, 3:1 for borders, in both themes.
+ * These are not eyeballed and not on trust either -- tools/docs_check.sh reads
+ * this palette and recomputes every pair, so a colour that drifts below its
+ * threshold fails the build:
+ *
+ *   light   text #24231f on #faf9f5   14.9:1
+ *           text #24231f on #f0eee6   13.5:1   (code)
+ *           dim  #4a443b on #f0eee6    8.3:1   (comments)
+ *           link #7d3319 on #faf9f5    8.5:1
+ *           rule #847d70 on #f0eee6    3.5:1   (borders)
+ *   dark    text #ebe8e1 on #232220   13.0:1
+ *           text #ebe8e1 on #2c2a27   11.7:1   (code)
+ *           dim  #c6c0b5 on #2c2a27    7.9:1   (comments)
+ *           link #efab90 on #232220    8.3:1
+ *           rule #817a6f on #2c2a27    3.4:1   (borders)
+ *
+ * The border is the one that needs watching. It started at 1.7:1, invisible on
+ * a poor screen, and in light mode the border is the only thing separating a
+ * code block from the page: the two backgrounds differ by about 1.05:1.
  *
  * Code is deliberately NOT syntax-highlighted beyond dimming comments. A full
  * highlight palette is where AAA contrast dies: five hues that all clear 7:1
@@ -29,24 +37,24 @@
 
 :root {
     color-scheme: light dark;
-    --bg: #ffffff;
-    --fg: #1a1a1a;
-    --code-bg: #f4f5f7;
-    --dim: #41475a;
-    --link: #14418f;
-    --rule: #7a7e88;
-    --focus: #14418f;
+    --bg: #faf9f5;
+    --fg: #24231f;
+    --code-bg: #f0eee6;
+    --dim: #4a443b;
+    --link: #7d3319;
+    --rule: #847d70;
+    --focus: #7d3319;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: #12141a;
-        --fg: #e8eaf0;
-        --code-bg: #1b1e26;
-        --dim: #a8b0c4;
-        --link: #9fc3ff;
-        --rule: #686e7a;
-        --focus: #9fc3ff;
+        --bg: #232220;
+        --fg: #ebe8e1;
+        --code-bg: #2c2a27;
+        --dim: #c6c0b5;
+        --link: #efab90;
+        --rule: #817a6f;
+        --focus: #efab90;
     }
 }
 
