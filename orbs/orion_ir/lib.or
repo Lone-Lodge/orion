@@ -442,6 +442,10 @@ pub fn ir_field_load(struct_id: int, field_index: int, field_type: Text) -> Inst
 pub fn ir_print_text(value_id: int) -> Inst:
     Inst{op: "print_text", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
+# Like print_text but with no trailing newline (calls orion_print_raw, not puts).
+pub fn ir_print_raw(value_id: int) -> Inst:
+    Inst{op: "print_raw", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+
 
 # --- Memory ops (for mutable variables and loop counters) ---
 # alloca produces a slot for `stored_type` ("i64" or "text").

@@ -638,6 +638,11 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
+    if op == "print_raw":
+        l1 = "    call void @orion_print_raw(ptr {value_ref(inst.value)})"
+        l2 = "    {value_ref(my_id)} = add i64 0, 0"
+        result = "{l1}\n{l2}"
+
     if op == "list_lit":
         n = len(inst.args)
         # `[]` interns to one shared constant: cap 0 forces every push —
@@ -1244,6 +1249,7 @@ fn emit_runtime() -> Text:
     text = "{text}target triple = \"x86_64-pc-windows-msvc19.44.35209\"\n"
     text = "{text}declare i32 @printf(ptr, ...)\n"
     text = "{text}declare i32 @puts(ptr)\n"
+    text = "{text}declare void @orion_print_raw(ptr)\n"
     text = "{text}declare ptr @malloc(i64)\n"
     # Float-literal hex conversion lives in orion_rt.c (strtod) — declare
     # here since the orion_ prefix skips the auto-extern-declare path.

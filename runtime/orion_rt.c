@@ -59,6 +59,11 @@ static const char *c_dim(void) { return orion_console_color() ? "\x1b[2m" : ""; 
 static const char *c_red(void) { return orion_console_color() ? "\x1b[31;1m" : ""; }
 static const char *c_off(void) { return orion_console_color() ? "\x1b[0m" : ""; }
 
+/* Write to stdout with NO trailing newline, flushed immediately, so a progress
+ * line can rewrite itself with a carriage return. `print`/`print_line` all use
+ * puts (which appends a newline); this is the raw variant. */
+void orion_print_raw(const char *s) { fputs(s, stdout); fflush(stdout); }
+
 /* ---- Parser recursion guard ------------------------------------------
  * The compiler's parser is recursive descent: nested parens, unary runs,
  * calls and indented blocks each add a native stack frame. On adversarial
