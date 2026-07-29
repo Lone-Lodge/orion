@@ -93,6 +93,7 @@ pub fn compile_fn_ast(fn_node: Map) -> WFn:
         f0 = add_local(f0)
     slot_set("wtmp:pbase", param_count)
     slot_set("wtmp:depth", 0)
+    slot_set("wbrk", 0)
     f1 = compile_block(f0, body, locals)
     emit_end(f1)
 
@@ -224,29 +225,47 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                 {"fn": emit_op(with_value, 15), "locals": locals}
             else:
                 if kind == "Break":
-                    # `br 1` — break out of the enclosing loop (depth 1)
+                    # Break out of the innermost loop. The target is the `block`
+                    # wrapping the loop; `wbrk` holds the branch depth to it,
+                    # which grows by one for each `if`/loop nested in between.
                     with_br = emit_op(fn_value, op_br())
-                    {"fn": emit_bytes(with_br, [1]), "locals": locals}
+                    {"fn": emit_bytes(with_br, [slot_get_int("wbrk")]), "locals": locals}
                 else:
                     if kind == "Loop":
                         loop_body = get(stmt, "body")
-                        # `loop` block — wasm structured loop with branch back.
-                        with_loop = emit_op(fn_value, op_loop())
+                        # A loop needs an enclosing `block` so `break` has an exit
+                        # target: `br 0` from the loop body repeats (loop label),
+                        # `br 1` exits (block label). Without the block, break would
+                        # jump to the loop header and spin forever.
+                        with_block = emit_op(fn_value, op_block())
+                        with_block_bt = emit_bytes(with_block, [blocktype_void()])
+                        with_loop = emit_op(with_block_bt, op_loop())
                         with_bt = emit_bytes(with_loop, [blocktype_void()])
+                        # Inside the loop body a bare break is `br 1` (past the loop
+                        # frame to the block). Save/restore for nested loops.
+                        prev_brk = slot_get_int("wbrk")
+                        slot_set("wbrk", 1)
                         body_fn = compile_block(with_bt, loop_body, locals)
+                        slot_set("wbrk", prev_brk)
                         # `br 0` — branch back to loop start
                         with_br0 = emit_op(body_fn, op_br())
                         with_zero = emit_bytes(with_br0, [0])
                         with_end_loop = emit_op(with_zero, op_end())
-                        {"fn": with_end_loop, "locals": locals}
+                        with_end_block = emit_op(with_end_loop, op_end())
+                        {"fn": with_end_block, "locals": locals}
                     else:
                         if kind == "IfBlock":
                             with_cond = compile_expr(fn_value, get(stmt, "cond"), locals)
                             with_if = emit_op(with_cond, op_if())
                             with_bt = emit_bytes(with_if, [blocktype_void()])
+                            # An `if` frame sits between an inner break and the loop
+                            # block, so a break here targets one level deeper.
+                            prev_brk = slot_get_int("wbrk")
+                            slot_set("wbrk", prev_brk + 1)
                             then_fn = compile_block(with_bt, get(stmt, "then"), locals)
                             with_else = emit_op(then_fn, op_else())
                             else_fn = compile_block(with_else, get(stmt, "else"), locals)
+                            slot_set("wbrk", prev_brk)
                             with_end_if = emit_op(else_fn, op_end())
                             {"fn": with_end_if, "locals": locals}
                         else:
