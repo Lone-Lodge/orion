@@ -156,8 +156,27 @@ pub fn op_i32_load8_u() -> int: 45  # 0x2D i32.load8_u
 pub fn op_i32_store() -> int: 54    # 0x36 i32.store
 pub fn op_i32_store8() -> int: 58   # 0x3A i32.store8
 
-# Type marker for i32 in function signatures.
+# f64 ops. Values are real wasm f64 (not boxed): f64 locals/params/results,
+# and conversions to/from i32. A decimal literal compiles to num/denom via
+# convert (see compile_expr), so no IEEE754 constant encoding is needed.
+pub fn op_f64_load() -> int: 43     # 0x2B f64.load
+pub fn op_f64_store() -> int: 57    # 0x39 f64.store
+pub fn op_f64_eq() -> int: 97       # 0x61 f64.eq
+pub fn op_f64_ne() -> int: 98       # 0x62 f64.ne
+pub fn op_f64_lt() -> int: 99       # 0x63 f64.lt
+pub fn op_f64_gt() -> int: 100      # 0x64 f64.gt
+pub fn op_f64_le() -> int: 101      # 0x65 f64.le
+pub fn op_f64_ge() -> int: 102      # 0x66 f64.ge
+pub fn op_f64_add() -> int: 160     # 0xA0 f64.add
+pub fn op_f64_sub() -> int: 161     # 0xA1 f64.sub
+pub fn op_f64_mul() -> int: 162     # 0xA2 f64.mul
+pub fn op_f64_div() -> int: 163     # 0xA3 f64.div
+pub fn op_i32_trunc_f64_s() -> int: 170   # 0xAA i32.trunc_f64_s
+pub fn op_f64_convert_i32_s() -> int: 183 # 0xB7 f64.convert_i32_s
+
+# Type markers in function signatures / local decls.
 pub fn ty_i32() -> int: 127         # 0x7F
+pub fn ty_f64() -> int: 124         # 0x7C
 
 # --- module assembly ---
 
@@ -469,87 +488,106 @@ fn import_list_length(module: WModule) -> int:
         count = count + 1
     count
 
-fn type_index_for_import(module: WModule, import_value: WImport) -> int:
-    # Same logic as type_index_for_fn — distinct (param_count, result_count) pairs.
-    mut signatures = collect_signatures(module)
-    mut at_index = 0
-    mut found = 0
-    loop sig in signatures:
-        if sig == encode_sig_key(import_value.param_count, import_value.result_count):
-            found = at_index
-        at_index = at_index + 1
-    found
+# A signature is text "<params>#<result>", one char per type ('i' i32,
+# 'f' f64). Imports are all i32 (host fns). A defined fn's real signature
+# is recorded by the codegen in slots wsig:<name> (params) and wret:<name>
+# (result); absent slots fall back to all-i32, so pure-i32 modules encode
+# byte-for-byte as before.
+fn irep(n: int) -> Text:
+    mut s = ""
+    mut k = 0
+    loop:
+        if k >= n:
+            break
+        s = "{s}i"
+        k = k + 1
+    s
 
-# Encode a (param_count, result_count) signature as one int so the
-# distinct-set logic is the same as for fns alone.
-fn encode_sig_key(param_count: int, result_count: int) -> int:
-    param_count * 10 + result_count
+fn sig_text_for_import(import_value: WImport) -> Text:
+    if import_value.result_count == 1:
+        "{irep(import_value.param_count)}#i"
+    else:
+        "{irep(import_value.param_count)}#"
 
-fn collect_signatures(module: WModule) -> [int]:
-    mut sigs = []
-    loop import_value in module.imports:
-        sig = encode_sig_key(import_value.param_count, import_value.result_count)
-        if not contains_count(sigs, sig):
-            sigs = push(sigs, sig)
-    loop fn_value in module.functions:
-        sig = encode_sig_key(fn_value.param_count, 1)
-        if not contains_count(sigs, sig):
-            sigs = push(sigs, sig)
-    sigs
+fn sig_text_for_fn(fn_value: WFn) -> Text:
+    mut params = irep(fn_value.param_count)
+    if slot_has("wsig:{fn_value.name}"):
+        params = slot_get("wsig:{fn_value.name}")
+    mut result = "i"
+    if slot_has("wret:{fn_value.name}"):
+        result = slot_get("wret:{fn_value.name}")
+    "{params}#{result}"
 
-# Type section — one entry per distinct (param_count, result_count)
-# signature across imports + functions.
-fn encode_type_section(module: WModule) -> [int]:
-    signatures = collect_signatures(module)
-    sig_count = list_length(signatures)
-    mut contents = []
-    count_bytes = leb_u(sig_count)
-    loop byte_value in count_bytes:
-        contents = push(contents, byte_value)
-    loop sig_key in signatures:
-        param_count = sig_key / 10
-        result_count = sig_key - param_count * 10
-        contents = push(contents, 96)
-        param_bytes = leb_u(param_count)
-        loop byte_value in param_bytes:
-            contents = push(contents, byte_value)
-        mut remaining = param_count
-        loop:
-            if remaining == 0:
-                break
-            contents = push(contents, ty_i32())
-            remaining = remaining - 1
-        result_bytes = leb_u(result_count)
-        loop byte_value in result_bytes:
-            contents = push(contents, byte_value)
-        mut remaining_results = result_count
-        loop:
-            if remaining_results == 0:
-                break
-            contents = push(contents, ty_i32())
-            remaining_results = remaining_results - 1
-    wrap_section(1, contents)
-
-fn contains_count(items: [int], value: int) -> bool:
+fn contains_text(items: [Text], value: Text) -> bool:
     mut found = false
     loop item in items:
         if item == value:
             found = true
     found
 
+fn index_of_text(items: [Text], value: Text) -> int:
+    mut at_index = 0
+    mut found = 0
+    loop item in items:
+        if item == value:
+            found = at_index
+        at_index = at_index + 1
+    found
+
+fn collect_signatures(module: WModule) -> [Text]:
+    mut sigs = []
+    loop import_value in module.imports:
+        s = sig_text_for_import(import_value)
+        if not contains_text(sigs, s):
+            sigs = push(sigs, s)
+    loop fn_value in module.functions:
+        s = sig_text_for_fn(fn_value)
+        if not contains_text(sigs, s):
+            sigs = push(sigs, s)
+    sigs
+
+fn type_index_for_import(module: WModule, import_value: WImport) -> int:
+    index_of_text(collect_signatures(module), sig_text_for_import(import_value))
+
+# 'f' (102) -> f64, everything else -> i32.
+fn wtype_char_to_byte(c: int) -> int:
+    if c == 102:
+        ty_f64()
+    else:
+        ty_i32()
+
+# Type section — one entry per distinct signature across imports + fns.
+fn encode_type_section(module: WModule) -> [int]:
+    signatures = collect_signatures(module)
+    mut contents = []
+    loop byte_value in leb_u(list_length(signatures)):
+        contents = push(contents, byte_value)
+    loop sig in signatures:
+        bs = bytes_from_text(sig)
+        n = len(bs)
+        mut hash_pos = 0
+        loop hi in 0..<n:
+            if at(bs, hi) == 35:
+                hash_pos = hi
+        contents = push(contents, 96)
+        loop byte_value in leb_u(hash_pos):
+            contents = push(contents, byte_value)
+        loop pi in 0..<hash_pos:
+            contents = push(contents, wtype_char_to_byte(at(bs, pi)))
+        loop byte_value in leb_u(n - hash_pos - 1):
+            contents = push(contents, byte_value)
+        loop ri in (hash_pos + 1)..<n:
+            contents = push(contents, wtype_char_to_byte(at(bs, ri)))
+    wrap_section(1, contents)
+
 # Function section — each fn's index into the type vector.
 fn encode_function_section(module: WModule) -> [int]:
     signatures = collect_signatures(module)
-    fn_count = function_count(module)
     mut contents = []
-    count_bytes = leb_u(fn_count)
-    loop byte_value in count_bytes:
+    loop byte_value in leb_u(function_count(module)):
         contents = push(contents, byte_value)
     loop fn_value in module.functions:
-        sig_key = encode_sig_key(fn_value.param_count, 1)
-        type_index = index_of_count(signatures, sig_key)
-        idx_bytes = leb_u(type_index)
-        loop byte_value in idx_bytes:
+        loop byte_value in leb_u(index_of_text(signatures, sig_text_for_fn(fn_value))):
             contents = push(contents, byte_value)
     wrap_section(3, contents)
 
@@ -558,15 +596,6 @@ fn function_count(module: WModule) -> int:
     loop _fn_value in module.functions:
         count = count + 1
     count
-
-fn index_of_count(items: [int], target: int) -> int:
-    mut found_at = 0
-    mut current = 0
-    loop item in items:
-        if item == target:
-            found_at = current
-        current = current + 1
-    found_at
 
 # Export section — local fns indexed AFTER imports. We also export
 # the single memory under the name "memory" so JS can `new Uint8Array(
@@ -598,6 +627,52 @@ fn encode_export_section(module: WModule) -> [int]:
     wrap_section(7, contents)
 
 # Code section — bundled function bodies.
+# Local declaration bytes for a function body. `types` is one char per
+# declared local ('i'/'f') in index order, set by the codegen in wloc:<name>.
+# Consecutive same-type locals are run-length grouped, as wasm requires. When
+# the type string is missing or its length disagrees with local_count, fall
+# back to all-i32 so index validity is preserved.
+fn encode_locals_decl(types: Text, fallback_count: int) -> [int]:
+    tb = bytes_from_text(types)
+    tn = len(tb)
+    if tn != fallback_count:
+        if fallback_count == 0:
+            [0]
+        else:
+            mut out = [1]
+            loop b in leb_u(fallback_count):
+                out = push(out, b)
+            out = push(out, ty_i32())
+            out
+    else:
+        mut counts = []
+        mut chars = []
+        mut i = 0
+        loop:
+            if i >= tn:
+                break
+            c = at(tb, i)
+            mut run = 1
+            loop:
+                if i + run >= tn:
+                    break
+                if at(tb, i + run) == c:
+                    run = run + 1
+                else:
+                    break
+            counts = push(counts, run)
+            chars = push(chars, c)
+            i = i + run
+        ngroups = list_length(counts)
+        mut out = []
+        loop b in leb_u(ngroups):
+            out = push(out, b)
+        loop gi in 0..<ngroups:
+            loop b in leb_u(at(counts, gi)):
+                out = push(out, b)
+            out = push(out, wtype_char_to_byte(at(chars, gi)))
+        out
+
 fn encode_code_section(module: WModule) -> [int]:
     fn_count = function_count(module)
     mut contents = []
@@ -605,16 +680,11 @@ fn encode_code_section(module: WModule) -> [int]:
     loop byte_value in count_bytes:
         contents = push(contents, byte_value)
     loop fn_value in module.functions:
-        # Function body framing: local declarations, then body bytes. Declare
-        # local_count i32 locals (indices param_count..param_count+local_count-1);
-        # without this a `local.get`/`local.set` past the params is invalid wasm.
-        mut body_with_locals = [0]
-        if fn_value.local_count != 0:
-            body_with_locals = [1]
-            lc_bytes = leb_u(fn_value.local_count)
-            loop byte_value in lc_bytes:
-                body_with_locals = push(body_with_locals, byte_value)
-            body_with_locals = push(body_with_locals, 127)
+        # Function body framing: local declarations, then body bytes.
+        mut local_types = ""
+        if slot_has("wloc:{fn_value.name}"):
+            local_types = slot_get("wloc:{fn_value.name}")
+        mut body_with_locals = encode_locals_decl(local_types, fn_value.local_count)
         loop byte_value in fn_value.body:
             body_with_locals = push(body_with_locals, byte_value)
         body_size = list_length(body_with_locals)

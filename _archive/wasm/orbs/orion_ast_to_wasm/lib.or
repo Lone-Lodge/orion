@@ -66,6 +66,15 @@ pub fn compile_program(decls: [Map]) -> WModule:
             fname = get(decl, "name")
             slot_set("wfn:{fname}", idx)
             idx = idx + 1
+            # Record the wasm signature (param types 'i'/'f') for the encoder,
+            # and the result type for call-site inference.
+            mut psig = ""
+            loop p in get_list(decl, "params"):
+                psig = "{psig}{wtype_of(get_map(p, \"type\"))}"
+            slot_set("wsig:{fname}", psig)
+            rett = wtype_of(get_map(decl, "ret"))
+            slot_set("wret:{fname}", rett)
+            slot_set("fret:{fname}", rett)
     loop decl in decls:
         if get(decl, "kind") == "Fn":
             module = add_fn(module, compile_fn_ast(decl))
@@ -92,20 +101,33 @@ pub fn compile_fn_ast(fn_node: Map) -> WFn:
     param_count = list_count(params)
     # Build the locals map: param name → index.
     mut locals = build_locals(params)
+    # Record each param's type so f64 params get f64 ops in the body.
+    loop p in params:
+        slot_set("ltype:{get(p, \"name\")}", wtype_of(get_map(p, "type")))
     mut f0 = new_fn(fn_name, param_count)
+    # wloc:cur accumulates one type char per declared local, in index order,
+    # so the encoder can declare each wasm local with the right type.
+    slot_set("wloc:cur", "")
     # Reserve one temp local per level of aggregate nesting. A list literal
     # tees its allocation pointer into temp[param_count + depth] while it fills
     # the elements; a nested literal uses the next temp. Seeding these names
-    # first keeps later let-bindings at their correct (shifted) indices.
+    # first keeps later let-bindings at their correct (shifted) indices. Temps
+    # hold pointers, so i32.
     max_depth = block_agg_depth(body)
     loop d in 0..<max_depth:
         locals = push(locals, "__t{d}")
         f0 = add_local(f0)
+        note_local("i")
     slot_set("wtmp:pbase", param_count)
     slot_set("wtmp:depth", 0)
     slot_set("wbrk", 0)
     f1 = compile_block(f0, body, locals)
+    slot_set("wloc:{fn_name}", slot_get("wloc:cur"))
     emit_end(f1)
+
+# Append one declared-local type char ('i'/'f') for the current function.
+fn note_local(tychar: Text):
+    slot_set("wloc:cur", "{slot_get(\"wloc:cur\")}{tychar}")
 
 fn list_count(items: [Map]) -> int:
     mut count = 0
@@ -224,6 +246,9 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
             name = get(stmt, "name")
             # Add new local if name isn't bound yet.
             existing = lookup_local(locals, name)
+            # Record the binding's type so later reads pick i32 vs f64 ops.
+            btype = type_of(value_node)
+            slot_set("ltype:{name}", btype)
             new_locals = locals
             mut current_locals = new_locals
             mut fn_after = after_value
@@ -231,6 +256,7 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                 current_locals = push(locals, name)
                 # A new binding needs a declared wasm local, not just an index.
                 fn_after = add_local(after_value)
+                note_local(btype)
             new_index = lookup_local(current_locals, name)
             with_set = emit_local_set(fn_after, new_index)
             {"fn": with_set, "locals": current_locals}
@@ -295,6 +321,8 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             if existing < 0:
                                 cur_locals = push(locals, var_name)
                                 f = add_local(fn_value)
+                                note_local("i")
+                            slot_set("ltype:{var_name}", "i")
                             vidx = lookup_local(cur_locals, var_name)
                             # v = low
                             f = compile_expr(f, get_map(stmt, "low"), cur_locals)
@@ -343,26 +371,32 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             lst_idx = len(cur_locals)
                             cur_locals = push(cur_locals, "__fl{k}")
                             f = add_local(f)
+                            note_local("i")
                             idx_idx = len(cur_locals)
                             cur_locals = push(cur_locals, "__fi{k}")
                             f = add_local(f)
+                            note_local("i")
                             # The loop variable — reuse its slot if already bound.
                             var_name = get(stmt, "var")
+                            slot_set("ltype:{var_name}", "i")
                             mut var_idx = lookup_local(cur_locals, var_name)
                             if var_idx < 0:
                                 var_idx = len(cur_locals)
                                 cur_locals = push(cur_locals, var_name)
                                 f = add_local(f)
+                                note_local("i")
                             index_var = get(stmt, "index_var")
                             mut has_index = false
                             mut iv_idx = 0
                             if index_var != "":
                                 has_index = true
+                                slot_set("ltype:{index_var}", "i")
                                 iv_idx = lookup_local(cur_locals, index_var)
                                 if iv_idx < 0:
                                     iv_idx = len(cur_locals)
                                     cur_locals = push(cur_locals, index_var)
                                     f = add_local(f)
+                                    note_local("i")
                             # __fl = xs ; __fi = 0
                             f = compile_expr(f, get_map(stmt, "iter"), cur_locals)
                             f = emit_local_set(f, lst_idx)
@@ -416,6 +450,34 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
         value_text = get(expr_node, "value")
         # Parse decimal int
         emit_const(fn_value, parse_decimal(value_text))
+    else if kind == "Float":
+        # A decimal literal compiles to num/denom, both i32.convert to f64 then
+        # f64.div. 3.14 -> 314.0 / 100.0, the exact same double, so no IEEE754
+        # bit-encoding is needed. (num over ~9 digits overflows i32; note it.)
+        ftext = get(expr_node, "value")
+        fb = bytes_from_text(ftext)
+        flen = len(fb)
+        mut fnum = 0
+        mut fden = 1
+        mut seen_dot = false
+        mut fneg = false
+        loop fi in 0..<flen:
+            fc = at(fb, fi)
+            if fc == 45:
+                fneg = true
+            else if fc == 46:
+                seen_dot = true
+            else if fc >= 48 and fc <= 57:
+                fnum = fnum * 10 + (fc - 48)
+                if seen_dot:
+                    fden = fden * 10
+        if fneg:
+            fnum = 0 - fnum
+        g1 = emit_const(fn_value, fnum)
+        g2 = emit_op(g1, op_f64_convert_i32_s())
+        g3 = emit_const(g2, fden)
+        g4 = emit_op(g3, op_f64_convert_i32_s())
+        emit_op(g4, op_f64_div())
     else:
         if kind == "Ident":
             name = get(expr_node, "name")
@@ -427,12 +489,23 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                 emit_const(fn_value, 0)
         else:
             if kind == "Binary":
-                left = get(expr_node, "left")
-                right = get(expr_node, "right")
+                left = get_map(expr_node, "left")
+                right = get_map(expr_node, "right")
                 op = get(expr_node, "op")
-                with_left = compile_expr(fn_value, left, locals)
-                with_right = compile_expr(with_left, right, locals)
-                emit_binop(with_right, op)
+                lt = type_of(left)
+                rt = type_of(right)
+                if lt == "f" or rt == "f":
+                    # f64 op: compile each side, promoting an i32 operand to f64
+                    # so mixed arithmetic (x * 2) and comparisons work.
+                    wl = compile_expr(fn_value, left, locals)
+                    wl2 = if lt == "i" then emit_op(wl, op_f64_convert_i32_s()) else wl
+                    wr = compile_expr(wl2, right, locals)
+                    wr2 = if rt == "i" then emit_op(wr, op_f64_convert_i32_s()) else wr
+                    emit_f64_binop(wr2, op)
+                else:
+                    with_left = compile_expr(fn_value, left, locals)
+                    with_right = compile_expr(with_left, right, locals)
+                    emit_binop(with_right, op)
             else:
                 if kind == "Call":
                     # Calling a host fn or another local fn — for now assume host index 0.
@@ -465,6 +538,14 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         s6 = compile_expr(s5, at(args, 2), locals)
                         s7 = emit_store(s6, 4)
                         compile_expr(s7, target, locals)
+                    else if callee == "to_float":
+                        # int -> f64
+                        wv = compile_expr(fn_value, at(args, 0), locals)
+                        emit_op(wv, op_f64_convert_i32_s())
+                    else if callee == "to_int":
+                        # f64 -> int (truncate toward zero)
+                        wv = compile_expr(fn_value, at(args, 0), locals)
+                        emit_op(wv, op_i32_trunc_f64_s())
                     else:
                         mut current_fn = fn_value
                         loop arg in args:
@@ -592,6 +673,77 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                     else:
                         # Unsupported expression — push 0 as a no-op.
                         emit_const(fn_value, 0)
+
+# A type node -> 'f' for f64/float, 'i' for everything else (i32 or pointer).
+fn wtype_of(tnode: Map) -> Text:
+    if get(tnode, "kind") == "Named":
+        nm = get(tnode, "name")
+        if nm == "f64" or nm == "float":
+            "f"
+        else:
+            "i"
+    else:
+        "i"
+
+# Static type of an expression: 'f' (f64) or 'i' (i32/pointer). Idents read
+# ltype:<name>, calls read fret:<callee>, arithmetic is f64 if either side is.
+# Comparisons/logical always yield an i32 bool. Aggregates are pointers ('i').
+fn type_of(node: Map) -> Text:
+    kind = get(node, "kind")
+    if kind == "Float":
+        "f"
+    else if kind == "Ident":
+        nm = get(node, "name")
+        if slot_has("ltype:{nm}") then slot_get("ltype:{nm}") else "i"
+    else if kind == "Binary":
+        op = get(node, "op")
+        if op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">=" or op == "and" or op == "or":
+            "i"
+        else if type_of(get_map(node, "left")) == "f" or type_of(get_map(node, "right")) == "f":
+            "f"
+        else:
+            "i"
+    else if kind == "Unary":
+        type_of(get_map(node, "operand"))
+    else if kind == "Call":
+        callee = get(node, "callee")
+        if callee == "to_float":
+            "f"
+        else if callee == "to_int":
+            "i"
+        else if slot_has("fret:{callee}"):
+            slot_get("fret:{callee}")
+        else:
+            "i"
+    else if kind == "If":
+        type_of(get_map(node, "then"))
+    else:
+        "i"
+
+# f64 binary op -> opcode. Arithmetic returns f64; comparisons return i32.
+fn emit_f64_binop(fn_value: WFn, op: Text) -> WFn:
+    if op == "+":
+        emit_op(fn_value, op_f64_add())
+    else if op == "-":
+        emit_op(fn_value, op_f64_sub())
+    else if op == "*":
+        emit_op(fn_value, op_f64_mul())
+    else if op == "/":
+        emit_op(fn_value, op_f64_div())
+    else if op == "==":
+        emit_op(fn_value, op_f64_eq())
+    else if op == "!=":
+        emit_op(fn_value, op_f64_ne())
+    else if op == "<":
+        emit_op(fn_value, op_f64_lt())
+    else if op == ">":
+        emit_op(fn_value, op_f64_gt())
+    else if op == "<=":
+        emit_op(fn_value, op_f64_le())
+    else if op == ">=":
+        emit_op(fn_value, op_f64_ge())
+    else:
+        emit_op(fn_value, op_f64_add())
 
 # Map an Orion binary op string to the corresponding wasm i32 opcode.
 fn emit_binop(fn_value: WFn, op: Text) -> WFn:
