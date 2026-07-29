@@ -57,6 +57,11 @@ fn win_path(p: Text) -> Text = if host_os() == 0 then str_replace(p, "/", "\\") 
 
 pub fn run_command(cmd: Text, args: [Text]) -> int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))
 
+# Same, but the child's stdout/stderr are discarded. For running a program when
+# you only care about its exit code and want its output kept off your console.
+extern fn sys_run_quiet(cmd: Text) -> int
+pub fn run_command_quiet(cmd: Text, args: [Text]) -> int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))
+
 extern fn capture(cmd: Text) -> Text
 pub fn capture_stdout(cmd: Text, args: [Text]) -> Text = capture(os_join(os_quote(cmd), args, 0))
 

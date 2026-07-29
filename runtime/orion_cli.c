@@ -51,6 +51,38 @@ long long sys_run(const char *cmd) {
     return (long long)code;
 }
 
+/* Like sys_run, but the child's stdout and stderr go to NUL. Lets a caller
+ * (the test runner) keep its own live progress line clean while still reading
+ * the child's exit code. */
+long long sys_run_quiet(const char *cmd) {
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    char buf[32768];
+    size_t i = 0;
+    while (cmd[i] && i < sizeof(buf) - 1) { buf[i] = cmd[i]; i++; }
+    buf[i] = 0;
+    HANDLE nul = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE, NULL,
+                             OPEN_EXISTING, 0, NULL);
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = nul;
+    si.hStdError = nul;
+    ZeroMemory(&pi, sizeof(pi));
+    if (!CreateProcessA(NULL, buf, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+        if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
+        return -1;
+    }
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD code = 0;
+    GetExitCodeProcess(pi.hProcess, &code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
+    return (long long)code;
+}
+
 /* Create a directory chain (best-effort recursive: create each prefix). */
 long long mkdir_all(const char *path) {
     char buf[4096];

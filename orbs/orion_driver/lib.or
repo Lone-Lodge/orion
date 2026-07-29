@@ -180,6 +180,10 @@ fn drv_want_quiet() -> bool:
     loop ai in 1..<argc():
         if argv(ai) == "--quiet":
             want = true
+    # A caller compiling in-process (the test runner) can silence the chatter
+    # via this slot without touching argv.
+    if slot_has("drv:quiet") and slot_get_int("drv:quiet") == 1:
+        want = true
     want
 
 # A flag is not a directory. Orb roots were taken from every argument at index

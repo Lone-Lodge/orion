@@ -173,6 +173,9 @@ fn main() -> int:
     is_tty = orion_console_color() == 1
     cr = bytes_to_text([13])
     frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    # Keep the in-process compiler's per-file "orbs N" chatter off the progress
+    # line (it prints once per compile otherwise).
+    slot_set("drv:quiet", 1)
 
     loop file_index in 0..<total_tests:
         filename = at(files, file_index)
@@ -189,7 +192,7 @@ fn main() -> int:
         size_bytes = file_size(exe_path)
         total_bytes = total_bytes + size_bytes
 
-        actual = run_command(exe_path, [])
+        actual = run_command_quiet(exe_path, [])
 
         passed = ok == 1 and actual == expected
         status_txt = if passed then "{c_green}PASS{c_off}" else "{c_red}FAIL{c_off}"
