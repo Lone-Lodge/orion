@@ -44,16 +44,21 @@ pub fn compile_program(decls: [Map]) -> WModule:
     slot_set("str:count", 0)
     mut module = new_module()
     mut idx = 0
-    # Struct field offsets. Each `type` decl lays its fields out in order, one
-    # i32 word each, so field name -> byte offset. Global (untyped backend), so
-    # p.x resolves without knowing p's type; a name shared across two structs
-    # at different offsets would collide, which game structs do not.
+    # Struct field layout. Each `type` decl lays its fields out in order; an
+    # i32 field takes 4 bytes, an f64 field 8. For each field name we record
+    # its byte offset (fld:<name>) and type (ftype:<name>), and per struct type
+    # the total size (ssize:<type>). Global (untyped backend), so p.x resolves
+    # without knowing p's type; a name shared across two structs at different
+    # offsets would collide, which game structs do not.
     loop decl in decls:
         if get(decl, "kind") == "Data":
             mut foff = 0
             loop fdef in get_list(decl, "fields"):
+                fty = wtype_of(get_map(fdef, "type"))
                 slot_set("fld:{get(fdef, \"name\")}", foff)
-                foff = foff + 4
+                slot_set("ftype:{get(fdef, \"name\")}", fty)
+                foff = foff + (if fty == "f" then 8 else 4)
+            slot_set("ssize:{get(decl, \"name\")}", foff)
     loop decl in decls:
         if get(decl, "kind") == "ExternFn":
             ename = get(decl, "name")
@@ -631,14 +636,16 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         slot_set("wtmp:depth", depth)
                         result
                     else if kind == "StructCons":
-                        # Same as a list, minus the length header: allocate one
-                        # i32 word per field and store each value at its declared
-                        # offset (fld:<name>), then leave the pointer on the stack.
+                        # Like a list, minus the length header: allocate the
+                        # struct's total size and store each value at its declared
+                        # offset, with an f64 store for f64 fields. Leaves the
+                        # pointer on the stack.
                         sfields = get_list(expr_node, "fields")
                         sdepth = slot_get_int("wtmp:depth")
                         stidx = slot_get_int("wtmp:pbase") + sdepth
                         slot_set("wtmp:depth", sdepth + 1)
-                        ssize = list_count(sfields) * 4
+                        sname = get(expr_node, "name")
+                        ssize = if slot_has("ssize:{sname}") then slot_get_int("ssize:{sname}") else list_count(sfields) * 4
                         c1 = emit_const(fn_value, 0)
                         c2 = emit_const(c1, 0)
                         c3 = emit_load(c2, 0)
@@ -650,18 +657,20 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         loop fdef in sfields:
                             fname = get(fdef, "name")
                             foff = if slot_has("fld:{fname}") then slot_get_int("fld:{fname}") else 0
+                            fty = if slot_has("ftype:{fname}") then slot_get("ftype:{fname}") else "i"
                             scur = emit_local_get(scur, stidx)
                             scur = compile_expr(scur, get_map(fdef, "value"), locals)
-                            scur = emit_store(scur, foff)
+                            scur = if fty == "f" then emit_f64_store(scur, foff) else emit_store(scur, foff)
                         sresult = emit_local_get(scur, stidx)
                         slot_set("wtmp:depth", sdepth)
                         sresult
                     else if kind == "Field":
-                        # p.field loads mem[ptr + offset], offset from fld:<name>.
+                        # p.field loads mem[ptr + offset]; f64 field -> f64.load.
                         fld = get(expr_node, "field")
                         foff2 = if slot_has("fld:{fld}") then slot_get_int("fld:{fld}") else 0
+                        fty2 = if slot_has("ftype:{fld}") then slot_get("ftype:{fld}") else "i"
                         with_obj = compile_expr(fn_value, get_map(expr_node, "object"), locals)
-                        emit_load(with_obj, foff2)
+                        if fty2 == "f" then emit_f64_load(with_obj, foff2) else emit_load(with_obj, foff2)
                     else if kind == "Index":
                         # x[i] loads element i: mem[ptr + 4 + i*4].
                         with_ptr = compile_expr(fn_value, get_map(expr_node, "object"), locals)
@@ -715,6 +724,9 @@ fn type_of(node: Map) -> Text:
             slot_get("fret:{callee}")
         else:
             "i"
+    else if kind == "Field":
+        fld = get(node, "field")
+        if slot_has("ftype:{fld}") then slot_get("ftype:{fld}") else "i"
     else if kind == "If":
         type_of(get_map(node, "then"))
     else:
