@@ -14,6 +14,33 @@ use orion_emit_wasm
 
 # Compile one fn AST node to a WFn. Param-name → local-index mapping
 # is built up as we walk the body so `Ident` references resolve.
+# Compile a whole program's decls to a WModule. This is the entry a host
+# (atlas, a driver, a playground) calls. `extern fn` declarations become wasm
+# imports from the "env" module, satisfied by the JS/host side, so Orion code
+# can call host_add / fill_rect / any capability the embedder provides. `fn`
+# declarations become defined functions. Imports take the low function indices;
+# each name's index goes in a `wfn:<name>` slot so calls resolve to the right
+# one, host import or local fn, during body compilation.
+pub fn compile_program(decls: [Map]) -> WModule:
+    mut module = new_module()
+    mut idx = 0
+    loop decl in decls:
+        if get(decl, "kind") == "ExternFn":
+            ename = get(decl, "name")
+            pc = list_count(get_list(decl, "params"))
+            module = add_import(module, new_import("env", ename, pc, 1))
+            slot_set("wfn:{ename}", idx)
+            idx = idx + 1
+    loop decl in decls:
+        if get(decl, "kind") == "Fn":
+            fname = get(decl, "name")
+            slot_set("wfn:{fname}", idx)
+            idx = idx + 1
+    loop decl in decls:
+        if get(decl, "kind") == "Fn":
+            module = add_fn(module, compile_fn_ast(decl))
+    module
+
 pub fn compile_fn_ast(fn_node: Map) -> WFn:
     fn_name = get(fn_node, "name")
     params = get_list(fn_node, "params")
