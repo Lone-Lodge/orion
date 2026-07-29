@@ -295,6 +295,20 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         s2 = emit_op(s1, op_i32_mul())
                         s3 = emit_op(s2, op_i32_add())
                         emit_load(s3, 4)
+                    else if callee == "set":
+                        # set(x, i, v) stores element i in place and returns the
+                        # container pointer (so `x[i] = v` = `x = set(x, i, v)`
+                        # works). The first arg is a plain name after desugaring,
+                        # so recompiling it to return the pointer is side-effect-free.
+                        target = at(args, 0)
+                        s1 = compile_expr(fn_value, target, locals)
+                        s2 = compile_expr(s1, at(args, 1), locals)
+                        s3 = emit_const(s2, 4)
+                        s4 = emit_op(s3, op_i32_mul())
+                        s5 = emit_op(s4, op_i32_add())
+                        s6 = compile_expr(s5, at(args, 2), locals)
+                        s7 = emit_store(s6, 4)
+                        compile_expr(s7, target, locals)
                     else:
                         mut current_fn = fn_value
                         loop arg in args:
