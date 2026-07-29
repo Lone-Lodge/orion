@@ -44,6 +44,16 @@ pub fn compile_program(decls: [Map]) -> WModule:
     slot_set("str:count", 0)
     mut module = new_module()
     mut idx = 0
+    # Struct field offsets. Each `type` decl lays its fields out in order, one
+    # i32 word each, so field name -> byte offset. Global (untyped backend), so
+    # p.x resolves without knowing p's type; a name shared across two structs
+    # at different offsets would collide, which game structs do not.
+    loop decl in decls:
+        if get(decl, "kind") == "Data":
+            mut foff = 0
+            loop fdef in get_list(decl, "fields"):
+                slot_set("fld:{get(fdef, \"name\")}", foff)
+                foff = foff + 4
     loop decl in decls:
         if get(decl, "kind") == "ExternFn":
             ename = get(decl, "name")
@@ -119,6 +129,13 @@ fn expr_agg_depth(node: Map) -> int:
         loop item in get_list(node, "items"):
             m = max2(m, expr_agg_depth(item))
         1 + m
+    else if kind == "StructCons":
+        mut m = 0
+        loop fdef in get_list(node, "fields"):
+            m = max2(m, expr_agg_depth(get_map(fdef, "value")))
+        1 + m
+    else if kind == "Field":
+        expr_agg_depth(get_map(node, "object"))
     else if kind == "Binary":
         max2(expr_agg_depth(get_map(node, "left")), expr_agg_depth(get_map(node, "right")))
     else if kind == "Index":
@@ -532,6 +549,38 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         result = emit_local_get(cur, tidx)
                         slot_set("wtmp:depth", depth)
                         result
+                    else if kind == "StructCons":
+                        # Same as a list, minus the length header: allocate one
+                        # i32 word per field and store each value at its declared
+                        # offset (fld:<name>), then leave the pointer on the stack.
+                        sfields = get_list(expr_node, "fields")
+                        sdepth = slot_get_int("wtmp:depth")
+                        stidx = slot_get_int("wtmp:pbase") + sdepth
+                        slot_set("wtmp:depth", sdepth + 1)
+                        ssize = list_count(sfields) * 4
+                        c1 = emit_const(fn_value, 0)
+                        c2 = emit_const(c1, 0)
+                        c3 = emit_load(c2, 0)
+                        c4 = emit_local_tee(c3, stidx)
+                        c5 = emit_const(c4, ssize)
+                        c6 = emit_op(c5, op_i32_add())
+                        c7 = emit_store(c6, 0)
+                        mut scur = c7
+                        loop fdef in sfields:
+                            fname = get(fdef, "name")
+                            foff = if slot_has("fld:{fname}") then slot_get_int("fld:{fname}") else 0
+                            scur = emit_local_get(scur, stidx)
+                            scur = compile_expr(scur, get_map(fdef, "value"), locals)
+                            scur = emit_store(scur, foff)
+                        sresult = emit_local_get(scur, stidx)
+                        slot_set("wtmp:depth", sdepth)
+                        sresult
+                    else if kind == "Field":
+                        # p.field loads mem[ptr + offset], offset from fld:<name>.
+                        fld = get(expr_node, "field")
+                        foff2 = if slot_has("fld:{fld}") then slot_get_int("fld:{fld}") else 0
+                        with_obj = compile_expr(fn_value, get_map(expr_node, "object"), locals)
+                        emit_load(with_obj, foff2)
                     else if kind == "Index":
                         # x[i] loads element i: mem[ptr + 4 + i*4].
                         with_ptr = compile_expr(fn_value, get_map(expr_node, "object"), locals)
