@@ -198,6 +198,24 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         with_else = emit_op(with_then, op_else())
                         with_otherwise = compile_expr(with_else, get(expr_node, "otherwise"), locals)
                         emit_op(with_otherwise, op_end())
+                    else if kind == "Unary":
+                        uop = get(expr_node, "op")
+                        operand = get_map(expr_node, "operand")
+                        if uop == "neg":
+                            # -x == 0 - x (i32 has no negate opcode)
+                            with_zero = emit_const(fn_value, 0)
+                            with_operand = compile_expr(with_zero, operand, locals)
+                            emit_op(with_operand, op_i32_sub())
+                        else if uop == "not":
+                            with_operand = compile_expr(fn_value, operand, locals)
+                            emit_op(with_operand, op_i32_eqz())
+                        else if uop == "bnot":
+                            # ~x == x ^ -1
+                            with_operand = compile_expr(fn_value, operand, locals)
+                            with_neg1 = emit_const(with_operand, 0 - 1)
+                            emit_op(with_neg1, op_i32_xor())
+                        else:
+                            compile_expr(fn_value, operand, locals)
                     else:
                         # Unsupported expression — push 0 as a no-op.
                         emit_const(fn_value, 0)
@@ -224,6 +242,18 @@ fn emit_binop(fn_value: WFn, op: Text) -> WFn:
         emit_op(fn_value, op_i32_le_s())
     else if op == ">=":
         emit_op(fn_value, op_i32_ge_s())
+    else if op == "%":
+        emit_op(fn_value, op_i32_rem_s())
+    else if op == "and" or op == "&":
+        emit_op(fn_value, op_i32_and())
+    else if op == "or" or op == "|":
+        emit_op(fn_value, op_i32_or())
+    else if op == "^":
+        emit_op(fn_value, op_i32_xor())
+    else if op == "<<":
+        emit_op(fn_value, op_i32_shl())
+    else if op == ">>":
+        emit_op(fn_value, op_i32_shr_s())
     else:
         # Unknown op: add, so the stack stays balanced.
         emit_op(fn_value, op_i32_add())

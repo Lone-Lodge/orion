@@ -128,6 +128,12 @@ pub fn op_i32_add() -> int: 106     # 0x6A i32.add
 pub fn op_i32_sub() -> int: 107     # 0x6B i32.sub
 pub fn op_i32_mul() -> int: 108     # 0x6C i32.mul
 pub fn op_i32_div_s() -> int: 109   # 0x6D i32.div_s
+pub fn op_i32_rem_s() -> int: 111    # 0x6F i32.rem_s
+pub fn op_i32_and() -> int: 113      # 0x71 i32.and
+pub fn op_i32_or() -> int: 114       # 0x72 i32.or
+pub fn op_i32_xor() -> int: 115      # 0x73 i32.xor
+pub fn op_i32_shl() -> int: 116      # 0x74 i32.shl
+pub fn op_i32_shr_s() -> int: 117    # 0x75 i32.shr_s
 
 # Control flow.
 pub fn op_block() -> int: 2         # 0x02 block (then blocktype)
