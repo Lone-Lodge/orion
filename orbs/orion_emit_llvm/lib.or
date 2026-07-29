@@ -1249,7 +1249,6 @@ fn emit_runtime() -> Text:
     text = "{text}target triple = \"x86_64-pc-windows-msvc19.44.35209\"\n"
     text = "{text}declare i32 @printf(ptr, ...)\n"
     text = "{text}declare i32 @puts(ptr)\n"
-    text = "{text}declare void @orion_print_raw(ptr)\n"
     text = "{text}declare ptr @malloc(i64)\n"
     # Float-literal hex conversion lives in orion_rt.c (strtod) — declare
     # here since the orion_ prefix skips the auto-extern-declare path.
@@ -2710,12 +2709,26 @@ fn emit_runtime() -> Text:
     text
 
 
+# True if any instruction is a print_raw, so its declare rides only in the
+# programs that use it (a plain program's IR is byte-identical to before).
+fn emit_uses_print_raw(module: IRModule) -> bool:
+    mut found = false
+    fns = module.functions
+    loop fi in 0..<len(fns):
+        insts = at(fns, fi).instructions
+        loop ii in 0..<len(insts):
+            if at(insts, ii).op == "print_raw":
+                found = true
+    found
+
 pub fn emit_module(module: IRModule) -> Text:
     # Chunk list + one join at the end — repeated concat would re-copy
     # the growing megabyte module text once per appended piece.
     mut chunks = []
     chunks = push_mut(chunks, "; orion_emit_llvm output\n")
     chunks = push_mut(chunks, emit_runtime())
+    if emit_uses_print_raw(module):
+        chunks = push_mut(chunks, "declare void @orion_print_raw(ptr)\n")
     # Emit declares for every user extern call — any `call @name` where
     # `name` isn't a user fn and isn't a runtime helper already declared
     # above. Without these declares clang rejects the .ll before linking.
