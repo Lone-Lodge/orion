@@ -209,6 +209,9 @@ fn drv_dim(s: Text) -> Text:
 fn drv_red(s: Text) -> Text:
     drv_sty("31;1", s)
 
+fn drv_green(s: Text) -> Text:
+    drv_sty("32", s)
+
 # ---- `symbols`: the compiler's own index, for tools --------------------
 #
 # One row per declaration, tab-free and line-oriented so a client can read it
@@ -758,7 +761,7 @@ pub fn driver_main() -> int:
             ok = file_write(out_path, llvm_text)
             if ok == 1:
                 if not drv_want_quiet():
-                    print_line(drv_dim("  {out_path}"))
+                    print_line(drv_green("  ok") + drv_dim("  {out_path}"))
                 0
             else:
                 print_line(drv_red("write failed"))
