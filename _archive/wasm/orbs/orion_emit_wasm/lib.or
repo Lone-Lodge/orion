@@ -116,6 +116,7 @@ pub fn op_return() -> int: 15       # 0x0F return
 pub fn op_call() -> int: 16         # 0x10 call funcidx
 pub fn op_local_get() -> int: 32    # 0x20 local.get
 pub fn op_local_set() -> int: 33    # 0x21 local.set
+pub fn op_local_tee() -> int: 34    # 0x22 local.tee (set + leave on stack)
 pub fn op_i32_const() -> int: 65    # 0x41 i32.const
 pub fn op_i32_eqz() -> int: 69      # 0x45 i32.eqz
 pub fn op_i32_eq() -> int: 70       # 0x46 i32.eq
@@ -331,6 +332,32 @@ pub fn emit_local_set(fn_value: WFn, index: int) -> WFn:
     idx_bytes = leb_u(index)
     mut grown = push(fn_value.body, op_local_set())
     loop byte_value in idx_bytes:
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
+# local.tee — like set but leaves the value on the stack (so an
+# allocation pointer can be stashed and reused in one instruction).
+pub fn emit_local_tee(fn_value: WFn, index: int) -> WFn:
+    idx_bytes = leb_u(index)
+    mut grown = push(fn_value.body, op_local_tee())
+    loop byte_value in idx_bytes:
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
+# i32.load / i32.store with a memarg (alignment exponent + byte offset).
+# Alignment 2 is natural for a 4-byte i32; baking the offset in lets a
+# field access (ptr + 4 + i*4) fold the constant `+ 4` into the load.
+pub fn emit_load(fn_value: WFn, offset: int) -> WFn:
+    mut grown = push(fn_value.body, op_i32_load())
+    grown = push(grown, 2)
+    loop byte_value in leb_u(offset):
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
+pub fn emit_store(fn_value: WFn, offset: int) -> WFn:
+    mut grown = push(fn_value.body, op_i32_store())
+    grown = push(grown, 2)
+    loop byte_value in leb_u(offset):
         grown = push(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 

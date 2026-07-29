@@ -21,17 +21,18 @@ use orion_emit_wasm
 # declarations become defined functions. Imports take the low function indices;
 # each name's index goes in a `wfn:<name>` slot so calls resolve to the right
 # one, host import or local fn, during body compilation.
+# A 32-bit value as 4 little-endian bytes — the in-memory word layout for
+# lengths, the bump pointer, and every i32 field or list element.
+fn le32(v: int) -> [int]:
+    [v % 256, (v / 256) % 256, (v / 65536) % 256, (v / 16777216) % 256]
+
 # Length-prefixed bytes for a string literal in linear memory: 4-byte
 # little-endian length, then the UTF-8 bytes. A host reads the length at the
 # pointer, then that many bytes at pointer + 4.
 fn str_data_bytes(text: Text) -> [int]:
     bs = bytes_from_text(text)
     n = len(bs)
-    mut out = []
-    out = push(out, n % 256)
-    out = push(out, (n / 256) % 256)
-    out = push(out, (n / 65536) % 256)
-    out = push(out, (n / 16777216) % 256)
+    mut out = le32(n)
     loop i in 0..<n:
         out = push(out, at(bs, i))
     out
@@ -64,6 +65,14 @@ pub fn compile_program(decls: [Map]) -> WModule:
         soff = slot_get_int("str:{si}:off")
         stext = slot_get("str:{si}:text")
         module = add_data(module, soff, str_data_bytes(stext))
+    # Initialise the bump allocator. The pointer lives at mem[0] (inside the
+    # low scratch region 0..1023); the heap starts just past the static string
+    # data, word-aligned. alloc() reads mem[0], returns it, writes back the
+    # advanced value. Every list/aggregate carves its memory from here.
+    mut heap_start = slot_get_int("str:next")
+    if heap_start % 4 != 0:
+        heap_start = heap_start + (4 - heap_start % 4)
+    module = add_data(module, 0, le32(heap_start))
     module
 
 pub fn compile_fn_ast(fn_node: Map) -> WFn:
@@ -72,8 +81,18 @@ pub fn compile_fn_ast(fn_node: Map) -> WFn:
     body = get_map(fn_node, "body")
     param_count = list_count(params)
     # Build the locals map: param name → index.
-    locals = build_locals(params)
-    f0 = new_fn(fn_name, param_count)
+    mut locals = build_locals(params)
+    mut f0 = new_fn(fn_name, param_count)
+    # Reserve one temp local per level of aggregate nesting. A list literal
+    # tees its allocation pointer into temp[param_count + depth] while it fills
+    # the elements; a nested literal uses the next temp. Seeding these names
+    # first keeps later let-bindings at their correct (shifted) indices.
+    max_depth = block_agg_depth(body)
+    loop d in 0..<max_depth:
+        locals = push(locals, "__t{d}")
+        f0 = add_local(f0)
+    slot_set("wtmp:pbase", param_count)
+    slot_set("wtmp:depth", 0)
     f1 = compile_block(f0, body, locals)
     emit_end(f1)
 
@@ -82,6 +101,65 @@ fn list_count(items: [Map]) -> int:
     loop _item in items:
         count = count + 1
     count
+
+# --- aggregate nesting depth ---
+#
+# How many temp locals a function needs = the deepest chain of list literals
+# nested as each other's elements. `[[1],[2]]` needs 2 (outer pointer live
+# while the inner list allocates); a flat `[1,2,3]` needs 1; no literal, 0.
+# These walkers mirror the compile_* shapes so the reserved count is exact.
+fn max2(a: int, b: int) -> int:
+    if a > b then a else b
+
+fn expr_agg_depth(node: Map) -> int:
+    kind = get(node, "kind")
+    if kind == "ListLit":
+        mut m = 0
+        loop item in get_list(node, "items"):
+            m = max2(m, expr_agg_depth(item))
+        1 + m
+    else if kind == "Binary":
+        max2(expr_agg_depth(get_map(node, "left")), expr_agg_depth(get_map(node, "right")))
+    else if kind == "Index":
+        max2(expr_agg_depth(get_map(node, "object")), expr_agg_depth(get_map(node, "index")))
+    else if kind == "Unary":
+        expr_agg_depth(get_map(node, "operand"))
+    else if kind == "Call":
+        mut m = 0
+        loop a in get_list(node, "args"):
+            m = max2(m, expr_agg_depth(a))
+        m
+    else if kind == "If":
+        c = expr_agg_depth(get_map(node, "cond"))
+        t = expr_agg_depth(get_map(node, "then"))
+        o = expr_agg_depth(get_map(node, "else"))
+        max2(c, max2(t, o))
+    else:
+        0
+
+fn stmt_agg_depth(stmt: Map) -> int:
+    kind = get(stmt, "kind")
+    if kind == "ExprStmt":
+        expr_agg_depth(get_map(stmt, "expr"))
+    else if kind == "MutLet" or kind == "LetOrAssign":
+        expr_agg_depth(get_map(stmt, "value"))
+    else if kind == "Return":
+        expr_agg_depth(get_map(stmt, "expr"))
+    else if kind == "IfBlock":
+        c = expr_agg_depth(get_map(stmt, "cond"))
+        t = block_agg_depth(get_map(stmt, "then"))
+        e = block_agg_depth(get_map(stmt, "else"))
+        max2(c, max2(t, e))
+    else if kind == "Loop":
+        block_agg_depth(get_map(stmt, "body"))
+    else:
+        0
+
+fn block_agg_depth(block: Map) -> int:
+    mut m = 0
+    loop s in get_list(block, "stmts"):
+        m = max2(m, stmt_agg_depth(s))
+    m
 
 # Locals table is a flat list of names — index into the list IS the
 # local index in wasm. push a name and you get its index for free.
@@ -204,14 +282,28 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                     # Calling a host fn or another local fn — for now assume host index 0.
                     args = get_list(expr_node, "args")
                     callee = get(expr_node, "callee")
-                    mut current_fn = fn_value
-                    loop arg in args:
-                        current_fn = compile_expr(current_fn, arg, locals)
-                    # Resolve the callee to its function index. The driver records
-                    # each Fn's index in a `wfn:<name>` slot before compiling, so
-                    # recursion and forward calls both resolve.
-                    call_idx = if slot_has("wfn:{callee}") then slot_get_int("wfn:{callee}") else 0
-                    emit_call(current_fn, call_idx)
+                    if callee == "len":
+                        # len(x) reads the 4-byte length header at the pointer.
+                        # Same layout as a string literal, so len("hi") works too.
+                        with_ptr = compile_expr(fn_value, at(args, 0), locals)
+                        emit_load(with_ptr, 0)
+                    else if callee == "at":
+                        # at(x, i) loads element i: mem[ptr + 4 + i*4].
+                        with_ptr = compile_expr(fn_value, at(args, 0), locals)
+                        with_idx = compile_expr(with_ptr, at(args, 1), locals)
+                        s1 = emit_const(with_idx, 4)
+                        s2 = emit_op(s1, op_i32_mul())
+                        s3 = emit_op(s2, op_i32_add())
+                        emit_load(s3, 4)
+                    else:
+                        mut current_fn = fn_value
+                        loop arg in args:
+                            current_fn = compile_expr(current_fn, arg, locals)
+                        # Resolve the callee to its function index. The driver records
+                        # each Fn's index in a `wfn:<name>` slot before compiling, so
+                        # recursion and forward calls both resolve.
+                        call_idx = if slot_has("wfn:{callee}") then slot_get_int("wfn:{callee}") else 0
+                        emit_call(current_fn, call_idx)
                 else:
                     if kind == "If":
                         # if-as-expression: cond, then push result, else push result
@@ -221,7 +313,7 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         with_bt = emit_bytes(with_if, [ty_i32()])
                         with_then = compile_expr(with_bt, get(expr_node, "then"), locals)
                         with_else = emit_op(with_then, op_else())
-                        with_otherwise = compile_expr(with_else, get(expr_node, "otherwise"), locals)
+                        with_otherwise = compile_expr(with_else, get_map(expr_node, "else"), locals)
                         emit_op(with_otherwise, op_end())
                     else if kind == "Unary":
                         uop = get(expr_node, "op")
@@ -254,6 +346,47 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         sblen = len(bytes_from_text(stext))
                         slot_set("str:next", soff + sblen + 4)
                         emit_const(fn_value, soff)
+                    else if kind == "ListLit":
+                        # Heap-allocate [length, elem0, elem1, ...] via the bump
+                        # allocator, fill it, and leave the pointer on the stack.
+                        items = get_list(expr_node, "items")
+                        n = list_count(items)
+                        depth = slot_get_int("wtmp:depth")
+                        tidx = slot_get_int("wtmp:pbase") + depth
+                        slot_set("wtmp:depth", depth + 1)
+                        size = 4 + n * 4
+                        # alloc(size): tee the old bump into tidx, store back the
+                        # advanced pointer. mem[0] is the bump pointer cell.
+                        a1 = emit_const(fn_value, 0)
+                        a2 = emit_const(a1, 0)
+                        a3 = emit_load(a2, 0)
+                        a4 = emit_local_tee(a3, tidx)
+                        a5 = emit_const(a4, size)
+                        a6 = emit_op(a5, op_i32_add())
+                        a7 = emit_store(a6, 0)
+                        # length header at mem[tidx]
+                        h1 = emit_local_get(a7, tidx)
+                        h2 = emit_const(h1, n)
+                        h3 = emit_store(h2, 0)
+                        # elements at mem[tidx + 4 + i*4]
+                        mut cur = h3
+                        mut i = 0
+                        loop item in items:
+                            cur = emit_local_get(cur, tidx)
+                            cur = compile_expr(cur, item, locals)
+                            cur = emit_store(cur, 4 + i * 4)
+                            i = i + 1
+                        result = emit_local_get(cur, tidx)
+                        slot_set("wtmp:depth", depth)
+                        result
+                    else if kind == "Index":
+                        # x[i] loads element i: mem[ptr + 4 + i*4].
+                        with_ptr = compile_expr(fn_value, get_map(expr_node, "object"), locals)
+                        with_idx = compile_expr(with_ptr, get_map(expr_node, "index"), locals)
+                        s1 = emit_const(with_idx, 4)
+                        s2 = emit_op(s1, op_i32_mul())
+                        s3 = emit_op(s2, op_i32_add())
+                        emit_load(s3, 4)
                     else:
                         # Unsupported expression — push 0 as a no-op.
                         emit_const(fn_value, 0)
