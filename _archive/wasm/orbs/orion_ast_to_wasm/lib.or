@@ -21,7 +21,26 @@ use orion_emit_wasm
 # declarations become defined functions. Imports take the low function indices;
 # each name's index goes in a `wfn:<name>` slot so calls resolve to the right
 # one, host import or local fn, during body compilation.
+# Length-prefixed bytes for a string literal in linear memory: 4-byte
+# little-endian length, then the UTF-8 bytes. A host reads the length at the
+# pointer, then that many bytes at pointer + 4.
+fn str_data_bytes(text: Text) -> [int]:
+    bs = bytes_from_text(text)
+    n = len(bs)
+    mut out = []
+    out = push(out, n % 256)
+    out = push(out, (n / 256) % 256)
+    out = push(out, (n / 65536) % 256)
+    out = push(out, (n / 16777216) % 256)
+    loop i in 0..<n:
+        out = push(out, at(bs, i))
+    out
+
 pub fn compile_program(decls: [Map]) -> WModule:
+    # String literals accumulate into the data segment (offsets above the low
+    # scratch area); compile_expr records each one, emitted as segments below.
+    slot_set("str:next", 1024)
+    slot_set("str:count", 0)
     mut module = new_module()
     mut idx = 0
     loop decl in decls:
@@ -39,6 +58,12 @@ pub fn compile_program(decls: [Map]) -> WModule:
     loop decl in decls:
         if get(decl, "kind") == "Fn":
             module = add_fn(module, compile_fn_ast(decl))
+    # Emit the string literals collected during compilation as data segments.
+    scount = slot_get_int("str:count")
+    loop si in 0..<scount:
+        soff = slot_get_int("str:{si}:off")
+        stext = slot_get("str:{si}:text")
+        module = add_data(module, soff, str_data_bytes(stext))
     module
 
 pub fn compile_fn_ast(fn_node: Map) -> WFn:
@@ -216,6 +241,19 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             emit_op(with_neg1, op_i32_xor())
                         else:
                             compile_expr(fn_value, operand, locals)
+                    else if kind == "Str":
+                        # Record the literal for a data segment; push its pointer.
+                        # The bytes live in linear memory (length-prefixed); a host
+                        # reads the length there, then the bytes at pointer + 4.
+                        stext = get(expr_node, "value")
+                        soff = slot_get_int("str:next")
+                        scnt = slot_get_int("str:count")
+                        slot_set("str:{scnt}:off", soff)
+                        slot_set("str:{scnt}:text", stext)
+                        slot_set("str:count", scnt + 1)
+                        sblen = len(bytes_from_text(stext))
+                        slot_set("str:next", soff + sblen + 4)
+                        emit_const(fn_value, soff)
                     else:
                         # Unsupported expression — push 0 as a no-op.
                         emit_const(fn_value, 0)
