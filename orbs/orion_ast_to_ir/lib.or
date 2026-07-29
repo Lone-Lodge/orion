@@ -36,6 +36,37 @@ fn scope_add_enum_decl(scope: Scope, enum_name: Text, variant_csv: Text) -> Scop
 #
 # Falls back to the old `line N:C` when there is no map (the compiler invoked
 # on an already-bundled text), so a diagnostic never becomes worse than before.
+# Slot-stored text must outlive the transient allocation it was built in.
+extern fn orion_persist_text(s: Text) -> Text
+
+fn otir_spaces(n: int) -> Text:
+    mut s = ""
+    loop i in 0..<n:
+        s = s + " "
+    s
+
+# The text of 1-based bundle line `n` from the collected source, "" if absent.
+fn otir_src_line(src: Text, n: int) -> Text:
+    b = bytes_from_text(src)
+    total = len(b)
+    mut cur = 1
+    mut start = 0
+    mut i = 0
+    mut result = ""
+    loop:
+        if i >= total:
+            if cur == n:
+                result = bytes_to_text(bytes_slice(b, start, total))
+            break
+        if at(b, i) == 10:
+            if cur == n:
+                result = bytes_to_text(bytes_slice(b, start, i))
+                break
+            cur = cur + 1
+            start = i + 1
+        i = i + 1
+    result
+
 fn otir_where(line: int, col: int) -> Text:
     total = if slot_has("src:map:n") then slot_get_int("src:map:n") else 0
     mut best_at = 0
@@ -45,6 +76,17 @@ fn otir_where(line: int, col: int) -> Text:
         if chunk_at <= line and chunk_at > best_at:
             best_at = chunk_at
             best_path = slot_get("src:map:{i}:path")
+    # Stash a source-line + caret frame for compile_error to print under the
+    # message. The gutter shows the local line; the caret sits at `col` (0-based)
+    # past the gutter width. Cleared by compile_error once consumed.
+    src = if slot_has("src:full") then slot_get("src:full") else ""
+    if src != "":
+        src_line = otir_src_line(src, line)
+        if src_line != "":
+            gutter = " {line - best_at} | "
+            gw = len(bytes_from_text(gutter))
+            frame = "\n{gutter}{src_line}\n{otir_spaces(gw + col)}^"
+            slot_set("err:frame", orion_persist_text(frame))
     if best_path == "":
         "line {line}:{col}"
     else:

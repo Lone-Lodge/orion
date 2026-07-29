@@ -689,6 +689,8 @@ pub fn driver_main() -> int:
         roots = push(roots, "orbs/")
         roots = push(roots, "../orbs/")
         src = drv_collect(entry_src, roots, in_path)
+        # Keep the collected source so error diagnostics can show the line + caret.
+        slot_set("src:full", orion_persist_text(src))
         t0 = monotonic_ms()
         tokens = self_lex(src)
         t1 = monotonic_ms()

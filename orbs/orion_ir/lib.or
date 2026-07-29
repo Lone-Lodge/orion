@@ -71,7 +71,13 @@ pub extern fn orion_arena_reset() -> int
 pub extern fn orion_arena_used() -> int
 
 pub fn compile_error(msg: Text):
-    print_line(msg)
+    # otir_where stashes a source-line + caret frame for located errors; print
+    # it under the message and consume it so the next error starts clean.
+    if slot_has("err:frame") and slot_get("err:frame") != "":
+        print_line(msg + slot_get("err:frame"))
+        slot_set("err:frame", "")
+    else:
+        print_line(msg)
     orion_err_bump()
 
 pub fn compile_errors() -> int:
