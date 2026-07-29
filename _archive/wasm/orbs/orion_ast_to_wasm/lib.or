@@ -11,14 +11,13 @@
 # core arithmetic pipeline runs orion-self's own files.
 
 use orion_emit_wasm
-use string
 
 # Compile one fn AST node to a WFn. Param-name → local-index mapping
 # is built up as we walk the body so `Ident` references resolve.
-pub fn compile_fn_ast(fn_node) -> WFn:
+pub fn compile_fn_ast(fn_node: Map) -> WFn:
     fn_name = get(fn_node, "name")
-    params = get(fn_node, "params")
-    body = get(fn_node, "body")
+    params = get_list(fn_node, "params")
+    body = get_map(fn_node, "body")
     param_count = list_count(params)
     # Build the locals map: param name → index.
     locals = build_locals(params)
@@ -26,17 +25,17 @@ pub fn compile_fn_ast(fn_node) -> WFn:
     f1 = compile_block(f0, body, locals)
     emit_end(f1)
 
-fn list_count(items) -> int:
+fn list_count(items: [Map]) -> int:
     mut count = 0
-    for _item in items:
+    loop _item in items:
         count = count + 1
     count
 
 # Locals table is a flat list of names — index into the list IS the
 # local index in wasm. push a name and you get its index for free.
-fn build_locals(params) -> [Text]:
+fn build_locals(params: [Map]) -> [Text]:
     mut locals = []
-    for param in params:
+    loop param in params:
         locals = push(locals, get(param, "name"))
     locals
 
@@ -45,7 +44,7 @@ fn build_locals(params) -> [Text]:
 fn lookup_local(locals: [Text], name: Text) -> int:
     mut found = 0 - 1
     mut index = 0
-    for entry in locals:
+    loop entry in locals:
         if entry == name:
             found = index
         index = index + 1
@@ -54,17 +53,17 @@ fn lookup_local(locals: [Text], name: Text) -> int:
 # Compile a Block (statement list) into the wasm fn body. Each
 # statement walks through with the locals table threaded so bindings
 # stay in scope. Returns the WFn with the body extended.
-fn compile_block(fn_value: WFn, block, locals: [Text]) -> WFn:
-    statements = get(block, "stmts")
+fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> WFn:
+    statements = get_list(block, "stmts")
     mut current_fn = fn_value
     mut current_locals = locals
-    for stmt in statements:
+    loop stmt in statements:
         result = compile_stmt(current_fn, stmt, current_locals)
         current_fn = get(result, "fn")
         current_locals = get(result, "locals")
     current_fn
 
-fn compile_stmt(fn_value: WFn, stmt, locals: [Text]):
+fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
     kind = get(stmt, "kind")
     if kind == "ExprStmt":
         expr_node = get(stmt, "expr")
@@ -122,7 +121,7 @@ fn compile_stmt(fn_value: WFn, stmt, locals: [Text]):
                             {"fn": fn_value, "locals": locals}
 
 # Compile an expression — pushes its result on the wasm stack.
-fn compile_expr(fn_value: WFn, expr_node, locals: [Text]) -> WFn:
+fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
     kind = get(expr_node, "kind")
     if kind == "Int":
         value_text = get(expr_node, "value")
@@ -148,10 +147,10 @@ fn compile_expr(fn_value: WFn, expr_node, locals: [Text]) -> WFn:
             else:
                 if kind == "Call":
                     # Calling a host fn or another local fn — for now assume host index 0.
-                    args = get(expr_node, "args")
+                    args = get_list(expr_node, "args")
                     callee = get(expr_node, "callee")
                     mut current_fn = fn_value
-                    for arg in args:
+                    loop arg in args:
                         current_fn = compile_expr(current_fn, arg, locals)
                     # Resolve callee by name — for now use host index by hash
                     emit_call(current_fn, 0)
@@ -193,4 +192,14 @@ fn emit_binop(fn_value: WFn, op: Text) -> WFn:
 # Parse a decimal integer string (no error handling — invalid input
 # returns 0). The Orion `str_to_int` builtin handles edge cases.
 fn parse_decimal(text: Text) -> int:
-    str_to_int(text)
+    bs = bytes_from_text(text)
+    n = len(bs)
+    mut v = 0
+    mut neg = false
+    loop i in 0..<n:
+        c = at(bs, i)
+        if c == 45:
+            neg = true
+        else if c >= 48 and c <= 57:
+            v = v * 10 + (c - 48)
+    if neg then 0 - v else v
