@@ -212,6 +212,31 @@ pre code { background: none; padding: 0; }
 /* The only thing the code colouring does. */
 .c { color: var(--dim); }
 
+/* Copy button, added by a small script to every code block. Subtle by default
+ * so it never competes with the code, terracotta on hover/focus. Kept visible
+ * (not hover-only) so it works on touch and for keyboard users. */
+.code-wrap { position: relative; }
+.copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    font: inherit;
+    font-size: 0.8125rem;
+    line-height: 1;
+    padding: 0.25em 0.6em;
+    color: var(--dim);
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.code-wrap:hover .copy-btn,
+.copy-btn:focus { opacity: 1; }
+.copy-btn:hover,
+.copy-btn.copied { color: var(--link); border-color: var(--link); }
+
 footer {
     margin-top: 3.5rem;
     padding-top: 1.25rem;

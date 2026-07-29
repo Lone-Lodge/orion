@@ -322,5 +322,57 @@ live in <code>examples/tests/tests/</code> as <code>test_42_effects</code>,
 <a href="https://github.com/Lone-Lodge/orion">Source on GitHub</a>.</p>
 </footer>
 
+<script>
+/* Add a Copy button to every code block. No dependencies, no network. Falls
+ * back to execCommand when the async clipboard API is unavailable (file://). */
+(function () {
+    function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise(function (resolve, reject) {
+            var ta = document.createElement("textarea");
+            ta.value = text;
+            ta.setAttribute("readonly", "");
+            ta.style.position = "absolute";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            var ok = false;
+            try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+            document.body.removeChild(ta);
+            ok ? resolve() : reject();
+        });
+    }
+    document.querySelectorAll("pre").forEach(function (pre) {
+        var code = pre.querySelector("code");
+        if (!code) return;
+        var wrap = document.createElement("div");
+        wrap.className = "code-wrap";
+        pre.parentNode.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "copy-btn";
+        btn.textContent = "Copy";
+        btn.setAttribute("aria-label", "Copy code to clipboard");
+        wrap.appendChild(btn);
+        btn.addEventListener("click", function () {
+            copyText(code.innerText).then(function () {
+                btn.textContent = "Copied";
+                btn.classList.add("copied");
+                setTimeout(function () {
+                    btn.textContent = "Copy";
+                    btn.classList.remove("copied");
+                }, 1500);
+            }, function () {
+                btn.textContent = "Press Ctrl+C";
+                setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+            });
+        });
+    });
+})();
+</script>
+
 </body>
 </html>
