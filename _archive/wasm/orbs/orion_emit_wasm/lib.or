@@ -119,6 +119,11 @@ pub fn op_local_set() -> int: 33    # 0x21 local.set
 pub fn op_i32_const() -> int: 65    # 0x41 i32.const
 pub fn op_i32_eqz() -> int: 69      # 0x45 i32.eqz
 pub fn op_i32_eq() -> int: 70       # 0x46 i32.eq
+pub fn op_i32_ne() -> int: 71       # 0x47 i32.ne
+pub fn op_i32_lt_s() -> int: 72     # 0x48 i32.lt_s
+pub fn op_i32_gt_s() -> int: 74     # 0x4A i32.gt_s
+pub fn op_i32_le_s() -> int: 76     # 0x4C i32.le_s
+pub fn op_i32_ge_s() -> int: 78     # 0x4E i32.ge_s
 pub fn op_i32_add() -> int: 106     # 0x6A i32.add
 pub fn op_i32_sub() -> int: 107     # 0x6B i32.sub
 pub fn op_i32_mul() -> int: 108     # 0x6C i32.mul
