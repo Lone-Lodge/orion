@@ -311,6 +311,83 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             f = emit_op(f, op_end())
                             f = emit_op(f, op_end())
                             {"fn": f, "locals": cur_locals}
+                        else if kind == "ForIn":
+                            # `loop x in xs:` — iterate a list. Evaluate xs once
+                            # into a hidden pointer local, walk a hidden index from
+                            # 0 to len, bind the element (and optional index var)
+                            # each pass. Hidden locals are numbered so nested
+                            # ForIn loops do not collide.
+                            k = if slot_has("forin:count") then slot_get_int("forin:count") else 0
+                            slot_set("forin:count", k + 1)
+                            mut cur_locals = locals
+                            mut f = fn_value
+                            # Two hidden locals (unique per loop so nesting is safe):
+                            # the list pointer and the index counter.
+                            lst_idx = len(cur_locals)
+                            cur_locals = push(cur_locals, "__fl{k}")
+                            f = add_local(f)
+                            idx_idx = len(cur_locals)
+                            cur_locals = push(cur_locals, "__fi{k}")
+                            f = add_local(f)
+                            # The loop variable — reuse its slot if already bound.
+                            var_name = get(stmt, "var")
+                            mut var_idx = lookup_local(cur_locals, var_name)
+                            if var_idx < 0:
+                                var_idx = len(cur_locals)
+                                cur_locals = push(cur_locals, var_name)
+                                f = add_local(f)
+                            index_var = get(stmt, "index_var")
+                            mut has_index = false
+                            mut iv_idx = 0
+                            if index_var != "":
+                                has_index = true
+                                iv_idx = lookup_local(cur_locals, index_var)
+                                if iv_idx < 0:
+                                    iv_idx = len(cur_locals)
+                                    cur_locals = push(cur_locals, index_var)
+                                    f = add_local(f)
+                            # __fl = xs ; __fi = 0
+                            f = compile_expr(f, get_map(stmt, "iter"), cur_locals)
+                            f = emit_local_set(f, lst_idx)
+                            f = emit_const(f, 0)
+                            f = emit_local_set(f, idx_idx)
+                            f = emit_op(f, op_block())
+                            f = emit_bytes(f, [blocktype_void()])
+                            f = emit_op(f, op_loop())
+                            f = emit_bytes(f, [blocktype_void()])
+                            # __fi >= len(__fl) → exit
+                            f = emit_local_get(f, idx_idx)
+                            f = emit_local_get(f, lst_idx)
+                            f = emit_load(f, 0)
+                            f = emit_op(f, op_i32_ge_s())
+                            f = emit_op(f, op_br_if())
+                            f = emit_bytes(f, [1])
+                            # var = at(__fl, __fi) = mem[__fl + 4 + __fi*4]
+                            f = emit_local_get(f, lst_idx)
+                            f = emit_local_get(f, idx_idx)
+                            f = emit_const(f, 4)
+                            f = emit_op(f, op_i32_mul())
+                            f = emit_op(f, op_i32_add())
+                            f = emit_load(f, 4)
+                            f = emit_local_set(f, var_idx)
+                            if has_index:
+                                f = emit_local_get(f, idx_idx)
+                                f = emit_local_set(f, iv_idx)
+                            # body (break exits the block: br 1 from loop level)
+                            prev_brk = slot_get_int("wbrk")
+                            slot_set("wbrk", 1)
+                            f = compile_block(f, get_map(stmt, "body"), cur_locals)
+                            slot_set("wbrk", prev_brk)
+                            # __fi++ ; repeat ; close loop and block
+                            f = emit_local_get(f, idx_idx)
+                            f = emit_const(f, 1)
+                            f = emit_op(f, op_i32_add())
+                            f = emit_local_set(f, idx_idx)
+                            f = emit_op(f, op_br())
+                            f = emit_bytes(f, [0])
+                            f = emit_op(f, op_end())
+                            f = emit_op(f, op_end())
+                            {"fn": f, "locals": cur_locals}
                         else:
                             # Unsupported — pass through unchanged.
                             {"fn": fn_value, "locals": locals}
