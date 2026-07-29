@@ -268,6 +268,49 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             slot_set("wbrk", prev_brk)
                             with_end_if = emit_op(else_fn, op_end())
                             {"fn": with_end_if, "locals": locals}
+                        else if kind == "ForRange":
+                            # `loop v in low..<high:` — counter loop lowered to
+                            # block { loop { br_if exit when done; body; v++ } }.
+                            var_name = get(stmt, "var")
+                            existing = lookup_local(locals, var_name)
+                            mut cur_locals = locals
+                            mut f = fn_value
+                            if existing < 0:
+                                cur_locals = push(locals, var_name)
+                                f = add_local(fn_value)
+                            vidx = lookup_local(cur_locals, var_name)
+                            # v = low
+                            f = compile_expr(f, get_map(stmt, "low"), cur_locals)
+                            f = emit_local_set(f, vidx)
+                            f = emit_op(f, op_block())
+                            f = emit_bytes(f, [blocktype_void()])
+                            f = emit_op(f, op_loop())
+                            f = emit_bytes(f, [blocktype_void()])
+                            # Exit test: v >= high (or v > high when inclusive).
+                            f = emit_local_get(f, vidx)
+                            f = compile_expr(f, get_map(stmt, "high"), cur_locals)
+                            if get(stmt, "inclusive") == 1:
+                                f = emit_op(f, op_i32_gt_s())
+                            else:
+                                f = emit_op(f, op_i32_ge_s())
+                            f = emit_op(f, op_br_if())
+                            f = emit_bytes(f, [1])
+                            # Body: a break here exits the block (br 1 from loop).
+                            prev_brk = slot_get_int("wbrk")
+                            slot_set("wbrk", 1)
+                            f = compile_block(f, get_map(stmt, "body"), cur_locals)
+                            slot_set("wbrk", prev_brk)
+                            # v = v + 1
+                            f = emit_local_get(f, vidx)
+                            f = emit_const(f, 1)
+                            f = emit_op(f, op_i32_add())
+                            f = emit_local_set(f, vidx)
+                            # Repeat, then close loop and block.
+                            f = emit_op(f, op_br())
+                            f = emit_bytes(f, [0])
+                            f = emit_op(f, op_end())
+                            f = emit_op(f, op_end())
+                            {"fn": f, "locals": cur_locals}
                         else:
                             # Unsupported — pass through unchanged.
                             {"fn": fn_value, "locals": locals}

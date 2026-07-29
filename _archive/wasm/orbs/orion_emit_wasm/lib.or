@@ -142,7 +142,7 @@ pub fn op_loop() -> int: 3          # 0x03 loop
 pub fn op_if() -> int: 4            # 0x04 if (then blocktype)
 pub fn op_else() -> int: 5          # 0x05 else
 pub fn op_br() -> int: 12           # 0x0C br
-pub fn op_br_if() -> int: 13        # 0x0D br_if
+pub fn op_br_if() -> int: 13        # 0x0D br_if (branch when top of stack != 0)
 
 # Blocktype sentinel — "no result". Used after `if`/`block`/`loop`
 # when the body doesn't push anything to the stack.
