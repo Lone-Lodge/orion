@@ -1909,7 +1909,15 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         val_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
-        pr = ir_fn_push(val_r.function, ir_list_push_mut(list_r.id, val_r.id))
+        # Carry the element type onto the result, exactly like `push` above.
+        # Without this, `mut x = []` (allocated list:i64) stays list:i64 through
+        # `x = push_mut(x, textval)`, so a later `at(x, i)` reads i64 and the
+        # value is mis-typed as an int downstream. `push` back-patches the slot
+        # via this type; push_mut must too, or the two are not interchangeable.
+        pm_val_type = get_value_type(val_r.function, val_r.id)
+        pm_base = ir_list_push_mut(list_r.id, val_r.id)
+        pm_typed = Inst{op: pm_base.op, type_text: "list:{pm_val_type}", value: pm_base.value, lhs: pm_base.lhs, rhs: pm_base.rhs, name: pm_base.name, args: pm_base.args}
+        pr = ir_fn_push(val_r.function, pm_typed)
         result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
     if is_struct_field_int:
         # Struct field by declaration index: raw slot read. The typed
@@ -4425,6 +4433,253 @@ fn nlam_block_has(block: Map) -> bool:
     found
 
 
+fn upp_is_ident(node: Map, name: Text) -> bool:
+    get(node, "kind") == "Ident" and get(node, "name") == name
+
+fn upp_is_reader(callee: Text) -> bool:
+    callee == "len" or callee == "at" or callee == "get" or callee == "get_int" or callee == "get_map" or callee == "get_list" or callee == "get_text_list" or callee == "get_int_list" or callee == "has" or callee == "contains" or callee == "byte_at" or callee == "bytes_length"
+
+fn upp_fresh(val: Map, name: Text) -> bool:
+    k = get(val, "kind")
+    if k == "ListLit":
+        true
+    else if k == "Call":
+        callee = get(val, "callee")
+        if callee == "push":
+            true
+        else if callee == "push_mut":
+            args = get_list(val, "args")
+            len(args) > 0 and upp_is_ident(at(args, 0), name)
+        else:
+            false
+    else:
+        false
+
+fn upp_bad_list(items: [Map], name: Text) -> int:
+    mut bad = 0
+    loop i in 0..<len(items):
+        bad = bad + upp_bad_expr(at(items, i), name)
+    bad
+
+fn upp_bad_pairs(pairs: [Map], name: Text) -> int:
+    mut bad = 0
+    loop i in 0..<len(pairs):
+        bad = bad + upp_bad_expr(get_map(at(pairs, i), "value"), name)
+    bad
+
+fn upp_bad_arms(arms: [Map], name: Text) -> int:
+    mut bad = 0
+    loop i in 0..<len(arms):
+        a = at(arms, i)
+        if has(a, "guard"):
+            bad = bad + upp_bad_expr(get_map(a, "guard"), name)
+        b = get_map(a, "body")
+        if get(b, "kind") == "Block":
+            bad = bad + upp_bad_block(b, name)
+        else:
+            bad = bad + upp_bad_expr(b, name)
+    bad
+
+fn upp_bad_expr(node: Map, name: Text) -> int:
+    kind = get(node, "kind")
+    if kind == "Ident":
+        if get(node, "name") == name then 1 else 0
+    else if kind == "Int" or kind == "Str" or kind == "Float" or kind == "Range":
+        0
+    else if kind == "Call":
+        callee = get(node, "callee")
+        args = get_list(node, "args")
+        na = len(args)
+        safe0 = (callee == "push" or callee == "push_mut" or upp_is_reader(callee)) and na > 0 and upp_is_ident(at(args, 0), name)
+        start = if safe0 then 1 else 0
+        mut bad = 0
+        loop i in start..<na:
+            bad = bad + upp_bad_expr(at(args, i), name)
+        bad
+    else if kind == "Binary":
+        upp_bad_expr(get_map(node, "left"), name) + upp_bad_expr(get_map(node, "right"), name)
+    else if kind == "Unary":
+        upp_bad_expr(get_map(node, "operand"), name)
+    else if kind == "MethodCall":
+        mut bad = upp_bad_expr(get_map(node, "receiver"), name)
+        args = get_list(node, "args")
+        loop i in 0..<len(args):
+            bad = bad + upp_bad_expr(at(args, i), name)
+        bad
+    else if kind == "Perform":
+        upp_bad_list(get_list(node, "args"), name)
+    else if kind == "Field":
+        upp_bad_expr(get_map(node, "object"), name)
+    else if kind == "Index":
+        upp_bad_expr(get_map(node, "object"), name) + upp_bad_expr(get_map(node, "index"), name)
+    else if kind == "Question":
+        upp_bad_expr(get_map(node, "inner"), name)
+    else if kind == "If":
+        upp_bad_expr(get_map(node, "cond"), name) + upp_bad_expr(get_map(node, "then"), name) + upp_bad_expr(get_map(node, "else"), name)
+    else if kind == "ListLit":
+        upp_bad_list(get_list(node, "items"), name)
+    else if kind == "Tuple":
+        upp_bad_list(get_list(node, "items"), name)
+    else if kind == "NamedArg":
+        upp_bad_expr(get_map(node, "value"), name)
+    else if kind == "MapLit":
+        upp_bad_pairs(get_list(node, "pairs"), name)
+    else if kind == "StructCons":
+        upp_bad_pairs(get_list(node, "fields"), name)
+    else if kind == "Match":
+        upp_bad_expr(get_map(node, "scrutinee"), name) + upp_bad_arms(get_list(node, "arms"), name)
+    else:
+        1000000
+
+fn upp_bad_else(els: Map, name: Text) -> int:
+    k = get(els, "kind")
+    if k == "Block":
+        upp_bad_block(els, name)
+    else if k == "IfBlock":
+        upp_bad_stmt(els, name)
+    else:
+        0
+
+fn upp_bad_stmt(s: Map, name: Text) -> int:
+    kind = get(s, "kind")
+    if kind == "MutLet" or kind == "LetOrAssign":
+        val = get_map(s, "value")
+        if get(s, "name") == name:
+            fresh_bad = if upp_fresh(val, name) then 0 else 1000000
+            fresh_bad + upp_bad_expr(val, name)
+        else:
+            upp_bad_expr(val, name)
+    else if kind == "ExprStmt":
+        e = get_map(s, "expr")
+        if upp_is_ident(e, name) then 0 else upp_bad_expr(e, name)
+    else if kind == "Return":
+        e = get_map(s, "expr")
+        if upp_is_ident(e, name) then 0 else upp_bad_expr(e, name)
+    else if kind == "Require" or kind == "Ensure" or kind == "Defer":
+        upp_bad_expr(get_map(s, "expr"), name)
+    else if kind == "Loop":
+        upp_bad_block(get_map(s, "body"), name)
+    else if kind == "ForRange":
+        upp_bad_expr(get_map(s, "low"), name) + upp_bad_expr(get_map(s, "high"), name) + upp_bad_block(get_map(s, "body"), name)
+    else if kind == "ForIn":
+        upp_bad_expr(get_map(s, "iter"), name) + upp_bad_block(get_map(s, "body"), name)
+    else if kind == "IfBlock":
+        upp_bad_expr(get_map(s, "cond"), name) + upp_bad_block(get_map(s, "then"), name) + upp_bad_else(get_map(s, "else"), name)
+    else if kind == "Match":
+        upp_bad_expr(get_map(s, "scrutinee"), name) + upp_bad_arms(get_list(s, "arms"), name)
+    else if kind == "Break" or kind == "Continue":
+        0
+    else:
+        1000000
+
+fn upp_bad_block(block: Map, name: Text) -> int:
+    stmts = get_list(block, "stmts")
+    mut bad = 0
+    loop i in 0..<len(stmts):
+        bad = bad + upp_bad_stmt(at(stmts, i), name)
+    bad
+
+fn upp_mut_names(block: Map, acc0: [Text]) -> [Text]:
+    stmts = get_list(block, "stmts")
+    mut acc = acc0
+    loop i in 0..<len(stmts):
+        s = at(stmts, i)
+        k = get(s, "kind")
+        if k == "MutLet":
+            acc = push(acc, get(s, "name"))
+        else if k == "Loop":
+            acc = upp_mut_names(get_map(s, "body"), acc)
+        else if k == "ForRange" or k == "ForIn":
+            acc = upp_mut_names(get_map(s, "body"), acc)
+        else if k == "IfBlock":
+            acc = upp_mut_names(get_map(s, "then"), acc)
+            els = get_map(s, "else")
+            if get(els, "kind") == "Block":
+                acc = upp_mut_names(els, acc)
+            else if get(els, "kind") == "IfBlock":
+                acc = upp_mut_names_stmt(els, acc)
+        else if k == "Match":
+            arms = get_list(s, "arms")
+            loop ai in 0..<len(arms):
+                b = get_map(at(arms, ai), "body")
+                if get(b, "kind") == "Block":
+                    acc = upp_mut_names(b, acc)
+    acc
+
+fn upp_mut_names_stmt(s: Map, acc0: [Text]) -> [Text]:
+    mut acc = upp_mut_names(get_map(s, "then"), acc0)
+    els = get_map(s, "else")
+    if get(els, "kind") == "Block":
+        acc = upp_mut_names(els, acc)
+    else if get(els, "kind") == "IfBlock":
+        acc = upp_mut_names_stmt(els, acc)
+    acc
+
+fn upp_contains_name(names: [Text], name: Text) -> bool:
+    mut f = false
+    loop i in 0..<len(names):
+        if at(names, i) == name:
+            f = true
+    f
+
+fn upp_is_self_push(value: Map, name: Text) -> bool:
+    if get(value, "kind") != "Call":
+        false
+    else:
+        args = get_list(value, "args")
+        get(value, "callee") == "push" and len(args) > 0 and upp_is_ident(at(args, 0), name)
+
+fn upp_promote_stmt(s: Map, uniq: [Text]) -> Map:
+    kind = get(s, "kind")
+    mut out = s
+    if kind == "LetOrAssign":
+        nm = get(s, "name")
+        val = get_map(s, "value")
+        if upp_contains_name(uniq, nm) and upp_is_self_push(val, nm):
+            out = set(out, "value", set(val, "callee", "push_mut"))
+    else if kind == "Loop":
+        out = set(out, "body", upp_promote_block(get_map(s, "body"), uniq))
+    else if kind == "ForRange" or kind == "ForIn":
+        out = set(out, "body", upp_promote_block(get_map(s, "body"), uniq))
+    else if kind == "IfBlock":
+        out = set(out, "then", upp_promote_block(get_map(s, "then"), uniq))
+        els = get_map(s, "else")
+        if get(els, "kind") == "Block":
+            out = set(out, "else", upp_promote_block(els, uniq))
+        else if get(els, "kind") == "IfBlock":
+            out = set(out, "else", upp_promote_stmt(els, uniq))
+    else if kind == "Match":
+        arms = get_list(s, "arms")
+        mut new_arms = slice(arms, 0, 0)
+        loop ai in 0..<len(arms):
+            a = at(arms, ai)
+            b = get_map(a, "body")
+            nb = if get(b, "kind") == "Block" then upp_promote_block(b, uniq) else b
+            new_arms = push(new_arms, set(a, "body", nb))
+        out = set(out, "arms", new_arms)
+    out
+
+fn upp_promote_block(block: Map, uniq: [Text]) -> Map:
+    stmts = get_list(block, "stmts")
+    mut out = slice(stmts, 0, 0)
+    loop i in 0..<len(stmts):
+        out = push(out, upp_promote_stmt(at(stmts, i), uniq))
+    set(block, "stmts", out)
+
+# Per-function: keep the mut locals proven unique, rewrite their self-pushes.
+fn upp_promote_fn(body: Map) -> Map:
+    cands = upp_mut_names(body, slice([""], 0, 0))
+    mut uniq = slice([""], 0, 0)
+    loop i in 0..<len(cands):
+        nm = at(cands, i)
+        if (not upp_contains_name(uniq, nm)) and (upp_bad_block(body, nm) == 0):
+            uniq = push(uniq, nm)
+    if len(uniq) == 0:
+        body
+    else:
+        upp_promote_block(body, uniq)
+
+
 pub fn ast_program_to_ir(program: Map) -> IRModule:
     # New EPOCH for the private-name registry. A host can compile many programs
     # in one process (the test runner does 118 in a row), and compiler slots
@@ -4580,6 +4835,19 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
             df_out = push(df_out, dfd2)
         defer_decls = df_out
     program_const = set(program_const, "decls", defer_decls)
+
+    # Pass -0.5: unique-accumulator promotion. Rewrite `x = push(x, v)` to the
+    # in-place push_mut wherever x is a mut local proven uniquely owned, killing
+    # the quadratic copy. Runs BEFORE lambda lift so a capturing lambda is still
+    # a Lambda node (which blocks promotion). See upp_promote_fn.
+    upp_decls = get_list(program_const, "decls")
+    mut upp_out = slice(upp_decls, 0, 0)
+    loop upi in 0..<len(upp_decls):
+        mut upd = at(upp_decls, upi)
+        if get(upd, "kind") == "Fn":
+            upd = set(upd, "body", upp_promote_fn(get_map(upd, "body")))
+        upp_out = push(upp_out, upd)
+    program_const = set(program_const, "decls", upp_out)
 
     # Pass 0: lambda lift. For each `name = |params| body` LetOrAssign at
     # top of a fn body, hoist as synthesized __lambda_N global fn. We

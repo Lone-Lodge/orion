@@ -82,9 +82,11 @@ emits the same IR on either host.
 
 Known gaps, stated plainly rather than left to be discovered:
 
-- `x = push(x, v)` copies, so building a list in a loop is quadratic. Use
-  `push_mut` for a hot accumulator. Making the copy elidable in general needs a
-  uniqueness analysis, which is the next real piece of language work.
+- `x = push(x, v)` copies. The compiler proves when `x` is uniquely owned and
+  then pushes in place automatically, so the common `mut x = []` build-in-a-loop
+  is linear with no annotation. When uniqueness cannot be proven (x is aliased,
+  stored, or captured) it stays a copy; reach for `push_mut` there if the copy
+  shows up in a profile.
 - Effects that resume (`ask` / `resume_with`) use Windows fibers. Elsewhere
   `resumable_ok()` reports 0 and `ask` refuses rather than pretending.
 - Interactive terminal input (`orion_console_readline`) works on Windows and
