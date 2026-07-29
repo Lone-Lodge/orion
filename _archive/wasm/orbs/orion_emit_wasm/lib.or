@@ -242,7 +242,7 @@ pub fn write_wasm(path: Text, bytes_data: [int]):
 # description, lays out each section, and returns the full .wasm.
 
 # One function within a module.
-pub type WFn: name: Text, param_count: int, body: [int]
+pub type WFn: name: Text, param_count: int, body: [int], local_count: int
 
 # One import from the JS host: `module.name`, taking N i32 args,
 # returning either i32 or nothing. The result_count flag is 0 for
@@ -286,19 +286,24 @@ pub fn add_string(module: WModule, offset: int, text: Text) -> WModule:
     add_data(module, offset, bytes_from_text(text))
 
 pub fn new_fn(name: Text, param_count: int) -> WFn:
-    WFn{name: name, param_count: param_count, body: []}
+    WFn{name: name, param_count: param_count, body: [], local_count: 0}
+
+# Register one more local (beyond params); emitted as an i32 in the code
+# section local declarations.
+pub fn add_local(fn_value: WFn) -> WFn:
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: fn_value.body, local_count: fn_value.local_count + 1}
 
 # Emit one opcode-with-no-immediate into the function body. Returns a
 # fresh WFn so the builder stays pure (no mutation).
 pub fn emit_op(fn_value: WFn, opcode: int) -> WFn:
-    WFn{name: fn_value.name, param_count: fn_value.param_count, body: push(fn_value.body, opcode)}
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: push(fn_value.body, opcode), local_count: fn_value.local_count}
 
 # Append several bytes (used for opcode + immediate combos).
 pub fn emit_bytes(fn_value: WFn, more: [int]) -> WFn:
     mut grown = fn_value.body
     loop byte_value in more:
         grown = push(grown, byte_value)
-    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown}
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # Push an i32 constant.
 pub fn emit_const(fn_value: WFn, value: int) -> WFn:
@@ -306,7 +311,7 @@ pub fn emit_const(fn_value: WFn, value: int) -> WFn:
     mut grown = push(fn_value.body, op_i32_const())
     loop byte_value in immediate:
         grown = push(grown, byte_value)
-    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown}
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # local.get / local.set with LEB128 index.
 pub fn emit_local_get(fn_value: WFn, index: int) -> WFn:
@@ -314,14 +319,14 @@ pub fn emit_local_get(fn_value: WFn, index: int) -> WFn:
     mut grown = push(fn_value.body, op_local_get())
     loop byte_value in idx_bytes:
         grown = push(grown, byte_value)
-    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown}
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 pub fn emit_local_set(fn_value: WFn, index: int) -> WFn:
     idx_bytes = leb_u(index)
     mut grown = push(fn_value.body, op_local_set())
     loop byte_value in idx_bytes:
         grown = push(grown, byte_value)
-    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown}
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # Direct call to another function by index. The caller already
 # arranged the arguments on the stack.
@@ -330,7 +335,7 @@ pub fn emit_call(fn_value: WFn, function_index: int) -> WFn:
     mut grown = push(fn_value.body, op_call())
     loop byte_value in idx_bytes:
         grown = push(grown, byte_value)
-    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown}
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # Close out a function body with the `end` opcode (required by the
 # WASM grammar at function/block end).
@@ -567,8 +572,16 @@ fn encode_code_section(module: WModule) -> [int]:
     loop byte_value in count_bytes:
         contents = push(contents, byte_value)
     loop fn_value in module.functions:
-        # Function body framing: local count (0 = no extra locals beyond params), then body bytes.
+        # Function body framing: local declarations, then body bytes. Declare
+        # local_count i32 locals (indices param_count..param_count+local_count-1);
+        # without this a `local.get`/`local.set` past the params is invalid wasm.
         mut body_with_locals = [0]
+        if fn_value.local_count != 0:
+            body_with_locals = [1]
+            lc_bytes = leb_u(fn_value.local_count)
+            loop byte_value in lc_bytes:
+                body_with_locals = push(body_with_locals, byte_value)
+            body_with_locals = push(body_with_locals, 127)
         loop byte_value in fn_value.body:
             body_with_locals = push(body_with_locals, byte_value)
         body_size = list_length(body_with_locals)

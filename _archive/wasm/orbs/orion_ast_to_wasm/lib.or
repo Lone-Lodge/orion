@@ -105,10 +105,13 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
             existing = lookup_local(locals, name)
             new_locals = locals
             mut current_locals = new_locals
+            mut fn_after = after_value
             if existing < 0:
                 current_locals = push(locals, name)
+                # A new binding needs a declared wasm local, not just an index.
+                fn_after = add_local(after_value)
             new_index = lookup_local(current_locals, name)
-            with_set = emit_local_set(after_value, new_index)
+            with_set = emit_local_set(fn_after, new_index)
             {"fn": with_set, "locals": current_locals}
         else:
             if kind == "Return":
