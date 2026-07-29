@@ -62,8 +62,19 @@ pub fn compile_program(decls: [Map]) -> WModule:
     loop decl in decls:
         if get(decl, "kind") == "ExternFn":
             ename = get(decl, "name")
-            pc = list_count(get_list(decl, "params"))
-            module = add_import(module, new_import("env", ename, pc, 1))
+            eparams = get_list(decl, "params")
+            pc = list_count(eparams)
+            # Typed import signature so host fns can take/return f64.
+            mut esig = ""
+            loop p in eparams:
+                esig = "{esig}{wtype_of(get_map(p, \"type\"))}"
+            slot_set("wsig:{ename}", esig)
+            rnode = get_map(decl, "ret")
+            rcount = if get(rnode, "name") == "Unit" then 0 else 1
+            erett = wtype_of(rnode)
+            slot_set("wret:{ename}", erett)
+            slot_set("fret:{ename}", erett)
+            module = add_import(module, new_import("env", ename, pc, rcount))
             slot_set("wfn:{ename}", idx)
             idx = idx + 1
     loop decl in decls:
@@ -552,9 +563,22 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         wv = compile_expr(fn_value, at(args, 0), locals)
                         emit_op(wv, op_i32_trunc_f64_s())
                     else:
+                        # Promote an i32 argument to f64 when the callee's param
+                        # (from wsig:<callee>) is f64, so scale(2, 3.0) works.
+                        csig = if slot_has("wsig:{callee}") then slot_get("wsig:{callee}") else ""
+                        sig_b = bytes_from_text(csig)
+                        sig_n = len(sig_b)
                         mut current_fn = fn_value
+                        mut ai = 0
                         loop arg in args:
                             current_fn = compile_expr(current_fn, arg, locals)
+                            mut want_f = false
+                            if ai < sig_n:
+                                if at(sig_b, ai) == 102:
+                                    want_f = true
+                            if want_f and type_of(arg) == "i":
+                                current_fn = emit_op(current_fn, op_f64_convert_i32_s())
+                            ai = ai + 1
                         # Resolve the callee to its function index. The driver records
                         # each Fn's index in a `wfn:<name>` slot before compiling, so
                         # recursion and forward calls both resolve.

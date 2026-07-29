@@ -520,10 +520,15 @@ fn irep(n: int) -> Text:
     s
 
 fn sig_text_for_import(import_value: WImport) -> Text:
+    mut params = irep(import_value.param_count)
+    if slot_has("wsig:{import_value.fn_name}"):
+        params = slot_get("wsig:{import_value.fn_name}")
+    mut result = ""
     if import_value.result_count == 1:
-        "{irep(import_value.param_count)}#i"
-    else:
-        "{irep(import_value.param_count)}#"
+        result = "i"
+        if slot_has("wret:{import_value.fn_name}"):
+            result = slot_get("wret:{import_value.fn_name}")
+    "{params}#{result}"
 
 fn sig_text_for_fn(fn_value: WFn) -> Text:
     mut params = irep(fn_value.param_count)
