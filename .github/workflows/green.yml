@@ -11,7 +11,11 @@
 # Ubuntu is the honest fresh-clone signal: it also exercises the retarget path
 # (the compiler always emits a Windows triple, so POSIX hosts rewrite the module
 # header before clang links it) which nobody runs by hand. Windows is where the
-# work happens, so it is here as the no-surprises job.
+# work happens, so it is here as the no-surprises job. macOS is the only runner
+# that is arm64 and Mach-O: it rewrites the header to `e-m:o` with an
+# arm64-apple triple and links under a main-thread stack the OS caps well below
+# the others, so it is the one place the non-x86 target and the tight stack get
+# exercised at all.
 
 name: green
 
@@ -36,7 +40,7 @@ jobs:
       # One red platform must not hide the other's result.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     defaults:
       run:

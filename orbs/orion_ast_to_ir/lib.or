@@ -3907,7 +3907,7 @@ fn defer_rewrite_block(block: Map, inherited: [Map]) -> Map:
                 tmp = defer_tmp_name()
                 out = push(out, {"kind": "LetOrAssign", "name": tmp, "value": get_map(s, "expr")})
                 out = defer_append_reverse(out, visible)
-                out = push(out, {"kind": "Return", "expr": {"kind": "Ident", "name": tmp}})
+                out = push(out, {"kind": "Return", "expr": {"kind": "Ident", "name": tmp}, "line": dfv_stmt_line(s), "col": dfv_stmt_col(s), "defer_covered": 1})
             else:
                 # The last expression of a block IS its value, so the same
                 # save-then-run applies at the block end: appending the defers
@@ -3921,7 +3921,7 @@ fn defer_rewrite_block(block: Map, inherited: [Map]) -> Map:
                     tail_expr = if k == "ExprStmt" then get_map(s, "expr") else s
                     out = push(out, {"kind": "LetOrAssign", "name": tmp2, "value": tail_expr})
                     out = defer_append_reverse(out, mine)
-                    out = push(out, {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": tmp2}})
+                    out = push(out, {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": tmp2}, "line": dfv_stmt_line(s), "col": dfv_stmt_col(s), "defer_covered": 1})
                 else:
                     out = push(out, defer_rewrite_stmt(s, visible))
     # Only if the value-preserving path above did not already do it: a block that
@@ -3954,6 +3954,163 @@ fn defer_block_has(block: Map) -> bool:
             if defer_block_has(get(s, "body")):
                 found = true
     found
+
+# ---- defer coverage verifier (compile-time) --------------------------
+#
+# An independent postcondition on the `defer` AST rewrite above. The rewrite
+# is the thing that can be wrong: every bug in this class (a `defer` before a
+# tail `match`, a `return` inside an `if`, a tail `if` whose branches return)
+# was the rewrite failing to RECURSE into a construct, leaving a value-
+# producing position uncovered while the value survived and answered wrong.
+#
+# So: the rewrite STAMPS every position it covers (`defer_covered`). This
+# oracle walks the ORIGINAL body, recursing into EVERY construct, and records
+# every position that NEEDS covering: a `return` or a tail value reached with
+# at least one visible `defer` in scope. A position the oracle reaches but the
+# rewrite did not leaves an entry in `needs` with no match in `covered`, and is
+# reported at the dropped defer's source line. The oracle is the spec; the
+# rewrite is the implementation; a divergence is the bug.
+#
+# It changes no emitted IR (a valid program compiles to exactly what it did
+# before), so it is fixpoint-safe: the compiler still self-hosts unchanged.
+
+fn dfv_line(s: Map) -> int:
+    if has(s, "line") then get_int(s, "line") else 0
+
+fn dfv_col(s: Map) -> int:
+    if has(s, "col") then get_int(s, "col") else 0
+
+# Statement wrappers (Defer, Return, ExprStmt) carry no location, but the
+# EXPRESSION they wrap does, and a `match` node carries its own. So a position's
+# location is its own `line` if present, else its expression's. This must be the
+# same value the rewrite stamps on what it covers, so the match key is stable and
+# distinct per position (line 0 for everything would collapse the keys and let a
+# real drop hide behind any covered defer).
+fn dfv_stmt_line(s: Map) -> int:
+    if has(s, "line") then get_int(s, "line")
+    else if has(s, "expr") then dfv_line(get_map(s, "expr"))
+    else 0
+
+fn dfv_stmt_col(s: Map) -> int:
+    if has(s, "col") then get_int(s, "col")
+    else if has(s, "expr") then dfv_col(get_map(s, "expr"))
+    else 0
+
+# One in-scope defer's source position, carried down the walk.
+fn dfv_defloc(s: Map) -> Map:
+    {"l": dfv_stmt_line(s), "c": dfv_stmt_col(s)}
+
+# A must-cover position: `m*` is the return/tail's own location (the match key,
+# also stamped by the rewrite on what it covers), `d*` is the nearest enclosing
+# defer (what the error points at).
+fn dfv_key(s: Map, vis: [Map]) -> Map:
+    d = at(vis, len(vis) - 1)
+    {"mline": dfv_stmt_line(s), "mcol": dfv_stmt_col(s), "dline": get_int(d, "l"), "dcol": get_int(d, "c")}
+
+# ---- oracle: positions that must be covered, from the ORIGINAL body ----
+
+fn dfv_need(block: Map) -> [Map]:
+    seed = get_list(block, "stmts")
+    dfv_need_block(seed, slice(seed, 0, 0), slice(seed, 0, 0), true)
+
+# stmts: block body. inh: defers inherited from enclosing blocks. acc0: needs so
+# far. blk_tail: true when this block's last statement is the function's value.
+fn dfv_need_block(stmts: [Map], inh: [Map], acc0: [Map], blk_tail: bool) -> [Map]:
+    mut acc = acc0
+    mut vis = slice(inh, 0, len(inh))
+    n = len(stmts)
+    loop i in 0..<n:
+        s = at(stmts, i)
+        k = get(s, "kind")
+        tail_here = blk_tail and (i == n - 1)
+        if k == "Defer":
+            vis = push(vis, dfv_defloc(s))
+        else if k == "Return":
+            if len(vis) > 0:
+                acc = push(acc, dfv_key(s, vis))
+        else if k == "IfBlock":
+            acc = dfv_need_block(get_list(get_map(s, "then"), "stmts"), vis, acc, tail_here)
+            acc = dfv_need_else(get_map(s, "else"), vis, acc, tail_here)
+        else if k == "Loop" or k == "ForRange" or k == "ForIn":
+            acc = dfv_need_block(get_list(get_map(s, "body"), "stmts"), vis, acc, false)
+        else if k == "Match":
+            if tail_here and len(vis) > 0:
+                acc = push(acc, dfv_key(s, vis))
+            arms = get_list(s, "arms")
+            loop ai in 0..<len(arms):
+                b = get_map(at(arms, ai), "body")
+                if get(b, "kind") == "Block":
+                    acc = dfv_need_block(get_list(b, "stmts"), vis, acc, false)
+        else if k == "ExprStmt":
+            if tail_here and len(vis) > 0:
+                acc = push(acc, dfv_key(s, vis))
+    acc
+
+# An `else` is a Block, an else-if chain (nested IfBlock), or empty.
+fn dfv_need_else(els: Map, vis: [Map], acc0: [Map], tail_here: bool) -> [Map]:
+    k = get(els, "kind")
+    if k == "Block":
+        dfv_need_block(get_list(els, "stmts"), vis, acc0, tail_here)
+    else if k == "IfBlock":
+        mut acc = dfv_need_block(get_list(get_map(els, "then"), "stmts"), vis, acc0, tail_here)
+        acc = dfv_need_else(get_map(els, "else"), vis, acc, tail_here)
+        acc
+    else:
+        acc0
+
+# ---- what the rewrite actually covered, from the REWRITTEN body ----
+
+fn dfv_covered(block: Map) -> [Map]:
+    seed = get_list(block, "stmts")
+    dfv_cov_block(seed, slice(seed, 0, 0))
+
+fn dfv_cov_block(stmts: [Map], acc0: [Map]) -> [Map]:
+    mut acc = acc0
+    loop i in 0..<len(stmts):
+        s = at(stmts, i)
+        if has(s, "defer_covered"):
+            acc = push(acc, {"mline": dfv_line(s), "mcol": dfv_col(s)})
+        acc = dfv_cov_nested(s, acc)
+    acc
+
+fn dfv_cov_nested(s: Map, acc0: [Map]) -> [Map]:
+    mut acc = acc0
+    k = get(s, "kind")
+    if k == "IfBlock":
+        acc = dfv_cov_block(get_list(get_map(s, "then"), "stmts"), acc)
+        els = get_map(s, "else")
+        if get(els, "kind") == "Block":
+            acc = dfv_cov_block(get_list(els, "stmts"), acc)
+        else if get(els, "kind") == "IfBlock":
+            acc = dfv_cov_nested(els, acc)
+    else if k == "Loop" or k == "ForRange" or k == "ForIn":
+        acc = dfv_cov_block(get_list(get_map(s, "body"), "stmts"), acc)
+    else if k == "Match":
+        arms = get_list(s, "arms")
+        loop ai in 0..<len(arms):
+            b = get_map(at(arms, ai), "body")
+            if get(b, "kind") == "Block":
+                acc = dfv_cov_block(get_list(b, "stmts"), acc)
+    acc
+
+# ---- report: every need with no matching cover is a dropped defer ----
+
+fn dfv_has(xs: [Map], ml: int, mc: int) -> bool:
+    mut f = false
+    loop i in 0..<len(xs):
+        x = at(xs, i)
+        if get_int(x, "mline") == ml and get_int(x, "mcol") == mc:
+            f = true
+    f
+
+fn dfv_report(needs: [Map], covered: [Map]):
+    loop i in 0..<len(needs):
+        nd = at(needs, i)
+        ml = get_int(nd, "mline")
+        mc = get_int(nd, "mcol")
+        if not dfv_has(covered, ml, mc):
+            where = otir_where(get_int(nd, "dline"), get_int(nd, "dcol"))
+            compile_error("orion: ERROR at {where}: `defer` is dropped on a return path (registered here, it never runs before the block's value leaves)")
 
 # ---- name substitution over an AST subtree ---------------------------
 # Replace every READ of a name with a given expression node, everywhere a name
@@ -4830,8 +4987,15 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
         loop dfj in 0..<len(defer_decls):
             mut dfd2 = at(defer_decls, dfj)
             if get(dfd2, "kind") == "Fn":
+                orig_body = get_map(dfd2, "body")
+                # Oracle over the ORIGINAL body BEFORE the rewrite can drop a
+                # defer; coverage over the rewritten body; a need with no cover
+                # is a `defer` the rewrite lost on some return path.
+                needs = dfv_need(orig_body)
                 no_defers = slice([{}], 0, 0)
-                dfd2 = set(dfd2, "body", defer_rewrite_block(get_map(dfd2, "body"), no_defers))
+                new_body = defer_rewrite_block(orig_body, no_defers)
+                dfv_report(needs, dfv_covered(new_body))
+                dfd2 = set(dfd2, "body", new_body)
             df_out = push(df_out, dfd2)
         defer_decls = df_out
     program_const = set(program_const, "decls", defer_decls)
