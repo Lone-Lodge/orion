@@ -88,7 +88,10 @@ pub fn compile_program(decls: [Map]) -> WModule:
             loop p in get_list(decl, "params"):
                 psig = "{psig}{wtype_of(get_map(p, \"type\"))}"
             slot_set("wsig:{fname}", psig)
-            rett = wtype_of(get_map(decl, "ret"))
+            # A Unit return means no wasm result (void); "" leaves the result
+            # slot empty in the signature.
+            rnode2 = get_map(decl, "ret")
+            rett = if get(rnode2, "name") == "Unit" then "" else wtype_of(rnode2)
             slot_set("wret:{fname}", rett)
             slot_set("fret:{fname}", rett)
     # Reserve the __push runtime helpers' indices (appended after all user fns),
