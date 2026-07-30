@@ -987,6 +987,8 @@ fn expr_agg_depth(node: Map) -> int:
             m = max2(m, expr_agg_depth(a))
         # A variant constructor allocates a tagged value, so it needs a temp.
         if slot_has("vtag:{get(node, \"callee\")}") then 1 + m else m
+    else if kind == "Question":
+        1 + expr_agg_depth(get_map(node, "inner"))
     else if kind == "MethodCall":
         mut m = expr_agg_depth(get_map(node, "receiver"))
         loop a in get_list(node, "args"):
@@ -1109,6 +1111,10 @@ fn scan_hostcalls(node: Map):
         scan_hostcalls(get_map(node, "scrutinee"))
         loop arm in get_list(node, "arms"):
             scan_hostcalls(get_map(arm, "body"))
+    else if kind == "Question":
+        scan_hostcalls(get_map(node, "inner"))
+    else if kind == "Defer" or kind == "Require" or kind == "Ensure":
+        scan_hostcalls(get_map(node, "expr"))
 
 fn scan_block_hostcalls(block: Map):
     loop s in get_list(block, "stmts"):
@@ -1144,6 +1150,25 @@ fn lookup_local(locals: [Text], name: Text) -> int:
 # Returns {fn, locals}. Locals declared in the block are threaded back out so
 # later statements get fresh wasm local indices (slots are function-scoped, so
 # reusing an index for a differently-typed local would corrupt the function).
+# True if a block's last statement produces a value (so the block, used as an
+# if/match branch, yields that value). Mirrors the drop logic in compile_block.
+fn block_last_is_value(block: Map) -> bool:
+    stmts = get_list(block, "stmts")
+    n = list_count(stmts)
+    if n == 0:
+        false
+    else:
+        last = at(stmts, n - 1)
+        sk = get(last, "kind")
+        if sk == "ExprStmt":
+            not expr_is_void(get_map(last, "expr"))
+        else if sk == "If" or sk == "Match":
+            true
+        else if sk == "IfBlock":
+            block_last_is_value(get_map(last, "then")) and block_last_is_value(get_map(last, "else"))
+        else:
+            false
+
 # True if the expression leaves nothing on the wasm stack (a void call). Used
 # to decide whether a non-final expression statement needs a `drop`.
 fn expr_is_void(node: Map) -> bool:
@@ -1160,22 +1185,45 @@ fn expr_is_void(node: Map) -> bool:
 
 fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> Map:
     statements = get_list(block, "stmts")
-    total = list_count(statements)
+    # The block's value is its last non-defer statement's value.
+    mut last_normal = 0 - 1
+    mut ti = 0
+    loop stmt in statements:
+        if get(stmt, "kind") != "Defer":
+            last_normal = ti
+        ti = ti + 1
     mut current_fn = fn_value
     mut current_locals = locals
+    mut deferred = []
     mut si = 0
     loop stmt in statements:
-        result = compile_stmt(current_fn, stmt, current_locals)
-        current_fn = get(result, "fn")
-        current_locals = get(result, "locals")
-        # A non-final statement that leaves a value must drop it; the final
-        # statement's value is the block's value (implicit return). Expression
-        # statements (unless void) and if/match used as statements produce values.
         sk = get(stmt, "kind")
-        produces = (sk == "ExprStmt" and not expr_is_void(get_map(stmt, "expr"))) or sk == "If" or sk == "Match"
-        if si < total - 1 and produces:
-            current_fn = emit_op(current_fn, op_drop())
+        if sk == "Defer":
+            # Deferred expressions run at block end, in reverse (see below).
+            deferred = push(deferred, get_map(stmt, "expr"))
+        else:
+            result = compile_stmt(current_fn, stmt, current_locals)
+            current_fn = get(result, "fn")
+            current_locals = get(result, "locals")
+            # A non-final statement that leaves a value must drop it; the final
+            # statement's value is the block's value (implicit return). Expression
+            # statements (unless void) and if/match used as statements produce values.
+            produces = (sk == "ExprStmt" and not expr_is_void(get_map(stmt, "expr"))) or sk == "If" or sk == "Match" or (sk == "IfBlock" and block_last_is_value(get_map(stmt, "then")) and block_last_is_value(get_map(stmt, "else")))
+            if si != last_normal and produces:
+                current_fn = emit_op(current_fn, op_drop())
         si = si + 1
+    # Run deferred expressions LIFO, dropping any value they leave. They come
+    # after the block value is already on the stack (void prints leave it intact).
+    ndef = list_count(deferred)
+    mut di = 0
+    loop:
+        if di >= ndef:
+            break
+        dexpr = at(deferred, ndef - 1 - di)
+        current_fn = compile_expr(current_fn, dexpr, current_locals)
+        if not expr_is_void(dexpr):
+            current_fn = emit_op(current_fn, op_drop())
+        di = di + 1
     {"fn": current_fn, "locals": current_locals}
 
 fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
@@ -1268,7 +1316,11 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                         if kind == "IfBlock":
                             with_cond = compile_expr(fn_value, get(stmt, "cond"), locals)
                             with_if = emit_op(with_cond, op_if())
-                            with_bt = emit_bytes(with_if, [blocktype_void()])
+                            # A block-form if whose branches both end in a value is
+                            # used as a value (e.g. a function body): give it an i32
+                            # result. A plain statement-if stays void.
+                            ifval = block_last_is_value(get_map(stmt, "then")) and block_last_is_value(get_map(stmt, "else"))
+                            with_bt = emit_bytes(with_if, [if ifval then ty_i32() else blocktype_void()])
                             # An `if` frame sits between an inner break/continue and
                             # the loop's blocks, so both targets go one level deeper.
                             prev_brk = slot_get_int("wbrk")
@@ -1446,6 +1498,15 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             # tail). Compile as an expression; its value stays on
                             # the stack as the block's value.
                             {"fn": compile_expr(fn_value, stmt, locals), "locals": locals}
+                        else if kind == "Require":
+                            # require cond: trap (unreachable) if the condition is false.
+                            rq1 = compile_expr(fn_value, get_map(stmt, "expr"), locals)
+                            rq2 = emit_op(rq1, op_i32_eqz())
+                            rq3 = emit_op(rq2, op_if())
+                            rq4 = emit_bytes(rq3, [blocktype_void()])
+                            rq5 = emit_op(rq4, op_unreachable())
+                            rq6 = emit_op(rq5, op_end())
+                            {"fn": rq6, "locals": locals}
                         else:
                             # Unsupported statement — report and pass through.
                             compile_error("orion: ERROR — the wasm backend does not support `{kind}` statements yet")
@@ -1848,6 +1909,27 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             bf = get(br, "fn")
                             blk_locals = get(br, "locals")
                         bf
+                    else if kind == "Question":
+                        # e? : the value is a tagged Result/Option. If it is an
+                        # error (tag != 0, i.e. not the first/success variant),
+                        # early-return it; otherwise unwrap the payload.
+                        qdepth = slot_get_int("wtmp:depth")
+                        qtidx = slot_get_int("wtmp:pbase") + qdepth
+                        slot_set("wtmp:depth", qdepth + 1)
+                        q1 = compile_expr(fn_value, get_map(expr_node, "inner"), locals)
+                        q2 = emit_local_tee(q1, qtidx)
+                        q3 = emit_load(q2, 0)
+                        q4 = emit_const(q3, 0)
+                        q5 = emit_op(q4, op_i32_ne())
+                        q6 = emit_op(q5, op_if())
+                        q7 = emit_bytes(q6, [blocktype_void()])
+                        q8 = emit_local_get(q7, qtidx)
+                        q9 = emit_op(q8, op_return())
+                        q10 = emit_op(q9, op_end())
+                        q11 = emit_local_get(q10, qtidx)
+                        qres = emit_load(q11, 4)
+                        slot_set("wtmp:depth", qdepth)
+                        qres
                     else if kind == "MethodCall":
                         # Enum.Variant(a) is a qualified constructor (ignore the
                         # receiver); otherwise UFCS: recv.m(a) -> m(recv, a).
