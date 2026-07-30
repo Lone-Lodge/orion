@@ -20,7 +20,6 @@
 # next as the JS shell expands.
 
 use bytes
-use os
 
 # --- LEB128 encoders ---
 
@@ -251,12 +250,6 @@ fn build_code_section_const(return_value: int) -> [int]:
     loop body_byte in fn_body:
         wrapped = push(wrapped, body_byte)
     wrap_section(10, wrapped)
-
-# Write a .wasm file to disk. The browser fetches it as application/wasm
-# and instantiates via WebAssembly.instantiateStreaming.
-pub fn write_wasm(path: Text, bytes_data: [int]):
-    ok = write_file(path, bytes_to_text(bytes_data))
-    ok
 
 # ============================================================
 #  Higher-level builder API — assemble a module from data types

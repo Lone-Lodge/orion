@@ -3,6 +3,8 @@ use orion_lex
 use orion_parse
 use orion_ast_to_ir
 use orion_emit_llvm
+use orion_ast_to_wasm
+use orion_emit_wasm
 
 # Self-hosted driver: orion_self <input.or> [output.ll] [orb-root...]
 #
@@ -673,6 +675,25 @@ fn drv_facts(module: IRModule) -> int:
     print_line("facts: {n} fn(s), {pure_count} pure")
     0
 
+# True when the output path ends in ".wasm".
+fn drv_wants_wasm(p: Text) -> bool:
+    b = bytes_from_text(p)
+    n = len(b)
+    if n < 5:
+        return false
+    at(b, n - 5) == 46 and at(b, n - 4) == 119 and at(b, n - 3) == 97 and at(b, n - 2) == 115 and at(b, n - 1) == 109
+
+# Compile the AST straight to a .wasm module (bump-allocated linear memory,
+# i32 + f64, structs, lists, extern host imports) and write the bytes. A Text
+# is length-prefixed, so binary survives file_write untouched.
+fn drv_emit_wasm(ast: Map, out_path: Text) -> int:
+    wmodule = compile_program(get_list(ast, "decls"))
+    wbytes = encode_module(wmodule)
+    file_write(out_path, bytes_to_text(wbytes))
+    if not (slot_has("drv:quiet")):
+        print_line(drv_green("  ok") + drv_dim("  {out_path}"))
+    0
+
 pub fn driver_main() -> int:
     if argc() < 2:
         print_line("usage: orion_self <input.or> [output.ll] [orb-root...]")
@@ -708,6 +729,9 @@ pub fn driver_main() -> int:
         # internal names instead of the ones the user typed.
         if out_path == "symbols":
             return drv_symbols(ast)
+        # `.wasm` output: compile straight to WebAssembly (own pipeline, no LLVM).
+        if drv_wants_wasm(out_path):
+            return drv_emit_wasm(ast, out_path)
         t2 = monotonic_ms()
         module = ast_program_to_ir(ast)
         t3 = monotonic_ms()

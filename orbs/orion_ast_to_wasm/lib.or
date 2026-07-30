@@ -444,7 +444,7 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
             btype = type_of(value_node)
             slot_set("ltype:{name}", btype)
             # If the value is a list, remember its element type for at()/for-in.
-            slot_set("eltype:{name}", list_elem_type(value_node))
+            slot_set("eltype:{name}", w_elem_type(value_node))
             new_locals = locals
             mut current_locals = new_locals
             mut fn_after = after_value
@@ -608,7 +608,7 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             note_local("i")
                             # Element type of the iterated list drives the loop
                             # variable's type and the element stride.
-                            iter_et = list_elem_type(get_map(stmt, "iter"))
+                            iter_et = w_elem_type(get_map(stmt, "iter"))
                             in_stride = if iter_et == "f" then 8 else 4
                             # The loop variable — reuse its slot if already bound.
                             var_name = get(stmt, "var")
@@ -761,7 +761,7 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         emit_load(with_ptr, 0)
                     else if callee == "at":
                         # at(x, i) loads element i: mem[ptr + 4 + i*stride].
-                        aet = list_elem_type(at(args, 0))
+                        aet = w_elem_type(at(args, 0))
                         astride = if aet == "f" then 8 else 4
                         with_ptr = compile_expr(fn_value, at(args, 0), locals)
                         with_idx = compile_expr(with_ptr, at(args, 1), locals)
@@ -775,7 +775,7 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         # works). The first arg is a plain name after desugaring,
                         # so recompiling it to return the pointer is side-effect-free.
                         target = at(args, 0)
-                        set_et = list_elem_type(target)
+                        set_et = w_elem_type(target)
                         set_stride = if set_et == "f" then 8 else 4
                         s1 = compile_expr(fn_value, target, locals)
                         s2 = compile_expr(s1, at(args, 1), locals)
@@ -939,7 +939,7 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         if fty2 == "f" then emit_f64_load(with_obj, foff2) else emit_load(with_obj, foff2)
                     else if kind == "Index":
                         # x[i] loads element i: mem[ptr + 4 + i*stride].
-                        iet = list_elem_type(get_map(expr_node, "object"))
+                        iet = w_elem_type(get_map(expr_node, "object"))
                         istride = if iet == "f" then 8 else 4
                         with_ptr = compile_expr(fn_value, get_map(expr_node, "object"), locals)
                         with_idx = compile_expr(with_ptr, get_map(expr_node, "index"), locals)
@@ -989,13 +989,13 @@ fn type_of(node: Map) -> Text:
         else if callee == "to_int":
             "i"
         else if callee == "at":
-            list_elem_type(at(get_list(node, "args"), 0))
+            w_elem_type(at(get_list(node, "args"), 0))
         else if slot_has("fret:{callee}"):
             slot_get("fret:{callee}")
         else:
             "i"
     else if kind == "Index":
-        list_elem_type(get_map(node, "object"))
+        w_elem_type(get_map(node, "object"))
     else if kind == "Field":
         fld = get(node, "field")
         if slot_has("ftype:{fld}") then slot_get("ftype:{fld}") else "i"
@@ -1007,7 +1007,7 @@ fn type_of(node: Map) -> Text:
 # The element type ('i'/'f') of a list-valued expression: from the literal's
 # first item, a variable's recorded eltype, or a push's appended value. Used
 # to pick element stride (4 vs 8 bytes) and i32 vs f64 loads/stores.
-fn list_elem_type(node: Map) -> Text:
+fn w_elem_type(node: Map) -> Text:
     kind = get(node, "kind")
     if kind == "ListLit":
         items = get_list(node, "items")
@@ -1020,7 +1020,7 @@ fn list_elem_type(node: Map) -> Text:
         if c == "push":
             type_of(at(get_list(node, "args"), 1))
         else if c == "set":
-            list_elem_type(at(get_list(node, "args"), 0))
+            w_elem_type(at(get_list(node, "args"), 0))
         else:
             "i"
     else:
