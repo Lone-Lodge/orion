@@ -74,7 +74,8 @@
           out.className = 'pg-out';
           out.innerHTML = 'This example uses ' +
             (feats.length ? '<b>' + feats.join(', ') + '</b>' : 'a language feature') +
-            ' that runs with the native Orion compiler (<code>orbit run</code>), not the ' +
+            (feats.length > 1 ? ', which run' : ', which runs') +
+            ' with the native Orion compiler (<code>orbit run</code>), not the ' +
             'in-browser playground. The playground runs the core: arithmetic, control flow, ' +
             'functions, lists, maps, structs, f64 and text.';
         } else {
