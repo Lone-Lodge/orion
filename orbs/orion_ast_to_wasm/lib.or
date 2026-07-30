@@ -987,6 +987,11 @@ fn expr_agg_depth(node: Map) -> int:
             m = max2(m, expr_agg_depth(a))
         # A variant constructor allocates a tagged value, so it needs a temp.
         if slot_has("vtag:{get(node, \"callee\")}") then 1 + m else m
+    else if kind == "MethodCall":
+        mut m = expr_agg_depth(get_map(node, "receiver"))
+        loop a in get_list(node, "args"):
+            m = max2(m, expr_agg_depth(a))
+        if slot_has("vtag:{get(node, \"method\")}") then 1 + m else m
     else if kind == "Match":
         mut m = expr_agg_depth(get_map(node, "scrutinee"))
         loop arm in get_list(node, "arms"):
@@ -1096,6 +1101,14 @@ fn scan_hostcalls(node: Map):
         scan_block_hostcalls(get_map(node, "body"))
     else if kind == "ForIn":
         scan_block_hostcalls(get_map(node, "body"))
+    else if kind == "MethodCall":
+        scan_hostcalls(get_map(node, "receiver"))
+        loop a in get_list(node, "args"):
+            scan_hostcalls(a)
+    else if kind == "Match":
+        scan_hostcalls(get_map(node, "scrutinee"))
+        loop arm in get_list(node, "arms"):
+            scan_hostcalls(get_map(arm, "body"))
 
 fn scan_block_hostcalls(block: Map):
     loop s in get_list(block, "stmts"):
@@ -1835,6 +1848,18 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             bf = get(br, "fn")
                             blk_locals = get(br, "locals")
                         bf
+                    else if kind == "MethodCall":
+                        # Enum.Variant(a) is a qualified constructor (ignore the
+                        # receiver); otherwise UFCS: recv.m(a) -> m(recv, a).
+                        mmethod = get(expr_node, "method")
+                        margs = get_list(expr_node, "args")
+                        if slot_has("vtag:{mmethod}"):
+                            compile_expr(fn_value, {"kind": "Call", "callee": mmethod, "args": margs}, locals)
+                        else:
+                            mut newargs = push([], get_map(expr_node, "receiver"))
+                            loop ma in margs:
+                                newargs = push(newargs, ma)
+                            compile_expr(fn_value, {"kind": "Call", "callee": mmethod, "args": newargs}, locals)
                     else if kind == "Match":
                         # match s: Variant(binds) -> body ... : store the scrutinee
                         # in a temp, then a tag-dispatch chain of if-expressions.
@@ -1959,6 +1984,9 @@ fn type_of(node: Map) -> Text:
         type_of(get_map(node, "then"))
     else if kind == "Match":
         type_of(get_map(at(get_list(node, "arms"), 0), "body"))
+    else if kind == "MethodCall":
+        mm = get(node, "method")
+        if slot_has("vtag:{mm}") then "i" else (if slot_has("fret:{mm}") then slot_get("fret:{mm}") else "i")
     else if kind == "Block":
         "i"
     else:
