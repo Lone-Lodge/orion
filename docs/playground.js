@@ -23,11 +23,12 @@
     .pg-out .exit { color:var(--dim); }
     .pg-out.err { color:#c0392b; }
     @media (prefers-color-scheme: dark) { .pg-out.err { color:#ff8b7d; } }
-    .pg-top { margin:1.5em 0 2em; padding:1.1em 1.2em; border:1px solid var(--rule);
+    .pg-top { max-width:42rem; margin:1.5rem auto 2.5rem; padding:1.1em 1.2em;
+              box-sizing:border-box; border:1px solid var(--rule);
               border-radius:8px; background:var(--code-bg); }
     .pg-top h2 { margin:0 0 .1em; font-size:1.05em; }
     .pg-top p { margin:0 0 .7em; font-size:.9em; color:var(--dim); }
-    .pg-top textarea { width:100%; box-sizing:border-box; min-height:11em; resize:vertical;
+    .pg-top textarea { width:100%; box-sizing:border-box; min-height:16em; resize:vertical;
               background:var(--bg); color:var(--fg); border:1px solid var(--rule);
               border-radius:4px; padding:.7em .9em; font-family:ui-monospace,monospace;
               font-size:.88em; line-height:1.55; tab-size:4; outline:none; }
