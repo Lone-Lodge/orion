@@ -1210,6 +1210,11 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             f = emit_op(f, op_end())
                             f = emit_op(f, op_end())
                             {"fn": f, "locals": cur_locals}
+                        else if kind == "If":
+                            # An if-expression used as a statement (a conditionless
+                            # `match:` desugars to one). Compile it as an expression;
+                            # its value stays on the stack as the block's value.
+                            {"fn": compile_expr(fn_value, stmt, locals), "locals": locals}
                         else:
                             # Unsupported statement — report and pass through.
                             compile_error("orion: ERROR — the wasm backend does not support `{kind}` statements yet")
