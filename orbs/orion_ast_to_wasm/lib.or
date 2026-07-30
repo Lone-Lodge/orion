@@ -951,6 +951,11 @@ fn expr_agg_depth(node: Map) -> int:
         t = expr_agg_depth(get_map(node, "then"))
         o = expr_agg_depth(get_map(node, "else"))
         max2(c, max2(t, o))
+    else if kind == "Block":
+        mut m = 0
+        loop s in get_list(node, "stmts"):
+            m = max2(m, stmt_agg_depth(s))
+        m
     else:
         0
 
@@ -1097,18 +1102,25 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
             value_node = get(stmt, "value")
             after_value = compile_expr(fn_value, value_node, locals)
             name = get(stmt, "name")
+            # The value may have declared locals (a comprehension block); reserve
+            # those slots so this binding's index does not collide with them.
+            mut base_locals = locals
+            loop:
+                if len(base_locals) >= fn_value.param_count + after_value.local_count:
+                    break
+                base_locals = push(base_locals, "__blkslot")
             # Add new local if name isn't bound yet.
-            existing = lookup_local(locals, name)
+            existing = lookup_local(base_locals, name)
             # Record the binding's type so later reads pick i32 vs f64 ops.
             btype = type_of(value_node)
             slot_set("ltype:{name}", btype)
             # If the value is a list, remember its element type for at()/for-in.
             slot_set("eltype:{name}", w_elem_type(value_node))
-            new_locals = locals
+            new_locals = base_locals
             mut current_locals = new_locals
             mut fn_after = after_value
             if existing < 0:
-                current_locals = push(locals, name)
+                current_locals = push(base_locals, name)
                 # A new binding needs a declared wasm local, not just an index.
                 fn_after = add_local(after_value)
                 note_local(btype)
@@ -1684,6 +1696,18 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         s2 = emit_op(s1, op_i32_mul())
                         s3 = emit_op(s2, op_i32_add())
                         if iet == "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
+                    else if kind == "Block":
+                        # A block used as a value (e.g. a list comprehension
+                        # `loop x in xs: e`): run its statements; the last one
+                        # leaves the block's value on the stack. The locals it
+                        # declares are reserved by the binding site (see MutLet).
+                        mut bf = fn_value
+                        mut blk_locals = locals
+                        loop bs in get_list(expr_node, "stmts"):
+                            br = compile_stmt(bf, bs, blk_locals)
+                            bf = get(br, "fn")
+                            blk_locals = get(br, "locals")
+                        bf
                     else:
                         # Unsupported expression: report it so the driver refuses
                         # to write invalid wasm (push 0 keeps the stack balanced
@@ -1749,6 +1773,8 @@ fn type_of(node: Map) -> Text:
         if slot_has("ftype:{fld}") then slot_get("ftype:{fld}") else "i"
     else if kind == "If":
         type_of(get_map(node, "then"))
+    else if kind == "Block":
+        "i"
     else:
         "i"
 
