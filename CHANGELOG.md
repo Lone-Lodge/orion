@@ -12,13 +12,14 @@ Notable changes to Orion. The format follows
   `extern fn` imports; Orion owns its memory (a bump allocator in linear
   memory). Covered: i32 and f64 (scalars, mixed structs, lists), maps, tuples,
   sum types with pattern matching, `?`, non-capturing closures, list
-  comprehensions, `require`/`defer`, text with interpolation, `print_line`, and
-  a stubbed OS-IO sandbox. Effects that resume and threads stay native (a
-  browser has no stack switching or thread model).
+  comprehensions, `require`/`defer`, text with interpolation, `print_line`,
+  first-class functions (`call_indirect`), a `par_run` that reduces its workers
+  in order, and a stubbed OS-IO sandbox. Effects that resume stay native (a
+  browser has no stack switching).
 - The **Field Guide playground** (`tools/playground.js`, `docs/playground.js`):
   a "Try Orion" editor plus a Run button on every sample, compiling to wasm and
-  running in place. 10 of the 12 Field Guide samples run in the browser; the two
-  that use effects or threads show a clear "native only" note.
+  running in place. 11 of the 12 Field Guide samples run in the browser; the one
+  that uses resumable effects shows a clear "native only" note.
 - `examples/wasm_demo/`: an Orion program compiled to wasm, animated on a canvas.
 
 ## [0.1.0] - 2026-07-28

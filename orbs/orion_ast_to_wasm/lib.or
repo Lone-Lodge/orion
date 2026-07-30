@@ -197,6 +197,11 @@ pub fn compile_program(decls: [Map]) -> WModule:
     slot_set("wret:__split", "i")
     slot_set("wloc:__split", "iiiiiiiiii")
     idx = idx + 1
+    slot_set("wfn:__par_run", idx)
+    slot_set("wsig:__par_run", "ii")
+    slot_set("wret:__par_run", "i")
+    slot_set("wloc:__par_run", "iii")
+    idx = idx + 1
     # Collect top-level lambda bindings (fn(...) : body assigned to a name);
     # reserve an index + signature for each, appended after the runtime helpers.
     mut lam_nodes = []
@@ -230,6 +235,7 @@ pub fn compile_program(decls: [Map]) -> WModule:
     module = add_fn(module, build_map_get_fn())
     module = add_fn(module, build_sum_fn())
     module = add_fn(module, build_split_fn())
+    module = add_fn(module, build_par_run_fn())
     # Lambdas become top-level functions, appended after the runtime helpers.
     mut lai = 0
     loop:
@@ -979,6 +985,54 @@ fn build_map_get_fn() -> WFn:
     f = emit_op(f, op_end())
     f = emit_op(f, op_end())
     f = emit_const(f, 0)
+    emit_end(f)
+
+# __par_run(list, arg) -> sum of calling each function value in the list with
+# arg. A function value is its index in the identity table; call_indirect (type
+# (i32)->i32, index 0) invokes it. Sequential in the browser (no real threads),
+# but the result matches. Locals: 0=list, 1=arg, 2=n, 3=i, 4=acc.
+fn build_par_run_fn() -> WFn:
+    mut f = new_fn("__par_run", 2)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 2)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 4)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 3)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 3)
+    f = emit_local_get(f, 2)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    # acc = acc + (table[mem[list + i*4 + 4]])(arg)
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 1)
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_load(f, 4)
+    f = emit_call_indirect(f, 0)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 4)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 3)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 4)
     emit_end(f)
 
 # __sum(list) -> sum of its i32 elements. Locals: 0=list, 1=n, 2=i, 3=acc.
@@ -1846,6 +1900,9 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
             index = lookup_local(locals, name)
             if index >= 0:
                 emit_local_get(fn_value, index)
+            else if slot_has("wfn:{name}"):
+                # A bare function name used as a value: its identity-table index.
+                emit_const(fn_value, slot_get_int("wfn:{name}"))
             else:
                 # Unknown identifier — push 0 as placeholder
                 emit_const(fn_value, 0)
@@ -1931,6 +1988,12 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         # sum(list) -> total of its i32 elements.
                         wsm = compile_expr(fn_value, at(args, 0), locals)
                         emit_call(wsm, slot_get_int("wfn:__sum"))
+                    else if callee == "par_run" and list_count(args) == 2:
+                        # par_run(fns, arg): call each function value with arg and
+                        # sum. Sequential in the browser; the result is the same.
+                        wpr0 = compile_expr(fn_value, at(args, 0), locals)
+                        wpr1 = compile_expr(wpr0, at(args, 1), locals)
+                        emit_call(wpr1, slot_get_int("wfn:__par_run"))
                     else if slot_has("lam:{callee}"):
                         # Closure call: direct call to the synthesized lambda fn.
                         lfn = slot_get("lam:{callee}")

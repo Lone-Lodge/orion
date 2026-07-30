@@ -115,6 +115,7 @@ pub fn op_return() -> int: 15       # 0x0F return
 pub fn op_drop() -> int: 26         # 0x1A drop (discard the top stack value)
 pub fn op_unreachable() -> int: 0   # 0x00 unreachable (trap)
 pub fn op_call() -> int: 16         # 0x10 call funcidx
+pub fn op_call_indirect() -> int: 17 # 0x11 call_indirect (typeidx, tableidx)
 pub fn op_local_get() -> int: 32    # 0x20 local.get
 pub fn op_local_set() -> int: 33    # 0x21 local.set
 pub fn op_local_tee() -> int: 34    # 0x22 local.tee (set + leave on stack)
@@ -415,6 +416,15 @@ pub fn emit_call(fn_value: WFn, function_index: int) -> WFn:
         grown = push(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
+# Indirect call through table 0: the callee's table index is on top of the
+# stack, below it the arguments. type_index names the signature to check.
+pub fn emit_call_indirect(fn_value: WFn, type_index: int) -> WFn:
+    mut grown = push(fn_value.body, op_call_indirect())
+    loop byte_value in leb_u(type_index):
+        grown = push(grown, byte_value)
+    grown = push(grown, 0)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
 # Close out a function body with the `end` opcode (required by the
 # WASM grammar at function/block end).
 pub fn emit_end(fn_value: WFn) -> WFn:
@@ -431,17 +441,23 @@ pub fn encode_module(module: WModule) -> [int]:
     type_section = encode_type_section(module)
     import_section = encode_import_section(module)
     func_section = encode_function_section(module)
+    table_section = encode_table_section(module)
     memory_section = wrap_section(5, [1, 0, 1])
     export_section = encode_export_section(module)
+    element_section = encode_element_section(module)
     code_section = encode_code_section(module)
     data_section = encode_data_section(module)
 
+    # Section order per the wasm spec: type, import, func, table, memory,
+    # export, element, code, data.
     mut output = [0, 97, 115, 109, 1, 0, 0, 0]
     loop byte_value in type_section: output = push(output, byte_value)
     loop byte_value in import_section: output = push(output, byte_value)
     loop byte_value in func_section: output = push(output, byte_value)
+    loop byte_value in table_section: output = push(output, byte_value)
     loop byte_value in memory_section: output = push(output, byte_value)
     loop byte_value in export_section: output = push(output, byte_value)
+    loop byte_value in element_section: output = push(output, byte_value)
     loop byte_value in code_section: output = push(output, byte_value)
     loop byte_value in data_section: output = push(output, byte_value)
     output
@@ -566,7 +582,9 @@ fn index_of_text(items: [Text], value: Text) -> int:
     found
 
 fn collect_signatures(module: WModule) -> [Text]:
-    mut sigs = []
+    # Type index 0 is reserved for the closure signature (i32)->i32, so
+    # call_indirect through a function value can name it directly.
+    mut sigs = push([], "i#i")
     loop import_value in module.imports:
         s = sig_text_for_import(import_value)
         if not contains_text(sigs, s):
@@ -627,6 +645,41 @@ fn function_count(module: WModule) -> int:
     loop _fn_value in module.functions:
         count = count + 1
     count
+
+fn total_function_count(module: WModule) -> int:
+    import_list_length(module) + function_count(module)
+
+# Table section (id 4) — one funcref table holding every function at its own
+# index (an identity table), so a function value is just its index and
+# call_indirect through it lands on the right function.
+fn encode_table_section(module: WModule) -> [int]:
+    n = total_function_count(module)
+    if n == 0:
+        []
+    else:
+        mut contents = [1, 112, 0]
+        loop b in leb_u(n):
+            contents = push(contents, b)
+        wrap_section(4, contents)
+
+# Element section (id 9) — one active segment filling the table with funcidx i
+# at slot i, at offset 0.
+fn encode_element_section(module: WModule) -> [int]:
+    n = total_function_count(module)
+    if n == 0:
+        []
+    else:
+        mut contents = [1, 0, 65, 0, 11]
+        loop b in leb_u(n):
+            contents = push(contents, b)
+        mut i = 0
+        loop:
+            if i >= n:
+                break
+            loop b in leb_u(i):
+                contents = push(contents, b)
+            i = i + 1
+        wrap_section(9, contents)
 
 # Export section — local fns indexed AFTER imports. We also export
 # the single memory under the name "memory" so JS can `new Uint8Array(

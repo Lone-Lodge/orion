@@ -85,9 +85,10 @@ top.
 
 The wasm backend covers the core language: i32 and f64, structs, lists, maps,
 tuples, sum types with pattern matching, `?`, closures, comprehensions, text and
-interpolation, the full control flow, and an in-browser IO sandbox. Effects that
-resume (setjmp) and threads (`par_run`) stay native — a browser sandbox has no
-stack switching or thread model — so those samples run with `orbit run`.
+interpolation, first-class functions, a `par_run` that reduces its workers in
+order, the full control flow, and an in-browser IO sandbox. Effects that resume
+(setjmp) stay native: a browser sandbox has no stack switching, so that sample
+runs with `orbit run`.
 
 ## Layout
 

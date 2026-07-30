@@ -1545,7 +1545,7 @@ cpln17:
     br label %cmrg17
 cmrg17:
     %v17 = phi i64 [ %v17.r1, %clam17 ], [ %v17.r2, %cpln17 ]
-    %v18 = call ptr @orion_list_push(ptr %v15, i64 %v17)
+    %v18 = call ptr @orion_list_push_mut(ptr %v15, i64 %v17)
     store ptr %v18, ptr %v3
     %v19 = add i64 0, 0
     br label %for_5_step
@@ -1602,7 +1602,7 @@ cmrg16:
     br i1 %v19.cb, label %if_19_then, label %if_19_else
 if_19_then:
     %v21 = load ptr, ptr %v3
-    %v22 = call ptr @orion_list_push(ptr %v21, i64 %v15)
+    %v22 = call ptr @orion_list_push_mut(ptr %v21, i64 %v15)
     store ptr %v22, ptr %v3
     %v23 = add i64 0, 0
     br label %if_19_merge
@@ -2234,7 +2234,7 @@ for_20_end:
     %v54 = load ptr, ptr %v2
     %v55 = load i64, ptr %v18
     %v56 = call i64 @orion_list_at(ptr %v54, i64 %v55)
-    %v57 = call ptr @orion_list_push(ptr %v53, i64 %v56)
+    %v57 = call ptr @orion_list_push_mut(ptr %v53, i64 %v56)
     store ptr %v57, ptr %v5
     %v58 = add i64 0, 0
     %v59 = getelementptr i64, ptr @orion_empty_list, i64 0

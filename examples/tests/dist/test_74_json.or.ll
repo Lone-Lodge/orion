@@ -3657,7 +3657,7 @@ entry:
 if_11_then:
     %v13 = load ptr, ptr %v7
     %v14.p = ptrtoint ptr %v0 to i64
-    %v14 = call ptr @orion_list_push(ptr %v13, i64 %v14.p)
+    %v14 = call ptr @orion_list_push_mut(ptr %v13, i64 %v14.p)
     store ptr %v14, ptr %v7
     %v15 = add i64 0, 0
     br label %if_11_merge
@@ -3732,7 +3732,7 @@ if_70_then:
     %v75 = call ptr @orion_bytes_slice(ptr %v2, i64 %v73, i64 %v74)
     %v76 = call ptr @orion_bytes_to_text(ptr %v75)
     %v77.p = ptrtoint ptr %v76 to i64
-    %v77 = call ptr @orion_list_push(ptr %v72, i64 %v77.p)
+    %v77 = call ptr @orion_list_push_mut(ptr %v72, i64 %v77.p)
     store ptr %v77, ptr %v7
     %v78 = add i64 0, 0
     %v79 = load i64, ptr %v22
@@ -3759,7 +3759,7 @@ loop_24_end:
     %v97 = call ptr @orion_bytes_slice(ptr %v2, i64 %v96, i64 %v4)
     %v98 = call ptr @orion_bytes_to_text(ptr %v97)
     %v99.p = ptrtoint ptr %v98 to i64
-    %v99 = call ptr @orion_list_push(ptr %v95, i64 %v99.p)
+    %v99 = call ptr @orion_list_push_mut(ptr %v95, i64 %v99.p)
     store ptr %v99, ptr %v7
     %v100 = add i64 0, 0
     br label %if_11_merge
