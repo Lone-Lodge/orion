@@ -91,17 +91,24 @@ pub fn compile_program(decls: [Map]) -> WModule:
             rett = wtype_of(get_map(decl, "ret"))
             slot_set("wret:{fname}", rett)
             slot_set("fret:{fname}", rett)
-    # Reserve the __push runtime helper's index (appended after all user fns),
-    # so push() call sites resolve. Signature (list, val) -> list; 3 i32 locals.
+    # Reserve the __push runtime helpers' indices (appended after all user fns),
+    # so push() call sites resolve. __push appends an i32/pointer element (4-byte
+    # stride); __push_f appends an f64 (8-byte stride). Both have 3 i32 locals.
     slot_set("wfn:__push", idx)
     slot_set("wsig:__push", "ii")
     slot_set("wret:__push", "i")
     slot_set("wloc:__push", "iii")
     idx = idx + 1
+    slot_set("wfn:__push_f", idx)
+    slot_set("wsig:__push_f", "if")
+    slot_set("wret:__push_f", "i")
+    slot_set("wloc:__push_f", "iii")
+    idx = idx + 1
     loop decl in decls:
         if get(decl, "kind") == "Fn":
             module = add_fn(module, compile_fn_ast(decl))
     module = add_fn(module, build_push_fn())
+    module = add_fn(module, build_push_f_fn())
     # Emit the string literals collected during compilation as data segments.
     scount = slot_get_int("str:count")
     loop si in 0..<scount:
@@ -230,6 +237,81 @@ fn build_push_fn() -> WFn:
     f = emit_local_get(f, 2)
     emit_end(f)
 
+# __push_f: like __push but for f64-element lists. Elements are 8 bytes;
+# the copy loop moves them bit-for-bit with f64.load/store. (list, val: f64)
+# -> new list. Locals: 0=list, 1=val (f64), 2=newptr, 3=oldlen, 4=i.
+fn build_push_f_fn() -> WFn:
+    mut f = new_fn("__push_f", 2)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    # oldlen = list[0]
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 3)
+    # newptr = bump ; bump += 12 + oldlen*8
+    f = emit_const(f, 0)
+    f = emit_const(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_tee(f, 2)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 8)
+    f = emit_op(f, op_i32_mul())
+    f = emit_const(f, 12)
+    f = emit_op(f, op_i32_add())
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    # newptr[0] = oldlen + 1
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    # i = 0
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 4)
+    # copy loop: while i < oldlen: newptr[4+i*8] = list[4+i*8]  (8-byte)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 8)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 8)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_f64_load(f, 4)
+    f = emit_f64_store(f, 4)
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 4)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    # newptr[4 + oldlen*8] = val (f64)
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 8)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 1)
+    f = emit_f64_store(f, 4)
+    # return newptr
+    f = emit_local_get(f, 2)
+    emit_end(f)
+
 fn list_count(items: [Map]) -> int:
     mut count = 0
     loop _item in items:
@@ -350,6 +432,8 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
             # Record the binding's type so later reads pick i32 vs f64 ops.
             btype = type_of(value_node)
             slot_set("ltype:{name}", btype)
+            # If the value is a list, remember its element type for at()/for-in.
+            slot_set("eltype:{name}", list_elem_type(value_node))
             new_locals = locals
             mut current_locals = new_locals
             mut fn_after = after_value
@@ -497,15 +581,19 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             cur_locals = push(cur_locals, "__fi{k}")
                             f = add_local(f)
                             note_local("i")
+                            # Element type of the iterated list drives the loop
+                            # variable's type and the element stride.
+                            iter_et = list_elem_type(get_map(stmt, "iter"))
+                            in_stride = if iter_et == "f" then 8 else 4
                             # The loop variable — reuse its slot if already bound.
                             var_name = get(stmt, "var")
-                            slot_set("ltype:{var_name}", "i")
+                            slot_set("ltype:{var_name}", iter_et)
                             mut var_idx = lookup_local(cur_locals, var_name)
                             if var_idx < 0:
                                 var_idx = len(cur_locals)
                                 cur_locals = push(cur_locals, var_name)
                                 f = add_local(f)
-                                note_local("i")
+                                note_local(iter_et)
                             index_var = get(stmt, "index_var")
                             mut has_index = false
                             mut iv_idx = 0
@@ -534,13 +622,13 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             f = emit_op(f, op_i32_ge_s())
                             f = emit_op(f, op_br_if())
                             f = emit_bytes(f, [1])
-                            # var = at(__fl, __fi) = mem[__fl + 4 + __fi*4]
+                            # var = at(__fl, __fi) = mem[__fl + 4 + __fi*stride]
                             f = emit_local_get(f, lst_idx)
                             f = emit_local_get(f, idx_idx)
-                            f = emit_const(f, 4)
+                            f = emit_const(f, in_stride)
                             f = emit_op(f, op_i32_mul())
                             f = emit_op(f, op_i32_add())
-                            f = emit_load(f, 4)
+                            f = if iter_et == "f" then emit_f64_load(f, 4) else emit_load(f, 4)
                             f = emit_local_set(f, var_idx)
                             if has_index:
                                 f = emit_local_get(f, idx_idx)
@@ -645,26 +733,30 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         with_ptr = compile_expr(fn_value, at(args, 0), locals)
                         emit_load(with_ptr, 0)
                     else if callee == "at":
-                        # at(x, i) loads element i: mem[ptr + 4 + i*4].
+                        # at(x, i) loads element i: mem[ptr + 4 + i*stride].
+                        aet = list_elem_type(at(args, 0))
+                        astride = if aet == "f" then 8 else 4
                         with_ptr = compile_expr(fn_value, at(args, 0), locals)
                         with_idx = compile_expr(with_ptr, at(args, 1), locals)
-                        s1 = emit_const(with_idx, 4)
+                        s1 = emit_const(with_idx, astride)
                         s2 = emit_op(s1, op_i32_mul())
                         s3 = emit_op(s2, op_i32_add())
-                        emit_load(s3, 4)
+                        if aet == "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
                     else if callee == "set":
                         # set(x, i, v) stores element i in place and returns the
                         # container pointer (so `x[i] = v` = `x = set(x, i, v)`
                         # works). The first arg is a plain name after desugaring,
                         # so recompiling it to return the pointer is side-effect-free.
                         target = at(args, 0)
+                        set_et = list_elem_type(target)
+                        set_stride = if set_et == "f" then 8 else 4
                         s1 = compile_expr(fn_value, target, locals)
                         s2 = compile_expr(s1, at(args, 1), locals)
-                        s3 = emit_const(s2, 4)
+                        s3 = emit_const(s2, set_stride)
                         s4 = emit_op(s3, op_i32_mul())
                         s5 = emit_op(s4, op_i32_add())
                         s6 = compile_expr(s5, at(args, 2), locals)
-                        s7 = emit_store(s6, 4)
+                        s7 = if set_et == "f" then emit_f64_store(s6, 4) else emit_store(s6, 4)
                         compile_expr(s7, target, locals)
                     else if callee == "to_float":
                         # int -> f64
@@ -675,10 +767,13 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         wv = compile_expr(fn_value, at(args, 0), locals)
                         emit_op(wv, op_i32_trunc_f64_s())
                     else if callee == "push":
-                        # push(list, val) -> new list, via the __push helper.
+                        # push(list, val) -> new list. f64 value -> __push_f
+                        # (8-byte elements); otherwise __push (4-byte).
+                        pet = type_of(at(args, 1))
                         wl = compile_expr(fn_value, at(args, 0), locals)
                         wv = compile_expr(wl, at(args, 1), locals)
-                        emit_call(wv, slot_get_int("wfn:__push"))
+                        pfn = if pet == "f" then slot_get_int("wfn:__push_f") else slot_get_int("wfn:__push")
+                        emit_call(wv, pfn)
                     else:
                         # Promote an i32 argument to f64 when the callee's param
                         # (from wsig:<callee>) is f64, so scale(2, 3.0) works.
@@ -746,12 +841,15 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                     else if kind == "ListLit":
                         # Heap-allocate [length, elem0, elem1, ...] via the bump
                         # allocator, fill it, and leave the pointer on the stack.
+                        # f64 elements take 8 bytes (stride 8), i32/pointers 4.
                         items = get_list(expr_node, "items")
                         n = list_count(items)
+                        et = if n > 0 then type_of(at(items, 0)) else "i"
+                        stride = if et == "f" then 8 else 4
                         depth = slot_get_int("wtmp:depth")
                         tidx = slot_get_int("wtmp:pbase") + depth
                         slot_set("wtmp:depth", depth + 1)
-                        size = 4 + n * 4
+                        size = 4 + n * stride
                         # alloc(size): tee the old bump into tidx, store back the
                         # advanced pointer. mem[0] is the bump pointer cell.
                         a1 = emit_const(fn_value, 0)
@@ -765,13 +863,13 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         h1 = emit_local_get(a7, tidx)
                         h2 = emit_const(h1, n)
                         h3 = emit_store(h2, 0)
-                        # elements at mem[tidx + 4 + i*4]
+                        # elements at mem[tidx + 4 + i*stride]
                         mut cur = h3
                         mut i = 0
                         loop item in items:
                             cur = emit_local_get(cur, tidx)
                             cur = compile_expr(cur, item, locals)
-                            cur = emit_store(cur, 4 + i * 4)
+                            cur = if et == "f" then emit_f64_store(cur, 4 + i * stride) else emit_store(cur, 4 + i * stride)
                             i = i + 1
                         result = emit_local_get(cur, tidx)
                         slot_set("wtmp:depth", depth)
@@ -813,13 +911,15 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         with_obj = compile_expr(fn_value, get_map(expr_node, "object"), locals)
                         if fty2 == "f" then emit_f64_load(with_obj, foff2) else emit_load(with_obj, foff2)
                     else if kind == "Index":
-                        # x[i] loads element i: mem[ptr + 4 + i*4].
+                        # x[i] loads element i: mem[ptr + 4 + i*stride].
+                        iet = list_elem_type(get_map(expr_node, "object"))
+                        istride = if iet == "f" then 8 else 4
                         with_ptr = compile_expr(fn_value, get_map(expr_node, "object"), locals)
                         with_idx = compile_expr(with_ptr, get_map(expr_node, "index"), locals)
-                        s1 = emit_const(with_idx, 4)
+                        s1 = emit_const(with_idx, istride)
                         s2 = emit_op(s1, op_i32_mul())
                         s3 = emit_op(s2, op_i32_add())
-                        emit_load(s3, 4)
+                        if iet == "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
                     else:
                         # Unsupported expression — push 0 as a no-op.
                         emit_const(fn_value, 0)
@@ -861,15 +961,41 @@ fn type_of(node: Map) -> Text:
             "f"
         else if callee == "to_int":
             "i"
+        else if callee == "at":
+            list_elem_type(at(get_list(node, "args"), 0))
         else if slot_has("fret:{callee}"):
             slot_get("fret:{callee}")
         else:
             "i"
+    else if kind == "Index":
+        list_elem_type(get_map(node, "object"))
     else if kind == "Field":
         fld = get(node, "field")
         if slot_has("ftype:{fld}") then slot_get("ftype:{fld}") else "i"
     else if kind == "If":
         type_of(get_map(node, "then"))
+    else:
+        "i"
+
+# The element type ('i'/'f') of a list-valued expression: from the literal's
+# first item, a variable's recorded eltype, or a push's appended value. Used
+# to pick element stride (4 vs 8 bytes) and i32 vs f64 loads/stores.
+fn list_elem_type(node: Map) -> Text:
+    kind = get(node, "kind")
+    if kind == "ListLit":
+        items = get_list(node, "items")
+        if list_count(items) > 0 then type_of(at(items, 0)) else "i"
+    else if kind == "Ident":
+        nm = get(node, "name")
+        if slot_has("eltype:{nm}") then slot_get("eltype:{nm}") else "i"
+    else if kind == "Call":
+        c = get(node, "callee")
+        if c == "push":
+            type_of(at(get_list(node, "args"), 1))
+        else if c == "set":
+            list_elem_type(at(get_list(node, "args"), 0))
+        else:
+            "i"
     else:
         "i"
 
