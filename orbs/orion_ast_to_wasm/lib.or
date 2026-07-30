@@ -11,6 +11,7 @@
 # core arithmetic pipeline runs orion-self's own files.
 
 use orion_emit_wasm
+use orion_ir
 
 # Compile one fn AST node to a WFn. Param-name → local-index mapping
 # is built up as we walk the body so `Ident` references resolve.
@@ -1210,7 +1211,8 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             f = emit_op(f, op_end())
                             {"fn": f, "locals": cur_locals}
                         else:
-                            # Unsupported — pass through unchanged.
+                            # Unsupported statement — report and pass through.
+                            compile_error("orion: ERROR — the wasm backend does not support `{kind}` statements yet")
                             {"fn": fn_value, "locals": locals}
 
 # Compile an expression — pushes its result on the wasm stack.
@@ -1375,9 +1377,13 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             ai = ai + 1
                         # Resolve the callee to its function index. The driver records
                         # each Fn's index in a `wfn:<name>` slot before compiling, so
-                        # recursion and forward calls both resolve.
-                        call_idx = if slot_has("wfn:{callee}") then slot_get_int("wfn:{callee}") else 0
-                        emit_call(current_fn, call_idx)
+                        # recursion and forward calls both resolve. An unknown callee
+                        # is a builtin/stdlib the wasm backend does not provide.
+                        if slot_has("wfn:{callee}"):
+                            emit_call(current_fn, slot_get_int("wfn:{callee}"))
+                        else:
+                            compile_error("orion: ERROR — the wasm backend does not support calling `{callee}` (unknown function or unsupported builtin)")
+                            current_fn
                 else:
                     if kind == "If":
                         # if-as-expression: cond, then push result, else push result
@@ -1503,7 +1509,10 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         s3 = emit_op(s2, op_i32_add())
                         if iet == "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
                     else:
-                        # Unsupported expression — push 0 as a no-op.
+                        # Unsupported expression: report it so the driver refuses
+                        # to write invalid wasm (push 0 keeps the stack balanced
+                        # so compilation can continue and collect more errors).
+                        compile_error("orion: ERROR — the wasm backend does not support `{kind}` expressions yet")
                         emit_const(fn_value, 0)
 
 # A type node -> 'f' for f64/float, 'i' for everything else (i32 or pointer).

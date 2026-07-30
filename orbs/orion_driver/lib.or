@@ -687,8 +687,14 @@ fn drv_wants_wasm(p: Text) -> bool:
 # i32 + f64, structs, lists, extern host imports) and write the bytes. A Text
 # is length-prefixed, so binary survives file_write untouched.
 fn drv_emit_wasm(ast: Map, out_path: Text) -> int:
+    errs_before = compile_errors()
     wmodule = compile_program(get_list(ast, "decls"))
     wbytes = encode_module(wmodule)
+    # Refuse to write invalid wasm: unsupported constructs report a compile
+    # error during compile_program, same contract as the LLVM path.
+    if compile_errors() > errs_before:
+        print_line(drv_red("orion: wasm compilation FAILED — no output written"))
+        return 1
     file_write(out_path, bytes_to_text(wbytes))
     if not (slot_has("drv:quiet")):
         print_line(drv_green("  ok") + drv_dim("  {out_path}"))
