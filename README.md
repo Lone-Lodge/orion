@@ -65,14 +65,38 @@ Every gate the repo owns, and what each one is for:
 CI runs all of them on Linux and Windows, starting from a checkout with no
 binary on disk.
 
+## WebAssembly
+
+Orion also compiles to WebAssembly, so Orion code can run in a browser. An
+output path ending in `.wasm` uses the wasm backend instead of LLVM:
+
+```
+orion prog.or prog.wasm orbs
+```
+
+The `.wasm` is self-contained — the host (JavaScript) provides only capabilities
+(draw, input, `print`), never data-structure semantics. `examples/wasm_demo/`
+compiles a small program to wasm and animates it on a canvas.
+
+The **Field Guide playground** makes every sample runnable in the browser: run
+`node tools/playground.js` and open `http://localhost:8100`. It compiles each
+snippet to wasm on demand and runs it in place, with a "Try Orion" editor at the
+top.
+
+The wasm backend covers the core language: i32 and f64, structs, lists, maps,
+tuples, sum types with pattern matching, `?`, closures, comprehensions, text and
+interpolation, the full control flow, and an in-browser IO sandbox. Effects that
+resume (setjmp) and threads (`par_run`) stay native — a browser sandbox has no
+stack switching or thread model — so those samples run with `orbit run`.
+
 ## Layout
 
 ```
-orbs/       the libraries, and the compiler itself (lex, parse, ir, emit)
+orbs/       the libraries, and the compiler itself (lex, parse, ir, emit, wasm)
 runtime/    the C runtime the emitted code links against
-tools/      bootstrap, test harnesses, benches, the LSP, orbit
-examples/   demos, the test suite
-docs/       the Field Guide
+tools/      bootstrap, test harnesses, benches, the LSP, orbit, the playground
+examples/   demos (incl. wasm_demo), the test suite
+docs/       the Field Guide (with an in-browser playground)
 ```
 
 ## Status
