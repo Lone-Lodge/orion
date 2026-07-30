@@ -373,6 +373,21 @@ pub fn emit_store(fn_value: WFn, offset: int) -> WFn:
         grown = push(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
+# i32.load8_u / i32.store8 — single byte, for text (UTF-8 byte payloads).
+pub fn emit_load8u(fn_value: WFn, offset: int) -> WFn:
+    mut grown = push(fn_value.body, op_i32_load8_u())
+    grown = push(grown, 0)
+    loop byte_value in leb_u(offset):
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
+pub fn emit_store8(fn_value: WFn, offset: int) -> WFn:
+    mut grown = push(fn_value.body, op_i32_store8())
+    grown = push(grown, 0)
+    loop byte_value in leb_u(offset):
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
 # f64.load / f64.store (8-byte). Alignment hint 3; wasm still permits the
 # access when a field lands unaligned (e.g. an f64 after an i32).
 pub fn emit_f64_load(fn_value: WFn, offset: int) -> WFn:
