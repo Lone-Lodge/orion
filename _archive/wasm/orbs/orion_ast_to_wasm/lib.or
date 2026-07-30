@@ -153,7 +153,9 @@ pub fn compile_fn_ast(fn_node: Map) -> WFn:
     slot_set("wtmp:depth", 0)
     slot_set("wbrk", 0)
     slot_set("wcont", 0)
-    f1 = compile_block(f0, body, locals)
+    cb = compile_block(f0, body, locals)
+    mut f1 = f0
+    f1 = get(cb, "fn")
     slot_set("wloc:{fn_name}", slot_get("wloc:cur"))
     emit_end(f1)
 
@@ -375,6 +377,12 @@ fn stmt_agg_depth(stmt: Map) -> int:
         max2(c, max2(t, e))
     else if kind == "Loop":
         block_agg_depth(get_map(stmt, "body"))
+    else if kind == "ForRange":
+        lo = expr_agg_depth(get_map(stmt, "low"))
+        hi = expr_agg_depth(get_map(stmt, "high"))
+        max2(max2(lo, hi), block_agg_depth(get_map(stmt, "body")))
+    else if kind == "ForIn":
+        max2(expr_agg_depth(get_map(stmt, "iter")), block_agg_depth(get_map(stmt, "body")))
     else:
         0
 
@@ -406,7 +414,10 @@ fn lookup_local(locals: [Text], name: Text) -> int:
 # Compile a Block (statement list) into the wasm fn body. Each
 # statement walks through with the locals table threaded so bindings
 # stay in scope. Returns the WFn with the body extended.
-fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> WFn:
+# Returns {fn, locals}. Locals declared in the block are threaded back out so
+# later statements get fresh wasm local indices (slots are function-scoped, so
+# reusing an index for a differently-typed local would corrupt the function).
+fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> Map:
     statements = get_list(block, "stmts")
     mut current_fn = fn_value
     mut current_locals = locals
@@ -414,7 +425,7 @@ fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> WFn:
         result = compile_stmt(current_fn, stmt, current_locals)
         current_fn = get(result, "fn")
         current_locals = get(result, "locals")
-    current_fn
+    {"fn": current_fn, "locals": current_locals}
 
 fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
     kind = get(stmt, "kind")
@@ -481,16 +492,20 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                         prev_cont = slot_get_int("wcont")
                         slot_set("wbrk", 2)
                         slot_set("wcont", 0)
-                        body_fn = compile_block(with_inner_bt, loop_body, locals)
+                        body_res = compile_block(with_inner_bt, loop_body, locals)
                         slot_set("wbrk", prev_brk)
                         slot_set("wcont", prev_cont)
+                        mut body_fn = with_inner_bt
+                        body_fn = get(body_res, "fn")
+                        mut loop_out_locals = locals
+                        loop_out_locals = get(body_res, "locals")
                         end_inner = emit_op(body_fn, op_end())
                         # `br 0` — branch back to loop start
                         with_br0 = emit_op(end_inner, op_br())
                         with_zero = emit_bytes(with_br0, [0])
                         with_end_loop = emit_op(with_zero, op_end())
                         with_end_block = emit_op(with_end_loop, op_end())
-                        {"fn": with_end_block, "locals": locals}
+                        {"fn": with_end_block, "locals": loop_out_locals}
                     else:
                         if kind == "IfBlock":
                             with_cond = compile_expr(fn_value, get(stmt, "cond"), locals)
@@ -502,13 +517,21 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             prev_cont = slot_get_int("wcont")
                             slot_set("wbrk", prev_brk + 1)
                             slot_set("wcont", prev_cont + 1)
-                            then_fn = compile_block(with_bt, get(stmt, "then"), locals)
+                            then_res = compile_block(with_bt, get(stmt, "then"), locals)
+                            mut then_fn = with_bt
+                            then_fn = get(then_res, "fn")
+                            mut mid_locals = locals
+                            mid_locals = get(then_res, "locals")
                             with_else = emit_op(then_fn, op_else())
-                            else_fn = compile_block(with_else, get(stmt, "else"), locals)
+                            else_res = compile_block(with_else, get(stmt, "else"), mid_locals)
+                            mut else_fn = with_else
+                            else_fn = get(else_res, "fn")
+                            mut if_out_locals = locals
+                            if_out_locals = get(else_res, "locals")
                             slot_set("wbrk", prev_brk)
                             slot_set("wcont", prev_cont)
                             with_end_if = emit_op(else_fn, op_end())
-                            {"fn": with_end_if, "locals": locals}
+                            {"fn": with_end_if, "locals": if_out_locals}
                         else if kind == "ForRange":
                             # `loop v in low..<high:` — counter loop lowered to
                             # block { loop { br_if exit when done; body; v++ } }.
@@ -546,7 +569,9 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             prev_cont = slot_get_int("wcont")
                             slot_set("wbrk", 2)
                             slot_set("wcont", 0)
-                            f = compile_block(f, get_map(stmt, "body"), cur_locals)
+                            fr_res = compile_block(f, get_map(stmt, "body"), cur_locals)
+                            f = get(fr_res, "fn")
+                            cur_locals = get(fr_res, "locals")
                             slot_set("wbrk", prev_brk)
                             slot_set("wcont", prev_cont)
                             f = emit_op(f, op_end())
@@ -641,7 +666,9 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                             prev_cont = slot_get_int("wcont")
                             slot_set("wbrk", 2)
                             slot_set("wcont", 0)
-                            f = compile_block(f, get_map(stmt, "body"), cur_locals)
+                            fi_res = compile_block(f, get_map(stmt, "body"), cur_locals)
+                            f = get(fi_res, "fn")
+                            cur_locals = get(fi_res, "locals")
                             slot_set("wbrk", prev_brk)
                             slot_set("wcont", prev_cont)
                             f = emit_op(f, op_end())
