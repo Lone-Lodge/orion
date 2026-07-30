@@ -60,14 +60,45 @@ pub fn compile_program(decls: [Map]) -> WModule:
                 slot_set("ftype:{get(fdef, \"name\")}", fty)
                 foff = foff + (if fty == "f" then 8 else 4)
             slot_set("ssize:{get(decl, \"name\")}", foff)
-    # Inject the __print host import (text ptr, newline flag) when the program
-    # prints, so print_line/print/println can call out to the host.
-    if prog_uses_print(decls):
+    # Scan once for host-call usage, then inject the imports the program needs.
+    slot_set("uses:print", 0)
+    slot_set("uses:io", 0)
+    scan_program_hostcalls(decls)
+    # __print host import (text ptr, newline flag) for print_line/print/println.
+    if slot_get_int("uses:print") == 1:
         module = add_import(module, new_import("env", "__print", 2, 0))
         slot_set("wfn:__print", idx)
         slot_set("wsig:__print", "ti")
         slot_set("wret:__print", "")
         slot_set("fret:__print", "")
+        idx = idx + 1
+    # OS-IO host imports (stubbed by the playground with an in-memory sandbox):
+    # argc/argv, and file_read/file_write. Returned Text is a heap pointer the
+    # host writes via the bump allocator at mem[0].
+    if slot_get_int("uses:io") == 1:
+        module = add_import(module, new_import("env", "__argc", 0, 1))
+        slot_set("wfn:__argc", idx)
+        slot_set("wsig:__argc", "")
+        slot_set("wret:__argc", "i")
+        slot_set("fret:__argc", "i")
+        idx = idx + 1
+        module = add_import(module, new_import("env", "__argv", 1, 1))
+        slot_set("wfn:__argv", idx)
+        slot_set("wsig:__argv", "i")
+        slot_set("wret:__argv", "t")
+        slot_set("fret:__argv", "t")
+        idx = idx + 1
+        module = add_import(module, new_import("env", "__file_read", 1, 1))
+        slot_set("wfn:__file_read", idx)
+        slot_set("wsig:__file_read", "t")
+        slot_set("wret:__file_read", "t")
+        slot_set("fret:__file_read", "t")
+        idx = idx + 1
+        module = add_import(module, new_import("env", "__file_write", 2, 1))
+        slot_set("wfn:__file_write", idx)
+        slot_set("wsig:__file_write", "tt")
+        slot_set("wret:__file_write", "i")
+        slot_set("fret:__file_write", "i")
         idx = idx + 1
     loop decl in decls:
         if get(decl, "kind") == "ExternFn":
@@ -989,72 +1020,73 @@ fn block_agg_depth(block: Map) -> int:
         m = max2(m, stmt_agg_depth(s))
     m
 
-# --- print detection ---
-# The playground lowers print_line/print/println to a host __print import.
-# That import is only added when the program uses it, so games that never
-# print do not force a host to provide __print. One recursive walk over the
-# shared Map/kind shapes covers both expressions and statements.
-fn uses_print(node: Map) -> bool:
+# --- host-call detection ---
+# The playground lowers print_line/print/println to a host __print import, and
+# argc/argv/file_read/file_write to host IO imports. Those imports are added
+# only when the program uses them, so a game that never prints or touches IO
+# does not force a host to provide them. One full walk (no early return) marks
+# the slots uses:print / uses:io.
+fn scan_hostcalls(node: Map):
     kind = get(node, "kind")
     if kind == "Call":
         c = get(node, "callee")
         if c == "print_line" or c == "print" or c == "println":
-            return true
+            slot_set("uses:print", 1)
+        if c == "argc" or c == "argv" or c == "file_read" or c == "file_write":
+            slot_set("uses:io", 1)
         loop a in get_list(node, "args"):
-            if uses_print(a):
-                return true
-        false
+            scan_hostcalls(a)
     else if kind == "Binary":
-        uses_print(get_map(node, "left")) or uses_print(get_map(node, "right"))
+        scan_hostcalls(get_map(node, "left"))
+        scan_hostcalls(get_map(node, "right"))
     else if kind == "Unary":
-        uses_print(get_map(node, "operand"))
+        scan_hostcalls(get_map(node, "operand"))
     else if kind == "Index":
-        uses_print(get_map(node, "object")) or uses_print(get_map(node, "index"))
+        scan_hostcalls(get_map(node, "object"))
+        scan_hostcalls(get_map(node, "index"))
     else if kind == "Field":
-        uses_print(get_map(node, "object"))
+        scan_hostcalls(get_map(node, "object"))
     else if kind == "If":
-        uses_print(get_map(node, "cond")) or uses_print(get_map(node, "then")) or uses_print(get_map(node, "else"))
+        scan_hostcalls(get_map(node, "cond"))
+        scan_hostcalls(get_map(node, "then"))
+        scan_hostcalls(get_map(node, "else"))
     else if kind == "ListLit":
         loop it in get_list(node, "items"):
-            if uses_print(it):
-                return true
-        false
+            scan_hostcalls(it)
+    else if kind == "MapLit":
+        loop pr in get_list(node, "pairs"):
+            scan_hostcalls(get_map(pr, "value"))
     else if kind == "StructCons":
         loop fd in get_list(node, "fields"):
-            if uses_print(get_map(fd, "value")):
-                return true
-        false
+            scan_hostcalls(get_map(fd, "value"))
+    else if kind == "Block":
+        loop s in get_list(node, "stmts"):
+            scan_hostcalls(s)
     else if kind == "ExprStmt":
-        uses_print(get_map(node, "expr"))
+        scan_hostcalls(get_map(node, "expr"))
     else if kind == "MutLet" or kind == "LetOrAssign":
-        uses_print(get_map(node, "value"))
+        scan_hostcalls(get_map(node, "value"))
     else if kind == "Return":
-        uses_print(get_map(node, "expr"))
+        scan_hostcalls(get_map(node, "expr"))
     else if kind == "IfBlock":
-        if uses_print(get_map(node, "cond")):
-            return true
-        block_uses_print(get_map(node, "then")) or block_uses_print(get_map(node, "else"))
+        scan_hostcalls(get_map(node, "cond"))
+        scan_block_hostcalls(get_map(node, "then"))
+        scan_block_hostcalls(get_map(node, "else"))
     else if kind == "Loop":
-        block_uses_print(get_map(node, "body"))
+        scan_block_hostcalls(get_map(node, "body"))
     else if kind == "ForRange":
-        block_uses_print(get_map(node, "body"))
+        scan_block_hostcalls(get_map(node, "body"))
     else if kind == "ForIn":
-        block_uses_print(get_map(node, "body"))
-    else:
-        false
+        scan_block_hostcalls(get_map(node, "body"))
 
-fn block_uses_print(block: Map) -> bool:
+fn scan_block_hostcalls(block: Map):
     loop s in get_list(block, "stmts"):
-        if uses_print(s):
-            return true
-    false
+        scan_hostcalls(s)
 
-fn prog_uses_print(decls: [Map]) -> bool:
+fn scan_program_hostcalls(decls: [Map]):
     loop d in decls:
         if get(d, "kind") == "Fn":
-            if block_uses_print(get_map(d, "body")):
-                return true
-    false
+            scan_block_hostcalls(get_map(d, "body"))
 
 # Locals table is a flat list of names — index into the list IS the
 # local index in wasm. push a name and you get its index for free.
@@ -1081,14 +1113,35 @@ fn lookup_local(locals: [Text], name: Text) -> int:
 # Returns {fn, locals}. Locals declared in the block are threaded back out so
 # later statements get fresh wasm local indices (slots are function-scoped, so
 # reusing an index for a differently-typed local would corrupt the function).
+# True if the expression leaves nothing on the wasm stack (a void call). Used
+# to decide whether a non-final expression statement needs a `drop`.
+fn expr_is_void(node: Map) -> bool:
+    if get(node, "kind") == "Call":
+        c = get(node, "callee")
+        if c == "print_line" or c == "print" or c == "println":
+            true
+        else if slot_has("wret:{c}") and slot_get("wret:{c}") == "":
+            true
+        else:
+            false
+    else:
+        false
+
 fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> Map:
     statements = get_list(block, "stmts")
+    total = list_count(statements)
     mut current_fn = fn_value
     mut current_locals = locals
+    mut si = 0
     loop stmt in statements:
         result = compile_stmt(current_fn, stmt, current_locals)
         current_fn = get(result, "fn")
         current_locals = get(result, "locals")
+        # A non-final expression statement whose value is unused must be dropped;
+        # the final statement's value is the block's value (implicit return).
+        if si < total - 1 and get(stmt, "kind") == "ExprStmt" and not expr_is_void(get_map(stmt, "expr")):
+            current_fn = emit_op(current_fn, op_drop())
+        si = si + 1
     {"fn": current_fn, "locals": current_locals}
 
 fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
@@ -1496,6 +1549,18 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         nl = if callee == "print" then 0 else 1
                         wn = emit_const(wt, nl)
                         emit_call(wn, slot_get_int("wfn:__print"))
+                    else if callee == "argc":
+                        emit_call(fn_value, slot_get_int("wfn:__argc"))
+                    else if callee == "argv":
+                        wa = compile_expr(fn_value, at(args, 0), locals)
+                        emit_call(wa, slot_get_int("wfn:__argv"))
+                    else if callee == "file_read":
+                        wp = compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
+                        emit_call(wp, slot_get_int("wfn:__file_read"))
+                    else if callee == "file_write":
+                        wp = compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
+                        wc = compile_as_text(wp, at(args, 1), type_of(at(args, 1)), locals)
+                        emit_call(wc, slot_get_int("wfn:__file_write"))
                     else if callee == "to_text":
                         # int/f64 -> text; text passes through unchanged.
                         compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
@@ -1758,7 +1823,7 @@ fn type_of(node: Map) -> Text:
             "f"
         else if callee == "to_int":
             "i"
-        else if callee == "to_text" or callee == "__interp_join":
+        else if callee == "to_text" or callee == "__interp_join" or callee == "argv" or callee == "file_read":
             "t"
         else if callee == "at":
             w_elem_type(at(get_list(node, "args"), 0))

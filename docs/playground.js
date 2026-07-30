@@ -41,6 +41,20 @@
     return new TextDecoder().decode(u.subarray(ptr + 4, ptr + 4 + len));
   }
 
+  // Write a [len][utf8] string into wasm linear memory using the module's own
+  // bump allocator (the pointer lives at mem[0]) and return its pointer. Lets
+  // host functions like file_read/argv hand a Text back to the program.
+  function allocText(mem, s) {
+    const bytes = new TextEncoder().encode(s);
+    const u8 = new Uint8Array(mem.buffer);
+    const dv = new DataView(mem.buffer);
+    const ptr = dv.getUint32(0, true);
+    dv.setUint32(ptr, bytes.length, true);
+    u8.set(bytes, ptr + 4);
+    dv.setUint32(0, ptr + 4 + bytes.length, true);
+    return ptr;
+  }
+
   async function run(source, btn, status, out) {
     btn.disabled = true; status.textContent = 'compiling…';
     out.style.display = 'block'; out.className = 'pg-out'; out.textContent = '';
@@ -70,9 +84,16 @@
       status.textContent = 'running…';
       const bytes = Uint8Array.from(atob(res.wasm), c => c.charCodeAt(0));
       let mem, text = '';
+      const files = {}; // in-memory sandbox filesystem, fresh per run
       const env = {
         __print: (p, nl) => { text += readText(mem, p) + (nl ? '\n' : ''); },
         host_sin: Math.sin, host_cos: Math.cos, host_sqrt: Math.sqrt,
+        // OS-IO stubs: a browser has no command line or filesystem, so argv is
+        // empty and file IO round-trips through an in-memory sandbox.
+        __argc: () => 1,
+        __argv: (i) => allocText(mem, i === 0 ? 'playground' : ''),
+        __file_write: (p, c) => { files[readText(mem, p)] = readText(mem, c); return 0; },
+        __file_read: (p) => allocText(mem, files[readText(mem, p)] || ''),
       };
       const { instance } = await WebAssembly.instantiate(bytes, { env });
       mem = instance.exports.memory;

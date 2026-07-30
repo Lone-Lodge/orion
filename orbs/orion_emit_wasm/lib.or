@@ -112,6 +112,7 @@ fn list_length(items: [int]) -> int:
 
 pub fn op_end() -> int: 11          # 0x0B end
 pub fn op_return() -> int: 15       # 0x0F return
+pub fn op_drop() -> int: 26         # 0x1A drop (discard the top stack value)
 pub fn op_call() -> int: 16         # 0x10 call funcidx
 pub fn op_local_get() -> int: 32    # 0x20 local.get
 pub fn op_local_set() -> int: 33    # 0x21 local.set
