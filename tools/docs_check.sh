@@ -147,6 +147,14 @@ awk '
         check("dark link",       dark["link"],  dark["bg"],       7)
         check("dark rule/page",  dark["rule"],  dark["bg"],       3)
         check("dark rule/code",  dark["rule"],  dark["code-bg"],  3)
+        # Syntax highlighting: every token hue is text, so it holds text AAA
+        # (7:1) on the code background. If a hue is retuned below threshold the
+        # build says so, same as the base palette.
+        split("tok-k tok-t tok-s tok-n tok-f tok-x", toks, " ")
+        for (t in toks) {
+            check("light " toks[t], light[toks[t]], light["code-bg"], 7)
+            check("dark "  toks[t], dark[toks[t]],  dark["code-bg"],  7)
+        }
         exit (bad > 0)
     }
 ' "$ROOT/docs/style.css" || fail=$((fail + 1))

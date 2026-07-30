@@ -29,10 +29,11 @@
  * a poor screen, and in light mode the border is the only thing separating a
  * code block from the page: the two backgrounds differ by about 1.05:1.
  *
- * Code is deliberately NOT syntax-highlighted beyond dimming comments. A full
- * highlight palette is where AAA contrast dies: five hues that all clear 7:1
- * against the same background stop being distinguishable from each other.
- * Two tones say everything a short guide needs.
+ * Code IS syntax-highlighted (highlight.js, the same token categories as the
+ * VS Code grammar), and it still clears AAA. The trick the earlier plain design
+ * missed: five hues that each clear 7:1 stay distinguishable when they are real
+ * hues (rust, teal, olive, plum, brown), not five tints of one colour. The
+ * token palette lives in --tok-* below and docs_check measures every one.
  */
 
 :root {
@@ -44,6 +45,14 @@
     --link: #7d3319;
     --rule: #847d70;
     --focus: #7d3319;
+    /* Syntax token colours. Distinct hues, each >=7:1 on --code-bg (AAA), so
+     * highlighting costs the guide nothing on contrast. docs_check verifies. */
+    --tok-k: #7d3319;
+    --tok-t: #0a5348;
+    --tok-s: #3f5412;
+    --tok-n: #7a356e;
+    --tok-f: #6a3f14;
+    --tok-x: #8a2014;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -55,6 +64,12 @@
         --link: #efab90;
         --rule: #817a6f;
         --focus: #efab90;
+        --tok-k: #efab90;
+        --tok-t: #6fd0c4;
+        --tok-s: #b6cf8e;
+        --tok-n: #daa6df;
+        --tok-f: #e0c58c;
+        --tok-x: #ffab98;
     }
 }
 
@@ -209,8 +224,18 @@ pre code { background: none; padding: 0; }
     padding: 0.05em 0.3em;
 }
 
-/* The only thing the code colouring does. */
-.c { color: var(--dim); }
+/* Syntax highlighting (highlight.js), mirroring the VS Code grammar's token
+ * categories. `.c` is the legacy comment class kept for any static markup.
+ * Each hue clears 7:1 on the code background in both themes, chosen so five
+ * DISTINCT hues stay distinguishable at AAA where five tints would not. */
+.c,
+.hl-c { color: var(--dim); }
+.hl-k { color: var(--tok-k); }
+.hl-t { color: var(--tok-t); }
+.hl-s { color: var(--tok-s); }
+.hl-n { color: var(--tok-n); }
+.hl-f { color: var(--tok-f); }
+.hl-x { color: var(--tok-x); text-decoration: line-through; }
 
 /* Copy button, added by a small script to every code block. Subtle by default
  * so it never competes with the code, terracotta on hover/focus. Kept visible
