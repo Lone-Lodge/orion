@@ -187,6 +187,37 @@ pub fn compile_program(decls: [Map]) -> WModule:
     slot_set("wret:__map_get", "i")
     slot_set("wloc:__map_get", "iii")
     idx = idx + 1
+    slot_set("wfn:__sum", idx)
+    slot_set("wsig:__sum", "i")
+    slot_set("wret:__sum", "i")
+    slot_set("wloc:__sum", "iii")
+    idx = idx + 1
+    slot_set("wfn:__split", idx)
+    slot_set("wsig:__split", "tt")
+    slot_set("wret:__split", "i")
+    slot_set("wloc:__split", "iiiiiiiiii")
+    idx = idx + 1
+    # Collect top-level lambda bindings (fn(...) : body assigned to a name);
+    # reserve an index + signature for each, appended after the runtime helpers.
+    mut lam_nodes = []
+    mut lam_names = []
+    loop decl in decls:
+        if get(decl, "kind") == "Fn":
+            loop lstmt in get_list(get_map(decl, "body"), "stmts"):
+                lsk = get(lstmt, "kind")
+                if lsk == "MutLet" or lsk == "LetOrAssign":
+                    lval = get_map(lstmt, "value")
+                    if get(lval, "kind") == "Lambda":
+                        lnm = "__lam_{get_int(lval, \"line\")}_{get_int(lval, \"col\")}"
+                        slot_set("wfn:{lnm}", idx)
+                        mut lpsig = ""
+                        loop lpt in get_list(lval, "param_types"):
+                            lpsig = "{lpsig}{wtype_of(lpt)}"
+                        slot_set("wsig:{lnm}", lpsig)
+                        slot_set("wret:{lnm}", type_of(get_map(lval, "body")))
+                        idx = idx + 1
+                        lam_nodes = push(lam_nodes, lval)
+                        lam_names = push(lam_names, lnm)
     loop decl in decls:
         if get(decl, "kind") == "Fn":
             module = add_fn(module, compile_fn_ast(decl))
@@ -197,6 +228,15 @@ pub fn compile_program(decls: [Map]) -> WModule:
     module = add_fn(module, build_f64_to_text_fn())
     module = add_fn(module, build_streq_fn())
     module = add_fn(module, build_map_get_fn())
+    module = add_fn(module, build_sum_fn())
+    module = add_fn(module, build_split_fn())
+    # Lambdas become top-level functions, appended after the runtime helpers.
+    mut lai = 0
+    loop:
+        if lai >= list_count(lam_nodes):
+            break
+        module = add_fn(module, compile_lambda_fn(at(lam_nodes, lai), at(lam_names, lai)))
+        lai = lai + 1
     # Emit the string literals collected during compilation as data segments.
     scount = slot_get_int("str:count")
     loop si in 0..<scount:
@@ -941,11 +981,257 @@ fn build_map_get_fn() -> WFn:
     f = emit_const(f, 0)
     emit_end(f)
 
+# __sum(list) -> sum of its i32 elements. Locals: 0=list, 1=n, 2=i, 3=acc.
+fn build_sum_fn() -> WFn:
+    mut f = new_fn("__sum", 1)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 1)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 3)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 2)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 1)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_local_get(f, 3)
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 2)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_load(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 3)
+    f = emit_local_get(f, 2)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 2)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 3)
+    emit_end(f)
+
+# __split(text, sep) -> list of text segments, splitting on sep's FIRST byte.
+# Two passes: count segments, then allocate the list and each segment. Locals:
+# 0=text, 1=sep, 2=tlen, 3=sepbyte, 4=count, 5=i, 6=list, 7=seg, 8=start,
+# 9=slen, 10=sptr (segment index 11 reused as copy counter j -> see below).
+fn build_split_fn() -> WFn:
+    mut f = new_fn("__split", 2)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    # tlen = mem[text] ; sepbyte = mem8[sep+4]
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 2)
+    f = emit_local_get(f, 1)
+    f = emit_load8u(f, 4)
+    f = emit_local_set(f, 3)
+    # count = 1 ; i = 0 ; count separators
+    f = emit_const(f, 1)
+    f = emit_local_set(f, 4)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 5)
+    f = emit_local_get(f, 2)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 5)
+    f = emit_op(f, op_i32_add())
+    f = emit_load8u(f, 4)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_eq())
+    f = emit_op(f, op_if())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 4)
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 5)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    # list = alloc(4 + count*4) ; mem[list] = count
+    f = emit_const(f, 0)
+    f = emit_const(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_tee(f, 6)
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    f = emit_local_get(f, 6)
+    f = emit_local_get(f, 4)
+    f = emit_store(f, 0)
+    # seg=0 ; start=0 ; i=0 ; walk i in 0..=tlen
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 7)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 8)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 5)
+    f = emit_local_get(f, 2)
+    f = emit_op(f, op_i32_gt_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    # boundary = (i >= tlen) or (mem8[text+i] == sepbyte)
+    f = emit_local_get(f, 5)
+    f = emit_local_get(f, 2)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 5)
+    f = emit_op(f, op_i32_add())
+    f = emit_load8u(f, 4)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_eq())
+    f = emit_op(f, op_i32_or())
+    f = emit_op(f, op_if())
+    f = emit_bytes(f, [blocktype_void()])
+    # slen = i - start ; sptr = alloc(4 + slen) ; mem[sptr] = slen
+    f = emit_local_get(f, 5)
+    f = emit_local_get(f, 8)
+    f = emit_op(f, op_i32_sub())
+    f = emit_local_set(f, 9)
+    f = emit_const(f, 0)
+    f = emit_const(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_tee(f, 10)
+    f = emit_local_get(f, 9)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    f = emit_local_get(f, 10)
+    f = emit_local_get(f, 9)
+    f = emit_store(f, 0)
+    # copy j in 0..<slen: mem8[sptr+4+j] = mem8[text+4+start+j]  (reuse local 5? no)
+    # use local 4 (count, no longer needed) as the copy counter j
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 4)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 9)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_local_get(f, 10)
+    f = emit_local_get(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 8)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_load8u(f, 4)
+    f = emit_store8(f, 4)
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 4)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    # mem[list + 4 + seg*4] = sptr ; seg++ ; start = i+1
+    f = emit_local_get(f, 6)
+    f = emit_local_get(f, 7)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 10)
+    f = emit_store(f, 4)
+    f = emit_local_get(f, 7)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 7)
+    f = emit_local_get(f, 5)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 8)
+    f = emit_op(f, op_end())
+    # i++
+    f = emit_local_get(f, 5)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 6)
+    emit_end(f)
+
 fn list_count(items: [Map]) -> int:
     mut count = 0
     loop _item in items:
         count = count + 1
     count
+
+# Compile a non-capturing lambda (fn(x): body) as a top-level function. Params
+# come as a name list plus a parallel type list; the body is a single
+# expression whose value is the function's result.
+fn compile_lambda_fn(lam: Map, lname: Text) -> WFn:
+    pnames = get_text_list(lam, "params")
+    ptypes = get_list(lam, "param_types")
+    pc = len(pnames)
+    mut locals = pnames
+    loop pi in 0..<pc:
+        slot_set("ltype:{at(pnames, pi)}", wtype_of(at(ptypes, pi)))
+    mut f0 = new_fn(lname, pc)
+    slot_set("wloc:cur", "")
+    max_depth = expr_agg_depth(get_map(lam, "body"))
+    loop d in 0..<max_depth:
+        locals = push(locals, "__t{d}")
+        f0 = add_local(f0)
+        note_local("i")
+    slot_set("wtmp:pbase", pc)
+    slot_set("wtmp:depth", 0)
+    slot_set("wbrk", 0)
+    slot_set("wcont", 0)
+    f1 = compile_expr(f0, get_map(lam, "body"), locals)
+    slot_set("wloc:{lname}", slot_get("wloc:cur"))
+    emit_end(f1)
 
 # --- aggregate nesting depth ---
 #
@@ -1235,7 +1521,14 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
     else:
         if kind == "MutLet" or kind == "LetOrAssign":
             value_node = get(stmt, "value")
-            after_value = compile_expr(fn_value, value_node, locals)
+            # A lambda binding names a synthesized top-level fn; the local holds a
+            # placeholder int (calls dispatch via lam:<name>).
+            mut after_value = fn_value
+            if get(value_node, "kind") == "Lambda":
+                slot_set("lam:{get(stmt, \"name\")}", "__lam_{get_int(value_node, \"line\")}_{get_int(value_node, \"col\")}")
+                after_value = emit_const(fn_value, 0)
+            else:
+                after_value = compile_expr(fn_value, value_node, locals)
             name = get(stmt, "name")
             # The value may have declared locals (a comprehension block); reserve
             # those slots so this binding's index does not collide with them.
@@ -1629,6 +1922,22 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         wm = compile_expr(fn_value, at(args, 0), locals)
                         wk = compile_expr(wm, at(args, 1), locals)
                         emit_call(wk, slot_get_int("wfn:__map_get"))
+                    else if callee == "split" and list_count(args) == 2:
+                        # split(text, sep) -> list of text segments.
+                        wsp0 = compile_expr(fn_value, at(args, 0), locals)
+                        wsp1 = compile_expr(wsp0, at(args, 1), locals)
+                        emit_call(wsp1, slot_get_int("wfn:__split"))
+                    else if callee == "sum" and list_count(args) == 1:
+                        # sum(list) -> total of its i32 elements.
+                        wsm = compile_expr(fn_value, at(args, 0), locals)
+                        emit_call(wsm, slot_get_int("wfn:__sum"))
+                    else if slot_has("lam:{callee}"):
+                        # Closure call: direct call to the synthesized lambda fn.
+                        lfn = slot_get("lam:{callee}")
+                        mut lc = fn_value
+                        loop larg in args:
+                            lc = compile_expr(lc, larg, locals)
+                        emit_call(lc, slot_get_int("wfn:{lfn}"))
                     else if callee == "push":
                         # push(list, val) -> new list. f64 value -> __push_f
                         # (8-byte elements); otherwise __push (4-byte).
