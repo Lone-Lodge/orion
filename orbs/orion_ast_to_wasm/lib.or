@@ -137,6 +137,16 @@ pub fn compile_program(decls: [Map]) -> WModule:
     slot_set("fret:__f64_to_text", "t")
     slot_set("wloc:__f64_to_text", "iiiiiiiif")
     idx = idx + 1
+    slot_set("wfn:__streq", idx)
+    slot_set("wsig:__streq", "tt")
+    slot_set("wret:__streq", "i")
+    slot_set("wloc:__streq", "iii")
+    idx = idx + 1
+    slot_set("wfn:__map_get", idx)
+    slot_set("wsig:__map_get", "it")
+    slot_set("wret:__map_get", "i")
+    slot_set("wloc:__map_get", "iii")
+    idx = idx + 1
     loop decl in decls:
         if get(decl, "kind") == "Fn":
             module = add_fn(module, compile_fn_ast(decl))
@@ -145,6 +155,8 @@ pub fn compile_program(decls: [Map]) -> WModule:
     module = add_fn(module, build_int_to_text_fn())
     module = add_fn(module, build_text_concat_fn())
     module = add_fn(module, build_f64_to_text_fn())
+    module = add_fn(module, build_streq_fn())
+    module = add_fn(module, build_map_get_fn())
     # Emit the string literals collected during compilation as data segments.
     scount = slot_get_int("str:count")
     loop si in 0..<scount:
@@ -775,6 +787,120 @@ fn build_f64_to_text_fn() -> WFn:
     f = emit_local_get(f, 5)
     emit_end(f)
 
+# __streq(a, b) -> 1 if the two texts are byte-equal, else 0.
+# Locals: 0=a, 1=b, 2=la, 3=lb, 4=i.
+fn build_streq_fn() -> WFn:
+    mut f = new_fn("__streq", 2)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 2)
+    f = emit_local_get(f, 1)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 3)
+    # if la != lb: return 0
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_ne())
+    f = emit_op(f, op_if())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_const(f, 0)
+    f = emit_op(f, op_return())
+    f = emit_op(f, op_end())
+    # i = 0 ; compare bytes
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 4)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 2)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_load8u(f, 4)
+    f = emit_local_get(f, 1)
+    f = emit_local_get(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_load8u(f, 4)
+    f = emit_op(f, op_i32_ne())
+    f = emit_op(f, op_if())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_const(f, 0)
+    f = emit_op(f, op_return())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 4)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_const(f, 1)
+    emit_end(f)
+
+# __map_get(m, k) -> value for the first key that __streq-matches, else 0.
+# Map layout: [count][key0_ptr, val0, key1_ptr, val1, ...] (8 bytes per entry).
+# Locals: 0=m, 1=k, 2=count, 3=i, 4=ek.
+fn build_map_get_fn() -> WFn:
+    mut f = new_fn("__map_get", 2)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 2)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 3)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 3)
+    f = emit_local_get(f, 2)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    # ek = mem[m + i*8 + 4]
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 8)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_load(f, 4)
+    f = emit_local_set(f, 4)
+    # if __streq(ek, k): return mem[m + i*8 + 8]
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 1)
+    f = emit_call(f, slot_get_int("wfn:__streq"))
+    f = emit_op(f, op_if())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 8)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_load(f, 8)
+    f = emit_op(f, op_return())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 3)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_const(f, 0)
+    emit_end(f)
+
 fn list_count(items: [Map]) -> int:
     mut count = 0
     loop _item in items:
@@ -801,6 +927,11 @@ fn expr_agg_depth(node: Map) -> int:
         mut m = 0
         loop fdef in get_list(node, "fields"):
             m = max2(m, expr_agg_depth(get_map(fdef, "value")))
+        1 + m
+    else if kind == "MapLit":
+        mut m = 0
+        loop pr in get_list(node, "pairs"):
+            m = max2(m, expr_agg_depth(get_map(pr, "value")))
         1 + m
     else if kind == "Field":
         expr_agg_depth(get_map(node, "object"))
@@ -1332,6 +1463,11 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         # f64 -> int (truncate toward zero)
                         wv = compile_expr(fn_value, at(args, 0), locals)
                         emit_op(wv, op_i32_trunc_f64_s())
+                    else if callee == "get" and list_count(args) == 2:
+                        # get(map, key) -> value (i32), linear search by key.
+                        wm = compile_expr(fn_value, at(args, 0), locals)
+                        wk = compile_expr(wm, at(args, 1), locals)
+                        emit_call(wk, slot_get_int("wfn:__map_get"))
                     else if callee == "push":
                         # push(list, val) -> new list. f64 value -> __push_f
                         # (8-byte elements); otherwise __push (4-byte).
@@ -1496,6 +1632,41 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         sresult = emit_local_get(scur, stidx)
                         slot_set("wtmp:depth", sdepth)
                         sresult
+                    else if kind == "MapLit":
+                        # Association list [count][key_ptr, value, ...] (8 bytes
+                        # per entry). String keys become text literals; values are
+                        # i32. get(m, key) linear-searches via __map_get.
+                        pairs = get_list(expr_node, "pairs")
+                        pn = list_count(pairs)
+                        mdepth = slot_get_int("wtmp:depth")
+                        mtidx = slot_get_int("wtmp:pbase") + mdepth
+                        slot_set("wtmp:depth", mdepth + 1)
+                        msize = 4 + pn * 8
+                        m1 = emit_const(fn_value, 0)
+                        m2 = emit_const(m1, 0)
+                        m3 = emit_load(m2, 0)
+                        m4 = emit_local_tee(m3, mtidx)
+                        m5 = emit_const(m4, msize)
+                        m6 = emit_op(m5, op_i32_add())
+                        m7 = emit_store(m6, 0)
+                        h1 = emit_local_get(m7, mtidx)
+                        h2 = emit_const(h1, pn)
+                        h3 = emit_store(h2, 0)
+                        mut mcur = h3
+                        mut mi = 0
+                        loop pr in pairs:
+                            # key pointer at offset 4 + i*8
+                            mcur = emit_local_get(mcur, mtidx)
+                            mcur = compile_expr(mcur, {"kind": "Str", "value": get(pr, "key")}, locals)
+                            mcur = emit_store(mcur, 4 + mi * 8)
+                            # value at offset 8 + i*8
+                            mcur = emit_local_get(mcur, mtidx)
+                            mcur = compile_expr(mcur, get_map(pr, "value"), locals)
+                            mcur = emit_store(mcur, 8 + mi * 8)
+                            mi = mi + 1
+                        mresult = emit_local_get(mcur, mtidx)
+                        slot_set("wtmp:depth", mdepth)
+                        mresult
                     else if kind == "Field":
                         # p.field loads mem[ptr + offset]; f64 field -> f64.load.
                         fld = get(expr_node, "field")
