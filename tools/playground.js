@@ -18,6 +18,10 @@ function compile(source, done) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'orionpg-'));
   const src = path.join(dir, 'prog.or');
   const wasm = path.join(dir, 'prog.wasm');
+  // The wasm backend provides split/sum/len/print etc. as builtins, so pulling
+  // in the text/iter/bytes orbs (which use byte primitives the backend does not
+  // support) is both unnecessary and fatal. Drop those use lines.
+  source = source.replace(/^[ \t]*use[ \t]+(text|iter|bytes)[ \t]*\r?$/gm, '');
   fs.writeFileSync(src, source);
   execFile(ORION, [src, wasm, ORBS, '--quiet'], { timeout: 15000 }, (err, stdout, stderr) => {
     let result;
