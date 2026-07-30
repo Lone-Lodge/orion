@@ -36,7 +36,23 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source })
       }).then(r => r.json());
-      if (!res.ok) { status.textContent = 'error'; out.className = 'pg-out err'; out.textContent = res.error; return; }
+      if (!res.ok) {
+        // A wasm-backend limitation (feature runs natively) reads as a calm note,
+        // not a red error. A real syntax/type error ('ERROR at line:col') stays red.
+        if (/the wasm backend does not support/.test(res.error)) {
+          const feats = [...new Set([...res.error.matchAll(/does not support `([A-Za-z_]+)`|calling `([A-Za-z_]+)`/g)]
+            .map(m => m[1] || m[2]))].slice(0, 5);
+          status.textContent = 'native only';
+          out.className = 'pg-out';
+          out.innerHTML = '<span style="color:#8b90a8">This example uses ' +
+            (feats.length ? '<b style="color:#b0b4c8">' + feats.join(', ') + '</b>' : 'a language feature') +
+            ' that runs with the native Orion compiler (<code>orbit run</code>), not the in-browser playground.<br>' +
+            'The playground runs the core: arithmetic, control flow, functions, lists, maps, structs, f64 and text.</span>';
+        } else {
+          status.textContent = 'error'; out.className = 'pg-out err'; out.textContent = res.error;
+        }
+        return;
+      }
       status.textContent = 'running...';
       const bytes = Uint8Array.from(atob(res.wasm), c => c.charCodeAt(0));
       let mem, text = '';
