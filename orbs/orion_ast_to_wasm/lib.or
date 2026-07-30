@@ -59,6 +59,15 @@ pub fn compile_program(decls: [Map]) -> WModule:
                 slot_set("ftype:{get(fdef, \"name\")}", fty)
                 foff = foff + (if fty == "f" then 8 else 4)
             slot_set("ssize:{get(decl, \"name\")}", foff)
+    # Inject the __print host import (text ptr, newline flag) when the program
+    # prints, so print_line/print/println can call out to the host.
+    if prog_uses_print(decls):
+        module = add_import(module, new_import("env", "__print", 2, 0))
+        slot_set("wfn:__print", idx)
+        slot_set("wsig:__print", "ti")
+        slot_set("wret:__print", "")
+        slot_set("fret:__print", "")
+        idx = idx + 1
     loop decl in decls:
         if get(decl, "kind") == "ExternFn":
             ename = get(decl, "name")
@@ -843,6 +852,73 @@ fn block_agg_depth(block: Map) -> int:
         m = max2(m, stmt_agg_depth(s))
     m
 
+# --- print detection ---
+# The playground lowers print_line/print/println to a host __print import.
+# That import is only added when the program uses it, so games that never
+# print do not force a host to provide __print. One recursive walk over the
+# shared Map/kind shapes covers both expressions and statements.
+fn uses_print(node: Map) -> bool:
+    kind = get(node, "kind")
+    if kind == "Call":
+        c = get(node, "callee")
+        if c == "print_line" or c == "print" or c == "println":
+            return true
+        loop a in get_list(node, "args"):
+            if uses_print(a):
+                return true
+        false
+    else if kind == "Binary":
+        uses_print(get_map(node, "left")) or uses_print(get_map(node, "right"))
+    else if kind == "Unary":
+        uses_print(get_map(node, "operand"))
+    else if kind == "Index":
+        uses_print(get_map(node, "object")) or uses_print(get_map(node, "index"))
+    else if kind == "Field":
+        uses_print(get_map(node, "object"))
+    else if kind == "If":
+        uses_print(get_map(node, "cond")) or uses_print(get_map(node, "then")) or uses_print(get_map(node, "else"))
+    else if kind == "ListLit":
+        loop it in get_list(node, "items"):
+            if uses_print(it):
+                return true
+        false
+    else if kind == "StructCons":
+        loop fd in get_list(node, "fields"):
+            if uses_print(get_map(fd, "value")):
+                return true
+        false
+    else if kind == "ExprStmt":
+        uses_print(get_map(node, "expr"))
+    else if kind == "MutLet" or kind == "LetOrAssign":
+        uses_print(get_map(node, "value"))
+    else if kind == "Return":
+        uses_print(get_map(node, "expr"))
+    else if kind == "IfBlock":
+        if uses_print(get_map(node, "cond")):
+            return true
+        block_uses_print(get_map(node, "then")) or block_uses_print(get_map(node, "else"))
+    else if kind == "Loop":
+        block_uses_print(get_map(node, "body"))
+    else if kind == "ForRange":
+        block_uses_print(get_map(node, "body"))
+    else if kind == "ForIn":
+        block_uses_print(get_map(node, "body"))
+    else:
+        false
+
+fn block_uses_print(block: Map) -> bool:
+    loop s in get_list(block, "stmts"):
+        if uses_print(s):
+            return true
+    false
+
+fn prog_uses_print(decls: [Map]) -> bool:
+    loop d in decls:
+        if get(d, "kind") == "Fn":
+            if block_uses_print(get_map(d, "body")):
+                return true
+    false
+
 # Locals table is a flat list of names — index into the list IS the
 # local index in wasm. push a name and you get its index for free.
 fn build_locals(params: [Map]) -> [Text]:
@@ -1257,6 +1333,14 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         wv = compile_expr(wl, at(args, 1), locals)
                         pfn = if pet == "f" then slot_get_int("wfn:__push_f") else slot_get_int("wfn:__push")
                         emit_call(wv, pfn)
+                    else if callee == "print_line" or callee == "println" or callee == "print":
+                        # Lower to the __print host import: text pointer + newline
+                        # flag (1 for the line variants, 0 for print). print()
+                        # with no argument is just a newline (empty text).
+                        wt = if list_count(args) >= 1 then compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals) else compile_expr(fn_value, {"kind": "Str", "value": ""}, locals)
+                        nl = if callee == "print" then 0 else 1
+                        wn = emit_const(wt, nl)
+                        emit_call(wn, slot_get_int("wfn:__print"))
                     else if callee == "to_text":
                         # int/f64 -> text; text passes through unchanged.
                         compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
