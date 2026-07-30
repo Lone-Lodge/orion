@@ -91,9 +91,17 @@ pub fn compile_program(decls: [Map]) -> WModule:
             rett = wtype_of(get_map(decl, "ret"))
             slot_set("wret:{fname}", rett)
             slot_set("fret:{fname}", rett)
+    # Reserve the __push runtime helper's index (appended after all user fns),
+    # so push() call sites resolve. Signature (list, val) -> list; 3 i32 locals.
+    slot_set("wfn:__push", idx)
+    slot_set("wsig:__push", "ii")
+    slot_set("wret:__push", "i")
+    slot_set("wloc:__push", "iii")
+    idx = idx + 1
     loop decl in decls:
         if get(decl, "kind") == "Fn":
             module = add_fn(module, compile_fn_ast(decl))
+    module = add_fn(module, build_push_fn())
     # Emit the string literals collected during compilation as data segments.
     scount = slot_get_int("str:count")
     loop si in 0..<scount:
@@ -145,6 +153,82 @@ pub fn compile_fn_ast(fn_node: Map) -> WFn:
 # Append one declared-local type char ('i'/'f') for the current function.
 fn note_local(tychar: Text):
     slot_set("wloc:cur", "{slot_get(\"wloc:cur\")}{tychar}")
+
+# The __push runtime helper: functional list append. (list, val) -> new list.
+# Allocates a fresh [len+1, elems..., val] block, copies the old elements with
+# a runtime loop, appends val, returns the new pointer. Locals: 0=list, 1=val
+# (params), 2=newptr, 3=oldlen, 4=i.
+fn build_push_fn() -> WFn:
+    mut f = new_fn("__push", 2)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    # oldlen = list[0]
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 3)
+    # newptr = bump ; bump += 8 + oldlen*4
+    f = emit_const(f, 0)
+    f = emit_const(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_tee(f, 2)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_const(f, 8)
+    f = emit_op(f, op_i32_add())
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    # newptr[0] = oldlen + 1
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    # i = 0
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 4)
+    # copy loop: while i < oldlen: newptr[4+i*4] = list[4+i*4]; i++
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_load(f, 4)
+    f = emit_store(f, 4)
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 4)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    # newptr[4 + oldlen*4] = val
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 1)
+    f = emit_store(f, 4)
+    # return newptr
+    f = emit_local_get(f, 2)
+    emit_end(f)
 
 fn list_count(items: [Map]) -> int:
     mut count = 0
@@ -590,6 +674,11 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         # f64 -> int (truncate toward zero)
                         wv = compile_expr(fn_value, at(args, 0), locals)
                         emit_op(wv, op_i32_trunc_f64_s())
+                    else if callee == "push":
+                        # push(list, val) -> new list, via the __push helper.
+                        wl = compile_expr(fn_value, at(args, 0), locals)
+                        wv = compile_expr(wl, at(args, 1), locals)
+                        emit_call(wv, slot_get_int("wfn:__push"))
                     else:
                         # Promote an i32 argument to f64 when the callee's param
                         # (from wsig:<callee>) is f64, so scale(2, 3.0) works.
