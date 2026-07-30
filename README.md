@@ -86,9 +86,10 @@ top.
 The wasm backend covers the core language: i32 and f64, structs, lists, maps,
 tuples, sum types with pattern matching, `?`, closures, comprehensions, text and
 interpolation, first-class functions, a `par_run` that reduces its workers in
-order, the full control flow, and an in-browser IO sandbox. Effects that resume
-(setjmp) stay native: a browser sandbox has no stack switching, so that sample
-runs with `orbit run`.
+order, one-shot algebraic effects (`perform`/`resume`), the full control flow,
+and an in-browser IO sandbox. All 12 Field Guide samples run in the browser. The
+async scheduler (`spawn`/`await` with parked tasks) needs real stack switching
+and stays native.
 
 ## Layout
 

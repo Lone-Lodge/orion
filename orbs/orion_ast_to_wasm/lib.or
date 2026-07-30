@@ -1349,6 +1349,11 @@ fn expr_agg_depth(node: Map) -> int:
         loop s in get_list(node, "stmts"):
             m = max2(m, stmt_agg_depth(s))
         m
+    else if kind == "Perform":
+        mut m = 0
+        loop a in get_list(node, "args"):
+            m = max2(m, expr_agg_depth(a))
+        m
     else:
         0
 
@@ -1453,6 +1458,9 @@ fn scan_hostcalls(node: Map):
             scan_hostcalls(get_map(arm, "body"))
     else if kind == "Question":
         scan_hostcalls(get_map(node, "inner"))
+    else if kind == "Perform":
+        loop a in get_list(node, "args"):
+            scan_hostcalls(a)
     else if kind == "Defer" or kind == "Require" or kind == "Ensure":
         scan_hostcalls(get_map(node, "expr"))
 
@@ -1994,6 +2002,14 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         wpr0 = compile_expr(fn_value, at(args, 0), locals)
                         wpr1 = compile_expr(wpr0, at(args, 1), locals)
                         emit_call(wpr1, slot_get_int("wfn:__par_run"))
+                    else if callee == "resume" and list_count(args) == 1:
+                        # resume(v): the handler returns v, which becomes the value
+                        # of the enclosing `perform`. Matches the native setjmp path
+                        # where resume does not return (it abandons the rest of the
+                        # handler). `return` makes the trailing handler code
+                        # unreachable, exactly like the longjmp did.
+                        rv = compile_expr(fn_value, at(args, 0), locals)
+                        emit_op(rv, op_return())
                     else if slot_has("lam:{callee}"):
                         # Closure call: direct call to the synthesized lambda fn.
                         lfn = slot_get("lam:{callee}")
@@ -2367,6 +2383,23 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             mf = emit_op(mf, op_end())
                         slot_set("wtmp:depth", mdepth)
                         mf
+                    else if kind == "Perform":
+                        # perform Effect.op(args) calls the synthesized handler fn
+                        # __handler_Effect_op (the parser turns `handle` into a
+                        # plain Fn with that name). Its return value is what perform
+                        # yields, whether the handler returned normally or called
+                        # resume(v) — one-shot effects, same as the native path.
+                        effect_name = get(expr_node, "effect")
+                        op_name = get(expr_node, "op")
+                        hname = "__handler_{effect_name}_{op_name}"
+                        if slot_has("wfn:{hname}"):
+                            mut pcur = fn_value
+                            loop parg in get_list(expr_node, "args"):
+                                pcur = compile_expr(pcur, parg, locals)
+                            emit_call(pcur, slot_get_int("wfn:{hname}"))
+                        else:
+                            compile_error("orion: ERROR — the wasm backend found no handler for `perform {effect_name}.{op_name}` (define `handle {effect_name}.{op_name}`)")
+                            emit_const(fn_value, 0)
                     else:
                         # Unsupported expression: report it so the driver refuses
                         # to write invalid wasm (push 0 keeps the stack balanced
@@ -2438,6 +2471,9 @@ fn type_of(node: Map) -> Text:
         type_of(get_map(node, "then"))
     else if kind == "Match":
         type_of(get_map(at(get_list(node, "arms"), 0), "body"))
+    else if kind == "Perform":
+        hn = "__handler_{get(node, \"effect\")}_{get(node, \"op\")}"
+        if slot_has("fret:{hn}") then slot_get("fret:{hn}") else "i"
     else if kind == "MethodCall":
         mm = get(node, "method")
         if slot_has("vtag:{mm}") then "i" else (if slot_has("fret:{mm}") then slot_get("fret:{mm}") else "i")

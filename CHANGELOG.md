@@ -14,12 +14,15 @@ Notable changes to Orion. The format follows
   sum types with pattern matching, `?`, non-capturing closures, list
   comprehensions, `require`/`defer`, text with interpolation, `print_line`,
   first-class functions (`call_indirect`), a `par_run` that reduces its workers
-  in order, and a stubbed OS-IO sandbox. Effects that resume stay native (a
-  browser has no stack switching).
+  in order, one-shot algebraic effects (`perform`/`resume`/`handle`, compiled to
+  a handler call and a `return`), and a stubbed OS-IO sandbox. The async
+  scheduler (`spawn`/`await` with parked tasks) stays native (a browser has no
+  stack switching).
 - The **Field Guide playground** (`tools/playground.js`, `docs/playground.js`):
   a "Try Orion" editor plus a Run button on every sample, compiling to wasm and
-  running in place. 11 of the 12 Field Guide samples run in the browser; the one
-  that uses resumable effects shows a clear "native only" note.
+  running in place. All 12 Field Guide samples run in the browser; a construct
+  the wasm backend cannot lower (e.g. the parked-task scheduler) shows a clear
+  "native only" note.
 - `examples/wasm_demo/`: an Orion program compiled to wasm, animated on a canvas.
 
 ## [0.1.0] - 2026-07-28
