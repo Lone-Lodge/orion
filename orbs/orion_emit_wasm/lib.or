@@ -132,6 +132,7 @@ pub fn op_i32_lt_s() -> int: 72     # 0x48 i32.lt_s
 pub fn op_i32_gt_s() -> int: 74     # 0x4A i32.gt_s
 pub fn op_i32_le_s() -> int: 76     # 0x4C i32.le_s
 pub fn op_i32_ge_s() -> int: 78     # 0x4E i32.ge_s
+pub fn op_i32_ge_u() -> int: 79     # 0x4F i32.ge_u (unsigned: catches idx<0 too)
 pub fn op_i32_add() -> int: 106     # 0x6A i32.add
 pub fn op_i32_sub() -> int: 107     # 0x6B i32.sub
 pub fn op_i32_mul() -> int: 108     # 0x6C i32.mul

@@ -1841,7 +1841,8 @@ fn expr_agg_depth(node: Map) -> int:
     else if kind == "Binary":
         max2(expr_agg_depth(get_map(node, "left")), expr_agg_depth(get_map(node, "right")))
     else if kind == "Index":
-        max2(expr_agg_depth(get_map(node, "object")), expr_agg_depth(get_map(node, "index")))
+        # a list index reserves two temps (pointer, index) for the bounds check.
+        2 + max2(expr_agg_depth(get_map(node, "object")), expr_agg_depth(get_map(node, "index")))
     else if kind == "Unary":
         expr_agg_depth(get_map(node, "operand"))
     else if kind == "Call":
@@ -3045,15 +3046,36 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             wky = compile_as_text(wmp, idxnode, "t", locals)
                             emit_call(wky, slot_get_int("wfn:__map_get"))
                         else:
-                            # x[i] loads element i: mem[ptr + 4 + i*stride].
+                            # x[i] loads element i: mem[ptr + 4 + i*stride], with a
+                            # bounds check first — an out-of-range index traps
+                            # (unreachable) rather than reading adjacent memory, the
+                            # same loud failure the native backend gives.
                             iet = w_elem_type(get_map(expr_node, "object"))
                             istride = if iet == "f" then 8 else 4
-                            with_ptr = compile_expr(fn_value, get_map(expr_node, "object"), locals)
-                            with_idx = compile_expr(with_ptr, idxnode, locals)
-                            s1 = emit_const(with_idx, istride)
-                            s2 = emit_op(s1, op_i32_mul())
-                            s3 = emit_op(s2, op_i32_add())
-                            if iet == "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
+                            idepth = slot_get_int("wtmp:depth")
+                            iptr = slot_get_int("wtmp:pbase") + idepth
+                            iidx = iptr + 1
+                            slot_set("wtmp:depth", idepth + 2)
+                            wpt = compile_expr(fn_value, get_map(expr_node, "object"), locals)
+                            wpt = emit_local_set(wpt, iptr)
+                            wpt = compile_expr(wpt, idxnode, locals)
+                            wpt = emit_local_set(wpt, iidx)
+                            # if idx < 0 or idx >= len: trap
+                            wpt = emit_local_get(wpt, iidx)
+                            wpt = emit_local_get(wpt, iptr)
+                            wpt = emit_load(wpt, 0)
+                            wpt = emit_op(wpt, op_i32_ge_u())
+                            wpt = emit_op(wpt, op_if())
+                            wpt = emit_bytes(wpt, [blocktype_void()])
+                            wpt = emit_op(wpt, op_unreachable())
+                            wpt = emit_op(wpt, op_end())
+                            wpt = emit_local_get(wpt, iptr)
+                            wpt = emit_local_get(wpt, iidx)
+                            wpt = emit_const(wpt, istride)
+                            wpt = emit_op(wpt, op_i32_mul())
+                            wpt = emit_op(wpt, op_i32_add())
+                            slot_set("wtmp:depth", idepth)
+                            if iet == "f" then emit_f64_load(wpt, 4) else emit_load(wpt, 4)
                     else if kind == "Block":
                         # A block used as a value (e.g. a list comprehension
                         # `loop x in xs: e`): run its statements; the last one
