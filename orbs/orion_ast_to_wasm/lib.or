@@ -1824,7 +1824,11 @@ fn expr_agg_depth(node: Map) -> int:
         mut m = 0
         loop fdef in get_list(node, "fields"):
             m = max2(m, expr_agg_depth(get_map(fdef, "value")))
-        1 + m
+        if has(node, "spread") and get(get_map(node, "spread"), "kind") != "Int":
+            # a spread reserves a second temp for the source pointer.
+            2 + max2(m, expr_agg_depth(get_map(node, "spread")))
+        else:
+            1 + m
     else if kind == "MapLit":
         mut m = 0
         loop pr in get_list(node, "pairs"):
@@ -2863,7 +2867,11 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         sfields = get_list(expr_node, "fields")
                         sdepth = slot_get_int("wtmp:depth")
                         stidx = slot_get_int("wtmp:pbase") + sdepth
-                        slot_set("wtmp:depth", sdepth + 1)
+                        # `Point{..p, x: 7}` spreads p: copy its words, then the
+                        # explicit fields below override. A struct value is never
+                        # an Int, so an Int spread node is the "no spread" marker.
+                        has_spread = has(expr_node, "spread") and get(get_map(expr_node, "spread"), "kind") != "Int"
+                        slot_set("wtmp:depth", sdepth + (if has_spread then 2 else 1))
                         sname = get(expr_node, "name")
                         ssize = if slot_has("ssize:{sname}") then slot_get_int("ssize:{sname}") else list_count(sfields) * 4
                         c1 = emit_const(fn_value, 0)
@@ -2874,6 +2882,16 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         c6 = emit_op(c5, op_i32_add())
                         c7 = emit_store(c6, 0)
                         mut scur = c7
+                        if has_spread:
+                            # copy the source struct word by word into the new one.
+                            spidx = stidx + 1
+                            scur = compile_expr(scur, get_map(expr_node, "spread"), locals)
+                            scur = emit_local_set(scur, spidx)
+                            loop wcopy in 0..<(ssize / 4):
+                                scur = emit_local_get(scur, stidx)
+                                scur = emit_local_get(scur, spidx)
+                                scur = emit_load(scur, wcopy * 4)
+                                scur = emit_store(scur, wcopy * 4)
                         loop fdef in sfields:
                             fname = get(fdef, "name")
                             foff = if slot_has("fld:{fname}") then slot_get_int("fld:{fname}") else 0
