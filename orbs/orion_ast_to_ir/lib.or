@@ -3023,6 +3023,29 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
 
+# `x as T` — numeric cast. Native ints are i64 (sized integer widths erase to
+# i64 for now, so int<->int is a value passthrough); int<->float uses sitofp /
+# fptosi. Width-exact sized integers are a native refinement; the wasm backend
+# is width-exact where it matters.
+fn ast_cast_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    inner = ast_expr_to_ir(fn_value, scope, get_map(node, "expr"))
+    tn = get_map(node, "type")
+    tname = if get(tn, "kind") == "Named" then get(tn, "name") else "i64"
+    to_float = tname == "f64" or tname == "float" or tname == "f32"
+    src = get_value_type(inner.function, inner.id)
+    if to_float:
+        if src == "f64":
+            inner
+        else:
+            pr = ir_fn_push(inner.function, ir_sitofp(inner.id))
+            ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+    else:
+        if src == "f64":
+            pr = ir_fn_push(inner.function, ir_fptosi(inner.id))
+            ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+        else:
+            inner
+
 pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     kind = get(node, "kind")
     # `xs[i]` / `m[k]` is sugar for `at(xs, i)` (lists) or `get(m, k)` (maps).
@@ -3061,6 +3084,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_call = kind == "Call"
     is_if = kind == "If"
     is_unary = kind == "Unary"
+    is_cast = kind == "Cast"
     is_list_lit = kind == "ListLit"
     is_tuple = kind == "Tuple"
     is_map_lit = kind == "MapLit"
@@ -3123,6 +3147,8 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         result = ast_if_to_ir(fn_value, scope, node)
     if is_unary:
         result = ast_unary_to_ir(fn_value, scope, node)
+    if is_cast:
+        result = ast_cast_to_ir(fn_value, scope, node)
     if is_method_call:
         method = get(node, "method")
         receiver = get(node, "receiver")
@@ -3284,7 +3310,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         else:
             pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_g, perf_arg_ids))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
-    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_tuple or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
+    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_cast or is_list_lit or is_tuple or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
