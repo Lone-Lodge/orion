@@ -223,6 +223,16 @@ pub fn compile_program(decls: [Map]) -> WModule:
     slot_set("wret:__index_of", "i")
     slot_set("wloc:__index_of", "iiii")
     idx = idx + 1
+    slot_set("wfn:__slice_text", idx)
+    slot_set("wsig:__slice_text", "tii")
+    slot_set("wret:__slice_text", "t")
+    slot_set("wloc:__slice_text", "iii")
+    idx = idx + 1
+    slot_set("wfn:__slice_list", idx)
+    slot_set("wsig:__slice_list", "iii")
+    slot_set("wret:__slice_list", "i")
+    slot_set("wloc:__slice_list", "iii")
+    idx = idx + 1
     # Collect top-level lambda bindings (fn(...) : body assigned to a name);
     # reserve an index + signature for each, appended after the runtime helpers.
     mut lam_nodes = []
@@ -258,6 +268,8 @@ pub fn compile_program(decls: [Map]) -> WModule:
     module = add_fn(module, build_split_fn())
     module = add_fn(module, build_par_run_fn())
     module = add_fn(module, build_index_of_fn())
+    module = add_fn(module, build_slice_text_fn())
+    module = add_fn(module, build_slice_list_fn())
     # Lambdas become top-level functions, appended after the runtime helpers.
     mut lai = 0
     loop:
@@ -1139,6 +1151,131 @@ fn build_index_of_fn() -> WFn:
     f = emit_const(f, 0)
     f = emit_const(f, 1)
     f = emit_op(f, op_i32_sub())
+    emit_end(f)
+
+# __slice_text(s, i, j) -> new text with bytes s[i..j). Length-prefixed.
+# Locals: 0=s, 1=i, 2=j, 3=newlen, 4=newptr, 5=k.
+fn build_slice_text_fn() -> WFn:
+    mut f = new_fn("__slice_text", 3)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    # newlen = j - i
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 1)
+    f = emit_op(f, op_i32_sub())
+    f = emit_local_set(f, 3)
+    # newptr = alloc(4 + newlen)
+    f = emit_const(f, 0)
+    f = emit_const(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_tee(f, 4)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    # mem[newptr] = newlen
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 3)
+    f = emit_store(f, 0)
+    # k = 0
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    # if k >= newlen: break
+    f = emit_local_get(f, 5)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    # mem8[newptr + 4 + k] = mem8[s + 4 + i + k]
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 5)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 5)
+    f = emit_op(f, op_i32_add())
+    f = emit_load8u(f, 4)
+    f = emit_store8(f, 4)
+    # k = k + 1
+    f = emit_local_get(f, 5)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 4)
+    emit_end(f)
+
+# __slice_list(xs, i, j) -> new list with elements xs[i..j) (i32 stride).
+# Locals: 0=xs, 1=i, 2=j, 3=newcount, 4=newptr, 5=k.
+fn build_slice_list_fn() -> WFn:
+    mut f = new_fn("__slice_list", 3)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 1)
+    f = emit_op(f, op_i32_sub())
+    f = emit_local_set(f, 3)
+    # newptr = alloc(4 + newcount*4)
+    f = emit_const(f, 0)
+    f = emit_const(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_tee(f, 4)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 3)
+    f = emit_store(f, 0)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 5)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    # mem[newptr + 4 + k*4] = mem[xs + 4 + (i+k)*4]
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 5)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 1)
+    f = emit_local_get(f, 5)
+    f = emit_op(f, op_i32_add())
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_load(f, 4)
+    f = emit_store(f, 4)
+    f = emit_local_get(f, 5)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 4)
     emit_end(f)
 
 # __sum(list) -> sum of its i32 elements. Locals: 0=list, 1=n, 2=i, 3=acc.
@@ -2241,6 +2378,18 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         wc2 = emit_call(wc1, slot_get_int("wfn:__index_of"))
                         wc3 = emit_const(wc2, 0)
                         emit_op(wc3, op_i32_ge_s())
+                    else if callee == "slice" and list_count(args) == 3:
+                        # slice(x, i, j): substring for text, sublist for a list.
+                        if type_of(at(args, 0)) == "t":
+                            ws0 = compile_as_text(fn_value, at(args, 0), "t", locals)
+                            ws1 = compile_expr(ws0, at(args, 1), locals)
+                            ws2 = compile_expr(ws1, at(args, 2), locals)
+                            emit_call(ws2, slot_get_int("wfn:__slice_text"))
+                        else:
+                            wl0 = compile_expr(fn_value, at(args, 0), locals)
+                            wl1 = compile_expr(wl0, at(args, 1), locals)
+                            wl2 = compile_expr(wl1, at(args, 2), locals)
+                            emit_call(wl2, slot_get_int("wfn:__slice_list"))
                     else if callee == "par_run" and list_count(args) == 2:
                         # par_run(fns, arg): call each function value with arg and
                         # sum. Sequential in the browser; the result is the same.
@@ -2790,6 +2939,9 @@ fn type_of(node: Map) -> Text:
             "i"
         else if callee == "to_text" or callee == "__interp_join" or callee == "argv" or callee == "file_read":
             "t"
+        else if callee == "slice":
+            # substring stays text; a sublist stays a pointer.
+            type_of(at(get_list(node, "args"), 0))
         else if callee == "at":
             w_elem_type(at(get_list(node, "args"), 0))
         else if slot_has("fret:{callee}"):
