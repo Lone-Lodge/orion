@@ -1,35 +1,46 @@
-# option — Option<T>-style for representing maybe-values.
+# option — Option<T>: a value, or nothing.
 #
-# Idiomatic usage:
-#   m = find_user(42)
-#   if is_some(m):
-#       print_line("found {m.value}")
-#   else:
-#       print_line("not found")
+# A native generic sum type. Same idea as `result` without the message: you
+# cannot read the payload without saying what the empty case does.
 #
-# Or with unwrap_or:
-#   user = find_user(42)
-#   id = unwrap_or(user, 0)
+#   use option
 #
-# When orion-self gets true sum types with payloads, this becomes
-# `enum Option: Some(T), None` natively.
+#   fn find(k: int) -> Option<int>:
+#       if k > 0 then Option.Some(k * 10) else Option.None
+#
+#   match find(4):
+#       Some(v) -> print_line("found {v}")
+#       None    -> print_line("not found")
+#
+# Softer forms:
+#   id = unwrap_or(find(0), 0)      # fallback value
+#   if let Some(v) = find(4):       # only the present case
+#       print_line("{v}")
+#
+# `?` propagates: `v = find(k)?` returns None out of the enclosing function
+# when there is nothing, and binds `v` otherwise.
+#
+# No `unwrap` on purpose — Orion has no panic, so it could only lie and hand
+# back a zero. Use `match`, `if let`, `?` or `unwrap_or`.
 
-type Option: has: int, value: int
+pub type Option<T>:
+    Some(T)
+    None
 
-pub fn Some(v: int) -> Option:
-    Option{has: 1, value: v}
+# The payload, or `default` if this is None.
+pub fn unwrap_or<T>(o: Option<T>, default: T) -> T:
+    match o:
+        Some(v) -> v
+        None -> default
 
-pub fn None() -> Option:
-    Option{has: 0, value: 0}
+# 1 if a value is present, else 0.
+pub fn is_some<T>(o: Option<T>) -> int:
+    match o:
+        Some(v) -> 1
+        None -> 0
 
-pub fn is_some(o: Option) -> int:
-    o.has
-
-pub fn is_none(o: Option) -> int:
-    if o.has == 1 then 0 else 1
-
-pub fn unwrap(o: Option) -> int:
-    o.value
-
-pub fn unwrap_or(o: Option, default: int) -> int:
-    if o.has == 1 then o.value else default
+# 1 if this is None, else 0.
+pub fn is_none<T>(o: Option<T>) -> int:
+    match o:
+        Some(v) -> 0
+        None -> 1

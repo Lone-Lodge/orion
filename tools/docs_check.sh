@@ -159,6 +159,25 @@ awk '
     }
 ' "$ROOT/docs/style.css" || fail=$((fail + 1))
 
+# --- library reference ----------------------------------------------------
+# docs/reference.html is generated from the orbs. A generated file that is
+# committed by hand goes stale the moment someone adds a `pub fn` and forgets
+# to regenerate — the same failure the samples above guard against. So build
+# it fresh and compare: if it differs, the committed page is out of date.
+echo
+if bash "$ROOT/tools/orb_reference.sh" --stdout > "$WORK/reference.html" 2> "$WORK/reflog.txt"; then
+    if diff -q "$ROOT/docs/reference.html" "$WORK/reference.html" > /dev/null 2>&1; then
+        echo "  reference: up to date with orbs/"
+    else
+        echo "  reference: STALE — run bash tools/orb_reference.sh"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  reference: generator failed"
+    sed 's/^/    /' "$WORK/reflog.txt" | head -10
+    fail=$((fail + 1))
+fi
+
 echo
 if [ "$fail" = "0" ]; then
     echo "  docs: $count sample(s) compile, translations agree, contrast is AAA"

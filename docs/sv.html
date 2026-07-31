@@ -309,8 +309,12 @@ fn main() -&gt; int:
     par_run(workers, 7)     <span class="c"># 3 threads, 3 x 14 == 42</span>
 </code></pre>
 
-<p>Hanterare som &ouml;verlever sin egen resume (<code>ask</code> och
-<code>resume_with</code>) &auml;r Windows-bara tills vidare; annars rapporterar
+<p>Effekterna ovan &auml;r <em>one-shot</em>: hanteraren resumar exakt en g&aring;ng
+och synkront. Det &auml;r den st&ouml;dda k&auml;rnan och den funkar p&aring;
+alla plattformar. Hanterare som &ouml;verlever sin egen resume (<code>ask</code>
+och <code>resume_with</code>) &auml;r <strong>experimentella</strong> &mdash;
+det &auml;r samma maskineri som async beh&ouml;ver, och det g&aring;r p&aring;
+Windows-fibrer. Annars rapporterar
 <code>resumable_ok()</code> 0 och <code>ask</code> v&auml;grar i st&auml;llet
 f&ouml;r att l&aring;tsas. De, plus uppgifter med <code>spawn</code> och
 <code>await</code>, finns i <code>examples/tests/tests/</code> som
@@ -321,8 +325,8 @@ f&ouml;r att l&aring;tsas. De, plus uppgifter med <code>spawn</code> och
 
 <ul>
 <li><code>examples/demos/</code> &mdash; 21 k&ouml;rbara program, en id&eacute; var.</li>
-<li><code>examples/tests/tests/</code> &mdash; 151 tester, en funktion var, alla gr&ouml;na p&aring; Linux och Windows.</li>
-<li><code>orbs/</code> &mdash; biblioteken: text, list, num, iter, json, net, async, result, option.</li>
+<li><code>examples/tests/tests/</code> &mdash; 153 tester, en funktion var, alla gr&ouml;na p&aring; Linux och Windows.</li>
+<li><a href="reference.html">Biblioteksreferens</a> &mdash; varje orb och funktionerna den exporterar, genererad ur k&auml;llan: text, list, num, iter, json, net, async, result, option med flera.</li>
 <li><code>tools/bootstrap.sh</code> &mdash; fr&aring;n bar checkout till fungerande kompilator: seeden bygger den, sedan bygger den sig sj&auml;lv till en fixpunkt.</li>
 </ul>
 

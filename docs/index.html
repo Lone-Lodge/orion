@@ -299,8 +299,11 @@ fn main() -&gt; int:
     par_run(workers, 7)     <span class="c"># 3 threads, 3 x 14 == 42</span>
 </code></pre>
 
-<p>Handlers that outlive their own resume (<code>ask</code> and
-<code>resume_with</code>) are Windows-only for now; elsewhere
+<p>The effects above are <em>one-shot</em>: the handler resumes exactly once and
+synchronously. That is the supported core and it works on every platform.
+Handlers that outlive their own resume (<code>ask</code> and
+<code>resume_with</code>) are <strong>experimental</strong> &mdash; that is the
+same machinery async needs, and it runs on Windows fibers. Elsewhere
 <code>resumable_ok()</code> reports 0 and <code>ask</code> refuses rather than
 pretending. Those, plus tasks with <code>spawn</code> and <code>await</code>,
 live in <code>examples/tests/tests/</code> as <code>test_42_effects</code>,
@@ -310,8 +313,8 @@ live in <code>examples/tests/tests/</code> as <code>test_42_effects</code>,
 
 <ul>
 <li><code>examples/demos/</code> &mdash; 21 runnable programs, one idea each.</li>
-<li><code>examples/tests/tests/</code> &mdash; 151 tests, one feature each, all green on Linux and Windows.</li>
-<li><code>orbs/</code> &mdash; the libraries: text, list, num, iter, json, net, async, result, option.</li>
+<li><code>examples/tests/tests/</code> &mdash; 153 tests, one feature each, all green on Linux and Windows.</li>
+<li><a href="reference.html">Library reference</a> &mdash; every orb and the functions it exports, generated from the source: text, list, num, iter, json, net, async, result, option and more.</li>
 <li><code>tools/bootstrap.sh</code> &mdash; a bare checkout to a working compiler: the seed builds it, then it builds itself to a fixpoint.</li>
 </ul>
 

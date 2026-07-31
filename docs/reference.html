@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orion Library Reference</title>
+<meta name="description" content="Every orb that ships with Orion and the functions it exports, generated from the source.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#ref">Skip to the reference</a>
+
+<header>
+<h1>Orion Library Reference</h1>
+<p class="lede">Every orb that ships with Orion, and what it exports. Generated from the <code>pub fn</code> signatures in <code>orbs/</code>, so it cannot drift from the code.</p>
+<ul class="langs">
+<li><a href="index.html">&larr; Field Guide</a></li>
+</ul>
+</header>
+<nav class="toc" aria-labelledby="toc-h">
+<h2 class="toc-h" id="toc-h">The orbs</h2>
+<ol>
+<li><a href="#text"><code>text</code></a></li>
+<li><a href="#list"><code>list</code></a></li>
+<li><a href="#num"><code>num</code></a></li>
+<li><a href="#iter"><code>iter</code></a></li>
+<li><a href="#dict"><code>dict</code></a></li>
+<li><a href="#json"><code>json</code></a></li>
+<li><a href="#net"><code>net</code></a></li>
+<li><a href="#os"><code>os</code></a></li>
+<li><a href="#async"><code>async</code></a></li>
+<li><a href="#scheduler"><code>scheduler</code></a></li>
+<li><a href="#timer"><code>timer</code></a></li>
+<li><a href="#result"><code>result</code></a></li>
+<li><a href="#option"><code>option</code></a></li>
+<li><a href="#assert"><code>assert</code></a></li>
+<li><a href="#closure"><code>closure</code></a></li>
+<li><a href="#log"><code>log</code></a></li>
+<li><a href="#ori_display"><code>ori_display</code></a></li>
+<li><a href="#ori_geometry"><code>ori_geometry</code></a></li>
+</ol>
+</nav>
+<main id="ref">
+<p>Bring an orb in with <code>use text</code>. Any function is also callable method-style, so <code>trim(s)</code> and <code>s.trim()</code> are the same call. The built-ins the guide uses (<code>print_line</code>, <code>len</code>, <code>push</code>, <code>get</code>, file and CLI functions) need no <code>use</code> at all.</p>
+<h2 id="text"><code>text</code></h2>
+<p class="orb-blurb">common text helpers callable via method-call syntax.</p>
+<div class="fn"><code class="sig">is_empty(t: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">byte_count(t: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">starts_with(t: Text, prefix: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">ends_with(t: Text, suffix: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">repeat(t: Text, n: int) -&gt; Text</code><p>Repeat <code>t</code> <code>n</code> times.</p></div>
+<div class="fn"><code class="sig">reverse(t: Text) -&gt; Text</code><p>Reverse the bytes (ASCII-safe only).</p></div>
+<div class="fn"><code class="sig">upper(t: Text) -&gt; Text</code><p>Convert ASCII letters to upper case (in place, ASCII only).</p></div>
+<div class="fn"><code class="sig">lower(t: Text) -&gt; Text</code><p>Convert ASCII letters to lower case.</p></div>
+<div class="fn"><code class="sig">trim(t: Text) -&gt; Text</code><p>Remove leading and trailing ASCII whitespace (space, tab, newline, CR).</p></div>
+<div class="fn"><code class="sig">join(parts: [Text], sep: Text) -&gt; Text</code><p>Join a list of pieces with <code>sep</code> between them.</p></div>
+<div class="fn"><code class="sig">split(t: Text, sep: Text) -&gt; [Text]</code><p>Split <code>t</code> on every occurrence of <code>sep</code>, returning the pieces.</p></div>
+<div class="fn"><code class="sig">replace(t: Text, from: Text, to: Text) -&gt; Text</code><p>Replace every occurrence of <code>from</code> with <code>to</code> - split on <code>from</code>, rejoin with <code>to</code>.</p></div>
+<div class="fn"><code class="sig">index_of(t: Text, sub: Text) -&gt; int</code><p>First byte index of <code>sub</code> in <code>t</code>, or -1 if absent.</p></div>
+<div class="fn"><code class="sig">pad_left(t: Text, width: int, pad: Text) -&gt; Text</code><p>Pad <code>t</code> on the left with <code>pad</code> until it is at least <code>width</code> bytes wide.</p></div>
+<div class="fn"><code class="sig">pad_right(t: Text, width: int, pad: Text) -&gt; Text</code><p>Pad <code>t</code> on the right with <code>pad</code> until it is at least <code>width</code> bytes wide.</p></div>
+<div class="fn"><code class="sig">lines(t: Text) -&gt; [Text]</code><p>Split <code>t</code> into lines on '\n'.</p></div>
+<h2 id="list"><code>list</code></h2>
+<p class="orb-blurb">everyday integer-list helpers that don't need a closure.</p>
+<div class="fn"><code class="sig">range(n: int) -&gt; [int]</code><p>[0, 1, …, n-1].</p></div>
+<div class="fn"><code class="sig">reversed(xs: [int]) -&gt; [int]</code><p>A new list with the elements in reverse order.</p></div>
+<div class="fn"><code class="sig">includes(xs: [int], v: int) -&gt; int</code><p>1 if <code>v</code> appears in <code>xs</code>, else 0.</p></div>
+<div class="fn"><code class="sig">find(xs: [int], v: int) -&gt; int</code><p>First index of <code>v</code>, or -1 if absent.</p></div>
+<div class="fn"><code class="sig">first(xs: [int]) -&gt; int</code><p>First / last element, or 0 for an empty list.</p></div>
+<div class="fn"><code class="sig">last(xs: [int]) -&gt; int</code></div>
+<div class="fn"><code class="sig">max_of(xs: [int]) -&gt; int</code><p>Largest / smallest element, or 0 for an empty list.</p></div>
+<div class="fn"><code class="sig">min_of(xs: [int]) -&gt; int</code></div>
+<div class="fn"><code class="sig">avg(xs: [int]) -&gt; int</code><p>Integer average (sum / count), truncated.</p></div>
+<h2 id="num"><code>num</code></h2>
+<p class="orb-blurb">the small integer helpers every program reaches for.</p>
+<div class="fn"><code class="sig">abs(x: int) -&gt; int</code><p>Absolute value.</p></div>
+<div class="fn"><code class="sig">min(a: int, b: int) -&gt; int</code><p>The smaller of two values.</p></div>
+<div class="fn"><code class="sig">max(a: int, b: int) -&gt; int</code><p>The larger of two values.</p></div>
+<div class="fn"><code class="sig">clamp(x: int, lo: int, hi: int) -&gt; int</code><p>Constrain <code>x</code> to the range [lo, hi].</p></div>
+<div class="fn"><code class="sig">sign(x: int) -&gt; int</code><p>-1, 0, or 1 by the sign of <code>x</code>.</p></div>
+<div class="fn"><code class="sig">gcd(a: int, b: int) -&gt; int</code><p>Greatest common divisor (Euclid).</p></div>
+<div class="fn"><code class="sig">parse(t: Text) -&gt; int</code><p>Parse a base-10 integer out of text.</p></div>
+<div class="fn"><code class="sig">ipow(base: int, exp: int) -&gt; int</code><p>Integer power (ipow): base^exp for exp &gt;= 0.</p></div>
+<div class="fn"><code class="sig">is_even(n: int) -&gt; int</code><p>1 if <code>n</code> is even, else 0.</p></div>
+<div class="fn"><code class="sig">is_odd(n: int) -&gt; int</code><p>1 if <code>n</code> is odd, else 0.</p></div>
+<h2 id="iter"><code>iter</code></h2>
+<p class="orb-blurb">functional list operations, powered by closures.</p>
+<div class="fn"><code class="sig">map&lt;T&gt;(xs: [T], f: fn) -&gt; [int]</code><p>Apply <code>f</code> to every element, collecting the results.</p></div>
+<div class="fn"><code class="sig">filter&lt;T&gt;(xs: [T], pred: fn) -&gt; [T]</code><p>Keep the elements for which <code>pred(x)</code> is 1.</p></div>
+<div class="fn"><code class="sig">reduce&lt;T&gt;(xs: [T], init: int, f: fn) -&gt; int</code><p>Fold left: acc starts at <code>init</code>, then acc = f(acc, x) for each element.</p></div>
+<div class="fn"><code class="sig">any&lt;T&gt;(xs: [T], pred: fn) -&gt; int</code><p>1 if <code>pred(x)</code> is 1 for at least one element, else 0.</p></div>
+<div class="fn"><code class="sig">all&lt;T&gt;(xs: [T], pred: fn) -&gt; int</code><p>1 if <code>pred(x)</code> is 1 for every element (vacuously 1 for an empty list).</p></div>
+<div class="fn"><code class="sig">find_index&lt;T&gt;(xs: [T], pred: fn) -&gt; int</code><p>Index of the first element where <code>pred(x)</code> is 1, or -1 if none match.</p></div>
+<div class="fn"><code class="sig">count&lt;T&gt;(xs: [T], pred: fn) -&gt; int</code><p>How many elements satisfy <code>pred</code>.</p></div>
+<div class="fn"><code class="sig">sum(xs: [int]) -&gt; int</code><p>Sum of every element (0 for an empty list).</p></div>
+<div class="fn"><code class="sig">max_by(xs: [int], key: fn) -&gt; int</code><p>The element with the largest <code>key(x)</code>.</p></div>
+<div class="fn"><code class="sig">min_by(xs: [int], key: fn) -&gt; int</code><p>The element with the smallest <code>key(x)</code>.</p></div>
+<div class="fn"><code class="sig">sort_by(xs: [int], less: fn) -&gt; [int]</code><p>Return a new list ordered so that <code>less(a, b) == 1</code> means <code>a</code> comes first.</p></div>
+<h2 id="dict"><code>dict</code></h2>
+<p class="orb-blurb">friendly names for the map built-ins a newcomer reaches for.</p>
+<div class="fn"><code class="sig">keys(m: Map) -&gt; [Text]</code><p>The keys of <code>m</code>, as a list of text.</p></div>
+<div class="fn"><code class="sig">size(m: Map) -&gt; int</code><p>Number of entries.</p></div>
+<div class="fn"><code class="sig">has_key(m: Map, k: Text) -&gt; int</code><p>1 if <code>k</code> is present, else 0.</p></div>
+<div class="fn"><code class="sig">values(m: Map) -&gt; [int]</code><p>The values of an int-valued map, in key order.</p></div>
+<h2 id="json"><code>json</code></h2>
+<p class="orb-blurb">parse and build JSON.</p>
+<div class="fn"><code class="sig">json_parse(src: Text) -&gt; Map</code></div>
+<div class="fn"><code class="sig">json_obj(o: Map, key: Text) -&gt; Map</code></div>
+<div class="fn"><code class="sig">json_text(o: Map, key: Text) -&gt; Text</code></div>
+<div class="fn"><code class="sig">json_int(o: Map, key: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">json_list(o: Map, key: Text) -&gt; [Map]</code></div>
+<div class="fn"><code class="sig">json_has(o: Map, key: Text) -&gt; bool</code></div>
+<div class="fn"><code class="sig">json_escape(s: Text) -&gt; Text</code><p>Escape a Text for embedding in JSON output.</p></div>
+<h2 id="net"><code>net</code></h2>
+<p class="orb-blurb">minimal blocking TCP, client and server.</p>
+<div class="fn"><code class="sig">connect(host: Text, port: int) -&gt; int = net_connect(host, port)</code><p>--- client ---</p></div>
+<div class="fn"><code class="sig">send(sock: int, data: Text) -&gt; int = net_send(sock, data)</code></div>
+<div class="fn"><code class="sig">recv(sock: int, maxlen: int) -&gt; Text = net_recv(sock, maxlen)</code></div>
+<div class="fn"><code class="sig">close(sock: int) -&gt; int = net_close(sock)</code></div>
+<div class="fn"><code class="sig">listen(port: int) -&gt; int = net_listen(port)</code><p>--- server ---</p></div>
+<div class="fn"><code class="sig">accept(server: int) -&gt; int = net_accept(server)</code></div>
+<div class="fn"><code class="sig">local_port(server: int) -&gt; int = net_local_port(server)</code></div>
+<h2 id="os"><code>os</code></h2>
+<p class="orb-blurb">CLI / OS primitives for self-hosted tools (orbit), under the names orbit already uses.</p>
+<div class="fn"><code class="sig">elapsed(start: int) -&gt; int = now() - start</code><p>Milliseconds between now() and an earlier now() - timing metric.</p></div>
+<div class="fn"><code class="sig">read_file(p: Text) -&gt; Text = file_read(p)</code><p>orion-self builtins under orbit's names (file_read/argv/argc live in the compiler, not an orb - callable directly).</p></div>
+<div class="fn"><code class="sig">arg(i: int) -&gt; Text = argv(i)</code></div>
+<div class="fn"><code class="sig">arg_count() -&gt; int = argc()</code></div>
+<div class="fn"><code class="sig">write_file(p: Text, c: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">os_kind() -&gt; int = host_os()</code><p>Public wrapper so other orbs can branch on the host without re-declaring the extern (a second <code>declare</code> in the bundle is an LLVM redefinition error).</p></div>
+<div class="fn"><code class="sig">run_command(cmd: Text, args: [Text]) -&gt; int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))</code></div>
+<div class="fn"><code class="sig">run_command_quiet(cmd: Text, args: [Text]) -&gt; int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))</code></div>
+<div class="fn"><code class="sig">capture_stdout(cmd: Text, args: [Text]) -&gt; Text = capture(os_join(os_quote(cmd), args, 0))</code></div>
+<div class="fn"><code class="sig">str_starts_with(t: Text, p: Text) -&gt; bool</code></div>
+<div class="fn"><code class="sig">str_ends_with(t: Text, p: Text) -&gt; bool</code></div>
+<div class="fn"><code class="sig">str_contains(t: Text, sub: Text) -&gt; bool</code></div>
+<div class="fn"><code class="sig">str_trim(t: Text) -&gt; Text</code></div>
+<div class="fn"><code class="sig">str_split(t: Text, sep: Text) -&gt; [Text]</code></div>
+<div class="fn"><code class="sig">str_join(parts: [Text], sep: Text) -&gt; Text</code></div>
+<div class="fn"><code class="sig">str_replace(t: Text, pat: Text, rep: Text) -&gt; Text = str_join(str_split(t, pat), rep)</code></div>
+<div class="fn"><code class="sig">path_join(a: Text, b: Text) -&gt; Text = "{a}/{b}"</code><p>---- paths ----</p></div>
+<div class="fn"><code class="sig">path_parent(p: Text) -&gt; Text</code></div>
+<div class="fn"><code class="sig">list_dir(dir: Text) -&gt; [Text] = str_split(orion_dir_list(dir), "\n")</code></div>
+<h2 id="async"><code>async</code></h2>
+<p class="orb-blurb">cooperative async helpers built on the new timing primitives.</p>
+<div class="fn"><code class="sig">sleep_until(deadline_ms: int)</code><p>Sleep until the monotonic clock reaches <code>deadline_ms</code>.</p></div>
+<div class="fn"><code class="sig">delay(duration_ms: int)</code><p>Sleep for at least <code>duration_ms</code>.</p></div>
+<div class="fn"><code class="sig">deadline_from_now(offset_ms: int) -&gt; int</code><p>Return the monotonic clock value <code>offset_ms</code> from now.</p></div>
+<div class="fn"><code class="sig">past_deadline(deadline_ms: int) -&gt; int</code><p>Did <code>deadline_ms</code> already pass? Plain comparison helper for readability in event loops.</p></div>
+<div class="fn"><code class="sig">time_left(deadline_ms: int) -&gt; int</code><p>Number of ms remaining until <code>deadline_ms</code>, clamped to 0 if past.</p></div>
+<div class="fn"><code class="sig">timers_new() -&gt; [int]</code><p>Build an empty timer queue.</p></div>
+<div class="fn"><code class="sig">add_timer(timers: [int], offset_ms: int) -&gt; [int]</code><p>Push a timer that fires <code>offset_ms</code> from now.</p></div>
+<div class="fn"><code class="sig">next_due(timers: [int]) -&gt; int</code><p>Earliest deadline in the queue, or -1 if empty.</p></div>
+<div class="fn"><code class="sig">count_due(timers: [int]) -&gt; int</code><p>How many timers have already fired (deadline &lt;= now)?</p></div>
+<div class="fn"><code class="sig">wait_next(timers: [int])</code><p>Sleep until the next deadline fires.</p></div>
+<div class="fn"><code class="sig">spawn(f: fn, arg: int) -&gt; int = orion_task_spawn(f, arg)</code><p>Start a task.</p></div>
+<div class="fn"><code class="sig">await(id: int) -&gt; int = orion_task_await(id)</code><p>Run the scheduler until this task finishes, then take its result.</p></div>
+<div class="fn"><code class="sig">yield_now() -&gt; int = orion_task_yield()</code><p>Give the scheduler a turn.</p></div>
+<div class="fn"><code class="sig">run_all() -&gt; int = orion_task_run_all()</code><p>Drive every ready task to completion; returns how many are finished.</p></div>
+<div class="fn"><code class="sig">task_state(id: int) -&gt; int = orion_task_state(id)</code><p>0 = no such task, 1 = ready, 2 = running, 3 = finished (result not taken yet).</p></div>
+<div class="fn"><code class="sig">task_count() -&gt; int = orion_task_live_count()</code></div>
+<div class="fn"><code class="sig">is_done(id: int) -&gt; bool = orion_task_state(id) == 3</code></div>
+<div class="fn"><code class="sig">sleep_task(ms: int) -&gt; int = orion_task_sleep(ms)</code><p>Wait <code>ms</code> WITHOUT holding the scheduler.</p></div>
+<div class="fn"><code class="sig">ask(handler: fn, arg: int) -&gt; int = orion_ms_perform(handler, arg)</code><p>Inside a task: hand control to <code>handler</code>, which may resume this point once and then keep working.</p></div>
+<div class="fn"><code class="sig">resume_with(v: int) -&gt; int = orion_ms_resume(v)</code><p>Inside such a handler: run the rest of the task with <code>v</code>, and get its result.</p></div>
+<div class="fn"><code class="sig">resumable_ok() -&gt; bool = orion_ms_supported() == 1</code></div>
+<h2 id="scheduler"><code>scheduler</code></h2>
+<p class="orb-blurb">cooperative task abstraction on top of the async orb.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Task: deadline_ms: int, fn_id: int, payload: int</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">task_new(fire_in_ms: int, fn_id: int, payload: int) -&gt; Task</code></div>
+<div class="fn"><code class="sig">task_deadline(t: Task) -&gt; int</code></div>
+<div class="fn"><code class="sig">task_fn_id(t: Task) -&gt; int</code></div>
+<div class="fn"><code class="sig">task_payload(t: Task) -&gt; int</code></div>
+<div class="fn"><code class="sig">task_due(t: Task) -&gt; int</code><p>Is this task ready to run (deadline ≤ now)?</p></div>
+<div class="fn"><code class="sig">await_task(t: Task)</code><p>Sleep until task fires.</p></div>
+<div class="fn"><code class="sig">await_next(tasks: [Task])</code><p>Sleep until the earliest deadline in a list.</p></div>
+<h2 id="timer"><code>timer</code></h2>
+<p class="orb-blurb">deterministic tick-based timers.</p>
+<div class="fn"><code class="sig">timer_start(id: Text, dur_ms: int)</code><p>Start (or restart) a timer running toward dur_ms.</p></div>
+<div class="fn"><code class="sig">timer_stop(id: Text)</code><p>Cancel a running timer (elapsed is kept for inspection).</p></div>
+<div class="fn"><code class="sig">timer_reset(id: Text)</code><p>Rewind to 0 and keep running toward the same duration.</p></div>
+<div class="fn"><code class="sig">timer_tick(id: Text, dt_ms: int) -&gt; int</code><p>Advance by dt_ms.</p></div>
+<div class="fn"><code class="sig">timer_elapsed(id: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">timer_remaining(id: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">timer_progress(id: Text) -&gt; int</code><p>Progress as permille (0..1000), clamped.</p></div>
+<div class="fn"><code class="sig">timer_done(id: Text) -&gt; int</code><p>1 once elapsed has reached the duration.</p></div>
+<div class="fn"><code class="sig">timer_active(id: Text) -&gt; int</code><p>1 while the timer is running (started, not yet completed or stopped).</p></div>
+<div class="fn"><code class="sig">timer_every(id: Text, period_ms: int, dt_ms: int) -&gt; int</code><p>Accumulate dt_ms and report how many whole periods elapsed this tick.</p></div>
+<h2 id="result"><code>result</code></h2>
+<p class="orb-blurb">Result&lt;T&gt;: a value, or an error message.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Result&lt;T&gt; = Ok(T) | Err(Text)</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">unwrap_or&lt;T&gt;(r: Result&lt;T&gt;, default: T) -&gt; T</code><p>The payload, or <code>default</code> if this is an Err.</p></div>
+<div class="fn"><code class="sig">is_ok&lt;T&gt;(r: Result&lt;T&gt;) -&gt; int</code><p>1 if this is an Ok, else 0.</p></div>
+<div class="fn"><code class="sig">is_err&lt;T&gt;(r: Result&lt;T&gt;) -&gt; int</code><p>1 if this is an Err, else 0.</p></div>
+<div class="fn"><code class="sig">err_msg&lt;T&gt;(r: Result&lt;T&gt;) -&gt; Text</code><p>The error message, or "" if this is an Ok.</p></div>
+<h2 id="option"><code>option</code></h2>
+<p class="orb-blurb">Option&lt;T&gt;: a value, or nothing.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Option&lt;T&gt; = Some(T) | None</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">unwrap_or&lt;T&gt;(o: Option&lt;T&gt;, default: T) -&gt; T</code><p>The payload, or <code>default</code> if this is None.</p></div>
+<div class="fn"><code class="sig">is_some&lt;T&gt;(o: Option&lt;T&gt;) -&gt; int</code><p>1 if a value is present, else 0.</p></div>
+<div class="fn"><code class="sig">is_none&lt;T&gt;(o: Option&lt;T&gt;) -&gt; int</code><p>1 if this is None, else 0.</p></div>
+<h2 id="assert"><code>assert</code></h2>
+<p class="orb-blurb">minimal assertion helper for Orion.</p>
+<div class="fn"><code class="sig">assert_true(cond: int, label: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">assert_eq(actual: int, expected: int, label: Text) -&gt; int</code></div>
+<div class="fn"><code class="sig">assert_text_eq(actual: Text, expected: Text, label: Text) -&gt; int</code></div>
+<h2 id="closure"><code>closure</code></h2>
+<p class="orb-blurb">first-class closures as a user-space data convention.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Closure: env: [int], fn_id: int</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">make_closure(captures: [int], fn_id: int) -&gt; Closure</code><p>Build a closure: pair of captured environment + fn id (the caller's private id used by dispatch - a fn name doesn't fit in an int).</p></div>
+<div class="fn"><code class="sig">closure_env(c: Closure) -&gt; [int]</code><p>Accessors - let callers introspect.</p></div>
+<div class="fn"><code class="sig">closure_fn_id(c: Closure) -&gt; int</code></div>
+<h2 id="log"><code>log</code></h2>
+<p class="orb-blurb">leveled, categorized console logging.</p>
+<div class="fn"><code class="sig">log_set_default(level: int)</code></div>
+<div class="fn"><code class="sig">log_set_level(cat: Text, level: int)</code></div>
+<div class="fn"><code class="sig">error(cat: Text, msg: Text)</code></div>
+<div class="fn"><code class="sig">warn(cat: Text, msg: Text)</code></div>
+<div class="fn"><code class="sig">info(cat: Text, msg: Text)</code></div>
+<div class="fn"><code class="sig">debug(cat: Text, msg: Text)</code></div>
+<div class="fn"><code class="sig">log_ring_on()</code></div>
+<div class="fn"><code class="sig">log_dump()</code></div>
+<h2 id="ori_display"><code>ori_display</code></h2>
+<p class="orb-blurb">the ORI (Orion Rendering Interface) display list.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">DrawCmd = DrawRect(Rect, Text, int) | DrawRoundRect(Rect, Text, int, int) | DrawText(Point, Text, Text, int, int) | DrawIcon(Point, Text, int, int) | DrawPath(Text, Text, int) | DrawSprite(Point, Text, int, int) | DrawImage(Point, Text, int, int, Text, Text, int)</code></div>
+<div class="fn"><code class="sig">DisplayList: commands: [DrawCmd]</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">empty_list() -&gt; DisplayList</code></div>
+<div class="fn"><code class="sig">push_cmd(list: DisplayList, cmd: DrawCmd) -&gt; DisplayList</code></div>
+<h2 id="ori_geometry"><code>ori_geometry</code></h2>
+<p class="orb-blurb">the ORI (Orion Rendering Interface) 2D primitives.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Point: x: int, y: int</code></div>
+<div class="fn"><code class="sig">Size: width: int, height: int</code></div>
+<div class="fn"><code class="sig">Rect: x: int, y: int, width: int, height: int</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">rect_contains(rect: Rect, point: Point) -&gt; bool</code></div>
+</main>
+
+</body>
+</html>

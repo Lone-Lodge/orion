@@ -113,8 +113,12 @@ Known gaps, stated plainly rather than left to be discovered:
   is linear with no annotation. When uniqueness cannot be proven (x is aliased,
   stored, or captured) it stays a copy; reach for `push_mut` there if the copy
   shows up in a profile.
-- Effects that resume (`ask` / `resume_with`) use Windows fibers. Elsewhere
-  `resumable_ok()` reports 0 and `ask` refuses rather than pretending.
+- Effects come in two tiers. One-shot (`perform` / `handle` / `resume`, resume
+  exactly once, synchronously) is the supported core and works everywhere.
+  Multi-shot (`ask` / `resume_with`, a handler that outlives its own resume) is
+  **experimental**: it is the same machinery async needs, and it runs on Windows
+  fibers. Elsewhere `resumable_ok()` reports 0 and `ask` refuses rather than
+  pretending. Do not build on it until it is cross-platform.
 - Interactive terminal input (`orion_console_readline`) works on Windows and
   through a pipe anywhere; on a POSIX TTY it returns nothing.
 

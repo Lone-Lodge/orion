@@ -1,0 +1,27 @@
+# The `option` orb is a native generic sum type, not a struct convention.
+# Covers: the payload-less `None` variant across an orb boundary, exhaustive
+# match, `?` propagation, a Text payload, and the generic-default `unwrap_or`.
+use option
+
+fn find(k: int) -> Option<int>:
+    if k > 0 then Option.Some(k * 10) else Option.None
+
+fn name(k: int) -> Option<Text>:
+    if k > 0 then Option.Some("abc") else Option.None
+
+fn twice(k: int) -> Option<int>:
+    v = find(k)?                 # returns None out of twice
+    Option.Some(v * 2)
+
+fn main() -> int:
+    mut total = 0
+    match find(0):
+        Some(v) -> total = total + v
+        None -> total = total + 1                       # 1
+    total = total + unwrap_or(find(2), 0)               # 21
+    total = total + is_some(find(1)) + is_none(find(0)) # 23
+    if let Some(v) = twice(2):
+        total = total + v                               # 63
+    total = total + is_none(twice(0))                   # 64
+    total = total + len(unwrap_or(name(1), "z"))        # 67
+    total
