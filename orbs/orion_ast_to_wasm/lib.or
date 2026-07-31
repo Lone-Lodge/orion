@@ -218,6 +218,11 @@ pub fn compile_program(decls: [Map]) -> WModule:
     slot_set("wret:__par_run", "i")
     slot_set("wloc:__par_run", "iii")
     idx = idx + 1
+    slot_set("wfn:__index_of", idx)
+    slot_set("wsig:__index_of", "tt")
+    slot_set("wret:__index_of", "i")
+    slot_set("wloc:__index_of", "iiii")
+    idx = idx + 1
     # Collect top-level lambda bindings (fn(...) : body assigned to a name);
     # reserve an index + signature for each, appended after the runtime helpers.
     mut lam_nodes = []
@@ -252,6 +257,7 @@ pub fn compile_program(decls: [Map]) -> WModule:
     module = add_fn(module, build_sum_fn())
     module = add_fn(module, build_split_fn())
     module = add_fn(module, build_par_run_fn())
+    module = add_fn(module, build_index_of_fn())
     # Lambdas become top-level functions, appended after the runtime helpers.
     mut lai = 0
     loop:
@@ -1049,6 +1055,90 @@ fn build_par_run_fn() -> WFn:
     f = emit_op(f, op_end())
     f = emit_op(f, op_end())
     f = emit_local_get(f, 4)
+    emit_end(f)
+
+# __index_of(s, sub) -> first byte index where sub occurs in s, else -1.
+# Texts are [len][bytes]. Locals: 0=s, 1=sub, 2=slen, 3=sublen, 4=i, 5=j.
+fn build_index_of_fn() -> WFn:
+    mut f = new_fn("__index_of", 2)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 2)
+    f = emit_local_get(f, 1)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 3)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 4)
+    # outer: over each start position i
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    # if i > slen - sublen: no match left, exit (br to outer block)
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 2)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_sub())
+    f = emit_op(f, op_i32_gt_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 5)
+    # inner: compare sub against s starting at i
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    # if j >= sublen: full match -> return i
+    f = emit_local_get(f, 5)
+    f = emit_local_get(f, 3)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_if())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 4)
+    f = emit_op(f, op_return())
+    f = emit_op(f, op_end())
+    # if s[i+j] != sub[j]: mismatch -> break inner (br to inner block)
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 5)
+    f = emit_op(f, op_i32_add())
+    f = emit_load8u(f, 4)
+    f = emit_local_get(f, 1)
+    f = emit_local_get(f, 5)
+    f = emit_op(f, op_i32_add())
+    f = emit_load8u(f, 4)
+    f = emit_op(f, op_i32_ne())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    # j = j + 1; repeat inner
+    f = emit_local_get(f, 5)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 5)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    # i = i + 1; repeat outer
+    f = emit_local_get(f, 4)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 4)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    # not found: -1, computed at runtime (a compile-time negative const trips a
+    # signed-LEB bug in the encoder that would swallow the function's end byte).
+    f = emit_const(f, 0)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_sub())
     emit_end(f)
 
 # __sum(list) -> sum of its i32 elements. Locals: 0=list, 1=n, 2=i, 3=acc.
@@ -2139,6 +2229,18 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         # sum(list) -> total of its i32 elements.
                         wsm = compile_expr(fn_value, at(args, 0), locals)
                         emit_call(wsm, slot_get_int("wfn:__sum"))
+                    else if callee == "index_of" and list_count(args) == 2:
+                        # index_of(s, sub) -> first byte index, or -1.
+                        wi0 = compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
+                        wi1 = compile_as_text(wi0, at(args, 1), type_of(at(args, 1)), locals)
+                        emit_call(wi1, slot_get_int("wfn:__index_of"))
+                    else if callee == "contains" and list_count(args) == 2 and type_of(at(args, 0)) == "t":
+                        # contains(s, sub) -> 1 if sub occurs in s (index_of >= 0).
+                        wc0 = compile_as_text(fn_value, at(args, 0), "t", locals)
+                        wc1 = compile_as_text(wc0, at(args, 1), type_of(at(args, 1)), locals)
+                        wc2 = emit_call(wc1, slot_get_int("wfn:__index_of"))
+                        wc3 = emit_const(wc2, 0)
+                        emit_op(wc3, op_i32_ge_s())
                     else if callee == "par_run" and list_count(args) == 2:
                         # par_run(fns, arg): call each function value with arg and
                         # sum. Sequential in the browser; the result is the same.
