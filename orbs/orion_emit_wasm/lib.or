@@ -182,8 +182,66 @@ pub fn op_f64_div() -> int: 163     # 0xA3 f64.div
 pub fn op_i32_trunc_f64_s() -> int: 170   # 0xAA i32.trunc_f64_s
 pub fn op_f64_convert_i32_s() -> int: 183 # 0xB7 f64.convert_i32_s
 
+# i64 ops — for the 64-bit `int` and the i64 sized type. Pointers stay i32
+# (wasm32 addresses); a value typed i64/u64 uses these, with wrap/extend at the
+# i32<->i64 boundaries.
+pub fn op_i64_const() -> int: 66    # 0x42 i64.const
+pub fn op_i64_load() -> int: 41     # 0x29 i64.load
+pub fn op_i64_store() -> int: 55    # 0x37 i64.store
+pub fn op_i64_eqz() -> int: 80      # 0x50 i64.eqz
+pub fn op_i64_eq() -> int: 81       # 0x51 i64.eq
+pub fn op_i64_ne() -> int: 82       # 0x52 i64.ne
+pub fn op_i64_lt_s() -> int: 83     # 0x53 i64.lt_s
+pub fn op_i64_lt_u() -> int: 84     # 0x54 i64.lt_u
+pub fn op_i64_gt_s() -> int: 85     # 0x55 i64.gt_s
+pub fn op_i64_gt_u() -> int: 86     # 0x56 i64.gt_u
+pub fn op_i64_le_s() -> int: 87     # 0x57 i64.le_s
+pub fn op_i64_ge_s() -> int: 89     # 0x59 i64.ge_s
+pub fn op_i64_ge_u() -> int: 90     # 0x5A i64.ge_u
+pub fn op_i64_add() -> int: 124     # 0x7C i64.add
+pub fn op_i64_sub() -> int: 125     # 0x7D i64.sub
+pub fn op_i64_mul() -> int: 126     # 0x7E i64.mul
+pub fn op_i64_div_s() -> int: 127   # 0x7F i64.div_s
+pub fn op_i64_div_u() -> int: 128   # 0x80 i64.div_u
+pub fn op_i64_rem_s() -> int: 129   # 0x81 i64.rem_s
+pub fn op_i64_and() -> int: 131     # 0x83 i64.and
+pub fn op_i64_or() -> int: 132      # 0x84 i64.or
+pub fn op_i64_xor() -> int: 133     # 0x85 i64.xor
+pub fn op_i64_shl() -> int: 134     # 0x86 i64.shl
+pub fn op_i64_shr_s() -> int: 135   # 0x87 i64.shr_s
+pub fn op_i64_shr_u() -> int: 136   # 0x88 i64.shr_u
+pub fn op_i32_wrap_i64() -> int: 167       # 0xA7 i32.wrap_i64 (i64 -> i32)
+pub fn op_i64_extend_i32_s() -> int: 172   # 0xAC i64.extend_i32_s
+pub fn op_i64_extend_i32_u() -> int: 173   # 0xAD i64.extend_i32_u
+pub fn op_i64_trunc_f64_s() -> int: 176    # 0xB0 i64.trunc_f64_s
+pub fn op_f64_convert_i64_s() -> int: 185  # 0xB9 f64.convert_i64_s
+
+# i64 const/load/store emit helpers (memarg alignment 3 for the 8-byte access).
+pub fn emit_i64_const(fn_value: WFn, value: int) -> WFn:
+    immediate = leb_s(value)
+    mut grown = push(fn_value.body, op_i64_const())
+    loop byte_value in immediate:
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
+pub fn emit_i64_load(fn_value: WFn, offset: int) -> WFn:
+    mut grown = push(fn_value.body, op_i64_load())
+    grown = push(grown, 3)
+    loop byte_value in leb_u(offset):
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
+pub fn emit_i64_store(fn_value: WFn, offset: int) -> WFn:
+    mut grown = push(fn_value.body, op_i64_store())
+    grown = push(grown, 3)
+    loop byte_value in leb_u(offset):
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
 # Type markers in function signatures / local decls.
 pub fn ty_i32() -> int: 127         # 0x7F
+pub fn ty_i64() -> int: 126         # 0x7E
+pub fn ty_f32() -> int: 125         # 0x7D
 pub fn ty_f64() -> int: 124         # 0x7C
 
 # --- module assembly ---
