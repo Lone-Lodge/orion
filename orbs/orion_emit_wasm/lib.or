@@ -191,6 +191,39 @@ pub fn op_f64_div() -> int: 163     # 0xA3 f64.div
 pub fn op_i32_trunc_f64_s() -> int: 170   # 0xAA i32.trunc_f64_s
 pub fn op_f64_convert_i32_s() -> int: 183 # 0xB7 f64.convert_i32_s
 
+# f32 ops (a distinct 32-bit float type). A literal is built as f64 (num/denom)
+# then demoted, so no f32.const encoding is needed.
+pub fn op_f32_load() -> int: 42     # 0x2A f32.load
+pub fn op_f32_store() -> int: 56    # 0x38 f32.store
+pub fn op_f32_eq() -> int: 91       # 0x5B
+pub fn op_f32_ne() -> int: 92       # 0x5C
+pub fn op_f32_lt() -> int: 93       # 0x5D
+pub fn op_f32_gt() -> int: 94       # 0x5E
+pub fn op_f32_le() -> int: 95       # 0x5F
+pub fn op_f32_ge() -> int: 96       # 0x60
+pub fn op_f32_add() -> int: 146     # 0x92
+pub fn op_f32_sub() -> int: 147     # 0x93
+pub fn op_f32_mul() -> int: 148     # 0x94
+pub fn op_f32_div() -> int: 149     # 0x95
+pub fn op_i32_trunc_f32_s() -> int: 168   # 0xA8 i32.trunc_f32_s
+pub fn op_f32_convert_i32_s() -> int: 178 # 0xB2 f32.convert_i32_s
+pub fn op_f32_demote_f64() -> int: 182    # 0xB6 f32.demote_f64
+pub fn op_f64_promote_f32() -> int: 187   # 0xBB f64.promote_f32
+
+pub fn emit_f32_load(fn_value: WFn, offset: int) -> WFn:
+    mut grown = push(fn_value.body, op_f32_load())
+    grown = push(grown, 2)
+    loop byte_value in leb_u(offset):
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
+pub fn emit_f32_store(fn_value: WFn, offset: int) -> WFn:
+    mut grown = push(fn_value.body, op_f32_store())
+    grown = push(grown, 2)
+    loop byte_value in leb_u(offset):
+        grown = push(grown, byte_value)
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
+
 # i64 ops — for the 64-bit `int` and the i64 sized type. Pointers stay i32
 # (wasm32 addresses); a value typed i64/u64 uses these, with wrap/extend at the
 # i32<->i64 boundaries.
@@ -675,6 +708,8 @@ fn type_index_for_import(module: WModule, import_value: WImport) -> int:
 fn wtype_char_to_byte(c: int) -> int:
     if c == 102:
         ty_f64()
+    else if c == 103:
+        ty_f32()
     else if c == 108 or c == 76:
         ty_i64()
     else:
