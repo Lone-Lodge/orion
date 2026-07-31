@@ -18,6 +18,19 @@ Notable changes to Orion. The format follows
   a handler call and a `return`), and a stubbed OS-IO sandbox. The async
   scheduler (`spawn`/`await` with parked tasks) stays native (a browser has no
   stack switching).
+- A **WebAssembly conformance gate** (`tools/wasm_conformance.sh`): compiles
+  every smoke test through the wasm backend, runs it in node, and compares the
+  answer to the native expectation, reporting OK / MISMATCH / UNSUPPORTED /
+  TRAP / HANG. It turned "the 12 Field Guide samples run" into a measured
+  124-of-151, and drove the backend past that: correct match dispatch
+  (int/text/binding/guard patterns) and text equality, the C-like vs boxed enum
+  distinction, void `if let` / `loop let`, `break` inside a match, `const`
+  inlining, environment-capturing closures, higher-order calls via
+  `call_indirect`, maps read/write/`has`, `contains`/`index_of`/`slice`, the
+  `bytes_*` family, struct spread, and a signed-LEB encoder fix. What stays
+  native: the async scheduler and real threads (no browser stack-switch or
+  thread model), 64-bit integer literals (the backend is i32), and the
+  compiler's own `slot_*` state.
 - The **Field Guide playground** (`tools/playground.js`, `docs/playground.js`):
   a "Try Orion" editor plus a Run button on every sample, compiling to wasm and
   running in place. All 12 Field Guide samples run in the browser; a construct
