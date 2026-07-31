@@ -2501,8 +2501,13 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
     kind = get(expr_node, "kind")
     if kind == "Int":
         value_text = get(expr_node, "value")
-        # Parse decimal int
-        emit_const(fn_value, parse_decimal(value_text))
+        iv = parse_decimal(value_text)
+        # A literal that does not fit i32 is an i64 (polymorphic literal: it takes
+        # the smallest type it fits, and i64 is the largest int).
+        if iv > 2147483647 or iv < (0 - 2147483648):
+            emit_i64_const(fn_value, iv)
+        else:
+            emit_const(fn_value, iv)
     else if kind == "Float":
         # A decimal literal compiles to num/denom, both i32.convert to f64 then
         # f64.div. 3.14 -> 314.0 / 100.0, the exact same double, so no IEEE754
@@ -3344,6 +3349,9 @@ fn type_of(node: Map) -> Text:
     kind = get(node, "kind")
     if kind == "Float":
         "f"
+    else if kind == "Int":
+        iv = parse_decimal(get(node, "value"))
+        if iv > 2147483647 or iv < (0 - 2147483648) then "l" else "i"
     else if kind == "Str":
         "t"
     else if kind == "Ident":
