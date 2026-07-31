@@ -1926,6 +1926,13 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                     wl = compile_as_text(fn_value, left, lt, locals)
                     wr = compile_as_text(wl, right, rt, locals)
                     emit_call(wr, slot_get_int("wfn:__text_concat"))
+                else if (op == "==" or op == "!=") and (lt == "t" or rt == "t"):
+                    # text equality is by CONTENT (__streq), not pointer: two
+                    # separate "hi" literals live at different addresses.
+                    wl = compile_as_text(fn_value, left, lt, locals)
+                    wr = compile_as_text(wl, right, rt, locals)
+                    weq = emit_call(wr, slot_get_int("wfn:__streq"))
+                    if op == "!=" then emit_op(weq, op_i32_eqz()) else weq
                 else if lt == "f" or rt == "f":
                     # f64 op: compile each side, promoting an i32 operand to f64
                     # so mixed arithmetic (x * 2) and comparisons work.
@@ -2343,23 +2350,31 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         mut mf = emit_local_set(ms0, scrut_idx)
                         mut maxbind = 0
                         mut open_ifs = 0
-                        mut default_body = get_map(at(marms, 0), "body")
-                        mut has_default = false
+                        # An if-else chain, one arm per level. The pattern kind
+                        # (from the parser's pat_kind) picks how the arm matches:
+                        # a variant checks the tag, an int/str compares the value,
+                        # a bare name or `_` or a tuple is irrefutable. Bindings are
+                        # set from the scrutinee BEFORE the test so a guard can read
+                        # them; only one arm's body ever runs, so binding on a
+                        # non-matching arm is harmless.
                         loop arm in marms:
+                            pk = get(arm, "pat_kind")
                             pat = get(arm, "pattern")
-                            if pat == "_" or pat == "else":
-                                default_body = get_map(arm, "body")
-                                has_default = true
-                            else:
+                            is_variant = pk == "ident" and slot_has("vtag:{pat}")
+                            is_wild = pk == "ident" and (pat == "_" or pat == "else")
+                            is_binding = pk == "ident" and (not is_variant) and (not is_wild)
+                            mut arm_locals = locals
+                            if is_binding:
+                                # a bare name binds the whole scrutinee value.
+                                if maxbind < 1:
+                                    mf = add_local(mf)
+                                    note_local("i")
+                                    maxbind = 1
                                 mf = emit_local_get(mf, scrut_idx)
-                                mf = emit_load(mf, 0)
-                                mf = emit_const(mf, slot_get_int("vtag:{pat}"))
-                                mf = emit_op(mf, op_i32_eq())
-                                mf = emit_op(mf, op_if())
-                                mf = emit_bytes(mf, [ty_i32()])
-                                # bind payload j -> local (len(locals)+j), keep the
-                                # names in arm_locals so the body resolves them.
-                                mut arm_locals = locals
+                                mf = emit_local_set(mf, len(locals))
+                                arm_locals = push(arm_locals, pat)
+                            else:
+                                # variant/tuple payload slots live at scrut + 4 + j*4.
                                 mut bj = 0
                                 loop bname in get_list(arm, "bindings"):
                                     if bj >= maxbind:
@@ -2372,13 +2387,35 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                                         mf = emit_local_set(mf, len(locals) + bj)
                                     arm_locals = push(arm_locals, bname)
                                     bj = bj + 1
-                                mf = compile_expr(mf, get_map(arm, "body"), arm_locals)
-                                mf = emit_op(mf, op_else())
-                                open_ifs = open_ifs + 1
-                        if has_default:
-                            mf = compile_expr(mf, default_body, locals)
-                        else:
-                            mf = emit_const(mf, 0)
+                            # base test: does the pattern shape match the scrutinee?
+                            if is_variant:
+                                mf = emit_local_get(mf, scrut_idx)
+                                mf = emit_load(mf, 0)
+                                mf = emit_const(mf, slot_get_int("vtag:{pat}"))
+                                mf = emit_op(mf, op_i32_eq())
+                            else if pk == "int":
+                                mf = emit_local_get(mf, scrut_idx)
+                                mf = emit_const(mf, parse_decimal(pat))
+                                mf = emit_op(mf, op_i32_eq())
+                            else if pk == "str":
+                                # text patterns compare by content, not pointer.
+                                mf = emit_local_get(mf, scrut_idx)
+                                mf = compile_expr(mf, {"kind": "Str", "value": pat}, locals)
+                                mf = emit_call(mf, slot_get_int("wfn:__streq"))
+                            else:
+                                # `_`, a bare binding, or a tuple: always matches.
+                                mf = emit_const(mf, 1)
+                            # a guard (with this arm's bindings in scope) ANDs in.
+                            if has(arm, "guard"):
+                                mf = compile_expr(mf, get_map(arm, "guard"), arm_locals)
+                                mf = emit_op(mf, op_i32_and())
+                            mf = emit_op(mf, op_if())
+                            mf = emit_bytes(mf, [ty_i32()])
+                            mf = compile_expr(mf, get_map(arm, "body"), arm_locals)
+                            mf = emit_op(mf, op_else())
+                            open_ifs = open_ifs + 1
+                        # no arm matched: fall through to 0 (as before).
+                        mf = emit_const(mf, 0)
                         loop _c in 0..<open_ifs:
                             mf = emit_op(mf, op_end())
                         slot_set("wtmp:depth", mdepth)
