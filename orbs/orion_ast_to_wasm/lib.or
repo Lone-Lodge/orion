@@ -2080,6 +2080,63 @@ fn match_is_void(node: Map) -> bool:
             any_value = true
     not any_value
 
+# A payload slot is normally a plain name (Some(x)); a NESTED sub-pattern
+# (Some(Ok(x))) is encoded by the parser as "@Variant:n1,n2". These read it back
+# (mirrors orion_ast_to_ir).
+fn w_is_nested_binding(enc: Text) -> bool:
+    b = bytes_from_text(enc)
+    mut nested = false
+    if len(b) > 0:
+        if at(b, 0) == 64:
+            nested = true
+    nested
+
+fn w_nested_binding_variant(enc: Text) -> Text:
+    b = bytes_from_text(enc)
+    n = len(b)
+    mut out = ""
+    mut done = false
+    loop i in 1..<n:
+        c = at(b, i)
+        if c == 58:
+            done = true
+        if not done:
+            piece = bytes_to_text([c])
+            out = "{out}{piece}"
+    out
+
+fn w_nested_binding_names(enc: Text) -> [Text]:
+    b = bytes_from_text(enc)
+    n = len(b)
+    mut rest = ""
+    mut past = false
+    loop i in 1..<n:
+        c = at(b, i)
+        if past:
+            piece = bytes_to_text([c])
+            rest = "{rest}{piece}"
+        if c == 58:
+            past = true
+    w_split_csv(rest)
+
+fn w_split_csv(csv: Text) -> [Text]:
+    bs = bytes_from_text(csv)
+    n = len(bs)
+    mut parts = []
+    mut current = ""
+    if n == 0:
+        return parts
+    loop i in 0..<n:
+        b = at(bs, i)
+        if b == 44:
+            parts = push(parts, current)
+            current = ""
+        else:
+            single = bytes_to_text(bytes_slice(bs, i, i + 1))
+            current = "{current}{single}"
+    parts = push(parts, current)
+    parts
+
 fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> Map:
     statements = get_list(block, "stmts")
     # The block's value is its last non-defer statement's value.
@@ -3072,6 +3129,7 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             is_wild = pk == "ident" and (pat == "_" or pat == "else")
                             is_binding = pk == "ident" and (not is_variant) and (not is_wild)
                             mut arm_locals = locals
+                            mut nested_specs = []
                             if is_binding:
                                 # a bare name binds the whole scrutinee value.
                                 if maxbind < 1:
@@ -3093,8 +3151,34 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                                         mf = emit_local_get(mf, scrut_idx)
                                         mf = emit_load(mf, 4 + bj * 4)
                                         mf = emit_local_set(mf, len(locals) + bj)
-                                    arm_locals = push(arm_locals, bname)
+                                    # A nested sub-pattern (Some(Ok(x))): this slot
+                                    # holds an inner variant pointer. Record its tag
+                                    # check and bind its sub-names below; the slot
+                                    # name itself is unused.
+                                    if w_is_nested_binding(bname):
+                                        nested_specs = push(nested_specs, {"inner": len(locals) + bj, "enc": bname})
+                                        arm_locals = push(arm_locals, "")
+                                    else:
+                                        arm_locals = push(arm_locals, bname)
                                     bj = bj + 1
+                                # bind the sub-names of nested patterns at fresh
+                                # locals past the payload slots.
+                                mut nextl = bj
+                                loop nspec in nested_specs:
+                                    inner_idx = get_int(nspec, "inner")
+                                    mut sk = 0
+                                    loop sub in w_nested_binding_names(get(nspec, "enc")):
+                                        if nextl >= maxbind:
+                                            mf = add_local(mf)
+                                            note_local("i")
+                                            maxbind = maxbind + 1
+                                        if sub != "":
+                                            mf = emit_local_get(mf, inner_idx)
+                                            mf = emit_load(mf, 4 + sk * 4)
+                                            mf = emit_local_set(mf, len(locals) + nextl)
+                                        arm_locals = push(arm_locals, sub)
+                                        nextl = nextl + 1
+                                        sk = sk + 1
                             # base test: does the pattern shape match the scrutinee?
                             if is_variant:
                                 mf = emit_local_get(mf, scrut_idx)
@@ -3116,6 +3200,15 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             else:
                                 # `_`, a bare binding, or a tuple: always matches.
                                 mf = emit_const(mf, 1)
+                            # nested sub-patterns (Some(Ok(x))): the inner variant's
+                            # tag must also match. AND each check into the arm test.
+                            loop nspec in nested_specs:
+                                nv = w_nested_binding_variant(get(nspec, "enc"))
+                                mf = emit_local_get(mf, get_int(nspec, "inner"))
+                                mf = emit_load(mf, 0)
+                                mf = emit_const(mf, slot_get_int("vtag:{nv}"))
+                                mf = emit_op(mf, op_i32_eq())
+                                mf = emit_op(mf, op_i32_and())
                             # a guard (with this arm's bindings in scope) ANDs in.
                             if has(arm, "guard"):
                                 mf = compile_expr(mf, get_map(arm, "guard"), arm_locals)
