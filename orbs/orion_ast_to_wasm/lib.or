@@ -238,6 +238,11 @@ pub fn compile_program(decls: [Map]) -> WModule:
     slot_set("wret:__bytes_zeros", "i")
     slot_set("wloc:__bytes_zeros", "i")
     idx = idx + 1
+    slot_set("wfn:__map_has", idx)
+    slot_set("wsig:__map_has", "it")
+    slot_set("wret:__map_has", "i")
+    slot_set("wloc:__map_has", "iii")
+    idx = idx + 1
     # Collect top-level lambda bindings (fn(...) : body assigned to a name);
     # reserve an index + signature for each, appended after the runtime helpers.
     mut lam_nodes = []
@@ -276,6 +281,7 @@ pub fn compile_program(decls: [Map]) -> WModule:
     module = add_fn(module, build_slice_text_fn())
     module = add_fn(module, build_slice_list_fn())
     module = add_fn(module, build_bytes_zeros_fn())
+    module = add_fn(module, build_map_has_fn())
     # Lambdas become top-level functions, appended after the runtime helpers.
     mut lai = 0
     loop:
@@ -1282,6 +1288,54 @@ fn build_slice_list_fn() -> WFn:
     f = emit_op(f, op_end())
     f = emit_op(f, op_end())
     f = emit_local_get(f, 4)
+    emit_end(f)
+
+# __map_has(m, k) -> 1 if a key __streq-matches k, else 0. Mirrors __map_get
+# but reports presence, so a value of 0 is not mistaken for "absent".
+# Locals: 0=m, 1=k, 2=count, 3=i, 4=ek.
+fn build_map_has_fn() -> WFn:
+    mut f = new_fn("__map_has", 2)
+    f = add_local(f)
+    f = add_local(f)
+    f = add_local(f)
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_set(f, 2)
+    f = emit_const(f, 0)
+    f = emit_local_set(f, 3)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 3)
+    f = emit_local_get(f, 2)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 8)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_load(f, 4)
+    f = emit_local_set(f, 4)
+    f = emit_local_get(f, 4)
+    f = emit_local_get(f, 1)
+    f = emit_call(f, slot_get_int("wfn:__streq"))
+    f = emit_op(f, op_if())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_const(f, 1)
+    f = emit_op(f, op_return())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 3)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_const(f, 0)
     emit_end(f)
 
 # __bytes_zeros(n) -> a fresh n-byte buffer, [len=n][n zero bytes]. Bump-
@@ -2317,9 +2371,11 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                     emit_call(wr, slot_get_int("wfn:__text_concat"))
                 else if (op == "==" or op == "!=") and (lt == "t" or rt == "t"):
                     # text equality is by CONTENT (__streq), not pointer: two
-                    # separate "hi" literals live at different addresses.
-                    wl = compile_as_text(fn_value, left, lt, locals)
-                    wr = compile_as_text(wl, right, rt, locals)
+                    # separate "hi" literals live at different addresses. A side
+                    # typed 'i' here is a text POINTER (e.g. a map value read by
+                    # get), so pass it straight to __streq — do not int_to_text it.
+                    wl = compile_as_text(fn_value, left, "t", locals)
+                    wr = compile_as_text(wl, right, "t", locals)
                     weq = emit_call(wr, slot_get_int("wfn:__streq"))
                     if op == "!=" then emit_op(weq, op_i32_eqz()) else weq
                 else if lt == "f" or rt == "f":
@@ -2378,11 +2434,17 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         # f64 -> int (truncate toward zero)
                         wv = compile_expr(fn_value, at(args, 0), locals)
                         emit_op(wv, op_i32_trunc_f64_s())
-                    else if callee == "get" and list_count(args) == 2:
-                        # get(map, key) -> value (i32), linear search by key.
+                    else if (callee == "get" or callee == "get_int") and list_count(args) == 2:
+                        # get(map, key) / get_int(map, key) -> the stored value (an
+                        # i32 word: an int, or a pointer for a text/list value).
                         wm = compile_expr(fn_value, at(args, 0), locals)
-                        wk = compile_expr(wm, at(args, 1), locals)
+                        wk = compile_as_text(wm, at(args, 1), type_of(at(args, 1)), locals)
                         emit_call(wk, slot_get_int("wfn:__map_get"))
+                    else if callee == "has" and list_count(args) == 2:
+                        # has(map, key) -> 1/0 (presence, distinct from a 0 value).
+                        whm = compile_expr(fn_value, at(args, 0), locals)
+                        whk = compile_as_text(whm, at(args, 1), type_of(at(args, 1)), locals)
+                        emit_call(whk, slot_get_int("wfn:__map_has"))
                     else if callee == "split" and list_count(args) == 2:
                         # split(text, sep) -> list of text segments.
                         wsp0 = compile_expr(fn_value, at(args, 0), locals)
