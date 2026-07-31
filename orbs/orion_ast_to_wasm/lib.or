@@ -1281,13 +1281,68 @@ fn list_count(items: [Map]) -> int:
 # Compile a non-capturing lambda (fn(x): body) as a top-level function. Params
 # come as a name list plus a parallel type list; the body is a single
 # expression whose value is the function's result.
+# Collect every identifier NAME referenced in an expression/statement tree.
+# Used to find a lambda's captured variables (free vars that are locals in the
+# enclosing scope). Duplicates are fine; the caller dedupes.
+fn collect_idents(node: Map, acc: [Text]) -> [Text]:
+    k = get(node, "kind")
+    mut a = acc
+    if k == "Ident":
+        a = push(a, get(node, "name"))
+    else if k == "Binary":
+        a = collect_idents(get_map(node, "left"), a)
+        a = collect_idents(get_map(node, "right"), a)
+    else if k == "Unary":
+        a = collect_idents(get_map(node, "operand"), a)
+    else if k == "Call" or k == "Perform":
+        loop arg in get_list(node, "args"):
+            a = collect_idents(arg, a)
+    else if k == "MethodCall":
+        a = collect_idents(get_map(node, "receiver"), a)
+        loop arg in get_list(node, "args"):
+            a = collect_idents(arg, a)
+    else if k == "If":
+        a = collect_idents(get_map(node, "cond"), a)
+        a = collect_idents(get_map(node, "then"), a)
+        a = collect_idents(get_map(node, "else"), a)
+    else if k == "Field":
+        a = collect_idents(get_map(node, "object"), a)
+    else if k == "Index":
+        a = collect_idents(get_map(node, "object"), a)
+        a = collect_idents(get_map(node, "index"), a)
+    else if k == "Question":
+        a = collect_idents(get_map(node, "inner"), a)
+    else if k == "Match":
+        a = collect_idents(get_map(node, "scrutinee"), a)
+        loop arm in get_list(node, "arms"):
+            a = collect_idents(get_map(arm, "body"), a)
+    else if k == "Block":
+        loop s in get_list(node, "stmts"):
+            a = collect_idents(s, a)
+    else if k == "ExprStmt":
+        a = collect_idents(get_map(node, "expr"), a)
+    else if k == "MutLet" or k == "LetOrAssign":
+        a = collect_idents(get_map(node, "value"), a)
+    else if k == "Return":
+        a = collect_idents(get_map(node, "expr"), a)
+    a
+
 fn compile_lambda_fn(lam: Map, lname: Text) -> WFn:
-    pnames = get_text_list(lam, "params")
+    pnames0 = get_text_list(lam, "params")
     ptypes = get_list(lam, "param_types")
+    # Captured variables (recorded at the binding site) become leading params.
+    capn = if slot_has("lamcapn:{lname}") then slot_get_int("lamcapn:{lname}") else 0
+    mut pnames = []
+    loop ci in 0..<capn:
+        pnames = push(pnames, slot_get("lamcap:{lname}:{ci}"))
+    loop p in pnames0:
+        pnames = push(pnames, p)
     pc = len(pnames)
     mut locals = pnames
-    loop pi in 0..<pc:
-        slot_set("ltype:{at(pnames, pi)}", wtype_of(at(ptypes, pi)))
+    # Original params get their declared types; captures keep the type recorded
+    # globally at their definition (ltype slots are not scoped).
+    loop pi in 0..<len(pnames0):
+        slot_set("ltype:{at(pnames0, pi)}", wtype_of(at(ptypes, pi)))
     mut f0 = new_fn(lname, pc)
     slot_set("wloc:cur", "")
     max_depth = expr_agg_depth(get_map(lam, "body"))
@@ -1631,7 +1686,29 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
             # placeholder int (calls dispatch via lam:<name>).
             mut after_value = fn_value
             if get(value_node, "kind") == "Lambda":
-                slot_set("lam:{get(stmt, \"name\")}", "__lam_{get_int(value_node, \"line\")}_{get_int(value_node, \"col\")}")
+                lamfn = "__lam_{get_int(value_node, \"line\")}_{get_int(value_node, \"col\")}"
+                slot_set("lam:{get(stmt, \"name\")}", lamfn)
+                # Captures: body idents that are locals HERE but not the lambda's
+                # own params. Recorded as leading params (see compile_lambda_fn)
+                # and pushed before the args at each call site.
+                lparams = get_text_list(value_node, "params")
+                mut capnames = []
+                loop nm in collect_idents(get_map(value_node, "body"), []):
+                    if lookup_local(locals, nm) >= 0 and lookup_local(lparams, nm) < 0 and lookup_local(capnames, nm) < 0:
+                        capnames = push(capnames, nm)
+                mut cix = 0
+                mut capsig = ""
+                loop cn in capnames:
+                    slot_set("lamcap:{lamfn}:{cix}", cn)
+                    ct = if slot_has("ltype:{cn}") then slot_get("ltype:{cn}") else "i"
+                    capsig = "{capsig}{ct}"
+                    cix = cix + 1
+                slot_set("lamcapn:{lamfn}", len(capnames))
+                # The signature was reserved from the lambda's own params before
+                # captures were known; prepend the capture params (leading) now,
+                # so the type section matches the body and the call.
+                oldsig = if slot_has("wsig:{lamfn}") then slot_get("wsig:{lamfn}") else ""
+                slot_set("wsig:{lamfn}", "{capsig}{oldsig}")
                 after_value = emit_const(fn_value, 0)
             else:
                 after_value = compile_expr(fn_value, value_node, locals)
@@ -2065,9 +2142,13 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         rv = compile_expr(fn_value, at(args, 0), locals)
                         emit_op(rv, op_return())
                     else if slot_has("lam:{callee}"):
-                        # Closure call: direct call to the synthesized lambda fn.
+                        # Closure call: push the captured values (from this scope)
+                        # first, then the args, then call the synthesized fn.
                         lfn = slot_get("lam:{callee}")
                         mut lc = fn_value
+                        lcapn = if slot_has("lamcapn:{lfn}") then slot_get_int("lamcapn:{lfn}") else 0
+                        loop ci in 0..<lcapn:
+                            lc = compile_expr(lc, {"kind": "Ident", "name": slot_get("lamcap:{lfn}:{ci}")}, locals)
                         loop larg in args:
                             lc = compile_expr(lc, larg, locals)
                         emit_call(lc, slot_get_int("wfn:{lfn}"))
