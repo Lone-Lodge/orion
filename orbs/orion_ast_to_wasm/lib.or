@@ -2027,7 +2027,19 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
         if kind == "Ident":
             name = get(expr_node, "name")
             index = lookup_local(locals, name)
-            if index >= 0:
+            if slot_has("lam:{name}"):
+                # A lambda-bound name used as a VALUE is its table index (the
+                # local holds only a placeholder). Only NON-capturing lambdas can
+                # be passed this way and called via call_indirect; a capturing one
+                # has no way to carry its env through an indirect call.
+                vlfn = slot_get("lam:{name}")
+                vcapn = if slot_has("lamcapn:{vlfn}") then slot_get_int("lamcapn:{vlfn}") else 0
+                if vcapn == 0:
+                    emit_const(fn_value, slot_get_int("wfn:{vlfn}"))
+                else:
+                    compile_error("orion: ERROR — the wasm backend does not support passing the capturing closure `{name}` as a value (only non-capturing lambdas and top-level fns)")
+                    emit_const(fn_value, 0)
+            else if index >= 0:
                 emit_local_get(fn_value, index)
             else if slot_has("constint:{name}"):
                 # `const NAME = <int>` inlined at the read site.
@@ -2246,6 +2258,12 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         # is a builtin/stdlib the wasm backend does not provide.
                         if slot_has("wfn:{callee}"):
                             emit_call(current_fn, slot_get_int("wfn:{callee}"))
+                        else if lookup_local(locals, callee) >= 0:
+                            # Calling a fn-valued local/param: it holds an identity-
+                            # table index, so push it and call_indirect. Type 0 is
+                            # the (i32)->i32 signature the identity table uses.
+                            with_fidx = emit_local_get(current_fn, lookup_local(locals, callee))
+                            emit_call_indirect(with_fidx, 0)
                         else:
                             compile_error("orion: ERROR — the wasm backend does not support calling `{callee}` (unknown function or unsupported builtin)")
                             current_fn
