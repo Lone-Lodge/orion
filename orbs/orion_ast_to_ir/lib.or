@@ -3040,11 +3040,29 @@ fn ast_cast_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             pr = ir_fn_push(inner.function, ir_sitofp(inner.id))
             ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
     else:
+        # First get an i64 value (fptosi if the source is a float).
+        mut base = inner
         if src == "f64":
             pr = ir_fn_push(inner.function, ir_fptosi(inner.id))
-            ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+            base = ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+        # Then narrow to a sized target's width (native ints are i64): unsigned
+        # masks with AND, signed sign-extends via shl/ashr by 64-width.
+        w = if tname == "i8" or tname == "u8" then 8 else if tname == "i16" or tname == "u16" then 16 else if tname == "i32" or tname == "u32" then 32 else 64
+        uns = tname == "u8" or tname == "u16" or tname == "u32"
+        if w >= 64:
+            base
+        else if uns:
+            mask_val = if w == 8 then 255 else if w == 16 then 65535 else 4294967295
+            pc = ir_fn_push(base.function, ir_iconst(mask_val))
+            pa = ir_fn_push(pc.function, ir_bit_and(base.id, pc.id))
+            ConvResult{function: pa.function, scope: base.scope, id: pa.id}
         else:
-            inner
+            sh = 64 - w
+            pc = ir_fn_push(base.function, ir_iconst(sh))
+            ps = ir_fn_push(pc.function, ir_shl(base.id, pc.id))
+            pc2 = ir_fn_push(ps.function, ir_iconst(sh))
+            pr2 = ir_fn_push(pc2.function, ir_shr(ps.id, pc2.id))
+            ConvResult{function: pr2.function, scope: base.scope, id: pr2.id}
 
 pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     kind = get(node, "kind")
