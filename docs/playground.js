@@ -114,11 +114,13 @@
   // --- the "Try Orion" editor at the top of the page ---
   const START = `fn main() -> int:
     print_line("Hello from Orion, compiled to WebAssembly.")
-    mut sum = 0
-    loop i in 1..=10:
-        sum = sum + i
-    print_line("sum 1..10 = {sum}")
-    return sum`;
+    # 64-bit integers work out of the box
+    big = 5000000000
+    print_line("big * 2 = {big * 2}")
+    # sized numeric types coerce automatically, checked at compile time
+    x: u8 = 300              # 300 wraps into a byte: 44
+    print_line("300 as u8 = {x as int}")
+    return (big / 1000000000) as int + (x as int)   # 5 + 44 = 49`;
 
   const top = document.createElement('section');
   top.className = 'pg-top';
