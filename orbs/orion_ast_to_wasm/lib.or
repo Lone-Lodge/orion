@@ -2436,15 +2436,22 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             with_obj = compile_expr(fn_value, get_map(expr_node, "object"), locals)
                             if fty2 == "f" then emit_f64_load(with_obj, foff2) else emit_load(with_obj, foff2)
                     else if kind == "Index":
-                        # x[i] loads element i: mem[ptr + 4 + i*stride].
-                        iet = w_elem_type(get_map(expr_node, "object"))
-                        istride = if iet == "f" then 8 else 4
-                        with_ptr = compile_expr(fn_value, get_map(expr_node, "object"), locals)
-                        with_idx = compile_expr(with_ptr, get_map(expr_node, "index"), locals)
-                        s1 = emit_const(with_idx, istride)
-                        s2 = emit_op(s1, op_i32_mul())
-                        s3 = emit_op(s2, op_i32_add())
-                        if iet == "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
+                        idxnode = get_map(expr_node, "index")
+                        if type_of(idxnode) == "t":
+                            # m["key"] — a text index means a map lookup by key.
+                            wmp = compile_expr(fn_value, get_map(expr_node, "object"), locals)
+                            wky = compile_as_text(wmp, idxnode, "t", locals)
+                            emit_call(wky, slot_get_int("wfn:__map_get"))
+                        else:
+                            # x[i] loads element i: mem[ptr + 4 + i*stride].
+                            iet = w_elem_type(get_map(expr_node, "object"))
+                            istride = if iet == "f" then 8 else 4
+                            with_ptr = compile_expr(fn_value, get_map(expr_node, "object"), locals)
+                            with_idx = compile_expr(with_ptr, idxnode, locals)
+                            s1 = emit_const(with_idx, istride)
+                            s2 = emit_op(s1, op_i32_mul())
+                            s3 = emit_op(s2, op_i32_add())
+                            if iet == "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
                     else if kind == "Block":
                         # A block used as a value (e.g. a list comprehension
                         # `loop x in xs: e`): run its statements; the last one
