@@ -49,8 +49,13 @@ pub fn leb_s(value: int) -> [int]:
     loop:
         if not keep:
             break
-        byte_chunk = remaining - (remaining / 128) * 128
-        remaining = remaining / 128
+        # The low 7 bits, and an ARITHMETIC right shift for the rest. Plain
+        # `remaining - (remaining/128)*128` broke for negatives: integer division
+        # truncates toward zero, so -1/128 == 0 and the chunk came out -1 (a 0xff
+        # byte) instead of 0x7f, which set a stray continuation bit and swallowed
+        # the following opcode.
+        byte_chunk = remaining & 127
+        remaining = remaining >> 7
         # bit 6 of byte_chunk = `byte_chunk >= 64`. That bit is the
         # signed-LEB sign indicator: when the last byte's bit-6 set
         # state matches the value's sign, encoding stops; otherwise
