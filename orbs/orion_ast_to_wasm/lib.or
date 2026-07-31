@@ -2587,6 +2587,13 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                     wr = compile_expr(wl2, right, locals)
                     wr2 = if rt == "i" then emit_op(wr, op_f64_convert_i32_s()) else wr
                     emit_f64_binop(wr2, op)
+                else if lt == "l" or rt == "l":
+                    # i64 op: compile each side, extending an i32 operand to i64.
+                    wl = compile_expr(fn_value, left, locals)
+                    wl2 = if lt == "l" then wl else emit_op(wl, op_i64_extend_i32_s())
+                    wr = compile_expr(wl2, right, locals)
+                    wr2 = if rt == "l" then wr else emit_op(wr, op_i64_extend_i32_s())
+                    emit_i64_binop(wr2, op)
                 else:
                     with_left = compile_expr(fn_value, left, locals)
                     with_right = compile_expr(with_left, right, locals)
@@ -2876,10 +2883,24 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         csrc = type_of(cexpr)
                         if ctype == "f64" or ctype == "float" or ctype == "Float":
                             wcv = compile_expr(fn_value, cexpr, locals)
-                            if csrc == "f" then wcv else emit_op(wcv, op_f64_convert_i32_s())
+                            if csrc == "f" then wcv
+                            else if csrc == "l" then emit_op(wcv, op_f64_convert_i64_s())
+                            else emit_op(wcv, op_f64_convert_i32_s())
+                        else if ctype == "i64" or ctype == "u64":
+                            # An int literal cast to i64 becomes an i64.const so
+                            # values beyond i32 survive; otherwise extend/trunc.
+                            if get(cexpr, "kind") == "Int":
+                                emit_i64_const(fn_value, parse_decimal(get(cexpr, "value")))
+                            else:
+                                wcv = compile_expr(fn_value, cexpr, locals)
+                                if csrc == "l" then wcv
+                                else if csrc == "f" then emit_op(wcv, op_i64_trunc_f64_s())
+                                else emit_op(wcv, op_i64_extend_i32_s())
                         else if ctype == "int" or ctype == "Int" or ctype == "i32":
                             wcv = compile_expr(fn_value, cexpr, locals)
-                            if csrc == "f" then emit_op(wcv, op_i32_trunc_f64_s()) else wcv
+                            if csrc == "f" then emit_op(wcv, op_i32_trunc_f64_s())
+                            else if csrc == "l" then emit_op(wcv, op_i32_wrap_i64())
+                            else wcv
                         else:
                             compile_error("orion: ERROR — the wasm backend does not support `as {ctype}` yet (sized integer types are not implemented)")
                             emit_const(fn_value, 0)
@@ -3309,6 +3330,8 @@ fn wtype_of(tnode: Map) -> Text:
             "f"
         else if nm == "Text":
             "t"
+        else if nm == "i64" or nm == "u64":
+            "l"
         else:
             "i"
     else:
@@ -3330,12 +3353,20 @@ fn type_of(node: Map) -> Text:
         op = get(node, "op")
         if op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">=" or op == "and" or op == "or":
             "i"
-        else if type_of(get_map(node, "left")) == "t" or type_of(get_map(node, "right")) == "t":
-            "t"
-        else if type_of(get_map(node, "left")) == "f" or type_of(get_map(node, "right")) == "f":
-            "f"
         else:
-            "i"
+            # Compute each side's type ONCE. Calling type_of per branch made a
+            # left-deep `a+b+...+t` chain exponential (3^depth) and hung the
+            # compiler on a 20-term sum.
+            lt = type_of(get_map(node, "left"))
+            rt = type_of(get_map(node, "right"))
+            if lt == "t" or rt == "t":
+                "t"
+            else if lt == "f" or rt == "f":
+                "f"
+            else if lt == "l" or rt == "l":
+                "l"
+            else:
+                "i"
     else if kind == "Unary":
         type_of(get_map(node, "operand"))
     else if kind == "Call":
@@ -3370,7 +3401,9 @@ fn type_of(node: Map) -> Text:
         type_of(get_map(at(get_list(node, "arms"), 0), "body"))
     else if kind == "Cast":
         ct = get(get_map(node, "type"), "name")
-        if ct == "f64" or ct == "float" or ct == "Float" or ct == "f32" then "f" else "i"
+        if ct == "f64" or ct == "float" or ct == "Float" or ct == "f32" then "f"
+        else if ct == "i64" or ct == "u64" then "l"
+        else "i"
     else if kind == "Perform":
         hn = "__handler_{get(node, \"effect\")}_{get(node, \"op\")}"
         if slot_has("fret:{hn}") then slot_get("fret:{hn}") else "i"
@@ -3441,6 +3474,43 @@ fn emit_f64_binop(fn_value: WFn, op: Text) -> WFn:
         emit_op(fn_value, op_f64_ge())
     else:
         emit_op(fn_value, op_f64_add())
+
+# Map an Orion binary op string to the corresponding wasm i64 opcode (signed).
+fn emit_i64_binop(fn_value: WFn, op: Text) -> WFn:
+    if op == "+":
+        emit_op(fn_value, op_i64_add())
+    else if op == "-":
+        emit_op(fn_value, op_i64_sub())
+    else if op == "*":
+        emit_op(fn_value, op_i64_mul())
+    else if op == "/":
+        emit_op(fn_value, op_i64_div_s())
+    else if op == "%":
+        emit_op(fn_value, op_i64_rem_s())
+    else if op == "==":
+        emit_op(fn_value, op_i64_eq())
+    else if op == "!=":
+        emit_op(fn_value, op_i64_ne())
+    else if op == "<":
+        emit_op(fn_value, op_i64_lt_s())
+    else if op == ">":
+        emit_op(fn_value, op_i64_gt_s())
+    else if op == "<=":
+        emit_op(fn_value, op_i64_le_s())
+    else if op == ">=":
+        emit_op(fn_value, op_i64_ge_s())
+    else if op == "&":
+        emit_op(fn_value, op_i64_and())
+    else if op == "|":
+        emit_op(fn_value, op_i64_or())
+    else if op == "^":
+        emit_op(fn_value, op_i64_xor())
+    else if op == "<<":
+        emit_op(fn_value, op_i64_shl())
+    else if op == ">>":
+        emit_op(fn_value, op_i64_shr_s())
+    else:
+        emit_op(fn_value, op_i64_add())
 
 # Map an Orion binary op string to the corresponding wasm i32 opcode.
 fn emit_binop(fn_value: WFn, op: Text) -> WFn:

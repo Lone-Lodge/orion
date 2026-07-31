@@ -666,6 +666,8 @@ fn type_index_for_import(module: WModule, import_value: WImport) -> int:
 fn wtype_char_to_byte(c: int) -> int:
     if c == 102:
         ty_f64()
+    else if c == 108:
+        ty_i64()
     else:
         ty_i32()
 
