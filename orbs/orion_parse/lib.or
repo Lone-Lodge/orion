@@ -1242,7 +1242,16 @@ fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
         if is_question:
             node = {"kind": "Question", "inner": node}
             cursor = cursor + 1
-        if not is_dot and not is_lbracket and not is_question:
+        # `x as T` — a numeric cast (binds tighter than binary ops, like the
+        # other postfixes, so `a + b as i32` is `a + (b as i32)`).
+        is_as = kind_here == "ident" and value_here == "as"
+        if is_as:
+            as_line = psr_peek_line(tokens, cursor)
+            as_col = psr_peek_col(tokens, cursor)
+            as_type = psr_parse_type(tokens, cursor + 1)
+            node = {"kind": "Cast", "expr": node, "type": get_map(as_type, "node"), "line": as_line, "col": as_col}
+            cursor = get_int(as_type, "next")
+        if not is_dot and not is_lbracket and not is_question and not is_as:
             break
     {"node": node, "next": cursor}
 

@@ -2867,6 +2867,22 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             emit_op(with_neg1, op_i32_xor())
                         else:
                             compile_expr(fn_value, operand, locals)
+                    else if kind == "Cast":
+                        # x as T. Phase 1: int<->float works (both types exist);
+                        # sized integer types (i8/i16/i64/u*) await the sized-types
+                        # backend work and refuse cleanly for now.
+                        ctype = get(get_map(expr_node, "type"), "name")
+                        cexpr = get_map(expr_node, "expr")
+                        csrc = type_of(cexpr)
+                        if ctype == "f64" or ctype == "float" or ctype == "Float":
+                            wcv = compile_expr(fn_value, cexpr, locals)
+                            if csrc == "f" then wcv else emit_op(wcv, op_f64_convert_i32_s())
+                        else if ctype == "int" or ctype == "Int" or ctype == "i32":
+                            wcv = compile_expr(fn_value, cexpr, locals)
+                            if csrc == "f" then emit_op(wcv, op_i32_trunc_f64_s()) else wcv
+                        else:
+                            compile_error("orion: ERROR — the wasm backend does not support `as {ctype}` yet (sized integer types are not implemented)")
+                            emit_const(fn_value, 0)
                     else if kind == "Str":
                         # Record the literal for a data segment; push its pointer.
                         # The bytes live in linear memory (length-prefixed); a host
@@ -3352,6 +3368,9 @@ fn type_of(node: Map) -> Text:
         type_of(get_map(node, "then"))
     else if kind == "Match":
         type_of(get_map(at(get_list(node, "arms"), 0), "body"))
+    else if kind == "Cast":
+        ct = get(get_map(node, "type"), "name")
+        if ct == "f64" or ct == "float" or ct == "Float" or ct == "f32" then "f" else "i"
     else if kind == "Perform":
         hn = "__handler_{get(node, \"effect\")}_{get(node, \"op\")}"
         if slot_has("fret:{hn}") then slot_get("fret:{hn}") else "i"
