@@ -2322,6 +2322,13 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
                 dtname = if get(dtn, "kind") == "Named" then get(dtn, "name") else ""
                 is_numeric_anno = dtname == "i8" or dtname == "i16" or dtname == "i32" or dtname == "i64" or dtname == "u8" or dtname == "u16" or dtname == "u32" or dtname == "u64" or dtname == "int" or dtname == "f32" or dtname == "f64" or dtname == "float"
                 if is_numeric_anno and get(value_node, "kind") != "Lambda":
+                    # A LITERAL that does not fit its declared sized type is a
+                    # compile error, not a silent wrap (`x: u8 = 300` is a bug).
+                    # `300 as u8` stays the deliberate-wrap escape hatch.
+                    if get(value_node, "kind") == "Int":
+                        litv = parse_decimal(get(value_node, "value"))
+                        if not w_int_fits(litv, dtname):
+                            compile_error("orion: ERROR — the literal {litv} does not fit `{dtname}` (write `{litv} as {dtname}` to wrap it deliberately)")
                     value_node = {"kind": "Cast", "expr": value_node, "type": dtn}
             # A lambda binding names a synthesized top-level fn; the local holds a
             # placeholder int (calls dispatch via lam:<name>).
@@ -3732,6 +3739,24 @@ fn w_to_f64(fn_value: WFn, c: Text) -> WFn:
 
 fn w_is_unsigned(c: Text) -> bool:
     c == "B" or c == "H" or c == "I" or c == "L"
+
+# True if literal value v fits a sized integer type NAME (i8/u8/.../u32). i64/
+# u64/int and floats always "fit" here (no narrow check).
+fn w_int_fits(v: int, t: Text) -> bool:
+    if t == "u8":
+        v >= 0 and v <= 255
+    else if t == "u16":
+        v >= 0 and v <= 65535
+    else if t == "u32":
+        v >= 0 and v <= 4294967295
+    else if t == "i8":
+        v >= (0 - 128) and v <= 127
+    else if t == "i16":
+        v >= (0 - 32768) and v <= 32767
+    else if t == "i32":
+        v >= (0 - 2147483648) and v <= 2147483647
+    else:
+        true
 
 fn w_int_width(c: Text) -> int:
     if c == "b" or c == "B":

@@ -117,10 +117,12 @@
     # 64-bit integers work out of the box
     big = 5000000000
     print_line("big * 2 = {big * 2}")
-    # sized numeric types coerce automatically, checked at compile time
-    x: u8 = 300              # 300 wraps into a byte: 44
-    print_line("300 as u8 = {x as int}")
-    return (big / 1000000000) as int + (x as int)   # 5 + 44 = 49`;
+    # sized numeric types are range-checked (x: u8 = 300 is a compile error);
+    # use \`as\` to wrap on purpose.
+    x: u8 = 200
+    wrapped = 300 as u8              # 300 wraps into a byte: 44
+    print_line("u8: {x as int} and {wrapped as int}")
+    return (big / 1000000000) as int + (wrapped as int)   # 5 + 44 = 49`;
 
   const top = document.createElement('section');
   top.className = 'pg-top';
