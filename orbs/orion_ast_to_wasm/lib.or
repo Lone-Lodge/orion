@@ -2592,17 +2592,20 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                     wr = compile_expr(wl2, right, locals)
                     wr2 = if rt == "i" then emit_op(wr, op_f64_convert_i32_s()) else wr
                     emit_f64_binop(wr2, op)
-                else if lt == "l" or rt == "l":
-                    # i64 op: compile each side, extending an i32 operand to i64.
-                    wl = compile_expr(fn_value, left, locals)
-                    wl2 = if lt == "l" then wl else emit_op(wl, op_i64_extend_i32_s())
-                    wr = compile_expr(wl2, right, locals)
-                    wr2 = if rt == "l" then wr else emit_op(wr, op_i64_extend_i32_s())
-                    emit_i64_binop(wr2, op)
                 else:
-                    with_left = compile_expr(fn_value, left, locals)
-                    with_right = compile_expr(with_left, right, locals)
-                    emit_binop(with_right, op)
+                    # integer op of any width/signedness. Peer type picks the
+                    # representation (i32 vs i64) and signedness; an i32-rep
+                    # operand is widened when the op is 64-bit; a narrow
+                    # arithmetic result is masked back to its width (wrapping).
+                    rc = w_peer(lt, rt)
+                    use64 = w_is_i64rep(rc)
+                    uns = w_is_unsigned(rc)
+                    wl = compile_expr(fn_value, left, locals)
+                    wl2 = if use64 and (not w_is_i64rep(lt)) then (if w_is_unsigned(lt) then emit_op(wl, op_i64_extend_i32_u()) else emit_op(wl, op_i64_extend_i32_s())) else wl
+                    wr = compile_expr(wl2, right, locals)
+                    wr2 = if use64 and (not w_is_i64rep(rt)) then (if w_is_unsigned(rt) then emit_op(wr, op_i64_extend_i32_u()) else emit_op(wr, op_i64_extend_i32_s())) else wr
+                    wop = if use64 then emit_i64_binop(wr2, op) else emit_i32_binop_u(wr2, op, uns)
+                    if w_is_cmp(op) then wop else w_emit_mask(wop, rc)
             else:
                 if kind == "Call":
                     # Calling a host fn or another local fn — for now assume host index 0.
@@ -2885,29 +2888,34 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         # backend work and refuse cleanly for now.
                         ctype = get(get_map(expr_node, "type"), "name")
                         cexpr = get_map(expr_node, "expr")
+                        tc = if ctype == "int" or ctype == "Int" then "i" else wtype_of(get_map(expr_node, "type"))
                         csrc = type_of(cexpr)
-                        if ctype == "f64" or ctype == "float" or ctype == "Float":
+                        if tc == "f":
                             wcv = compile_expr(fn_value, cexpr, locals)
                             if csrc == "f" then wcv
-                            else if csrc == "l" then emit_op(wcv, op_f64_convert_i64_s())
+                            else if w_is_i64rep(csrc) then emit_op(wcv, op_f64_convert_i64_s())
                             else emit_op(wcv, op_f64_convert_i32_s())
-                        else if ctype == "i64" or ctype == "u64":
-                            # An int literal cast to i64 becomes an i64.const so
+                        else if w_is_i64rep(tc):
+                            # An int literal cast to i64/u64 becomes an i64.const so
                             # values beyond i32 survive; otherwise extend/trunc.
                             if get(cexpr, "kind") == "Int":
                                 emit_i64_const(fn_value, parse_decimal(get(cexpr, "value")))
                             else:
                                 wcv = compile_expr(fn_value, cexpr, locals)
-                                if csrc == "l" then wcv
+                                if w_is_i64rep(csrc) then wcv
                                 else if csrc == "f" then emit_op(wcv, op_i64_trunc_f64_s())
+                                else if w_is_unsigned(csrc) then emit_op(wcv, op_i64_extend_i32_u())
                                 else emit_op(wcv, op_i64_extend_i32_s())
-                        else if ctype == "int" or ctype == "Int" or ctype == "i32":
+                        else if w_int_width(tc) > 0:
+                            # An i32-rep int target (i8/i16/i32/u8/u16/u32): produce
+                            # an i32, then mask to the target width.
                             wcv = compile_expr(fn_value, cexpr, locals)
-                            if csrc == "f" then emit_op(wcv, op_i32_trunc_f64_s())
-                            else if csrc == "l" then emit_op(wcv, op_i32_wrap_i64())
-                            else wcv
+                            wi = if csrc == "f" then emit_op(wcv, op_i32_trunc_f64_s())
+                                 else if w_is_i64rep(csrc) then emit_op(wcv, op_i32_wrap_i64())
+                                 else wcv
+                            w_emit_mask(wi, tc)
                         else:
-                            compile_error("orion: ERROR — the wasm backend does not support `as {ctype}` yet (sized integer types are not implemented)")
+                            compile_error("orion: ERROR — the wasm backend does not support `as {ctype}` yet")
                             emit_const(fn_value, 0)
                     else if kind == "Str":
                         # Record the literal for a data segment; push its pointer.
@@ -3328,6 +3336,10 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         emit_const(fn_value, 0)
 
 # A type node -> 'f' for f64/float, 'i' for everything else (i32 or pointer).
+# Type code alphabet: i32 signed "i", i64 signed "l"; unsigned widths use the
+# upper-case letter: u8 "B", u16 "H", u32 "I", u64 "L". Narrow signed: i8 "b",
+# i16 "h". f64 "f", text/pointer "t". All the <=32-bit ints represent as wasm
+# i32 (masked to width); i64/u64 use wasm i64.
 fn wtype_of(tnode: Map) -> Text:
     if get(tnode, "kind") == "Named":
         nm = get(tnode, "name")
@@ -3335,8 +3347,20 @@ fn wtype_of(tnode: Map) -> Text:
             "f"
         else if nm == "Text":
             "t"
-        else if nm == "i64" or nm == "u64":
+        else if nm == "i64":
             "l"
+        else if nm == "u64":
+            "L"
+        else if nm == "i8":
+            "b"
+        else if nm == "i16":
+            "h"
+        else if nm == "u8":
+            "B"
+        else if nm == "u16":
+            "H"
+        else if nm == "u32":
+            "I"
         else:
             "i"
     else:
@@ -3371,10 +3395,8 @@ fn type_of(node: Map) -> Text:
                 "t"
             else if lt == "f" or rt == "f":
                 "f"
-            else if lt == "l" or rt == "l":
-                "l"
             else:
-                "i"
+                w_peer(lt, rt)
     else if kind == "Unary":
         type_of(get_map(node, "operand"))
     else if kind == "Call":
@@ -3408,10 +3430,7 @@ fn type_of(node: Map) -> Text:
     else if kind == "Match":
         type_of(get_map(at(get_list(node, "arms"), 0), "body"))
     else if kind == "Cast":
-        ct = get(get_map(node, "type"), "name")
-        if ct == "f64" or ct == "float" or ct == "Float" or ct == "f32" then "f"
-        else if ct == "i64" or ct == "u64" then "l"
-        else "i"
+        wtype_of(get_map(node, "type"))
     else if kind == "Perform":
         hn = "__handler_{get(node, \"effect\")}_{get(node, \"op\")}"
         if slot_has("fret:{hn}") then slot_get("fret:{hn}") else "i"
@@ -3519,6 +3538,84 @@ fn emit_i64_binop(fn_value: WFn, op: Text) -> WFn:
         emit_op(fn_value, op_i64_shr_s())
     else:
         emit_op(fn_value, op_i64_add())
+
+# --- sized-integer helpers ---
+fn w_is_i64rep(c: Text) -> bool:
+    c == "l" or c == "L"
+
+fn w_is_unsigned(c: Text) -> bool:
+    c == "B" or c == "H" or c == "I" or c == "L"
+
+fn w_int_width(c: Text) -> int:
+    if c == "b" or c == "B":
+        8
+    else if c == "h" or c == "H":
+        16
+    else if c == "i" or c == "I":
+        32
+    else if c == "l" or c == "L":
+        64
+    else:
+        0
+
+# Peer type of two integer operand codes: the wider dominates; a plain i32 int
+# ("i", also a small literal's type) yields to a sized partner of equal width.
+fn w_peer(a: Text, b: Text) -> Text:
+    wa = w_int_width(a)
+    wb = w_int_width(b)
+    if wa == 0:
+        b
+    else if wb == 0:
+        a
+    else if wb > wa:
+        b
+    else if wa > wb:
+        a
+    else if a == "i":
+        b
+    else:
+        a
+
+# Mask a value on the stack back into a narrow type's range (wrapping semantics):
+# i8/i16 sign-extend from their width, u8/u16 zero-extend by masking. i32/u32
+# and i64/u64 are already full width.
+fn w_emit_mask(fn_value: WFn, c: Text) -> WFn:
+    if c == "b":
+        emit_op(fn_value, op_i32_extend8_s())
+    else if c == "h":
+        emit_op(fn_value, op_i32_extend16_s())
+    else if c == "B":
+        m1 = emit_const(fn_value, 255)
+        emit_op(m1, op_i32_and())
+    else if c == "H":
+        m1 = emit_const(fn_value, 65535)
+        emit_op(m1, op_i32_and())
+    else:
+        fn_value
+
+# i32 binary op with a signedness flag: div/rem/shr and comparisons pick the
+# unsigned variant when `uns`; add/sub/mul/and/or/xor/shl are signedness-free.
+fn emit_i32_binop_u(fn_value: WFn, op: Text, uns: bool) -> WFn:
+    if op == "/":
+        emit_op(fn_value, if uns then op_i32_div_u() else op_i32_div_s())
+    else if op == "%":
+        emit_op(fn_value, if uns then op_i32_rem_u() else op_i32_rem_s())
+    else if op == ">>":
+        emit_op(fn_value, if uns then op_i32_shr_u() else op_i32_shr_s())
+    else if op == "<":
+        emit_op(fn_value, if uns then op_i32_lt_u() else op_i32_lt_s())
+    else if op == ">":
+        emit_op(fn_value, if uns then op_i32_gt_u() else op_i32_gt_s())
+    else if op == "<=":
+        emit_op(fn_value, if uns then op_i32_le_u() else op_i32_le_s())
+    else if op == ">=":
+        emit_op(fn_value, if uns then op_i32_ge_u() else op_i32_ge_s())
+    else:
+        emit_binop(fn_value, op)
+
+# True for the comparison/logical ops whose result is a 0/1 bool (never masked).
+fn w_is_cmp(op: Text) -> bool:
+    op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">=" or op == "and" or op == "or"
 
 # Map an Orion binary op string to the corresponding wasm i32 opcode.
 fn emit_binop(fn_value: WFn, op: Text) -> WFn:

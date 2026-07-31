@@ -143,6 +143,15 @@ pub fn op_i32_or() -> int: 114       # 0x72 i32.or
 pub fn op_i32_xor() -> int: 115      # 0x73 i32.xor
 pub fn op_i32_shl() -> int: 116      # 0x74 i32.shl
 pub fn op_i32_shr_s() -> int: 117    # 0x75 i32.shr_s
+pub fn op_i32_shr_u() -> int: 118    # 0x76 i32.shr_u
+# Unsigned i32 ops + narrow sign-extension, for u8/u16/u32 and i8/i16.
+pub fn op_i32_div_u() -> int: 110    # 0x6E i32.div_u
+pub fn op_i32_rem_u() -> int: 112    # 0x70 i32.rem_u
+pub fn op_i32_lt_u() -> int: 73      # 0x49 i32.lt_u
+pub fn op_i32_gt_u() -> int: 75      # 0x4B i32.gt_u
+pub fn op_i32_le_u() -> int: 77      # 0x4D i32.le_u
+pub fn op_i32_extend8_s() -> int: 192   # 0xC0 i32.extend8_s
+pub fn op_i32_extend16_s() -> int: 193  # 0xC1 i32.extend16_s
 
 # Control flow.
 pub fn op_block() -> int: 2         # 0x02 block (then blocktype)
@@ -666,7 +675,7 @@ fn type_index_for_import(module: WModule, import_value: WImport) -> int:
 fn wtype_char_to_byte(c: int) -> int:
     if c == 102:
         ty_f64()
-    else if c == 108:
+    else if c == 108 or c == 76:
         ty_i64()
     else:
         ty_i32()
