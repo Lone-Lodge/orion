@@ -648,6 +648,16 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             er = ast_expr_to_ir(current_fn, current_scope, value_node)
             current_fn = er.function
             current_scope = er.scope
+            # A literal that does not fit its declared sized type is a compile
+            # error (mirrors the wasm backend); `as` remains the deliberate wrap.
+            if has(stmt, "decl_type"):
+                dtchk = get_map(stmt, "decl_type")
+                dtcn = if get(dtchk, "kind") == "Named" then get(dtchk, "name") else ""
+                vchk = get_map(stmt, "value")
+                if get(vchk, "kind") == "Int":
+                    litval = parse_int(get(vchk, "value"))
+                    if not otir_int_fits(litval, dtcn):
+                        compile_error("orion: ERROR — the literal {litval} does not fit `{dtcn}` (write `{litval} as {dtcn}` to wrap it deliberately)")
             # If this is MutLet (fresh mut binding): alloca + store + bind as mut.
             # Else if it's LetOrAssign on an existing mut var: just store.
             # Else: regular SSA-style bind (immutable shadowing).
@@ -1000,6 +1010,24 @@ fn ast_int_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     value_text = get(node, "value")
     pr = ir_fn_push(fn_value, ir_iconst(parse_int(value_text)))
     ConvResult{function: pr.function, scope: scope, id: pr.id}
+
+# True if literal value v fits sized integer type NAME (mirrors the wasm
+# backend's w_int_fits). i64/u64/int and floats always "fit" here.
+fn otir_int_fits(v: int, t: Text) -> bool:
+    if t == "u8":
+        v >= 0 and v <= 255
+    else if t == "u16":
+        v >= 0 and v <= 65535
+    else if t == "u32":
+        v >= 0 and v <= 4294967295
+    else if t == "i8":
+        v >= (0 - 128) and v <= 127
+    else if t == "i16":
+        v >= (0 - 32768) and v <= 32767
+    else if t == "i32":
+        v >= (0 - 2147483648) and v <= 2147483647
+    else:
+        true
 
 fn ast_float_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     value_text = get(node, "value")
