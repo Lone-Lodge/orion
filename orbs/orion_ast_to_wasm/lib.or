@@ -2189,7 +2189,17 @@ fn compile_stmt(fn_value: WFn, stmt: Map, locals: [Text]) -> Map:
         {"fn": new_fn, "locals": locals}
     else:
         if kind == "MutLet" or kind == "LetOrAssign":
-            value_node = get(stmt, "value")
+            mut value_node = get(stmt, "value")
+            # A numeric type annotation (`x: u8 = 300`) coerces the value to that
+            # type WITHOUT a cast: treat it as `x = (value as T)` so the width
+            # masking / sign handling all reuse the Cast path. Only numeric named
+            # types trigger this; a list/text/struct annotation is left alone.
+            if has(stmt, "decl_type"):
+                dtn = get_map(stmt, "decl_type")
+                dtname = if get(dtn, "kind") == "Named" then get(dtn, "name") else ""
+                is_numeric_anno = dtname == "i8" or dtname == "i16" or dtname == "i32" or dtname == "i64" or dtname == "u8" or dtname == "u16" or dtname == "u32" or dtname == "u64" or dtname == "int" or dtname == "f32" or dtname == "f64" or dtname == "float"
+                if is_numeric_anno and get(value_node, "kind") != "Lambda":
+                    value_node = {"kind": "Cast", "expr": value_node, "type": dtn}
             # A lambda binding names a synthesized top-level fn; the local holds a
             # placeholder int (calls dispatch via lam:<name>).
             mut after_value = fn_value
