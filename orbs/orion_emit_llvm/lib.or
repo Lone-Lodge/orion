@@ -1,15 +1,12 @@
 use orion_ir
 use bytes
 
-# orion_emit_llvm — emit LLVM IR text from typed IR (orion_ir).
+# orion_emit_llvm — the backend: typed IR (orion_ir) in, LLVM IR text out.
 #
-# Pipeline: orion_ir → orion_emit_llvm → .ll file → clang → .exe
-#
-# Supports today: ints + arith + cmp + logic, branches (br/phi),
-# typed params, calls with proper return-type lookup, alloca/load/store
-# for mut vars, strings (literals + concat + cmp + interpolation),
-# int lists (literal + at + len), print_int/print_text/print_str.
-# Inline runtime helpers: text_concat, int_to_text, list_new/at/set/len.
+# Pipeline: orion_ir -> orion_emit_llvm -> .ll -> clang -> .exe. It always emits
+# a Windows target triple; POSIX hosts retarget the module header before clang
+# links. The last stage, so an IR op it has no lowering for is a compile error,
+# not a silently wrong module.
 
 
 # --- Helpers ---
@@ -638,6 +635,11 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
     if op == "print_text":
         l1 = "    call i32 @puts(ptr {value_ref(inst.value)})"
+        l2 = "    {value_ref(my_id)} = add i64 0, 0"
+        result = "{l1}\n{l2}"
+
+    if op == "print_raw":
+        l1 = "    call void @orion_print_raw(ptr {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
@@ -2707,12 +2709,26 @@ fn emit_runtime() -> Text:
     text
 
 
+# True if any instruction is a print_raw, so its declare rides only in the
+# programs that use it (a plain program's IR is byte-identical to before).
+fn emit_uses_print_raw(module: IRModule) -> bool:
+    mut found = false
+    fns = module.functions
+    loop fi in 0..<len(fns):
+        insts = at(fns, fi).instructions
+        loop ii in 0..<len(insts):
+            if at(insts, ii).op == "print_raw":
+                found = true
+    found
+
 pub fn emit_module(module: IRModule) -> Text:
     # Chunk list + one join at the end — repeated concat would re-copy
     # the growing megabyte module text once per appended piece.
     mut chunks = []
     chunks = push_mut(chunks, "; orion_emit_llvm output\n")
     chunks = push_mut(chunks, emit_runtime())
+    if emit_uses_print_raw(module):
+        chunks = push_mut(chunks, "declare void @orion_print_raw(ptr)\n")
     # Emit declares for every user extern call — any `call @name` where
     # `name` isn't a user fn and isn't a runtime helper already declared
     # above. Without these declares clang rejects the .ll before linking.

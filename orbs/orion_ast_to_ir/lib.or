@@ -1,15 +1,11 @@
 use orion_ir
 use bytes
 
-# orion_ast_to_ir — walk Orion AST and emit typed IR.
-#
-# Today: ints, arith (+ - * / %), comparisons, and/or/not,
-# if/else (expr + stmt), locals (let/mut), text (literals,
-# interpolation, concat, cmp via strcmp), int lists with
-# at/len/iteration, for-range, for-in, loop + break/continue,
-# typed fn params (int + Text + [int]), recursion, mutual recursion.
-#
-# Roadmap: maps, text lists, struct types.
+# orion_ast_to_ir — lowering: the AST in, typed IR (orion_ir) out. The
+# compiler's largest stage. Names resolve, types are checked, and the
+# desugarings run here as ordered AST passes (const folding, defer, lambda
+# lift) before the tree is shaped into IR. Diagnostics carry a source line, and
+# a reported error stops output downstream.
 
 
 # --- Symbol table ---
@@ -40,6 +36,39 @@ fn scope_add_enum_decl(scope: Scope, enum_name: Text, variant_csv: Text) -> Scop
 #
 # Falls back to the old `line N:C` when there is no map (the compiler invoked
 # on an already-bundled text), so a diagnostic never becomes worse than before.
+# Slot-stored text must outlive the transient allocation it was built in.
+extern fn orion_persist_text(s: Text) -> Text
+# 1 when the console can show colour (a TTY), 0 when piped or redirected.
+extern fn orion_console_color() -> int
+
+fn otir_spaces(n: int) -> Text:
+    mut s = ""
+    loop i in 0..<n:
+        s = s + " "
+    s
+
+# The text of 1-based bundle line `n` from the collected source, "" if absent.
+fn otir_src_line(src: Text, n: int) -> Text:
+    b = bytes_from_text(src)
+    total = len(b)
+    mut cur = 1
+    mut start = 0
+    mut i = 0
+    mut result = ""
+    loop:
+        if i >= total:
+            if cur == n:
+                result = bytes_to_text(bytes_slice(b, start, total))
+            break
+        if at(b, i) == 10:
+            if cur == n:
+                result = bytes_to_text(bytes_slice(b, start, i))
+                break
+            cur = cur + 1
+            start = i + 1
+        i = i + 1
+    result
+
 fn otir_where(line: int, col: int) -> Text:
     total = if slot_has("src:map:n") then slot_get_int("src:map:n") else 0
     mut best_at = 0
@@ -49,6 +78,19 @@ fn otir_where(line: int, col: int) -> Text:
         if chunk_at <= line and chunk_at > best_at:
             best_at = chunk_at
             best_path = slot_get("src:map:{i}:path")
+    # Stash a source-line + caret frame for compile_error to print under the
+    # message. The gutter shows the local line; the caret sits at `col` (0-based)
+    # past the gutter width. Cleared by compile_error once consumed.
+    src = if slot_has("src:full") then slot_get("src:full") else ""
+    if src != "":
+        src_line = otir_src_line(src, line)
+        if src_line != "":
+            gutter = " {line - best_at} | "
+            gw = len(bytes_from_text(gutter))
+            esc = bytes_to_text([27])
+            caret = if orion_console_color() == 1 then "{esc}[31m^{esc}[0m" else "^"
+            frame = "\n{gutter}{src_line}\n{otir_spaces(gw + col)}{caret}"
+            slot_set("err:frame", orion_persist_text(frame))
     if best_path == "":
         "line {line}:{col}"
     else:
@@ -606,6 +648,16 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             er = ast_expr_to_ir(current_fn, current_scope, value_node)
             current_fn = er.function
             current_scope = er.scope
+            # A literal that does not fit its declared sized type is a compile
+            # error (mirrors the wasm backend); `as` remains the deliberate wrap.
+            if has(stmt, "decl_type"):
+                dtchk = get_map(stmt, "decl_type")
+                dtcn = if get(dtchk, "kind") == "Named" then get(dtchk, "name") else ""
+                vchk = get_map(stmt, "value")
+                if get(vchk, "kind") == "Int":
+                    litval = parse_int(get(vchk, "value"))
+                    if not otir_int_fits(litval, dtcn):
+                        compile_error("orion: ERROR — the literal {litval} does not fit `{dtcn}` (write `{litval} as {dtcn}` to wrap it deliberately)")
             # If this is MutLet (fresh mut binding): alloca + store + bind as mut.
             # Else if it's LetOrAssign on an existing mut var: just store.
             # Else: regular SSA-style bind (immutable shadowing).
@@ -958,6 +1010,24 @@ fn ast_int_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     value_text = get(node, "value")
     pr = ir_fn_push(fn_value, ir_iconst(parse_int(value_text)))
     ConvResult{function: pr.function, scope: scope, id: pr.id}
+
+# True if literal value v fits sized integer type NAME (mirrors the wasm
+# backend's w_int_fits). i64/u64/int and floats always "fit" here.
+fn otir_int_fits(v: int, t: Text) -> bool:
+    if t == "u8":
+        v >= 0 and v <= 255
+    else if t == "u16":
+        v >= 0 and v <= 65535
+    else if t == "u32":
+        v >= 0 and v <= 4294967295
+    else if t == "i8":
+        v >= (0 - 128) and v <= 127
+    else if t == "i16":
+        v >= (0 - 32768) and v <= 32767
+    else if t == "i32":
+        v >= (0 - 2147483648) and v <= 2147483647
+    else:
+        true
 
 fn ast_float_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     value_text = get(node, "value")
@@ -1538,7 +1608,7 @@ fn otir_resolve(name: Text) -> Text:
 # "list index 1 out of range (len 1)" — an internal trap where a diagnostic
 # belongs. A fuzzer found it in the second run.
 fn builtin_min_args(callee: Text) -> int:
-    one = callee == "len" or callee == "print_line" or callee == "print" or callee == "println" or callee == "to_text" or callee == "to_int" or callee == "to_float" or callee == "bytes_from_text" or callee == "bytes_to_text" or callee == "bytes_zeros" or callee == "bytes_length" or callee == "map_keys" or callee == "map_values" or callee == "slot_get" or callee == "slot_has" or callee == "slot_get_int" or callee == "file_read" or callee == "argv" or callee == "resume" or callee == "parse_int"
+    one = callee == "len" or callee == "print_line" or callee == "print" or callee == "println" or callee == "print_raw" or callee == "to_text" or callee == "to_int" or callee == "to_float" or callee == "bytes_from_text" or callee == "bytes_to_text" or callee == "bytes_zeros" or callee == "bytes_length" or callee == "map_keys" or callee == "map_values" or callee == "slot_get" or callee == "slot_has" or callee == "slot_get_int" or callee == "file_read" or callee == "argv" or callee == "resume" or callee == "parse_int"
     two = callee == "at" or callee == "get" or callee == "get_int" or callee == "get_map" or callee == "get_list" or callee == "get_text_list" or callee == "get_int_list" or callee == "has" or callee == "push" or callee == "push_mut" or callee == "contains" or callee == "map_remove" or callee == "byte_at" or callee == "bytes_concat" or callee == "slot_set" or callee == "file_write" or callee == "call_ptr" or callee == "par_run" or callee == "vec_add" or callee == "vec_sub" or callee == "vec_mul" or callee == "vec_dot"
     three = callee == "set" or callee == "slice" or callee == "get_or" or callee == "bytes_slice" or callee == "vec_madd" or callee == "vec_addi"
     if three:
@@ -1635,6 +1705,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         ij_jn = ir_fn_push(ij_lst.function, ir_text_join(ij_lst.id))
         return ConvResult{function: ij_jn.function, scope: ij_scope, id: ij_jn.id}
     is_print_line = callee == "print_line" or callee == "println" or callee == "print"
+    is_print_raw = callee == "print_raw"
     is_to_text = callee == "to_text"
     is_to_float = callee == "to_float"
     is_to_int = callee == "to_int"
@@ -1692,6 +1763,12 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 else:
                     pr = ir_fn_push(arg_r.function, ir_print_int(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+    if is_print_raw:
+        # No-newline write, for progress lines. Text only (its one caller builds
+        # a progress string), so the arg goes straight to orion_print_raw.
+        arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
+        pr = ir_fn_push(arg_r.function, ir_print_raw(arg_r.id))
+        result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_to_text:
         arg0 = at(args, 0)
         arg_r = ast_expr_to_ir(fn_value, scope, arg0)
@@ -1913,7 +1990,15 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         val_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
-        pr = ir_fn_push(val_r.function, ir_list_push_mut(list_r.id, val_r.id))
+        # Carry the element type onto the result, exactly like `push` above.
+        # Without this, `mut x = []` (allocated list:i64) stays list:i64 through
+        # `x = push_mut(x, textval)`, so a later `at(x, i)` reads i64 and the
+        # value is mis-typed as an int downstream. `push` back-patches the slot
+        # via this type; push_mut must too, or the two are not interchangeable.
+        pm_val_type = get_value_type(val_r.function, val_r.id)
+        pm_base = ir_list_push_mut(list_r.id, val_r.id)
+        pm_typed = Inst{op: pm_base.op, type_text: "list:{pm_val_type}", value: pm_base.value, lhs: pm_base.lhs, rhs: pm_base.rhs, name: pm_base.name, args: pm_base.args}
+        pr = ir_fn_push(val_r.function, pm_typed)
         result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
     if is_struct_field_int:
         # Struct field by declaration index: raw slot read. The typed
@@ -2121,7 +2206,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         gl_elem = if is_get_text_list then "list:text" else (if is_get_int_list then "list:i64" else (if is_list_type(gl_declared) then gl_declared else "list:dyn"))
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, gl_elem))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_get_text_list == false) and (is_get_int_list == false) and (is_vec_add == false) and (is_vec_addi == false) and (is_vec_madd == false) and (is_par_madd == false) and (is_par_run == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
+    is_user_fn = (is_print_line == false) and (is_print_raw == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_mut == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_get_text_list == false) and (is_get_int_list == false) and (is_vec_add == false) and (is_vec_addi == false) and (is_vec_madd == false) and (is_par_madd == false) and (is_par_run == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
     if is_resume:
         # One `resume(v)` — pick the int vs text runtime call from the value's
         # type. (There is intentionally no resume_int / resume_text; one way.)
@@ -2966,6 +3051,47 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
 
+# `x as T` — numeric cast. Native ints are i64 (sized integer widths erase to
+# i64 for now, so int<->int is a value passthrough); int<->float uses sitofp /
+# fptosi. Width-exact sized integers are a native refinement; the wasm backend
+# is width-exact where it matters.
+fn ast_cast_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+    inner = ast_expr_to_ir(fn_value, scope, get_map(node, "expr"))
+    tn = get_map(node, "type")
+    tname = if get(tn, "kind") == "Named" then get(tn, "name") else "i64"
+    to_float = tname == "f64" or tname == "float" or tname == "f32"
+    src = get_value_type(inner.function, inner.id)
+    if to_float:
+        if src == "f64":
+            inner
+        else:
+            pr = ir_fn_push(inner.function, ir_sitofp(inner.id))
+            ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+    else:
+        # First get an i64 value (fptosi if the source is a float).
+        mut base = inner
+        if src == "f64":
+            pr = ir_fn_push(inner.function, ir_fptosi(inner.id))
+            base = ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+        # Then narrow to a sized target's width (native ints are i64): unsigned
+        # masks with AND, signed sign-extends via shl/ashr by 64-width.
+        w = if tname == "i8" or tname == "u8" then 8 else if tname == "i16" or tname == "u16" then 16 else if tname == "i32" or tname == "u32" then 32 else 64
+        uns = tname == "u8" or tname == "u16" or tname == "u32"
+        if w >= 64:
+            base
+        else if uns:
+            mask_val = if w == 8 then 255 else if w == 16 then 65535 else 4294967295
+            pc = ir_fn_push(base.function, ir_iconst(mask_val))
+            pa = ir_fn_push(pc.function, ir_bit_and(base.id, pc.id))
+            ConvResult{function: pa.function, scope: base.scope, id: pa.id}
+        else:
+            sh = 64 - w
+            pc = ir_fn_push(base.function, ir_iconst(sh))
+            ps = ir_fn_push(pc.function, ir_shl(base.id, pc.id))
+            pc2 = ir_fn_push(ps.function, ir_iconst(sh))
+            pr2 = ir_fn_push(pc2.function, ir_shr(ps.id, pc2.id))
+            ConvResult{function: pr2.function, scope: base.scope, id: pr2.id}
+
 pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     kind = get(node, "kind")
     # `xs[i]` / `m[k]` is sugar for `at(xs, i)` (lists) or `get(m, k)` (maps).
@@ -3004,6 +3130,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_call = kind == "Call"
     is_if = kind == "If"
     is_unary = kind == "Unary"
+    is_cast = kind == "Cast"
     is_list_lit = kind == "ListLit"
     is_tuple = kind == "Tuple"
     is_map_lit = kind == "MapLit"
@@ -3066,6 +3193,8 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         result = ast_if_to_ir(fn_value, scope, node)
     if is_unary:
         result = ast_unary_to_ir(fn_value, scope, node)
+    if is_cast:
+        result = ast_cast_to_ir(fn_value, scope, node)
     if is_method_call:
         method = get(node, "method")
         receiver = get(node, "receiver")
@@ -3227,7 +3356,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         else:
             pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_g, perf_arg_ids))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
-    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_list_lit or is_tuple or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
+    any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_cast or is_list_lit or is_tuple or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
     if not any_match:
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
@@ -3903,7 +4032,7 @@ fn defer_rewrite_block(block: Map, inherited: [Map]) -> Map:
                 tmp = defer_tmp_name()
                 out = push(out, {"kind": "LetOrAssign", "name": tmp, "value": get_map(s, "expr")})
                 out = defer_append_reverse(out, visible)
-                out = push(out, {"kind": "Return", "expr": {"kind": "Ident", "name": tmp}})
+                out = push(out, {"kind": "Return", "expr": {"kind": "Ident", "name": tmp}, "line": dfv_stmt_line(s), "col": dfv_stmt_col(s), "defer_covered": 1})
             else:
                 # The last expression of a block IS its value, so the same
                 # save-then-run applies at the block end: appending the defers
@@ -3917,7 +4046,7 @@ fn defer_rewrite_block(block: Map, inherited: [Map]) -> Map:
                     tail_expr = if k == "ExprStmt" then get_map(s, "expr") else s
                     out = push(out, {"kind": "LetOrAssign", "name": tmp2, "value": tail_expr})
                     out = defer_append_reverse(out, mine)
-                    out = push(out, {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": tmp2}})
+                    out = push(out, {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": tmp2}, "line": dfv_stmt_line(s), "col": dfv_stmt_col(s), "defer_covered": 1})
                 else:
                     out = push(out, defer_rewrite_stmt(s, visible))
     # Only if the value-preserving path above did not already do it: a block that
@@ -3950,6 +4079,163 @@ fn defer_block_has(block: Map) -> bool:
             if defer_block_has(get(s, "body")):
                 found = true
     found
+
+# ---- defer coverage verifier (compile-time) --------------------------
+#
+# An independent postcondition on the `defer` AST rewrite above. The rewrite
+# is the thing that can be wrong: every bug in this class (a `defer` before a
+# tail `match`, a `return` inside an `if`, a tail `if` whose branches return)
+# was the rewrite failing to RECURSE into a construct, leaving a value-
+# producing position uncovered while the value survived and answered wrong.
+#
+# So: the rewrite STAMPS every position it covers (`defer_covered`). This
+# oracle walks the ORIGINAL body, recursing into EVERY construct, and records
+# every position that NEEDS covering: a `return` or a tail value reached with
+# at least one visible `defer` in scope. A position the oracle reaches but the
+# rewrite did not leaves an entry in `needs` with no match in `covered`, and is
+# reported at the dropped defer's source line. The oracle is the spec; the
+# rewrite is the implementation; a divergence is the bug.
+#
+# It changes no emitted IR (a valid program compiles to exactly what it did
+# before), so it is fixpoint-safe: the compiler still self-hosts unchanged.
+
+fn dfv_line(s: Map) -> int:
+    if has(s, "line") then get_int(s, "line") else 0
+
+fn dfv_col(s: Map) -> int:
+    if has(s, "col") then get_int(s, "col") else 0
+
+# Statement wrappers (Defer, Return, ExprStmt) carry no location, but the
+# EXPRESSION they wrap does, and a `match` node carries its own. So a position's
+# location is its own `line` if present, else its expression's. This must be the
+# same value the rewrite stamps on what it covers, so the match key is stable and
+# distinct per position (line 0 for everything would collapse the keys and let a
+# real drop hide behind any covered defer).
+fn dfv_stmt_line(s: Map) -> int:
+    if has(s, "line") then get_int(s, "line")
+    else if has(s, "expr") then dfv_line(get_map(s, "expr"))
+    else 0
+
+fn dfv_stmt_col(s: Map) -> int:
+    if has(s, "col") then get_int(s, "col")
+    else if has(s, "expr") then dfv_col(get_map(s, "expr"))
+    else 0
+
+# One in-scope defer's source position, carried down the walk.
+fn dfv_defloc(s: Map) -> Map:
+    {"l": dfv_stmt_line(s), "c": dfv_stmt_col(s)}
+
+# A must-cover position: `m*` is the return/tail's own location (the match key,
+# also stamped by the rewrite on what it covers), `d*` is the nearest enclosing
+# defer (what the error points at).
+fn dfv_key(s: Map, vis: [Map]) -> Map:
+    d = at(vis, len(vis) - 1)
+    {"mline": dfv_stmt_line(s), "mcol": dfv_stmt_col(s), "dline": get_int(d, "l"), "dcol": get_int(d, "c")}
+
+# ---- oracle: positions that must be covered, from the ORIGINAL body ----
+
+fn dfv_need(block: Map) -> [Map]:
+    seed = get_list(block, "stmts")
+    dfv_need_block(seed, slice(seed, 0, 0), slice(seed, 0, 0), true)
+
+# stmts: block body. inh: defers inherited from enclosing blocks. acc0: needs so
+# far. blk_tail: true when this block's last statement is the function's value.
+fn dfv_need_block(stmts: [Map], inh: [Map], acc0: [Map], blk_tail: bool) -> [Map]:
+    mut acc = acc0
+    mut vis = slice(inh, 0, len(inh))
+    n = len(stmts)
+    loop i in 0..<n:
+        s = at(stmts, i)
+        k = get(s, "kind")
+        tail_here = blk_tail and (i == n - 1)
+        if k == "Defer":
+            vis = push(vis, dfv_defloc(s))
+        else if k == "Return":
+            if len(vis) > 0:
+                acc = push(acc, dfv_key(s, vis))
+        else if k == "IfBlock":
+            acc = dfv_need_block(get_list(get_map(s, "then"), "stmts"), vis, acc, tail_here)
+            acc = dfv_need_else(get_map(s, "else"), vis, acc, tail_here)
+        else if k == "Loop" or k == "ForRange" or k == "ForIn":
+            acc = dfv_need_block(get_list(get_map(s, "body"), "stmts"), vis, acc, false)
+        else if k == "Match":
+            if tail_here and len(vis) > 0:
+                acc = push(acc, dfv_key(s, vis))
+            arms = get_list(s, "arms")
+            loop ai in 0..<len(arms):
+                b = get_map(at(arms, ai), "body")
+                if get(b, "kind") == "Block":
+                    acc = dfv_need_block(get_list(b, "stmts"), vis, acc, false)
+        else if k == "ExprStmt":
+            if tail_here and len(vis) > 0:
+                acc = push(acc, dfv_key(s, vis))
+    acc
+
+# An `else` is a Block, an else-if chain (nested IfBlock), or empty.
+fn dfv_need_else(els: Map, vis: [Map], acc0: [Map], tail_here: bool) -> [Map]:
+    k = get(els, "kind")
+    if k == "Block":
+        dfv_need_block(get_list(els, "stmts"), vis, acc0, tail_here)
+    else if k == "IfBlock":
+        mut acc = dfv_need_block(get_list(get_map(els, "then"), "stmts"), vis, acc0, tail_here)
+        acc = dfv_need_else(get_map(els, "else"), vis, acc, tail_here)
+        acc
+    else:
+        acc0
+
+# ---- what the rewrite actually covered, from the REWRITTEN body ----
+
+fn dfv_covered(block: Map) -> [Map]:
+    seed = get_list(block, "stmts")
+    dfv_cov_block(seed, slice(seed, 0, 0))
+
+fn dfv_cov_block(stmts: [Map], acc0: [Map]) -> [Map]:
+    mut acc = acc0
+    loop i in 0..<len(stmts):
+        s = at(stmts, i)
+        if has(s, "defer_covered"):
+            acc = push(acc, {"mline": dfv_line(s), "mcol": dfv_col(s)})
+        acc = dfv_cov_nested(s, acc)
+    acc
+
+fn dfv_cov_nested(s: Map, acc0: [Map]) -> [Map]:
+    mut acc = acc0
+    k = get(s, "kind")
+    if k == "IfBlock":
+        acc = dfv_cov_block(get_list(get_map(s, "then"), "stmts"), acc)
+        els = get_map(s, "else")
+        if get(els, "kind") == "Block":
+            acc = dfv_cov_block(get_list(els, "stmts"), acc)
+        else if get(els, "kind") == "IfBlock":
+            acc = dfv_cov_nested(els, acc)
+    else if k == "Loop" or k == "ForRange" or k == "ForIn":
+        acc = dfv_cov_block(get_list(get_map(s, "body"), "stmts"), acc)
+    else if k == "Match":
+        arms = get_list(s, "arms")
+        loop ai in 0..<len(arms):
+            b = get_map(at(arms, ai), "body")
+            if get(b, "kind") == "Block":
+                acc = dfv_cov_block(get_list(b, "stmts"), acc)
+    acc
+
+# ---- report: every need with no matching cover is a dropped defer ----
+
+fn dfv_has(xs: [Map], ml: int, mc: int) -> bool:
+    mut f = false
+    loop i in 0..<len(xs):
+        x = at(xs, i)
+        if get_int(x, "mline") == ml and get_int(x, "mcol") == mc:
+            f = true
+    f
+
+fn dfv_report(needs: [Map], covered: [Map]):
+    loop i in 0..<len(needs):
+        nd = at(needs, i)
+        ml = get_int(nd, "mline")
+        mc = get_int(nd, "mcol")
+        if not dfv_has(covered, ml, mc):
+            where = otir_where(get_int(nd, "dline"), get_int(nd, "dcol"))
+            compile_error("orion: ERROR at {where}: `defer` is dropped on a return path (registered here, it never runs before the block's value leaves)")
 
 # ---- name substitution over an AST subtree ---------------------------
 # Replace every READ of a name with a given expression node, everywhere a name
@@ -4429,6 +4715,253 @@ fn nlam_block_has(block: Map) -> bool:
     found
 
 
+fn upp_is_ident(node: Map, name: Text) -> bool:
+    get(node, "kind") == "Ident" and get(node, "name") == name
+
+fn upp_is_reader(callee: Text) -> bool:
+    callee == "len" or callee == "at" or callee == "get" or callee == "get_int" or callee == "get_map" or callee == "get_list" or callee == "get_text_list" or callee == "get_int_list" or callee == "has" or callee == "contains" or callee == "byte_at" or callee == "bytes_length"
+
+fn upp_fresh(val: Map, name: Text) -> bool:
+    k = get(val, "kind")
+    if k == "ListLit":
+        true
+    else if k == "Call":
+        callee = get(val, "callee")
+        if callee == "push":
+            true
+        else if callee == "push_mut":
+            args = get_list(val, "args")
+            len(args) > 0 and upp_is_ident(at(args, 0), name)
+        else:
+            false
+    else:
+        false
+
+fn upp_bad_list(items: [Map], name: Text) -> int:
+    mut bad = 0
+    loop i in 0..<len(items):
+        bad = bad + upp_bad_expr(at(items, i), name)
+    bad
+
+fn upp_bad_pairs(pairs: [Map], name: Text) -> int:
+    mut bad = 0
+    loop i in 0..<len(pairs):
+        bad = bad + upp_bad_expr(get_map(at(pairs, i), "value"), name)
+    bad
+
+fn upp_bad_arms(arms: [Map], name: Text) -> int:
+    mut bad = 0
+    loop i in 0..<len(arms):
+        a = at(arms, i)
+        if has(a, "guard"):
+            bad = bad + upp_bad_expr(get_map(a, "guard"), name)
+        b = get_map(a, "body")
+        if get(b, "kind") == "Block":
+            bad = bad + upp_bad_block(b, name)
+        else:
+            bad = bad + upp_bad_expr(b, name)
+    bad
+
+fn upp_bad_expr(node: Map, name: Text) -> int:
+    kind = get(node, "kind")
+    if kind == "Ident":
+        if get(node, "name") == name then 1 else 0
+    else if kind == "Int" or kind == "Str" or kind == "Float" or kind == "Range":
+        0
+    else if kind == "Call":
+        callee = get(node, "callee")
+        args = get_list(node, "args")
+        na = len(args)
+        safe0 = (callee == "push" or callee == "push_mut" or upp_is_reader(callee)) and na > 0 and upp_is_ident(at(args, 0), name)
+        start = if safe0 then 1 else 0
+        mut bad = 0
+        loop i in start..<na:
+            bad = bad + upp_bad_expr(at(args, i), name)
+        bad
+    else if kind == "Binary":
+        upp_bad_expr(get_map(node, "left"), name) + upp_bad_expr(get_map(node, "right"), name)
+    else if kind == "Unary":
+        upp_bad_expr(get_map(node, "operand"), name)
+    else if kind == "MethodCall":
+        mut bad = upp_bad_expr(get_map(node, "receiver"), name)
+        args = get_list(node, "args")
+        loop i in 0..<len(args):
+            bad = bad + upp_bad_expr(at(args, i), name)
+        bad
+    else if kind == "Perform":
+        upp_bad_list(get_list(node, "args"), name)
+    else if kind == "Field":
+        upp_bad_expr(get_map(node, "object"), name)
+    else if kind == "Index":
+        upp_bad_expr(get_map(node, "object"), name) + upp_bad_expr(get_map(node, "index"), name)
+    else if kind == "Question":
+        upp_bad_expr(get_map(node, "inner"), name)
+    else if kind == "If":
+        upp_bad_expr(get_map(node, "cond"), name) + upp_bad_expr(get_map(node, "then"), name) + upp_bad_expr(get_map(node, "else"), name)
+    else if kind == "ListLit":
+        upp_bad_list(get_list(node, "items"), name)
+    else if kind == "Tuple":
+        upp_bad_list(get_list(node, "items"), name)
+    else if kind == "NamedArg":
+        upp_bad_expr(get_map(node, "value"), name)
+    else if kind == "MapLit":
+        upp_bad_pairs(get_list(node, "pairs"), name)
+    else if kind == "StructCons":
+        upp_bad_pairs(get_list(node, "fields"), name)
+    else if kind == "Match":
+        upp_bad_expr(get_map(node, "scrutinee"), name) + upp_bad_arms(get_list(node, "arms"), name)
+    else:
+        1000000
+
+fn upp_bad_else(els: Map, name: Text) -> int:
+    k = get(els, "kind")
+    if k == "Block":
+        upp_bad_block(els, name)
+    else if k == "IfBlock":
+        upp_bad_stmt(els, name)
+    else:
+        0
+
+fn upp_bad_stmt(s: Map, name: Text) -> int:
+    kind = get(s, "kind")
+    if kind == "MutLet" or kind == "LetOrAssign":
+        val = get_map(s, "value")
+        if get(s, "name") == name:
+            fresh_bad = if upp_fresh(val, name) then 0 else 1000000
+            fresh_bad + upp_bad_expr(val, name)
+        else:
+            upp_bad_expr(val, name)
+    else if kind == "ExprStmt":
+        e = get_map(s, "expr")
+        if upp_is_ident(e, name) then 0 else upp_bad_expr(e, name)
+    else if kind == "Return":
+        e = get_map(s, "expr")
+        if upp_is_ident(e, name) then 0 else upp_bad_expr(e, name)
+    else if kind == "Require" or kind == "Ensure" or kind == "Defer":
+        upp_bad_expr(get_map(s, "expr"), name)
+    else if kind == "Loop":
+        upp_bad_block(get_map(s, "body"), name)
+    else if kind == "ForRange":
+        upp_bad_expr(get_map(s, "low"), name) + upp_bad_expr(get_map(s, "high"), name) + upp_bad_block(get_map(s, "body"), name)
+    else if kind == "ForIn":
+        upp_bad_expr(get_map(s, "iter"), name) + upp_bad_block(get_map(s, "body"), name)
+    else if kind == "IfBlock":
+        upp_bad_expr(get_map(s, "cond"), name) + upp_bad_block(get_map(s, "then"), name) + upp_bad_else(get_map(s, "else"), name)
+    else if kind == "Match":
+        upp_bad_expr(get_map(s, "scrutinee"), name) + upp_bad_arms(get_list(s, "arms"), name)
+    else if kind == "Break" or kind == "Continue":
+        0
+    else:
+        1000000
+
+fn upp_bad_block(block: Map, name: Text) -> int:
+    stmts = get_list(block, "stmts")
+    mut bad = 0
+    loop i in 0..<len(stmts):
+        bad = bad + upp_bad_stmt(at(stmts, i), name)
+    bad
+
+fn upp_mut_names(block: Map, acc0: [Text]) -> [Text]:
+    stmts = get_list(block, "stmts")
+    mut acc = acc0
+    loop i in 0..<len(stmts):
+        s = at(stmts, i)
+        k = get(s, "kind")
+        if k == "MutLet":
+            acc = push(acc, get(s, "name"))
+        else if k == "Loop":
+            acc = upp_mut_names(get_map(s, "body"), acc)
+        else if k == "ForRange" or k == "ForIn":
+            acc = upp_mut_names(get_map(s, "body"), acc)
+        else if k == "IfBlock":
+            acc = upp_mut_names(get_map(s, "then"), acc)
+            els = get_map(s, "else")
+            if get(els, "kind") == "Block":
+                acc = upp_mut_names(els, acc)
+            else if get(els, "kind") == "IfBlock":
+                acc = upp_mut_names_stmt(els, acc)
+        else if k == "Match":
+            arms = get_list(s, "arms")
+            loop ai in 0..<len(arms):
+                b = get_map(at(arms, ai), "body")
+                if get(b, "kind") == "Block":
+                    acc = upp_mut_names(b, acc)
+    acc
+
+fn upp_mut_names_stmt(s: Map, acc0: [Text]) -> [Text]:
+    mut acc = upp_mut_names(get_map(s, "then"), acc0)
+    els = get_map(s, "else")
+    if get(els, "kind") == "Block":
+        acc = upp_mut_names(els, acc)
+    else if get(els, "kind") == "IfBlock":
+        acc = upp_mut_names_stmt(els, acc)
+    acc
+
+fn upp_contains_name(names: [Text], name: Text) -> bool:
+    mut f = false
+    loop i in 0..<len(names):
+        if at(names, i) == name:
+            f = true
+    f
+
+fn upp_is_self_push(value: Map, name: Text) -> bool:
+    if get(value, "kind") != "Call":
+        false
+    else:
+        args = get_list(value, "args")
+        get(value, "callee") == "push" and len(args) > 0 and upp_is_ident(at(args, 0), name)
+
+fn upp_promote_stmt(s: Map, uniq: [Text]) -> Map:
+    kind = get(s, "kind")
+    mut out = s
+    if kind == "LetOrAssign":
+        nm = get(s, "name")
+        val = get_map(s, "value")
+        if upp_contains_name(uniq, nm) and upp_is_self_push(val, nm):
+            out = set(out, "value", set(val, "callee", "push_mut"))
+    else if kind == "Loop":
+        out = set(out, "body", upp_promote_block(get_map(s, "body"), uniq))
+    else if kind == "ForRange" or kind == "ForIn":
+        out = set(out, "body", upp_promote_block(get_map(s, "body"), uniq))
+    else if kind == "IfBlock":
+        out = set(out, "then", upp_promote_block(get_map(s, "then"), uniq))
+        els = get_map(s, "else")
+        if get(els, "kind") == "Block":
+            out = set(out, "else", upp_promote_block(els, uniq))
+        else if get(els, "kind") == "IfBlock":
+            out = set(out, "else", upp_promote_stmt(els, uniq))
+    else if kind == "Match":
+        arms = get_list(s, "arms")
+        mut new_arms = slice(arms, 0, 0)
+        loop ai in 0..<len(arms):
+            a = at(arms, ai)
+            b = get_map(a, "body")
+            nb = if get(b, "kind") == "Block" then upp_promote_block(b, uniq) else b
+            new_arms = push(new_arms, set(a, "body", nb))
+        out = set(out, "arms", new_arms)
+    out
+
+fn upp_promote_block(block: Map, uniq: [Text]) -> Map:
+    stmts = get_list(block, "stmts")
+    mut out = slice(stmts, 0, 0)
+    loop i in 0..<len(stmts):
+        out = push(out, upp_promote_stmt(at(stmts, i), uniq))
+    set(block, "stmts", out)
+
+# Per-function: keep the mut locals proven unique, rewrite their self-pushes.
+fn upp_promote_fn(body: Map) -> Map:
+    cands = upp_mut_names(body, slice([""], 0, 0))
+    mut uniq = slice([""], 0, 0)
+    loop i in 0..<len(cands):
+        nm = at(cands, i)
+        if (not upp_contains_name(uniq, nm)) and (upp_bad_block(body, nm) == 0):
+            uniq = push(uniq, nm)
+    if len(uniq) == 0:
+        body
+    else:
+        upp_promote_block(body, uniq)
+
+
 pub fn ast_program_to_ir(program: Map) -> IRModule:
     # New EPOCH for the private-name registry. A host can compile many programs
     # in one process (the test runner does 118 in a row), and compiler slots
@@ -4579,11 +5112,31 @@ pub fn ast_program_to_ir(program: Map) -> IRModule:
         loop dfj in 0..<len(defer_decls):
             mut dfd2 = at(defer_decls, dfj)
             if get(dfd2, "kind") == "Fn":
+                orig_body = get_map(dfd2, "body")
+                # Oracle over the ORIGINAL body BEFORE the rewrite can drop a
+                # defer; coverage over the rewritten body; a need with no cover
+                # is a `defer` the rewrite lost on some return path.
+                needs = dfv_need(orig_body)
                 no_defers = slice([{}], 0, 0)
-                dfd2 = set(dfd2, "body", defer_rewrite_block(get_map(dfd2, "body"), no_defers))
+                new_body = defer_rewrite_block(orig_body, no_defers)
+                dfv_report(needs, dfv_covered(new_body))
+                dfd2 = set(dfd2, "body", new_body)
             df_out = push(df_out, dfd2)
         defer_decls = df_out
     program_const = set(program_const, "decls", defer_decls)
+
+    # Pass -0.5: unique-accumulator promotion. Rewrite `x = push(x, v)` to the
+    # in-place push_mut wherever x is a mut local proven uniquely owned, killing
+    # the quadratic copy. Runs BEFORE lambda lift so a capturing lambda is still
+    # a Lambda node (which blocks promotion). See upp_promote_fn.
+    upp_decls = get_list(program_const, "decls")
+    mut upp_out = slice(upp_decls, 0, 0)
+    loop upi in 0..<len(upp_decls):
+        mut upd = at(upp_decls, upi)
+        if get(upd, "kind") == "Fn":
+            upd = set(upd, "body", upp_promote_fn(get_map(upd, "body")))
+        upp_out = push(upp_out, upd)
+    program_const = set(program_const, "decls", upp_out)
 
     # Pass 0: lambda lift. For each `name = |params| body` LetOrAssign at
     # top of a fn body, hoist as synthesized __lambda_N global fn. We

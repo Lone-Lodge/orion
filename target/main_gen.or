@@ -1,0 +1,4 @@
+use atlas_project
+
+fn main() -> int:
+    project_run("orion-self.toml", "orion-self:")

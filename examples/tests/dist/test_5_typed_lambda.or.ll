@@ -1542,7 +1542,7 @@ cpln17:
     br label %cmrg17
 cmrg17:
     %v17 = phi i64 [ %v17.r1, %clam17 ], [ %v17.r2, %cpln17 ]
-    %v18 = call ptr @orion_list_push(ptr %v15, i64 %v17)
+    %v18 = call ptr @orion_list_push_mut(ptr %v15, i64 %v17)
     store ptr %v18, ptr %v3
     %v19 = add i64 0, 0
     br label %for_5_step

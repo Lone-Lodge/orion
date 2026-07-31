@@ -1,0 +1,18 @@
+# Orion -> wasm demo. Compiled with:  orion demo.or demo.wasm ../../orbs
+# The browser (main.js) provides the host functions and a per-frame clock.
+
+extern fn clear()
+extern fn fill_circle(x: f64, y: f64, r: f64, color: int)
+extern fn host_sin(a: f64) -> f64
+extern fn host_cos(a: f64) -> f64
+
+# Draw eight circles orbiting the centre at growing radii, rotating with t.
+fn render(t: f64):
+    clear()
+    loop i in 0..<8:
+        fi = to_float(i)
+        angle = t * 0.8 + fi * 0.7853981
+        radius = 40.0 + fi * 18.0
+        x = 300.0 + host_cos(angle) * radius
+        y = 220.0 + host_sin(angle) * radius
+        fill_circle(x, y, 14.0, i)

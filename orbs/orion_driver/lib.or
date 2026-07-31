@@ -3,6 +3,8 @@ use orion_lex
 use orion_parse
 use orion_ast_to_ir
 use orion_emit_llvm
+use orion_ast_to_wasm
+use orion_emit_wasm
 
 # Self-hosted driver: orion_self <input.or> [output.ll] [orb-root...]
 #
@@ -180,6 +182,10 @@ fn drv_want_quiet() -> bool:
     loop ai in 1..<argc():
         if argv(ai) == "--quiet":
             want = true
+    # A caller compiling in-process (the test runner) can silence the chatter
+    # via this slot without touching argv.
+    if slot_has("drv:quiet") and slot_get_int("drv:quiet") == 1:
+        want = true
     want
 
 # A flag is not a directory. Orb roots were taken from every argument at index
@@ -208,6 +214,9 @@ fn drv_dim(s: Text) -> Text:
 
 fn drv_red(s: Text) -> Text:
     drv_sty("31;1", s)
+
+fn drv_green(s: Text) -> Text:
+    drv_sty("32", s)
 
 # ---- `symbols`: the compiler's own index, for tools --------------------
 #
@@ -666,6 +675,31 @@ fn drv_facts(module: IRModule) -> int:
     print_line("facts: {n} fn(s), {pure_count} pure")
     0
 
+# True when the output path ends in ".wasm".
+fn drv_wants_wasm(p: Text) -> bool:
+    b = bytes_from_text(p)
+    n = len(b)
+    if n < 5:
+        return false
+    at(b, n - 5) == 46 and at(b, n - 4) == 119 and at(b, n - 3) == 97 and at(b, n - 2) == 115 and at(b, n - 1) == 109
+
+# Compile the AST straight to a .wasm module (bump-allocated linear memory,
+# i32 + f64, structs, lists, extern host imports) and write the bytes. A Text
+# is length-prefixed, so binary survives file_write untouched.
+fn drv_emit_wasm(ast: Map, out_path: Text) -> int:
+    errs_before = compile_errors()
+    wmodule = compile_program(get_list(ast, "decls"))
+    wbytes = encode_module(wmodule)
+    # Refuse to write invalid wasm: unsupported constructs report a compile
+    # error during compile_program, same contract as the LLVM path.
+    if compile_errors() > errs_before:
+        print_line(drv_red("orion: wasm compilation FAILED — no output written"))
+        return 1
+    file_write(out_path, bytes_to_text(wbytes))
+    if not (slot_has("drv:quiet")):
+        print_line(drv_green("  ok") + drv_dim("  {out_path}"))
+    0
+
 pub fn driver_main() -> int:
     if argc() < 2:
         print_line("usage: orion_self <input.or> [output.ll] [orb-root...]")
@@ -689,6 +723,8 @@ pub fn driver_main() -> int:
         roots = push(roots, "orbs/")
         roots = push(roots, "../orbs/")
         src = drv_collect(entry_src, roots, in_path)
+        # Keep the collected source so error diagnostics can show the line + caret.
+        slot_set("src:full", orion_persist_text(src))
         t0 = monotonic_ms()
         tokens = self_lex(src)
         t1 = monotonic_ms()
@@ -699,6 +735,9 @@ pub fn driver_main() -> int:
         # internal names instead of the ones the user typed.
         if out_path == "symbols":
             return drv_symbols(ast)
+        # `.wasm` output: compile straight to WebAssembly (own pipeline, no LLVM).
+        if drv_wants_wasm(out_path):
+            return drv_emit_wasm(ast, out_path)
         t2 = monotonic_ms()
         module = ast_program_to_ir(ast)
         t3 = monotonic_ms()
@@ -756,7 +795,7 @@ pub fn driver_main() -> int:
             ok = file_write(out_path, llvm_text)
             if ok == 1:
                 if not drv_want_quiet():
-                    print_line(drv_dim("  {out_path}"))
+                    print_line(drv_green("  ok") + drv_dim("  {out_path}"))
                 0
             else:
                 print_line(drv_red("write failed"))

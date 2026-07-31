@@ -1,5 +1,4 @@
 # Smoke test covering EVERY interp category we found in orbs/.
-# Run grep tools/extract_interp_patterns.sh to see current categories.
 #
 # Categories tested:
 #   - Simple ident:           {name}

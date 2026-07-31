@@ -867,9 +867,6 @@ fn cli_build(path: Text) -> Text:
     remove_file(ll)
     exe
 
-fn __os_orbit_build(path: Text) -> bool:
-    cli_build(path) != ""
-
 # Returns the PROGRAM's exit code, not a pass/fail. Every Orion main returns an
 # int, and the guide says that int becomes the process exit code -- but this
 # collapsed anything non-zero to 1, so the one promise the language makes about

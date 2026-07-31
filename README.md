@@ -65,14 +65,40 @@ Every gate the repo owns, and what each one is for:
 CI runs all of them on Linux and Windows, starting from a checkout with no
 binary on disk.
 
+## WebAssembly
+
+Orion also compiles to WebAssembly, so Orion code can run in a browser. An
+output path ending in `.wasm` uses the wasm backend instead of LLVM:
+
+```
+orion prog.or prog.wasm orbs
+```
+
+The `.wasm` is self-contained — the host (JavaScript) provides only capabilities
+(draw, input, `print`), never data-structure semantics. `examples/wasm_demo/`
+compiles a small program to wasm and animates it on a canvas.
+
+The **Field Guide playground** makes every sample runnable in the browser: run
+`node tools/playground.js` and open `http://localhost:8100`. It compiles each
+snippet to wasm on demand and runs it in place, with a "Try Orion" editor at the
+top.
+
+The wasm backend covers the core language: i32 and f64, structs, lists, maps,
+tuples, sum types with pattern matching, `?`, closures, comprehensions, text and
+interpolation, first-class functions, a `par_run` that reduces its workers in
+order, one-shot algebraic effects (`perform`/`resume`), the full control flow,
+and an in-browser IO sandbox. All 12 Field Guide samples run in the browser. The
+async scheduler (`spawn`/`await` with parked tasks) needs real stack switching
+and stays native.
+
 ## Layout
 
 ```
-orbs/       the libraries, and the compiler itself (lex, parse, ir, emit)
+orbs/       the libraries, and the compiler itself (lex, parse, ir, emit, wasm)
 runtime/    the C runtime the emitted code links against
-tools/      bootstrap, test harnesses, benches, the LSP, orbit
-examples/   demos, the test suite
-docs/       the Field Guide
+tools/      bootstrap, test harnesses, benches, the LSP, orbit, the playground
+examples/   demos (incl. wasm_demo), the test suite
+docs/       the Field Guide (with an in-browser playground)
 ```
 
 ## Status
@@ -82,10 +108,18 @@ emits the same IR on either host.
 
 Known gaps, stated plainly rather than left to be discovered:
 
-- `x = push(x, v)` copies, so building a list in a loop is quadratic. Use
-  `push_mut` for a hot accumulator. Making the copy elidable in general needs a
-  uniqueness analysis, which is the next real piece of language work.
+- `x = push(x, v)` copies. The compiler proves when `x` is uniquely owned and
+  then pushes in place automatically, so the common `mut x = []` build-in-a-loop
+  is linear with no annotation. When uniqueness cannot be proven (x is aliased,
+  stored, or captured) it stays a copy; reach for `push_mut` there if the copy
+  shows up in a profile.
 - Effects that resume (`ask` / `resume_with`) use Windows fibers. Elsewhere
   `resumable_ok()` reports 0 and `ask` refuses rather than pretending.
 - Interactive terminal input (`orion_console_readline`) works on Windows and
   through a pipe anywhere; on a POSIX TTY it returns nothing.
+
+## License
+
+Orion is licensed under the Apache License, Version 2.0. Copyright 2026 Lone
+Lodge. See [LICENSE](LICENSE) for the full text and [NOTICE](NOTICE) for
+attribution.

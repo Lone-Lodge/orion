@@ -6,6 +6,9 @@ use orion_emit_llvm
 use os
 use orion_driver
 
+# 1 when stdout is a TTY: show a live progress bar. 0 when piped (CI): plain rows.
+extern fn orion_console_color() -> int
+
 # Orion test runner — LLVM backend.
 #
 # Each tests/test_<EXPECTED>.or contains an Orion source program that
@@ -167,6 +170,13 @@ fn main() -> int:
     print_line("  {c_dim}──────────────────────────────────────────────{c_off}")
     print_line("")
 
+    is_tty = orion_console_color() == 1
+    cr = bytes_to_text([13])
+    frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    # Keep the in-process compiler's per-file "orbs N" chatter off the progress
+    # line (it prints once per compile otherwise).
+    slot_set("drv:quiet", 1)
+
     loop file_index in 0..<total_tests:
         filename = at(files, file_index)
         src_path = "tests/{filename}"
@@ -182,7 +192,7 @@ fn main() -> int:
         size_bytes = file_size(exe_path)
         total_bytes = total_bytes + size_bytes
 
-        actual = run_command(exe_path, [])
+        actual = run_command_quiet(exe_path, [])
 
         passed = ok == 1 and actual == expected
         status_txt = if passed then "{c_green}PASS{c_off}" else "{c_red}FAIL{c_off}"
@@ -192,7 +202,21 @@ fn main() -> int:
             fail_count = fail_count + 1
 
         done_n = file_index + 1
-        print_line("{c_dim}[{done_n}/{total_tests}]{c_off} {status_txt} {filename}  {c_dim}{compile_ms}ms  {size_bytes}b{c_off}")
+        row = "{c_dim}[{done_n}/{total_tests}]{c_off} {status_txt} {filename}  {c_dim}{compile_ms}ms  {size_bytes}b{c_off}"
+        # Piped (CI): the same per-test rows as before, byte for byte. On a TTY:
+        # a live progress line that rewrites itself with `\r`; failures stay as
+        # permanent rows above it, and `{esc}[K` clears any leftover characters.
+        if is_tty:
+            if not passed:
+                print_raw("{cr}{esc}[K")
+                print_line(row)
+            spin = at(frames, file_index - (file_index / 10) * 10)
+            print_raw("{cr}  {c_cyan}{spin}{c_off} {c_dim}{done_n}/{total_tests}{c_off}  {c_green}{pass_count} ok{c_off}  {c_red}{fail_count} fail{c_off}  {c_dim}{filename}{c_off}{esc}[K")
+        else:
+            print_line(row)
+
+    if is_tty:
+        print_raw("{cr}{esc}[K")
 
     print_line("--------------------------------------------------------------------")
     print_line("")

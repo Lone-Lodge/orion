@@ -38,7 +38,7 @@ echo "# Auto-generated bundle of orion-self." >> "$OUT"
 echo "# Concatenated: ir → lex → parse → ast_to_ir → emit_llvm → driver" >> "$OUT"
 echo "" >> "$OUT"
 
-for orb in orion_ir orion_lex orion_parse orion_ast_to_ir orion_emit_llvm orion_driver; do
+for orb in orion_ir orion_lex orion_parse orion_ast_to_ir orion_emit_llvm orion_emit_wasm orion_ast_to_wasm orion_driver; do
     echo "# ===== $orb =====" >> "$OUT"
     strip_uses "$ORBS/$orb/lib.or" >> "$OUT"
     echo "" >> "$OUT"

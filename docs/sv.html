@@ -333,5 +333,58 @@ f&ouml;r att l&aring;tsas. De, plus uppgifter med <code>spawn</code> och
 <a href="https://github.com/Lone-Lodge/orion">K&auml;llkod p&aring; GitHub</a>.</p>
 </footer>
 
+<script>
+/* Lägg till en Kopiera-knapp på varje kodblock. Inga beroenden, inget nät.
+ * Faller tillbaka på execCommand när clipboard-API:t saknas (file://). */
+(function () {
+    function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise(function (resolve, reject) {
+            var ta = document.createElement("textarea");
+            ta.value = text;
+            ta.setAttribute("readonly", "");
+            ta.style.position = "absolute";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            var ok = false;
+            try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+            document.body.removeChild(ta);
+            ok ? resolve() : reject();
+        });
+    }
+    document.querySelectorAll("pre").forEach(function (pre) {
+        var code = pre.querySelector("code");
+        if (!code) return;
+        var wrap = document.createElement("div");
+        wrap.className = "code-wrap";
+        pre.parentNode.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "copy-btn";
+        btn.textContent = "Kopiera";
+        btn.setAttribute("aria-label", "Kopiera koden till urklipp");
+        wrap.appendChild(btn);
+        btn.addEventListener("click", function () {
+            copyText(code.innerText).then(function () {
+                btn.textContent = "Kopierat";
+                btn.classList.add("copied");
+                setTimeout(function () {
+                    btn.textContent = "Kopiera";
+                    btn.classList.remove("copied");
+                }, 1500);
+            }, function () {
+                btn.textContent = "Tryck Ctrl+C";
+                setTimeout(function () { btn.textContent = "Kopiera"; }, 1500);
+            });
+        });
+    });
+})();
+</script>
+<script src="highlight.js"></script>
+
 </body>
 </html>

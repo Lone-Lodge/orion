@@ -7,14 +7,6 @@
 #   - Typed: every value has a type (i64, ptr, bool, void).
 #
 # Pipeline: lex → parse → AST → IR → orion_emit_llvm → .ll → clang → .exe
-#
-# Today supports: ints, arith (+ - * / %), comparisons, and/or/not,
-# branches (if/else via br + phi), function calls, recursion,
-# typed params (int + Text), strings + interpolation + concat + cmp,
-# for-range, for-in-list, loop + break/continue, int lists with
-# at/len iteration.
-#
-# Roadmap: maps, text lists, struct types.
 
 
 # --- Typed data structures ---
@@ -79,7 +71,13 @@ pub extern fn orion_arena_reset() -> int
 pub extern fn orion_arena_used() -> int
 
 pub fn compile_error(msg: Text):
-    print_line(msg)
+    # otir_where stashes a source-line + caret frame for located errors; print
+    # it under the message and consume it so the next error starts clean.
+    if slot_has("err:frame") and slot_get("err:frame") != "":
+        print_line(msg + slot_get("err:frame"))
+        slot_set("err:frame", "")
+    else:
+        print_line(msg)
     orion_err_bump()
 
 pub fn compile_errors() -> int:
@@ -443,6 +441,10 @@ pub fn ir_field_load(struct_id: int, field_index: int, field_type: Text) -> Inst
 # Print a dynamically-computed text value (calls puts on the ptr).
 pub fn ir_print_text(value_id: int) -> Inst:
     Inst{op: "print_text", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+
+# Like print_text but with no trailing newline (calls orion_print_raw, not puts).
+pub fn ir_print_raw(value_id: int) -> Inst:
+    Inst{op: "print_raw", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # --- Memory ops (for mutable variables and loop counters) ---
