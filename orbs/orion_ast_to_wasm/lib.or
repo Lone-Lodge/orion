@@ -65,10 +65,26 @@ pub fn compile_program(decls: [Map]) -> WModule:
     loop decl in decls:
         if get(decl, "kind") == "Enum":
             mut vtag = 0
+            # An enum with any payload variant is BOXED: every value is a pointer
+            # to [tag, payload...]. An all-zero-payload enum (Color: Red, Green)
+            # is a C-like integer: the value IS the tag, so arithmetic works.
+            mut boxed = false
+            loop variant in get_list(decl, "variants"):
+                if list_count(get_list(variant, "payload")) > 0:
+                    boxed = true
             loop variant in get_list(decl, "variants"):
                 slot_set("vtag:{get(variant, \"name\")}", vtag)
                 slot_set("varity:{get(variant, \"name\")}", list_count(get_list(variant, "payload")))
+                slot_set("vboxed:{get(variant, \"name\")}", if boxed then 1 else 0)
                 vtag = vtag + 1
+    # `const NAME = <int literal>` is inlined at every read site. Only integer
+    # constants are folded here (the ones the tests use); a non-literal const
+    # would need per-site expression inlining.
+    loop decl in decls:
+        if get(decl, "kind") == "Const":
+            cval = get_map(decl, "value")
+            if get(cval, "kind") == "Int":
+                slot_set("constint:{get(decl, \"name\")}", parse_decimal(get(cval, "value")))
     # Scan once for host-call usage, then inject the imports the program needs.
     slot_set("uses:print", 0)
     slot_set("uses:io", 0)
@@ -1314,7 +1330,9 @@ fn expr_agg_depth(node: Map) -> int:
             m = max2(m, expr_agg_depth(get_map(pr, "value")))
         1 + m
     else if kind == "Field":
-        expr_agg_depth(get_map(node, "object"))
+        # a boxed zero-payload variant value (Opt.None) allocates a [tag] block;
+        # a C-like one (Color.Red) is just a constant.
+        if slot_has("vtag:{get(node, \"field\")}") and slot_get_int("vboxed:{get(node, \"field\")}") == 1 then 1 else expr_agg_depth(get_map(node, "object"))
     else if kind == "Binary":
         max2(expr_agg_depth(get_map(node, "left")), expr_agg_depth(get_map(node, "right")))
     else if kind == "Index":
@@ -1510,7 +1528,9 @@ fn block_last_is_value(block: Map) -> bool:
         sk = get(last, "kind")
         if sk == "ExprStmt":
             not expr_is_void(get_map(last, "expr"))
-        else if sk == "If" or sk == "Match":
+        else if sk == "Match":
+            not match_is_void(last)
+        else if sk == "If":
             true
         else if sk == "IfBlock":
             block_last_is_value(get_map(last, "then")) and block_last_is_value(get_map(last, "else"))
@@ -1528,8 +1548,32 @@ fn expr_is_void(node: Map) -> bool:
             true
         else:
             false
+    else if get(node, "kind") == "Match":
+        match_is_void(node)
     else:
         false
+
+# True if a match arm body leaves a value on the stack. A block-form arm that
+# ends in a statement (an assignment, a block-`if`, a loop, a `break`) yields
+# nothing; since every arm must leave one i32, the caller pushes a 0 for those.
+fn arm_produces_value(body: Map) -> bool:
+    bk = get(body, "kind")
+    if bk == "Block":
+        block_last_is_value(body)
+    else if bk == "IfBlock":
+        block_last_is_value(get_map(body, "then")) and block_last_is_value(get_map(body, "else"))
+    else:
+        not expr_is_void(body)
+
+# A match is VOID when no arm produces a value (its arms only mutate or diverge,
+# as in `if let`, `loop let`, and side-effecting arms). Such a match compiles
+# to a void if-chain and must not be dropped as if it left an i32.
+fn match_is_void(node: Map) -> bool:
+    mut any_value = false
+    loop a in get_list(node, "arms"):
+        if arm_produces_value(get_map(a, "body")):
+            any_value = true
+    not any_value
 
 fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> Map:
     statements = get_list(block, "stmts")
@@ -1556,7 +1600,7 @@ fn compile_block(fn_value: WFn, block: Map, locals: [Text]) -> Map:
             # A non-final statement that leaves a value must drop it; the final
             # statement's value is the block's value (implicit return). Expression
             # statements (unless void) and if/match used as statements produce values.
-            produces = (sk == "ExprStmt" and not expr_is_void(get_map(stmt, "expr"))) or sk == "If" or sk == "Match" or (sk == "IfBlock" and block_last_is_value(get_map(stmt, "then")) and block_last_is_value(get_map(stmt, "else")))
+            produces = (sk == "ExprStmt" and not expr_is_void(get_map(stmt, "expr"))) or sk == "If" or (sk == "Match" and not match_is_void(stmt)) or (sk == "IfBlock" and block_last_is_value(get_map(stmt, "then")) and block_last_is_value(get_map(stmt, "else")))
             if si != last_normal and produces:
                 current_fn = emit_op(current_fn, op_drop())
         si = si + 1
@@ -1908,6 +1952,9 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
             index = lookup_local(locals, name)
             if index >= 0:
                 emit_local_get(fn_value, index)
+            else if slot_has("constint:{name}"):
+                # `const NAME = <int>` inlined at the read site.
+                emit_const(fn_value, slot_get_int("constint:{name}"))
             else if slot_has("wfn:{name}"):
                 # A bare function name used as a value: its identity-table index.
                 emit_const(fn_value, slot_get_int("wfn:{name}"))
@@ -2271,7 +2318,32 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         fld = get(expr_node, "field")
                         flb = bytes_from_text(fld)
                         is_tup_fld = len(flb) >= 2 and at(flb, 0) == 95 and at(flb, 1) >= 48 and at(flb, 1) <= 57
-                        if is_tup_fld:
+                        if slot_has("vtag:{fld}"):
+                            if slot_get_int("vboxed:{fld}") == 0:
+                                # C-like enum (Color.Red): the value IS the tag.
+                                emit_const(fn_value, slot_get_int("vtag:{fld}"))
+                            else:
+                                # Boxed enum, zero-payload variant (Opt.None):
+                                # allocate a one-word [tag] block and return the
+                                # pointer, so `match` reads the tag like any
+                                # variant. Payload variants go through the Call path.
+                                vdepth = slot_get_int("wtmp:depth")
+                                vtidx = slot_get_int("wtmp:pbase") + vdepth
+                                slot_set("wtmp:depth", vdepth + 1)
+                                z1 = emit_const(fn_value, 0)
+                                z2 = emit_const(z1, 0)
+                                z3 = emit_load(z2, 0)
+                                z4 = emit_local_tee(z3, vtidx)
+                                z5 = emit_const(z4, 4)
+                                z6 = emit_op(z5, op_i32_add())
+                                z7 = emit_store(z6, 0)
+                                g1 = emit_local_get(z7, vtidx)
+                                g2 = emit_const(g1, slot_get_int("vtag:{fld}"))
+                                g3 = emit_store(g2, 0)
+                                gres = emit_local_get(g3, vtidx)
+                                slot_set("wtmp:depth", vdepth)
+                                gres
+                        else if is_tup_fld:
                             teidx = parse_decimal(fld)
                             tet = w_elem_type(get_map(expr_node, "object"))
                             tstr = if tet == "f" then 8 else 4
@@ -2350,6 +2422,9 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                         mut mf = emit_local_set(ms0, scrut_idx)
                         mut maxbind = 0
                         mut open_ifs = 0
+                        # void match (if let / loop let / side-effecting arms):
+                        # a void if-chain, no per-arm or fallthrough i32.
+                        mvoid = match_is_void(expr_node)
                         # An if-else chain, one arm per level. The pattern kind
                         # (from the parser's pat_kind) picks how the arm matches:
                         # a variant checks the tag, an int/str compares the value,
@@ -2390,7 +2465,10 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                             # base test: does the pattern shape match the scrutinee?
                             if is_variant:
                                 mf = emit_local_get(mf, scrut_idx)
-                                mf = emit_load(mf, 0)
+                                # boxed enum: the scrutinee is a pointer, load its
+                                # tag. C-like enum: the scrutinee IS the tag.
+                                if slot_get_int("vboxed:{pat}") == 1:
+                                    mf = emit_load(mf, 0)
                                 mf = emit_const(mf, slot_get_int("vtag:{pat}"))
                                 mf = emit_op(mf, op_i32_eq())
                             else if pk == "int":
@@ -2410,12 +2488,27 @@ fn compile_expr(fn_value: WFn, expr_node: Map, locals: [Text]) -> WFn:
                                 mf = compile_expr(mf, get_map(arm, "guard"), arm_locals)
                                 mf = emit_op(mf, op_i32_and())
                             mf = emit_op(mf, op_if())
-                            mf = emit_bytes(mf, [ty_i32()])
+                            mf = emit_bytes(mf, [if mvoid then blocktype_void() else ty_i32()])
+                            # arm k's body sits inside (open_ifs + 1) of the match's
+                            # own if-frames; bump the break/continue branch depth so
+                            # a `break`/`continue` still targets the enclosing loop.
+                            mbrk_save = slot_get_int("wbrk")
+                            mcont_save = slot_get_int("wcont")
+                            slot_set("wbrk", mbrk_save + open_ifs + 1)
+                            slot_set("wcont", mcont_save + open_ifs + 1)
                             mf = compile_expr(mf, get_map(arm, "body"), arm_locals)
+                            slot_set("wbrk", mbrk_save)
+                            slot_set("wcont", mcont_save)
+                            # in a value match, a void arm body (assignment,
+                            # block-if, loop) leaves nothing; push a 0 to keep the
+                            # arm's i32 result balanced. A void match wants nothing.
+                            if (not mvoid) and (not arm_produces_value(get_map(arm, "body"))):
+                                mf = emit_const(mf, 0)
                             mf = emit_op(mf, op_else())
                             open_ifs = open_ifs + 1
-                        # no arm matched: fall through to 0 (as before).
-                        mf = emit_const(mf, 0)
+                        # no arm matched: a value match falls through to 0.
+                        if not mvoid:
+                            mf = emit_const(mf, 0)
                         loop _c in 0..<open_ifs:
                             mf = emit_op(mf, op_end())
                         slot_set("wtmp:depth", mdepth)
