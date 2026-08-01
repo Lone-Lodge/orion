@@ -58,6 +58,7 @@ Every gate the repo owns, and what each one is for:
 | `tools/combo_test.sh` | 66 pairs of features used together |
 | `tools/demos_smoke.sh` | the 21 demo programs still run |
 | `tools/docs_check.sh` | every code sample in the Field Guide compiles |
+| `tools/wasm_conformance.sh` | the wasm backend does not regress (OK count holds, no unexpected wrong answers; known gaps allowlisted) |
 | `tools/lsp_test.sh` | the editor server answers the way an editor asks |
 | `tools/region_shrink_test.sh` | the arena gives memory back and does not thrash |
 | `tools/compile_bench.sh` | how fast the compiler runs |
@@ -91,6 +92,14 @@ order, one-shot algebraic effects (`perform`/`resume`), the full control flow,
 and an in-browser IO sandbox. All 12 Field Guide samples run in the browser. The
 async scheduler (`spawn`/`await` with parked tasks) needs real stack switching
 and stays native.
+
+It is a secondary backend, not a mirror of the native one: `tools/wasm_conformance.sh`
+runs the whole smoke suite through wasm and currently gets the right answer on
+131 of them, with the rest either using an unsupported feature or being a
+must-fail runtime test that aborts. CI gates it against regression, not against
+100%. One known gap: a "bytes" value is a `[int]` list natively but a packed
+buffer in wasm, so code that builds bytes from computed ints (e.g. the `encoding`
+orb) is native-verified and awaits a `bytes_from_ints` primitive for wasm.
 
 ## Layout
 

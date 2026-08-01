@@ -22,7 +22,9 @@ Notable changes to Orion. The format follows
   every smoke test through the wasm backend, runs it in node, and compares the
   answer to the native expectation, reporting OK / MISMATCH / UNSUPPORTED /
   TRAP / HANG. It turned "the 12 Field Guide samples run" into a measured
-  124-of-151, and drove the backend past that: correct match dispatch
+  131-of-160, now wired into CI as a regression gate (the OK count must hold and
+  there must be no unexpected wrong answer; known gaps are allowlisted). It drove
+  the backend past the old number: correct match dispatch
   (int/text/binding/guard patterns) and text equality, the C-like vs boxed enum
   distinction, void `if let` / `loop let`, `break` inside a match, `const`
   inlining, environment-capturing closures, higher-order calls via
