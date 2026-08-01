@@ -1258,6 +1258,18 @@ fn current_block(fn_value: IRFn) -> Text:
             if inst.op == "label":
                 found = inst.name
                 done = 1
+            else:
+                # A `closure_call` is one IR instruction but expands at emit time
+                # into clam/cpln/cmrg{id} blocks with NO `label` instruction to
+                # record them (see emit_llvm). Code after it therefore lives in
+                # `cmrg{id}`, and `id` is the instruction's index (emit numbers
+                # instructions by position). Without this, a phi built from a
+                # branch whose tail is a closure_call named the branch's ENTRY
+                # label as the predecessor, and the value did not dominate it —
+                # exactly the `if a and o.method(x) then ...` crash.
+                if inst.op == "closure_call":
+                    found = "cmrg{from_end}"
+                    done = 1
     found
 
 
@@ -3295,14 +3307,43 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 cons_node = {"kind": "StructCons", "name": enum_name, "fields": cons_fields}
                 result = ast_struct_cons_to_ir(fn_value, scope, cons_node)
         else:
-            mut new_args_list = [receiver]
-            n_m_args = len(m_args)
-            loop ami in 0..<n_m_args:
-                new_args_list = push(new_args_list, at(m_args, ami))
-            line = if has(node, "line") then get_int(node, "line") else 0
-            col = if has(node, "col") then get_int(node, "col") else 0
-            call_node = {"kind": "Call", "callee": method, "args": new_args_list, "line": line, "col": col}
-            result = ast_call_to_ir(fn_value, scope, call_node)
+            # Dictionary / trait call: `o.method(args)` where `method` is a
+            # fn-TYPED field of the receiver struct calls THAT field's value,
+            # not a global `method(o, args)`. This is what makes a struct-of-
+            # functions (a trait dictionary you pass explicitly) callable like
+            # methods. Only for an Ident receiver, so the field type is read
+            # from scope without re-evaluating a side-effecting expression;
+            # anything else falls through to the UFCS desugar below unchanged.
+            mut did_field_call = false
+            if get(receiver, "kind") == "Ident":
+                rcv_id = scope_lookup(scope, get(receiver, "name"))
+                if rcv_id >= 0:
+                    rcv_ty = get_value_type(fn_value, rcv_id)
+                    if concrete_ptr_kind(rcv_ty) == "struct":
+                        fparts = parse_data_spec(scope_lookup_data_spec(scope, strip_struct_prefix(rcv_ty)))
+                        fidx = find_field_index(fparts, method)
+                        if fidx >= 0 and field_type_at(fparts, fidx) == "fn":
+                            pr_fld = ir_fn_push(fn_value, ir_field_load(rcv_id, fidx, "fn"))
+                            mut cf_fn = pr_fld.function
+                            mut cf_scope = scope
+                            mut cf_args = []
+                            loop cfi in 0..<len(m_args):
+                                a_r = ast_expr_to_ir(cf_fn, cf_scope, at(m_args, cfi))
+                                cf_fn = a_r.function
+                                cf_scope = a_r.scope
+                                cf_args = push(cf_args, a_r.id)
+                            pr_cc = ir_fn_push(cf_fn, ir_closure_call(pr_fld.id, cf_args, "i64"))
+                            result = ConvResult{function: pr_cc.function, scope: cf_scope, id: pr_cc.id}
+                            did_field_call = true
+            if not did_field_call:
+                mut new_args_list = [receiver]
+                n_m_args = len(m_args)
+                loop ami in 0..<n_m_args:
+                    new_args_list = push(new_args_list, at(m_args, ami))
+                line = if has(node, "line") then get_int(node, "line") else 0
+                col = if has(node, "col") then get_int(node, "col") else 0
+                call_node = {"kind": "Call", "callee": method, "args": new_args_list, "line": line, "col": col}
+                result = ast_call_to_ir(fn_value, scope, call_node)
     # Catch SILENT dispatch failures: only fire if NONE of the kind checks
     # matched (handled dispatchers legitimately return id=-1 for void blocks).
     if is_question:

@@ -7,6 +7,13 @@ Notable changes to Orion. The format follows
 ## [Unreleased]
 
 ### Added
+- **Traits as explicit dictionaries.** A struct whose fields are functions is a
+  dictionary of operations, and `o.method(args)` now calls the fn-typed field
+  `method` on the struct value `o` (instead of desugaring to a UFCS global
+  `method(o, args)`). So a comparator, a printer, an `Ord` — any bundle of
+  behavior — is a plain struct value you build and pass by hand, with no
+  implicit resolution: you can always see which dictionary is passed. Builds on
+  typed function values.
 - A **WebAssembly backend**: `orion prog.or prog.wasm orbs` compiles to a
   self-contained `.wasm` module. The host (JS) supplies capabilities via
   `extern fn` imports; Orion owns its memory (a bump allocator in linear
@@ -77,6 +84,14 @@ Notable changes to Orion. The format follows
   intermediates or yielding more than once per step are both fine. Collecting
   loops nest (each owns its accumulator). The `where` filter clause is
   **removed**; `if ...: yield` replaces it.
+
+### Fixed
+- A **closure call inside a short-circuit `and`/`or`** (or any branch tail)
+  generated invalid LLVM ("instruction does not dominate all uses"). A
+  `closure_call` is one IR instruction that expands into several LLVM blocks at
+  emit time, and the phi-predecessor tracking named the branch's entry block
+  instead of the closure's merge block. `if valid(x) and o.check(y)` and similar
+  now compile. Pre-existing; surfaced by trait-dictionary method calls.
 
 ## [0.1.0] - 2026-07-28
 

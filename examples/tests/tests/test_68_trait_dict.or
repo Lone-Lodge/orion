@@ -1,0 +1,28 @@
+# Traits as explicit dictionaries: a `trait` is a struct of functions, an
+# instance is a struct value you pass by hand, and `o.method(args)` calls the
+# fn-typed field (not a UFCS global). No implicit resolution: you can see which
+# dictionary is passed. Here two Ord instances drive one `minimum`.
+type Ord: lt: fn(int, int) -> int, eq: fn(int, int) -> int
+
+fn int_lt(a: int, b: int) -> int:
+    if a < b then 1 else 0
+fn int_eq(a: int, b: int) -> int:
+    if a == b then 1 else 0
+fn desc_lt(a: int, b: int) -> int:
+    if a > b then 1 else 0
+
+fn minimum(o: Ord, xs: [int]) -> int:
+    mut best = at(xs, 0)
+    loop i in 1..<len(xs):
+        if o.lt(at(xs, i), best) == 1:
+            best = at(xs, i)
+    best
+
+fn main() -> int:
+    asc = Ord{lt: int_lt, eq: int_eq}
+    desc = Ord{lt: desc_lt, eq: int_eq}
+    xs = [30, 10, 50, 20]
+    ok_min = if minimum(asc, xs) == 10 then 1 else 0
+    ok_max = if minimum(desc, xs) == 50 then 1 else 0     # min by desc-lt = the largest
+    ok_eq = if asc.eq(7, 7) == 1 and asc.eq(7, 8) == 0 then 1 else 0
+    ok_min * 23 + ok_max * 23 + ok_eq * 22                # 68
