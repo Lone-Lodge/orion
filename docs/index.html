@@ -132,7 +132,8 @@ true arm wins. It is what you use instead of <code>else if</code>.
     loop i in 1..=3:                          <span class="c"># 1 2 3</span>
         sum += i
     doubled = loop x in [1, 2, 3]: x * 2      <span class="c"># [2, 4, 6]</span>
-    big = loop x in [1, 2, 3] where x &gt; 1: x  <span class="c"># [2, 3]</span>
+    big = loop x in [1, 2, 3]:                <span class="c"># [2, 3]</span>
+        if x &gt; 1: yield x
     loop:
         break
     sum + len(doubled) + len(big)
@@ -140,9 +141,11 @@ true arm wins. It is what you use instead of <code>else if</code>.
 
 <p><code>loop</code> is the only iteration keyword. In statement position it
 loops; in expression position it collects each body value into a list, which
-is where map and filter come from &mdash; <code>where</code> is the filter.
-<code>0..&lt;5</code> excludes the end, <code>1..=3</code> includes it, and a
-bare <code>loop:</code> runs until <code>break</code>.</p>
+is where map and filter come from. A one-liner yields its trailing expression;
+an indented body yields explicitly with <code>yield</code>, and filters with an
+<code>if</code> that only yields sometimes. <code>0..&lt;5</code> excludes the
+end, <code>1..=3</code> includes it, and a bare <code>loop:</code> runs until
+<code>break</code>.</p>
 
 <h2 id="lists">6. Lists and maps</h2>
 

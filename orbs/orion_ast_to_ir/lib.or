@@ -812,7 +812,14 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         if already_done == 0 and is_defer:
             # Just stash the expression; we'll emit it at block end / before return.
             defer_exprs = push(defer_exprs, get(stmt, "expr"))
-        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt or is_require_stmt or is_ensure_stmt or stmt_kind == "If"
+        # A `Yield` that survives to here never sat inside a collecting loop
+        # (those get rewritten to a push in the parser). Say so, don't let it
+        # fall through to the generic "unhandled statement kind" message.
+        if already_done == 0 and stmt_kind == "Yield":
+            yl_line = if has(stmt, "line") then get_int(stmt, "line") else 0
+            yl_col = if has(stmt, "col") then get_int(stmt, "col") else 0
+            compile_error("orion: ERROR at {otir_where(yl_line, yl_col)} — `yield` outside a collecting loop; it only works inside `x = loop v in seq:` with an indented body")
+        handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt or is_require_stmt or is_ensure_stmt or stmt_kind == "If" or stmt_kind == "Yield"
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
@@ -1077,7 +1084,9 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             # Say what happened instead of "unknown identifier `for`".
             if name == "for":
                 compile_error("orion: ERROR at {otir_where(line, col)} — `for` was retired; the loop keyword is `loop` (`loop x in xs:`, `loop:`, `loop parallel x in xs:`)")
-            if name != "for":
+            if name == "where":
+                compile_error("orion: ERROR at {otir_where(line, col)} — `where` was retired; filter with an `if` that yields (`loop x in xs:` then `if cond: yield x`)")
+            if name != "for" and name != "where":
                 compile_error("orion: ERROR at {otir_where(line, col)} — unknown identifier `{name}` (interpolation may need a temp var)")
             pr = ir_fn_push(fn_value, ir_iconst(0))
             result = ConvResult{function: pr.function, scope: scope, id: pr.id}

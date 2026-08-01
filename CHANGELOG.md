@@ -55,6 +55,13 @@ Notable changes to Orion. The format follows
   `resume`) is the supported core and runs everywhere; multi-shot (`ask` /
   `resume_with`) is marked **experimental** - it is the machinery async needs
   and currently rides on Windows fibers.
+- A collecting `loop` now takes an **indented body that yields explicitly**:
+  `loop x in xs:` then `yield expr`. Filtering is an `if` that only yields
+  sometimes (`if x > 2: yield x`), computing intermediates and yielding more
+  than once per step are both fine, and collecting loops nest (each owns its
+  accumulator). The one-liner `loop x in xs: expr` is unchanged - its trailing
+  expression is yielded, the same "last value is the value" rule as every other
+  block. The `where` filter clause is **removed**; `if ...: yield` replaces it.
 
 ## [0.1.0] - 2026-07-28
 
