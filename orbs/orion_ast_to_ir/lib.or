@@ -2277,6 +2277,18 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     # the safe ceiling for the guard pattern.
             arg_ids = push(arg_ids, arg_r.id)
         if is_local_callee:
+            # If the callee is a `fn(...)`-typed param of THIS fn (matched by
+            # name + generation stamp), its declared arity is known — so a call
+            # with the wrong argument count is a compile error, not a silently
+            # ignored extra arg. Params without a spelled-out fn signature (a
+            # bare closure local) have no stamp and stay unchecked.
+            fnp_gen_key = "otir:fnparam_gen:" + callee
+            if slot_has(fnp_gen_key) and slot_get_int(fnp_gen_key) == slot_int_or_zero("otir:tvgen"):
+                want_arity = slot_get_int("otir:fnparam_arity:" + callee)
+                if len(arg_ids) != want_arity:
+                    hoc_line = if has(node, "line") then get_int(node, "line") else 0
+                    hoc_col = if has(node, "col") then get_int(node, "col") else 0
+                    compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} — `{callee}` expects {want_arity} argument(s) but got {len(arg_ids)}")
             # The local holds a closure value ([fn_ptr, flag, caps...]); call
             # through it. Return type defaults to i64 — proper type tracking on
             # closure values is future work.
@@ -3865,6 +3877,14 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         pr = ir_fn_push(fn_value, ir_param(index, param_type))
         fn_value = pr.function
         scope = scope_bind(scope, param_name, pr.id)
+        # A `f: fn(A, B) -> R` param carries a real signature the checker can
+        # hold on to. The IR type erases to "fn", so record the arity here,
+        # stamped with this fn's generation (see tv_gen above) so a same-named
+        # param in another fn never matches. The call site (`f(args)`, the
+        # is_local_callee path) reads it to reject a wrong argument count.
+        if has(param, "type") and get(param_type_node, "kind") == "FnType":
+            slot_set("otir:fnparam_arity:" + param_name, len(get_list(param_type_node, "params")))
+            slot_set("otir:fnparam_gen:" + param_name, tv_gen)
     body = get(ast_fn, "body")
     # A block-form fn with zero statements means the body was empty in source
     # (a forgotten body) OR a mis-parse swallowed it (e.g. a keyword used as a

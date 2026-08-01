@@ -45,6 +45,12 @@ Notable changes to Orion. The format follows
   fails if the committed page is stale.
 
 ### Changed
+- A `fn(A, B) -> R` **parameter now carries its arity**, and a call through it
+  with the wrong number of arguments is a compile error instead of silently
+  ignoring the extras (or reading past the given ones). The signature was
+  already parsed; the checker now holds onto the arity (stamped per fn so a
+  same-named param elsewhere never matches) and enforces it at the call site.
+  First step toward typed function values (param/return types come next).
 - `result` and `option` are **native generic sum types**, not struct
   conventions: `Result<T>: Ok(T) | Err(Text)` and `Option<T>: Some(T) | None`.
   They work across an orb boundary, carry any payload type (`Result<Text>`),
