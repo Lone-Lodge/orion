@@ -39,6 +39,7 @@
 <li><a href="#log"><code>log</code></a></li>
 <li><a href="#ori_display"><code>ori_display</code></a></li>
 <li><a href="#ori_geometry"><code>ori_geometry</code></a></li>
+<li><a href="#encoding"><code>encoding</code></a></li>
 <li><a href="#rand"><code>rand</code></a></li>
 </ol>
 </nav>
@@ -117,6 +118,9 @@
 <div class="fn"><code class="sig">values(m: Map) -&gt; [int]</code><p>The values of an int-valued map, in key order.</p></div>
 <h2 id="json"><code>json</code></h2>
 <p class="orb-blurb">parse and build JSON.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Json = JNull | JBool(int)                 # 0 = false, anything else = true | JInt(int) | JFloat(float) | JStr(Text) | JArr([Json]) | JObj([Text], [Json])       # parallel keys and values</code></div>
+<h3 class="sub">Functions</h3>
 <div class="fn"><code class="sig">json_parse(src: Text) -&gt; Map</code></div>
 <div class="fn"><code class="sig">json_obj(o: Map, key: Text) -&gt; Map</code></div>
 <div class="fn"><code class="sig">json_text(o: Map, key: Text) -&gt; Text</code></div>
@@ -124,6 +128,14 @@
 <div class="fn"><code class="sig">json_list(o: Map, key: Text) -&gt; [Map]</code></div>
 <div class="fn"><code class="sig">json_has(o: Map, key: Text) -&gt; bool</code></div>
 <div class="fn"><code class="sig">json_escape(s: Text) -&gt; Text</code><p>Escape a Text for embedding in JSON output.</p></div>
+<div class="fn"><code class="sig">jnull() -&gt; Json</code></div>
+<div class="fn"><code class="sig">jbool(b: int) -&gt; Json</code></div>
+<div class="fn"><code class="sig">jint(n: int) -&gt; Json</code></div>
+<div class="fn"><code class="sig">jfloat(x: float) -&gt; Json</code></div>
+<div class="fn"><code class="sig">jstr(s: Text) -&gt; Json</code></div>
+<div class="fn"><code class="sig">jarr(items: [Json]) -&gt; Json</code></div>
+<div class="fn"><code class="sig">jobj(keys: [Text], vals: [Json]) -&gt; Json</code></div>
+<div class="fn"><code class="sig">json_stringify(j: Json) -&gt; Text</code><p>Serialize a Json value to compact JSON text.</p></div>
 <h2 id="net"><code>net</code></h2>
 <p class="orb-blurb">minimal blocking TCP, client and server.</p>
 <div class="fn"><code class="sig">connect(host: Text, port: int) -&gt; int = net_connect(host, port)</code><p>--- client ---</p></div>
@@ -257,6 +269,12 @@
 <div class="fn"><code class="sig">Rect: x: int, y: int, width: int, height: int</code></div>
 <h3 class="sub">Functions</h3>
 <div class="fn"><code class="sig">rect_contains(rect: Rect, point: Point) -&gt; bool</code></div>
+<h2 id="encoding"><code>encoding</code></h2>
+<p class="orb-blurb">hex and base64, both directions.</p>
+<div class="fn"><code class="sig">hex_encode(data: [int]) -&gt; Text</code><p>bytes -&gt; lowercase hex text.</p></div>
+<div class="fn"><code class="sig">hex_decode(s: Text) -&gt; [int]</code><p>hex text -&gt; bytes.</p></div>
+<div class="fn"><code class="sig">base64_encode(data: [int]) -&gt; Text</code><p>bytes -&gt; base64 text (standard alphabet, '=' padded).</p></div>
+<div class="fn"><code class="sig">base64_decode(s: Text) -&gt; [int]</code><p>base64 text -&gt; bytes.</p></div>
 <h2 id="rand"><code>rand</code></h2>
 <p class="orb-blurb">a small pseudo-random generator.</p>
 <div class="fn"><code class="sig">srand(seed: int) -&gt; int</code><p>Fix the sequence.</p></div>

@@ -304,3 +304,69 @@ pub fn json_escape(s: Text) -> Text:
                             else:
                                 out = push(out, c)
     bytes_to_text(out)
+
+# --- writing JSON ---
+#
+# `json_parse` reads INTO a dynamic Map. To WRITE JSON, build a typed `Json`
+# value with the `j*` constructors and hand it to `json_stringify`. The two
+# sides are deliberately separate: reading is dynamic, writing is a typed tree
+# that serializes without guessing any value's type.
+
+type Json:
+    JNull
+    JBool(int)                 # 0 = false, anything else = true
+    JInt(int)
+    JFloat(float)
+    JStr(Text)
+    JArr([Json])
+    JObj([Text], [Json])       # parallel keys and values
+
+pub fn jnull() -> Json:
+    Json.JNull
+pub fn jbool(b: int) -> Json:
+    Json.JBool(b)
+pub fn jint(n: int) -> Json:
+    Json.JInt(n)
+pub fn jfloat(x: float) -> Json:
+    Json.JFloat(x)
+pub fn jstr(s: Text) -> Json:
+    Json.JStr(s)
+pub fn jarr(items: [Json]) -> Json:
+    Json.JArr(items)
+pub fn jobj(keys: [Text], vals: [Json]) -> Json:
+    Json.JObj(keys, vals)
+
+# Serialize a Json value to compact JSON text.
+pub fn json_stringify(j: Json) -> Text:
+    match j:
+        JNull -> "null"
+        JBool(b) -> if b == 0 then "false" else "true"
+        JInt(n) -> "{n}"
+        JFloat(x) -> "{x}"
+        JStr(s) -> jsn_quote(s)
+        JArr(items) -> jsn_arr_text(items)
+        JObj(keys, vals) -> jsn_obj_text(keys, vals)
+
+# A JSON string literal: escaped and wrapped in double quotes.
+fn jsn_quote(s: Text) -> Text:
+    q = bytes_to_text([34])
+    "{q}{json_escape(s)}{q}"
+
+fn jsn_arr_text(items: [Json]) -> Text:
+    mut out = "["
+    loop i in 0..<len(items):
+        if i > 0:
+            out = "{out},"
+        out = "{out}{json_stringify(at(items, i))}"
+    "{out}]"
+
+fn jsn_obj_text(keys: [Text], vals: [Json]) -> Text:
+    lb = bytes_to_text([123])          # { and } are interpolation delimiters,
+    rb = bytes_to_text([125])          # so the braces come in as bytes.
+    mut out = lb
+    n = len(keys)
+    loop i in 0..<n:
+        if i > 0:
+            out = "{out},"
+        out = "{out}{jsn_quote(at(keys, i))}:{json_stringify(at(vals, i))}"
+    "{out}{rb}"

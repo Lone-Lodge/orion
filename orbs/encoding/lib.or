@@ -1,0 +1,92 @@
+# encoding — hex and base64, both directions.
+#
+#   hex_encode([255, 16])     ->  "ff10"
+#   hex_decode("ff10")        ->  [255, 16]
+#   base64_encode(bytes)      ->  "..."
+#   base64_decode("...")      ->  bytes
+#
+# A "bytes" value in Orion is just a `[int]` of byte values (0..255): that is
+# what `bytes_from_text` returns and what `bytes_to_text` consumes, so these
+# functions take and return plain int lists. Build one with a list literal or
+# `bytes_from_text`, read it back with `bytes_to_text`.
+
+# The nibble value of a hex digit byte, or -1 if it is not one.
+fn hex_val(c: int) -> int:
+    if c >= 48 and c <= 57 then c - 48                    # '0'..'9'
+    else if c >= 97 and c <= 102 then c - 97 + 10         # 'a'..'f'
+    else if c >= 65 and c <= 70 then c - 65 + 10          # 'A'..'F'
+    else 0 - 1
+
+# bytes -> lowercase hex text.
+pub fn hex_encode(data: [int]) -> Text:
+    hex = bytes_from_text("0123456789abcdef")
+    mut out = []
+    loop i in 0..<len(data):
+        b = at(data, i)
+        out = push(out, at(hex, (b >> 4) & 15))
+        out = push(out, at(hex, b & 15))
+    bytes_to_text(out)
+
+# hex text -> bytes. Non-hex characters are skipped; a trailing half-byte is
+# dropped.
+pub fn hex_decode(s: Text) -> [int]:
+    b = bytes_from_text(s)
+    n = bytes_length(b)
+    mut out = []
+    mut hi = 0 - 1
+    loop i in 0..<n:
+        v = hex_val(byte_at(b, i))
+        if v >= 0:
+            if hi < 0:
+                hi = v
+            else:
+                out = push(out, (hi << 4) | v)
+                hi = 0 - 1
+    out
+
+# The base64 value of a byte, or -1 for padding / anything else (so newlines
+# and '=' are skipped on decode).
+fn b64_val(c: int) -> int:
+    if c >= 65 and c <= 90 then c - 65                    # 'A'..'Z' -> 0..25
+    else if c >= 97 and c <= 122 then c - 97 + 26         # 'a'..'z' -> 26..51
+    else if c >= 48 and c <= 57 then c - 48 + 52          # '0'..'9' -> 52..61
+    else if c == 43 then 62                               # '+'
+    else if c == 47 then 63                               # '/'
+    else 0 - 1
+
+# bytes -> base64 text (standard alphabet, '=' padded).
+pub fn base64_encode(data: [int]) -> Text:
+    alpha = bytes_from_text("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+    n = len(data)
+    mut out = []
+    mut i = 0
+    loop:
+        if i >= n: break
+        has1 = i + 1 < n
+        has2 = i + 2 < n
+        b0 = at(data, i)
+        b1 = if has1 then at(data, i + 1) else 0
+        b2 = if has2 then at(data, i + 2) else 0
+        out = push(out, at(alpha, (b0 >> 2) & 63))
+        out = push(out, at(alpha, ((b0 << 4) | (b1 >> 4)) & 63))
+        out = push(out, if has1 then at(alpha, ((b1 << 2) | (b2 >> 6)) & 63) else 61)   # '='
+        out = push(out, if has2 then at(alpha, b2 & 63) else 61)
+        i = i + 3
+    bytes_to_text(out)
+
+# base64 text -> bytes. Padding, newlines and stray characters are ignored.
+pub fn base64_decode(s: Text) -> [int]:
+    b = bytes_from_text(s)
+    n = bytes_length(b)
+    mut out = []
+    mut acc = 0
+    mut bits = 0
+    loop i in 0..<n:
+        v = b64_val(byte_at(b, i))
+        if v >= 0:
+            acc = (acc << 6) | v
+            bits = bits + 6
+            if bits >= 8:
+                bits = bits - 8
+                out = push(out, (acc >> bits) & 255)
+    out
