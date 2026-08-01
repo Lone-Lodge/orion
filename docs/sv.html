@@ -144,10 +144,10 @@ blockformen.</p>
 </code></pre>
 
 <p><code>loop</code> &auml;r det enda iterationsordet. I satsposition loopar
-det; i uttrycksposition samlar det varje kroppsv&auml;rde i en lista, och
-d&auml;rifr&aring;n kommer map och filter. En enradare ger sitt sista uttryck;
-en indenterad kropp ger v&auml;rden explicit med <code>yield</code>, och filtrerar
-med ett <code>if</code> som bara ibland g&ouml;r <code>yield</code>.
+det; i uttrycksposition samlar det i en lista, och d&auml;rifr&aring;n kommer
+map och filter. En regel g&auml;ller b&aring;de enradare och block: kroppens
+sista uttryck samlas, och <code>yield</code> samlar fler v&auml;rden inuti
+kroppen, s&aring; <code>if villkor: yield x</code> &auml;r filtret.
 <code>0..&lt;5</code> utesluter slutet, <code>1..=3</code> inkluderar det, och
 ett naket <code>loop:</code> g&aring;r tills <code>break</code>.</p>
 

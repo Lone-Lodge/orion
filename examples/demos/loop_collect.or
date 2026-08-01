@@ -1,10 +1,10 @@
 # `loop` as an EXPRESSION — one construct for map and filter.
 #
-# In expression position `loop x in xs: body` collects each body value into a
-# list. The one-liner yields its trailing expression; an indented body yields
-# explicitly with `yield`, and filters with an `if` that only yields sometimes.
-# In statement position the same `loop x in xs:` is a plain side-effect loop.
-# Same keyword; position decides.
+# In expression position `loop x in xs: body` collects into a list. One rule
+# spans one-liner and block: the body's trailing expression is collected, and
+# `yield` collects additional values inside the body (so `if c: yield x` is the
+# filter). In statement position the same `loop x in xs:` is a plain side-effect
+# loop. Same keyword; position decides.
 #
 #   ys = loop x in xs: x * 2            # map    -> [2, 4, 6, 8]
 #   ys = loop x in xs:                  # filter -> [3, 4]

@@ -502,20 +502,25 @@ fn psr_parse_for_collect(tokens: [Map], position: int) -> Map:
     cursor = get_int(fc_iter_r, "next")
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
         cursor = cursor + 1
-    # A newline right after `:` means an indented body whose `yield`s already
-    # desugar to `__yield` pushes; parse it as a block. Otherwise the rest of
-    # the line is a single yielded expression (a leading `yield` is optional).
-    # Each collecting loop owns a distinct accumulator, keyed by the `loop`
-    # token's position, so a collecting loop nested in another's body does not
-    # clobber the outer one (both would otherwise be `__yield`).
+    # A newline right after `:` means an indented body; parse it as a block.
+    # Otherwise the rest of the line is a single yielded expression (a leading
+    # `yield` is optional). One rule spans both: the body's TAIL expression is
+    # yielded (like every block, its last value is its value), and each `yield`
+    # inside the body collects an ADDITIONAL value. So a one-liner yields its
+    # expression, a block ending in a bare expression yields that, and
+    # `if cond: yield x` filters. Each collecting loop owns a distinct
+    # accumulator, keyed by the `loop` token's position, so a collecting loop
+    # nested in another's body does not clobber the outer one.
     fc_acc = "__yield_{position}"
     fc_is_block = psr_peek_kind(tokens, cursor) == "newline"
     mut fc_body_block = {"kind": "Block", "stmts": []}
     if fc_is_block:
         fc_body_col = psr_peek_col(tokens, psr_skip_newlines(tokens, cursor))
         fc_body_r = psr_parse_body_at(tokens, cursor, fc_body_col)
-        # Turn each `yield e` inside the body into `acc = push(acc, e)`.
-        fc_body_block = psr_rewrite_yields(get_map(fc_body_r, "node"), fc_acc)
+        # Rewrite explicit `yield e` to `acc = push(acc, e)`, then make the
+        # block's tail expression (if any) yield too.
+        fc_rewritten = psr_rewrite_yields(get_map(fc_body_r, "node"), fc_acc)
+        fc_body_block = psr_yield_tail(fc_rewritten, fc_acc)
         cursor = get_int(fc_body_r, "next")
     if not fc_is_block:
         if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "yield":
@@ -560,6 +565,22 @@ fn psr_rewrite_yields(node: Map, target: Text) -> Map:
             ry_new = push(ry_new, set(ry_a, "body", psr_rewrite_yields(get_map(ry_a, "body"), target)))
         return set(node, "arms", ry_new)
     node
+
+# If a collecting loop's block ends in a bare expression, that tail value is
+# yielded — the same "last value is the value" rule the one-liner already uses.
+# A block ending in a statement (an `if`, an explicit `yield`, an assignment)
+# has no tail expression, so nothing extra is collected there.
+fn psr_yield_tail(block: Map, target: Text) -> Map:
+    yt_stmts = get_list(block, "stmts")
+    yt_n = len(yt_stmts)
+    if yt_n == 0:
+        return block
+    yt_last = at(yt_stmts, yt_n - 1)
+    if get(yt_last, "kind") != "ExprStmt":
+        return block
+    yt_push = {"kind": "Call", "callee": "push", "args": [{"kind": "Ident", "name": target}, get_map(yt_last, "expr")]}
+    yt_assign = {"kind": "LetOrAssign", "name": target, "value": yt_push}
+    set(block, "stmts", set(yt_stmts, yt_n - 1, yt_assign))
 
 # `loop parallel VAR in RANGE:` / `loop parallel VAR in LIST:` — run each
 # iteration on a worker thread. Desugars to closure-per-iteration on top of
