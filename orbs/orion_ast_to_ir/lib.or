@@ -2283,12 +2283,23 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             # ignored extra arg. Params without a spelled-out fn signature (a
             # bare closure local) have no stamp and stay unchecked.
             fnp_gen_key = "otir:fnparam_gen:" + callee
+            mut hoc_ret = "i64"
             if slot_has(fnp_gen_key) and slot_get_int(fnp_gen_key) == slot_int_or_zero("otir:tvgen"):
                 want_arity = slot_get_int("otir:fnparam_arity:" + callee)
                 hoc_line = if has(node, "line") then get_int(node, "line") else 0
                 hoc_col = if has(node, "col") then get_int(node, "col") else 0
                 if len(arg_ids) != want_arity:
                     compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} — `{callee}` expects {want_arity} argument(s) but got {len(arg_ids)}")
+                # Propagate the declared return type, normalized to its STORAGE
+                # CLASS so the closure call's ABI always matches how the value is
+                # actually returned. There are exactly three classes: a pointer
+                # (text/list/map/struct) rides in the same integer register as an
+                # i64 but must carry its real type for downstream `.field`/len;
+                # an f64 comes back in a float register (double); everything else
+                # (int/bool/sized ints/type vars) is an i64. Forwarding the raw
+                # type unnormalized was the bug that made `bool` become `i1` and
+                # corrupt the call, so we map to the class, never the spelling.
+                hoc_ret = otir_ret_storage(slot_get("otir:fnparam_ret:" + callee))
                 # Argument-shape check, same conservative rule as direct calls
                 # (see the is_not_local branch above): a reliably-shaped arg of
                 # one concrete pointer kind passed where a DIFFERENT concrete kind
@@ -2304,9 +2315,9 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                         if hac_decl != "" and hac_arg != "" and hac_decl != hac_arg and (not is_unreliable_ptr(current_fn, hac_aid)):
                             compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} — argument {hac_i + 1} to `{callee}` is a `{friendly_type(get_value_type(current_fn, hac_aid))}` but the parameter is declared `{friendly_type(slot_get(hac_key))}`")
             # The local holds a closure value ([fn_ptr, flag, caps...]); call
-            # through it. Return type defaults to i64 — proper type tracking on
-            # closure values is future work.
-            pr = ir_fn_push(current_fn, ir_closure_call(bound_id, arg_ids, "i64"))
+            # through it, with the declared pointer return type when known (see
+            # hoc_ret above), else i64.
+            pr = ir_fn_push(current_fn, ir_closure_call(bound_id, arg_ids, hoc_ret))
             result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
         else:
             erased_ret_type = scope_lookup_fn_ret_loc(scope, callee_g, node)
@@ -3611,6 +3622,27 @@ fn concrete_ptr_kind(t: Text) -> Text:
                 is_struct = true
         if is_struct then "struct" else ""
 
+# The return type to hand a closure_call so its ABI matches how the value is
+# actually returned, normalized to one of three storage classes. Mirrors the
+# emitter's `llvm_type_of` (which lives in another orb and cannot be called from
+# here): `f64` returns in a float register, pointer types (text/list/map/dyn/
+# struct/fn) in an integer register carrying a real pointer, and everything else
+# (int, bool, sized ints, erased type vars) is a plain i64. Forwarding the raw
+# declared type unnormalized was the bug that turned `bool` into `i1`; a pointer
+# type is kept as-is so the result still knows it is a text/list for `.field`
+# and `len`, while non-pointer scalars all collapse to `i64`.
+fn otir_ret_storage(t: Text) -> Text:
+    if t == "f64":
+        "f64"
+    else:
+        bs = bytes_from_text(t)
+        mut is_struct = false
+        if len(bs) >= 7:
+            if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
+                is_struct = true
+        is_ptr = t == "text" or t == "list" or t == "map" or t == "dyn" or t == "ptr" or t == "fn" or is_struct or is_list_type(t) or is_map_type(t)
+        if is_ptr then t else "i64"
+
 # True when a value's static type is UNRELIABLE because it came from a dynamic,
 # untyped getter: slot_get returns "text" for what is really an untyped pointer
 # (the whole slot store is dynamically typed), and map get/get_or read a dynamic
@@ -3905,6 +3937,8 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
             fpt_list = get_list(param_type_node, "params")
             loop fpt_i in 0..<len(fpt_list):
                 slot_set("otir:fnparam_pt:" + param_name + ":{fpt_i}", ast_type_to_ir_with_scope(at(fpt_list, fpt_i), initial_scope))
+            # Declared return type, for the call-site return-type propagation.
+            slot_set("otir:fnparam_ret:" + param_name, ast_type_to_ir_with_scope(get_map(param_type_node, "ret"), initial_scope))
     body = get(ast_fn, "body")
     # A block-form fn with zero statements means the body was empty in source
     # (a forgotten body) OR a mis-parse swallowed it (e.g. a keyword used as a

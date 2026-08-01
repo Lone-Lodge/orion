@@ -52,8 +52,11 @@ Notable changes to Orion. The format follows
   a direct call (a concrete pointer kind passed where a different one is
   declared fails; i64/generic wildcards are skipped so erased values never
   false-positive). The checker records the signature in `ast_fn_to_ir`, stamped
-  per fn so a same-named param elsewhere never matches. Return-type propagation
-  through the call is the remaining step toward fully typed function values.
+  per fn so a same-named param elsewhere never matches. The declared **return
+  type is propagated** through the call too, normalized to its storage class
+  (pointer / f64 / i64), so `f(x)` on a `fn(int) -> Text` or `fn(int) -> [int]`
+  or `fn(int) -> f64` yields that type instead of collapsing to i64 — function
+  values are now typed end to end.
 - `result` and `option` are **native generic sum types**, not struct
   conventions: `Result<T>: Ok(T) | Err(Text)` and `Option<T>: Some(T) | None`.
   They work across an orb boundary, carry any payload type (`Result<Text>`),
