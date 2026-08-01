@@ -2285,10 +2285,24 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             fnp_gen_key = "otir:fnparam_gen:" + callee
             if slot_has(fnp_gen_key) and slot_get_int(fnp_gen_key) == slot_int_or_zero("otir:tvgen"):
                 want_arity = slot_get_int("otir:fnparam_arity:" + callee)
+                hoc_line = if has(node, "line") then get_int(node, "line") else 0
+                hoc_col = if has(node, "col") then get_int(node, "col") else 0
                 if len(arg_ids) != want_arity:
-                    hoc_line = if has(node, "line") then get_int(node, "line") else 0
-                    hoc_col = if has(node, "col") then get_int(node, "col") else 0
                     compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} — `{callee}` expects {want_arity} argument(s) but got {len(arg_ids)}")
+                # Argument-shape check, same conservative rule as direct calls
+                # (see the is_not_local branch above): a reliably-shaped arg of
+                # one concrete pointer kind passed where a DIFFERENT concrete kind
+                # is declared is a real error. i64/fn/generic wildcards and
+                # unreliable-typed args are skipped, so erased values never
+                # false-positive.
+                loop hac_i in 0..<len(arg_ids):
+                    hac_key = "otir:fnparam_pt:" + callee + ":{hac_i}"
+                    if slot_has(hac_key):
+                        hac_decl = concrete_ptr_kind(slot_get(hac_key))
+                        hac_aid = at(arg_ids, hac_i)
+                        hac_arg = concrete_ptr_kind(get_value_type(current_fn, hac_aid))
+                        if hac_decl != "" and hac_arg != "" and hac_decl != hac_arg and (not is_unreliable_ptr(current_fn, hac_aid)):
+                            compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} — argument {hac_i + 1} to `{callee}` is a `{friendly_type(get_value_type(current_fn, hac_aid))}` but the parameter is declared `{friendly_type(slot_get(hac_key))}`")
             # The local holds a closure value ([fn_ptr, flag, caps...]); call
             # through it. Return type defaults to i64 — proper type tracking on
             # closure values is future work.
@@ -3885,6 +3899,12 @@ pub fn ast_fn_to_ir(ast_fn: Map, initial_scope: Scope) -> IRFn:
         if has(param, "type") and get(param_type_node, "kind") == "FnType":
             slot_set("otir:fnparam_arity:" + param_name, len(get_list(param_type_node, "params")))
             slot_set("otir:fnparam_gen:" + param_name, tv_gen)
+            # Each declared parameter type, for the call-site argument-shape
+            # check (below). Stored as the erased IR type; the check only reads
+            # its concrete pointer kind, so a type var stays a wildcard.
+            fpt_list = get_list(param_type_node, "params")
+            loop fpt_i in 0..<len(fpt_list):
+                slot_set("otir:fnparam_pt:" + param_name + ":{fpt_i}", ast_type_to_ir_with_scope(at(fpt_list, fpt_i), initial_scope))
     body = get(ast_fn, "body")
     # A block-form fn with zero statements means the body was empty in source
     # (a forgotten body) OR a mis-parse swallowed it (e.g. a keyword used as a
