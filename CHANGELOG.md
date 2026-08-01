@@ -29,8 +29,8 @@ Notable changes to Orion. The format follows
   `call_indirect`, maps read/write/`has`, `contains`/`index_of`/`slice`, the
   `bytes_*` family, struct spread, and a signed-LEB encoder fix. What stays
   native: the async scheduler and real threads (no browser stack-switch or
-  thread model), 64-bit integer literals (the backend is i32), and the
-  compiler's own `slot_*` state.
+  thread model) and the compiler's own `slot_*` state. (i64 values are
+  supported in wasm; addressing is i32.)
 - The **Field Guide playground** (`tools/playground.js`, `docs/playground.js`):
   a "Try Orion" editor plus a Run button on every sample, compiling to wasm and
   running in place. All 12 Field Guide samples run in the browser; a construct

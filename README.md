@@ -30,9 +30,10 @@ bash tools/bootstrap.sh
 
 That goes from a bare checkout to a working toolchain: the checked-in seed IR
 builds a first compiler, that compiler rebuilds itself to a fixpoint, `orbit`
-is built, and the smoke suite runs. Verified on Linux and Windows by CI on
-every push. The macOS paths are written but have never been run anywhere, so
-treat them as untested rather than supported.
+is built, and the smoke suite runs. Verified on Linux, Windows and macOS by CI
+on every push; macOS is the one leg that exercises the arm64/Mach-O retarget and
+the tight main-thread stack. I do not develop on a Mac, so mac-only regressions
+are caught by CI rather than hand-verified.
 
 Then compile a program:
 
@@ -52,8 +53,8 @@ Every gate the repo owns, and what each one is for:
 | | |
 |---|---|
 | `tools/seed_check.sh` | the committed seed can still build the compiler, so a fresh clone can bootstrap |
-| `tools/test.sh` | 151 smoke tests, one feature each |
-| `tools/negative_test.sh` | 23 programs that must be *rejected*, with the right message |
+| `tools/test.sh` | 155 smoke tests, one feature each |
+| `tools/negative_test.sh` | 26 programs that must be *rejected*, with the right message |
 | `tools/combo_test.sh` | 66 pairs of features used together |
 | `tools/demos_smoke.sh` | the 21 demo programs still run |
 | `tools/docs_check.sh` | every code sample in the Field Guide compiles |
@@ -62,8 +63,8 @@ Every gate the repo owns, and what each one is for:
 | `tools/compile_bench.sh` | how fast the compiler runs |
 | `tools/runtime_bench.sh` | how fast the code it emits runs |
 
-CI runs all of them on Linux and Windows, starting from a checkout with no
-binary on disk.
+CI runs all of them on Linux, Windows and macOS, starting from a checkout with
+no binary on disk.
 
 ## WebAssembly
 
