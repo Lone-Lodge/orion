@@ -39,6 +39,7 @@
 <li><a href="#log"><code>log</code></a></li>
 <li><a href="#ori_display"><code>ori_display</code></a></li>
 <li><a href="#ori_geometry"><code>ori_geometry</code></a></li>
+<li><a href="#rand"><code>rand</code></a></li>
 </ol>
 </nav>
 <main id="ref">
@@ -72,6 +73,10 @@
 <div class="fn"><code class="sig">max_of(xs: [int]) -&gt; int</code><p>Largest / smallest element, or 0 for an empty list.</p></div>
 <div class="fn"><code class="sig">min_of(xs: [int]) -&gt; int</code></div>
 <div class="fn"><code class="sig">avg(xs: [int]) -&gt; int</code><p>Integer average (sum / count), truncated.</p></div>
+<div class="fn"><code class="sig">concat(a: [int], b: [int]) -&gt; [int]</code><p>a followed by b, as a new list.</p></div>
+<div class="fn"><code class="sig">unique(xs: [int]) -&gt; [int]</code><p>The elements of <code>xs</code> with later duplicates removed (first occurrence kept).</p></div>
+<div class="fn"><code class="sig">take(xs: [int], n: int) -&gt; [int]</code><p>The first <code>n</code> elements (all of them if n &gt;= len, none if n &lt;= 0).</p></div>
+<div class="fn"><code class="sig">drop(xs: [int], n: int) -&gt; [int]</code><p>All but the first <code>n</code> elements.</p></div>
 <h2 id="num"><code>num</code></h2>
 <p class="orb-blurb">the small integer helpers every program reaches for.</p>
 <div class="fn"><code class="sig">abs(x: int) -&gt; int</code><p>Absolute value.</p></div>
@@ -84,6 +89,13 @@
 <div class="fn"><code class="sig">ipow(base: int, exp: int) -&gt; int</code><p>Integer power (ipow): base^exp for exp &gt;= 0.</p></div>
 <div class="fn"><code class="sig">is_even(n: int) -&gt; int</code><p>1 if <code>n</code> is even, else 0.</p></div>
 <div class="fn"><code class="sig">is_odd(n: int) -&gt; int</code><p>1 if <code>n</code> is odd, else 0.</p></div>
+<div class="fn"><code class="sig">pi() -&gt; float</code><p>pi and e as functions: a bare <code>const</code> does not cross the orb boundary, so these are the exported form.</p></div>
+<div class="fn"><code class="sig">e() -&gt; float</code></div>
+<div class="fn"><code class="sig">fabs(x: float) -&gt; float</code><p>Absolute value of a float.</p></div>
+<div class="fn"><code class="sig">fmin(a: float, b: float) -&gt; float</code><p>The smaller / larger of two floats.</p></div>
+<div class="fn"><code class="sig">fmax(a: float, b: float) -&gt; float</code></div>
+<div class="fn"><code class="sig">fclamp(x: float, lo: float, hi: float) -&gt; float</code><p>Constrain a float to [lo, hi].</p></div>
+<div class="fn"><code class="sig">parse_float(t: Text) -&gt; float</code><p>Parse a float out of text: optional '-', integer part, optional '.fraction', optional 'e'/'E' exponent (with optional sign).</p></div>
 <h2 id="iter"><code>iter</code></h2>
 <p class="orb-blurb">functional list operations, powered by closures.</p>
 <div class="fn"><code class="sig">map&lt;T&gt;(xs: [T], f: fn) -&gt; [int]</code><p>Apply <code>f</code> to every element, collecting the results.</p></div>
@@ -245,6 +257,13 @@
 <div class="fn"><code class="sig">Rect: x: int, y: int, width: int, height: int</code></div>
 <h3 class="sub">Functions</h3>
 <div class="fn"><code class="sig">rect_contains(rect: Rect, point: Point) -&gt; bool</code></div>
+<h2 id="rand"><code>rand</code></h2>
+<p class="orb-blurb">a small pseudo-random generator.</p>
+<div class="fn"><code class="sig">srand(seed: int) -&gt; int</code><p>Fix the sequence.</p></div>
+<div class="fn"><code class="sig">rand() -&gt; int</code><p>Advance the generator and return a non-negative pseudo-random int.</p></div>
+<div class="fn"><code class="sig">rand_range(lo: int, hi: int) -&gt; int</code><p>A pseudo-random int in [lo, hi).</p></div>
+<div class="fn"><code class="sig">rand_float() -&gt; float</code><p>A pseudo-random float in [0.0, 1.0).</p></div>
+<div class="fn"><code class="sig">rand_chance(n: int) -&gt; bool</code><p>true with probability 1/n (rand_chance(2) is a coin flip).</p></div>
 </main>
 
 </body>

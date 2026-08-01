@@ -78,3 +78,36 @@ pub fn avg(xs: [int]) -> int:
     loop i in 0..<n:
         total = total + at(xs, i)
     if n == 0 then 0 else total / n
+
+# a followed by b, as a new list.
+pub fn concat(a: [int], b: [int]) -> [int]:
+    mut out = []
+    loop i in 0..<len(a):
+        out = push(out, at(a, i))
+    loop i in 0..<len(b):
+        out = push(out, at(b, i))
+    out
+
+# The elements of `xs` with later duplicates removed (first occurrence kept).
+pub fn unique(xs: [int]) -> [int]:
+    mut out = []
+    loop i in 0..<len(xs):
+        if includes(out, at(xs, i)) == 0:
+            out = push(out, at(xs, i))
+    out
+
+# The first `n` elements (all of them if n >= len, none if n <= 0).
+pub fn take(xs: [int], n: int) -> [int]:
+    mut out = []
+    loop i in 0..<len(xs):
+        if i < n:
+            out = push(out, at(xs, i))
+    out
+
+# All but the first `n` elements.
+pub fn drop(xs: [int], n: int) -> [int]:
+    mut out = []
+    loop i in 0..<len(xs):
+        if i >= n:
+            out = push(out, at(xs, i))
+    out

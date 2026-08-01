@@ -1,0 +1,45 @@
+# rand — a small pseudo-random generator. NOT cryptographic.
+#
+#   rand()             ->  a non-negative int
+#   rand_range(1, 7)   ->  1..6 (hi exclusive)
+#   rand_float()       ->  0.0 .. 1.0
+#   srand(seed)        ->  fix the sequence
+#
+# Deterministic by default: with no `srand` the stream is fixed, so tests stay
+# reproducible. For a run that varies, seed once at startup, e.g.
+# `srand(monotonic_ms())`. State lives in a global slot (C's srand/rand model),
+# so there is nothing to thread through your code.
+#
+# The generator is a 64-bit LCG (Knuth MMIX constants); the multiply wraps in
+# i64. Good enough for games, sampling and shuffles; do not use it for secrets.
+
+RAND_A = 6364136223846793005       # LCG multiplier
+RAND_C = 1442695040888963407       # LCG increment (both wrap in i64)
+RAND_DEFAULT = 88172645463325252   # fixed nonzero default seed
+
+# Current state, or the default if unseeded.
+fn rand_state() -> int:
+    if slot_has("rand:state") then slot_get_int("rand:state") else RAND_DEFAULT
+
+# Fix the sequence. Any int works (0 included — the increment keeps it moving).
+pub fn srand(seed: int) -> int:
+    slot_set("rand:state", seed)
+    seed
+
+# Advance the generator and return a non-negative pseudo-random int.
+pub fn rand() -> int:
+    next = rand_state() * RAND_A + RAND_C
+    slot_set("rand:state", next)
+    next & 0x7FFFFFFFFFFFFFFF
+
+# A pseudo-random int in [lo, hi). Returns lo when the range is empty.
+pub fn rand_range(lo: int, hi: int) -> int:
+    if hi <= lo then lo else lo + (rand() % (hi - lo))
+
+# A pseudo-random float in [0.0, 1.0).
+pub fn rand_float() -> float:
+    (rand() % 1000000000) as float / 1000000000.0
+
+# true with probability 1/n (rand_chance(2) is a coin flip). n <= 1 is always true.
+pub fn rand_chance(n: int) -> bool:
+    if n <= 1 then true else rand_range(0, n) == 0

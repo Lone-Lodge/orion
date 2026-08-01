@@ -5,6 +5,11 @@
 #   max(4, 9)          ->  9
 #   clamp(12, 0, 10)   ->  10
 #   sign(-5)           ->  -1
+#
+# Floats: the language already gives you f64 arithmetic and the math builtins
+# `sqrt sin cos tan exp log log2 floor ceil round atan2 pow` directly (no import
+# needed). This orb adds what those leave out: `pi()`, `e()`, the `f*` min/max/abs
+# helpers, and `parse_float` (the int-only `parse` above cannot read a decimal).
 
 # Absolute value.
 pub fn abs(x: int) -> int:
@@ -77,3 +82,77 @@ pub fn is_even(n: int) -> int:
 # 1 if `n` is odd, else 0.
 pub fn is_odd(n: int) -> int:
     if n % 2 == 0 then 0 else 1
+
+# --- floats ---
+
+# pi and e as functions: a bare `const` does not cross the orb boundary, so
+# these are the exported form. Call them: `pi()`, `e()`.
+pub fn pi() -> float:
+    3.141592653589793
+
+pub fn e() -> float:
+    2.718281828459045
+
+# Absolute value of a float.
+pub fn fabs(x: float) -> float:
+    if x < 0.0 then 0.0 - x else x
+
+# The smaller / larger of two floats.
+pub fn fmin(a: float, b: float) -> float:
+    if a < b then a else b
+
+pub fn fmax(a: float, b: float) -> float:
+    if a > b then a else b
+
+# Constrain a float to [lo, hi].
+pub fn fclamp(x: float, lo: float, hi: float) -> float:
+    if x < lo then lo else (if x > hi then hi else x)
+
+# Parse a float out of text: optional '-', integer part, optional '.fraction',
+# optional 'e'/'E' exponent (with optional sign). Non-numeric tails stop the
+# scan. parse_float("") is 0.0.
+#   parse_float("3.14")    ->  3.14
+#   parse_float("-2.5e3")  ->  -2500.0
+pub fn parse_float(t: Text) -> float:
+    b = bytes_from_text(t)
+    n = bytes_length(b)
+    mut i = 0
+    mut neg = false
+    if n > 0 and byte_at(b, 0) == 45:
+        neg = true
+        i = 1
+    mut val = 0.0
+    loop:
+        if i >= n: break
+        d = byte_at(b, i)
+        if d < 48 or d > 57: break
+        val = val * 10.0 + ((d - 48) as float)
+        i = i + 1
+    if i < n and byte_at(b, i) == 46:              # '.'
+        i = i + 1
+        mut scale = 0.1
+        loop:
+            if i >= n: break
+            d = byte_at(b, i)
+            if d < 48 or d > 57: break
+            val = val + ((d - 48) as float) * scale
+            scale = scale * 0.1
+            i = i + 1
+    if i < n and (byte_at(b, i) == 101 or byte_at(b, i) == 69):   # 'e' / 'E'
+        i = i + 1
+        mut eneg = false
+        if i < n and byte_at(b, i) == 45:
+            eneg = true
+            i = i + 1
+        if i < n and byte_at(b, i) == 43:          # '+'
+            i = i + 1
+        mut exp = 0
+        loop:
+            if i >= n: break
+            d = byte_at(b, i)
+            if d < 48 or d > 57: break
+            exp = exp * 10 + (d - 48)
+            i = i + 1
+        factor = pow(10.0, exp as float)
+        val = if eneg then val / factor else val * factor
+    if neg then 0.0 - val else val
