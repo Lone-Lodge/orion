@@ -28,8 +28,7 @@ const feats = {};
 for (const f of files) {
   const exp = expectedOf(f);
   if (exp === null) continue;
-  let src = fs.readFileSync(path.join(TESTS, f), 'utf8');
-  src = src.replace(/^[ \t]*use[ \t]+(text|iter|bytes)[ \t]*\r?$/gm, '');
+  const src = fs.readFileSync(path.join(TESTS, f), 'utf8');
   const sf = path.join(TMP, f), wf = sf.replace(/\.or$/, '.wasm');
   try { fs.unlinkSync(wf); } catch {}
   fs.writeFileSync(sf, src);
@@ -74,13 +73,11 @@ if (cats.UNSUPPORTED.length && filter) {
 // must be no MISMATCH (wrong answer) or FAIL (compile/link crash). Expected
 // runtime aborts (divide-by-zero, out-of-range, require) land in TRAP and are
 // tolerated. Bump BASELINE_OK when real coverage rises.
-const BASELINE_OK = 131;
+const BASELINE_OK = 141;
 // Tests that are correct natively but rely on an idiom the wasm backend does
 // not share, each with a tracked reason. They must NOT silently count as
 // regressions, but they are listed loudly so the set cannot grow unnoticed.
-const KNOWN_GAPS = {
-  'test_63_encoding.or': 'bytes built as a [int] list; wasm bytes are a packed buffer. Needs a bytes_from_ints primitive.',
-};
+const KNOWN_GAPS = {};
 if (!filter) {
   const isGap = (line) => Object.keys(KNOWN_GAPS).some((f) => line.startsWith(f));
   const unexpected = [...cats.MISMATCH, ...cats.FAIL].filter((x) => !isGap(x));

@@ -95,11 +95,12 @@ and stays native.
 
 It is a secondary backend, not a mirror of the native one: `tools/wasm_conformance.sh`
 runs the whole smoke suite through wasm and currently gets the right answer on
-131 of them, with the rest either using an unsupported feature or being a
+141 of them, with the rest either using an unsupported feature or being a
 must-fail runtime test that aborts. CI gates it against regression, not against
-100%. One known gap: a "bytes" value is a `[int]` list natively but a packed
-buffer in wasm, so code that builds bytes from computed ints (e.g. the `encoding`
-orb) is native-verified and awaits a `bytes_from_ints` primitive for wasm.
+100%. A "bytes" value is a `[int]` list in both backends: wasm keeps text packed
+and converts at `bytes_from_text` / `bytes_to_text`, so code that BUILDS bytes
+from computed ints (the `encoding` orb, `text`'s case mapping) means the same
+thing in the browser as it does natively.
 
 ## Layout
 
