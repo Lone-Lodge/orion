@@ -80,6 +80,18 @@ jobs:
           bash tools/build_lsp.sh
           bash tools/lsp_test.sh
 
+      # Every `example` line in every orb compiles and runs as a claim.
+      - name: stdlib examples run true
+        run: bash tools/example_check.sh
+
+      # get / lock / transitive / update, against local git repos (no network).
+      - name: package system
+        run: bash tools/package_test.sh
+
+      # call trail on trap, breakpoint() reporting, opt-in instrumentation.
+      - name: debugger
+        run: bash tools/debug_test.sh
+
       # A documented feature that no longer exists fails exactly like a stale
       # seed: it reads fine and nobody runs it. Every sample in the Field Guide
       # is a whole program, and this compiles all of them.
