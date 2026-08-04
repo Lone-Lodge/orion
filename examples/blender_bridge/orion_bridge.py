@@ -35,7 +35,7 @@ except ImportError:
     bpy = None
 
 bl_info = {
-    "name": "Orion Bridge",
+    "name": "Claude Bridge",
     "author": "Lone Lodge",
     "version": (1, 2),
     "blender": (4, 2, 0),
@@ -84,34 +84,75 @@ def record(code, reply):
 
 def chat_worker(prompt, entry):
     exe = shutil.which("claude")
+    meta = ""
+    tokens = 0
     if exe is None:
         ok, text = 0, "hittar inte claude-CLI:t pa PATH"
     else:
         try:
             # --continue keeps one ongoing Blender conversation; the first
             # message ever has nothing to continue, so retry without it.
-            run = subprocess.run([exe, "-c", "-p", prompt], cwd=CHAT_DIR,
+            # json output carries the reply plus usage (tokens, duration).
+            brief = ("Du ar assistenten INNE i Blender. Blender kor redan med "
+                     "Claude Bridge-addonet aktivt. Kor bpy-kod direkt via Bash: "
+                     'build\\blender_bridge_cli.exe "<python>" - utfor uppgifter '
+                     "sjalv istallet for att instruera anvandaren. Svara kort, "
+                     "pa svenska, utan markdown.")
+            flags = ["-p", "--output-format", "json",
+                     "--append-system-prompt", brief, prompt]
+            run = subprocess.run([exe, "-c"] + flags, cwd=CHAT_DIR,
                                  capture_output=True, text=True, encoding="utf-8",
                                  errors="replace", timeout=600,
                                  creationflags=CREATE_NO_WINDOW)
             if run.returncode != 0:
-                run = subprocess.run([exe, "-p", prompt], cwd=CHAT_DIR,
+                run = subprocess.run([exe] + flags, cwd=CHAT_DIR,
                                      capture_output=True, text=True, encoding="utf-8",
                                      errors="replace", timeout=600,
                                      creationflags=CREATE_NO_WINDOW)
             ok = 1 if run.returncode == 0 else 0
             text = (run.stdout if ok else (run.stderr or run.stdout)).strip()
+            if ok:
+                try:
+                    parsed = json.loads(text)
+                    text = (parsed.get("result") or "").strip()
+                    usage = parsed.get("usage") or {}
+                    tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+                    seconds = round(parsed.get("duration_ms", 0) / 1000)
+                    meta = f"{seconds}s  ·  {tokens} tokens"
+                except ValueError:
+                    pass  # not json after all - show the raw text
         except (OSError, subprocess.TimeoutExpired) as failure:
             ok, text = 0, str(failure)
 
     def apply():
         entry["ok"] = ok
         entry["output"] = text
+        entry["meta"] = meta
+        entry["tokens"] = tokens
+        entry["pending"] = False
         entry["when"] = time.strftime("%H:%M:%S")
         redraw()
         return None
 
     bpy.app.timers.register(apply)
+
+
+def chat_is_busy():
+    return any(entry.get("pending") for entry in history)
+
+
+# Repeats every half second while a reply is pending, so the wait is visibly
+# alive (cycling dots + elapsed seconds) instead of a frozen row.
+def tick_pending():
+    pending = [entry for entry in history if entry.get("pending")]
+    if not pending:
+        return None
+    for entry in pending:
+        seconds = int(time.monotonic() - entry["started"])
+        dots = "." * (1 + seconds % 3)
+        entry["output"] = f"Claude tanker{dots} ({seconds}s)"
+    redraw()
+    return 0.5
 
 
 class ORION_OT_chat_send(bpy.types.Operator if bpy else object):
@@ -121,15 +162,17 @@ class ORION_OT_chat_send(bpy.types.Operator if bpy else object):
 
     def execute(self, context):
         prompt = context.window_manager.orion_prompt.strip()
-        if not prompt:
+        if not prompt or chat_is_busy():
             return {"CANCELLED"}
         context.window_manager.orion_prompt = ""
         entry = {"when": time.strftime("%H:%M:%S"), "ok": 1, "kind": "chat",
-                 "code": prompt, "output": "... vantar pa Claude"}
+                 "code": prompt, "output": "Claude tanker.",
+                 "pending": True, "started": time.monotonic()}
         history.append(entry)
         del history[:-HISTORY_MAX]
         redraw()
         threading.Thread(target=chat_worker, args=(prompt, entry), daemon=True).start()
+        bpy.app.timers.register(tick_pending)
         return {"FINISHED"}
 
 
@@ -197,18 +240,29 @@ def wrap_chars(context):
     return max(24, int((width - 48) / 7))
 
 
+# Replies arrive as markdown - strip the tokens Blender cannot render.
+def plain(text):
+    return text.replace("**", "").replace("`", "")
+
+
 class ORION_PT_bridge(bpy.types.Panel if bpy else object):
-    bl_label = "Orion Bridge"
+    bl_label = "Claude"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Orion"
+    bl_category = "Claude"
 
     def draw(self, context):
-        running = _server is not None
-        status = self.layout.row(align=True)
-        status.active = False
-        status.label(text=f"{HOST}:{PORT}",
-                     icon="LINKED" if running else "UNLINKED")
+        layout = self.layout
+        if _server is None:
+            warning = layout.row()
+            warning.alert = True
+            warning.label(text="Servern lyssnar inte", icon="UNLINKED")
+        sent = [entry for entry in history if entry.get("kind") == "chat"]
+        if sent:
+            used = sum(entry.get("tokens", 0) for entry in sent)
+            info = layout.row()
+            info.active = False
+            info.label(text=f"{len(sent)} meddelanden  ·  {used} tokens denna session")
 
 
 class ORION_PT_chat(bpy.types.Panel if bpy else object):
@@ -216,24 +270,43 @@ class ORION_PT_chat(bpy.types.Panel if bpy else object):
     bl_parent_id = "ORION_PT_bridge"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Orion"
+    bl_category = "Claude"
 
     def draw(self, context):
         layout = self.layout
         chars = wrap_chars(context)
-        exchanges = [entry for entry in history if entry.get("kind") == "chat"][-8:]
+        exchanges = [entry for entry in history if entry.get("kind") == "chat"][-6:]
+        if not exchanges:
+            hint = layout.column()
+            hint.active = False
+            hint.label(text="Skriv nedan sa bygger Claude i scenen.")
         for entry in exchanges:
-            block = layout.column(align=True)
-            prompt_col = block.column(align=True)
-            prompt_col.active = False  # your words dimmed, the reply carries the weight
-            for index, line in enumerate(wrapped(entry["code"], chars)):
-                prompt_col.label(text=line, icon="USER" if index == 0 else "BLANK1")
-            reply_col = block.column(align=True)
-            reply_col.alert = not entry["ok"]
-            for index, line in enumerate(wrapped(entry["output"], chars)[:30]):
-                reply_col.label(text=line, icon="SOLO_ON" if index == 0 else "BLANK1")
-            layout.separator()
+            user_box = layout.box()
+            user_col = user_box.column(align=True)
+            user_col.active = False  # your words dimmed, the reply carries the weight
+            user_col.label(text=f"Du  ·  {entry['when']}", icon="USER")
+            for line in wrapped(entry["code"], chars):
+                user_col.label(text=line)
+            reply_box = layout.box()
+            reply_col = reply_box.column(align=True)
+            if entry.get("pending"):
+                waiting = reply_col.row()
+                waiting.active = False
+                waiting.label(text=entry["output"], icon="SORTTIME")
+                continue
+            head = reply_col.row()
+            head.active = False
+            head.label(text="Claude", icon="SOLO_ON")
+            body = reply_col.column(align=True)
+            body.alert = not entry["ok"]
+            for line in wrapped(plain(entry["output"]), chars)[:40]:
+                body.label(text=line)
+            if entry.get("meta"):
+                foot = reply_col.row()
+                foot.active = False
+                foot.label(text=entry["meta"])
         send = layout.row(align=True)
+        send.enabled = not chat_is_busy()
         send.prop(context.window_manager, "orion_prompt", text="",
                   placeholder="Fraga Claude...")
         send.operator("orion.chat_send", text="", icon="PLAY")
@@ -244,7 +317,7 @@ class ORION_PT_quick(bpy.types.Panel if bpy else object):
     bl_parent_id = "ORION_PT_bridge"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Orion"
+    bl_category = "Claude"
 
     def draw(self, context):
         quick = self.layout.grid_flow(columns=2, align=True)
@@ -259,7 +332,7 @@ class ORION_PT_log(bpy.types.Panel if bpy else object):
     bl_parent_id = "ORION_PT_bridge"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Orion"
+    bl_category = "Claude"
     bl_options = {"DEFAULT_CLOSED"}
 
     def draw(self, context):
