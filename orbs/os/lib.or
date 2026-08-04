@@ -77,6 +77,60 @@ external define capture(cmd: text) -> text
 # no example: runs a child process — proven by tools/lsp_test.sh
 public define capture_stdout(cmd: text, args: [text]) -> text = capture(os_join(os_quote(cmd), args, 0))
 
+# ---- commands that run WHILE your tasks keep going ----
+# run_command waits for the child before returning, which inside a task parks
+# the whole scheduler: a "parallel" build runner would gain nothing. These
+# start the child and return a job id at once; a task then waits with
+# `finished_within`, which parks the TASK — the children run truly in
+# parallel (they are OS processes), the scheduler only coordinates the waits.
+#
+#     job = start_command_to_file("clang", ["-c", "a.c"], "build/a.log")
+#     if not finished_within(job, 60000):
+#         stop_command(job)
+#     code = command_result(job)
+#
+# Same bargain as the net orb's readable_within, one level up the stack.
+external define proc_start(cmd: text) -> int
+external define proc_start_to_file(cmd: text, path: text) -> int
+external define proc_wait_ready(id: int, ms: int) -> int
+external define proc_result(id: int) -> int
+external define proc_stop(id: int) -> int
+
+# Start a command without waiting. Returns a job id, or -1 if it could not
+# start. The child's output goes to your console, interleaved with everyone
+# else's — use start_command_to_file when more than one runs at a time.
+# no example: runs a child process — proven by test_42_proc_parallel.or
+public define start_command(cmd: text, args: [text]) -> int = proc_start(os_join(os_quote(win_path(cmd)), args, 0))
+
+# Same, but the child's stdout+stderr are written to `out_path` (truncated).
+# Read the file after `finished_within` says true.
+# no example: runs a child process — proven by test_42_proc_parallel.or
+public define start_command_to_file(cmd: text, args: [text], out_path: text) -> int = proc_start_to_file(os_join(os_quote(win_path(cmd)), args, 0), out_path)
+
+# Did job `id` finish within `ms`? Inside a task this parks the task and lets
+# the others run; outside it is an ordinary wait. false = still running.
+# no example: runs a child process — proven by test_42_proc_parallel.or
+public define finished_within(id: int, ms: int) -> truth = proc_wait_ready(id, ms) is 1
+
+# Exit code of a finished job, taken ONCE (the job id is dead afterwards).
+# -1 while the job still runs or for an unknown id.
+# no example: runs a child process — proven by test_42_proc_parallel.or
+public define command_result(id: int) -> int = proc_result(id)
+
+# Kill a running job. Its command_result becomes the kill status the OS
+# reports, not the program's own exit code.
+# no example: runs a child process — proven by test_42_proc_parallel.or
+public define stop_command(id: int) -> truth = proc_stop(id) is 1
+
+# (`orion_`-prefixed externs are assumed runtime-internal and skip the
+# emitter's auto-declare, so this one is named like host_os above.)
+external define host_cpus() -> int
+
+# Hardware threads on this machine — what to size a worker pool by.
+public define cpu_count() -> int:
+    example cpu_count() >= 1
+    host_cpus()
+
 # String helpers live in ONE place: the `text` orb (split/join/trim/replace/
 # starts_with/ends_with) plus the `contains` builtin. The str_* copies that
 # used to sit here were bootstrap history from before orbs could share code.

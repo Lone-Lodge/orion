@@ -5,20 +5,24 @@ use orion_ast_to_ir
 use orion_emit_llvm
 use os
 use text
+use async
 use orion_driver
 
 # 1 when stdout is a TTY: show a live progress bar. 0 when piped (CI): plain rows.
 external define orion_console_color() -> int
 
-# Orion test runner — LLVM backend.
+# Orion test runner — LLVM backend, parallel.
 #
 # Each tests/test_<EXPECTED>.or contains an Orion source program that
-# should compile and run with exit code EXPECTED. The runner:
-#   1. compiles every test via LLVM IR → clang → native .exe
-#   2. runs the .exe
-#   3. checks exit == expected
-#   4. measures compile time + binary size
-#   5. prints summary table + totals
+# should compile and run with exit code EXPECTED. Two phases:
+#   1. EMIT (serial, in-process): lex/parse/emit every test to LLVM IR.
+#      The compiler's recursion needs the main stack — it does not fit a
+#      task's 256 KB fiber, which is why this phase stays out of tasks.
+#   2. LINK+RUN (parallel): a pool of worker tasks, one per hardware
+#      thread. clang and the test exe are CHILD PROCESSES started with
+#      start_command_to_file; `finished_within` parks the task, so the
+#      children run OS-parallel while one scheduler coordinates. A test
+#      that hangs is stopped at its deadline instead of hanging the suite.
 
 
 define parse_expected(filename: text) -> int:
@@ -39,105 +43,36 @@ define parse_expected(filename: text) -> int:
     value
 
 
-# Compile one source file. Returns 1 if ok, 0 if compilation failed.
-# rt_obj is the runtime PRE-COMPILED once (see main) — linking that object
-# is ~10x faster than re-compiling orion_rt.c (all of Windows.h) per test.
-# clang_path / mangle / host_triple are host-specific (see main): the compiler
-# always emits a Windows triple, so off Windows we retarget the IR here.
-define compile_one(src_path: text, ll_path: text, exe_path: text, rt_obj: text, clang_path: text, mangle: text, host_triple: text) -> int:
-    raw = read_file(src_path)
-    # Resolve `use` the way the real driver does. The runner used to lex the file
-    # as-is, so a test could only touch the compiler's own orbs: `use async` or
-    # `use iter` was an "unknown function" error, and every stdlib change had to
-    # be proven by hand outside the suite. Same collector as `orion.exe`, so a
-    # test sees exactly what a normal build sees.
-    src = drv_collect(raw, ["../../orbs/", "orbs/"], src_path)
-    tokens = self_lex(src)
-    ast = self_parse(tokens)
-    # Reject empty/garbage AST. A Program with 0 decls means the input
-    # wasn't valid Orion source — clang would happily compile an empty
-    # LLVM module, the resulting exe exits 0, and any test expecting 0
-    # would falsely pass. Fail fast here.
-    decls = get_list(ast, "decls")
-    if len(decls) == 0:
-        return 0
-    # A type/lowering error makes the .ll unsound; building + running it
-    # anyway is how malformed tests used to silently pass. compile_errors()
-    # is a process-global counter, so compare the delta for THIS file.
-    errs_before = compile_errors()
-    module = ast_program_to_ir(ast)
-    edit llvm_text = emit_module(module)
-    if compile_errors() > errs_before:
-        return 0
-    # Retarget the baked-in Windows triple to the host (Linux/Mac). The
-    # compiler pins a Windows triple (the effect ABI needs it), so a non-
-    # Windows runner rewrites the two header tokens before clang. mangle "w"
-    # = Windows = leave as-is.
-    # Anchor to the header context ("datalayout = / triple = ") so we patch
-    # only the two module-header lines, never a same-looking byte sequence
-    # inside a program string constant (that would change the constant's
-    # length and desync its LLVM array-size prefix).
-    #
-    # The retargeted text goes to a SEPARATE file. ll_path is tracked in git —
-    # it is the compiler's own output, which CI diffs against a fresh build —
-    # and rewriting it in place made every one of the 151 committed .ll files
-    # differ by exactly those two header lines on any non-Windows host. The
-    # artifact must be what the compiler emitted, the same on every machine;
-    # the host-specific copy is scratch, so it is scratch on disk too.
-    write_file(ll_path, llvm_text)
-    edit link_path = ll_path
-    if mangle != "w":
-        retargeted = replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
-        host_text = replace(retargeted, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
-        link_path = "{ll_path}.host.ll"
-        write_file(link_path, host_text)
-    # Link the pre-built runtime object; -O0 skips the LLVM opt pipeline
-    # (tests only assert exit codes, so optimization buys nothing here).
-    # -Wno-override-module: silence clang's note that our retargeted triple
-    # differs from its own default (harmless; no-op on Windows).
-    args = [link_path, rt_obj, "-O2", "-Wno-override-module", "-o", exe_path]
-    exit_code = run_command(clang_path, args)
-    if exit_code == 0 then 1 else 0
+# Host-specific toolchain bits, callable from any task. The runner works on
+# Windows/Linux/Mac: clang location, the datalayout mangling + target triple
+# to retarget the compiler's Windows IR to (0=Win 1=Linux 2=Mac).
+define host_clang() -> text:
+    if os_kind() == 0 then "C:\\Program Files\\LLVM\\bin\\clang.exe" else "clang"
+
+define host_mangle() -> text:
+    if os_kind() == 0:
+        return "w"
+    if os_kind() == 2:
+        return "o"
+    "e"
+
+define host_triple_of() -> text:
+    if os_kind() == 0:
+        return ""
+    if os_kind() == 2:
+        return "arm64-apple-macosx"
+    "x86_64-unknown-linux-gnu"
 
 
-define fmt_ms(seconds: f64) -> text:
-    ms = seconds * 1000.0
-    ms_int = to_int(ms)
-    "{ms_int}ms"
-
-
-define main() -> int:
-    mkdir_all("dist")
-    # Host-specific toolchain bits. The runner works on Windows/Linux/Mac:
-    # clang location, the datalayout mangling + target triple to retarget the
-    # compiler's Windows IR to, all keyed off host_os() (0=Win 1=Linux 2=Mac).
-    # rt_c is relative to this project dir (examples/tests), so no absolute,
-    # machine-specific path is baked in.
-    os = os_kind()
-    edit clang_path = "clang"
-    edit mangle = "e"
-    edit host_triple = "x86_64-unknown-linux-gnu"
-    if os == 0:
-        clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
-        mangle = "w"
-        host_triple = ""
-    if os == 2:
-        mangle = "o"
-        host_triple = "arm64-apple-macosx"
-    rt_obj = "dist/orion_rt.o"
-    rt_c = "../../runtime/orion_rt.c"
-    # Pre-compile the runtime ONCE to an object file. Every test then just
-    # links this object instead of re-compiling orion_rt.c (all of Windows.h)
-    # from scratch — the single biggest per-test cost.
-    run_command(clang_path, ["-c", "-Os", rt_c, "-o", rt_obj])
+# Only .or files. Without this filter, non-source files like KNOWN_BUGS.md
+# get fed to the compiler, produce broken-but-not-crashing .exe's, exit=0
+# happens to match parse_expected()=0, and we get a silent false pass.
+# Workers rebuild this list themselves (same directory, same order) — a task
+# can only carry one int, and the list is cheap.
+define or_files() -> [text]:
     raw_files = list_dir("tests")
-    raw_total = len(raw_files)
-    # Only run .or files. Without this filter, non-source files like
-    # KNOWN_BUGS.md get fed to the compiler, produce broken-but-not-crashing
-    # .exe's, exit=0 happens to match parse_expected()=0, and we get a
-    # silent false pass. Filter at the source.
     edit files = []
-    loop raw_index in 0..<raw_total:
+    loop raw_index in 0..<len(raw_files):
         raw_name = at(raw_files, raw_index)
         name_bytes = bytes_from_text(raw_name)
         name_len = len(name_bytes)
@@ -150,14 +85,152 @@ define main() -> int:
                 is_or_file = true
         if is_or_file:
             files = append(files, raw_name)
+    files
+
+
+# Emit one source file to LLVM IR. Returns 1 if ok, 0 if compilation failed.
+define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) -> int:
+    raw = read_file(src_path)
+    # Resolve `use` the way the real driver does, so a test sees exactly what
+    # a normal build sees.
+    src = drv_collect(raw, ["../../orbs/", "orbs/"], src_path)
+    tokens = self_lex(src)
+    ast = self_parse(tokens)
+    # Reject empty/garbage AST — clang would happily compile an empty LLVM
+    # module, the resulting exe exits 0, and any test expecting 0 would
+    # falsely pass.
+    decls = get_list(ast, "decls")
+    if len(decls) == 0:
+        return 0
+    # A type/lowering error makes the .ll unsound. compile_errors() is a
+    # process-global counter, so compare the delta for THIS file.
+    errs_before = compile_errors()
+    module = ast_program_to_ir(ast)
+    edit llvm_text = emit_module(module)
+    if compile_errors() > errs_before:
+        return 0
+    # The compiler pins a Windows triple (the effect ABI needs it); a
+    # non-Windows runner retargets the two header tokens into a SEPARATE
+    # scratch file — ll_path is tracked in git and must stay byte-identical
+    # to what the compiler emitted on every machine.
+    write_file(ll_path, llvm_text)
+    if mangle != "w":
+        retargeted = replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
+        host_text = replace(retargeted, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
+        write_file("{ll_path}.host.ll", host_text)
+    1
+
+
+# Link one emitted test with clang and run the exe, both as child processes
+# the task can park on. Records the outcome in the shared counters and
+# prints the row. Runs INSIDE a worker task.
+define finish_one(filename: text, clang_path: text) -> int:
+    esc = bytes_to_text([27])
+    c_green = "{esc}[32m"
+    c_red = "{esc}[31m"
+    c_cyan = "{esc}[36m"
+    c_dim = "{esc}[2m"
+    c_off = "{esc}[0m"
+    cr = bytes_to_text([13])
+
+    ll_path = "dist/{filename}.ll"
+    exe_path = "dist/{filename}.exe"
+    expected = parse_expected(filename)
+    link_path = if host_mangle() == "w" then ll_path else "{ll_path}.host.ll"
+
+    link_start = now()
+    edit built = 0
+    if slot_get_int("ok:{filename}") == 1:
+        cj = start_command_to_file(clang_path, [link_path, "dist/orion_rt.o", "dist/orion_cli.o", "-O2", "-Wno-override-module", "-o", exe_path], "dist/.clang_{filename}.txt")
+        if cj >= 0 and finished_within(cj, 120000):
+            built = if command_result(cj) == 0 then 1 else 0
+        else:
+            stopped = stop_command(cj)
+            reaped = command_result(cj)
+
+    edit actual = 0 - 1
+    if built == 1:
+        rj = start_command_to_file(exe_path, [], "dist/.out_{filename}.txt")
+        if rj >= 0 and finished_within(rj, 30000):
+            actual = command_result(rj)
+        else:
+            stopped2 = stop_command(rj)
+            reaped2 = command_result(rj)
+
+    compile_ms = slot_get_int("ems:{filename}") + elapsed(link_start)
+    size_bytes = file_size(exe_path)
+    slot_set("tms", slot_get_int("tms") + compile_ms)
+    slot_set("tbytes", slot_get_int("tbytes") + size_bytes)
+
+    passed = built == 1 and actual == expected
+    status_txt = if passed then "{c_green}PASS{c_off}" else "{c_red}FAIL{c_off}"
+    if passed:
+        slot_set("pass", slot_get_int("pass") + 1)
+    else:
+        slot_set("fail", slot_get_int("fail") + 1)
+
+    done_n = slot_get_int("done") + 1
+    slot_set("done", done_n)
+    total = slot_get_int("total")
+    pass_count = slot_get_int("pass")
+    fail_count = slot_get_int("fail")
+
+    row = "{c_dim}[{done_n}/{total}]{c_off} {status_txt} {filename}  {c_dim}{compile_ms}ms  {size_bytes}b{c_off}"
+    # Piped (CI): one row per test as it finishes. On a TTY: a live progress
+    # line that rewrites itself with `\r`; failures stay as permanent rows
+    # above it. A failed test names the log its child wrote.
+    if slot_get_int("tty") == 1:
+        if not passed:
+            print("{cr}{esc}[K")
+            print_line(row)
+            log_hint = if built == 1 then "dist/.out_{filename}.txt" else "dist/.clang_{filename}.txt"
+            print_line("{c_dim}      output: {log_hint}{c_off}")
+        frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        spin = at(frames, done_n - (done_n // 10) * 10)
+        print("{cr}  {c_cyan}{spin}{c_off} {c_dim}{done_n}/{total}{c_off}  {c_green}{pass_count} ok{c_off}  {c_red}{fail_count} fail{c_off}  {c_dim}{filename}{c_off}{esc}[K")
+    else:
+        print_line(row)
+        if not passed:
+            log_hint = if built == 1 then "dist/.out_{filename}.txt" else "dist/.clang_{filename}.txt"
+            print_line("{c_dim}      output: {log_hint}{c_off}")
+    0
+
+
+# One worker task: pull the next un-linked test, finish it, repeat. Between
+# reading `next` and bumping it there is no park point, and the scheduler is
+# cooperative and single-threaded — two workers can never claim the same test.
+define worker(w: int) -> int:
+    files = or_files()
+    total = len(files)
+    clang_path = host_clang()
+    loop:
+        i = slot_get_int("next")
+        if i >= total:
+            break
+        slot_set("next", i + 1)
+        junk = finish_one(at(files, i), clang_path)
+    0
+
+
+define main() -> int:
+    wall_start = now()
+    mkdir_all("dist")
+    clang_path = host_clang()
+    mangle = host_mangle()
+    host_triple = host_triple_of()
+    rt_obj = "dist/orion_rt.o"
+    rt_c = "../../runtime/orion_rt.c"
+    # Pre-compile the runtime ONCE to object files. Every test then just
+    # links these objects instead of re-compiling orion_rt.c (all of
+    # Windows.h) from scratch — the single biggest per-test cost. orion_cli.c
+    # is what carries the `os` orb's externs (sys_run, now, fs ops), so a
+    # test that says `use os` links clean.
+    run_command(clang_path, ["-c", "-Os", rt_c, "-o", rt_obj])
+    run_command(clang_path, ["-c", "-Os", "../../runtime/orion_cli.c", "-o", "dist/orion_cli.o"])
+
+    files = or_files()
     total_tests = len(files)
 
-    edit pass_count = 0
-    edit fail_count = 0
-    edit total_compile_ms = 0
-    edit total_bytes = 0
-
-    # ANSI colors (ESC = byte 27) — green PASS, red FAIL, dim detail.
     esc = bytes_to_text([27])
     c_green = "{esc}[32m"
     c_red = "{esc}[31m"
@@ -165,6 +238,7 @@ define main() -> int:
     c_bold = "{esc}[1m"
     c_dim = "{esc}[2m"
     c_off = "{esc}[0m"
+    cr = bytes_to_text([13])
 
     print_line("")
     print_line("  {c_bold}{c_cyan}◆ Orion{c_off} {c_dim}test runner · LLVM backend · {total_tests} tests{c_off}")
@@ -172,52 +246,48 @@ define main() -> int:
     print_line("")
 
     is_tty = orion_console_color() == 1
-    cr = bytes_to_text([13])
-    frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
     # Keep the in-process compiler's per-file "orbs N" chatter off the progress
     # line (it prints once per compile otherwise).
     slot_set("drv:quiet", 1)
 
+    # Phase 1: emit every test to IR, serially, on the main stack.
     loop file_index in 0..<total_tests:
         filename = at(files, file_index)
-        src_path = "tests/{filename}"
-        ll_path = "dist/{filename}.ll"
-        exe_path = "dist/{filename}.exe"
-        expected = parse_expected(filename)
-
-        compile_start = now()
-        ok = compile_one(src_path, ll_path, exe_path, rt_obj, clang_path, mangle, host_triple)
-        compile_ms = elapsed(compile_start)
-        total_compile_ms = total_compile_ms + compile_ms
-
-        size_bytes = file_size(exe_path)
-        total_bytes = total_bytes + size_bytes
-
-        actual = run_command_quiet(exe_path, [])
-
-        passed = ok == 1 and actual == expected
-        status_txt = if passed then "{c_green}PASS{c_off}" else "{c_red}FAIL{c_off}"
-        if passed:
-            pass_count = pass_count + 1
-        else:
-            fail_count = fail_count + 1
-
-        done_n = file_index + 1
-        row = "{c_dim}[{done_n}/{total_tests}]{c_off} {status_txt} {filename}  {c_dim}{compile_ms}ms  {size_bytes}b{c_off}"
-        # Piped (CI): the same per-test rows as before, byte for byte. On a TTY:
-        # a live progress line that rewrites itself with `\r`; failures stay as
-        # permanent rows above it, and `{esc}[K` clears any leftover characters.
+        emit_start = now()
+        ok = emit_one("tests/{filename}", "dist/{filename}.ll", mangle, host_triple)
+        slot_set("ok:{filename}", ok)
+        slot_set("ems:{filename}", elapsed(emit_start))
         if is_tty:
-            if not passed:
-                print("{cr}{esc}[K")
-                print_line(row)
-            spin = at(frames, file_index - (file_index // 10) * 10)
-            print("{cr}  {c_cyan}{spin}{c_off} {c_dim}{done_n}/{total_tests}{c_off}  {c_green}{pass_count} ok{c_off}  {c_red}{fail_count} fail{c_off}  {c_dim}{filename}{c_off}{esc}[K")
-        else:
-            print_line(row)
+            shown = file_index + 1
+            print("{cr}  {c_dim}emit {shown}/{total_tests}  {filename}{c_off}{esc}[K")
+    if is_tty:
+        print("{cr}{esc}[K")
+
+    # Phase 2: link + run through a worker pool, one worker per hardware
+    # thread. The children are real OS processes; the tasks only wait.
+    slot_set("next", 0)
+    slot_set("done", 0)
+    slot_set("pass", 0)
+    slot_set("fail", 0)
+    slot_set("tms", 0)
+    slot_set("tbytes", 0)
+    slot_set("total", total_tests)
+    slot_set("tty", if is_tty then 1 else 0)
+    jobs = cpu_count()
+    edit workers = []
+    loop w in 0..<jobs:
+        workers = append(workers, spawn(worker, w))
+    loop t in 0..<len(workers):
+        junk = await(at(workers, t))
 
     if is_tty:
         print("{cr}{esc}[K")
+
+    pass_count = slot_get_int("pass")
+    fail_count = slot_get_int("fail")
+    total_compile_ms = slot_get_int("tms")
+    total_bytes = slot_get_int("tbytes")
+    wall_ms = elapsed(wall_start)
 
     print_line("--------------------------------------------------------------------")
     print_line("")
@@ -227,6 +297,6 @@ define main() -> int:
     if fail_count > 0:
         print_line("{c_red}Fail: {fail_count}{c_off}")
     avg_ms = total_compile_ms // total_tests
-    print_line("{c_dim}Total compile: {total_compile_ms}ms   avg: {avg_ms}ms/test   binaries: {total_bytes}b{c_off}")
+    print_line("{c_dim}Total compile: {total_compile_ms}ms   wall: {wall_ms}ms ({jobs} workers)   avg: {avg_ms}ms/test   binaries: {total_bytes}b{c_off}")
 
     fail_count

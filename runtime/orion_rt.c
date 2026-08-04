@@ -2408,7 +2408,9 @@ long long orion_stderr_line(const char *s) {
 #define ORION_TASK_STACK (256 * 1024)
 
 /* 0 = free, 1 = ready, 2 = running, 3 = done, 4 = sleeping until `wake_ms`,
- * 5 = parked until `wait_fd` is readable or `wake_ms` passes */
+ * 5 = parked until `wait_fd` is readable or `wake_ms` passes,
+ * 6 = parked until child process `wait_fd` (a proc-table id) exits or
+ *     `wake_ms` passes */
 typedef struct {
     void *stack_ctx;
     void *clos;
@@ -2523,6 +2525,194 @@ static void orion_sched_poll_io(long long budget) {
     }
     free(pf);
 #endif
+}
+
+/* ---- Waiting on a CHILD PROCESS without holding the scheduler --------------
+ * `sock_wait_ready` fixed waiting on sockets; this is the same bargain for
+ * `run_command`, whose WaitForSingleObject/system() parks the WHOLE process.
+ * With it, one slow compile serializes every task — a "parallel" build runner
+ * gains nothing. Here a command is STARTED without waiting, and a task parks
+ * (state 6) until the child exits or a deadline passes. Children run OS-truly
+ * in parallel; the single-threaded scheduler only coordinates the waiting.
+ *
+ * A child process has no fd select() can watch alongside the sockets, so while
+ * one is parked on, the scheduler wakes every 10 ms and asks the OS (a 0 ms
+ * WaitForSingleObject / WNOHANG waitpid). Builds run for hundreds of ms; 10 ms
+ * of wake granularity is noise, and one shared poll interval keeps Windows and
+ * POSIX behaviour identical. */
+#define ORION_MAX_PROCS 256
+
+/* 0 = free, 1 = running, 2 = exited (code not yet taken) */
+typedef struct {
+    int state;
+    long long exit_code;
+#ifdef _WIN32
+    HANDLE handle;
+#else
+    long long pid;
+#endif
+} orion_proc_slot;
+
+static orion_proc_slot orion_procs[ORION_MAX_PROCS];
+
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#endif
+
+/* Start `cmd`; stdout+stderr go to `outfile` when given (truncated), else they
+ * are inherited. Returns a job id, or -1 (table full / spawn failed). */
+static long long orion_proc_spawn(const char *cmd, const char *outfile) {
+    int id = -1;
+    for (int i = 0; i < ORION_MAX_PROCS; i++)
+        if (orion_procs[i].state == 0) { id = i; break; }
+    if (id < 0) return -1;
+#ifdef _WIN32
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    char buf[32768];   /* CreateProcessA needs a mutable command buffer */
+    size_t n = 0;
+    while (cmd[n] && n < sizeof(buf) - 1) { buf[n] = cmd[n]; n++; }
+    buf[n] = 0;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    HANDLE out = INVALID_HANDLE_VALUE;
+    if (outfile && outfile[0]) {
+        SECURITY_ATTRIBUTES sa;
+        sa.nLength = sizeof(sa);
+        sa.lpSecurityDescriptor = NULL;
+        sa.bInheritHandle = TRUE;
+        out = CreateFileA(outfile, GENERIC_WRITE, FILE_SHARE_READ, &sa,
+                          CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (out == INVALID_HANDLE_VALUE) return -1;
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        si.hStdOutput = out;
+        si.hStdError = out;
+    }
+    BOOL ok = CreateProcessA(NULL, buf, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+    if (out != INVALID_HANDLE_VALUE) CloseHandle(out);
+    if (!ok) return -1;
+    CloseHandle(pi.hThread);
+    orion_procs[id].handle = pi.hProcess;
+#else
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+    if (pid == 0) {
+        if (outfile && outfile[0]) {
+            int fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd >= 0) { dup2(fd, 1); dup2(fd, 2); close(fd); }
+        }
+        execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+        _exit(127);
+    }
+    orion_procs[id].pid = (long long)pid;
+#endif
+    orion_procs[id].exit_code = -1;
+    orion_procs[id].state = 1;
+    return id;
+}
+
+/* Has job `id` exited? Non-blocking; reaps (and remembers the exit code) the
+ * first time it sees the exit. 1 = exited, 0 = still running / no such job. */
+static int orion_proc_poll(int id) {
+    if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state == 0) return 0;
+    if (orion_procs[id].state == 2) return 1;
+#ifdef _WIN32
+    if (WaitForSingleObject(orion_procs[id].handle, 0) != WAIT_OBJECT_0) return 0;
+    DWORD code = 0;
+    GetExitCodeProcess(orion_procs[id].handle, &code);
+    CloseHandle(orion_procs[id].handle);
+    orion_procs[id].exit_code = (long long)(int)code;
+#else
+    int st = 0;
+    pid_t r = waitpid((pid_t)orion_procs[id].pid, &st, WNOHANG);
+    if (r == 0) return 0;
+    orion_procs[id].exit_code = (r < 0) ? -1 : (WIFEXITED(st) ? WEXITSTATUS(st) : -1);
+#endif
+    orion_procs[id].state = 2;
+    return 1;
+}
+
+/* How many hardware threads the host has — what a build runner sizes its
+ * worker pool by. */
+long long host_cpus(void) {
+#ifdef _WIN32
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    long long n = (long long)si.dwNumberOfProcessors;
+    return n > 0 ? n : 1;
+#else
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+    return n > 0 ? (long long)n : 1;
+#endif
+}
+
+long long proc_start(const char *cmd) { return orion_proc_spawn(cmd, NULL); }
+long long proc_start_to_file(const char *cmd, const char *path) { return orion_proc_spawn(cmd, path); }
+
+/* Exit code of a finished job, freeing its slot — taken ONCE, like a task
+ * result. -1 while it still runs (or for an unknown id). */
+long long proc_result(long long id) {
+    if (id < 0 || id >= ORION_MAX_PROCS) return -1;
+    if (!orion_proc_poll((int)id)) return -1;
+    long long code = orion_procs[id].exit_code;
+    orion_procs[id].state = 0;
+    return code;
+}
+
+/* Kill a running job. Its exit code (taken via proc_result) becomes the
+ * kill status the OS reports, not the program's own. */
+long long proc_stop(long long id) {
+    if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state != 1) return 0;
+#ifdef _WIN32
+    TerminateProcess(orion_procs[id].handle, 137);
+#else
+    kill((pid_t)orion_procs[id].pid, SIGKILL);
+#endif
+    return 1;
+}
+
+/* Soonest deadline among tasks parked on a process, or -1 when none are. */
+static long long orion_sched_proc_soonest(void) {
+    long long now = __orion_monotonic_ms();
+    long long soonest = -1;
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 6) continue;
+        long long left = orion_tasks[i].wake_ms - now;
+        if (left < 0) left = 0;
+        if (soonest < 0 || left < soonest) soonest = left;
+    }
+    return soonest;
+}
+
+/* Wake tasks whose process exited (wait_ok = 1) or whose deadline passed. */
+static void orion_sched_poll_procs(void) {
+    long long now = __orion_monotonic_ms();
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 6) continue;
+        if (orion_proc_poll((int)orion_tasks[i].wait_fd)) {
+            orion_tasks[i].wait_ok = 1;
+            orion_tasks[i].state = 1;
+        } else if (orion_tasks[i].wake_ms <= now) {
+            orion_tasks[i].wait_ok = 0;
+            orion_tasks[i].state = 1;
+        }
+    }
+}
+
+/* Outside a task there is nobody else to run: slice-poll until exit/deadline. */
+static long long orion_proc_wait_blocking(long long id, long long ms) {
+    long long deadline = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    for (;;) {
+        if (orion_proc_poll((int)id)) return 1;
+        long long left = deadline - __orion_monotonic_ms();
+        if (left <= 0) return 0;
+        __orion_sleep_ms(left < 10 ? left : 10);
+    }
 }
 
 /* Outside a task there is nobody else to run, so this is an ordinary wait —
@@ -2644,11 +2834,17 @@ static long long orion_sched_drive(int until_idx) {
         if (!ran) {
             long long wait = orion_sched_wake_due();
             long long io = orion_sched_io_soonest();
-            /* nothing runnable, no timers, nobody waiting on a socket: stop */
-            if (wait <= 0 && io < 0) break;
+            long long pr = orion_sched_proc_soonest();
+            /* nothing runnable, no timers, nothing parked on: stop */
+            if (wait <= 0 && io < 0 && pr < 0) break;
             long long budget = wait;
             if (budget <= 0 || (io >= 0 && io < budget)) budget = io;
+            if (budget <= 0 || (pr >= 0 && pr < budget)) budget = pr;
+            /* a child process has no fd to select on — while one is
+             * watched, wake every 10 ms and ask the OS about it */
+            if (pr >= 0 && budget > 10) budget = 10;
             if (io >= 0) orion_sched_poll_io(budget); else __orion_sleep_ms(budget);
+            if (pr >= 0) orion_sched_poll_procs();
         }
     }
     return switches;
@@ -2678,6 +2874,19 @@ long long sock_wait_ready(long long fd, long long ms, long long want_write) {
     orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
     orion_tasks[me].wait_ok = 0;
     orion_tasks[me].state = 5;
+    SwitchToFiber(orion_sched_fiber);
+    return orion_tasks[me].wait_ok;
+}
+
+/* Park until job `id` exits, or `ms` passes. 1 = exited, 0 = timed out. */
+long long proc_wait_ready(long long id, long long ms) {
+    if (orion_proc_poll((int)id)) return 1;
+    int me = orion_task_current;
+    if (me < 0) return orion_proc_wait_blocking(id, ms);
+    orion_tasks[me].wait_fd = id;
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].wait_ok = 0;
+    orion_tasks[me].state = 6;
     SwitchToFiber(orion_sched_fiber);
     return orion_tasks[me].wait_ok;
 }
@@ -2795,6 +3004,19 @@ long long sock_wait_ready(long long fd, long long ms, long long want_write) {
     orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
     orion_tasks[me].wait_ok = 0;
     orion_tasks[me].state = 5;
+    swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
+    return orion_tasks[me].wait_ok;
+}
+
+/* Park until job `id` exits, or `ms` passes. 1 = exited, 0 = timed out. */
+long long proc_wait_ready(long long id, long long ms) {
+    if (orion_proc_poll((int)id)) return 1;
+    int me = orion_task_current;
+    if (me < 0) return orion_proc_wait_blocking(id, ms);
+    orion_tasks[me].wait_fd = id;
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].wait_ok = 0;
+    orion_tasks[me].state = 6;
     swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
     return orion_tasks[me].wait_ok;
 }
