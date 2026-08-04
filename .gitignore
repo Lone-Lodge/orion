@@ -23,3 +23,4 @@ examples/tests/.*.txt
 examples/tests/dist/.*.txt
 examples/tests/.*.bat
 examples/tests/dist/.*.bat
+examples/tests/dist/.watch/
