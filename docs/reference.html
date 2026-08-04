@@ -27,6 +27,7 @@
 <li><a href="#iter"><code>iter</code></a></li>
 <li><a href="#dict"><code>dict</code></a></li>
 <li><a href="#json"><code>json</code></a></li>
+<li><a href="#sqlite"><code>sqlite</code></a></li>
 <li><a href="#time"><code>time</code></a></li>
 <li><a href="#http"><code>http</code></a></li>
 <li><a href="#net"><code>net</code></a></li>
@@ -165,6 +166,19 @@ example not has_key({"a": 1}, "z")</pre></div>
 <div class="fn"><code class="sig">jobj(keys: [text], vals: [Json]) -&gt; Json</code><pre class="ex">example json_stringify(jobj([], [])) is "\{\}"</pre></div>
 <div class="fn"><code class="sig">json_stringify(j: Json) -&gt; text</code><p>Serialize a Json value to compact JSON text.</p><pre class="ex">example json_stringify(jint(42)) is "42"
 example json_stringify(jarr([jint(1), jint(2)])) is "[1,2]"</pre></div>
+<h2 id="sqlite"><code>sqlite</code></h2>
+<p class="orb-blurb">a real SQL database in one file, no server.</p>
+<div class="fn"><code class="sig">db_open(path: text) -&gt; int uses files = sq_open(path)</code><p>Open (or create) the database file. A handle, or -1 - ask db_error(-1) for nothing; a failed open names its reason on the handle it tried. no example: opens a file on disk - proven by tools/sqlite_test.sh</p></div>
+<div class="fn"><code class="sig">db_close(db: int) -&gt; int uses files = sq_close(db)</code></div>
+<div class="fn"><code class="sig">db_run(db: int, sql: text) -&gt; truth uses files = sq_exec(db, sql, "") is 0</code><p>Run SQL that yields no rows (CREATE, INSERT, UPDATE, DELETE). false on error - db_error(db) says why. no example: writes to a database file - proven by tools/sqlite_test.sh</p></div>
+<div class="fn"><code class="sig">db_run_with(db: int, sql: text, params: [text]) -&gt; truth uses files = sq_exec(db, sql, join_params(params)) is 0</code><p>Same, with <code>?</code> placeholders bound from <code>params</code>, in order. The ONLY way user input should ever reach SQL. no example: writes to a database file - proven by tools/sqlite_test.sh</p></div>
+<div class="fn"><code class="sig">db_rows(db: int, sql: text) -&gt; [text] uses files</code><p>All result rows, one text per row. Split a row's cells with columns(). Empty result is []; on error it is also [] and db_error(db) says why. no example: reads a database file - proven by tools/sqlite_test.sh</p></div>
+<div class="fn"><code class="sig">db_rows_with(db: int, sql: text, params: [text]) -&gt; [text] uses files</code></div>
+<div class="fn"><code class="sig">columns(row: text) -&gt; [text]</code><p>One row's cells. NULL comes back as "".</p><pre class="ex">example len(columns("a")) is 1</pre></div>
+<div class="fn"><code class="sig">db_one(db: int, sql: text) -&gt; text uses files</code><p>The first cell of the first row - the shape of COUNT(*) and friends. "" when the query gave nothing. no example: reads a database file - proven by tools/sqlite_test.sh</p></div>
+<div class="fn"><code class="sig">db_error(db: int) -&gt; text uses files = sq_error(db)</code><p>Why the last call on this handle failed, "" when it did not. no example: database state - proven by tools/sqlite_test.sh</p></div>
+<div class="fn"><code class="sig">db_changes(db: int) -&gt; int uses files = sq_changes(db)</code><p>Rows changed by the last INSERT/UPDATE/DELETE. no example: database state - proven by tools/sqlite_test.sh</p></div>
+<div class="fn"><code class="sig">db_last_id(db: int) -&gt; int uses files = sq_last_id(db)</code><p>The rowid the last INSERT got. no example: database state - proven by tools/sqlite_test.sh</p></div>
 <h2 id="time"><code>time</code></h2>
 <p class="orb-blurb">clock time for humans: unix seconds and formatted dates.</p>
 <div class="fn"><code class="sig">now_unix() -&gt; int uses clock = unix_now()</code><p>Seconds since 1970-01-01 UTC. no example: wall-clock dependent - proven by test_42_general_floor.or</p></div>

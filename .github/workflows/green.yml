@@ -96,6 +96,10 @@ jobs:
       - name: vendored C links
         run: bash tools/link_test.sh
 
+      # The sqlite orb over that door: create/insert/bind/query/error.
+      - name: sqlite
+        run: bash tools/sqlite_test.sh
+
       # A documented feature that no longer exists fails exactly like a stale
       # seed: it reads fine and nobody runs it. Every sample in the Field Guide
       # is a whole program, and this compiles all of them.

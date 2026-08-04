@@ -22,7 +22,7 @@ MODE="file"
 # User-facing orbs, curated order first so `text` is not buried under `assert`.
 # Any non-orion_ orb not listed here is appended alphabetically, so a new orb
 # still shows up without editing this file.
-PREFERRED="text list num iter dict json time http net os file async rand encoding store watch timer result option assert log ori_display ori_geometry"
+PREFERRED="text list num iter dict json sqlite time http net os file async rand encoding store watch timer result option assert log ori_display ori_geometry"
 
 all=""
 for d in "$ROOT"/orbs/*/; do

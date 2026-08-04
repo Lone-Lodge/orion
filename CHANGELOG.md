@@ -7,6 +7,13 @@ Notable changes to Orion. The format follows
 ## [Unreleased]
 
 ### Added
+- **A sqlite orb** - a real SQL database in one file, no server. db_open /
+  db_run / db_run_with (bound `?` params - the injection-safe path, proven
+  by a hostile string in the gate) / db_rows / columns / db_one / db_error /
+  db_changes / db_last_id, over the vendored sqlite 3.53.4 amalgamation
+  through the `link =` seam. tools/sqlite_test.sh proves create, insert,
+  bind, query, count, update and error reporting end to end, in CI on all
+  three platforms.
 - **Width-exact sized-integer arithmetic, natively - one semantics.**
   `x: u8 = 200` then `x + 100` is 44 on BOTH backends now (native used to
   answer 300): a sized binding coerces its value, the type rides the IR,
