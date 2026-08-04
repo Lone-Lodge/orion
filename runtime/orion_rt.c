@@ -12,6 +12,15 @@
  * favour of non-portable _s variants. We stay portable - suppress. */
 #define _CRT_SECURE_NO_WARNINGS 1
 
+/* Darwin hides the (deprecated but fully working) ucontext routines - the
+ * task scheduler's stack switching on POSIX - unless asked like this.
+ * Must precede every system include. _DARWIN_C_SOURCE keeps the rest of
+ * the BSD surface visible alongside the _XOPEN_SOURCE restriction. */
+#if defined(__APPLE__)
+#define _XOPEN_SOURCE 700
+#define _DARWIN_C_SOURCE 1
+#endif
+
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -1255,41 +1264,6 @@ static long long orion_rt_slot(void *p, long long i) {
     return ((long long *)p)[2 + i];
 }
 
-#ifdef _WIN32
-/* winsock2 must precede windows.h (the classic ordering fix) - the tcp_*
- * functions at the end of this file are the `net` orb's floor. FD_SETSIZE
- * must precede winsock2.h too: the default 64 is smaller than the task table,
- * and the scheduler selects over every socket a task is parked on. */
-#define FD_SETSIZE 1024
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-#include <windows.h>
-
-/* Crash forensics: on an unhandled fault, print the exception code
- * and the MODULE-RELATIVE offset (symbolizable against the link map
- * orbit emits next to the exe) before dying. Fail fast, but say
- * where. The crumb trail recorded above prints newest-first. */
-
-/* The report goes to stderr AND crash.txt - a console window dies
- * with the process, a file survives to be read (by the pilot or by
- * the recovery boot). */
-static FILE *crash_tee = NULL;
-static void crash_line(const char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    fprintf(stderr, "%s", c_red());
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "%s\n", c_off());
-    va_end(ap);
-    if (crash_tee) {
-        va_start(ap, fmt);
-        vfprintf(crash_tee, fmt, ap);
-        fprintf(crash_tee, "\n");
-        va_end(ap);
-    }
-}
-
 /* ---- debugger v1: the call trail + breakpoint --------------------------
  * A `--trace` build (orbit debug) prefixes every user define with
  * orion_trace_enter(name), a ring of the last 64 entered functions. It is
@@ -1355,6 +1329,40 @@ long long orion_breakpoint(const char *where) {
         if (c == '\n' || c == EOF) return 0;
         /* swallow the rest of the line, then ask again */
         while (c != '\n' && c != EOF) c = fgetc(stdin);
+    }
+}
+#ifdef _WIN32
+/* winsock2 must precede windows.h (the classic ordering fix) - the tcp_*
+ * functions at the end of this file are the `net` orb's floor. FD_SETSIZE
+ * must precede winsock2.h too: the default 64 is smaller than the task table,
+ * and the scheduler selects over every socket a task is parked on. */
+#define FD_SETSIZE 1024
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#include <windows.h>
+
+/* Crash forensics: on an unhandled fault, print the exception code
+ * and the MODULE-RELATIVE offset (symbolizable against the link map
+ * orbit emits next to the exe) before dying. Fail fast, but say
+ * where. The crumb trail recorded above prints newest-first. */
+
+/* The report goes to stderr AND crash.txt - a console window dies
+ * with the process, a file survives to be read (by the pilot or by
+ * the recovery boot). */
+static FILE *crash_tee = NULL;
+static void crash_line(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "%s", c_red());
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "%s\n", c_off());
+    va_end(ap);
+    if (crash_tee) {
+        va_start(ap, fmt);
+        vfprintf(crash_tee, fmt, ap);
+        fprintf(crash_tee, "\n");
+        va_end(ap);
     }
 }
 

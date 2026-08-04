@@ -251,11 +251,19 @@ def plain(text):
     return "\n".join(lines)
 
 
-# The last few distinct successful bridge snippets - the "kor igen" rows.
+# A snippet earns a "kor igen" row only if it actually touches the scene -
+# bridge maintenance (reloads, verifications) is noise, not an action.
+def is_scene_code(code):
+    plumbing = ("orion_bridge", "importlib", "addon_", "window_manager")
+    return "bpy." in code and not any(word in code for word in plumbing)
+
+
+# The last few distinct successful scene snippets - the "kor igen" rows.
 def recent_codes():
     seen = []
     for entry in reversed(history):
-        if entry.get("kind") == "code" and entry["ok"] and entry["code"] not in seen:
+        if (entry.get("kind") == "code" and entry["ok"]
+                and is_scene_code(entry["code"]) and entry["code"] not in seen):
             seen.append(entry["code"])
         if len(seen) == 3:
             break
@@ -421,11 +429,10 @@ if bpy is not None:
 
         def draw(self, context):
             layout = self.layout
-            quick = layout.grid_flow(columns=2, align=True)
+            quick = layout.grid_flow(row_major=True, columns=2, align=True)
             quick.operator("orion.clear_scene", text="Rensa scen", icon="TRASH")
-            quick.operator("orion.clean_mesh", text="Stada mesh", icon="MOD_SMOOTH")
-            quick.operator("view3d.view_all", text="Visa allt", icon="ZOOM_ALL")
             quick.operator("orion.toggle_rendered", text="Rendera", icon="SHADING_RENDERED")
+            quick.operator("orion.clean_mesh", text="Stada mesh", icon="MOD_SMOOTH")
             quick.operator("wm.save_mainfile", text="Spara", icon="FILE_TICK")
             codes = recent_codes()
             if codes:
@@ -456,7 +463,7 @@ if bpy is not None:
         def draw(self, context):
             layout = self.layout
             wm = context.window_manager
-            grid = layout.grid_flow(columns=2, align=True)
+            grid = layout.grid_flow(row_major=True, columns=2, align=True)
             grid.prop(wm, "orion_ctx_scene", text="Scengraf")
             grid.prop(wm, "orion_ctx_selection", text="Markering")
             grid.prop(wm, "orion_ctx_material", text="Material")
@@ -549,18 +556,20 @@ if bpy is not None:
                     foot.active = False
                     foot.label(text=entry["meta"], icon="SOLO_ON")
                 layout.separator(factor=0.8)
-            send = layout.row(align=True)
-            send.scale_y = 1.2
-            send.enabled = not chat_is_busy()
-            send.prop(context.window_manager, "orion_prompt", text="",
-                      placeholder="Fraga Claude...")
-            send.operator("orion.chat_send", text="", icon="PLAY")
-            foot = layout.row(align=True)
-            auto = foot.row()
+            field = layout.row()
+            field.scale_y = 1.4
+            field.enabled = not chat_is_busy()
+            field.prop(context.window_manager, "orion_prompt", text="",
+                       placeholder="Fraga Claude...")
+            controls = layout.row(align=True)
+            auto = controls.row()
             auto.prop(context.window_manager, "orion_autorun", text="Kor automatiskt")
-            usage = foot.row()
+            send_button = controls.row()
+            send_button.alignment = "RIGHT"
+            send_button.enabled = not chat_is_busy()
+            send_button.operator("orion.chat_send", text="Skicka", icon="PLAY")
+            usage = layout.row()
             usage.active = False
-            usage.alignment = "RIGHT"
             sent = [entry for entry in history if entry.get("kind") == "chat"]
             used = sum(entry.get("tokens", 0) for entry in sent)
             model = last_model[0] or "claude"
@@ -644,8 +653,16 @@ def register():
         for ui_class in classes:
             bpy.utils.register_class(ui_class)
         window_manager = bpy.types.WindowManager
+
+        # Enter in the field confirms the edit, which fires this - so Enter
+        # sends. chat_send clears the field; the empty re-fire is a no-op.
+        def prompt_updated(self, context):
+            if self.orion_prompt.strip() and not chat_is_busy():
+                bpy.ops.orion.chat_send("EXEC_DEFAULT")
+
         window_manager.orion_prompt = bpy.props.StringProperty(
-            name="", description="Meddelande till Claude")
+            name="", description="Meddelande till Claude - Enter skickar",
+            update=prompt_updated)
         window_manager.orion_autorun = bpy.props.BoolProperty(
             name="Kor automatiskt", default=False,
             description="Kor kodblock fran Claude direkt nar svaret landar")
