@@ -19,5 +19,7 @@ build/crash.*
 *.host.ll
 
 # test scratch written into the tracked dist dir
+examples/tests/.*.txt
 examples/tests/dist/.*.txt
+examples/tests/.*.bat
 examples/tests/dist/.*.bat
