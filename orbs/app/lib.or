@@ -20,6 +20,7 @@ use async
 type request:
     method: text
     path: text
+    query: text
     body: text
 
 type response:
@@ -49,12 +50,17 @@ public define not_found() -> response:
 # the handler to split if it cares.
 public define parse_request(raw: text) -> request:
     example parse_request("GET /x HTTP/1.1").path is "/x"
+    example parse_request("GET /x?a=1 HTTP/1.1").path is "/x"
+    example parse_request("GET /x?a=1 HTTP/1.1").query is "a=1"
     example parse_request("").method is ""
     first = at(lines(raw), 0)
     parts = split(trim(first), " ")
     if len(parts) < 2:
-        return request{method: "", path: "", body: ""}
-    request{method: at(parts, 0), path: at(parts, 1), body: ""}
+        return request{method: "", path: "", query: "", body: ""}
+    target = at(parts, 1)
+    halves = split(target, "?")
+    q = if len(halves) > 1 then at(halves, 1) else ""
+    request{method: at(parts, 0), path: at(halves, 0), query: q, body: ""}
 
 define status_line(code: int) -> text:
     choose:
@@ -194,3 +200,22 @@ public define open_window(url: text) -> int uses net:
     b = "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
     exe = if file_exists(a) then a else b
     start_command(exe, ["--app={url}"])
+
+# The value of `key` in the request's query string, "" when absent. Values
+# arrive percent-decoded enough for filenames (space and %2F handled).
+public define query_of(req: request, key: text) -> text:
+    example query_of(request{method: "GET", path: "/", query: "name=a.png&x=1", body: ""}, "name") is "a.png"
+    example query_of(request{method: "GET", path: "/", query: "", body: ""}, "name") is ""
+    edit found = ""
+    loop pair in split(req.query, "&"):
+        kv = split(pair, "=")
+        if len(kv) is 2 and at(kv, 0) is key and found is "":
+            found = replace(replace(replace(at(kv, 1), "%20", " "), "+", " "), "%2F", "/")
+    found
+
+external define win_set_topmost(needle: text) -> int
+
+# Pin the window whose title contains `needle` above every other window.
+# true when found. Windows-only today; elsewhere always false.
+# no example: window state - proven by folio's pin feature
+public define window_on_top(title: text) -> truth uses console = win_set_topmost(title) is 0

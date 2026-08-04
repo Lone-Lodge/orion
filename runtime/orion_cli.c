@@ -488,6 +488,35 @@ const char *sha256_hex(const char *msg) {
     return orion_text_from_c(out);
 }
 
+/* Pin the window whose TITLE contains `needle` above every other window
+ * (0 = found and pinned). How folio's "image on top" works: the popup names
+ * itself after the image, then asks the server to hoist it. Windows-only -
+ * elsewhere it answers -1 and the app says so. */
+#ifdef _WIN32
+static char win_topmost_needle[256];
+static long long win_topmost_hit;
+static int __stdcall win_topmost_scan(HWND h, LONG_PTR unused) {
+    char title[512];
+    (void)unused;
+    if (!IsWindowVisible(h)) return 1;
+    GetWindowTextA(h, title, sizeof title);
+    if (title[0] && strstr(title, win_topmost_needle)) {
+        SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        win_topmost_hit = 0;
+        return 0;
+    }
+    return 1;
+}
+long long win_set_topmost(const char *needle) {
+    snprintf(win_topmost_needle, sizeof win_topmost_needle, "%s", needle);
+    win_topmost_hit = -1;
+    EnumWindows((WNDENUMPROC)win_topmost_scan, 0);
+    return win_topmost_hit;
+}
+#else
+long long win_set_topmost(const char *needle) { (void)needle; return -1; }
+#endif
+
 /* Exit the process with a code. */
 long long exit_with(long long code) {
     exit((int)code);
