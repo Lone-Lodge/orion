@@ -168,6 +168,13 @@ public define path_parent(p: text) -> text:
 # what they return.
 external define orion_dir_list(dir: text) -> text
 external define orion_dir_subdirs(dir: text) -> text
+external define fs_remove_tree(path: text) -> int
+
+# Delete a directory and everything under it. 0 when it is gone, -1 when
+# something survived. Clears read-only bits on the way (a git checkout
+# marks its object files read-only).
+# no example: deletes from disk — proven by tools/package_test.sh
+public define remove_tree(p: text) -> int uses files = fs_remove_tree(p)
 # no example: depends on the filesystem — proven by tools/orbstat.or
 public define list_dir(dir: text) -> [text] uses files = split(orion_dir_list(dir), "\n")
 # no example: depends on the filesystem — proven by tools/orbstat.or

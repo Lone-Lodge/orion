@@ -123,6 +123,8 @@ define usage():
     eprint("  new <name>                  " + c_dim("scaffold a project"))
     eprint("  test                        " + c_dim("run the project's tests"))
     eprint("  add <orb>                   " + c_dim("add a library to Orbit.toml"))
+    eprint("  get                         " + c_dim("fetch [deps] git packages into orbs_pkg/, pinned by Orbit.lock"))
+    eprint("  update [name]               " + c_dim("refetch package(s) at their ref's newest commit, move the lock"))
     eprint("  fmt                         " + c_dim("format the sources in place"))
     eprint("")
     eprint(c_bold("  projects and games"))
@@ -489,7 +491,176 @@ define nb_dep_dirs(lines: [text], base: text) -> [text]:
             dir = if base == "" then rel else base + "/" + rel
             if not list_contains(out, dir):
                 out = append(out, dir)
+        if contains(line, "\"git:"):
+            # A fetched package lives in the PROJECT's orbs_pkg/, wherever
+            # the toml naming it sits (transitive git deps are hoisted flat
+            # by `orbit get`) — so this is cwd-relative, not base-relative.
+            gdir = "orbs_pkg/" + dep_key(line)
+            if not list_contains(out, gdir):
+                out = append(out, gdir)
     out
+
+# ---------- packages: git deps fetched into orbs_pkg/ ----------
+#
+# A dependency line can name a REMOTE orb:
+#
+#     [deps]
+#     weblib = "git:https://github.com/x/weblib"        # default branch
+#     maths  = "git:https://github.com/x/maths@v1.2"    # a tag or a branch
+#
+# A package repo IS one orb: lib.or at its root, plus its own Orbit.toml
+# when it has dependencies of its own. `orbit get` clones each dep into
+# orbs_pkg/<name>/ and pins the exact commit in Orbit.lock, so the next
+# `orbit get` — on any machine — checks out the same code. `orbit update
+# [name]` refetches at the ref's newest commit and rewrites the lock.
+# Transitive git deps are fetched FLAT into the same orbs_pkg/ (first name
+# wins), which is also how they resolve at build time. No registry, no
+# version solving: a name, a repo, a ref, a pinned commit.
+
+define dep_key(line: text) -> text:
+    trim(at(split(line, "="), 0))
+
+# "url@ref" -> [url, ref]. The separator is the LAST `@` after the last
+# `/`, so ssh remotes (git@host:...) keep their `@`.
+define spec_split_ref(spec: text) -> [text]:
+    bs = bytes_from_text(spec)
+    n = len(bs)
+    edit last_slash = 0 - 1
+    edit cut = 0 - 1
+    loop i in 0..<n:
+        if at(bs, i) == 47:
+            last_slash = i
+    loop j in 0..<n:
+        if at(bs, j) == 64 and j > last_slash:
+            cut = j
+    if cut < 0:
+        return [spec, ""]
+    [bytes_to_text(bytes_slice(bs, 0, cut)), bytes_to_text(bytes_slice(bs, cut + 1, n))]
+
+# Every git dep in a toml, one "name|url|ref" row each.
+define nb_git_deps(lines: [text]) -> [text]:
+    total = len(lines)
+    edit out = []
+    loop index in 0..<total:
+        line = at(lines, index)
+        if contains(line, "\"git:"):
+            spec = replace(nb_quoted(line), "git:", "")
+            parts = spec_split_ref(spec)
+            out = append(out, dep_key(line) + "|" + at(parts, 0) + "|" + at(parts, 1))
+    out
+
+define lock_rows() -> [text]:
+    if not file_exists("Orbit.lock"):
+        return []
+    all_lines = nb_lines(read_file("Orbit.lock"))
+    edit out = []
+    loop i in 0..<len(all_lines):
+        line = trim(at(all_lines, i))
+        if line != "" and not starts_with(line, "#"):
+            out = append(out, line)
+    out
+
+# The pinned commit for `name`, or "" when the lock has none.
+define lock_commit(name: text) -> text:
+    rows = lock_rows()
+    edit found = ""
+    loop i in 0..<len(rows):
+        parts = split(at(rows, i), " ")
+        if len(parts) >= 2 and at(parts, 0) == name:
+            found = at(parts, 1)
+    found
+
+define pkg_head(dir: text) -> text:
+    trim(capture_stdout("git", ["-C", dir, "rev-parse", "HEAD"]))
+
+# Fetch one package. An existing dir is left EXACTLY as it is (get never
+# moves code under you — that is update's job). A locked commit gets a full
+# clone + checkout (the commit may be far behind the ref); an unlocked ref
+# gets a shallow clone of just that ref. Returns the checked-out commit,
+# "" when git failed.
+define pkg_fetch(name: text, url: text, ref: text) -> text:
+    dir = "orbs_pkg/" + name
+    if is_dir(dir):
+        return pkg_head(dir)
+    mkdir_all("orbs_pkg")
+    locked = lock_commit(name)
+    if locked != "":
+        if run_command("git", ["clone", "--quiet", url, dir]) != 0:
+            return ""
+        if run_command("git", ["-C", dir, "-c", "advice.detachedHead=false", "checkout", "--quiet", locked]) != 0:
+            return ""
+    else:
+        edit cargs = ["clone", "--quiet", "--depth", "1"]
+        if ref != "":
+            cargs = append(cargs, "--branch")
+            cargs = append(cargs, ref)
+        cargs = append(cargs, url)
+        cargs = append(cargs, dir)
+        if run_command("git", cargs) != 0:
+            return ""
+    pkg_head(dir)
+
+define short_commit(commit: text) -> text:
+    bs = bytes_from_text(commit)
+    if len(bs) > 9 then bytes_to_text(bytes_slice(bs, 0, 9)) else commit
+
+define cmd_get():
+    if not file_exists("Orbit.toml"):
+        die("orbit: no Orbit.toml in this directory")
+    edit queue = nb_git_deps(nb_lines(read_file("Orbit.toml")))
+    if len(queue) == 0:
+        print_line("orbit: no git deps in Orbit.toml")
+        return
+    edit seen = []
+    edit lock_out = ["# orbit lock — the exact commit of every fetched package."]
+    lock_out = append(lock_out, "# `orbit get` reproduces these; `orbit update [name]` moves them.")
+    edit failures = 0
+    edit idx = 0
+    loop:
+        if idx >= len(queue):
+            break
+        parts = split(at(queue, idx), "|")
+        idx = idx + 1
+        name = at(parts, 0)
+        url = at(parts, 1)
+        ref = at(parts, 2)
+        if not list_contains(seen, name):
+            seen = append(seen, name)
+            commit = pkg_fetch(name, url, ref)
+            if commit == "":
+                eprint(c_red("orbit: could not fetch `" + name + "` from " + url))
+                failures = failures + 1
+            else:
+                shown = if ref == "" then url else url + "@" + ref
+                print_line("  " + name + " @ " + short_commit(commit) + "  " + c_dim(shown))
+                lock_out = append(lock_out, name + " " + commit + " " + shown)
+                sub_toml = "orbs_pkg/" + name + "/Orbit.toml"
+                if file_exists(sub_toml):
+                    more = nb_git_deps(nb_lines(read_file(sub_toml)))
+                    loop m_index in 0..<len(more):
+                        queue = append(queue, at(more, m_index))
+    write_file("Orbit.lock", join(lock_out, "\n") + "\n")
+    if failures > 0:
+        exit_with(1)
+
+# Drop the chosen package dirs and their lock rows, then get fresh — the
+# refetch lands on the ref's newest commit and the lock is rewritten.
+define cmd_update():
+    target = first_param()
+    if not file_exists("Orbit.toml"):
+        die("orbit: no Orbit.toml in this directory")
+    rows = lock_rows()
+    edit kept = ["# orbit lock — the exact commit of every fetched package."]
+    kept = append(kept, "# `orbit get` reproduces these; `orbit update [name]` moves them.")
+    loop i in 0..<len(rows):
+        parts = split(at(rows, i), " ")
+        name = at(parts, 0)
+        if target == "" or name == target:
+            fs_junk = remove_tree("orbs_pkg/" + name)
+        else:
+            kept = append(kept, at(rows, i))
+    write_file("Orbit.lock", join(kept, "\n") + "\n")
+    cmd_get()
 
 # Collect an orb's dir plus every orb reachable through its own Orbit.toml,
 # transitively. `acc` doubles as the visited set (a repeated dir short-
@@ -1090,6 +1261,10 @@ public define main():
     else:
         if command == "add":
             cmd_add()
+        else if command == "get":
+            cmd_get()
+        else if command == "update":
+            cmd_update()
         else:
             if command == "build" or command == "check":
                 cmd_build()

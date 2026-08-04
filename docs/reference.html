@@ -177,6 +177,7 @@
 <div class="fn"><code class="sig">cpu_count() -&gt; int</code><p>Hardware threads on this machine - what to size a worker pool by.</p></div>
 <div class="fn"><code class="sig">path_join(a: text, b: text) -&gt; text</code><p>---- paths ----</p></div>
 <div class="fn"><code class="sig">path_parent(p: text) -&gt; text</code></div>
+<div class="fn"><code class="sig">remove_tree(p: text) -&gt; int uses files = fs_remove_tree(p)</code><p>Delete a directory and everything under it.</p></div>
 <div class="fn"><code class="sig">list_dir(dir: text) -&gt; [text] uses files = split(orion_dir_list(dir), "\n")</code><p>no example: depends on the filesystem - proven by tools/orbstat.or</p></div>
 <div class="fn"><code class="sig">list_dirs(dir: text) -&gt; [text] uses files = split(orion_dir_subdirs(dir), "\n")</code><p>no example: depends on the filesystem - proven by tools/orbstat.or</p></div>
 <div class="fn"><code class="sig">arguments() -&gt; [text]</code><p>The command line as ONE list of text - <code>arguments()</code> replaces argc()/argv(i) (the literal C names).</p></div>

@@ -1886,6 +1886,15 @@ if_46_merge:
     ret ptr %v57
 }
 
+declare i64 @fs_remove_tree(ptr)
+
+define i64 @os__remove_tree(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call i64 @fs_remove_tree(ptr %v0)
+    ret i64 %v1
+}
+
 define ptr @os__list_dir(ptr %p0) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0

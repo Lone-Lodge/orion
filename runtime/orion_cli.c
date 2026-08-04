@@ -20,6 +20,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 /* orion_rt.c wraps a raw C string into a headered orion Text; without it a
  * returned `const char*` isn't a real Text and `==` against a literal fails. */
@@ -121,6 +122,31 @@ long long file_size(const char *path) {
     return ((long long)d.nFileSizeHigh << 32) | (long long)d.nFileSizeLow;
 }
 
+/* Delete a directory and everything under it. Returns 0 when the directory
+ * is gone. Clears read-only bits first — a fetched git checkout marks its
+ * object files read-only, and DeleteFileA refuses those. */
+long long fs_remove_tree(const char *path) {
+    char pat[4096];
+    WIN32_FIND_DATAA fd;
+    snprintf(pat, sizeof(pat), "%s\\*", path);
+    HANDLE h = FindFirstFileA(pat, &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) continue;
+            char sub[4096];
+            snprintf(sub, sizeof(sub), "%s\\%s", path, fd.cFileName);
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                fs_remove_tree(sub);
+            } else {
+                SetFileAttributesA(sub, FILE_ATTRIBUTE_NORMAL);
+                DeleteFileA(sub);
+            }
+        } while (FindNextFileA(h, &fd));
+        FindClose(h);
+    }
+    return RemoveDirectoryA(path) ? 0 : -1;
+}
+
 /* Last-write time in milliseconds (Windows FILETIME epoch scaled down; only
  * comparisons and deltas are meaningful, same as the POSIX side). -1 if the
  * file cannot be read — a watcher treats that as "changed". */
@@ -213,6 +239,26 @@ long long file_mtime(const char *path) {
     struct stat st;
     if (stat(path, &st) != 0) return -1;
     return (long long)st.st_mtime * 1000;
+}
+
+#include <dirent.h>
+
+/* Delete a directory and everything under it. 0 when it is gone. */
+long long fs_remove_tree(const char *path) {
+    DIR *d = opendir(path);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL) {
+            if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+            char sub[4096];
+            snprintf(sub, sizeof(sub), "%s/%s", path, e->d_name);
+            struct stat st;
+            if (lstat(sub, &st) == 0 && S_ISDIR(st.st_mode)) fs_remove_tree(sub);
+            else unlink(sub);
+        }
+        closedir(d);
+    }
+    return rmdir(path) == 0 ? 0 : -1;
 }
 
 const char *capture(const char *cmd) {
