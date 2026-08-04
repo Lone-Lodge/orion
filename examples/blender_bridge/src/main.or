@@ -1,4 +1,4 @@
-# blender_bridge - send Python to a running Blender (blender_addon.py in this
+# blender_bridge - send Python to a running Blender (orion_bridge.py in this
 # dir) and print what came back. The whole Claude<->Blender link, in Orion.
 #
 #   cd examples/blender_bridge
@@ -33,7 +33,7 @@ define main() -> int uses net, console:
     request = "\{\"code\":\"{escaped}\"\}\n"
     conn = connect("127.0.0.1", 4777)
     if not ok(conn):
-        eprint("no Blender bridge on 127.0.0.1:4777 - start blender_addon.py first")
+        eprint("no Blender bridge on 127.0.0.1:4777 - start orion_bridge.py first")
         return 1
     defer close(conn)
     send(conn, request)

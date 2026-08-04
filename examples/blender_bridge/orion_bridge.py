@@ -4,8 +4,8 @@
 #
 # Three ways to run it:
 #   Blender add-on: Edit > Preferences > Add-ons > Install, enable "Orion Bridge"
-#   blender --background --python tools/blender_addon.py   (headless, blocks)
-#   python tools/blender_addon.py                          (no bpy - protocol test)
+#   blender --background --python tools/orion_bridge.py   (headless, blocks)
+#   python tools/orion_bridge.py                          (no bpy - protocol test)
 
 import contextlib
 import io
