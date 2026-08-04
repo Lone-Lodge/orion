@@ -254,6 +254,34 @@ def plain(text):
     return "\n".join(lines)
 
 
+# The last few distinct successful bridge snippets - the "kor igen" rows.
+def recent_codes():
+    seen = []
+    for entry in reversed(history):
+        if entry.get("kind") == "code" and entry["ok"] and entry["code"] not in seen:
+            seen.append(entry["code"])
+        if len(seen) == 3:
+            break
+    return seen
+
+
+if bpy is not None:
+    class ORION_OT_rerun(bpy.types.Operator):
+        bl_idname = "orion.rerun"
+        bl_label = "Kor igen"
+        bl_description = "Kor snutten en gang till"
+
+        index: bpy.props.IntProperty()
+
+        def execute(self, context):
+            codes = recent_codes()
+            if 0 <= self.index < len(codes):
+                record(codes[self.index], run_code(codes[self.index]))
+            return {"FINISHED"}
+else:
+    ORION_OT_rerun = object
+
+
 class ORION_PT_bridge(bpy.types.Panel if bpy else object):
     bl_label = "Claude"
     bl_space_type = "VIEW_3D"
@@ -266,12 +294,41 @@ class ORION_PT_bridge(bpy.types.Panel if bpy else object):
             warning = layout.row()
             warning.alert = True
             warning.label(text="Servern lyssnar inte", icon="UNLINKED")
-        sent = [entry for entry in history if entry.get("kind") == "chat"]
-        if sent:
+        if history:
+            sent = [entry for entry in history if entry.get("kind") == "chat"]
             used = sum(entry.get("tokens", 0) for entry in sent)
-            info = layout.row()
-            info.active = False
-            info.label(text=f"{len(sent)} meddelanden  ·  {used} tokens denna session")
+            info = layout.row(align=True)
+            summary = info.row()
+            summary.active = False
+            summary.label(text=f"{len(sent)} meddelanden  ·  {used} tokens",
+                          icon="SOLO_ON")
+            info.operator("orion.copy_output", text="", icon="COPYDOWN")
+            info.operator("orion.clear_log", text="", icon="TRASH")
+
+
+class ORION_PT_quick(bpy.types.Panel if bpy else object):
+    bl_label = "Snabbt"
+    bl_parent_id = "ORION_PT_bridge"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Claude"
+    bl_order = 0
+
+    def draw(self, context):
+        layout = self.layout
+        quick = layout.grid_flow(columns=2, align=True)
+        quick.operator("wm.save_mainfile", text="Spara", icon="FILE_TICK")
+        quick.operator("orion.toggle_rendered", text="Rendera", icon="SHADING_RENDERED")
+        quick.operator("view3d.view_all", text="Visa allt", icon="ZOOM_ALL")
+        quick.operator("orion.clear_scene", text="Rensa scen", icon="TRASH")
+        codes = recent_codes()
+        if codes:
+            layout.separator(factor=0.3)
+            again = layout.column(align=True)
+            for index, code in enumerate(codes):
+                code_line = code.splitlines()[0][:34]
+                rerun = again.operator("orion.rerun", text=code_line, icon="LOOP_BACK")
+                rerun.index = index
 
 
 class ORION_PT_chat(bpy.types.Panel if bpy else object):
@@ -280,16 +337,31 @@ class ORION_PT_chat(bpy.types.Panel if bpy else object):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Claude"
+    bl_order = 1
 
     def draw(self, context):
         layout = self.layout
         chars = wrap_chars(context)
-        exchanges = [entry for entry in history if entry.get("kind") == "chat"][-6:]
-        if not exchanges:
+        feed = history[-14:]
+        if not feed:
             hint = layout.column()
             hint.active = False
             hint.label(text="Skriv nedan sa bygger Claude i scenen.")
-        for entry in exchanges:
+        for entry in feed:
+            if entry.get("kind") != "chat":
+                # a bridge run: one dimmed action line, like the app's tool rows
+                action = layout.row()
+                action.active = False
+                code_line = entry["code"].splitlines()[0] if entry["code"] else ""
+                action.label(text=code_line[:44],
+                             icon="CHECKMARK" if entry["ok"] else "CANCEL")
+                if not entry["ok"] and entry["output"]:
+                    reason = layout.row()
+                    reason.active = False
+                    reason.alert = True
+                    reason.label(text=entry["output"].splitlines()[-1][:48],
+                                 icon="BLANK1")
+                continue
             # your message: a right-aligned bubble, like the chat apps
             split = layout.split(factor=0.22)
             split.label(text="")
@@ -320,59 +392,6 @@ class ORION_PT_chat(bpy.types.Panel if bpy else object):
         send.prop(context.window_manager, "orion_prompt", text="",
                   placeholder="Fraga Claude...")
         send.operator("orion.chat_send", text="", icon="PLAY")
-
-
-class ORION_PT_quick(bpy.types.Panel if bpy else object):
-    bl_label = "Snabbt"
-    bl_parent_id = "ORION_PT_bridge"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = "Claude"
-
-    def draw(self, context):
-        quick = self.layout.grid_flow(columns=2, align=True)
-        quick.operator("wm.save_mainfile", text="Spara", icon="FILE_TICK")
-        quick.operator("orion.toggle_rendered", text="Rendera", icon="SHADING_RENDERED")
-        quick.operator("view3d.view_all", text="Visa allt", icon="ZOOM_ALL")
-        quick.operator("orion.clear_scene", text="Rensa scen", icon="TRASH")
-
-
-class ORION_PT_log(bpy.types.Panel if bpy else object):
-    bl_label = "Aktivitet"
-    bl_parent_id = "ORION_PT_bridge"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = "Claude"
-    bl_options = {"DEFAULT_CLOSED"}
-
-    def draw(self, context):
-        layout = self.layout
-        runs = [entry for entry in history if entry.get("kind") == "code"]
-        if not runs:
-            hint = layout.column()
-            hint.active = False
-            hint.label(text="Inget kort an.")
-            return
-        fails = sum(1 for entry in runs if not entry["ok"])
-        summary = layout.row(align=True)
-        count = summary.row()
-        count.active = False
-        count.label(text=f"{len(runs)} korningar, {fails} fel")
-        summary.operator("orion.copy_output", text="", icon="COPYDOWN")
-        summary.operator("orion.clear_log", text="", icon="TRASH")
-        log = layout.column(align=True)
-        for entry in reversed(runs):
-            box = log.box()
-            head = box.row(align=True)
-            head.alert = not entry["ok"]
-            code_line = entry["code"].splitlines()[0] if entry["code"] else ""
-            head.label(text=f"{entry['when']}  {code_line[:34]}",
-                       icon="CHECKMARK" if entry["ok"] else "CANCEL")
-            if entry["output"]:
-                body = box.column(align=True)
-                body.active = False  # dimmed: output is secondary to the code line
-                for out_line in entry["output"].splitlines()[:3]:
-                    body.label(text=out_line[:52])
 
 
 # bpy is not thread-safe: in GUI mode the code runs via a timer on Blender's
@@ -441,8 +460,8 @@ def serve():
 
 
 classes = (ORION_OT_chat_send, ORION_OT_clear_scene, ORION_OT_toggle_rendered,
-           ORION_OT_clear_log, ORION_OT_copy_output,
-           ORION_PT_bridge, ORION_PT_chat, ORION_PT_quick, ORION_PT_log)
+           ORION_OT_clear_log, ORION_OT_copy_output, ORION_OT_rerun,
+           ORION_PT_bridge, ORION_PT_quick, ORION_PT_chat)
 
 
 def register():
