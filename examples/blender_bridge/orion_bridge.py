@@ -70,9 +70,22 @@ def record(code, reply):
 class ORION_OT_clear_log(bpy.types.Operator if bpy else object):
     bl_idname = "orion.clear_log"
     bl_label = "Rensa loggen"
+    bl_description = "Tom aktivitetsloggen"
 
     def execute(self, context):
         history.clear()
+        return {"FINISHED"}
+
+
+class ORION_OT_copy_output(bpy.types.Operator if bpy else object):
+    bl_idname = "orion.copy_output"
+    bl_label = "Kopiera senaste svar"
+    bl_description = "Lagg senaste korningens output pa urklipp"
+
+    def execute(self, context):
+        if history:
+            latest = history[-1]
+            context.window_manager.clipboard = latest["output"] or latest["code"]
         return {"FINISHED"}
 
 
@@ -84,20 +97,35 @@ class ORION_PT_bridge(bpy.types.Panel if bpy else object):
 
     def draw(self, context):
         layout = self.layout
-        head = layout.row()
         running = _server is not None
-        head.label(text=f"{HOST}:{PORT}", icon="LINKED" if running else "UNLINKED")
-        head.operator("orion.clear_log", text="", icon="TRASH")
+        status = layout.row(align=True)
+        status.label(text=f"Server {HOST}:{PORT}",
+                     icon="LINKED" if running else "UNLINKED")
         if not history:
-            layout.label(text="Inget kort an.")
+            hint = layout.column()
+            hint.active = False
+            hint.label(text="Inget kort an.")
             return
+        fails = sum(1 for entry in history if not entry["ok"])
+        summary = layout.row(align=True)
+        count = summary.row()
+        count.active = False
+        count.label(text=f"{len(history)} korningar, {fails} fel")
+        summary.operator("orion.copy_output", text="", icon="COPYDOWN")
+        summary.operator("orion.clear_log", text="", icon="TRASH")
+        log = layout.column(align=True)
         for entry in reversed(history):
-            box = layout.box()
-            row = box.row()
-            row.label(text=f"{entry['when']}  {entry['code'][:38]}",
-                      icon="CHECKMARK" if entry["ok"] else "CANCEL")
-            for out_line in entry["output"].splitlines()[:4]:
-                box.label(text=out_line[:52])
+            box = log.box()
+            head = box.row(align=True)
+            head.alert = not entry["ok"]
+            code_line = entry["code"].splitlines()[0] if entry["code"] else ""
+            head.label(text=f"{entry['when']}  {code_line[:34]}",
+                       icon="CHECKMARK" if entry["ok"] else "CANCEL")
+            if entry["output"]:
+                body = box.column(align=True)
+                body.active = False  # dimmed: output is secondary to the code line
+                for out_line in entry["output"].splitlines()[:3]:
+                    body.label(text=out_line[:52])
 
 
 # bpy is not thread-safe: in GUI mode the code runs via a timer on Blender's
@@ -168,6 +196,7 @@ def serve():
 def register():
     if bpy is not None:
         bpy.utils.register_class(ORION_OT_clear_log)
+        bpy.utils.register_class(ORION_OT_copy_output)
         bpy.utils.register_class(ORION_PT_bridge)
     threading.Thread(target=serve, daemon=True).start()
 
@@ -175,6 +204,7 @@ def register():
 def unregister():
     if bpy is not None:
         bpy.utils.unregister_class(ORION_PT_bridge)
+        bpy.utils.unregister_class(ORION_OT_copy_output)
         bpy.utils.unregister_class(ORION_OT_clear_log)
     if _server is not None:
         _server.close()
