@@ -100,3 +100,8 @@ public define append_line(path: text, line: text) -> int uses files:
 # no example: touches the filesystem - proven by test_42_file_stream.or
 public define write_line(handle: int, line: text) -> int uses files:
     write_chunk(handle, "{line}\n")
+
+# Collision-friendly alias: `close` and `ok` exist in the net orb too, and an
+# orb using both (a file server) needs the selective import to stay readable.
+# no example: closes a handle - proven by the app orb
+public define close_file(handle: int) -> int uses files = file_close(handle)

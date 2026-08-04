@@ -3427,6 +3427,20 @@ long long tcp_connect_wait(const char *host, long long port, long long ms) {
     return (long long)s;
 }
 
+/* Binary-safe send: the length comes from the orion text HEADER, not
+ * strlen, so a JPEG's null bytes survive. What a file server sends with. */
+long long tcp_send_len(long long conn, const char *data) {
+    if (!data) return 0;
+    long long n = ((const long long *)data)[-1];
+    long long sent = 0;
+    while (sent < n) {
+        int r = send((orion_sock_t)conn, data + sent, (int)(n - sent), 0);
+        if (r <= 0) return -1;
+        sent += r;
+    }
+    return sent;
+}
+
 long long tcp_send(long long conn, const char *data) {
     if (!data) return 0;
     long long n = (long long)strlen(data);

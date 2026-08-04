@@ -157,3 +157,10 @@ external define sock_local_port(sock: int) -> int
 # The port a socket actually bound to - what `listen(0)`/`udp(0)` picked.
 # no example: opens a socket - proven by test_42_udp_loopback.or
 public define local_port(sock: int) -> int uses net = sock_local_port(sock)
+
+external define tcp_send_len(sock: int, data: text) -> int
+
+# Binary-safe send: the byte count comes from the text's length header, not
+# a null scan - a JPEG survives intact. What a file server answers with.
+# no example: sends on a socket - proven by folio (the image viewer)
+public define send_raw(sock: int, data: text) -> int uses net = tcp_send_len(sock, data)
