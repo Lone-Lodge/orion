@@ -2314,6 +2314,16 @@ if_304_merge:
     ret double %v314
 }
 
+declare ptr @fmt_float(double, i64)
+
+define ptr @num__with_decimals(double %p0, i64 %p1) {
+entry:
+    %v0 = fadd double %p0, 0x0000000000000000
+    %v1 = add i64 0, %p1
+    %v2 = call ptr @fmt_float(double %v0, i64 %v1)
+    ret ptr %v2
+}
+
 define i64 @orion_main() {
 entry:
     %v0 = getelementptr i8, ptr @.str_0, i64 16

@@ -303,3 +303,6 @@ footer {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* proven usage under a reference entry: the example lines the build runs */
+.fn pre.ex { margin: 0.35rem 0 0.2rem; padding: 0.4rem 0.6rem; font-size: 0.85em; opacity: 0.85; overflow-x: auto; }

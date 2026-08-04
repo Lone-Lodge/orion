@@ -22,7 +22,7 @@ MODE="file"
 # User-facing orbs, curated order first so `text` is not buried under `assert`.
 # Any non-orion_ orb not listed here is appended alphabetically, so a new orb
 # still shows up without editing this file.
-PREFERRED="text list num iter dict json net os async scheduler timer result option assert closure log ori_display ori_geometry"
+PREFERRED="text list num iter dict json time http net os file async rand encoding store watch timer result option assert log ori_display ori_geometry"
 
 all=""
 for d in "$ROOT"/orbs/*/; do
@@ -91,20 +91,31 @@ types() {
     ' "$ROOT/orbs/$1/lib.or"
 }
 
-# Every exported function: signature plus the first sentence of the comment
-# directly above it.
+# Every exported function: signature, the WHOLE comment above it (the code
+# comment IS the documentation - there is no second prose to drift), and its
+# `example` lines as proven usage: the build runs every one of them, so what
+# this page shows can never lie.
 funcs() {
     awk "$AWK_LIB"'
+        function flush() {
+            if (sig == "") return
+            printf "<div class=\"fn\"><code class=\"sig\">%s</code>", esc(sig)
+            if (doc != "" && doc !~ /^no example:/) printf "<p>%s</p>", codetags(esc(doc))
+            if (exs != "") printf "<pre class=\"ex\">%s</pre>", exs
+            print "</div>"
+            sig = ""
+        }
         /^[ \t]*#/ { l = $0; sub(/^[ \t]*#[ ]?/, "", l); if (!incmt) { allcmt = l; incmt = 1 } else { allcmt = allcmt " " l } next }
         /^pub fn |^public define / {
-            sig = $0; sub(/^pub fn /, "", sig); sub(/^public define /, "", sig); sub(/:[ \t]*$/, "", sig)
-            doc = firstsentence(allcmt)
-            printf "<div class=\"fn\"><code class=\"sig\">%s</code>", esc(sig)
-            if (doc != "") printf "<p>%s</p>", codetags(esc(doc))
-            print "</div>"
+            flush()
+            s = $0; sub(/^pub fn /, "", s); sub(/^public define /, "", s); sub(/:[ \t]*$/, "", s)
+            sig = s; doc = allcmt; exs = ""
             allcmt = ""; incmt = 0; next
         }
+        /^[ \t]+example / { l = $0; sub(/^[ \t]+/, "", l); exs = (exs == "") ? esc(l) : exs "\n" esc(l); next }
+        /^[ \t]+# no example:/ { next }
         { allcmt = ""; incmt = 0 }
+        END { flush() }
     ' "$ROOT/orbs/$1/lib.or"
 }
 

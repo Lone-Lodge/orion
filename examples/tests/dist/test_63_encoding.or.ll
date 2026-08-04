@@ -2072,6 +2072,15 @@ for_12_end:
     ret ptr %v68
 }
 
+declare ptr @sha256_hex(ptr)
+
+define ptr @encoding__sha256(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call ptr @sha256_hex(ptr %v0)
+    ret ptr %v1
+}
+
 define i64 @orion_main() {
 entry:
     %v0 = add i64 0, 255

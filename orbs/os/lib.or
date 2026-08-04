@@ -202,3 +202,21 @@ public define arguments() -> [text]:
     loop i in 0 until argc():
         out = append(out, argv(i))
     out
+
+# ---- fs completeness: move, copy, where-am-i ----
+external define fs_rename(from: text, to: text) -> int
+external define fs_copy_file(from: text, to: text) -> int
+external define fs_cwd() -> text
+
+# Move or rename a file (or directory). 0 on success. On Windows the target
+# must not already exist - remove it first when you mean replace.
+# no example: moves files on disk - proven by test_42_general_floor.or
+public define move_path(from: text, to: text) -> int uses files = fs_rename(from, to)
+
+# Byte-for-byte file copy (binary-safe). 0 on success.
+# no example: writes to disk - proven by test_42_general_floor.or
+public define copy_file(from: text, to: text) -> int uses files = fs_copy_file(from, to)
+
+# The current working directory, "" if the OS cannot say.
+# no example: depends on where the process runs - proven by test_42_general_floor.or
+public define cwd() -> text uses files = fs_cwd()

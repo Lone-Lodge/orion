@@ -96,3 +96,12 @@ public define base64_decode(s: text) -> [int]:
                 bits = bits - 8
                 out = append(out, (acc >> bits) & 255)
     out
+
+external define sha256_hex(t: text) -> text
+
+# SHA-256 of `t`, as 64 hex characters. The stdlib's content hash:
+# checksums, cache keys, integrity. The examples are FIPS 180-4 vectors.
+public define sha256(t: text) -> text:
+    example sha256("") is "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    example sha256("abc") is "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    sha256_hex(t)

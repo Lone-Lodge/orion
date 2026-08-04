@@ -169,3 +169,13 @@ public define parse_float(t: text) -> float:
         factor = pow(10.0, exp as float)
         val = if eneg then val / factor else val * factor
     if neg then 0.0 - val else val
+
+external define fmt_float(x: float, decimals: int) -> text
+
+# `x` as text with a fixed number of decimals - the one formatting ask
+# plain to_text cannot answer.
+public define with_decimals(x: float, decimals: int) -> text:
+    example with_decimals(3.14159, 2) is "3.14"
+    example with_decimals(2.5, 0) is "2"
+    example with_decimals(1.0, 3) is "1.000"
+    fmt_float(x, decimals)

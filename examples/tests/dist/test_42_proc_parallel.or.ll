@@ -1970,6 +1970,34 @@ for_3_end:
     ret ptr %v24
 }
 
+declare i64 @fs_rename(ptr, ptr)
+
+declare i64 @fs_copy_file(ptr, ptr)
+
+declare ptr @fs_cwd()
+
+define i64 @os__move_path(ptr %p0, ptr %p1) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = call i64 @fs_rename(ptr %v0, ptr %v1)
+    ret i64 %v2
+}
+
+define i64 @os__copy_file(ptr %p0, ptr %p1) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = call i64 @fs_copy_file(ptr %v0, ptr %v1)
+    ret i64 %v2
+}
+
+define ptr @os__cwd() {
+entry:
+    %v0 = call ptr @fs_cwd()
+    ret ptr %v0
+}
+
 define i64 @async__spawn(ptr %p0, i64 %p1) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0

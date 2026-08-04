@@ -73,7 +73,9 @@ if (cats.UNSUPPORTED.length && filter) {
 // must be no MISMATCH (wrong answer) or FAIL (compile/link crash). Expected
 // runtime aborts (divide-by-zero, out-of-range, require) land in TRAP and are
 // tolerated. Bump BASELINE_OK when real coverage rises.
-const BASELINE_OK = 142;
+// 142 -> 141 on 2026-08-04: test_42_general_floor gained copy/move/cwd and
+// moved OK -> UNSUPPORTED (honestly native-only). Not a lost capability.
+const BASELINE_OK = 141;
 // Tests that are correct natively but rely on an idiom the wasm backend does
 // not share, each with a tracked reason. They must NOT silently count as
 // regressions, but they are listed loudly so the set cannot grow unnoticed.

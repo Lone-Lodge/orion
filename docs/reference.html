@@ -27,9 +27,16 @@
 <li><a href="#iter"><code>iter</code></a></li>
 <li><a href="#dict"><code>dict</code></a></li>
 <li><a href="#json"><code>json</code></a></li>
+<li><a href="#time"><code>time</code></a></li>
+<li><a href="#http"><code>http</code></a></li>
 <li><a href="#net"><code>net</code></a></li>
 <li><a href="#os"><code>os</code></a></li>
+<li><a href="#file"><code>file</code></a></li>
 <li><a href="#async"><code>async</code></a></li>
+<li><a href="#rand"><code>rand</code></a></li>
+<li><a href="#encoding"><code>encoding</code></a></li>
+<li><a href="#store"><code>store</code></a></li>
+<li><a href="#watch"><code>watch</code></a></li>
 <li><a href="#timer"><code>timer</code></a></li>
 <li><a href="#result"><code>result</code></a></li>
 <li><a href="#option"><code>option</code></a></li>
@@ -37,215 +44,325 @@
 <li><a href="#log"><code>log</code></a></li>
 <li><a href="#ori_display"><code>ori_display</code></a></li>
 <li><a href="#ori_geometry"><code>ori_geometry</code></a></li>
-<li><a href="#encoding"><code>encoding</code></a></li>
-<li><a href="#file"><code>file</code></a></li>
-<li><a href="#http"><code>http</code></a></li>
-<li><a href="#rand"><code>rand</code></a></li>
-<li><a href="#store"><code>store</code></a></li>
-<li><a href="#time"><code>time</code></a></li>
-<li><a href="#watch"><code>watch</code></a></li>
 </ol>
 </nav>
 <main id="ref">
 <p>Bring an orb in with <code>use text</code>. Any function is also callable method-style, so <code>trim(s)</code> and <code>s.trim()</code> are the same call. The built-ins the guide uses (<code>print_line</code>, <code>len</code>, <code>push</code>, <code>get</code>, file and CLI functions) need no <code>use</code> at all.</p>
 <h2 id="text"><code>text</code></h2>
 <p class="orb-blurb">common text helpers callable via method-call syntax.</p>
-<div class="fn"><code class="sig">is_empty(t: text) -&gt; truth</code></div>
-<div class="fn"><code class="sig">byte_count(t: text) -&gt; int</code></div>
-<div class="fn"><code class="sig">starts_with(t: text, prefix: text) -&gt; truth</code></div>
-<div class="fn"><code class="sig">ends_with(t: text, suffix: text) -&gt; truth</code></div>
-<div class="fn"><code class="sig">repeat(t: text, n: int) -&gt; text</code><p>Repeat <code>t</code> <code>n</code> times.</p></div>
-<div class="fn"><code class="sig">reverse(t: text) -&gt; text</code><p>Reverse by CHARACTER (UTF-8-aware): a multibyte sequence keeps its byte order, so reversing Swedish never produces invalid UTF-8.</p></div>
-<div class="fn"><code class="sig">upper(t: text) -&gt; text</code><p>Upper-case, code point by code point.</p></div>
-<div class="fn"><code class="sig">lower(t: text) -&gt; text</code><p>Lower-case, code point by code point.</p></div>
-<div class="fn"><code class="sig">characters(t: text) -&gt; int</code><p>How many CHARACTERS (Unicode code points) the text holds - <code>len</code> counts bytes, and "åsa" is 4 bytes but 3 characters.</p></div>
-<div class="fn"><code class="sig">trim(t: text) -&gt; text</code><p>Remove leading and trailing ASCII whitespace (space, tab, newline, CR).</p></div>
-<div class="fn"><code class="sig">join(parts: [text], sep: text) -&gt; text</code><p>Join a list of pieces with <code>sep</code> between them.</p></div>
-<div class="fn"><code class="sig">split(t: text, sep: text) -&gt; [text]</code><p>Split <code>t</code> on every occurrence of <code>sep</code>, returning the pieces.</p></div>
-<div class="fn"><code class="sig">replace(t: text, from: text, to: text) -&gt; text</code><p>Replace every occurrence of <code>from</code> with <code>to</code> - split on <code>from</code>, rejoin with <code>to</code>.</p></div>
-<div class="fn"><code class="sig">index_of(t: text, sub: text) -&gt; int</code><p>First byte index of <code>sub</code> in <code>t</code>, or -1 if absent.</p></div>
-<div class="fn"><code class="sig">pad_left(t: text, width: int, pad: text) -&gt; text</code><p>Pad <code>t</code> on the left with <code>pad</code> until it is at least <code>width</code> bytes wide.</p></div>
-<div class="fn"><code class="sig">pad_right(t: text, width: int, pad: text) -&gt; text</code><p>Pad <code>t</code> on the right with <code>pad</code> until it is at least <code>width</code> bytes wide.</p></div>
+<div class="fn"><code class="sig">is_empty(t: text) -&gt; truth</code><pre class="ex">example is_empty("")
+example not is_empty("x")</pre></div>
+<div class="fn"><code class="sig">byte_count(t: text) -&gt; int</code><pre class="ex">example byte_count("åsa") is 4</pre></div>
+<div class="fn"><code class="sig">starts_with(t: text, prefix: text) -&gt; truth</code><pre class="ex">example starts_with("hello", "he")</pre></div>
+<div class="fn"><code class="sig">ends_with(t: text, suffix: text) -&gt; truth</code><pre class="ex">example ends_with("hello", "lo")</pre></div>
+<div class="fn"><code class="sig">repeat(t: text, n: int) -&gt; text</code><p>Repeat <code>t</code> <code>n</code> times. Returns "" if n &lt;= 0.</p><pre class="ex">example repeat("ab", 3) is "ababab"</pre></div>
+<div class="fn"><code class="sig">reverse(t: text) -&gt; text</code><p>Reverse by CHARACTER (UTF-8-aware): a multibyte sequence keeps its byte order, so reversing Swedish never produces invalid UTF-8.</p><pre class="ex">example reverse("abc") is "cba"
+example reverse("åsa") is "aså"</pre></div>
+<div class="fn"><code class="sig">upper(t: text) -&gt; text</code><p>Upper-case, code point by code point.</p><pre class="ex">example upper("hej") is "HEJ"
+example upper("åsa är glad") is "ÅSA ÄR GLAD"
+example upper("ελληνικά") is "ΕΛΛΗΝΙΚΆ"
+example upper("привет") is "ПРИВЕТ"</pre></div>
+<div class="fn"><code class="sig">lower(t: text) -&gt; text</code><p>Lower-case, code point by code point.</p><pre class="ex">example lower("HEJ") is "hej"
+example lower("ÅSA ÄR GLAD") is "åsa är glad"
+example lower("ΕΛΛΗΝΙΚΆ") is "ελληνικά"
+example lower("ПРИВЕТ") is "привет"</pre></div>
+<div class="fn"><code class="sig">characters(t: text) -&gt; int</code><p>How many CHARACTERS (Unicode code points) the text holds - <code>len</code> counts bytes, and "åsa" is 4 bytes but 3 characters. Counts every byte that is not a UTF-8 continuation byte (0x80-0xBF).</p><pre class="ex">example characters("åsa") is 3
+example characters("abc") is 3</pre></div>
+<div class="fn"><code class="sig">trim(t: text) -&gt; text</code><p>Remove leading and trailing ASCII whitespace (space, tab, newline, CR).   trim("  hi  ")  -&gt;  "hi"</p><pre class="ex">example trim("  hi  ") is "hi"</pre></div>
+<div class="fn"><code class="sig">join(parts: [text], sep: text) -&gt; text</code><p>Join a list of pieces with <code>sep</code> between them.   join(["a", "b", "c"], "-")  -&gt;  "a-b-c"</p><pre class="ex">example join(["a", "b", "c"], "-") is "a-b-c"</pre></div>
+<div class="fn"><code class="sig">split(t: text, sep: text) -&gt; [text]</code><p>Split <code>t</code> on every occurrence of <code>sep</code>, returning the pieces.   split("a,b,c", ",")  -&gt;  ["a", "b", "c"] An empty <code>sep</code> yields the whole string as a single piece.</p><pre class="ex">example len(split("a,b,c", ",")) is 3</pre></div>
+<div class="fn"><code class="sig">replace(t: text, from: text, to: text) -&gt; text</code><p>Replace every occurrence of <code>from</code> with <code>to</code> - split on <code>from</code>, rejoin with <code>to</code>. An empty <code>from</code> returns <code>t</code> unchanged.   replace("a,b,c", ",", "; ")  -&gt;  "a; b; c"</p><pre class="ex">example replace("a,b", ",", "; ") is "a; b"</pre></div>
+<div class="fn"><code class="sig">index_of(t: text, sub: text) -&gt; int</code><p>First byte index of <code>sub</code> in <code>t</code>, or -1 if absent. Empty <code>sub</code> -&gt; 0.</p><pre class="ex">example index_of("hello", "ll") is 2
+example index_of("hello", "zz") is 0 - 1</pre></div>
+<div class="fn"><code class="sig">pad_left(t: text, width: int, pad: text) -&gt; text</code><p>Pad <code>t</code> on the left with <code>pad</code> until it is at least <code>width</code> bytes wide.</p><pre class="ex">example pad_left("7", 3, "0") is "007"</pre></div>
+<div class="fn"><code class="sig">pad_right(t: text, width: int, pad: text) -&gt; text</code><p>Pad <code>t</code> on the right with <code>pad</code> until it is at least <code>width</code> bytes wide.</p><pre class="ex">example pad_right("7", 3, "0") is "700"</pre></div>
 <div class="fn"><code class="sig">lines(t: text) -&gt; [text]</code><p>Split <code>t</code> into lines on '\n'.</p></div>
-<div class="fn"><code class="sig">int_from_text(t: text) -&gt; int</code><p>The integer written at the start of <code>t</code>: an optional <code>-</code>, then digits.</p></div>
+<div class="fn"><code class="sig">int_from_text(t: text) -&gt; int</code><p>The integer written at the start of <code>t</code>: an optional <code>-</code>, then digits. Stops at the first non-digit; no digits at all is 0. For CLI arguments and simple protocols - not a validator.</p><pre class="ex">example int_from_text("42") is 42
+example int_from_text("-7") is 0 - 7
+example int_from_text("12ab") is 12
+example int_from_text("x") is 0</pre></div>
 <h2 id="list"><code>list</code></h2>
 <p class="orb-blurb">everyday integer-list helpers that don't need a closure.</p>
-<div class="fn"><code class="sig">range(n: int) -&gt; [int]</code><p>[0, 1, …, n-1].</p></div>
-<div class="fn"><code class="sig">reversed(xs: [int]) -&gt; [int]</code><p>A new list with the elements in reverse order.</p></div>
-<div class="fn"><code class="sig">includes(xs: [int], v: int) -&gt; truth</code><p>true if <code>v</code> appears in <code>xs</code>.</p></div>
-<div class="fn"><code class="sig">find(xs: [int], v: int) -&gt; int</code><p>First index of <code>v</code>, or -1 if absent.</p></div>
-<div class="fn"><code class="sig">first(xs: [int]) -&gt; int</code><p>First / last element, or 0 for an empty list.</p></div>
-<div class="fn"><code class="sig">last(xs: [int]) -&gt; int</code></div>
-<div class="fn"><code class="sig">max_of(xs: [int]) -&gt; int</code><p>Largest / smallest element, or 0 for an empty list.</p></div>
-<div class="fn"><code class="sig">min_of(xs: [int]) -&gt; int</code></div>
-<div class="fn"><code class="sig">avg(xs: [int]) -&gt; int</code><p>Integer average (sum / count), truncated.</p></div>
-<div class="fn"><code class="sig">concat(a: [int], b: [int]) -&gt; [int]</code><p>a followed by b, as a new list.</p></div>
-<div class="fn"><code class="sig">unique(xs: [int]) -&gt; [int]</code><p>The elements of <code>xs</code> with later duplicates removed (first occurrence kept).</p></div>
-<div class="fn"><code class="sig">take(xs: [int], n: int) -&gt; [int]</code><p>The first <code>n</code> elements (all of them if n &gt;= len, none if n &lt;= 0).</p></div>
-<div class="fn"><code class="sig">drop(xs: [int], n: int) -&gt; [int]</code><p>All but the first <code>n</code> elements.</p></div>
+<div class="fn"><code class="sig">range(n: int) -&gt; [int]</code><p>[0, 1, …, n-1]. Empty for n &lt;= 0.</p><pre class="ex">example len(range(4)) is 4</pre></div>
+<div class="fn"><code class="sig">reversed(xs: [int]) -&gt; [int]</code><p>A new list with the elements in reverse order.</p><pre class="ex">example at(reversed([1, 2, 3]), 0) is 3</pre></div>
+<div class="fn"><code class="sig">includes(xs: [int], v: int) -&gt; truth</code><p>true if <code>v</code> appears in <code>xs</code>. (Named <code>includes</code> to avoid the built-in <code>contains</code>, which is text-substring only.)</p><pre class="ex">example includes([1, 2, 3], 2)</pre></div>
+<div class="fn"><code class="sig">find(xs: [int], v: int) -&gt; int</code><p>First index of <code>v</code>, or -1 if absent.</p><pre class="ex">example find([5, 6], 6) is 1
+example find([5, 6], 9) is 0 - 1</pre></div>
+<div class="fn"><code class="sig">first(xs: [int]) -&gt; int</code><p>First / last element, or 0 for an empty list.</p><pre class="ex">example first([9, 8]) is 9</pre></div>
+<div class="fn"><code class="sig">last(xs: [int]) -&gt; int</code><pre class="ex">example last([9, 8]) is 8
+example last([9, 8]) is 8</pre></div>
+<div class="fn"><code class="sig">max_of(xs: [int]) -&gt; int</code><p>Largest / smallest element, or 0 for an empty list. (Named *_of to avoid num's two-argument max / min.)</p><pre class="ex">example max_of([3, 42, 7]) is 42</pre></div>
+<div class="fn"><code class="sig">min_of(xs: [int]) -&gt; int</code><pre class="ex">example min_of([3, 42, 7]) is 3</pre></div>
+<div class="fn"><code class="sig">avg(xs: [int]) -&gt; int</code><p>Integer average (sum / count), truncated. 0 for an empty list.</p><pre class="ex">example avg([2, 4, 6]) is 4</pre></div>
+<div class="fn"><code class="sig">concat(a: [int], b: [int]) -&gt; [int]</code><p>a followed by b, as a new list.</p><pre class="ex">example len(concat([1, 2], [3])) is 3</pre></div>
+<div class="fn"><code class="sig">unique(xs: [int]) -&gt; [int]</code><p>The elements of <code>xs</code> with later duplicates removed (first occurrence kept).</p><pre class="ex">example len(unique([1, 2, 1, 3])) is 3</pre></div>
+<div class="fn"><code class="sig">take(xs: [int], n: int) -&gt; [int]</code><p>The first <code>n</code> elements (all of them if n &gt;= len, none if n &lt;= 0).</p><pre class="ex">example len(take([1, 2, 3], 2)) is 2</pre></div>
+<div class="fn"><code class="sig">drop(xs: [int], n: int) -&gt; [int]</code><p>All but the first <code>n</code> elements.</p><pre class="ex">example len(drop([1, 2, 3], 2)) is 1</pre></div>
 <h2 id="num"><code>num</code></h2>
 <p class="orb-blurb">the small integer helpers every program reaches for.</p>
-<div class="fn"><code class="sig">abs(x: int) -&gt; int</code><p>Absolute value.</p></div>
-<div class="fn"><code class="sig">min(a: int, b: int) -&gt; int</code><p>The smaller of two values.</p></div>
-<div class="fn"><code class="sig">max(a: int, b: int) -&gt; int</code><p>The larger of two values.</p></div>
-<div class="fn"><code class="sig">clamp(x: int, lo: int, hi: int) -&gt; int</code><p>Constrain <code>x</code> to the range [lo, hi].</p></div>
-<div class="fn"><code class="sig">sign(x: int) -&gt; int</code><p>-1, 0, or 1 by the sign of <code>x</code>.</p></div>
-<div class="fn"><code class="sig">gcd(a: int, b: int) -&gt; int</code><p>Greatest common divisor (Euclid).</p></div>
-<div class="fn"><code class="sig">parse(t: text) -&gt; int</code><p>Parse a base-10 integer out of text.</p></div>
-<div class="fn"><code class="sig">ipow(base: int, exp: int) -&gt; int</code><p>Integer power (ipow): base^exp for exp &gt;= 0.</p></div>
-<div class="fn"><code class="sig">is_even(n: int) -&gt; truth</code><p>1 if <code>n</code> is even, else 0.</p></div>
-<div class="fn"><code class="sig">is_odd(n: int) -&gt; truth</code><p>1 if <code>n</code> is odd, else 0.</p></div>
-<div class="fn"><code class="sig">fabs(x: float) -&gt; float</code><p>Absolute value of a float.</p></div>
-<div class="fn"><code class="sig">fmin(a: float, b: float) -&gt; float</code><p>The smaller / larger of two floats.</p></div>
-<div class="fn"><code class="sig">fmax(a: float, b: float) -&gt; float</code></div>
-<div class="fn"><code class="sig">fclamp(x: float, lo: float, hi: float) -&gt; float</code><p>Constrain a float to [lo, hi].</p></div>
-<div class="fn"><code class="sig">parse_float(t: text) -&gt; float</code><p>Parse a float out of text: optional '-', integer part, optional '.fraction', optional 'e'/'E' exponent (with optional sign).</p></div>
+<div class="fn"><code class="sig">abs(x: int) -&gt; int</code><p>Absolute value.</p><pre class="ex">example abs(0 - 5) is 5</pre></div>
+<div class="fn"><code class="sig">min(a: int, b: int) -&gt; int</code><p>The smaller of two values.</p><pre class="ex">example min(3, 7) is 3</pre></div>
+<div class="fn"><code class="sig">max(a: int, b: int) -&gt; int</code><p>The larger of two values.</p><pre class="ex">example max(3, 7) is 7</pre></div>
+<div class="fn"><code class="sig">clamp(x: int, lo: int, hi: int) -&gt; int</code><p>Constrain <code>x</code> to the range [lo, hi].</p><pre class="ex">example clamp(15, 0, 10) is 10</pre></div>
+<div class="fn"><code class="sig">sign(x: int) -&gt; int</code><p>-1, 0, or 1 by the sign of <code>x</code>.</p><pre class="ex">example sign(0 - 9) is 0 - 1</pre></div>
+<div class="fn"><code class="sig">gcd(a: int, b: int) -&gt; int</code><p>Greatest common divisor (Euclid). gcd(0, 0) is 0.</p><pre class="ex">example gcd(12, 18) is 6</pre></div>
+<div class="fn"><code class="sig">parse(t: text) -&gt; int</code><p>Parse a base-10 integer out of text. A leading '-' negates; digits are read left to right and any non-digit is skipped. parse("") is 0.   parse("42")   -&gt;  42   parse("-7")   -&gt;  -7 Pairs with split: split("3,4,5", ",") then parse each piece.</p><pre class="ex">example parse("42") is 42</pre></div>
+<div class="fn"><code class="sig">ipow(base: int, exp: int) -&gt; int</code><p>Integer power (ipow): base^exp for exp &gt;= 0. Negative exp yields 0.   ipow(2, 10)  -&gt;  1024</p><pre class="ex">example ipow(2, 10) is 1024</pre></div>
+<div class="fn"><code class="sig">is_even(n: int) -&gt; truth</code><p>1 if <code>n</code> is even, else 0.</p><pre class="ex">example is_even(4)</pre></div>
+<div class="fn"><code class="sig">is_odd(n: int) -&gt; truth</code><p>1 if <code>n</code> is odd, else 0.</p><pre class="ex">example is_odd(7)</pre></div>
+<div class="fn"><code class="sig">fabs(x: float) -&gt; float</code><p>Absolute value of a float.</p><pre class="ex">example fabs(0.0 - 2.5) is 2.5</pre></div>
+<div class="fn"><code class="sig">fmin(a: float, b: float) -&gt; float</code><p>The smaller / larger of two floats.</p><pre class="ex">example fmin(1.5, 2.5) is 1.5</pre></div>
+<div class="fn"><code class="sig">fmax(a: float, b: float) -&gt; float</code><pre class="ex">example fmax(1.5, 2.5) is 2.5</pre></div>
+<div class="fn"><code class="sig">fclamp(x: float, lo: float, hi: float) -&gt; float</code><p>Constrain a float to [lo, hi].</p><pre class="ex">example fclamp(5.0, 0.0, 1.0) is 1.0</pre></div>
+<div class="fn"><code class="sig">parse_float(t: text) -&gt; float</code><p>Parse a float out of text: optional '-', integer part, optional '.fraction', optional 'e'/'E' exponent (with optional sign). Non-numeric tails stop the scan. parse_float("") is 0.0.   parse_float("3.14")    -&gt;  3.14   parse_float("-2.5e3")  -&gt;  -2500.0</p><pre class="ex">example parse_float("1.5") is 1.5</pre></div>
+<div class="fn"><code class="sig">with_decimals(x: float, decimals: int) -&gt; text</code><p><code>x</code> as text with a fixed number of decimals - the one formatting ask plain to_text cannot answer.</p><pre class="ex">example with_decimals(3.14159, 2) is "3.14"
+example with_decimals(2.5, 0) is "2"
+example with_decimals(1.0, 3) is "1.000"</pre></div>
 <h2 id="iter"><code>iter</code></h2>
 <p class="orb-blurb">functional list operations, powered by closures.</p>
 <h3 class="sub">Types</h3>
 <div class="fn"><code class="sig">order_of: less: fn</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">each&lt;T&gt;(xs: [T], f: fn) -&gt; [int]</code><p>Apply <code>f</code> to every element, collecting the results.</p></div>
-<div class="fn"><code class="sig">keep&lt;T&gt;(xs: [T], pred: fn) -&gt; [T]</code><p>Keep the elements for which <code>pred(x)</code> holds.</p></div>
-<div class="fn"><code class="sig">combine&lt;T&gt;(xs: [T], init: int, f: fn) -&gt; int</code><p>Fold left: acc starts at <code>init</code>, then acc = f(acc, x) for each element.</p></div>
-<div class="fn"><code class="sig">any&lt;T&gt;(xs: [T], pred: fn) -&gt; truth</code><p>true when <code>pred(x)</code> holds for at least one element.</p></div>
-<div class="fn"><code class="sig">all&lt;T&gt;(xs: [T], pred: fn) -&gt; truth</code><p>true when <code>pred(x)</code> holds for every element (vacuously true when empty).</p></div>
-<div class="fn"><code class="sig">find_index&lt;T&gt;(xs: [T], pred: fn) -&gt; int</code><p>Index of the first element where <code>pred(x)</code> holds, or -1 if none match.</p></div>
-<div class="fn"><code class="sig">count&lt;T&gt;(xs: [T], pred: fn) -&gt; int</code><p>How many elements satisfy <code>pred</code>.</p></div>
-<div class="fn"><code class="sig">sum(xs: [int]) -&gt; int</code><p>Sum of every element (0 for an empty list).</p></div>
-<div class="fn"><code class="sig">max_by(xs: [int], key: fn) -&gt; int</code><p>The element with the largest <code>key(x)</code>.</p></div>
-<div class="fn"><code class="sig">min_by(xs: [int], key: fn) -&gt; int</code><p>The element with the smallest <code>key(x)</code>.</p></div>
-<div class="fn"><code class="sig">sorted&lt;T&gt;(xs: [T], order: order_of) -&gt; [T]</code><p>Generic: works on ANY element type, because the ORDER comes in as a capability record (<code>requires order</code>) rather than being baked into the element type.</p></div>
-<div class="fn"><code class="sig">sort_by(xs: [int], less: fn) -&gt; [int]</code><p>The int-typed form (kept: the common case, no capability record needed).</p></div>
+<div class="fn"><code class="sig">each&lt;T&gt;(xs: [T], f: fn) -&gt; [int]</code><p>Apply <code>f</code> to every element, collecting the results.</p><pre class="ex">example at(each([1, 2, 3], (x): x * 2), 1) is 4</pre></div>
+<div class="fn"><code class="sig">keep&lt;T&gt;(xs: [T], pred: fn) -&gt; [T]</code><p>Keep the elements for which <code>pred(x)</code> holds. Result keeps the element type.</p><pre class="ex">example len(keep([1, 2, 3, 4], (x): x &gt; 2)) is 2</pre></div>
+<div class="fn"><code class="sig">combine&lt;T&gt;(xs: [T], init: int, f: fn) -&gt; int</code><p>Fold left: acc starts at <code>init</code>, then acc = f(acc, x) for each element.</p><pre class="ex">example combine([1, 2, 3], 0, (a, b): a + b) is 6</pre></div>
+<div class="fn"><code class="sig">any&lt;T&gt;(xs: [T], pred: fn) -&gt; truth</code><p>true when <code>pred(x)</code> holds for at least one element.</p><pre class="ex">example any([1, 5, 9], (x): x &gt; 8)
+example not any([1, 2], (x): x &gt; 8)</pre></div>
+<div class="fn"><code class="sig">all&lt;T&gt;(xs: [T], pred: fn) -&gt; truth</code><p>true when <code>pred(x)</code> holds for every element (vacuously true when empty).</p><pre class="ex">example all([2, 4], (x): x % 2 is 0)
+example not all([2, 5], (x): x % 2 is 0)</pre></div>
+<div class="fn"><code class="sig">find_index&lt;T&gt;(xs: [T], pred: fn) -&gt; int</code><p>Index of the first element where <code>pred(x)</code> holds, or -1 if none match.</p><pre class="ex">example find_index([1, 9, 3], (x): x &gt; 5) is 1</pre></div>
+<div class="fn"><code class="sig">count&lt;T&gt;(xs: [T], pred: fn) -&gt; int</code><p>How many elements satisfy <code>pred</code>.</p><pre class="ex">example count([1, 9, 3, 7], (x): x &gt; 5) is 2</pre></div>
+<div class="fn"><code class="sig">sum(xs: [int]) -&gt; int</code><p>Sum of every element (0 for an empty list). No closure - the workhorse <code>combine(xs, 0, fn(a, b): a + b)</code> written once.</p><pre class="ex">example sum([1, 2, 3]) is 6
+example sum([40, 2]) is 42</pre></div>
+<div class="fn"><code class="sig">max_by(xs: [int], key: fn) -&gt; int</code><p>The element with the largest <code>key(x)</code>. Ties keep the earlier element. Returns 0 for an empty list.</p><pre class="ex">example max_by([1, 9, 3], (x): x) is 9</pre></div>
+<div class="fn"><code class="sig">min_by(xs: [int], key: fn) -&gt; int</code><p>The element with the smallest <code>key(x)</code>. Ties keep the earlier element. Returns 0 for an empty list.</p><pre class="ex">example min_by([4, 2, 8], (x): x) is 2</pre></div>
+<div class="fn"><code class="sig">sorted&lt;T&gt;(xs: [T], order: order_of) -&gt; [T]</code><p>Generic: works on ANY element type, because the ORDER comes in as a capability record (<code>requires order</code>) rather than being baked into the element type. <code>sort_by(xs, less_fn)</code> stays for the plain int case.</p><pre class="ex">example at(sorted([3, 1, 2], order_of{less: (a, b): a &lt; b}), 0) is 1</pre></div>
+<div class="fn"><code class="sig">sort_by(xs: [int], less: fn) -&gt; [int]</code><p>The int-typed form (kept: the common case, no capability record needed).</p><pre class="ex">example at(sort_by([3, 1, 2], (a, b): a &lt; b), 0) is 1</pre></div>
 <h2 id="dict"><code>dict</code></h2>
 <p class="orb-blurb">friendly names for the map built-ins a newcomer reaches for.</p>
-<div class="fn"><code class="sig">keys(m: table) -&gt; [text]</code><p>The keys of <code>m</code>, as a list of text.</p></div>
-<div class="fn"><code class="sig">has_key(m: table, k: text) -&gt; truth</code><p>1 if <code>k</code> is present, else 0.</p></div>
-<div class="fn"><code class="sig">values(m: table) -&gt; [int]</code><p>The values of an int-valued map, in key order.</p></div>
+<div class="fn"><code class="sig">keys(m: table) -&gt; [text]</code><p>The keys of <code>m</code>, as a list of text.</p><pre class="ex">example len(keys({"a": 1, "b": 2})) is 2</pre></div>
+<div class="fn"><code class="sig">has_key(m: table, k: text) -&gt; truth</code><p>1 if <code>k</code> is present, else 0.</p><pre class="ex">example has_key({"a": 1}, "a")
+example not has_key({"a": 1}, "z")</pre></div>
+<div class="fn"><code class="sig">values(m: table) -&gt; [int]</code><p>The values of an int-valued map, in key order.</p><pre class="ex">example at(values({"a": 7}), 0) is 7</pre></div>
 <h2 id="json"><code>json</code></h2>
 <p class="orb-blurb">parse and build JSON.</p>
 <h3 class="sub">Types</h3>
 <div class="fn"><code class="sig">Json = JNull | JBool(int)                 # 0 = false, anything else = true | JInt(int) | JFloat(float) | JStr(text) | JArr([Json]) | JObj([text], [Json])       # parallel keys and values</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">json_parse(src: text) -&gt; table</code></div>
-<div class="fn"><code class="sig">json_obj(o: table, key: text) -&gt; table</code></div>
-<div class="fn"><code class="sig">json_text(o: table, key: text) -&gt; text</code></div>
-<div class="fn"><code class="sig">json_int(o: table, key: text) -&gt; int</code></div>
-<div class="fn"><code class="sig">json_list(o: table, key: text) -&gt; [table]</code></div>
-<div class="fn"><code class="sig">json_has(o: table, key: text) -&gt; truth</code></div>
-<div class="fn"><code class="sig">json_escape(s: text) -&gt; text</code><p>Escape a Text for embedding in JSON output.</p></div>
-<div class="fn"><code class="sig">jnull() -&gt; Json</code></div>
-<div class="fn"><code class="sig">jbool(b: int) -&gt; Json</code></div>
-<div class="fn"><code class="sig">jint(n: int) -&gt; Json</code></div>
-<div class="fn"><code class="sig">jfloat(x: float) -&gt; Json</code></div>
-<div class="fn"><code class="sig">jstr(s: text) -&gt; Json</code></div>
-<div class="fn"><code class="sig">jarr(items: [Json]) -&gt; Json</code></div>
-<div class="fn"><code class="sig">jobj(keys: [text], vals: [Json]) -&gt; Json</code></div>
-<div class="fn"><code class="sig">json_stringify(j: Json) -&gt; text</code><p>Serialize a Json value to compact JSON text.</p></div>
+<div class="fn"><code class="sig">json_parse(src: text) -&gt; table</code><pre class="ex">example json_has(json_parse("\{\"k\": 1\}"), "k")</pre></div>
+<div class="fn"><code class="sig">json_obj(o: table, key: text) -&gt; table</code><pre class="ex">example json_has(json_obj(json_parse("\{\"o\": \{\"k\": 1\}\}"), "o"), "k")</pre></div>
+<div class="fn"><code class="sig">json_text(o: table, key: text) -&gt; text</code><pre class="ex">example json_text(json_parse("\{\"s\": \"hi\"\}"), "s") is "hi"</pre></div>
+<div class="fn"><code class="sig">json_int(o: table, key: text) -&gt; int</code><pre class="ex">example json_int(json_parse("\{\"n\": 7\}"), "n") is 7</pre></div>
+<div class="fn"><code class="sig">json_list(o: table, key: text) -&gt; [table]</code><pre class="ex">example len(json_list(json_parse("\{\"xs\": [1, 2]\}"), "xs")) is 2</pre></div>
+<div class="fn"><code class="sig">json_has(o: table, key: text) -&gt; truth</code><pre class="ex">example json_has(json_parse("\{\"a\": 1\}"), "a")</pre></div>
+<div class="fn"><code class="sig">json_escape(s: text) -&gt; text</code><p>Escape a Text for embedding in JSON output. Single pass; the byte list is turned into text once at the end.</p><pre class="ex">example json_escape("a\"b") is "a\\\"b"</pre></div>
+<div class="fn"><code class="sig">jnull() -&gt; Json</code><pre class="ex">example json_stringify(jnull()) is "null"</pre></div>
+<div class="fn"><code class="sig">jbool(b: int) -&gt; Json</code><pre class="ex">example json_stringify(jbool(1)) is "true"</pre></div>
+<div class="fn"><code class="sig">jint(n: int) -&gt; Json</code><pre class="ex">example json_stringify(jint(0 - 5)) is "-5"</pre></div>
+<div class="fn"><code class="sig">jfloat(x: float) -&gt; Json</code><pre class="ex">example json_stringify(jfloat(1.5)) is "1.5"</pre></div>
+<div class="fn"><code class="sig">jstr(s: text) -&gt; Json</code><pre class="ex">example json_stringify(jstr("hi")) is "\"hi\""</pre></div>
+<div class="fn"><code class="sig">jarr(items: [Json]) -&gt; Json</code><pre class="ex">example json_stringify(jarr([])) is "[]"</pre></div>
+<div class="fn"><code class="sig">jobj(keys: [text], vals: [Json]) -&gt; Json</code><pre class="ex">example json_stringify(jobj([], [])) is "\{\}"</pre></div>
+<div class="fn"><code class="sig">json_stringify(j: Json) -&gt; text</code><p>Serialize a Json value to compact JSON text.</p><pre class="ex">example json_stringify(jint(42)) is "42"
+example json_stringify(jarr([jint(1), jint(2)])) is "[1,2]"</pre></div>
+<h2 id="time"><code>time</code></h2>
+<p class="orb-blurb">clock time for humans: unix seconds and formatted dates.</p>
+<div class="fn"><code class="sig">now_unix() -&gt; int uses clock = unix_now()</code><p>Seconds since 1970-01-01 UTC. no example: wall-clock dependent - proven by test_42_general_floor.or</p></div>
+<div class="fn"><code class="sig">local_time(unix_s: int, fmt: text) -&gt; text</code><p><code>unix_s</code> formatted with strftime codes, in the machine's local timezone.</p><pre class="ex">example len(local_time(0, "%Y")) is 4</pre></div>
+<div class="fn"><code class="sig">utc_time(unix_s: int, fmt: text) -&gt; text</code><p><code>unix_s</code> formatted with strftime codes, in UTC.</p><pre class="ex">example utc_time(0, "%Y-%m-%d") is "1970-01-01"
+example utc_time(86400, "%H:%M:%S") is "00:00:00"</pre></div>
+<div class="fn"><code class="sig">timestamp() -&gt; text uses clock = local_time(unix_now(), "%Y-%m-%d %H:%M:%S")</code><p>The common stamp, local: "2026-08-04 21:30:05". no example: wall-clock dependent - proven by test_42_general_floor.or</p></div>
+<div class="fn"><code class="sig">parse_utc(t: text) -&gt; int</code><p>"YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS" (UTC) -&gt; unix seconds. -1 when the text does not have that shape. The inverse of utc_time with the same formats - round-trips by construction.</p><pre class="ex">example parse_utc("1970-01-01") is 0
+example parse_utc("1970-01-02 00:00:00") is 86400
+example parse_utc("not a date") is 0 - 1
+example utc_time(parse_utc("2026-08-04 21:30:05"), "%Y-%m-%d %H:%M:%S") is "2026-08-04 21:30:05"</pre></div>
+<h2 id="http"><code>http</code></h2>
+<p class="orb-blurb">fetch and post over HTTP(S).</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">response = status: int | body: text</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">status_from_headers(header_dump: text) -&gt; int</code><p>The status is read from curl's header dump (-D), not from stdout: the dump is a file of its own, so a stray stderr line can never corrupt it. With redirects (-L) the dump holds one block per hop - the LAST status line is the answer.</p><pre class="ex">example status_from_headers("HTTP/1.1 200 OK") is 200
+example status_from_headers("garbage") is 0</pre></div>
+<div class="fn"><code class="sig">fetch(url: text) -&gt; response uses net, files</code><p>GET <code>url</code>. <code>success(r)</code> when the request went through AND the server said 2xx. no example: needs the network - proven by examples/demos/httpd.or + manual runs</p></div>
+<div class="fn"><code class="sig">post(url: text, content_type: text, payload: text) -&gt; response uses net, files</code><p>POST <code>body</code> to <code>url</code> with the given Content-Type. no example: needs the network - proven by manual runs</p></div>
+<div class="fn"><code class="sig">success(r: response) -&gt; truth</code><p>Did the request reach a server that answered success?</p><pre class="ex">example success(response{status: 200, body: ""})
+example not success(response{status: 404, body: ""})
+example not success(response{status: 0, body: ""})</pre></div>
 <h2 id="net"><code>net</code></h2>
 <p class="orb-blurb">blocking TCP, client and server.</p>
-<div class="fn"><code class="sig">connect(host: text, port: int) -&gt; int uses net</code><p>--- client ---</p></div>
-<div class="fn"><code class="sig">send(sock: int, data: text) -&gt; int uses net = tcp_send(sock, data)</code><p>no example: needs a live peer - proven by test_42_net_loopback.or</p></div>
-<div class="fn"><code class="sig">recv(sock: int, maxlen: int) -&gt; text uses net = tcp_recv(sock, maxlen)</code><p>no example: needs a live peer - proven by test_42_net_timeout.or</p></div>
-<div class="fn"><code class="sig">close(sock: int) -&gt; int uses net</code></div>
-<div class="fn"><code class="sig">listen(port: int) -&gt; int uses net</code><p>--- server --- Open a listening socket on <code>port</code> (loopback).</p></div>
-<div class="fn"><code class="sig">accept(server: int) -&gt; int uses net = tcp_accept(server)</code><p>no example: blocks for a client - proven by test_42_net_loopback.or</p></div>
-<div class="fn"><code class="sig">with_connection(host: text, port: int, body: fn) -&gt; int uses net</code><p>--- lifetime-safe forms --- The socket you cannot forget to close: the ORB owns the handle, runs your body with it, and closes on the way out (including when the body returns early - the close is a <code>defer</code>).</p></div>
-<div class="fn"><code class="sig">with_listener(port: int, body: fn) -&gt; int uses net</code><p>The same for a listening socket: serve, hand the listener to the body, and close it however the body leaves.</p></div>
-<div class="fn"><code class="sig">set_timeout(sock: int, ms: int) -&gt; int uses net = tcp_set_timeout(sock, ms)</code><p>Give up after <code>ms</code> milliseconds instead of blocking forever: <code>accept</code> then returns -1 and <code>recv</code> returns "" when the deadline passes.</p></div>
-<div class="fn"><code class="sig">accept_within(listener: int, ms: int) -&gt; int uses net = tcp_accept_wait(listener, ms)</code><p>Wait up to <code>ms</code> for a client; -1 when nobody came.</p></div>
-<div class="fn"><code class="sig">connect_within(host: text, port: int, ms: int) -&gt; int uses net</code><p>Connect, but give up after <code>ms</code> instead of blocking.</p></div>
-<div class="fn"><code class="sig">readable_within(sock: int, ms: int) -&gt; truth uses net</code><p>Has <code>sock</code> got anything to read? Waits up to <code>ms</code> for it.</p></div>
-<div class="fn"><code class="sig">timed_out(chunk: text) -&gt; truth</code><p>Did a read time out (or the peer close)? Both surface as "".</p></div>
-<div class="fn"><code class="sig">ok(handle: int) -&gt; truth</code><p>Did the call succeed? Reads better than comparing to -1 at every site.</p></div>
+<div class="fn"><code class="sig">connect(host: text, port: int) -&gt; int uses net</code><p>--- client ---</p><pre class="ex">example not ok(connect("127.0.0.1", 1))</pre></div>
+<div class="fn"><code class="sig">send(sock: int, data: text) -&gt; int uses net = tcp_send(sock, data)</code></div>
+<div class="fn"><code class="sig">recv(sock: int, maxlen: int) -&gt; text uses net = tcp_recv(sock, maxlen)</code></div>
+<div class="fn"><code class="sig">close(sock: int) -&gt; int uses net</code><pre class="ex">example close(0 - 1) is 0</pre></div>
+<div class="fn"><code class="sig">listen(port: int) -&gt; int uses net</code><p>--- server --- Open a listening socket on <code>port</code> (loopback). -1 if the port is taken.</p><pre class="ex">example close(listen(58499)) is 0</pre></div>
+<div class="fn"><code class="sig">accept(server: int) -&gt; int uses net = tcp_accept(server)</code></div>
+<div class="fn"><code class="sig">with_connection(host: text, port: int, body: fn) -&gt; int uses net</code><p>--- lifetime-safe forms --- The socket you cannot forget to close: the ORB owns the handle, runs your body with it, and closes on the way out (including when the body returns early - the close is a <code>defer</code>). This is the library-level shape of the scope-owned resource model (Tema 10); when the language gains handler-owned resources these become that, with the same call sites.    answer = with_connection("127.0.0.1", 8080, (c): send(c, "hi")) The body gets the socket and returns a number; -1 means the connect failed. no example: needs a live peer - proven by examples/demos/httpd.or</p></div>
+<div class="fn"><code class="sig">with_listener(port: int, body: fn) -&gt; int uses net</code><p>The same for a listening socket: serve, hand the listener to the body, and close it however the body leaves. no example: binds a port - proven by test_42_net_scoped.or</p></div>
+<div class="fn"><code class="sig">set_timeout(sock: int, ms: int) -&gt; int uses net = tcp_set_timeout(sock, ms)</code><p>Give up after <code>ms</code> milliseconds instead of blocking forever: <code>accept</code> then returns -1 and <code>recv</code> returns "" when the deadline passes. 0 restores blocking. Set it on a LISTENER before accept, or on a connection before recv - a server that cannot time out cannot do anything else. no example: needs a live socket - proven by test_42_net_timeout.or</p></div>
+<div class="fn"><code class="sig">accept_within(listener: int, ms: int) -&gt; int uses net = tcp_accept_wait(listener, ms)</code><p>Wait up to <code>ms</code> for a client; -1 when nobody came. This is the one a server loop wants: it can time out, do other work, and come back. no example: needs a listener + timing - proven by test_42_net_timeout.or</p></div>
+<div class="fn"><code class="sig">connect_within(host: text, port: int, ms: int) -&gt; int uses net</code><p>Connect, but give up after <code>ms</code> instead of blocking. Plain <code>connect</code> is the one socket call that cannot time out, and a blocked connect parks the whole PROCESS - so inside a task it freezes every other task too. That is not theoretical: ten clients against a server whose listen backlog was full deadlocked, because the connect that had to wait was holding the scheduler the acceptor needed. Inside a task, use this and <code>sleep_task</code> between tries.</p><pre class="ex">example not ok(connect_within("127.0.0.1", 1, 50))</pre></div>
+<div class="fn"><code class="sig">readable_within(sock: int, ms: int) -&gt; truth uses net</code><p>Has <code>sock</code> got anything to read? Waits up to <code>ms</code> for it.  This is the call that makes a task-per-connection server scale. Without it the only way to wait is <code>recv</code> with a short timeout, retried - and every attempt parks the whole PROCESS, so a round costs (waiting tasks x timeout). Here the task parks and the SCHEDULER waits for every parked socket in one select, so a round costs one wait however many tasks are in it. Outside a task it is an ordinary wait, so the same call is right in both places. no example: needs a live socket - proven by test_42_net_concurrent.or</p></div>
+<div class="fn"><code class="sig">timed_out(chunk: text) -&gt; truth</code><p>Did a read time out (or the peer close)? Both surface as "".</p><pre class="ex">example timed_out("")
+example not timed_out("data")</pre></div>
+<div class="fn"><code class="sig">ok(handle: int) -&gt; truth</code><p>Did the call succeed? Reads better than comparing to -1 at every site.</p><pre class="ex">example ok(0 - 1) is false
+example ok(3)</pre></div>
+<div class="fn"><code class="sig">udp(port: int) -&gt; int uses net = udp_open(port)</code><p>A bound UDP socket, or -1. Port 0 picks an ephemeral one. no example: opens a socket - proven by test_42_udp_loopback.or</p></div>
+<div class="fn"><code class="sig">udp_send(sock: int, host: text, port: int, data: text) -&gt; int uses net = udp_send_to(sock, host, port, data)</code><p>Send one datagram to host:port. Bytes sent, or -1. no example: sends on the network - proven by test_42_udp_loopback.or</p></div>
+<div class="fn"><code class="sig">udp_receive(sock: int, maxlen: int) -&gt; text uses net = udp_recv_from(sock, maxlen)</code><p>One datagram as text ("" when nothing). Pair with readable_within for a deadline; ask udp_sender() right after for who sent it. no example: reads the network - proven by test_42_udp_loopback.or</p></div>
+<div class="fn"><code class="sig">udp_sender() -&gt; text uses net = udp_last_sender()</code><p>"ip:port" of the last datagram udp_receive returned, "" before any. no example: network state - proven by test_42_udp_loopback.or</p></div>
+<div class="fn"><code class="sig">local_port(sock: int) -&gt; int uses net = sock_local_port(sock)</code><p>The port a socket actually bound to - what <code>listen(0)</code>/<code>udp(0)</code> picked. no example: opens a socket - proven by test_42_udp_loopback.or</p></div>
 <h2 id="os"><code>os</code></h2>
 <p class="orb-blurb">CLI / OS primitives for self-hosted tools (orbit), under the names orbit already uses.</p>
-<div class="fn"><code class="sig">elapsed(start: int) -&gt; int uses clock = now() - start</code><p>Milliseconds between now() and an earlier now() - timing metric.</p></div>
-<div class="fn"><code class="sig">read_file(p: text) -&gt; text uses files = file_read(p)</code><p>orion-self builtins under orbit's names (file_read/argv/argc live in the compiler, not an orb - callable directly).</p></div>
-<div class="fn"><code class="sig">arg(i: int) -&gt; text = argv(i)</code><p>no example: depends on the process command line - proven by orbit</p></div>
-<div class="fn"><code class="sig">arg_count() -&gt; int = argc()</code><p>no example: depends on the process command line - proven by orbit</p></div>
+<div class="fn"><code class="sig">elapsed(start: int) -&gt; int uses clock = now() - start</code><p>Milliseconds between now() and an earlier now() - timing metric. no example: wall-clock dependent - proven by tools/compile_bench.sh</p></div>
+<div class="fn"><code class="sig">read_file(p: text) -&gt; text uses files = file_read(p)</code><p>orion-self builtins under orbit's names (file_read/argv/argc live in the compiler, not an orb - callable directly). no example: needs a file on disk - proven by test_42_file_stream.or</p></div>
+<div class="fn"><code class="sig">arg(i: int) -&gt; text = argv(i)</code></div>
+<div class="fn"><code class="sig">arg_count() -&gt; int = argc()</code></div>
 <div class="fn"><code class="sig">write_file(p: text, c: text) -&gt; int uses files</code></div>
-<div class="fn"><code class="sig">modified_at(p: text) -&gt; int uses files = file_mtime(p)</code><p>When was <code>p</code> last written, in ms? Only comparisons and deltas are meaningful (the epoch is host-specific).</p></div>
-<div class="fn"><code class="sig">os_kind() -&gt; int</code><p>Public wrapper so other orbs can branch on the host without re-declaring the extern (a second <code>declare</code> in the bundle is an LLVM redefinition error).</p></div>
-<div class="fn"><code class="sig">run_command(cmd: text, args: [text]) -&gt; int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))</code><p>no example: runs a child process - proven by orbit itself (build_orbit.sh)</p></div>
-<div class="fn"><code class="sig">run_command_quiet(cmd: text, args: [text]) -&gt; int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))</code><p>no example: runs a child process - proven by orbit itself</p></div>
-<div class="fn"><code class="sig">capture_stdout(cmd: text, args: [text]) -&gt; text = capture(os_join(os_quote(cmd), args, 0))</code><p>no example: runs a child process - proven by tools/lsp_test.sh</p></div>
-<div class="fn"><code class="sig">start_command(cmd: text, args: [text]) -&gt; int = proc_start(os_join(os_quote(win_path(cmd)), args, 0))</code><p>Start a command without waiting.</p></div>
-<div class="fn"><code class="sig">start_command_to_file(cmd: text, args: [text], out_path: text) -&gt; int = proc_start_to_file(os_join(os_quote(win_path(cmd)), args, 0), out_path)</code><p>Same, but the child's stdout+stderr are written to <code>out_path</code> (truncated).</p></div>
-<div class="fn"><code class="sig">finished_within(id: int, ms: int) -&gt; truth = proc_wait_ready(id, ms) is 1</code><p>Did job <code>id</code> finish within <code>ms</code>? Inside a task this parks the task and lets the others run; outside it is an ordinary wait.</p></div>
-<div class="fn"><code class="sig">command_result(id: int) -&gt; int = proc_result(id)</code><p>Exit code of a finished job, taken ONCE (the job id is dead afterwards).</p></div>
-<div class="fn"><code class="sig">stop_command(id: int) -&gt; truth = proc_stop(id) is 1</code><p>Kill a running job.</p></div>
-<div class="fn"><code class="sig">env(name: text) -&gt; text = env_get(name)</code><p>The environment variable <code>name</code>, or "" when unset.</p></div>
-<div class="fn"><code class="sig">interrupted() -&gt; truth = interrupt_seen() is 1</code><p>Has the user pressed Ctrl+C? The first call arms the handler; from then on one Ctrl+C sets this flag instead of killing (poll it in your loop and shut down cleanly), and a SECOND Ctrl+C kills as normal - a hung program still dies at the keyboard.</p></div>
-<div class="fn"><code class="sig">cpu_count() -&gt; int</code><p>Hardware threads on this machine - what to size a worker pool by.</p></div>
-<div class="fn"><code class="sig">path_join(a: text, b: text) -&gt; text</code><p>---- paths ----</p></div>
-<div class="fn"><code class="sig">path_parent(p: text) -&gt; text</code></div>
-<div class="fn"><code class="sig">remove_tree(p: text) -&gt; int uses files = fs_remove_tree(p)</code><p>Delete a directory and everything under it.</p></div>
-<div class="fn"><code class="sig">list_dir(dir: text) -&gt; [text] uses files = split(orion_dir_list(dir), "\n")</code><p>no example: depends on the filesystem - proven by tools/orbstat.or</p></div>
-<div class="fn"><code class="sig">list_dirs(dir: text) -&gt; [text] uses files = split(orion_dir_subdirs(dir), "\n")</code><p>no example: depends on the filesystem - proven by tools/orbstat.or</p></div>
-<div class="fn"><code class="sig">arguments() -&gt; [text]</code><p>The command line as ONE list of text - <code>arguments()</code> replaces argc()/argv(i) (the literal C names).</p></div>
+<div class="fn"><code class="sig">modified_at(p: text) -&gt; int uses files = file_mtime(p)</code><p>When was <code>p</code> last written, in ms? Only comparisons and deltas are meaningful (the epoch is host-specific). -1 for a missing file - a watcher treats that as "changed". no example: depends on the filesystem - proven by tools/orbwatch.or</p></div>
+<div class="fn"><code class="sig">os_kind() -&gt; int</code><p>Public wrapper so other orbs can branch on the host without re-declaring the extern (a second <code>declare</code> in the bundle is an LLVM redefinition error). 0 = Windows, 1 = Linux, 2 = macOS.</p><pre class="ex">example os_kind() &gt;= 0</pre></div>
+<div class="fn"><code class="sig">run_command(cmd: text, args: [text]) -&gt; int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))</code></div>
+<div class="fn"><code class="sig">run_command_quiet(cmd: text, args: [text]) -&gt; int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))</code></div>
+<div class="fn"><code class="sig">capture_stdout(cmd: text, args: [text]) -&gt; text = capture(os_join(os_quote(cmd), args, 0))</code></div>
+<div class="fn"><code class="sig">start_command(cmd: text, args: [text]) -&gt; int = proc_start(os_join(os_quote(win_path(cmd)), args, 0))</code><p>Start a command without waiting. Returns a job id, or -1 if it could not start. The child's output goes to your console, interleaved with everyone else's - use start_command_to_file when more than one runs at a time. no example: runs a child process - proven by test_42_proc_parallel.or</p></div>
+<div class="fn"><code class="sig">start_command_to_file(cmd: text, args: [text], out_path: text) -&gt; int = proc_start_to_file(os_join(os_quote(win_path(cmd)), args, 0), out_path)</code><p>Same, but the child's stdout+stderr are written to <code>out_path</code> (truncated). Read the file after <code>finished_within</code> says true. no example: runs a child process - proven by test_42_proc_parallel.or</p></div>
+<div class="fn"><code class="sig">finished_within(id: int, ms: int) -&gt; truth = proc_wait_ready(id, ms) is 1</code><p>Did job <code>id</code> finish within <code>ms</code>? Inside a task this parks the task and lets the others run; outside it is an ordinary wait. false = still running. no example: runs a child process - proven by test_42_proc_parallel.or</p></div>
+<div class="fn"><code class="sig">command_result(id: int) -&gt; int = proc_result(id)</code><p>Exit code of a finished job, taken ONCE (the job id is dead afterwards). -1 while the job still runs or for an unknown id. no example: runs a child process - proven by test_42_proc_parallel.or</p></div>
+<div class="fn"><code class="sig">stop_command(id: int) -&gt; truth = proc_stop(id) is 1</code><p>Kill a running job. Its command_result becomes the kill status the OS reports, not the program's own exit code. no example: runs a child process - proven by test_42_proc_parallel.or</p></div>
+<div class="fn"><code class="sig">env(name: text) -&gt; text = env_get(name)</code><p>The environment variable <code>name</code>, or "" when unset. How PATH, HOME and API keys reach a program. no example: depends on the host environment - proven by test_42_general_floor.or</p></div>
+<div class="fn"><code class="sig">interrupted() -&gt; truth = interrupt_seen() is 1</code><p>Has the user pressed Ctrl+C? The first call arms the handler; from then on one Ctrl+C sets this flag instead of killing (poll it in your loop and shut down cleanly), and a SECOND Ctrl+C kills as normal - a hung program still dies at the keyboard. no example: needs a keyboard - proven by test_42_general_floor.or (arm side)</p></div>
+<div class="fn"><code class="sig">cpu_count() -&gt; int</code><p>Hardware threads on this machine - what to size a worker pool by.</p><pre class="ex">example cpu_count() &gt;= 1</pre></div>
+<div class="fn"><code class="sig">path_join(a: text, b: text) -&gt; text</code><p>---- paths ----</p><pre class="ex">example path_join("src", "main.or") is "src/main.or"</pre></div>
+<div class="fn"><code class="sig">path_parent(p: text) -&gt; text</code><pre class="ex">example path_parent("a/b/c.or") is "a/b"
+example path_parent("solo") is "."</pre></div>
+<div class="fn"><code class="sig">remove_tree(p: text) -&gt; int uses files = fs_remove_tree(p)</code><p>Delete a directory and everything under it. 0 when it is gone, -1 when something survived. Clears read-only bits on the way (a git checkout marks its object files read-only). no example: deletes from disk - proven by tools/package_test.sh</p></div>
+<div class="fn"><code class="sig">list_dir(dir: text) -&gt; [text] uses files = split(orion_dir_list(dir), "\n")</code></div>
+<div class="fn"><code class="sig">list_dirs(dir: text) -&gt; [text] uses files = split(orion_dir_subdirs(dir), "\n")</code></div>
+<div class="fn"><code class="sig">arguments() -&gt; [text]</code><p>The command line as ONE list of text - <code>arguments()</code> replaces argc()/argv(i) (the literal C names). argv/argc stay as the raw boundary underneath.</p></div>
+<div class="fn"><code class="sig">move_path(from: text, to: text) -&gt; int uses files = fs_rename(from, to)</code><p>Move or rename a file (or directory). 0 on success. On Windows the target must not already exist - remove it first when you mean replace. no example: moves files on disk - proven by test_42_general_floor.or</p></div>
+<div class="fn"><code class="sig">copy_file(from: text, to: text) -&gt; int uses files = fs_copy_file(from, to)</code><p>Byte-for-byte file copy (binary-safe). 0 on success. no example: writes to disk - proven by test_42_general_floor.or</p></div>
+<div class="fn"><code class="sig">cwd() -&gt; text uses files = fs_cwd()</code><p>The current working directory, "" if the OS cannot say. no example: depends on where the process runs - proven by test_42_general_floor.or</p></div>
+<h2 id="file"><code>file</code></h2>
+<p class="orb-blurb">streaming file IO.</p>
+<div class="fn"><code class="sig">open_read(path: text) -&gt; int uses files = file_open(path, 0)</code><p>--- opening --- -1 when the file cannot be opened (missing, locked, out of handles). no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
+<div class="fn"><code class="sig">open_write(path: text) -&gt; int uses files = file_open(path, 1)</code></div>
+<div class="fn"><code class="sig">open_append(path: text) -&gt; int uses files = file_open(path, 2)</code></div>
+<div class="fn"><code class="sig">ok(handle: int) -&gt; truth</code><pre class="ex">example ok(0 - 1) is false
+example ok(2)</pre></div>
+<div class="fn"><code class="sig">read_chunk(handle: int, maxlen: int) -&gt; text uses files = file_read_chunk(handle, maxlen)</code><p>--- moving bytes --- Up to <code>maxlen</code> bytes. "" means end of stream. no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
+<div class="fn"><code class="sig">write_chunk(handle: int, data: text) -&gt; int uses files = file_write_chunk(handle, data)</code><p>How many bytes were written (-1 on failure). no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
+<div class="fn"><code class="sig">close(handle: int) -&gt; int uses files = file_close(handle)</code></div>
+<div class="fn"><code class="sig">size_of(path: text) -&gt; int uses files = file_bytes(path)</code><p>Size in bytes without reading the contents. -1 if it does not exist. no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
+<div class="fn"><code class="sig">is_end(chunk: text) -&gt; truth</code><p>Is this chunk the end of the stream?</p><pre class="ex">example is_end("")
+example not is_end("x")</pre></div>
+<div class="fn"><code class="sig">with_read(path: text, body: fn) -&gt; int uses files</code><p>--- scope-owned forms: the handle you cannot forget to close --- The orb owns the handle, runs your body with it, and closes on the way out (including an early return - the close is a <code>defer</code>). -1 when the open failed, so a caller can tell "could not open" from a body result. no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
+<div class="fn"><code class="sig">with_write(path: text, body: fn) -&gt; int uses files</code></div>
+<div class="fn"><code class="sig">with_append(path: text, body: fn) -&gt; int uses files</code></div>
+<div class="fn"><code class="sig">append_line(path: text, line: text) -&gt; int uses files</code><p>--- line-oriented convenience --- Append one line (adds the newline). Opens and closes around the write, so it is safe to call in a loop but not the fastest way to write many lines - for that, open once with <code>with_append</code> and <code>write_line</code> into the handle. no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
+<div class="fn"><code class="sig">write_line(handle: int, line: text) -&gt; int uses files</code></div>
 <h2 id="async"><code>async</code></h2>
 <p class="orb-blurb">tasks: real suspension, one stack each.</p>
-<div class="fn"><code class="sig">spawn(f: fn, arg: int) -&gt; int = orion_task_spawn(f, arg)</code><p>Start a task.</p></div>
-<div class="fn"><code class="sig">await(id: int) -&gt; int = orion_task_await(id)</code><p>Run the scheduler until this task finishes, then take its result.</p></div>
-<div class="fn"><code class="sig">yield_now() -&gt; int = orion_task_yield()</code><p>Give the scheduler a turn.</p></div>
-<div class="fn"><code class="sig">run_all() -&gt; int = orion_task_run_all()</code><p>Drive every ready task to completion; returns how many are finished.</p></div>
-<div class="fn"><code class="sig">task_state(id: int) -&gt; int = orion_task_state(id)</code><p>0 = no such task, 1 = ready, 2 = running, 3 = finished (result not taken yet).</p></div>
-<div class="fn"><code class="sig">task_count() -&gt; int = orion_task_live_count()</code><p>no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
-<div class="fn"><code class="sig">is_done(id: int) -&gt; truth = orion_task_state(id) is 3</code><p>no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
-<div class="fn"><code class="sig">sleep_task(ms: int) -&gt; int = orion_task_sleep(ms)</code><p>Wait <code>ms</code> WITHOUT holding the scheduler.</p></div>
-<div class="fn"><code class="sig">ask(handler: fn, arg: int) -&gt; int = orion_ms_perform(handler, arg)</code><p>Inside a task: hand control to <code>handler</code>, which may resume this point once and then keep working.</p></div>
-<div class="fn"><code class="sig">resume_with(v: int) -&gt; int = orion_ms_resume(v)</code><p>Inside such a handler: run the rest of the task with <code>v</code>, and get its result.</p></div>
-<div class="fn"><code class="sig">resumable_ok() -&gt; truth = orion_ms_supported() is 1</code><p>no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">spawn(f: fn, arg: int) -&gt; int = orion_task_spawn(f, arg)</code><p>Start a task. Returns its id, or -1 if the task table is full (1024). no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">await(id: int) -&gt; int = orion_task_await(id)</code><p>Run the scheduler until this task finishes, then take its result. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">yield_now() -&gt; int = orion_task_yield()</code><p>Give the scheduler a turn. No-op outside a task. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">run_all() -&gt; int = orion_task_run_all()</code><p>Drive every ready task to completion; returns how many are finished. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">task_state(id: int) -&gt; int = orion_task_state(id)</code><p>0 = no such task, 1 = ready, 2 = running, 3 = finished (result not taken yet). no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">task_count() -&gt; int = orion_task_live_count()</code></div>
+<div class="fn"><code class="sig">is_done(id: int) -&gt; truth = orion_task_state(id) is 3</code></div>
+<div class="fn"><code class="sig">sleep_task(ms: int) -&gt; int = orion_task_sleep(ms)</code><p>Wait <code>ms</code> WITHOUT holding the scheduler. Inside a task this parks it and lets the others run; the scheduler makes one real OS sleep for the shortest pending deadline and wakes whoever is due. Outside a task it is an ordinary sleep, so the same call is right in both places.  This is the difference between concurrency and a queue: with <code>sleep_ms</code> inside a task, ten tasks each waiting 100 ms took a second, because the first one parked the whole scheduler in the OS. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">ask(handler: fn, arg: int) -&gt; int = orion_ms_perform(handler, arg)</code><p>Inside a task: hand control to <code>handler</code>, which may resume this point once and then keep working. Returns the handler's value, or the resumed value. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">resume_with(v: int) -&gt; int = orion_ms_resume(v)</code><p>Inside such a handler: run the rest of the task with <code>v</code>, and get its result. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">resumable_ok() -&gt; truth = orion_ms_supported() is 1</code></div>
+<h2 id="rand"><code>rand</code></h2>
+<p class="orb-blurb">a small pseudo-random generator.</p>
+<div class="fn"><code class="sig">srand(seed: int) -&gt; int uses random</code><p>Fix the sequence. Any int works (0 included - the increment keeps it moving).</p><pre class="ex">example srand(42) is 42</pre></div>
+<div class="fn"><code class="sig">rand() -&gt; int uses random</code><p>Advance the generator and return a non-negative pseudo-random int.</p><pre class="ex">example rand() &gt;= 0</pre></div>
+<div class="fn"><code class="sig">rand_range(lo: int, hi: int) -&gt; int uses random</code><p>A pseudo-random int in [lo, hi). Returns lo when the range is empty.</p><pre class="ex">example rand_range(5, 6) is 5</pre></div>
+<div class="fn"><code class="sig">rand_float() -&gt; float uses random</code><p>A pseudo-random float in [0.0, 1.0).</p><pre class="ex">example rand_float() &gt;= 0.0</pre></div>
+<div class="fn"><code class="sig">rand_chance(n: int) -&gt; truth uses random</code><p>true with probability 1/n (rand_chance(2) is a coin flip). n &lt;= 1 is always true.</p><pre class="ex">example rand_chance(1)</pre></div>
+<div class="fn"><code class="sig">secure_bytes(n: int) -&gt; [int] uses random</code><p><code>n</code> unpredictable bytes (0..255 each) from the OS.</p><pre class="ex">example len(secure_bytes(8)) is 8</pre></div>
+<div class="fn"><code class="sig">secure_token(n: int) -&gt; text uses random</code><p>An unpredictable hex token of <code>n</code> bytes (2n characters), for session ids and API keys.</p><pre class="ex">example len(secure_token(8)) is 16</pre></div>
+<h2 id="encoding"><code>encoding</code></h2>
+<p class="orb-blurb">hex and base64, both directions.</p>
+<div class="fn"><code class="sig">hex_encode(data: [int]) -&gt; text</code><p>bytes -&gt; lowercase hex text.</p><pre class="ex">example hex_encode([255, 16]) is "ff10"
+example hex_encode([]) is ""</pre></div>
+<div class="fn"><code class="sig">hex_decode(s: text) -&gt; [int]</code><p>hex text -&gt; bytes. Non-hex characters are skipped; a trailing half-byte is dropped.</p><pre class="ex">example at(hex_decode("ff10"), 0) is 255</pre></div>
+<div class="fn"><code class="sig">base64_encode(data: [int]) -&gt; text</code><p>bytes -&gt; base64 text (standard alphabet, '=' padded).</p><pre class="ex">example base64_encode([77, 97, 110]) is "TWFu"
+example base64_encode([]) is ""</pre></div>
+<div class="fn"><code class="sig">base64_decode(s: text) -&gt; [int]</code><p>base64 text -&gt; bytes. Padding, newlines and stray characters are ignored.</p><pre class="ex">example at(base64_decode("TWFu"), 0) is 77</pre></div>
+<div class="fn"><code class="sig">sha256(t: text) -&gt; text</code><p>SHA-256 of <code>t</code>, as 64 hex characters. The stdlib's content hash: checksums, cache keys, integrity. The examples are FIPS 180-4 vectors.</p><pre class="ex">example sha256("") is "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+example sha256("abc") is "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"</pre></div>
+<h2 id="store"><code>store</code></h2>
+<p class="orb-blurb">program state shaped like a database (manifesto P1).</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">sstore: seq: int, cells: table&lt;table&gt;</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">store_new() -&gt; sstore</code><pre class="ex">example len(items(store_new())) is 0
+example store_new().seq is 0</pre></div>
+<div class="fn"><code class="sig">insert(s: sstore, cell: table) -&gt; (sstore, int)</code><p>Add a record; returns (new store, its id). Ids are never reused.</p><pre class="ex">example len(items(store_new())) is 0</pre></div>
+<div class="fn"><code class="sig">remove(s: sstore, id: int) -&gt; sstore</code><pre class="ex">example len(items(remove(store_new(), 0))) is 0</pre></div>
+<div class="fn"><code class="sig">entity(s: sstore, id: int) -&gt; table</code><p>The record for <code>id</code>, or {} when it was never inserted / was removed.</p><pre class="ex">example not has_id(store_new(), 9)</pre></div>
+<div class="fn"><code class="sig">has_id(s: sstore, id: int) -&gt; truth</code><pre class="ex">example not has_id(store_new(), 0)</pre></div>
+<div class="fn"><code class="sig">items(s: sstore) -&gt; [table]</code><p>Every live record - the iteration/query source.</p><pre class="ex">example len(items(store_new())) is 0</pre></div>
+<h2 id="watch"><code>watch</code></h2>
+<p class="orb-blurb">the mechanics of a file watcher: scan a tree, fingerprint it, name what changed.</p>
+<div class="fn"><code class="sig">scan_tree(dir: text) -&gt; [text] uses files</code><p>Every watched file under <code>dir</code>, recursively, skipping build dirs. no example: depends on the filesystem - proven by test_42_watch_core.or</p></div>
+<div class="fn"><code class="sig">snapshot(dir: text) -&gt; text uses files</code><p>One line per watched file: "mtime:size path". Two snapshots compare as one text; size is included so an edit inside the mtime resolution is still seen when the length moves. no example: depends on the filesystem - proven by test_42_watch_core.or</p></div>
+<div class="fn"><code class="sig">first_change(old: text, new: text) -&gt; text</code><p>The path behind the first line that differs between two snapshots. "" when nothing changed; a set-level answer when a file came or went (the caller reruns either way, so it needs a name only for the message).</p><pre class="ex">example first_change("1:2 a\n", "1:2 a\n") is ""
+example first_change("1:2 a\n", "9:9 a\n") is "a"
+example first_change("1:2 a\n", "") is "(file added or removed)"</pre></div>
 <h2 id="timer"><code>timer</code></h2>
 <p class="orb-blurb">deterministic tick-based timers.</p>
-<div class="fn"><code class="sig">timer_start(id: text, dur_ms: int) uses clock</code><p>Start (or restart) a timer running toward dur_ms.</p></div>
-<div class="fn"><code class="sig">timer_stop(id: text)</code><p>Cancel a running timer (elapsed is kept for inspection).</p></div>
-<div class="fn"><code class="sig">timer_reset(id: text)</code><p>Rewind to 0 and keep running toward the same duration.</p></div>
-<div class="fn"><code class="sig">timer_tick(id: text, dt_ms: int) -&gt; int</code><p>Advance by dt_ms.</p></div>
-<div class="fn"><code class="sig">timer_elapsed(id: text) -&gt; int</code></div>
-<div class="fn"><code class="sig">timer_remaining(id: text) -&gt; int</code></div>
-<div class="fn"><code class="sig">timer_progress(id: text) -&gt; int</code><p>Progress as permille (0..1000), clamped.</p></div>
-<div class="fn"><code class="sig">timer_done(id: text) -&gt; truth</code><p>1 once elapsed has reached the duration.</p></div>
-<div class="fn"><code class="sig">timer_active(id: text) -&gt; truth</code><p>true while the timer is running (started, not yet completed or stopped).</p></div>
-<div class="fn"><code class="sig">timer_every(id: text, period_ms: int, dt_ms: int) -&gt; int</code><p>Accumulate dt_ms and report how many whole periods elapsed this tick.</p></div>
+<div class="fn"><code class="sig">timer_start(id: text, dur_ms: int) uses clock</code><p>Start (or restart) a timer running toward dur_ms. no example: mutates timer state - proven by test_42_timer.or</p></div>
+<div class="fn"><code class="sig">timer_stop(id: text)</code><p>Cancel a running timer (elapsed is kept for inspection). no example: mutates timer state - proven by test_42_timer.or</p></div>
+<div class="fn"><code class="sig">timer_reset(id: text)</code><p>Rewind to 0 and keep running toward the same duration. no example: mutates timer state - proven by test_42_timer.or no example: mutates timer state - proven by test_42_timer.or</p></div>
+<div class="fn"><code class="sig">timer_tick(id: text, dt_ms: int) -&gt; int</code><p>Advance by dt_ms. Returns 1 on the single tick it completes, else 0. A completed or stopped timer is inert (returns 0).</p><pre class="ex">example timer_tick("unstarted-timer", 10) is 0</pre></div>
+<div class="fn"><code class="sig">timer_elapsed(id: text) -&gt; int</code><pre class="ex">example timer_elapsed("never-started") is 0</pre></div>
+<div class="fn"><code class="sig">timer_remaining(id: text) -&gt; int</code><pre class="ex">example timer_remaining("never-started") is 0</pre></div>
+<div class="fn"><code class="sig">timer_progress(id: text) -&gt; int</code><p>Progress as permille (0..1000), clamped. A zero-duration timer reads 1000.</p><pre class="ex">example timer_progress("never-started") is 1000</pre></div>
+<div class="fn"><code class="sig">timer_done(id: text) -&gt; truth</code><p>1 once elapsed has reached the duration.</p><pre class="ex">example not timer_done("never-started")</pre></div>
+<div class="fn"><code class="sig">timer_active(id: text) -&gt; truth</code><p>true while the timer is running (started, not yet completed or stopped).</p><pre class="ex">example not timer_active("never-started")</pre></div>
+<div class="fn"><code class="sig">timer_every(id: text, period_ms: int, dt_ms: int) -&gt; int</code><p>Accumulate dt_ms and report how many whole periods elapsed this tick. Usually 0 or 1; larger dt (or a long period) can fire several. The leftover is carried, so cadence never drifts. Independent of timer_start/tick above. no example: mutates timer state - proven by test_42_timer.or no example: mutates timer state - proven by test_42_timer.or</p></div>
 <h2 id="result"><code>result</code></h2>
 <p class="orb-blurb">Result&lt;T&gt;: a value, or an error message.</p>
 <h3 class="sub">Types</h3>
 <div class="fn"><code class="sig">Result&lt;T&gt; = Ok(T) | Err(text)</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">unwrap_or&lt;T&gt;(r: Result&lt;T&gt;, default: T) -&gt; T</code><p>The payload, or <code>default</code> if this is an Err.</p></div>
-<div class="fn"><code class="sig">is_ok&lt;T&gt;(r: Result&lt;T&gt;) -&gt; truth</code><p>1 if this is an Ok, else 0.</p></div>
-<div class="fn"><code class="sig">is_err&lt;T&gt;(r: Result&lt;T&gt;) -&gt; truth</code><p>true if this is an Err.</p></div>
-<div class="fn"><code class="sig">err_msg&lt;T&gt;(r: Result&lt;T&gt;) -&gt; text</code><p>The error message, or "" if this is an Ok.</p></div>
+<div class="fn"><code class="sig">unwrap_or&lt;T&gt;(r: Result&lt;T&gt;, default: T) -&gt; T</code><p>The payload, or <code>default</code> if this is an Err.</p><pre class="ex">example unwrap_or(Result.Ok(7), 0) is 7
+example unwrap_or(Result.Err("x"), 9) is 9</pre></div>
+<div class="fn"><code class="sig">is_ok&lt;T&gt;(r: Result&lt;T&gt;) -&gt; truth</code><p>1 if this is an Ok, else 0.</p><pre class="ex">example is_ok(Result.Ok(5))
+example not is_ok(Result.Err("no"))</pre></div>
+<div class="fn"><code class="sig">is_err&lt;T&gt;(r: Result&lt;T&gt;) -&gt; truth</code><p>true if this is an Err.</p><pre class="ex">example is_err(Result.Err("boom"))</pre></div>
+<div class="fn"><code class="sig">err_msg&lt;T&gt;(r: Result&lt;T&gt;) -&gt; text</code><p>The error message, or "" if this is an Ok.</p><pre class="ex">example err_msg(Result.Err("boom")) is "boom"</pre></div>
 <h2 id="option"><code>option</code></h2>
 <p class="orb-blurb">Option&lt;T&gt;: a value, or nothing.</p>
 <h3 class="sub">Types</h3>
 <div class="fn"><code class="sig">Option&lt;T&gt; = Some(T) | None</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">unwrap_or&lt;T&gt;(o: Option&lt;T&gt;, default: T) -&gt; T</code><p>The payload, or <code>default</code> if this is None.</p></div>
-<div class="fn"><code class="sig">is_some&lt;T&gt;(o: Option&lt;T&gt;) -&gt; truth</code><p>1 if a value is present, else 0.</p></div>
-<div class="fn"><code class="sig">is_none&lt;T&gt;(o: Option&lt;T&gt;) -&gt; truth</code><p>true if this is None.</p></div>
+<div class="fn"><code class="sig">unwrap_or&lt;T&gt;(o: Option&lt;T&gt;, default: T) -&gt; T</code><p>The payload, or <code>default</code> if this is None.</p><pre class="ex">example unwrap_or(Option.Some(7), 0) is 7
+example unwrap_or(Option.None, 9) is 9</pre></div>
+<div class="fn"><code class="sig">is_some&lt;T&gt;(o: Option&lt;T&gt;) -&gt; truth</code><p>1 if a value is present, else 0.</p><pre class="ex">example is_some(Option.Some(5))
+example not is_some(Option.None)</pre></div>
+<div class="fn"><code class="sig">is_none&lt;T&gt;(o: Option&lt;T&gt;) -&gt; truth</code><p>true if this is None.</p><pre class="ex">example is_none(Option.None)</pre></div>
 <h2 id="assert"><code>assert</code></h2>
 <p class="orb-blurb">ONE assertion for Orion.</p>
-<div class="fn"><code class="sig">assert(cond: truth, label: text) -&gt; int</code></div>
+<div class="fn"><code class="sig">assert(cond: truth, label: text) -&gt; int</code><pre class="ex">example assert(true, "holds") is 1</pre></div>
 <h2 id="log"><code>log</code></h2>
 <p class="orb-blurb">leveled, categorized console logging.</p>
-<div class="fn"><code class="sig">log_set_default(level: int)</code><p>no example: sets global logging state - proven by the log ring test</p></div>
-<div class="fn"><code class="sig">log_set_level(cat: text, level: int)</code><p>no example: sets global logging state - proven by the log ring test</p></div>
-<div class="fn"><code class="sig">error(cat: text, msg: text) uses console</code><p>no example: prints - an example would be noise in every gate run</p></div>
-<div class="fn"><code class="sig">warn(cat: text, msg: text) uses console</code><p>no example: prints - an example would be noise in every gate run</p></div>
-<div class="fn"><code class="sig">info(cat: text, msg: text) uses console</code><p>no example: prints - an example would be noise in every gate run</p></div>
-<div class="fn"><code class="sig">debug(cat: text, msg: text) uses console</code><p>no example: prints - an example would be noise in every gate run</p></div>
-<div class="fn"><code class="sig">log_ring_on()</code><p>no example: sets global logging state - proven by the log ring test</p></div>
-<div class="fn"><code class="sig">log_dump() uses console</code><p>no example: prints - an example would be noise in every gate run</p></div>
+<div class="fn"><code class="sig">log_set_default(level: int)</code></div>
+<div class="fn"><code class="sig">log_set_level(cat: text, level: int)</code></div>
+<div class="fn"><code class="sig">error(cat: text, msg: text) uses console</code></div>
+<div class="fn"><code class="sig">warn(cat: text, msg: text) uses console</code></div>
+<div class="fn"><code class="sig">info(cat: text, msg: text) uses console</code></div>
+<div class="fn"><code class="sig">debug(cat: text, msg: text) uses console</code></div>
+<div class="fn"><code class="sig">log_ring_on()</code></div>
+<div class="fn"><code class="sig">log_dump() uses console</code></div>
 <h2 id="ori_display"><code>ori_display</code></h2>
 <p class="orb-blurb">the ORI (Orion Rendering Interface) display list.</p>
 <h3 class="sub">Types</h3>
 <div class="fn"><code class="sig">DrawCmd = DrawRect(Rect, text, int) | DrawRoundRect(Rect, text, int, int) | DrawText(Point, text, text, int, int) | DrawIcon(Point, text, int, int) | DrawPath(text, text, int) | DrawSprite(Point, text, int, int) | DrawImage(Point, text, int, int, text, text, int)</code></div>
 <div class="fn"><code class="sig">DisplayList: commands: [DrawCmd]</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">empty_list() -&gt; DisplayList</code></div>
+<div class="fn"><code class="sig">empty_list() -&gt; DisplayList</code><pre class="ex">example len(empty_list().commands) is 0</pre></div>
 <div class="fn"><code class="sig">push_cmd(list: DisplayList, cmd: DrawCmd) -&gt; DisplayList</code></div>
 <h2 id="ori_geometry"><code>ori_geometry</code></h2>
 <p class="orb-blurb">the ORI (Orion Rendering Interface) 2D primitives.</p>
@@ -254,70 +371,8 @@
 <div class="fn"><code class="sig">Size: width: int, height: int</code></div>
 <div class="fn"><code class="sig">Rect: x: int, y: int, width: int, height: int</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">rect_contains(rect: Rect, point: Point) -&gt; truth</code></div>
-<h2 id="encoding"><code>encoding</code></h2>
-<p class="orb-blurb">hex and base64, both directions.</p>
-<div class="fn"><code class="sig">hex_encode(data: [int]) -&gt; text</code><p>bytes -&gt; lowercase hex text.</p></div>
-<div class="fn"><code class="sig">hex_decode(s: text) -&gt; [int]</code><p>hex text -&gt; bytes.</p></div>
-<div class="fn"><code class="sig">base64_encode(data: [int]) -&gt; text</code><p>bytes -&gt; base64 text (standard alphabet, '=' padded).</p></div>
-<div class="fn"><code class="sig">base64_decode(s: text) -&gt; [int]</code><p>base64 text -&gt; bytes.</p></div>
-<h2 id="file"><code>file</code></h2>
-<p class="orb-blurb">streaming file IO.</p>
-<div class="fn"><code class="sig">open_read(path: text) -&gt; int uses files = file_open(path, 0)</code><p>--- opening --- -1 when the file cannot be opened (missing, locked, out of handles).</p></div>
-<div class="fn"><code class="sig">open_write(path: text) -&gt; int uses files = file_open(path, 1)</code><p>no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
-<div class="fn"><code class="sig">open_append(path: text) -&gt; int uses files = file_open(path, 2)</code><p>no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
-<div class="fn"><code class="sig">ok(handle: int) -&gt; truth</code></div>
-<div class="fn"><code class="sig">read_chunk(handle: int, maxlen: int) -&gt; text uses files = file_read_chunk(handle, maxlen)</code><p>--- moving bytes --- Up to <code>maxlen</code> bytes.</p></div>
-<div class="fn"><code class="sig">write_chunk(handle: int, data: text) -&gt; int uses files = file_write_chunk(handle, data)</code><p>How many bytes were written (-1 on failure).</p></div>
-<div class="fn"><code class="sig">close(handle: int) -&gt; int uses files = file_close(handle)</code><p>no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
-<div class="fn"><code class="sig">size_of(path: text) -&gt; int uses files = file_bytes(path)</code><p>Size in bytes without reading the contents.</p></div>
-<div class="fn"><code class="sig">is_end(chunk: text) -&gt; truth</code><p>Is this chunk the end of the stream?</p></div>
-<div class="fn"><code class="sig">with_read(path: text, body: fn) -&gt; int uses files</code><p>--- scope-owned forms: the handle you cannot forget to close --- The orb owns the handle, runs your body with it, and closes on the way out (including an early return - the close is a <code>defer</code>).</p></div>
-<div class="fn"><code class="sig">with_write(path: text, body: fn) -&gt; int uses files</code><p>no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
-<div class="fn"><code class="sig">with_append(path: text, body: fn) -&gt; int uses files</code><p>no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
-<div class="fn"><code class="sig">append_line(path: text, line: text) -&gt; int uses files</code><p>--- line-oriented convenience --- Append one line (adds the newline).</p></div>
-<div class="fn"><code class="sig">write_line(handle: int, line: text) -&gt; int uses files</code><p>no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
-<h2 id="http"><code>http</code></h2>
-<p class="orb-blurb">fetch and post over HTTP(S).</p>
-<h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">response = status: int | body: text</code></div>
-<h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">status_from_headers(header_dump: text) -&gt; int</code><p>The status is read from curl's header dump (-D), not from stdout: the dump is a file of its own, so a stray stderr line can never corrupt it.</p></div>
-<div class="fn"><code class="sig">fetch(url: text) -&gt; response uses net, files</code><p>GET <code>url</code>.</p></div>
-<div class="fn"><code class="sig">post(url: text, content_type: text, payload: text) -&gt; response uses net, files</code><p>POST <code>body</code> to <code>url</code> with the given Content-Type.</p></div>
-<div class="fn"><code class="sig">success(r: response) -&gt; truth</code><p>Did the request reach a server that answered success?</p></div>
-<h2 id="rand"><code>rand</code></h2>
-<p class="orb-blurb">a small pseudo-random generator.</p>
-<div class="fn"><code class="sig">srand(seed: int) -&gt; int uses random</code><p>Fix the sequence.</p></div>
-<div class="fn"><code class="sig">rand() -&gt; int uses random</code><p>Advance the generator and return a non-negative pseudo-random int.</p></div>
-<div class="fn"><code class="sig">rand_range(lo: int, hi: int) -&gt; int uses random</code><p>A pseudo-random int in [lo, hi).</p></div>
-<div class="fn"><code class="sig">rand_float() -&gt; float uses random</code><p>A pseudo-random float in [0.0, 1.0).</p></div>
-<div class="fn"><code class="sig">rand_chance(n: int) -&gt; truth uses random</code><p>true with probability 1/n (rand_chance(2) is a coin flip).</p></div>
-<div class="fn"><code class="sig">secure_bytes(n: int) -&gt; [int] uses random</code><p><code>n</code> unpredictable bytes (0..255 each) from the OS.</p></div>
-<div class="fn"><code class="sig">secure_token(n: int) -&gt; text uses random</code><p>An unpredictable hex token of <code>n</code> bytes (2n characters), for session ids and API keys.</p></div>
-<h2 id="store"><code>store</code></h2>
-<p class="orb-blurb">program state shaped like a database (manifesto P1).</p>
-<h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">sstore: seq: int, cells: table&lt;table&gt;</code></div>
-<h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">store_new() -&gt; sstore</code></div>
-<div class="fn"><code class="sig">insert(s: sstore, cell: table) -&gt; (sstore, int)</code><p>Add a record; returns (new store, its id).</p></div>
-<div class="fn"><code class="sig">remove(s: sstore, id: int) -&gt; sstore</code></div>
-<div class="fn"><code class="sig">entity(s: sstore, id: int) -&gt; table</code><p>The record for <code>id</code>, or {} when it was never inserted / was removed.</p></div>
-<div class="fn"><code class="sig">has_id(s: sstore, id: int) -&gt; truth</code></div>
-<div class="fn"><code class="sig">items(s: sstore) -&gt; [table]</code><p>Every live record - the iteration/query source.</p></div>
-<h2 id="time"><code>time</code></h2>
-<p class="orb-blurb">clock time for humans: unix seconds and formatted dates.</p>
-<div class="fn"><code class="sig">now_unix() -&gt; int uses clock = unix_now()</code><p>Seconds since 1970-01-01 UTC.</p></div>
-<div class="fn"><code class="sig">local_time(unix_s: int, fmt: text) -&gt; text</code><p><code>unix_s</code> formatted with strftime codes, in the machine's local timezone.</p></div>
-<div class="fn"><code class="sig">utc_time(unix_s: int, fmt: text) -&gt; text</code><p><code>unix_s</code> formatted with strftime codes, in UTC.</p></div>
-<div class="fn"><code class="sig">timestamp() -&gt; text uses clock = local_time(unix_now(), "%Y-%m-%d %H:%M:%S")</code><p>The common stamp, local: "2026-08-04 21:30:05".</p></div>
-<div class="fn"><code class="sig">parse_utc(t: text) -&gt; int</code><p>"YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS" (UTC) -&gt; unix seconds.</p></div>
-<h2 id="watch"><code>watch</code></h2>
-<p class="orb-blurb">the mechanics of a file watcher: scan a tree, fingerprint it, name what changed.</p>
-<div class="fn"><code class="sig">scan_tree(dir: text) -&gt; [text] uses files</code><p>Every watched file under <code>dir</code>, recursively, skipping build dirs.</p></div>
-<div class="fn"><code class="sig">snapshot(dir: text) -&gt; text uses files</code><p>One line per watched file: "mtime:size path".</p></div>
-<div class="fn"><code class="sig">first_change(old: text, new: text) -&gt; text</code><p>The path behind the first line that differs between two snapshots.</p></div>
+<div class="fn"><code class="sig">rect_contains(rect: Rect, point: Point) -&gt; truth</code><pre class="ex">example rect_contains(Rect{x: 0, y: 0, width: 4, height: 4}, Point{x: 1, y: 1})
+example not rect_contains(Rect{x: 0, y: 0, width: 4, height: 4}, Point{x: 9, y: 1})</pre></div>
 </main>
 
 </body>

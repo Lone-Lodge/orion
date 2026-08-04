@@ -1702,6 +1702,54 @@ entry:
     ret i64 %v2
 }
 
+declare i64 @udp_open(i64)
+
+declare i64 @udp_send_to(i64, ptr, i64, ptr)
+
+declare ptr @udp_recv_from(i64, i64)
+
+declare ptr @udp_last_sender()
+
+define i64 @net__udp(i64 %p0) {
+entry:
+    %v0 = add i64 0, %p0
+    %v1 = call i64 @udp_open(i64 %v0)
+    ret i64 %v1
+}
+
+define i64 @net__udp_send(i64 %p0, ptr %p1, i64 %p2, ptr %p3) {
+entry:
+    %v0 = add i64 0, %p0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = add i64 0, %p2
+    %v3 = getelementptr i8, ptr %p3, i64 0
+    %v4 = call i64 @udp_send_to(i64 %v0, ptr %v1, i64 %v2, ptr %v3)
+    ret i64 %v4
+}
+
+define ptr @net__udp_receive(i64 %p0, i64 %p1) {
+entry:
+    %v0 = add i64 0, %p0
+    %v1 = add i64 0, %p1
+    %v2 = call ptr @udp_recv_from(i64 %v0, i64 %v1)
+    ret ptr %v2
+}
+
+define ptr @net__udp_sender() {
+entry:
+    %v0 = call ptr @udp_last_sender()
+    ret ptr %v0
+}
+
+declare i64 @sock_local_port(i64)
+
+define i64 @net__local_port(i64 %p0) {
+entry:
+    %v0 = add i64 0, %p0
+    %v1 = call i64 @sock_local_port(i64 %v0)
+    ret i64 %v1
+}
+
 define i64 @prog__wait_briefly(i64 %p0) {
 entry:
     %v0 = add i64 0, %p0

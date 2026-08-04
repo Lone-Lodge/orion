@@ -382,6 +382,112 @@ const char *time_format(long long unix_s, const char *fmt, long long local) {
     return orion_text_from_c(buf);
 }
 
+/* ---- fs completeness: rename, copy, cwd - the standard trio ---- */
+
+/* Move/rename a file or directory. 0 on success. Overwrites a file at the
+ * target on POSIX; on Windows rename() refuses, so remove first when you
+ * mean replace. */
+long long fs_rename(const char *from, const char *to) {
+    return rename(from, to) == 0 ? 0 : -1;
+}
+
+/* Byte-for-byte file copy (binary-safe). 0 on success. */
+long long fs_copy_file(const char *from, const char *to) {
+    FILE *in = fopen(from, "rb");
+    if (!in) return -1;
+    FILE *out = fopen(to, "wb");
+    if (!out) { fclose(in); return -1; }
+    char buf[65536];
+    size_t n;
+    long long ok = 0;
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0) {
+        if (fwrite(buf, 1, n, out) != n) { ok = -1; break; }
+    }
+    if (ferror(in)) ok = -1;
+    fclose(in);
+    if (fclose(out) != 0) ok = -1;
+    return ok;
+}
+
+/* The current working directory, "" on failure. */
+const char *fs_cwd(void) {
+    static char buf[4096];
+#ifdef _WIN32
+    DWORD n = GetCurrentDirectoryA((DWORD)sizeof buf, buf);
+    if (n == 0 || n >= sizeof buf) buf[0] = 0;
+#else
+    if (!getcwd(buf, sizeof buf)) buf[0] = 0;
+#endif
+    return orion_text_from_c(buf);
+}
+
+/* Format a float with a fixed number of decimals - the one formatting ask
+ * to_text cannot answer. Decimals clamped to 0..17. */
+const char *fmt_float(double x, long long decimals) {
+    static char buf[64];
+    if (decimals < 0) decimals = 0;
+    if (decimals > 17) decimals = 17;
+    snprintf(buf, sizeof buf, "%.*f", (int)decimals, x);
+    return orion_text_from_c(buf);
+}
+
+/* ---- sha256 (FIPS 180-4), dependency-free ----
+ * The stdlib's content hash: checksums, cache keys, integrity. Proven by
+ * the FIPS test vectors in the encoding orb's example lines. */
+static const unsigned int sha256_k[64] = {
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+};
+#define SHA_ROR(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
+static void sha256_block(unsigned int st[8], const unsigned char *p) {
+    unsigned int w[64];
+    for (int i = 0; i < 16; i++)
+        w[i] = (unsigned int)p[i*4] << 24 | (unsigned int)p[i*4+1] << 16 |
+               (unsigned int)p[i*4+2] << 8 | (unsigned int)p[i*4+3];
+    for (int i = 16; i < 64; i++) {
+        unsigned int s0 = SHA_ROR(w[i-15], 7) ^ SHA_ROR(w[i-15], 18) ^ (w[i-15] >> 3);
+        unsigned int s1 = SHA_ROR(w[i-2], 17) ^ SHA_ROR(w[i-2], 19) ^ (w[i-2] >> 10);
+        w[i] = w[i-16] + s0 + w[i-7] + s1;
+    }
+    unsigned int a=st[0],b=st[1],c=st[2],d=st[3],e=st[4],f=st[5],g=st[6],h=st[7];
+    for (int i = 0; i < 64; i++) {
+        unsigned int S1 = SHA_ROR(e,6) ^ SHA_ROR(e,11) ^ SHA_ROR(e,25);
+        unsigned int ch = (e & f) ^ (~e & g);
+        unsigned int t1 = h + S1 + ch + sha256_k[i] + w[i];
+        unsigned int S0 = SHA_ROR(a,2) ^ SHA_ROR(a,13) ^ SHA_ROR(a,22);
+        unsigned int mj = (a & b) ^ (a & c) ^ (b & c);
+        unsigned int t2 = S0 + mj;
+        h=g; g=f; f=e; e=d+t1; d=c; c=b; b=a; a=t1+t2;
+    }
+    st[0]+=a; st[1]+=b; st[2]+=c; st[3]+=d; st[4]+=e; st[5]+=f; st[6]+=g; st[7]+=h;
+}
+const char *sha256_hex(const char *msg) {
+    static char out[65];
+    unsigned int st[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+                          0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+    size_t len = strlen(msg);
+    size_t full = len / 64;
+    for (size_t i = 0; i < full; i++) sha256_block(st, (const unsigned char *)msg + i*64);
+    unsigned char tail[128];
+    size_t rest = len - full*64;
+    memcpy(tail, msg + full*64, rest);
+    tail[rest] = 0x80;
+    size_t padded = (rest + 1 + 8 <= 64) ? 64 : 128;
+    memset(tail + rest + 1, 0, padded - rest - 1 - 8);
+    unsigned long long bits = (unsigned long long)len * 8;
+    for (int i = 0; i < 8; i++) tail[padded - 1 - i] = (unsigned char)(bits >> (8*i));
+    sha256_block(st, tail);
+    if (padded == 128) sha256_block(st, tail + 64);
+    for (int i = 0; i < 8; i++) snprintf(out + i*8, 9, "%08x", st[i]);
+    return orion_text_from_c(out);
+}
+
 /* Exit the process with a code. */
 long long exit_with(long long code) {
     exit((int)code);

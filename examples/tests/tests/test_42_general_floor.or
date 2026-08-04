@@ -34,9 +34,17 @@ define main() -> int:
     armed = interrupted()
     arm_ok = not armed
 
-    p1 = if path_ok and unset_ok then 10 else 0
-    p2 = if ent_ok then 12 else 0
-    p3 = if t_ok and now_ok and stamp_ok then 12 else 0
-    p4 = if arm_ok then 8 else 0
-    print_line("env={path_ok} ent={ent_ok} time={t_ok} tok={tok}")
-    p1 + p2 + p3 + p4
+    # fs completeness: write, copy, move, and cwd answers something.
+    w9 = write_file("dist/.floor_a.txt", "flytta mig")
+    cp = copy_file("dist/.floor_a.txt", "dist/.floor_b.txt")
+    junk9 = remove_file("dist/.floor_c.txt")
+    mv = move_path("dist/.floor_b.txt", "dist/.floor_c.txt")
+    fs_ok = cp is 0 and mv is 0 and read_file("dist/.floor_c.txt") is "flytta mig" and cwd() is not ""
+
+    p1 = if path_ok and unset_ok then 6 else 0
+    p2 = if ent_ok then 8 else 0
+    p3 = if t_ok and now_ok and stamp_ok then 8 else 0
+    p4 = if arm_ok then 6 else 0
+    p5 = if fs_ok then 14 else 0
+    print_line("env={path_ok} ent={ent_ok} time={t_ok} fs={fs_ok} tok={tok}")
+    p1 + p2 + p3 + p4 + p5

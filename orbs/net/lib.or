@@ -125,3 +125,35 @@ public define ok(handle: int) -> truth:
     example ok(0 - 1) is false
     example ok(3)
     handle >= 0
+
+# ---- UDP: the datagram floor a game's netcode stands on ----
+# Connectionless: one socket per side, no accept. A UDP socket is a socket -
+# `readable_within` parks a task on it exactly like TCP, and `local_port`
+# reads the ephemeral port `udp_open(0)` picked.
+external define udp_open(port: int) -> int
+external define udp_send_to(sock: int, host: text, port: int, data: text) -> int
+external define udp_recv_from(sock: int, maxlen: int) -> text
+external define udp_last_sender() -> text
+
+# A bound UDP socket, or -1. Port 0 picks an ephemeral one.
+# no example: opens a socket - proven by test_42_udp_loopback.or
+public define udp(port: int) -> int uses net = udp_open(port)
+
+# Send one datagram to host:port. Bytes sent, or -1.
+# no example: sends on the network - proven by test_42_udp_loopback.or
+public define udp_send(sock: int, host: text, port: int, data: text) -> int uses net = udp_send_to(sock, host, port, data)
+
+# One datagram as text ("" when nothing). Pair with readable_within for a
+# deadline; ask udp_sender() right after for who sent it.
+# no example: reads the network - proven by test_42_udp_loopback.or
+public define udp_receive(sock: int, maxlen: int) -> text uses net = udp_recv_from(sock, maxlen)
+
+# "ip:port" of the last datagram udp_receive returned, "" before any.
+# no example: network state - proven by test_42_udp_loopback.or
+public define udp_sender() -> text uses net = udp_last_sender()
+
+external define sock_local_port(sock: int) -> int
+
+# The port a socket actually bound to - what `listen(0)`/`udp(0)` picked.
+# no example: opens a socket - proven by test_42_udp_loopback.or
+public define local_port(sock: int) -> int uses net = sock_local_port(sock)

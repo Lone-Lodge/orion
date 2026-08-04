@@ -3458,6 +3458,75 @@ long long tcp_close(long long h) {
     return 0;
 }
 
+/* ---- UDP: the datagram floor a game's netcode stands on --------------------
+ * Connectionless: one socket per side, no accept. A UDP socket is a socket -
+ * sock_wait_ready parks a task on it exactly like TCP. Datagrams carry TEXT
+ * like the tcp_* family; a binary protocol rides bytes/base64 on top. */
+
+/* udp_open(port) -> a bound UDP socket, or -1. Port 0 picks an ephemeral
+ * one (read it back with sock_local_port). */
+long long udp_open(long long port) {
+    orion_net_init();
+    orion_sock_t s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s == (orion_sock_t)-1) return -1;
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof a);
+    a.sin_family = AF_INET;
+    a.sin_addr.s_addr = htonl(INADDR_ANY);
+    a.sin_port = htons((unsigned short)port);
+    if (bind(s, (struct sockaddr *)&a, sizeof a) != 0) { orion_closesock(s); return -1; }
+    return (long long)s;
+}
+
+/* udp_send_to(sock, host, port, data) -> bytes sent, or -1. */
+long long udp_send_to(long long sock, const char *host, long long port, const char *data) {
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof a);
+    a.sin_family = AF_INET;
+    a.sin_port = htons((unsigned short)port);
+    if (inet_pton(AF_INET, host, &a.sin_addr) != 1) return -1;
+    size_t n = strlen(data);
+    return (long long)sendto((orion_sock_t)sock, data, (int)n, 0,
+                             (struct sockaddr *)&a, sizeof a);
+}
+
+/* One datagram as text ("" when nothing there). The sender's "ip:port" is
+ * readable right after via udp_last_sender - what a server keys clients by. */
+static char orion_udp_sender[64];
+const char *udp_recv_from(long long sock, long long maxlen) {
+    if (maxlen <= 0) maxlen = 4096;
+    if (maxlen > 1 << 16) maxlen = 1 << 16;
+    char *buf = (char *)malloc((size_t)maxlen);
+    if (!buf) return orion_text_empty();
+    struct sockaddr_in a;
+    socklen_t alen = sizeof a;
+    int r = recvfrom((orion_sock_t)sock, buf, (int)maxlen, 0,
+                     (struct sockaddr *)&a, &alen);
+    if (r <= 0) { free(buf); orion_udp_sender[0] = 0; return orion_text_empty(); }
+    char ip[46];
+    if (!inet_ntop(AF_INET, &a.sin_addr, ip, sizeof ip)) ip[0] = 0;
+    snprintf(orion_udp_sender, sizeof orion_udp_sender, "%s:%d", ip, (int)ntohs(a.sin_port));
+    char *out = orion_text_alloc((long long)r);
+    memcpy(out, buf, (size_t)r);
+    out[r] = 0;
+    free(buf);
+    return out;
+}
+
+const char *udp_last_sender(void) {
+    char *out = orion_text_alloc((long long)strlen(orion_udp_sender));
+    strcpy(out, orion_udp_sender);
+    return out;
+}
+
+/* The port a socket actually bound to - what listen(0)/udp_open(0) picked. */
+long long sock_local_port(long long sock) {
+    struct sockaddr_in a;
+    socklen_t len = sizeof a;
+    if (getsockname((orion_sock_t)sock, (struct sockaddr *)&a, &len) != 0) return -1;
+    return (long long)ntohs(a.sin_port);
+}
+
 /* ---- Streaming file IO -----------------------------------------------------
  * Whole-file read/write cannot process anything larger than memory, and a
  * socket reply had to fit one recv. These are the missing primitives: open a
