@@ -86,6 +86,13 @@ def record(code, reply):
         "output": shown.strip(),
     })
     del history[:-HISTORY_MAX]
+    # Every executed snippet must be one Ctrl+Z step. bpy.ops calls push
+    # their own steps; only pure bpy.data edits need an explicit push.
+    if reply["ok"] and "bpy.ops." not in code and not bpy.app.background:
+        try:
+            bpy.ops.ed.undo_push(message=f"Claude: {code_label(code)[:40]}")
+        except Exception:
+            pass
     redraw()
 
 
@@ -133,18 +140,22 @@ def chat_worker(prompt, entry):
             # --continue keeps one ongoing Blender conversation; the first
             # message ever has nothing to continue, so retry without it.
             # json output carries the reply plus usage (tokens, duration).
-            # The panel executes the reply's code block itself (autorun), so
-            # the headless session needs no tools and no permission prompts.
+            # The panel executes the reply's code block itself, so the headless
+            # session needs no tools and no permission prompts. Destructive
+            # asks come back as a plain question - no block, nothing runs.
             brief = ("Du ar assistenten INNE i Blender. Svara ALLTID med exakt "
                      "ETT python-kodblock med bpy-kod som UTFOR uppgiften - "
-                     "blocket kors automatiskt i Blender i samma stund som "
-                     "svaret landar. Utanfor blocket: hogst ett par korta "
-                     "meningar pa svenska. Be aldrig anvandaren kora nagot "
-                     "sjalv. Scenkontexten i prompten ar farsk.")
+                     "blocket kors automatiskt nar svaret landar och blir ett "
+                     "angra-steg (Ctrl+Z). UNDANTAG: ar uppgiften destruktiv "
+                     "(raderar objekt, tommer scenen, skriver over filer) - "
+                     "svara da UTAN kodblock med EN kort motfraga och vanta pa "
+                     "klartecken. Utanfor kodblocket: hogst ett par korta "
+                     "meningar pa svenska. Scenkontexten i prompten ar farsk.")
             # The prompt goes via STDIN, never as an argument: the .CMD shim
             # routes argv through cmd.exe, which truncates at the first
             # newline (the multi-line scene context arrived empty that way).
-            flags = ["-p", "--output-format", "json",
+            # haiku: the fast tier - scene snippets need speed, not deep thought
+            flags = ["-p", "--output-format", "json", "--model", "haiku",
                      "--append-system-prompt", cmd_safe(brief)]
             run = subprocess.run([exe, "-c"] + flags, input=prompt, cwd=CHAT_DIR,
                                  capture_output=True, text=True, encoding="utf-8",
@@ -182,7 +193,7 @@ def chat_worker(prompt, entry):
         entry["snippet"] = snippet
         entry["pending"] = False
         entry["when"] = time.strftime("%H:%M:%S")
-        if snippet and bpy.context.window_manager.orion_autorun:
+        if snippet:
             record(snippet, run_code(snippet))
         redraw()
         return None
@@ -593,18 +604,16 @@ if bpy is not None:
             field.prop(context.window_manager, "orion_prompt", text="",
                        placeholder="Fraga Claude...")
             controls = layout.row(align=True)
-            auto = controls.row()
-            auto.prop(context.window_manager, "orion_autorun", text="Kor automatiskt")
-            send_button = controls.row()
-            send_button.alignment = "RIGHT"
-            send_button.enabled = not chat_is_busy()
-            send_button.operator("orion.chat_send", text="Skicka", icon="PLAY")
-            usage = layout.row()
+            usage = controls.row()
             usage.active = False
             sent = [entry for entry in history if entry.get("kind") == "chat"]
             used = sum(entry.get("tokens", 0) for entry in sent)
             model = last_model[0] or "claude"
             usage.label(text=f"{model}  ·  {used} tokens")
+            send_button = controls.row()
+            send_button.alignment = "RIGHT"
+            send_button.enabled = not chat_is_busy()
+            send_button.operator("orion.chat_send", text="Skicka", icon="PLAY")
 
     classes = (ORION_OT_chat_send, ORION_OT_run_snippet, ORION_OT_copy_snippet,
                ORION_OT_rerun, ORION_OT_clear_scene, ORION_OT_clean_mesh,
@@ -694,9 +703,6 @@ def register():
         window_manager.orion_prompt = bpy.props.StringProperty(
             name="", description="Meddelande till Claude - Enter skickar",
             update=prompt_updated)
-        window_manager.orion_autorun = bpy.props.BoolProperty(
-            name="Kor automatiskt", default=True,
-            description="Kor kodblock fran Claude direkt nar svaret landar")
         window_manager.orion_ctx_scene = bpy.props.BoolProperty(
             name="Scengraf", default=True,
             description="Skicka med objektlistan i varje fraga")
@@ -718,7 +724,6 @@ def unregister():
             bpy.utils.unregister_class(ui_class)
         window_manager = bpy.types.WindowManager
         del window_manager.orion_prompt
-        del window_manager.orion_autorun
         del window_manager.orion_ctx_scene
         del window_manager.orion_ctx_selection
         del window_manager.orion_ctx_material
