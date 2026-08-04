@@ -46,6 +46,15 @@ case "$(uname -s 2>/dev/null || echo Linux)" in
         "$CLANG" "$WORK/seed.host.ll" "$ROOT/runtime/orion_rt.c" -Os -o "$WORK/seed.exe" ;;
 esac
 
+# The compiler recurses deep; Windows reserves a big stack in the exe
+# (/STACK above), POSIX raises it at run time. Without this the seed exe
+# SEGFAULTS on the grown bundle and reports as "stale" - which is exactly
+# what CI showed on ubuntu/macos while Windows stayed green.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
+esac
+
 echo "==> the seed compiles today's bundle"
 if "$WORK/seed.exe" "$BUNDLE" "$WORK/from_seed.ll" > "$WORK/log.txt" 2>&1; then
     rm -rf "$WORK"

@@ -16,7 +16,7 @@ touch "$WS/.orbit"
 
 mkdir -p "$WS/libs/deep/nested/orbs/greeter"
 cat > "$WS/libs/deep/nested/orbs/greeter/lib.or" <<'EOF'
-pub fn hello() -> Text = "name-resolved"
+public define hello() -> text = "name-resolved"
 EOF
 cat > "$WS/libs/deep/nested/orbs/greeter/Orbit.toml" <<'EOF'
 name = "greeter"
@@ -34,7 +34,7 @@ greeter = "*"
 EOF
 cat > "$WS/games/mygame/src/main.or" <<'EOF'
 use greeter
-fn main():
+define main():
     print(hello())
 EOF
 

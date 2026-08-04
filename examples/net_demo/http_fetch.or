@@ -13,5 +13,5 @@ define main() -> int:
     if success(r) and contains(r.body, "Example Domain"):
         print_line("http orb: live fetch OK")
         return 0
-    print_line("http orb: fetch failed (offline? curl missing?)")
+    print_line("http orb: fetch failed - {r.body}")
     1

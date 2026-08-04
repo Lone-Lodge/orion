@@ -57,10 +57,14 @@ define run_curl(args: [text], body_file: text) -> response:
     rc = command_result(job)
     status = status_from_headers(read_file(hdr_file))
     body = read_file(body_file)
+    err = read_file(log_file)
     cleanup1 = remove_file(body_file)
     cleanup2 = remove_file(hdr_file)
     cleanup3 = remove_file(log_file)
-    if rc is not 0 then response{status: 0, body: body} else response{status: status, body: body}
+    # A failed request answers status 0 with curl's OWN complaint as the
+    # body ("could not resolve host", proxy refusals...), so the caller can
+    # show WHY instead of a blank.
+    if rc is not 0 then response{status: 0, body: trim(err)} else response{status: status, body: body}
 
 # GET `url`. `success(r)` when the request went through AND the server said 2xx.
 # no example: needs the network - proven by examples/demos/httpd.or + manual runs
