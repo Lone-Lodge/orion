@@ -492,25 +492,43 @@ const char *sha256_hex(const char *msg) {
  * (0 = found and pinned). How folio's "image on top" works: the popup names
  * itself after the image, then asks the server to hoist it. Windows-only -
  * elsewhere it answers -1 and the app says so. */
+/* user32 loads DYNAMICALLY: linking it statically would make every CLI
+ * program (and every test probe) demand -luser32 - measured, it broke the
+ * whole battery. LoadLibrary costs one call on first pin. */
 #ifdef _WIN32
+typedef int (__stdcall *wt_enum_fn)(void *, LONG_PTR);
+static int (__stdcall *wt_EnumWindows)(wt_enum_fn, LONG_PTR);
+static int (__stdcall *wt_IsWindowVisible)(void *);
+static int (__stdcall *wt_GetWindowTextA)(void *, char *, int);
+static int (__stdcall *wt_SetWindowPos)(void *, void *, int, int, int, int, unsigned int);
 static char win_topmost_needle[256];
 static long long win_topmost_hit;
-static int __stdcall win_topmost_scan(HWND h, LONG_PTR unused) {
+static int __stdcall win_topmost_scan(void *h, LONG_PTR unused) {
     char title[512];
     (void)unused;
-    if (!IsWindowVisible(h)) return 1;
-    GetWindowTextA(h, title, sizeof title);
+    if (!wt_IsWindowVisible(h)) return 1;
+    wt_GetWindowTextA(h, title, sizeof title);
     if (title[0] && strstr(title, win_topmost_needle)) {
-        SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        wt_SetWindowPos(h, (void *)(intptr_t)-1 /* HWND_TOPMOST */, 0, 0, 0, 0,
+                        0x0001 | 0x0002 /* SWP_NOSIZE|SWP_NOMOVE */);
         win_topmost_hit = 0;
         return 0;
     }
     return 1;
 }
 long long win_set_topmost(const char *needle) {
+    if (!wt_EnumWindows) {
+        HMODULE u = LoadLibraryA("user32.dll");
+        if (!u) return -1;
+        wt_EnumWindows = (int (__stdcall *)(wt_enum_fn, LONG_PTR))(void *)GetProcAddress(u, "EnumWindows");
+        wt_IsWindowVisible = (int (__stdcall *)(void *))(void *)GetProcAddress(u, "IsWindowVisible");
+        wt_GetWindowTextA = (int (__stdcall *)(void *, char *, int))(void *)GetProcAddress(u, "GetWindowTextA");
+        wt_SetWindowPos = (int (__stdcall *)(void *, void *, int, int, int, int, unsigned int))(void *)GetProcAddress(u, "SetWindowPos");
+        if (!wt_EnumWindows || !wt_IsWindowVisible || !wt_GetWindowTextA || !wt_SetWindowPos) return -1;
+    }
     snprintf(win_topmost_needle, sizeof win_topmost_needle, "%s", needle);
     win_topmost_hit = -1;
-    EnumWindows((WNDENUMPROC)win_topmost_scan, 0);
+    wt_EnumWindows(win_topmost_scan, 0);
     return win_topmost_hit;
 }
 #else
