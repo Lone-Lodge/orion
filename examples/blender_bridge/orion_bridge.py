@@ -18,6 +18,7 @@ import json
 import shutil
 import socket
 import subprocess
+import textwrap
 import threading
 import time
 import traceback
@@ -124,7 +125,7 @@ class ORION_OT_chat_send(bpy.types.Operator if bpy else object):
             return {"CANCELLED"}
         context.window_manager.orion_prompt = ""
         entry = {"when": time.strftime("%H:%M:%S"), "ok": 1, "kind": "chat",
-                 "code": f"Du: {prompt}", "output": "... vantar pa Claude"}
+                 "code": prompt, "output": "... vantar pa Claude"}
         history.append(entry)
         del history[:-HISTORY_MAX]
         redraw()
@@ -183,6 +184,19 @@ class ORION_OT_copy_output(bpy.types.Operator if bpy else object):
         return {"FINISHED"}
 
 
+# Blender labels never wrap - wrap by hand from the region's pixel width.
+def wrapped(text, chars):
+    lines = []
+    for raw_line in text.splitlines():
+        lines.extend(textwrap.wrap(raw_line, chars) or [""])
+    return lines
+
+
+def wrap_chars(context):
+    width = getattr(context.region, "width", 300)
+    return max(24, int((width - 48) / 7))
+
+
 class ORION_PT_bridge(bpy.types.Panel if bpy else object):
     bl_label = "Orion Bridge"
     bl_space_type = "VIEW_3D"
@@ -190,35 +204,81 @@ class ORION_PT_bridge(bpy.types.Panel if bpy else object):
     bl_category = "Orion"
 
     def draw(self, context):
-        layout = self.layout
-        chat = layout.row(align=True)
-        chat.prop(context.window_manager, "orion_prompt", text="", icon="OUTLINER_OB_ARMATURE")
-        chat.operator("orion.chat_send", text="", icon="PLAY")
+        running = _server is not None
+        status = self.layout.row(align=True)
+        status.active = False
+        status.label(text=f"{HOST}:{PORT}",
+                     icon="LINKED" if running else "UNLINKED")
 
-        quick = layout.grid_flow(columns=2, align=True)
+
+class ORION_PT_chat(bpy.types.Panel if bpy else object):
+    bl_label = "Chat"
+    bl_parent_id = "ORION_PT_bridge"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Orion"
+
+    def draw(self, context):
+        layout = self.layout
+        chars = wrap_chars(context)
+        exchanges = [entry for entry in history if entry.get("kind") == "chat"][-8:]
+        for entry in exchanges:
+            block = layout.column(align=True)
+            prompt_col = block.column(align=True)
+            prompt_col.active = False  # your words dimmed, the reply carries the weight
+            for index, line in enumerate(wrapped(entry["code"], chars)):
+                prompt_col.label(text=line, icon="USER" if index == 0 else "BLANK1")
+            reply_col = block.column(align=True)
+            reply_col.alert = not entry["ok"]
+            for index, line in enumerate(wrapped(entry["output"], chars)[:30]):
+                reply_col.label(text=line, icon="SOLO_ON" if index == 0 else "BLANK1")
+            layout.separator()
+        send = layout.row(align=True)
+        send.prop(context.window_manager, "orion_prompt", text="",
+                  placeholder="Fraga Claude...")
+        send.operator("orion.chat_send", text="", icon="PLAY")
+
+
+class ORION_PT_quick(bpy.types.Panel if bpy else object):
+    bl_label = "Snabbt"
+    bl_parent_id = "ORION_PT_bridge"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Orion"
+
+    def draw(self, context):
+        quick = self.layout.grid_flow(columns=2, align=True)
         quick.operator("wm.save_mainfile", text="Spara", icon="FILE_TICK")
         quick.operator("orion.toggle_rendered", text="Rendera", icon="SHADING_RENDERED")
         quick.operator("view3d.view_all", text="Visa allt", icon="ZOOM_ALL")
         quick.operator("orion.clear_scene", text="Rensa scen", icon="TRASH")
 
-        status = layout.row(align=True)
-        running = _server is not None
-        status.label(text=f"Server {HOST}:{PORT}",
-                     icon="LINKED" if running else "UNLINKED")
-        if not history:
+
+class ORION_PT_log(bpy.types.Panel if bpy else object):
+    bl_label = "Aktivitet"
+    bl_parent_id = "ORION_PT_bridge"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Orion"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        layout = self.layout
+        runs = [entry for entry in history if entry.get("kind") == "code"]
+        if not runs:
             hint = layout.column()
             hint.active = False
             hint.label(text="Inget kort an.")
             return
-        fails = sum(1 for entry in history if not entry["ok"])
+        fails = sum(1 for entry in runs if not entry["ok"])
         summary = layout.row(align=True)
         count = summary.row()
         count.active = False
-        count.label(text=f"{len(history)} korningar, {fails} fel")
+        count.label(text=f"{len(runs)} korningar, {fails} fel")
         summary.operator("orion.copy_output", text="", icon="COPYDOWN")
         summary.operator("orion.clear_log", text="", icon="TRASH")
         log = layout.column(align=True)
-        for entry in reversed(history):
+        for entry in reversed(runs):
             box = log.box()
             head = box.row(align=True)
             head.alert = not entry["ok"]
@@ -226,12 +286,10 @@ class ORION_PT_bridge(bpy.types.Panel if bpy else object):
             head.label(text=f"{entry['when']}  {code_line[:34]}",
                        icon="CHECKMARK" if entry["ok"] else "CANCEL")
             if entry["output"]:
-                shown_lines = 12 if entry.get("kind") == "chat" else 3
                 body = box.column(align=True)
                 body.active = False  # dimmed: output is secondary to the code line
-                for out_line in entry["output"].splitlines()[:shown_lines]:
-                    box_line = body.row()
-                    box_line.label(text=out_line[:52])
+                for out_line in entry["output"].splitlines()[:3]:
+                    body.label(text=out_line[:52])
 
 
 # bpy is not thread-safe: in GUI mode the code runs via a timer on Blender's
@@ -300,7 +358,8 @@ def serve():
 
 
 classes = (ORION_OT_chat_send, ORION_OT_clear_scene, ORION_OT_toggle_rendered,
-           ORION_OT_clear_log, ORION_OT_copy_output, ORION_PT_bridge)
+           ORION_OT_clear_log, ORION_OT_copy_output,
+           ORION_PT_bridge, ORION_PT_chat, ORION_PT_quick, ORION_PT_log)
 
 
 def register():
