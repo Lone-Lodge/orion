@@ -2029,14 +2029,25 @@ const char *orion_dir_list(const char *dir) {
         return evac;
     }
 }
-/* Absolute path of the running executable (POSIX mirror). unistd.h for
- * readlink is included with the other POSIX headers. */
+/* Absolute path of the running executable (POSIX mirror). /proc/self/exe
+ * is Linux-only; Darwin answers via _NSGetExecutablePath (CI showed orbit
+ * on macOS falling back to a hard-coded engine path because this returned
+ * "" there). */
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 const char *host_self_exe(void) {
     char path[4096];
+#if defined(__APPLE__)
+    uint32_t cap = (uint32_t)sizeof path;
+    if (_NSGetExecutablePath(path, &cap) != 0) return otx_empty.z;
+    return orion_text_from_c(path);
+#else
     ssize_t n = readlink("/proc/self/exe", path, sizeof path - 1);
     if (n <= 0) return otx_empty.z;
     path[n] = 0;
     return orion_text_from_c(path);
+#endif
 }
 /* Subdirectories of `dir` (newline-separated, excludes . and ..). Lets orbit
  * scan a workspace for orbs regardless of folder layout. */
