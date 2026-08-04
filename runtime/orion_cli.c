@@ -350,6 +350,25 @@ long long *entropy_bytes(long long n) {
  * orb builds on. `local` 1 = the machine's timezone, 0 = UTC. */
 long long unix_now(void) { return (long long)time(NULL); }
 
+/* Calendar parts (UTC) -> unix seconds. -1 on an impossible date. */
+long long time_from_parts(long long y, long long mo, long long d,
+                          long long h, long long mi, long long s) {
+    struct tm tmv;
+    memset(&tmv, 0, sizeof(tmv));
+    tmv.tm_year = (int)(y - 1900);
+    tmv.tm_mon = (int)(mo - 1);
+    tmv.tm_mday = (int)d;
+    tmv.tm_hour = (int)h;
+    tmv.tm_min = (int)mi;
+    tmv.tm_sec = (int)s;
+#ifdef _WIN32
+    long long r = (long long)_mkgmtime(&tmv);
+#else
+    long long r = (long long)timegm(&tmv);
+#endif
+    return r;
+}
+
 const char *time_format(long long unix_s, const char *fmt, long long local) {
     static char buf[256];
     time_t t = (time_t)unix_s;

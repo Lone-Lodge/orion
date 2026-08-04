@@ -312,6 +312,7 @@
 <div class="fn"><code class="sig">local_time(unix_s: int, fmt: text) -&gt; text</code><p><code>unix_s</code> formatted with strftime codes, in the machine's local timezone.</p></div>
 <div class="fn"><code class="sig">utc_time(unix_s: int, fmt: text) -&gt; text</code><p><code>unix_s</code> formatted with strftime codes, in UTC.</p></div>
 <div class="fn"><code class="sig">timestamp() -&gt; text uses clock = local_time(unix_now(), "%Y-%m-%d %H:%M:%S")</code><p>The common stamp, local: "2026-08-04 21:30:05".</p></div>
+<div class="fn"><code class="sig">parse_utc(t: text) -&gt; int</code><p>"YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS" (UTC) -&gt; unix seconds.</p></div>
 <h2 id="watch"><code>watch</code></h2>
 <p class="orb-blurb">the mechanics of a file watcher: scan a tree, fingerprint it, name what changed.</p>
 <div class="fn"><code class="sig">scan_tree(dir: text) -&gt; [text] uses files</code><p>Every watched file under <code>dir</code>, recursively, skipping build dirs.</p></div>
