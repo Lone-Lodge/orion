@@ -90,6 +90,42 @@ public define mime_of(path: text) -> text:
         ends_with(path, ".woff2") then "font/woff2"
         else "application/octet-stream"
 
+# The nibble value of a hex digit byte, or -1 if it is not one.
+define nibble(b: int) -> int:
+    choose:
+        b >= 48 and b <= 57 then b - 48
+        b >= 97 and b <= 102 then b - 87
+        b >= 65 and b <= 70 then b - 55
+        else -1
+
+# "%XX" byte triples back to the bytes they stand for. The browser sends every
+# path and query value this way, so the file "Skärmbild 1.png" arrives as
+# "Sk%C3%A4rmbild%201.png" and has to come back before it can be opened. A "%"
+# that is not followed by two hex digits stays literal. ("+" is NOT space here:
+# that rule belongs to query strings only - see query_of.)
+public define percent_decode(s: text) -> text:
+    example percent_decode("a%20b") is "a b"
+    example percent_decode("Sk%C3%A4rmbild") is "Skärmbild"
+    example percent_decode("100% sure") is "100% sure"
+    example percent_decode("a+b") is "a+b"
+    b = bytes_from_text(s)
+    n = bytes_length(b)
+    edit out = []
+    edit i = 0
+    loop:
+        if i >= n:
+            break
+        c = byte_at(b, i)
+        hi = if c is 37 and i + 2 < n then nibble(byte_at(b, i + 1)) else -1
+        lo = if hi >= 0 then nibble(byte_at(b, i + 2)) else -1
+        if lo >= 0:
+            out = append(out, hi * 16 + lo)
+            i = i + 3
+        else:
+            out = append(out, c)
+            i = i + 1
+    bytes_to_text(out)
+
 # ".." must never climb out of the served folder.
 public define safe_path(p: text) -> truth:
     example safe_path("/bilder/a.png")
@@ -144,7 +180,7 @@ define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files,
 # A static file, streamed in binary chunks so a large image never has to
 # fit one send.
 define serve_static(conn: int, req: request, static_dir: text) uses net, files:
-    rel = if req.path is "/" then "/index.html" else req.path
+    rel = if req.path is "/" then "/index.html" else percent_decode(req.path)
     if req.method is not "GET" or not safe_path(rel):
         r404 = not_found()
         s1 = send(conn, head_of(r404))
@@ -201,16 +237,17 @@ public define open_window(url: text) -> int uses net:
     exe = if file_exists(a) then a else b
     start_command(exe, ["--app={url}"])
 
-# The value of `key` in the request's query string, "" when absent. Values
-# arrive percent-decoded enough for filenames (space and %2F handled).
+# The value of `key` in the request's query string, "" when absent. Decoded the
+# form-urlencoded way: "+" is a space, then the %XX triples.
 public define query_of(req: request, key: text) -> text:
     example query_of(request{method: "GET", path: "/", query: "name=a.png&x=1", body: ""}, "name") is "a.png"
     example query_of(request{method: "GET", path: "/", query: "", body: ""}, "name") is ""
+    example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png", body: ""}, "name") is "Skärm 1.png"
     edit found = ""
     loop pair in split(req.query, "&"):
         kv = split(pair, "=")
         if len(kv) is 2 and at(kv, 0) is key and found is "":
-            found = replace(replace(replace(at(kv, 1), "%20", " "), "+", " "), "%2F", "/")
+            found = percent_decode(replace(at(kv, 1), "+", " "))
     found
 
 external define win_set_topmost(needle: text) -> int
