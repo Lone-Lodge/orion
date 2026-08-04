@@ -98,6 +98,14 @@ def entry_by_id(entry_id):
 
 # --- chat: the panel talks to the claude CLI ---
 
+# claude is an npm .CMD shim, so its arguments pass through cmd.exe - an
+# embedded double quote breaks the quoting there and any < > after it become
+# redirects ("The system cannot find the file specified"). Single quotes are
+# harmless to Claude and safe through cmd.exe.
+def cmd_safe(value):
+    return value.replace('"', "'")
+
+
 # First fenced code block out, prose (with the fence removed) stays as text.
 def extract_snippet(text):
     if "```" not in text:
@@ -127,12 +135,13 @@ def chat_worker(prompt, entry):
             # json output carries the reply plus usage (tokens, duration).
             brief = ("Du ar assistenten INNE i Blender. Blender kor redan med "
                      "Claude Bridge-addonet aktivt. Kor bpy-kod direkt via Bash: "
-                     'build\\blender_bridge_cli.exe "<python>" - utfor uppgifter '
-                     "sjalv istallet for att instruera anvandaren. Vill du ge "
-                     "anvandaren kod att kora i panelen, lagg den i ETT "
-                     "```python-block. Svara kort, pa svenska.")
+                     "build\\blender_bridge_cli.exe med python-koden som ett "
+                     "citerat argument - utfor uppgifter sjalv istallet for att "
+                     "instruera anvandaren. Vill du ge anvandaren kod att kora "
+                     "i panelen, lagg den i ETT python-kodblock. "
+                     "Svara kort, pa svenska.")
             flags = ["-p", "--output-format", "json",
-                     "--append-system-prompt", brief, prompt]
+                     "--append-system-prompt", cmd_safe(brief), cmd_safe(prompt)]
             run = subprocess.run([exe, "-c"] + flags, cwd=CHAT_DIR,
                                  capture_output=True, text=True, encoding="utf-8",
                                  errors="replace", timeout=600,
