@@ -133,13 +133,14 @@ def chat_worker(prompt, entry):
             # --continue keeps one ongoing Blender conversation; the first
             # message ever has nothing to continue, so retry without it.
             # json output carries the reply plus usage (tokens, duration).
-            brief = ("Du ar assistenten INNE i Blender. Blender kor redan med "
-                     "Claude Bridge-addonet aktivt. Kor bpy-kod direkt via Bash: "
-                     "build\\blender_bridge_cli.exe med python-koden som ett "
-                     "citerat argument - utfor uppgifter sjalv istallet for att "
-                     "instruera anvandaren. Vill du ge anvandaren kod att kora "
-                     "i panelen, lagg den i ETT python-kodblock. "
-                     "Svara kort, pa svenska.")
+            # The panel executes the reply's code block itself (autorun), so
+            # the headless session needs no tools and no permission prompts.
+            brief = ("Du ar assistenten INNE i Blender. Svara ALLTID med exakt "
+                     "ETT python-kodblock med bpy-kod som UTFOR uppgiften - "
+                     "blocket kors automatiskt i Blender i samma stund som "
+                     "svaret landar. Utanfor blocket: hogst ett par korta "
+                     "meningar pa svenska. Be aldrig anvandaren kora nagot "
+                     "sjalv. Scenkontexten i prompten ar farsk.")
             # The prompt goes via STDIN, never as an argument: the .CMD shim
             # routes argv through cmd.exe, which truncates at the first
             # newline (the multi-line scene context arrived empty that way).
@@ -249,16 +250,24 @@ def wrap_chars(context):
     return max(24, int((width - 48) / 7))
 
 
-# Replies arrive as markdown - strip the tokens Blender cannot render and
-# turn list dashes into bullets, so the text reads clean in plain labels.
+# Replies arrive as markdown - strip the tokens Blender cannot render, turn
+# list dashes into bullets, and collapse the blank runs a lifted code block
+# leaves behind, so the text reads clean in plain labels.
 def plain(text):
     lines = []
+    blank_pending = False
     for raw_line in text.replace("**", "").replace("`", "").splitlines():
         stripped = raw_line.strip()
         if stripped.startswith("#"):
             stripped = stripped.lstrip("#").strip()
         if stripped.startswith("- "):
             stripped = "•  " + stripped[2:]
+        if not stripped:
+            blank_pending = bool(lines)
+            continue
+        if blank_pending:
+            lines.append("")
+            blank_pending = False
         lines.append(stripped)
     return "\n".join(lines)
 
@@ -686,7 +695,7 @@ def register():
             name="", description="Meddelande till Claude - Enter skickar",
             update=prompt_updated)
         window_manager.orion_autorun = bpy.props.BoolProperty(
-            name="Kor automatiskt", default=False,
+            name="Kor automatiskt", default=True,
             description="Kor kodblock fran Claude direkt nar svaret landar")
         window_manager.orion_ctx_scene = bpy.props.BoolProperty(
             name="Scengraf", default=True,
