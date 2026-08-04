@@ -35,12 +35,12 @@ define main() -> int:
         l_acc = l_acc + at(buf, i % 8)
     t3 = monotonic_ms()
 
-    # --- push_mut: the in-place accumulator ---
+    # --- append into a growing list (promoted in place) ---
     push_reps = 2000000
     t4 = monotonic_ms()
     edit xs = [0]
     loop i in 0..<push_reps:
-        xs = push_mut(xs, i)
+        xs = append(xs, i)
     t5 = monotonic_ms()
 
     # --- int -> text ---
@@ -76,7 +76,7 @@ define main() -> int:
     interp_ms = t11 - t10
     print_line("BENCH map_get {map_ms} {map_reps}")
     print_line("BENCH list_at {list_ms} {list_reps}")
-    print_line("BENCH push_mut {push_ms} {push_reps}")
+    print_line("BENCH append {push_ms} {push_reps}")
     print_line("BENCH int_to_text {itt_ms} {itt_reps}")
     print_line("BENCH concat {cat_ms} {cat_reps}")
     print_line("BENCH interp {interp_ms} {interp_reps}")

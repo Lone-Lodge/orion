@@ -36,7 +36,8 @@ mkdir -p "$TMP"
 # Anything measured at -O0 would be measuring the wrong binary.
 echo "  building examples/bench/runtime.or (-O2)"
 "$ORION" "$SRC" "$TMP/runtime.ll" "$ROOT/orbs" >/dev/null || { echo "  compile FAILED"; exit 1; }
-[ -f "$TMP/orion_rt.o" ] || "$CLANG" -c -Os "$ROOT/runtime/orion_rt.c" -o "$TMP/orion_rt.o"
+# a cached object with no invalidation measured a STALE runtime - always fresh
+"$CLANG" -c -Os "$ROOT/runtime/orion_rt.c" -o "$TMP/orion_rt.o"
 "$CLANG" "$TMP/runtime.ll" "$TMP/orion_rt.o" -O2 -Wno-override-module -o "$TMP/runtime.exe" || {
     echo "  link FAILED"; exit 1; }
 

@@ -5,4 +5,4 @@ int_to_text 101 2500000
 interp 96 750000
 list_at 4 10000000
 map_get 63 10000000
-push_mut 7 2000000
+append 7 2000000
