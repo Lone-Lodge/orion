@@ -119,6 +119,7 @@ define usage():
     # not here at all -- it did not exist.
     eprint(c_bold("  getting started"))
     eprint("  run [file.or] [args...]     " + c_dim("compile and run. `orbit run hello.or` needs no project"))
+    eprint("  debug [file.or] [args...]   " + c_dim("run with the call trail: crashes, traps and breakpoint() say how you got there"))
     eprint("  build [file.or]             " + c_dim("compile and link to an exe beside the source"))
     eprint("  new <name>                  " + c_dim("scaffold a project"))
     eprint("  test                        " + c_dim("run the project's tests"))
@@ -339,6 +340,15 @@ define cmd_run():
     fname = if arg_count() <= fname_index then "main" else arg(fname_index)
     rest = args_after(fname_index + 1)
     exit_with(__os_orbit_run(path, fname, rest))
+
+# `orbit debug [file.or] [fn] [args...]` — exactly `orbit run`, but the build
+# carries the call trail: every define's entry is recorded (last 64 kept), and
+# a crash, a require/index trap, or a breakpoint() in the source prints them
+# newest-first. `breakpoint()` also pauses on a terminal (Enter continues,
+# q quits); piped it reports and continues, so gates never hang.
+define cmd_debug():
+    slot_set("orbit:trace", 1)
+    cmd_run()
 
 define cmd_test():
     path = resolve_path()
@@ -1010,6 +1020,9 @@ define cli_build(path: text) -> text:
     # how its compilation went. Diagnostics and failures still print.
     if standalone:
         compile_args = append(compile_args, "--quiet")
+    # `orbit debug` builds with the call trail (see cmd_debug).
+    if slot_has("orbit:trace") and slot_get_int("orbit:trace") == 1:
+        compile_args = append(compile_args, "--trace")
     if run_command(compiler, compile_args) != 0:
         return ""
     # The compiler always emits a Windows triple (effect ABI). Off Windows,
@@ -1265,6 +1278,8 @@ public define main():
             cmd_get()
         else if command == "update":
             cmd_update()
+        else if command == "debug":
+            cmd_debug()
         else:
             if command == "build" or command == "check":
                 cmd_build()

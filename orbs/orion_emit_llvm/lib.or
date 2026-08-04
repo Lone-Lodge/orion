@@ -1256,6 +1256,11 @@ define emit_runtime() -> text:
     # Parallel closure runner (orion_rt.c): run each closure(arg) on a worker,
     # sum the results. orion_ prefix skips the auto-extern path, so declare here.
     text = "{text}declare i64 @orion_par_run(ptr, i64)\n"
+    # Debugger v1 (orion_ prefix skips the auto-extern path, so declare here):
+    # --trace fn-entry hook, the trap-time trail dump, and breakpoint().
+    text = "{text}declare i64 @orion_trace_enter(ptr)\n"
+    text = "{text}declare i64 @orion_trail_note_trap()\n"
+    text = "{text}declare i64 @orion_breakpoint(ptr)\n"
     # Frame-arena allocator (orion_rt.c): ALL runtime allocations route
     # through orion_alloc — malloc passthrough unless a game loop turns
     # the arena on per frame. Control fns declared too — orion_ prefix
@@ -2140,6 +2145,7 @@ define emit_runtime() -> text:
     text = "{text}  br i1 %at_oob, label %at_fail, label %at_ok\n"
     text = "{text}at_fail:\n"
     text = "{text}  %_atp = call i32 (ptr, ...) @printf(ptr @.msg_oob, i64 %idx, i64 %at_len)\n"
+    text = "{text}  %_att = call i64 @orion_trail_note_trap()\n"
     text = "{text}  call void @exit(i32 70)\n"
     text = "{text}  unreachable\n"
     text = "{text}at_ok:\n"
@@ -2186,6 +2192,7 @@ define emit_runtime() -> text:
     text = "{text}  br i1 %rq, label %rfail, label %rok\n"
     text = "{text}rfail:\n"
     text = "{text}  %_rp = call i32 (ptr, ...) @printf(ptr @.msg_require)\n"
+    text = "{text}  %_rt = call i64 @orion_trail_note_trap()\n"
     text = "{text}  call void @exit(i32 70)\n"
     text = "{text}  unreachable\n"
     text = "{text}rok:\n"
@@ -2197,6 +2204,7 @@ define emit_runtime() -> text:
     text = "{text}  br i1 %eq0, label %efail, label %eok\n"
     text = "{text}efail:\n"
     text = "{text}  %_ep = call i32 (ptr, ...) @printf(ptr @.msg_ensure)\n"
+    text = "{text}  %_et = call i64 @orion_trail_note_trap()\n"
     text = "{text}  call void @exit(i32 70)\n"
     text = "{text}  unreachable\n"
     text = "{text}eok:\n"

@@ -1290,6 +1290,74 @@ static void crash_line(const char *fmt, ...) {
     }
 }
 
+/* ---- debugger v1: the call trail + breakpoint --------------------------
+ * A `--trace` build (orbit debug) prefixes every user define with
+ * orion_trace_enter(name), a ring of the last 64 entered functions. It is
+ * printed newest-first wherever execution stops surprised: a crash, a
+ * require/index trap, or a breakpoint() the program placed itself. The
+ * names are string constants in the binary — storing the pointer is the
+ * whole cost of a hop, so a traced run stays fast enough to be usable. */
+#define ORION_TRAIL_N 64
+static const char *orion_trail_name[ORION_TRAIL_N];
+static long long orion_trail_seq = 0;
+
+long long orion_trace_enter(const char *name) {
+    orion_trail_name[(int)(orion_trail_seq % ORION_TRAIL_N)] = name;
+    orion_trail_seq++;
+    return 0;
+}
+
+/* Newest-first, to stderr. Quiet when the program was not built with
+ * --trace (an untraced binary never enters anything). */
+long long orion_trail_print(void) {
+    if (orion_trail_seq == 0) return 0;
+    long long n = orion_trail_seq < ORION_TRAIL_N ? orion_trail_seq : ORION_TRAIL_N;
+    fprintf(stderr, "[orion] last %lld call(s), newest first:\n", n);
+    for (long long k = 1; k <= n; k++) {
+        const char *nm = orion_trail_name[(int)((orion_trail_seq - k) % ORION_TRAIL_N)];
+        fprintf(stderr, "[orion]   %s\n", nm ? nm : "?");
+    }
+    return n;
+}
+
+/* The require/ensure/index traps call this before exit(70). */
+long long orion_trail_note_trap(void) {
+    fflush(stdout);
+    return orion_trail_print();
+}
+
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
+
+/* breakpoint() — stop here, on purpose. Prints where (the enclosing
+ * function) and the trail, then waits on stdin: Enter continues, q quits
+ * with 70. When stdin is not a terminal (a gate, a pipe) it reports and
+ * continues, so a forgotten breakpoint never hangs a script. */
+long long orion_breakpoint(const char *where) {
+    fflush(stdout);
+    fprintf(stderr, "[orion] breakpoint in `%s`\n", where);
+    orion_trail_print();
+#ifdef _WIN32
+    int interactive = _isatty(_fileno(stdin));
+#else
+    int interactive = isatty(0);
+#endif
+    if (!interactive) {
+        fprintf(stderr, "[orion]   (stdin is not a terminal — continuing)\n");
+        return 0;
+    }
+    for (;;) {
+        fprintf(stderr, "[orion]   Enter = continue, q = quit: ");
+        fflush(stderr);
+        int c = fgetc(stdin);
+        if (c == 'q') exit(70);
+        if (c == '\n' || c == EOF) return 0;
+        /* swallow the rest of the line, then ask again */
+        while (c != '\n' && c != EOF) c = fgetc(stdin);
+    }
+}
+
 static void crash_print_crumbs(void) {
     if (crumb_head < 0) return;
     if (crumb_rule[0])
@@ -1418,6 +1486,7 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                orion_exc_name(info->ExceptionRecord->ExceptionCode),
                (unsigned long)info->ExceptionRecord->ExceptionCode, sym);
     crash_print_crumbs();
+    orion_trail_print();   /* the --trace call trail, when there is one */
     /* Backtrace: scan the crashed thread's stack for return addresses
      * inside our module, symbolized inline. No dbghelp, always works. */
     if (info->ContextRecord) {

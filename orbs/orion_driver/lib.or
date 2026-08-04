@@ -798,6 +798,11 @@ public define driver_main() -> int:
         src = drv_collect(entry_src, roots, in_path)
         # Keep the collected source so error diagnostics can show the line + caret.
         slot_set("src:full", orion_persist_text(src))
+        # `--trace` (orbit debug): ast_fn_to_ir prefixes every define with a
+        # call-trail entry. Communicated by slot, like drv:quiet.
+        loop flag_i in 1..<argc():
+            if argv(flag_i) == "--trace":
+                slot_set("drv:trace", 1)
         t0 = monotonic_ms()
         tokens = self_lex(src)
         t1 = monotonic_ms()

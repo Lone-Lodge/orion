@@ -1918,6 +1918,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_vec_madd = callee == "vec_madd"
     is_par_madd = callee == "par_madd"
     is_par_run = callee == "par_run"
+    is_breakpoint = callee == "breakpoint"
     is_vec_sub = callee == "vec_sub"
     is_vec_mul = callee == "vec_mul"
     is_vec_dot = callee == "vec_dot"
@@ -2166,6 +2167,13 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         prun_b = ast_expr_to_ir(prun_a.function, prun_a.scope, at(args, 1))
         pr = ir_fn_push(prun_b.function, ir_call("orion_par_run", [prun_a.id, prun_b.id], "i64"))
         result = ConvResult{function: pr.function, scope: prun_b.scope, id: pr.id}
+    if is_breakpoint:
+        # `breakpoint()` — stop here, on purpose (orion_rt.c). The argument is
+        # the enclosing function's name: a Call node carries no position, and
+        # the --trace trail supplies the rest of the story.
+        bp_s = ir_fn_push(fn_value, ir_const_str(friendly_fn_name(fn_value.name)))
+        bp_c = ir_fn_push(bp_s.function, ir_call("orion_breakpoint", [bp_s.id], "i64"))
+        result = ConvResult{function: bp_c.function, scope: scope, id: bp_c.id}
     if is_vec_sub:
         a_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         b_r = ast_expr_to_ir(a_r.function, a_r.scope, at(args, 1))
@@ -2323,7 +2331,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         gl_elem = if is_get_text_list then "list:text" else (if is_get_int_list then "list:i64" else (if is_list_type(gl_declared) then gl_declared else "list:dyn"))
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, gl_elem))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line == false) and (is_print_raw == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_inplace == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_get_text_list == false) and (is_get_int_list == false) and (is_vec_add == false) and (is_vec_addi == false) and (is_vec_madd == false) and (is_par_madd == false) and (is_par_run == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
+    is_user_fn = (is_print_line == false) and (is_print_raw == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_inplace == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_get_text_list == false) and (is_get_int_list == false) and (is_vec_add == false) and (is_vec_addi == false) and (is_vec_madd == false) and (is_par_madd == false) and (is_par_run == false) and (is_breakpoint == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
     if is_resume:
         # One `resume(v)` — pick the int vs text runtime call from the value's
         # type. (There is intentionally no resume_int / resume_text; one way.)
@@ -4113,6 +4121,14 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
                 slot_set("otir:fnparam_pt:" + param_name + ":{fpt_i}", ast_type_to_ir_with_scope(at(fpt_list, fpt_i), initial_scope))
             # Declared return type, for the call-site return-type propagation.
             slot_set("otir:fnparam_ret:" + param_name, ast_type_to_ir_with_scope(get_map(param_type_node, "ret"), initial_scope))
+    # --trace (orbit debug): prefix the body with a call-trail entry, so a
+    # crash, a trap or a breakpoint can say how execution got there. Off by
+    # default — one runtime call per function entry is not free.
+    if slot_int_or_zero("drv:trace") == 1:
+        tr_s = ir_fn_push(fn_value, ir_const_str(friendly_fn_name(name)))
+        fn_value = tr_s.function
+        tr_c = ir_fn_push(fn_value, ir_call("orion_trace_enter", [tr_s.id], "i64"))
+        fn_value = tr_c.function
     body = get(ast_fn, "body")
     # A block-form fn with zero statements means the body was empty in source
     # (a forgotten body) OR a mis-parse swallowed it (e.g. a keyword used as a

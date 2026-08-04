@@ -7,6 +7,13 @@ Notable changes to Orion. The format follows
 ## [Unreleased]
 
 ### Added
+- **Debugger v1**: `orbit debug prog.or` runs with a call trail — every
+  define's entry is recorded (last 64 kept) and a crash, a `require`/index
+  trap, or a `breakpoint()` placed in the source prints them newest-first.
+  `breakpoint()` names its enclosing function and pauses on a terminal
+  (Enter continues, q quits); piped, it reports and continues, so a
+  forgotten one never hangs a gate. The instrumentation is opt-in
+  (`--trace` at the compiler level): a plain build pays nothing.
 - **A file watcher**: `orbit run tools/orbwatch.or main <dir> <command>`
   reruns the command whenever a source file under `<dir>` changes, and a
   change DURING a run stops the stale run and starts a fresh one (built on
