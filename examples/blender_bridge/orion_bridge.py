@@ -128,7 +128,7 @@ def extract_snippet(text):
     return code.strip(), prose
 
 
-def chat_worker(prompt, entry):
+def chat_worker(prompt, entry, model="sonnet", allow_retry=True):
     exe = shutil.which("claude")
     tokens = 0
     meta = ""
@@ -154,8 +154,7 @@ def chat_worker(prompt, entry):
             # The prompt goes via STDIN, never as an argument: the .CMD shim
             # routes argv through cmd.exe, which truncates at the first
             # newline (the multi-line scene context arrived empty that way).
-            # haiku: the fast tier - scene snippets need speed, not deep thought
-            flags = ["-p", "--output-format", "json", "--model", "haiku",
+            flags = ["-p", "--output-format", "json", "--model", model,
                      "--append-system-prompt", cmd_safe(brief)]
             run = subprocess.run([exe, "-c"] + flags, input=prompt, cwd=CHAT_DIR,
                                  capture_output=True, text=True, encoding="utf-8",
@@ -194,7 +193,24 @@ def chat_worker(prompt, entry):
         entry["pending"] = False
         entry["when"] = time.strftime("%H:%M:%S")
         if snippet:
-            record(snippet, run_code(snippet))
+            result = run_code(snippet)
+            record(snippet, result)
+            # self-correction, one round: hand the traceback back and run
+            # the corrected block - the panel never leaves a red row silently
+            if not result["ok"] and allow_retry:
+                error_tail = "\n".join(result["error"].splitlines()[-12:])
+                retry_prompt = ("Ditt kodblock gav foljande fel nar det "
+                                f"kordes:\n{error_tail}\n"
+                                "Svara med ETT rattat python-kodblock.")
+                retry_entry = {"id": take_id(), "when": time.strftime("%H:%M:%S"),
+                               "ok": 1, "kind": "chat", "code": "",
+                               "output": "Claude rattar felet.",
+                               "pending": True, "started": time.monotonic()}
+                history.append(retry_entry)
+                threading.Thread(target=chat_worker,
+                                 args=(retry_prompt, retry_entry, model, False),
+                                 daemon=True).start()
+                bpy.app.timers.register(tick_pending)
         redraw()
         return None
 
@@ -334,7 +350,9 @@ if bpy is not None:
             redraw()
             scene_facts = context_block(context.window_manager)
             full_prompt = f"[Scenkontext]\n{scene_facts}\n\n{prompt}" if scene_facts else prompt
-            threading.Thread(target=chat_worker, args=(full_prompt, entry),
+            threading.Thread(target=chat_worker,
+                             args=(full_prompt, entry,
+                                   context.window_manager.orion_model),
                              daemon=True).start()
             bpy.app.timers.register(tick_pending)
             return {"FINISHED"}
@@ -553,15 +571,17 @@ if bpy is not None:
                             reason.alert = not entry["ok"]
                             reason.label(text=out_line[:48], icon="BLANK1")
                     continue
-                # your message: a right-aligned bubble
-                split = layout.split(factor=0.22)
-                split.label(text="")
-                bubble = split.box().column(align=True)
-                for line in wrapped(entry["code"], max(16, int(chars * 0.7))):
-                    bubble_row = bubble.row()
-                    bubble_row.alignment = "RIGHT"
-                    bubble_row.label(text=line)
-                layout.separator(factor=0.4)
+                # your message: a right-aligned bubble (self-correction
+                # rounds have no user text - no bubble)
+                if entry["code"]:
+                    split = layout.split(factor=0.22)
+                    split.label(text="")
+                    bubble = split.box().column(align=True)
+                    for line in wrapped(entry["code"], max(16, int(chars * 0.7))):
+                        bubble_row = bubble.row()
+                        bubble_row.alignment = "RIGHT"
+                        bubble_row.label(text=line)
+                    layout.separator(factor=0.4)
                 if entry.get("pending"):
                     waiting = layout.row()
                     waiting.active = False
@@ -604,12 +624,13 @@ if bpy is not None:
             field.prop(context.window_manager, "orion_prompt", text="",
                        placeholder="Fraga Claude...")
             controls = layout.row(align=True)
+            picker = controls.row()
+            picker.prop(context.window_manager, "orion_model", text="")
             usage = controls.row()
             usage.active = False
             sent = [entry for entry in history if entry.get("kind") == "chat"]
             used = sum(entry.get("tokens", 0) for entry in sent)
-            model = last_model[0] or "claude"
-            usage.label(text=f"{model}  ·  {used} tokens")
+            usage.label(text=f"{used} tokens")
             send_button = controls.row()
             send_button.alignment = "RIGHT"
             send_button.enabled = not chat_is_busy()
@@ -703,6 +724,11 @@ def register():
         window_manager.orion_prompt = bpy.props.StringProperty(
             name="", description="Meddelande till Claude - Enter skickar",
             update=prompt_updated)
+        window_manager.orion_model = bpy.props.EnumProperty(
+            name="Modell", default="sonnet",
+            items=[("haiku", "Snabb", "Haiku - svar pa ett par sekunder"),
+                   ("sonnet", "Smart", "Sonnet - bra balans for scenbygge"),
+                   ("opus", "Smartast", "Opus - bast nar det ska bli fint")])
         window_manager.orion_ctx_scene = bpy.props.BoolProperty(
             name="Scengraf", default=True,
             description="Skicka med objektlistan i varje fraga")
@@ -724,6 +750,7 @@ def unregister():
             bpy.utils.unregister_class(ui_class)
         window_manager = bpy.types.WindowManager
         del window_manager.orion_prompt
+        del window_manager.orion_model
         del window_manager.orion_ctx_scene
         del window_manager.orion_ctx_selection
         del window_manager.orion_ctx_material
