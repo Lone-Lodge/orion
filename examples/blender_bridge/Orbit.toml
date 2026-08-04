@@ -1,0 +1,8 @@
+name = "blender_bridge"
+version = "0.1.0"
+
+[orbs]
+net = "path:../../orbs/net"
+json = "path:../../orbs/json"
+text = "path:../../orbs/text"
+os = "path:../../orbs/os"

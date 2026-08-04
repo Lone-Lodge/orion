@@ -1,0 +1,55 @@
+# blender_bridge - send Python to a running Blender (blender_addon.py in this
+# dir) and print what came back. The whole Claude<->Blender link, in Orion.
+#
+#   cd examples/blender_bridge
+#   orbit run src/main.or main "import bpy; print(bpy.app.version_string)"
+#   type snippet.py | orbit run src/main.or main
+#
+# Protocol: one line-delimited JSON request per connection -
+# {"code": "..."} in, {"ok": 0|1, "output": "...", "error": "..."} out.
+use net
+use json
+use text
+use os
+
+external define orion_stdin_line() -> text
+
+define read_code_from_stdin() -> text:
+    edit acc = ""
+    loop:
+        line = orion_stdin_line()
+        if len(line) == 0:
+            break
+        acc = "{acc}{line}"
+    acc
+
+define main() -> int uses net, console:
+    # argv(0) is the exe itself - the code is the first real argument.
+    code = if arg_count() > 1 then arg(1) else read_code_from_stdin()
+    if len(code) == 0:
+        eprint("usage: blender_bridge \"<python>\"  (or pipe the code on stdin)")
+        return 2
+    escaped = json_escape(code)
+    request = "\{\"code\":\"{escaped}\"\}\n"
+    conn = connect("127.0.0.1", 4777)
+    if not ok(conn):
+        eprint("no Blender bridge on 127.0.0.1:4777 - start blender_addon.py first")
+        return 1
+    defer close(conn)
+    send(conn, request)
+    edit reply = ""
+    loop:
+        chunk = recv(conn, 65536)
+        if len(chunk) == 0:
+            break
+        reply = "{reply}{chunk}"
+        if contains(reply, "\n"):
+            break
+    root = json_parse(reply)
+    output = json_text(root, "output")
+    if len(output) > 0:
+        print_line(trim(output))
+    if json_int(root, "ok") == 1:
+        return 0
+    eprint(json_text(root, "error"))
+    1
