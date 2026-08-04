@@ -121,6 +121,17 @@ long long file_size(const char *path) {
     return ((long long)d.nFileSizeHigh << 32) | (long long)d.nFileSizeLow;
 }
 
+/* Last-write time in milliseconds (Windows FILETIME epoch scaled down; only
+ * comparisons and deltas are meaningful, same as the POSIX side). -1 if the
+ * file cannot be read — a watcher treats that as "changed". */
+long long file_mtime(const char *path) {
+    WIN32_FILE_ATTRIBUTE_DATA d;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return -1;
+    long long t = ((long long)d.ftLastWriteTime.dwHighDateTime << 32) |
+                  (long long)d.ftLastWriteTime.dwLowDateTime;
+    return t / 10000; /* 100ns ticks -> ms */
+}
+
 /* Run a command and capture its stdout as one string (static buffer;
  * orion-self copies the returned bytes into a headered Text). */
 const char *capture(const char *cmd) {
@@ -194,6 +205,14 @@ long long now(void) {
 long long file_size(const char *path) {
     struct stat st;
     return stat(path, &st) == 0 ? (long long)st.st_size : -1;
+}
+
+/* Last-write time in milliseconds. Only comparisons and deltas are
+ * meaningful (the epoch differs from Windows). -1 if unreadable. */
+long long file_mtime(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+    return (long long)st.st_mtime * 1000;
 }
 
 const char *capture(const char *cmd) {

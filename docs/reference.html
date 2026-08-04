@@ -42,6 +42,7 @@
 <li><a href="#file"><code>file</code></a></li>
 <li><a href="#rand"><code>rand</code></a></li>
 <li><a href="#store"><code>store</code></a></li>
+<li><a href="#watch"><code>watch</code></a></li>
 </ol>
 </nav>
 <main id="ref">
@@ -65,6 +66,7 @@
 <div class="fn"><code class="sig">pad_left(t: text, width: int, pad: text) -&gt; text</code><p>Pad <code>t</code> on the left with <code>pad</code> until it is at least <code>width</code> bytes wide.</p></div>
 <div class="fn"><code class="sig">pad_right(t: text, width: int, pad: text) -&gt; text</code><p>Pad <code>t</code> on the right with <code>pad</code> until it is at least <code>width</code> bytes wide.</p></div>
 <div class="fn"><code class="sig">lines(t: text) -&gt; [text]</code><p>Split <code>t</code> into lines on '\n'.</p></div>
+<div class="fn"><code class="sig">int_from_text(t: text) -&gt; int</code><p>The integer written at the start of <code>t</code>: an optional <code>-</code>, then digits.</p></div>
 <h2 id="list"><code>list</code></h2>
 <p class="orb-blurb">everyday integer-list helpers that don't need a closure.</p>
 <div class="fn"><code class="sig">range(n: int) -&gt; [int]</code><p>[0, 1, …, n-1].</p></div>
@@ -162,6 +164,7 @@
 <div class="fn"><code class="sig">arg(i: int) -&gt; text = argv(i)</code><p>no example: depends on the process command line - proven by orbit</p></div>
 <div class="fn"><code class="sig">arg_count() -&gt; int = argc()</code><p>no example: depends on the process command line - proven by orbit</p></div>
 <div class="fn"><code class="sig">write_file(p: text, c: text) -&gt; int uses files</code></div>
+<div class="fn"><code class="sig">modified_at(p: text) -&gt; int uses files = file_mtime(p)</code><p>When was <code>p</code> last written, in ms? Only comparisons and deltas are meaningful (the epoch is host-specific).</p></div>
 <div class="fn"><code class="sig">os_kind() -&gt; int</code><p>Public wrapper so other orbs can branch on the host without re-declaring the extern (a second <code>declare</code> in the bundle is an LLVM redefinition error).</p></div>
 <div class="fn"><code class="sig">run_command(cmd: text, args: [text]) -&gt; int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))</code><p>no example: runs a child process - proven by orbit itself (build_orbit.sh)</p></div>
 <div class="fn"><code class="sig">run_command_quiet(cmd: text, args: [text]) -&gt; int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))</code><p>no example: runs a child process - proven by orbit itself</p></div>
@@ -310,6 +313,11 @@
 <div class="fn"><code class="sig">entity(s: sstore, id: int) -&gt; table</code><p>The record for <code>id</code>, or {} when it was never inserted / was removed.</p></div>
 <div class="fn"><code class="sig">has_id(s: sstore, id: int) -&gt; truth</code></div>
 <div class="fn"><code class="sig">items(s: sstore) -&gt; [table]</code><p>Every live record - the iteration/query source.</p></div>
+<h2 id="watch"><code>watch</code></h2>
+<p class="orb-blurb">the mechanics of a file watcher: scan a tree, fingerprint it, name what changed.</p>
+<div class="fn"><code class="sig">scan_tree(dir: text) -&gt; [text] uses files</code><p>Every watched file under <code>dir</code>, recursively, skipping build dirs.</p></div>
+<div class="fn"><code class="sig">snapshot(dir: text) -&gt; text uses files</code><p>One line per watched file: "mtime:size path".</p></div>
+<div class="fn"><code class="sig">first_change(old: text, new: text) -&gt; text</code><p>The path behind the first line that differs between two snapshots.</p></div>
 </main>
 
 </body>

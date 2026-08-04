@@ -19,6 +19,7 @@ external define exit_with(code: int)
 external define eprint(s: text) -> int
 external define now() -> int
 external define file_size(path: text) -> int
+external define file_mtime(path: text) -> int
 
 # Milliseconds between now() and an earlier now() — timing metric.
 # no example: wall-clock dependent — proven by tools/compile_bench.sh
@@ -37,6 +38,12 @@ public define write_file(p: text, c: text) -> int uses files:
     # no example: writes to disk — proven by test_42_file_stream.or
     file_write(p, c)
     0
+
+# When was `p` last written, in ms? Only comparisons and deltas are
+# meaningful (the epoch is host-specific). -1 for a missing file — a
+# watcher treats that as "changed".
+# no example: depends on the filesystem — proven by tools/orbwatch.or
+public define modified_at(p: text) -> int uses files = file_mtime(p)
 
 # Join a command + its args into one line. Each arg is double-quoted so
 # paths with spaces (e.g. "C:/Program Files/LLVM/...") survive.

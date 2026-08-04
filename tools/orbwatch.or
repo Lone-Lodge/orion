@@ -1,0 +1,95 @@
+# orbwatch — rerun a command when source files change.
+#
+#   orbit run tools/orbwatch.or main <dir> <command> [args...]
+#   orbit run tools/orbwatch.or main --rounds 50 <dir> <command> [args...]
+#
+# Watches every .or/.c/.toml file under <dir> (recursively, skipping
+# dist/build/target/.git/_archive — see orbs/watch). Runs the command once
+# at start, then again after every change. A change DURING a run STOPS the
+# run and starts a fresh one, so what you are looking at is never built
+# from stale source. `--rounds N` gives up after N quiet polls (~200 ms
+# each), which is what lets a script or test use this; 0 means forever.
+#
+# The command's output goes to your console. One command at a time by
+# design — this is a watcher, not a job runner.
+use os
+use text
+use watch
+
+define usage() -> int:
+    eprint("orbwatch: watch a tree, rerun a command on change")
+    eprint("  orbit run tools/orbwatch.or main [--rounds N] <dir> <command> [args...]")
+    2
+
+# Wait out the editor: a save is often several writes. Rescan until two
+# snapshots in a row agree, and return the settled one.
+define settled(root: text) -> text:
+    edit cur = snapshot(root)
+    loop:
+        sleep_ms(120)
+        again = snapshot(root)
+        if again is cur:
+            return cur
+        cur = again
+
+# Stop a running job and make sure its slot is reaped, whatever state it
+# reached between our poll and the kill.
+define put_down(job: int) -> int:
+    stopped = stop_command(job)
+    flushed = finished_within(job, 5000)
+    command_result(job)
+
+define main() -> int:
+    args = arguments()
+    edit i = 1
+    edit rounds = 0
+    if len(args) > i + 1 and at(args, i) is "--rounds":
+        rounds = int_from_text(at(args, i + 1))
+        i = i + 2
+    if len(args) < i + 2:
+        return usage()
+    root = at(args, i)
+    cmd = at(args, i + 1)
+    edit cmd_args = []
+    loop k in i + 2 until len(args):
+        cmd_args = append(cmd_args, at(args, k))
+
+    edit snap = snapshot(root)
+    n_files = len(scan_tree(root))
+    print_line("orbwatch: watching {n_files} files under {root}")
+    edit job = start_command(cmd, cmd_args)
+    edit quiet = 0
+    loop:
+        if job >= 0 and finished_within(job, 0):
+            code = command_result(job)
+            job = 0 - 1
+            print_line("orbwatch: exit {code} — watching")
+        cur = snapshot(root)
+        if cur is not snap:
+            changed = first_change(snap, cur)
+            snap = settled(root)
+            if job >= 0:
+                print_line("orbwatch: {changed} changed — restarting")
+                tossed = put_down(job)
+            else:
+                print_line("orbwatch: {changed} changed — running")
+            job = start_command(cmd, cmd_args)
+            quiet = 0
+        else:
+            quiet = quiet + 1
+            if rounds > 0 and quiet >= rounds:
+                break
+            sleep_ms(200)
+    # Bounded mode leaves nothing running behind: wait the last run out and
+    # pass its exit code on (a hung command is stopped and reported as 1).
+    if job >= 0:
+        if not finished_within(job, 600000):
+            junk = stop_command(job)
+            flushed = finished_within(job, 5000)
+            tossed = command_result(job)
+            return 1
+        code = command_result(job)
+        print_line("orbwatch: exit {code}")
+        if code is not 0:
+            return if code > 0 and code < 256 then code else 1
+    0

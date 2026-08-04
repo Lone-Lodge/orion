@@ -7,6 +7,13 @@ Notable changes to Orion. The format follows
 ## [Unreleased]
 
 ### Added
+- **A file watcher**: `orbit run tools/orbwatch.or main <dir> <command>`
+  reruns the command whenever a source file under `<dir>` changes, and a
+  change DURING a run stops the stale run and starts a fresh one (built on
+  `stop_command`). The mechanics live in the new `watch` orb (`scan_tree` /
+  `snapshot` / `first_change`) so they are test-proven. New primitives it
+  drove out: `modified_at(path)` in `os` (there was no mtime), and
+  `int_from_text` in `text` (there was no public text-to-int).
 - **Child processes the scheduler can wait on** (`os` orb):
   `start_command` / `start_command_to_file` begin a command and return a job
   id at once; `finished_within` parks the calling TASK until the child exits

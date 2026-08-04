@@ -411,3 +411,29 @@ public define pad_right(t: text, width: int, pad: text) -> text:
 public define lines(t: text) -> [text]:
     # no example: the newline in the input cannot be written inline here
     split(t, "\n")
+
+# The integer written at the start of `t`: an optional `-`, then digits.
+# Stops at the first non-digit; no digits at all is 0. For CLI arguments
+# and simple protocols — not a validator.
+public define int_from_text(t: text) -> int:
+    example int_from_text("42") is 42
+    example int_from_text("-7") is 0 - 7
+    example int_from_text("12ab") is 12
+    example int_from_text("x") is 0
+    bs = bytes_from_text(t)
+    n = len(bs)
+    edit i = 0
+    edit neg = false
+    if n > 0 and at(bs, 0) is 45:
+        neg = true
+        i = 1
+    edit value = 0
+    edit done = false
+    loop k in i until n:
+        if not done:
+            c = at(bs, k)
+            if c >= 48 and c <= 57:
+                value = value * 10 + (c - 48)
+            else:
+                done = true
+    if neg then 0 - value else value
