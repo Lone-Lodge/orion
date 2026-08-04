@@ -72,7 +72,8 @@ REQ_FILE="$TMP/requests"
 } > "$REQ_FILE"
 
 OUT="$TMP/out"
-timeout 90 "$LSP" < "$REQ_FILE" > "$OUT" 2>"$TMP/err" || true
+TO="$(command -v timeout || command -v gtimeout || true)"
+${TO:+"$TO" 90} "$LSP" < "$REQ_FILE" > "$OUT" 2>"$TMP/err" || true
 
 pass=0; fail=0
 check() {  # $1 = label, $2 = pattern

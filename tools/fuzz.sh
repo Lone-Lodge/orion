@@ -84,7 +84,8 @@ for i in $(seq "$ITERS"); do
     case_file="$WORK/case_$i.or"
     mutate "$seed_file" "$case_file"
 
-    out=$(timeout "$TIMEOUT" "$ORION" "$case_file" "$WORK/out.ll" "$ROOT/orbs" 2>&1)
+    TO="$(command -v timeout || command -v gtimeout || true)"
+    out=$(${TO:+"$TO" "$TIMEOUT"} "$ORION" "$case_file" "$WORK/out.ll" "$ROOT/orbs" 2>&1)
     code=$?
 
     if [ "$code" = "124" ]; then

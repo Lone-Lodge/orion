@@ -170,11 +170,18 @@ for a in $FEATURES; do
             echo "    x + y"
         } > "$src"
 
-        if ! timeout 60 "$ORION" "$src" "$WORK/$name.ll" "$ROOT/orbs" > "$WORK/$name.log" 2>&1; then
-            # An empty log means the compiler DIED (signal, no message) -
-            # say so instead of printing nothing to debug by.
-            printf "  %-24s COMPILE FAILED: %s\n" "$name" "$(grep -m1 -iE 'error|list index' "$WORK/$name.log" | cut -c1-90)"
-            [ -s "$WORK/$name.log" ] || echo "      (empty log: compiler crashed - signal, or stack)"
+        # macOS has no `timeout` (coreutils calls it gtimeout) - a bare call
+        # made EVERY pair "fail" there with command-not-found.
+        TO="$(command -v timeout || command -v gtimeout || true)"
+        code=0
+        ${TO:+"$TO" 60} "$ORION" "$src" "$WORK/$name.ll" "$ROOT/orbs" > "$WORK/$name.log" 2>&1 || code=$?
+        if [ "$code" -ne 0 ]; then
+            # Print what the log actually holds: signal names on macOS
+            # ("Abort trap: 6") match no error-grep, and an empty tail with
+            # a bare exit code is still more to debug by than nothing.
+            printf "  %-24s COMPILE FAILED (exit %s)\n" "$name" "$code"
+            sed 's/^/      | /' "$WORK/$name.log" | tail -4
+            [ -s "$WORK/$name.log" ] || echo "      | (empty log: killed by a signal before printing)"
             fail=$((fail + 1)); continue
         fi
         if ! "$CLANG" "$WORK/$name.ll" "$RT" -o "$WORK/$name.exe" >> "$WORK/$name.log" 2>&1; then
