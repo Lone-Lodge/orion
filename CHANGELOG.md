@@ -7,6 +7,14 @@ Notable changes to Orion. The format follows
 ## [Unreleased]
 
 ### Added
+- **Width-exact sized-integer arithmetic, natively - one semantics.**
+  `x: u8 = 200` then `x + 100` is 44 on BOTH backends now (native used to
+  answer 300): a sized binding coerces its value, the type rides the IR,
+  and every arithmetic result wraps to the peer width through the same
+  mask path the `as`-cast always used. A bare literal in arithmetic takes
+  the sized peer's type - on wasm too, which closed its standing literal
+  gap in the same stroke (conformance ratchet 141 -> 142). This was the
+  last known correctness gap between the two backends.
 - **The general-software floor.** `env(name)` reads environment variables;
   `interrupted()` turns the first Ctrl+C into a pollable flag (the second
   one kills as normal); `secure_bytes`/`secure_token` draw OS entropy (the
