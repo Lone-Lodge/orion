@@ -45,6 +45,10 @@ define main() -> int uses net, console:
         reply = "{reply}{chunk}"
         if contains(reply, "\n"):
             break
+    # the peer vanished mid-request (or replied nothing): say so, don't parse
+    if len(reply) == 0:
+        eprint("bridge closed without a reply")
+        return 1
     root = json_parse(reply)
     output = json_text(root, "output")
     if len(output) > 0:
