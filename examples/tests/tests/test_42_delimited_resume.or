@@ -2,7 +2,7 @@
 #
 # `resume(v)` in a `handle` block is a longjmp: control leaves for the perform
 # site and the handler's frame is gone, so a handler can never do anything after
-# the continuation runs — not inspect the result, not clean up, not decide
+# the continuation runs - not inspect the result, not clean up, not decide
 # anything based on how it went.
 #
 # `ask`/`resume_with` run the handler on its OWN stack (a fiber), so it lives
@@ -36,7 +36,7 @@ define quiet(seed: int) -> int:
 
 # The fiber switch behind `ask` is Windows-only for now, and the runtime says so
 # rather than pretending: `resumable_ok()` is 0 elsewhere and `ask` yields -1.
-# So this pins BOTH contracts. The refusal is a promise too — before this, the
+# So this pins BOTH contracts. The refusal is a promise too - before this, the
 # test simply demanded the Windows numbers everywhere and went red on Linux
 # while the runtime was behaving exactly as documented.
 define main() -> int:

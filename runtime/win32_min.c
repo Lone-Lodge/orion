@@ -1,4 +1,4 @@
-// win32_min.c — minimal window shim for native Orion.
+// win32_min.c - minimal window shim for native Orion.
 //
 // Exposes 3 functions to Orion via extern:
 //   win_open(title, w, h) -> hwnd (as i64; 0 on failure)
@@ -35,7 +35,7 @@ static OrionEvent ev_current;
 
 /* Input-to-present latency, CPU side: stamp the moment the OS hands
  * us a user event; the engine samples the age right after present.
- * (GPU/DWM tail is invisible from here — this measures OUR share.) */
+ * (GPU/DWM tail is invisible from here - this measures OUR share.) */
 static LARGE_INTEGER g_last_input_qpc;
 
 static void ev_push(long long kind, long long key, long long x, long long y) {
@@ -88,8 +88,8 @@ void (*win_paint_hook)(void) = 0;
 /* Live-resize: Windows runs a modal message loop while the user drags
  * a window edge, so our main render loop is paused and DWM stretches
  * the last frame. When win_live_resize is on we call atlas_live_frame
- * right here in WM_SIZE — it reattaches the swap chain, re-runs the
- * layout tree, and draws — so the UI reflows LIVE during the drag,
+ * right here in WM_SIZE - it reattaches the swap chain, re-runs the
+ * layout tree, and draws - so the UI reflows LIVE during the drag,
  * exactly like a webview. atlas_live_frame is a pub Orion fn resolved
  * as an extern symbol; declared weak so non-atlas hosts still link. */
 __attribute__((weak)) void atlas_live_frame(long long w, long long h);
@@ -103,7 +103,7 @@ long long win_live_resize(long long on, long long bg) {
 
 /* ---- frameless window with custom caption (Tauri-style) ----
  * frameless: WM_NCCALCSIZE returns 0 so the client area fills the
- * whole window — native caption gone, WS_THICKFRAME resize kept.
+ * whole window - native caption gone, WS_THICKFRAME resize kept.
  * WM_NCHITTEST then hands back resize edges plus a caption drag-zone
  * the app declares: the top `g_caption_h` pixels act as HTCAPTION,
  * except `g_caption_left`/`g_caption_right` pixels reserved at each
@@ -229,7 +229,7 @@ static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
 
 /* Borderless fullscreen: WS_POPUP over the whole monitor, windowed
  * rect saved for the way back. The WM_SIZE this fires is the whole
- * integration — the engine's resize path does everything else. */
+ * integration - the engine's resize path does everything else. */
 static RECT g_saved_rect;
 static LONG g_saved_style;
 long long win_fullscreen(long long hwnd_i, long long on) {
@@ -323,7 +323,7 @@ static wchar_t* to_wide(const char* s) {
 int64_t win_open(const char* title, int64_t w, int64_t h) {
     ensure_class();
     /* 1ms timer resolution: without it every Sleep() rounds up to
-     * ~15.6ms and the frame-budget pacing quantizes to 16/31ms —
+     * ~15.6ms and the frame-budget pacing quantizes to 16/31ms -
      * which plays as sub-30fps stutter. Loaded dynamically so
      * headless builds never touch winmm. */
     {
@@ -335,7 +335,7 @@ int64_t win_open(const char* title, int64_t w, int64_t h) {
         }
     }
     wchar_t* wtitle = to_wide(title);
-    /* w/h are the requested CLIENT size — grow the outer rect by the
+    /* w/h are the requested CLIENT size - grow the outer rect by the
      * frame so games get exactly the pixels they laid out for. */
     RECT rc = {0, 0, (LONG)w, (LONG)h};
     AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
@@ -366,7 +366,7 @@ int64_t win_pump(void) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
-    /* No sleep here — frame pacing is the app loop's job
+    /* No sleep here - frame pacing is the app loop's job
      * (atlas app_frame_sleep_since). A raw Sleep(16) quantizes to the
      * 15.6ms scheduler tick and doubled up with the app's own pacing,
      * capping every game at ~25fps. */
@@ -377,7 +377,7 @@ void win_close(int64_t hwnd) {
     if (hwnd) DestroyWindow((HWND)(uintptr_t)hwnd);
 }
 
-/* Sleep until timeout OR any input/window message arrives — the
+/* Sleep until timeout OR any input/window message arrives - the
  * event-driven idle with ZERO added input latency: a click lands,
  * the loop wakes instantly instead of finishing a Sleep() quantum. */
 int64_t win_wait_input(int64_t ms) {

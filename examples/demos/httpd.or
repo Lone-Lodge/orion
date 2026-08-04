@@ -1,4 +1,4 @@
-# httpd — a CONCURRENT HTTP/1.0 server in Orion, one task per connection.
+# httpd - a CONCURRENT HTTP/1.0 server in Orion, one task per connection.
 #
 # Written to dogfood the newest code in the language: sockets (`net`), the task
 # scheduler (`async`: spawn / sleep_task / run_all), the scope-owned resource
@@ -9,7 +9,7 @@
 #   orbit run examples/demos/httpd.or
 #
 # THE ONE IDEA: a socket call must never park the whole process. A task waits
-# with `readable_within`, which parks the TASK — the scheduler then waits for
+# with `readable_within`, which parks the TASK - the scheduler then waits for
 # every parked socket in one call and runs whoever is ready. `connect_within`
 # and `accept_within` are the same bargain for the other two blocking calls.
 # With plain blocking `recv`, one slow client stalls every other one; the demo
@@ -59,7 +59,7 @@ define note(what: text) -> int:
 #
 # The task never calls `recv` on a quiet socket: `readable_within` parks it
 # until there is something there, and the scheduler waits for every parked
-# socket at once. Polling instead — `recv` with a 5 ms timeout, retried —
+# socket at once. Polling instead - `recv` with a 5 ms timeout, retried -
 # looks the same and costs (waiting tasks x 5 ms) per round; at 80
 # connections that was 400 ms of the process doing nothing per round.
 define read_head(sock: int, deadline: int) -> text uses net, clock:
@@ -94,7 +94,7 @@ define handle(conn: int) -> int uses net, clock:
 # A listener is a socket, so the accept loop waits the same way a read does:
 # park until somebody is there. Polling with a 2 ms `accept_within` also
 # works and reads almost the same, but it takes one turn of the scheduler per
-# connection — at 300 clients the backlog drained slower than the clients
+# connection - at 300 clients the backlog drained slower than the clients
 # gave up.
 define acceptor(listener: int) -> int uses net:
     want = slot_get_int("want")
@@ -159,9 +159,9 @@ define fast_client(id: int) -> int uses net, clock:
     if len(reply) > 0 then 1 else 0
 
 # The demo drives itself: the server AND its clients are tasks in one process.
-# `run_all` is the only thing main does — everything else is the scheduler.
+# `run_all` is the only thing main does - everything else is the scheduler.
 define main() uses net, console:
-    print_line("httpd on 127.0.0.1:58480 — 1 slow client, 2 fast ones")
+    print_line("httpd on 127.0.0.1:58480 - 1 slow client, 2 fast ones")
     listener = listen(58480)
     if not ok(listener):
         print_line("port busy")

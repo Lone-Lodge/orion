@@ -1,4 +1,4 @@
-# watch — the mechanics of a file watcher: scan a tree, fingerprint it,
+# watch - the mechanics of a file watcher: scan a tree, fingerprint it,
 # name what changed. Pure bookkeeping, so it is testable; the loop that
 # ACTS on a change (rerun a command, stop a stale run) lives in
 # tools/orbwatch.or.
@@ -16,7 +16,7 @@ define watched(name: text) -> truth:
     ends_with(name, ".or") or ends_with(name, ".c") or ends_with(name, ".toml")
 
 # Every watched file under `dir`, recursively, skipping build dirs.
-# no example: depends on the filesystem — proven by test_42_watch_core.or
+# no example: depends on the filesystem - proven by test_42_watch_core.or
 public define scan_tree(dir: text) -> [text] uses files:
     edit acc = []
     names = list_dir(dir)
@@ -32,7 +32,7 @@ public define scan_tree(dir: text) -> [text] uses files:
 # One line per watched file: "mtime:size path". Two snapshots compare as
 # one text; size is included so an edit inside the mtime resolution is
 # still seen when the length moves.
-# no example: depends on the filesystem — proven by test_42_watch_core.or
+# no example: depends on the filesystem - proven by test_42_watch_core.or
 public define snapshot(dir: text) -> text uses files:
     edit out = ""
     loop p in scan_tree(dir):

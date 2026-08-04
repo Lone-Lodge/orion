@@ -1,5 +1,5 @@
 # Generic sorting: the ORDER is a capability record, so any element type
-# sorts — text, records, anything — not just ints.
+# sorts - text, records, anything - not just ints.
 use iter
 use text
 

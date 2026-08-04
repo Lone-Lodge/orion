@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# docs_check.sh — compile every code sample in the Field Guide.
+# docs_check.sh - compile every code sample in the Field Guide.
 #
 # WHY: a documented feature that no longer exists is the same failure as a
 # stale seed. It reads fine, nobody runs it, and it is wrong for months.
@@ -21,18 +21,18 @@ WORK="$ROOT/dist/.docscheck"
 # the same samples drifts by construction.
 PAGES="index.html"
 
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 rm -rf "$WORK"; mkdir -p "$WORK"
 
 # Pull the samples out of one page into $2/NN.or, one file per block.
 # The guide marks them `<code data-or>`; anything else (shell commands) is
 # skipped. Inline <span> markup for comments is stripped, then the four HTML
-# entities are turned back into the characters Orion actually uses — `&amp;`
+# entities are turned back into the characters Orion actually uses - `&amp;`
 # LAST, or an escaped `&amp;lt;` would decode twice.
 extract() {
     local page="$1" dir="$2"
     mkdir -p "$dir"
-    # The tags share a line with code — `<code data-or>type Player: ...` — so
+    # The tags share a line with code - `<code data-or>type Player: ...` - so
     # take the remainder of the opening line and the part before the closing
     # tag, rather than dropping both lines whole.
     awk -v dir="$dir" '
@@ -164,14 +164,14 @@ awk '
 # --- library reference ----------------------------------------------------
 # docs/reference.html is generated from the orbs. A generated file that is
 # committed by hand goes stale the moment someone adds a `pub fn` and forgets
-# to regenerate — the same failure the samples above guard against. So build
+# to regenerate - the same failure the samples above guard against. So build
 # it fresh and compare: if it differs, the committed page is out of date.
 echo
 if bash "$ROOT/tools/orb_reference.sh" --stdout > "$WORK/reference.html" 2> "$WORK/reflog.txt"; then
     if diff -q "$ROOT/docs/reference.html" "$WORK/reference.html" > /dev/null 2>&1; then
         echo "  reference: up to date with orbs/"
     else
-        echo "  reference: STALE — run bash tools/orb_reference.sh"
+        echo "  reference: STALE - run bash tools/orb_reference.sh"
         fail=$((fail + 1))
     fi
 else
@@ -186,5 +186,5 @@ if [ "$fail" = "0" ]; then
     rm -rf "$WORK"
     exit 0
 fi
-echo "  docs: $fail problem(s) — samples left in $WORK"
+echo "  docs: $fail problem(s) - samples left in $WORK"
 exit 1

@@ -1,5 +1,5 @@
 # THE STACK TEST: a cubsy-shaped main loop through the ori orb +
-# veil DisplayList — compiled natively, zero lodge-orion. Orb
+# veil DisplayList - compiled natively, zero lodge-orion. Orb
 # shadowing supplies native window/gpu.
 #
 #   orion test_files/atlas_native_demo.or out.ll \

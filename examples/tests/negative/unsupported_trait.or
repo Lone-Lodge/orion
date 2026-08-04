@@ -1,4 +1,4 @@
-# expect: unsupported_trait.or:5:0 — `trait` is reserved but not implemented
+# expect: unsupported_trait.or:5:0 - `trait` is reserved but not implemented
 # This used to report "function `prog__(` has an empty body": the decl fell
 # through as unknown, was skipped a token at a time, and the FUNCTION AFTER it
 # took the blame. Reserved-but-unimplemented must say so, where it stands.

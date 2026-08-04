@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Auto watch-and-reload: run the Orion watcher, then EDIT the gameplay source
 # while it runs. The watcher detects the change, invokes the compiler, and
-# hot-swaps the new code into itself — state preserved, no restart.
+# hot-swaps the new code into itself - state preserved, no restart.
 #
 #   bash examples/hot_reload/run_watch.sh
 set -e
@@ -33,4 +33,4 @@ printf 'fn tick(state: int) -> int:\n    state + 10\n' > plugin.or   # the live 
 echo ">>> edited plugin.or:  state + 1  ->  state + 10"
 rc=0; wait $WPID || rc=$?
 rm -f _rt.o _cli.o _watch.ll _watch_host.ll _watch _w.ll _w_host.ll _rt.o plugin_gen*.so plugin.or
-echo "==> done — final state $rc (climbed by 1, then by 10 after the hot swap)"
+echo "==> done - final state $rc (climbed by 1, then by 10 after the hot swap)"

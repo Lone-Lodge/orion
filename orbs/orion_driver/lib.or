@@ -11,12 +11,12 @@ use orion_emit_wasm
 # MULTI-ORB: scans the entry file for `use NAME` lines, resolves each
 # name to an orb source (NAME/lib.or under a set of search roots),
 # recursively discovers that orb's own uses, and compiles everything
-# as one program. Replaces tools/bundle_orbs.sh — no bash, one command
+# as one program. Replaces tools/bundle_orbs.sh - no bash, one command
 # builds a whole dependency graph.
 #
 # Resolution roots (first hit wins): any extra argv paths, then
 # <entry-dir>/orbs/, <entry-dir>/../orbs/, <entry-dir>/../../orbs/,
-# orbs/, ../orbs/. Unresolved names print a note and are skipped —
+# orbs/, ../orbs/. Unresolved names print a note and are skipped -
 # builtins (bytes/io/fs/...) live in the compiler, not in orb files.
 #
 # Declaration order doesn't matter: ast_program_to_ir collects all
@@ -42,7 +42,7 @@ define drv_dirname(path: text) -> text:
 # "use foo" → "foo"; anything else → "".
 define drv_use_name(line: text) -> text:
     bs0 = bytes_from_text(line)
-    # `pub use X` (a facade RE-EXPORTING X) loads X exactly like `use X` does —
+    # `pub use X` (a facade RE-EXPORTING X) loads X exactly like `use X` does -
     # the visibility difference is the compiler's business, not the loader's.
     # Missing this made a facade orb stop pulling in the orbs it re-exports.
     is_pub_use = len(bs0) > 4 and at(bs0, 0) == 112 and at(bs0, 1) == 117 and at(bs0, 2) == 98 and at(bs0, 3) == 32
@@ -60,7 +60,7 @@ define drv_use_name(line: text) -> text:
             break
         c = at(bs, i)
         # 40 = `(`: `use text (trim)` and `use text(trim)` both name the orb
-        # `text` — the selective list is the parser's business, not the loader's.
+        # `text` - the selective list is the parser's business, not the loader's.
         if c == 32 or c == 13 or c == 10 or c == 35 or c == 40:
             break
         single = bytes_to_text(bytes_slice(bs, i, i + 1))
@@ -84,7 +84,7 @@ define drv_uses_of(src: text) -> [text]:
             is_nl = at(bs, i) == 10
         if at_end or is_nl:
             # A `use` / `pub use` line begins with `u` (117) or `p` (112) at
-            # column 0 — that is exactly what drv_use_name requires. Peek that
+            # column 0 - that is exactly what drv_use_name requires. Peek that
             # one byte straight out of `bs` and only materialise a Text (a slice
             # + a to_text, and a third byte list inside drv_use_name) for the
             # rare lines that could name an orb. Before this, EVERY line of the
@@ -230,8 +230,8 @@ define drv_green(s: text) -> text:
 #   CONST LIMIT
 #
 # Types are printed as WRITTEN (source form), because that is what a completion
-# list or a hover has to show. The alternative — letting the editor re-derive
-# this from the text — is how the previous language server ended up describing a
+# list or a hover has to show. The alternative - letting the editor re-derive
+# this from the text - is how the previous language server ended up describing a
 # language that no longer existed.
 
 define drv_type_name(t: table) -> text:
@@ -297,7 +297,7 @@ define drv_symbols(ast: table) -> int:
 
 # Discover the whole use-graph from the entry source; return the
 # combined program text (orbs in discovery order, entry last).
-# Quiet by design: one dim summary line instead of a line per orb —
+# Quiet by design: one dim summary line instead of a line per orb -
 # unresolved `use` means builtin, which is the normal case, not news.
 public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> text:
     edit queue = drv_uses_of(entry_src)
@@ -531,10 +531,10 @@ define drv_call_bits(callee: text, names: [text]) -> int:
         return 64
     if drv_starts(callee, "orion_console") or drv_starts(callee, "orion_dir") or drv_starts(callee, "orion_file") or drv_starts(callee, "orion_embedded"):
         return 2
-    # 128: libm transcendentals — the ONE thing about `number` arithmetic that
+    # 128: libm transcendentals - the ONE thing about `number` arithmetic that
     # is NOT bit-exact across platforms (different libms round the last bits
     # differently). Basic ops, sqrt, floor/ceil/round ARE exact per IEEE-754
-    # on every target we emit for, so `number` needs no fixed-point type —
+    # on every target we emit for, so `number` needs no fixed-point type -
     # determinism is guaranteed by forbidding exactly this list.
     if callee == "sin" or callee == "cos" or callee == "tan" or callee == "exp" or callee == "log" or callee == "pow" or callee == "atan2":
         return 128
@@ -555,7 +555,7 @@ define drv_direct_bits(f: IRFn, names: [text]) -> int:
             bits = drv_or(bits, 2)
         if op == "call":
             bits = drv_or(bits, drv_call_bits(inst.name, names))
-        # Transcendentals lower to their OWN op (fmath1/fmath2), not "call" —
+        # Transcendentals lower to their OWN op (fmath1/fmath2), not "call" -
         # they were invisible to this walk, so `deterministic` never saw them.
         if op == "fmath1" or op == "fmath2":
             bits = drv_or(bits, drv_call_bits(inst.name, names))
@@ -589,13 +589,13 @@ define drv_flags_text(bits: int) -> text:
 # Drop functions nothing can reach from `main`.
 #
 # `use text` pulls the WHOLE orb into the program, and every one of its
-# functions used to be lowered and emitted — so a program that called `trim`
+# functions used to be lowered and emitted - so a program that called `trim`
 # still emitted `run_command`, and the linker demanded `sys_run` from a C file
 # it was never given ("undefined symbol: sys_run" for a program that shells out
 # to nothing). Reachability fixes the general case: what you do not call is not
 # emitted, so an orb costs what you use of it.
 #
-# Roots: `main`, plus anything reached indirectly — effect handlers, and any
+# Roots: `main`, plus anything reached indirectly - effect handlers, and any
 # function whose ADDRESS is taken (a closure/callback: `each(xs, f)` passes
 # `fn_ref`, and par_run/call_ptr call through the pointer). Those show up as
 # `fn_ref` instructions, so the walk seeds from them too. Conservative by
@@ -707,7 +707,7 @@ define drv_check_deterministic(module: IRModule) -> int:
             hit = drv_flag_and(eff, nd_mask)
             if hit != 0:
                 bad = bad + 1
-                compile_error("orion: ERROR — `deterministic fn` " + drv_deterministic_label(at(marked, i)) + " is not deterministic: it (transitively) performs " + drv_flags_text(hit))
+                compile_error("orion: ERROR - `deterministic fn` " + drv_deterministic_label(at(marked, i)) + " is not deterministic: it (transitively) performs " + drv_flags_text(hit))
     bad
 
 # `orb__name` -> a readable `name` for the error; leaves already-plain names be.
@@ -766,7 +766,7 @@ define drv_emit_wasm(ast: table, out_path: text) -> int:
     # Refuse to write invalid wasm: unsupported constructs report a compile
     # error during compile_program, same contract as the LLVM path.
     if compile_errors() > errs_before:
-        print_line(drv_red("orion: wasm compilation FAILED — no output written"))
+        print_line(drv_red("orion: wasm compilation FAILED - no output written"))
         return 1
     file_write(out_path, bytes_to_text(wbytes))
     if not (slot_has("drv:quiet")):
@@ -867,10 +867,10 @@ public define driver_main() -> int:
         # gets said on every build - but only when there is one.
         n_unbalanced = drv_scope_check(module, 0)
         if n_unbalanced > 0:
-            print_line(drv_red("  memory: {n_unbalanced} unbalanced region scope(s) — `orbit memfacts` to name them"))
+            print_line(drv_red("  memory: {n_unbalanced} unbalanced region scope(s) - `orbit memfacts` to name them"))
         n_errors = compile_errors()
         if n_errors > 0:
-            print_line(drv_red("orion: compilation FAILED with {n_errors} error(s) — no output written"))
+            print_line(drv_red("orion: compilation FAILED with {n_errors} error(s) - no output written"))
             0 - 1
         else:
             ok = file_write(out_path, llvm_text)

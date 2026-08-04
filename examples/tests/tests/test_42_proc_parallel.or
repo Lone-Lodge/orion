@@ -18,7 +18,7 @@ define sleep_job(log: text, seconds: int) -> int:
 
 # A child whose only job is to exit with `code`. On Windows a tiny batch
 # file, because a QUOTED `cmd /c "exit 7"` trips cmd's quote-stripping rule
-# (the same trap capture() documents) — a .bat runs clean via CreateProcess.
+# (the same trap capture() documents) - a .bat runs clean via CreateProcess.
 define exit_job(code: int) -> int:
     if os_kind() is 0:
         wrote = write_file(".proc_exit.bat", "@exit /b {code}")
@@ -52,7 +52,7 @@ define main() -> int:
     got_seven = seven_done and seven_code is 7
 
     # The timeout arm: a ~5 s child is NOT finished within 200 ms, is
-    # stopped, and its (kill) status is reaped — not the code it never
+    # stopped, and its (kill) status is reaped - not the code it never
     # got to exit with.
     slow = sleep_job(".proc_slow.txt", 5)
     still_going = not finished_within(slow, 200)

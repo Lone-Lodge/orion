@@ -1,6 +1,6 @@
 # require / ensure are runtime-checked. When the condition holds, execution
 # continues; a false condition traps (see test_70_require_fails). Previously
-# these parsed but were dropped silently — now they're enforced.
+# these parsed but were dropped silently - now they're enforced.
 define twice(x: int) -> int:
     require x > 0
     r = x * 2

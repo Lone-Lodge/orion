@@ -1,4 +1,4 @@
-# dict — friendly names for the map built-ins a newcomer reaches for.
+# dict - friendly names for the map built-ins a newcomer reaches for.
 #
 #   keys(m)            ->  ["a", "b"]      (map keys are text)
 #   len(m)             ->  2

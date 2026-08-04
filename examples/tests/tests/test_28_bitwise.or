@@ -6,7 +6,7 @@
 # `12 & 10` answered 12. `<<` and `>>` did not lex at all, and neither did
 # `0xFF` (it came out as the number 0 followed by an identifier `xFF`).
 #
-# Nothing caught it because nothing used it — the one place in the tree that
+# Nothing caught it because nothing used it - the one place in the tree that
 # does, `atlas/orbs/atlas_ws` (a WebSocket implementation in Orion), cannot
 # compile for an unrelated reason and so was never built.
 #

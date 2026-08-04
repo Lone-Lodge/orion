@@ -1,4 +1,4 @@
-# result — Result<T>: a value, or an error message.
+# result - Result<T>: a value, or an error message.
 #
 # A native generic sum type. The point is that you cannot look at the value
 # without saying what happens in the error case: `match` is exhaustive, so the

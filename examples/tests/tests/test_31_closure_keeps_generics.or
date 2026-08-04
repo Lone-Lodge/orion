@@ -1,7 +1,7 @@
 # A closure anywhere must not disable generic call-site instantiation.
 #
 # The nested-lambda pass rebuilt every function with a block body from a MAP
-# LITERAL listing six fields — name, params, ret, body, pub, orb — and silently
+# LITERAL listing six fields - name, params, ret, body, pub, orb - and silently
 # dropped everything else on the declaration, including `generics_csv`. That
 # field is what tells the call site which type variables a function has, so:
 #

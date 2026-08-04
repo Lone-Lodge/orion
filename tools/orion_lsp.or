@@ -1,4 +1,4 @@
-# orion-lsp — entry point. The server itself is `orbs/orion_lsp`.
+# orion-lsp - entry point. The server itself is `orbs/orion_lsp`.
 #
 # Build:  bash tools/build_lsp.sh   ->  dist/orion-lsp.exe
 # Run:    orion-lsp.exe [orion.exe-path] [orbs-root]

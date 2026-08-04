@@ -1,4 +1,4 @@
-# String interpolation now parses the full expression inside `{...}` —
+# String interpolation now parses the full expression inside `{...}` -
 # arithmetic and indexing, not just bare idents / calls / fields. Here
 # `{a + b}` must render "14" (2 chars), not fail as an unknown identifier.
 define main() -> int:

@@ -1,4 +1,4 @@
-# `loop parallel i in ...:` — one worker thread per iteration, on top of the
+# `loop parallel i in ...:` - one worker thread per iteration, on top of the
 # verified par_run primitive. Each iteration's closure captures ITS OWN index
 # by value and writes only its own slot, so the result is deterministic.
 define main() -> int:

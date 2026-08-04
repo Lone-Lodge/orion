@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# self_bootstrap.sh — rebuild orion.exe using orion.exe itself. No lodge-orion.
+# self_bootstrap.sh - rebuild orion.exe using orion.exe itself. No lodge-orion.
 #
 # WHY: orion-self has out-grown lodge-orion's parser (it uses `else if` and
-# other syntax lodge-orion's older parser rejects — "expected `:`, found If").
+# other syntax lodge-orion's older parser rejects - "expected `:`, found If").
 # So tools/aot_bootstrap.sh (which compiles the compiler via lodge-orion) can
-# no longer parse orion-self. But the current orion.exe CAN — it's the
+# no longer parse orion-self. But the current orion.exe CAN - it's the
 # self-hosted compiler. This uses it to rebuild itself:
 #
 #   orion.exe  bundle.or -> stage1.ll  ->  clang + orion_rt.c  ->  orion_new.exe
@@ -13,7 +13,7 @@
 #
 # Cross-platform: the compiler ALWAYS emits a Windows target triple (the
 # setjmp/longjmp effect ABI is pinned to it). On Linux/Mac we retarget each
-# emitted .ll to the host before clang links it — same trick as
+# emitted .ll to the host before clang links it - same trick as
 # bootstrap_from_ll.sh. On a fresh non-Windows clone, run bootstrap_from_ll.sh
 # first to get an initial dist/orion.exe from the seed, then run this.
 #
@@ -59,19 +59,19 @@ if [ "$RETARGET" = "1" ]; then
 fi
 
 # Link an emitted .ll into a native compiler exe. On POSIX the .ll carries a
-# Windows triple, so link from a RETARGETED COPY — the original .ll stays
+# Windows triple, so link from a RETARGETED COPY - the original .ll stays
 # Windows-triple, which is what the stage1==stage2 fixpoint diff compares (the
 # compiler always re-emits the Windows triple, so both sides must keep it).
 # The sed is portable across GNU and BSD sed (no in-place -i, which differ).
 # orion.exe runs UNOPTIMIZED unless we ask clang to optimize it. -O2 makes the
 # compiler itself ~1.4x faster at every compile (it is map/list heavy) and does
-# NOT change what it emits — verified: the -O2 and -O0 binaries produce byte-
+# NOT change what it emits - verified: the -O2 and -O0 binaries produce byte-
 # identical .ll, so the stage1==stage2 fixpoint holds. It costs ~5s more per
 # clang link; override with OPT=-O0 for fast dev iteration.
 OPT="${OPT:--O2}"
 link_stage() {
     if [ "$RETARGET" = "1" ]; then
-        # Keep a .ll extension — clang dispatches on it to detect LLVM IR.
+        # Keep a .ll extension - clang dispatches on it to detect LLVM IR.
         sed -e "2s#e-m:w#e-m:${MANGLE}#" \
             -e "3s#x86_64-pc-windows-msvc[0-9.]*#${HOST_TRIPLE}#" \
             "$1" > "$1.host.ll"
@@ -83,7 +83,7 @@ link_stage() {
 }
 
 echo "==> host: $HOST_OS (retarget=$RETARGET triple=${HOST_TRIPLE:-native})"
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bootstrap from the seed first: bash tools/bootstrap_from_ll.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bootstrap from the seed first: bash tools/bootstrap_from_ll.sh"; exit 1; }
 
 echo "==> bundling orbs"
 bash "$ROOT/tools/bundle_orbs.sh" >/dev/null
@@ -106,9 +106,9 @@ fi
 
 # stage1 != stage2 is EXPECTED after an intentional codegen change: the old
 # compiler renders the (new) bundle differently than the new compiler does.
-# The new compiler must still be STABLE — compiling itself reproducibly. So
+# The new compiler must still be STABLE - compiling itself reproducibly. So
 # iterate once more: build from stage2 and check stage2 == stage3.
-echo "==> stage1 != stage2 (codegen changed) — iterating to confirm the new compiler is stable"
+echo "==> stage1 != stage2 (codegen changed) - iterating to confirm the new compiler is stable"
 link_stage "$DIST/orion_stage2.ll" "$DIST/orion_new2.exe"
 "$DIST/orion_new2.exe" "$BUNDLE" "$DIST/orion_stage3.ll"
 
@@ -117,6 +117,6 @@ if diff -q "$DIST/orion_stage2.ll" "$DIST/orion_stage3.ll" >/dev/null; then
     rm -f "$DIST/orion_stage1.ll" "$DIST/orion_stage2.ll" "$DIST/orion_stage3.ll" "$DIST/orion_new.exe" "$DIST/orion_new2.exe"
     echo "==> SUCCESS: converged after codegen change (stage2 == stage3), orion.exe rebuilt"
 else
-    echo "==> FAILED: still diverging (stage2 != stage3) — non-deterministic compile, orion.exe NOT replaced"
+    echo "==> FAILED: still diverging (stage2 != stage3) - non-deterministic compile, orion.exe NOT replaced"
     exit 1
 fi

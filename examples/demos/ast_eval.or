@@ -1,10 +1,10 @@
-# ast_eval — parse arithmetic into a REAL tree, then evaluate the tree.
+# ast_eval - parse arithmetic into a REAL tree, then evaluate the tree.
 #
 # Build: orion.exe examples/demos/ast_eval.or out.ll orbs
 #
 # The calculator evaluates while it parses. This one separates the phases like
 # a real compiler: parse builds an AST, then a recursive pass walks it. The
-# tree is an ARENA — every node lives in one `[Node]` list and refers to its
+# tree is an ARENA - every node lives in one `[Node]` list and refers to its
 # children by index. That's the data-oriented shape (Orion's whole ethos) and
 # the natural way to model a recursive structure with an `enum` whose payloads
 # are plain ints:

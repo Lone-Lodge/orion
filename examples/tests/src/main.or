@@ -11,12 +11,12 @@ use orion_driver
 # 1 when stdout is a TTY: show a live progress bar. 0 when piped (CI): plain rows.
 external define orion_console_color() -> int
 
-# Orion test runner — LLVM backend, parallel.
+# Orion test runner - LLVM backend, parallel.
 #
 # Each tests/test_<EXPECTED>.or contains an Orion source program that
 # should compile and run with exit code EXPECTED. Two phases:
 #   1. EMIT (serial, in-process): lex/parse/emit every test to LLVM IR.
-#      The compiler's recursion needs the main stack — it does not fit a
+#      The compiler's recursion needs the main stack - it does not fit a
 #      task's 256 KB fiber, which is why this phase stays out of tasks.
 #   2. LINK+RUN (parallel): a pool of worker tasks, one per hardware
 #      thread. clang and the test exe are CHILD PROCESSES started with
@@ -67,7 +67,7 @@ define host_triple_of() -> text:
 # Only .or files. Without this filter, non-source files like KNOWN_BUGS.md
 # get fed to the compiler, produce broken-but-not-crashing .exe's, exit=0
 # happens to match parse_expected()=0, and we get a silent false pass.
-# Workers rebuild this list themselves (same directory, same order) — a task
+# Workers rebuild this list themselves (same directory, same order) - a task
 # can only carry one int, and the list is cheap.
 define or_files() -> [text]:
     raw_files = list_dir("tests")
@@ -96,7 +96,7 @@ define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) 
     src = drv_collect(raw, ["../../orbs/", "orbs/"], src_path)
     tokens = self_lex(src)
     ast = self_parse(tokens)
-    # Reject empty/garbage AST — clang would happily compile an empty LLVM
+    # Reject empty/garbage AST - clang would happily compile an empty LLVM
     # module, the resulting exe exits 0, and any test expecting 0 would
     # falsely pass.
     decls = get_list(ast, "decls")
@@ -111,7 +111,7 @@ define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) 
         return 0
     # The compiler pins a Windows triple (the effect ABI needs it); a
     # non-Windows runner retargets the two header tokens into a SEPARATE
-    # scratch file — ll_path is tracked in git and must stay byte-identical
+    # scratch file - ll_path is tracked in git and must stay byte-identical
     # to what the compiler emitted on every machine.
     write_file(ll_path, llvm_text)
     if mangle != "w":
@@ -198,7 +198,7 @@ define finish_one(filename: text, clang_path: text) -> int:
 
 # One worker task: pull the next un-linked test, finish it, repeat. Between
 # reading `next` and bumping it there is no park point, and the scheduler is
-# cooperative and single-threaded — two workers can never claim the same test.
+# cooperative and single-threaded - two workers can never claim the same test.
 define worker(w: int) -> int:
     files = or_files()
     total = len(files)
@@ -222,7 +222,7 @@ define main() -> int:
     rt_c = "../../runtime/orion_rt.c"
     # Pre-compile the runtime ONCE to object files. Every test then just
     # links these objects instead of re-compiling orion_rt.c (all of
-    # Windows.h) from scratch — the single biggest per-test cost. orion_cli.c
+    # Windows.h) from scratch - the single biggest per-test cost. orion_cli.c
     # is what carries the `os` orb's externs (sys_run, now, fs ops), so a
     # test that says `use os` links clean.
     run_command(clang_path, ["-c", "-Os", rt_c, "-o", rt_obj])

@@ -1,4 +1,4 @@
-# green.yml — the suite the repo already had, run somewhere that is not the
+# green.yml - the suite the repo already had, run somewhere that is not the
 # author's laptop.
 #
 # The first job is the one that matters: it starts from a bare checkout with no

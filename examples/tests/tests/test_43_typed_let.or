@@ -1,4 +1,4 @@
-# Immutable typed binding `name: Type = expr` — the symmetric partner of
+# Immutable typed binding `name: Type = expr` - the symmetric partner of
 # `mut name: Type = expr`. Works with a builtin type and a type alias.
 type Meters = int
 

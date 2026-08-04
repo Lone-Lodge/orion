@@ -1,6 +1,6 @@
-# assert — ONE assertion for Orion.
+# assert - ONE assertion for Orion.
 #
-# Doesn't abort the process (no panic by design — failure is data), but
+# Doesn't abort the process (no panic by design - failure is data), but
 # prints the label and returns a sentinel so tests can detect failures.
 #
 # Usage:
@@ -10,7 +10,7 @@
 # Convention: success returns 1, failure returns 0. A test fn can count
 # assertion results and return 0 if any failed. Comparisons read as words:
 # `assert(a is b, ...)` replaced the old assert_eq/assert_true/assert_text_eq
-# trio — one word, any condition.
+# trio - one word, any condition.
 
 public define assert(cond: truth, label: text) -> int:
     example assert(true, "holds") is 1

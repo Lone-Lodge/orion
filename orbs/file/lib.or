@@ -1,4 +1,4 @@
-# file — streaming file IO.
+# file - streaming file IO.
 #
 # Whole-file `read_file` / `write_file` (builtins) are fine until the data is
 # bigger than memory, or you want to write a line at a time. These are the
@@ -12,10 +12,10 @@
 #       process(chunk)
 #   close(h)
 #
-# A read at end-of-stream returns "" — the same convention `net.recv` uses,
+# A read at end-of-stream returns "" - the same convention `net.recv` uses,
 # so files and sockets are read the same way.
 #
-# LIFETIME: prefer `with_read` / `with_write` — they own the handle and close
+# LIFETIME: prefer `with_read` / `with_write` - they own the handle and close
 # it on every exit path, including an early return from your body.
 use text
 
@@ -27,11 +27,11 @@ external define file_bytes(path: text) -> int
 
 # --- opening ---
 # -1 when the file cannot be opened (missing, locked, out of handles).
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define open_read(path: text) -> int uses files = file_open(path, 0)
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define open_write(path: text) -> int uses files = file_open(path, 1)
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define open_append(path: text) -> int uses files = file_open(path, 2)
 
 public define ok(handle: int) -> truth:
@@ -41,18 +41,18 @@ public define ok(handle: int) -> truth:
 
 # --- moving bytes ---
 # Up to `maxlen` bytes. "" means end of stream.
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define read_chunk(handle: int, maxlen: int) -> text uses files = file_read_chunk(handle, maxlen)
 
 # How many bytes were written (-1 on failure).
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define write_chunk(handle: int, data: text) -> int uses files = file_write_chunk(handle, data)
 
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define close(handle: int) -> int uses files = file_close(handle)
 
 # Size in bytes without reading the contents. -1 if it does not exist.
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define size_of(path: text) -> int uses files = file_bytes(path)
 
 # Is this chunk the end of the stream?
@@ -63,9 +63,9 @@ public define is_end(chunk: text) -> truth:
 
 # --- scope-owned forms: the handle you cannot forget to close ---
 # The orb owns the handle, runs your body with it, and closes on the way out
-# (including an early return — the close is a `defer`). -1 when the open
+# (including an early return - the close is a `defer`). -1 when the open
 # failed, so a caller can tell "could not open" from a body result.
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define with_read(path: text, body: fn) -> int uses files:
     h = open_read(path)
     if not ok(h):
@@ -73,7 +73,7 @@ public define with_read(path: text, body: fn) -> int uses files:
     defer close(h)
     body(h)
 
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define with_write(path: text, body: fn) -> int uses files:
     h = open_write(path)
     if not ok(h):
@@ -81,7 +81,7 @@ public define with_write(path: text, body: fn) -> int uses files:
     defer close(h)
     body(h)
 
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define with_append(path: text, body: fn) -> int uses files:
     h = open_append(path)
     if not ok(h):
@@ -91,12 +91,12 @@ public define with_append(path: text, body: fn) -> int uses files:
 
 # --- line-oriented convenience ---
 # Append one line (adds the newline). Opens and closes around the write, so
-# it is safe to call in a loop but not the fastest way to write many lines —
+# it is safe to call in a loop but not the fastest way to write many lines -
 # for that, open once with `with_append` and `write_line` into the handle.
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define append_line(path: text, line: text) -> int uses files:
     with_append(path, (h): write_chunk(h, "{line}\n"))
 
-# no example: touches the filesystem — proven by test_42_file_stream.or
+# no example: touches the filesystem - proven by test_42_file_stream.or
 public define write_line(handle: int, line: text) -> int uses files:
     write_chunk(handle, "{line}\n")

@@ -1,3 +1,3 @@
 name = "file"
 version = "0.1.0"
-description = "Streaming file IO: open a handle, move bytes a chunk at a time, close it — plus scope-owned forms that cannot leak"
+description = "Streaming file IO: open a handle, move bytes a chunk at a time, close it - plus scope-owned forms that cannot leak"

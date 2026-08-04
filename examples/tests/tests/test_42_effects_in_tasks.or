@@ -5,11 +5,11 @@
 # back to the perform site), while a task is a separate STACK the scheduler
 # switches to. A perform inside a task captures its jump target on the task's
 # own stack, and the scheduler may switch stacks between two performs in the
-# same task — which is exactly what this does.
+# same task - which is exactly what this does.
 #
 # One-shot stays one-shot: `resume(v)` returns to the perform site once. Multi-
 # shot (resuming the same continuation twice) would need the continuation's
-# stack to be COPIED, and that is not something to fake — it is not implemented,
+# stack to be COPIED, and that is not something to fake - it is not implemented,
 # and nothing here pretends otherwise.
 use async
 

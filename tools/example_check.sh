@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# example_check.sh — docs that cannot lie, all the way down.
+# example_check.sh - docs that cannot lie, all the way down.
 #
 # Every `example EXPR` line in an orb is a CLAIM (`example double(21) is 42`).
 # This extracts each one, wraps it in a probe program (`use <orb>` + main
 # returning 0 when the claim holds), compiles it with the real compiler and
 # RUNS it. A false example fails the gate exactly like a failing test.
-# It also reports how many public defines still lack an example — the
+# It also reports how many public defines still lack an example - the
 # mandatory-coverage ratchet tightens as the stdlib gets documented.
 #
 #   bash tools/example_check.sh
@@ -22,14 +22,14 @@ for orbdir in "$ROOT"/orbs/*/; do
     orb=$(basename "$orbdir")
     lib="$orbdir/lib.or"
     [ -f "$lib" ] || continue
-    # Coverage counts the STDLIB — the orbs a user writes against. The
+    # Coverage counts the STDLIB - the orbs a user writes against. The
     # compiler's own orbs (orion_*) are internals: they are covered by the
     # test suite and the fixpoint, not by user-facing examples, and counting
     # them made the number say nothing.
     # Per FUNCTION, not per file: a public define is covered when its own body
     # carries an `example`, and excused when it carries `# no example: reason`.
-    # Some functions cannot have one honestly — they write files, run commands,
-    # sleep, print, or need a live peer — and those are proven by TESTS. Making
+    # Some functions cannot have one honestly - they write files, run commands,
+    # sleep, print, or need a live peer - and those are proven by TESTS. Making
     # the excuse explicit is what lets "uncovered" mean "could and should, but
     # doesn't", i.e. a number that can actually reach zero.
     case "$orb" in orion_*) : ;; *)
@@ -43,7 +43,7 @@ $(awk '
 ' "$lib")
 EOF
         # A `# no example:` marker counts whether it sits INSIDE the body or on
-        # the line just above the signature — both read naturally, so both are
+        # the line just above the signature - both read naturally, so both are
         # accepted (the short form `define f() = expr` has no body to put it in).
         missing=$(awk '
             /^public define / { if (started && !has) miss++; started=1; has=(prev_marker?1:0); prev_marker=0; next }

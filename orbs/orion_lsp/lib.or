@@ -1,4 +1,4 @@
-# orion_lsp — a Language Server for Orion, written in Orion.
+# orion_lsp - a Language Server for Orion, written in Orion.
 #
 # The editor used to talk to `orion-lsp.exe`, a binary built from the Rust crate
 # that was deleted when the compiler became self-hosted (`extension.js` still
@@ -10,14 +10,14 @@
 # grammar.
 #
 # What it serves: diagnostics (on open / change / save), document symbols
-# (outline), go-to-definition, hover, and DECLARATION-BASED completion — every
+# (outline), go-to-definition, hover, and DECLARATION-BASED completion - every
 # `fn`/`type`/`effect`/`const` in the document and in the orbs it can see, plus
 # the keywords. It does not filter by what would type-check at the cursor,
 # because the compiler does not expose scope-aware types; that limit is stated in
 # the completion section rather than implied by a confident-looking list.
 #
 # Protocol framing is `Content-Length: N\r\n\r\n<json>` over stdin/stdout, so
-# stdout is RESERVED for protocol traffic — logging goes to stderr.
+# stdout is RESERVED for protocol traffic - logging goes to stderr.
 
 use json
 use text
@@ -139,7 +139,7 @@ define doc_get(uri: text) -> text:
 #
 # The compiler is the authority. Write the in-editor buffer to a sibling file
 # (so relative `use` roots still resolve), compile it, and translate its own
-# `path:line:col — message` output. Nothing here re-implements a grammar.
+# `path:line:col - message` output. Nothing here re-implements a grammar.
 
 define lsp_compiler() -> text:
     if slot_has("lsp:orion") then slot_get("lsp:orion") else "orion.exe"
@@ -151,7 +151,7 @@ define diag_json_of(line_no: int, col: int, msg: text) -> text:
     zero_line = if line_no > 0 then line_no - 1 else 0
     "\{\"range\":\{\"start\":\{\"line\":{zero_line},\"character\":{col}\},\"end\":\{\"line\":{zero_line},\"character\":{col + 1}\}\},\"severity\":1,\"source\":\"orion\",\"message\":\"{json_escape(msg)}\"\}"
 
-# `orion: ERROR at C:/x/y.or:12:8 — message` -> the pieces. Returns line 0 when
+# `orion: ERROR at C:/x/y.or:12:8 - message` -> the pieces. Returns line 0 when
 # the diagnostic is not for `want_file` (an error inside an orb belongs to that
 # orb's file, not to the document being edited).
 define diag_parse(raw: text, want_file: text) -> table:
@@ -161,12 +161,12 @@ define diag_parse(raw: text, want_file: text) -> table:
         {"line": 0, "col": 0, "msg": ""}
     else:
         after = slice_from(raw, mi + 10)
-        sep = index_of(after, " — ")
+        sep = index_of(after, " - ")
         if sep < 0:
             {"line": 0, "col": 0, "msg": ""}
         else:
             loc = bytes_to_text(bytes_slice(bytes_from_text(after), 0, sep))
-            msg = slice_from(after, sep + 5)
+            msg = slice_from(after, sep + 3)
             parts = split(loc, ":")
             np = len(parts)
             if np < 2:
@@ -377,7 +377,7 @@ define caps_json() -> text:
 # DECLARATION-BASED, not type-aware: every `fn` / `type` / `effect` / `const` in
 # the open document and in the orbs it can see, plus the language's keywords and
 # builtins. It does not know which of those would type-check at the cursor,
-# because the compiler does not hand out scope-aware type information — and that
+# because the compiler does not hand out scope-aware type information - and that
 # is stated here rather than implied by a confident-looking list. Names you can
 # actually write beat a shorter list that pretends to be smarter.
 #
@@ -417,7 +417,7 @@ define compl_from_source(src: text, origin: text, seen: text, out: text) -> tabl
 # `x.f(a)` IS `f(x, a)` in this language, so "what can I write after the dot"
 # has an exact answer: the FIELDS of x's type, plus every function whose first
 # parameter is that type. Both come from the compiler (`orion <file> symbols`),
-# not from a pattern matcher over the source — a second model of the grammar is
+# not from a pattern matcher over the source - a second model of the grammar is
 # what made the previous language server describe a language that no longer
 # existed.
 #

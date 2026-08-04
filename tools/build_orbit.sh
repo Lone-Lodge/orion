@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# build_orbit.sh — build dist/orbit.exe from tools/orbit.or using orion.exe.
+# build_orbit.sh - build dist/orbit.exe from tools/orbit.or using orion.exe.
 #
 # orbit is Orion's project tool, self-hosted: orion.exe compiles it to LLVM IR,
 # clang links it with the CLI runtime (orion_cli.c: process spawn, fs, exit +
 # orion_rt.c: the compiler runtime's file_read/argv/print). No lodge-orion, no
-# interpreter — build/run/test all shell out to orion.exe + clang (see
+# interpreter - build/run/test all shell out to orion.exe + clang (see
 # cli_build / build_native_entry in tools/orbit.or).
 #
 #   orion.exe  tools/orbit.or -> orbit.ll  ->  clang + orion_cli.c + orion_rt.c
@@ -34,7 +34,7 @@ echo "==> compile tools/orbit.or -> orbit.ll"
 
 LINK_LL="$ROOT/dist/orbit.ll"
 if [ "$RETARGET" = "1" ]; then
-    # Line-targeted (only the two module-header lines) — never touch a triple
+    # Line-targeted (only the two module-header lines) - never touch a triple
     # string that appears as a program constant. Keep the .ll extension.
     sed -e "2s#e-m:w#e-m:${MANGLE}#" \
         -e "3s#x86_64-pc-windows-msvc[0-9.]*#${HOST_TRIPLE}#" \

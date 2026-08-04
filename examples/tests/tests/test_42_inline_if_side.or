@@ -3,10 +3,10 @@ define track_42() -> int:
     42
 
 define track_0() -> int:
-    print_line("else — should NOT print")
+    print_line("else - should NOT print")
     0
 
 define main() -> int:
-    # Inline if-then-else with side effects — only one branch should run.
+    # Inline if-then-else with side effects - only one branch should run.
     cond = 1
     if cond == 1 then track_42() else track_0()

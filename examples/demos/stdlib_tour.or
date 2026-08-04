@@ -1,4 +1,4 @@
-# stdlib tour — text + num + list + iter working together.
+# stdlib tour - text + num + list + iter working together.
 # Build: orion.exe examples/demos/stdlib_tour.or out.ll orbs
 #
 # Take a CSV-ish line of numbers, clean it up, parse it, and report.

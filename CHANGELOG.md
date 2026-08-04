@@ -6,8 +6,24 @@ Notable changes to Orion. The format follows
 
 ## [Unreleased]
 
+### Removed
+- The `scheduler` orb and the async orb's deadline/timer-queue block
+  (sleep_until, delay, deadline_from_now, past_deadline, time_left,
+  timers_new/add_timer/next_due/count_due/wait_next). All of it was the
+  pre-task workaround; nothing used any of it once real tasks landed. The
+  scheduler orb is archived under _archive/orbs/.
+
+### Fixed
+- **A local binding now shadows a same-named const.** Const inlining used
+  to substitute num's `e` (2.718...) into any body with its own `e`, so
+  `e = e + 1` failed with "cannot reassign: int vs float". The pass now
+  skips names a fn binds itself (parameters, bindings, loop variables).
+- The LSP's diagnostic parser kept a byte offset sized for the old wide
+  dash after the message separator narrowed; the first two characters of
+  every diagnostic were eaten.
+
 ### Added
-- **Debugger v1**: `orbit debug prog.or` runs with a call trail — every
+- **Debugger v1**: `orbit debug prog.or` runs with a call trail - every
   define's entry is recorded (last 64 kept) and a crash, a `require`/index
   trap, or a `breakpoint()` placed in the source prints them newest-first.
   `breakpoint()` names its enclosing function and pauses on a terminal
@@ -30,13 +46,13 @@ Notable changes to Orion. The format follows
   Children are real OS processes, so they run in parallel while the
   single-threaded scheduler coordinates the waiting. Proven by the test
   runner itself: it now links and runs every test through one worker task
-  per hardware thread — the suite's ~79 s of serial compile became a
+  per hardware thread - the suite's ~79 s of serial compile became a
   ~17 s total wall.
 - **Traits as explicit dictionaries.** A struct whose fields are functions is a
   dictionary of operations, and `o.method(args)` now calls the fn-typed field
   `method` on the struct value `o` (instead of desugaring to a UFCS global
-  `method(o, args)`). So a comparator, a printer, an `Ord` — any bundle of
-  behavior — is a plain struct value you build and pass by hand, with no
+  `method(o, args)`). So a comparator, a printer, an `Ord` - any bundle of
+  behavior - is a plain struct value you build and pass by hand, with no
   implicit resolution: you can always see which dictionary is passed. Builds on
   typed function values.
 - A **WebAssembly backend**: `orion prog.or prog.wasm orbs` compiles to a
@@ -87,7 +103,7 @@ Notable changes to Orion. The format follows
   per fn so a same-named param elsewhere never matches. The declared **return
   type is propagated** through the call too, normalized to its storage class
   (pointer / f64 / i64), so `f(x)` on a `fn(int) -> Text` or `fn(int) -> [int]`
-  or `fn(int) -> f64` yields that type instead of collapsing to i64 — function
+  or `fn(int) -> f64` yields that type instead of collapsing to i64 - function
   values are now typed end to end.
 - `result` and `option` are **native generic sum types**, not struct
   conventions: `Result<T>: Ok(T) | Err(Text)` and `Option<T>: Some(T) | None`.

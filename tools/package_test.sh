@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# package_test.sh — the package system, end to end, against LOCAL git repos
+# package_test.sh - the package system, end to end, against LOCAL git repos
 # (no network). Proves: `orbit get` fetches a git dep into orbs_pkg/ and pins
 # it in Orbit.lock; a tag ref stays on the tag; a transitive git dep (a
 # package's own Orbit.toml) is fetched flat without the app naming it; a
@@ -17,7 +17,7 @@ rm -rf "$WORK"; mkdir -p "$WORK"
 # paths, not the shell's /c/-style. cygpath -m exists on git-bash/msys;
 # elsewhere the paths are already native.
 np() { cygpath -m "$1" 2>/dev/null || echo "$1"; }
-fail() { echo "package_test: FAIL — $1"; exit 1; }
+fail() { echo "package_test: FAIL - $1"; exit 1; }
 G() { git -C "$1" -c user.email=t@t -c user.name=t "${@:2}"; }
 
 # --- package c: a leaf orb nobody's app names directly
@@ -98,7 +98,7 @@ G "$APKG" add -A; G "$APKG" commit -qm two
 "$ORBIT" run src/main.or main >/dev/null 2>&1; code=$?
 [ "$code" = "41" ] || fail "lock did not hold after remote moved, got $code"
 
-# update apkg: now it follows — 21+21=42. The tag pin stays where it is.
+# update apkg: now it follows - 21+21=42. The tag pin stays where it is.
 "$ORBIT" update apkg >/dev/null || fail "orbit update errored"
 [ -f orbs_pkg/apkg/lib.or ] || fail "apkg gone after update"
 "$ORBIT" run src/main.or main >/dev/null 2>&1; code=$?

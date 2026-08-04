@@ -1,5 +1,5 @@
 # Bundle-flow entry: bundle_orbs.sh appends this after the orbs
-# (orion_driver among them — the single source of truth for the
+# (orion_driver among them - the single source of truth for the
 # driver logic is orbs/orion_driver/lib.or).
 
 define main() -> int:

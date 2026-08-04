@@ -1,7 +1,7 @@
 # Recompute vs snapshot.
 #
 # `derived name = expr` (once a keyword here) was retired from the language
-# core — reactivity belongs to the library layer, not the syntax. What it
+# core - reactivity belongs to the library layer, not the syntax. What it
 # stood for is expressible directly, and more honestly: a truth you re-read is
 # a FUNCTION of its inputs, a snapshot is a binding. The difference is visible
 # below, and it is the whole point the keyword used to make.

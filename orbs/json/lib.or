@@ -1,4 +1,4 @@
-# json — parse and build JSON. Written for the language server, which speaks
+# json - parse and build JSON. Written for the language server, which speaks
 # JSON-RPC over a pipe, but there is nothing LSP-specific here.
 #
 # Values map onto Orion's own dynamic shapes: an object is a `Map`, an array is

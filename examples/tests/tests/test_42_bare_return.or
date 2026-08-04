@@ -1,4 +1,4 @@
-# Bare `return` — the natural early exit from a function that yields nothing.
+# Bare `return` - the natural early exit from a function that yields nothing.
 define guard(n: int) -> int:
     edit hits = 0
     if n < 0:

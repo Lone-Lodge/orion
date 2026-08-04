@@ -5,13 +5,13 @@
 # gets a working compiler without a prior binary.
 #
 # Windows note: the seed already carries the Windows triple the compiler always
-# emits, so there it is linked AS IS — retargeting it to ELF (what this script
+# emits, so there it is linked AS IS - retargeting it to ELF (what this script
 # used to do on MINGW, since it fell into the catch-all case) produced a broken
 # binary. Only Linux/Mac retarget.
 set -e
 R="$(cd "$(dirname "$0")/.." && pwd)"
 LL="$R/tools/seed/orion.ll"
-[ -f "$LL" ] || { echo "no seed at tools/seed/orion.ll — emit it on any machine: orion.exe bundle.or tools/seed/orion.ll"; exit 1; }
+[ -f "$LL" ] || { echo "no seed at tools/seed/orion.ll - emit it on any machine: orion.exe bundle.or tools/seed/orion.ll"; exit 1; }
 CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
 mkdir -p "$R/dist"
@@ -22,7 +22,7 @@ case "$(uname -s 2>/dev/null || echo Linux)" in
         # Native triple already: link it, with the big stack the compiler's
         # recursion needs (Windows reserves stack in the exe at link time).
         "$CLANG" "$LL" "$R/runtime/orion_rt.c" -Os -Xlinker /STACK:67108864 -o "$R/dist/orion.exe"
-        echo "built dist/orion.exe for Windows (native triple) — verify: printf 'fn main()->int:\\n 42\\n' > /tmp/t.or && dist/orion.exe /tmp/t.or /tmp/t.ll"
+        echo "built dist/orion.exe for Windows (native triple) - verify: printf 'fn main()->int:\\n 42\\n' > /tmp/t.or && dist/orion.exe /tmp/t.or /tmp/t.ll"
         exit 0 ;;
     Darwin)
         MANGLE="o"
@@ -34,4 +34,4 @@ sed -e "2s#e-m:w#e-m:${MANGLE}#" \
     -e "3s#x86_64-pc-windows-msvc[0-9.]*#${TRIPLE}#" \
     "$LL" > "$R/dist/host.ll"
 "$CLANG" "$R/dist/host.ll" "$R/runtime/orion_rt.c" -Os -o "$R/dist/orion.exe"
-echo "built dist/orion.exe for $(uname -s) ($TRIPLE) — verify: printf 'fn main()->int:\\n 42\\n' > /tmp/t.or && dist/orion.exe /tmp/t.or /tmp/t.ll"
+echo "built dist/orion.exe for $(uname -s) ($TRIPLE) - verify: printf 'fn main()->int:\\n 42\\n' > /tmp/t.or && dist/orion.exe /tmp/t.or /tmp/t.ll"

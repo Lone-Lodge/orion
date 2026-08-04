@@ -1,27 +1,27 @@
-/* linux_min.c — X11 window + software renderer for Orion apps on Linux.
+/* linux_min.c - X11 window + software renderer for Orion apps on Linux.
  *
  *   ⚠ UNVERIFIED FIRST CUT ⚠
  *   Written on a Windows host that cannot compile or run it. The X11 API
  *   calls follow the standard Xlib playbook and mirror the contract of
  *   win32_min.c + gdi_min.c, but NOTHING here has been built or run. Every
  *   `ASSUME:` note marks a thing to confirm on the first real Linux build.
- *   Build + verify:  orbit shot   (headless, no X needed — exercises the
+ *   Build + verify:  orbit shot   (headless, no X needed - exercises the
  *   rasterizer path) then  orbit dev  under an X server (WSLg / a desktop).
  *
  * This is one self-contained file on purpose: it provides BOTH halves the
- * app links on Linux —
+ * app links on Linux -
  *   - the windowing contract the `window` orb externs (win_open, win_pump,
  *     win_event_*, win_close, + chrome stubs), mirroring win32_min.c;
  *   - the software renderer the `ogpu_min.c` dispatch externs (sw_og_*),
  *     a BGRX CPU framebuffer presented with XPutImage instead of GDI.
  * The rasterizer duplicates gdi_min.c's ~40 lines for now; unify the three
  * backends (win/linux/eink) into a shared soft_raster.c AFTER this is
- * verified against a real target — never refactor the working Windows path
+ * verified against a real target - never refactor the working Windows path
  * toward an unproven one.
  *
  * Deliberately minimal: window + present + core input + resize + close.
  * Chrome (frameless, fullscreen, rounded, live-resize, clipboard) is
- * stubbed — get pixels on screen and clicks flowing first; add chrome once
+ * stubbed - get pixels on screen and clicks flowing first; add chrome once
  * the vertical slice is proven. This is the PineNote/e-ink track's desktop
  * proving ground; the framebuffer here is the same buffer a panel receives.
  */
@@ -70,7 +70,7 @@ static void evq_push(int kind, int key, int x, int y) {
 /* ---------- present ---------- */
 /* The XImage is created lazily here, on first present, NOT in sw_og_init.
  * That keeps the framebuffer path X-free until a window actually exists, so
- * a headless run (`orbit shot` — no window, g_dpy NULL) fills g_fb and
+ * a headless run (`orbit shot` - no window, g_dpy NULL) fills g_fb and
  * snapshots it without ever touching Xlib. */
 static void present_current(void) {
     if (!g_dpy || !g_fb) return;           /* headless: no window to present to */
@@ -92,7 +92,7 @@ long long sw_og_init(long long hwnd_i, long long width, long long height) {
     g_height = (int)height;
     g_fb = (uint32_t *)malloc((size_t)g_width * g_height * 4);
     win_paint_hook = present_current;
-    /* No Xlib here — the XImage is built lazily on first present (see
+    /* No Xlib here - the XImage is built lazily on first present (see
      * present_current), so a headless render just needs g_fb. */
     return g_fb ? 1 : 0;
 }
@@ -141,7 +141,7 @@ void sw_og_shutdown(void) {
     g_fb = 0;
 }
 
-/* Headless framebuffer dump — identical to gdi_min.c's, so `orbit shot`
+/* Headless framebuffer dump - identical to gdi_min.c's, so `orbit shot`
  * works on Linux with no X server. g_fb is BGRX = BMP byte order. */
 long long sw_og_snapshot(const char *path) {
     if (!g_fb || !path) return 0;

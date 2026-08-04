@@ -1,4 +1,4 @@
-/* orion_cli.c — CLI / OS primitives for self-hosted tools (orbit).
+/* orion_cli.c - CLI / OS primitives for self-hosted tools (orbit).
  *
  * The game runtime (orion_rt.c + win32_min.c ...) covers windows/gpu/
  * audio + orion_file_stamp. A command-line TOOL like orbit needs a
@@ -6,7 +6,7 @@
  * that surface.
  *
  * Named to MATCH orbit's own function names (run_command, mkdir_all, ...)
- * and WITHOUT the orion_ prefix — the self-hosted compiler treats any
+ * and WITHOUT the orion_ prefix - the self-hosted compiler treats any
  * orion_* call as a prelude symbol (skips the declare), but a plain name
  * is auto-declared as a user extern (`declare i64 @name(...)`), which is
  * exactly what links against these. So orbit_main.or's calls resolve here
@@ -113,7 +113,7 @@ long long is_dir(const char *path) {
 }
 long long is_file(const char *path) { return file_exists(path); }
 
-/* Milliseconds since boot — the test runner times compiles with now()/elapsed. */
+/* Milliseconds since boot - the test runner times compiles with now()/elapsed. */
 long long now(void) { return (long long)GetTickCount64(); }
 
 long long file_size(const char *path) {
@@ -123,7 +123,7 @@ long long file_size(const char *path) {
 }
 
 /* Delete a directory and everything under it. Returns 0 when the directory
- * is gone. Clears read-only bits first — a fetched git checkout marks its
+ * is gone. Clears read-only bits first - a fetched git checkout marks its
  * object files read-only, and DeleteFileA refuses those. */
 long long fs_remove_tree(const char *path) {
     char pat[4096];
@@ -149,7 +149,7 @@ long long fs_remove_tree(const char *path) {
 
 /* Last-write time in milliseconds (Windows FILETIME epoch scaled down; only
  * comparisons and deltas are meaningful, same as the POSIX side). -1 if the
- * file cannot be read — a watcher treats that as "changed". */
+ * file cannot be read - a watcher treats that as "changed". */
 long long file_mtime(const char *path) {
     WIN32_FILE_ATTRIBUTE_DATA d;
     if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return -1;
@@ -165,7 +165,7 @@ const char *capture(const char *cmd) {
     cbuf[0] = 0;
     /* cmd.exe strips the outermost quote pair from a `cmd /c` string, so a
      * command like `"where" "clang"` becomes the garbage `where" "clang`.
-     * Wrap in one extra outer pair — cmd strips that, leaving ours intact. */
+     * Wrap in one extra outer pair - cmd strips that, leaving ours intact. */
     char wbuf[65600];
     size_t w = 0, j = 0;
     wbuf[w++] = '"';
@@ -194,7 +194,7 @@ const char *capture(const char *cmd) {
 #include <unistd.h>
 #include <string.h>
 
-/* system() returns a wait-encoded status, not the child's exit code — the
+/* system() returns a wait-encoded status, not the child's exit code - the
  * code lives in bits 8-15. Decode it so run_command() yields the real exit
  * code (matching the Windows CreateProcess path, which returns it directly). */
 long long sys_run(const char *cmd) {

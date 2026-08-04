@@ -1,4 +1,4 @@
-# option — Option<T>: a value, or nothing.
+# option - Option<T>: a value, or nothing.
 #
 # A native generic sum type. Same idea as `result` without the message: you
 # cannot read the payload without saying what the empty case does.
@@ -20,7 +20,7 @@
 # `?` propagates: `v = find(k)?` returns None out of the enclosing function
 # when there is nothing, and binds `v` otherwise.
 #
-# No `unwrap` on purpose — Orion has no panic, so it could only lie and hand
+# No `unwrap` on purpose - Orion has no panic, so it could only lie and hand
 # back a zero. Use `match`, `if let`, `?` or `unwrap_or`.
 
 public type Option<T>:

@@ -24,3 +24,5 @@ examples/tests/dist/.*.txt
 examples/tests/.*.bat
 examples/tests/dist/.*.bat
 examples/tests/dist/.watch/
+build/autosave.txt
+build/*.map

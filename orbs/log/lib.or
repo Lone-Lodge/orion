@@ -1,4 +1,4 @@
-# log — leveled, categorized console logging. Pure Orion, language-
+# log - leveled, categorized console logging. Pure Orion, language-
 # level orb: usable by astra, atlas, games and tools alike. The only
 # runtime hooks are orion_console_color (tty probe, fallback arm in
 # the interp) and orion_persist_text (identity in the interp).
@@ -10,19 +10,19 @@
 #
 # Levels: error 0, warn 1, info 2, debug 3. A category shows a line
 # when line-level <= category ceiling; default ceiling is info(2).
-# Ceilings live in slots and can be flipped at RUNTIME — per category
-# or globally — by the game, the dev console, or an agent:
+# Ceilings live in slots and can be flipped at RUNTIME - per category
+# or globally - by the game, the dev console, or an agent:
 #
 #   log_set_default(3)            # everything, everywhere
 #   log_set_level("ecs", 3)       # just one subsystem
 #
-# Styling rides the same tty-gated ANSI as the rest of the engine —
+# Styling rides the same tty-gated ANSI as the rest of the engine -
 # redirected output stays plain. Message interpolation happens at the
 # call site and lands in the frame region: a suppressed line costs
 # one transient text + a slot probe, never permanent heap.
 #
 # FLIGHT RECORDER: log_ring_on() keeps the last 128 lines (plain
-# text) so log_dump() can replay the recent past — wire it to a dev
+# text) so log_dump() can replay the recent past - wire it to a dev
 # key and the exit path next to the mem ledger. Ring copies persist
 # (~100B a line, dev-only, visible in the session ledger like every
 # other byte).
@@ -52,11 +52,11 @@ define lcyan(s: text) -> text:
 
 # ---- Ceilings ----
 
-# no example: sets global logging state — proven by the log ring test
+# no example: sets global logging state - proven by the log ring test
 public define log_set_default(level: int):
     slot_set("log:lvl:*", level)
 
-# no example: sets global logging state — proven by the log ring test
+# no example: sets global logging state - proven by the log ring test
 public define log_set_level(cat: text, level: int):
     slot_set("log:lvl:" + cat, level)
 
@@ -69,22 +69,22 @@ define ceiling_of(cat: text) -> int:
 
 # ---- Emit ----
 
-# no example: prints — an example would be noise in every gate run
+# no example: prints - an example would be noise in every gate run
 public define error(cat: text, msg: text) uses console:
     if ceiling_of(cat) >= 0:
         emit_line(0, cat, msg)
 
-# no example: prints — an example would be noise in every gate run
+# no example: prints - an example would be noise in every gate run
 public define warn(cat: text, msg: text) uses console:
     if ceiling_of(cat) >= 1:
         emit_line(1, cat, msg)
 
-# no example: prints — an example would be noise in every gate run
+# no example: prints - an example would be noise in every gate run
 public define info(cat: text, msg: text) uses console:
     if ceiling_of(cat) >= 2:
         emit_line(2, cat, msg)
 
-# no example: prints — an example would be noise in every gate run
+# no example: prints - an example would be noise in every gate run
 public define debug(cat: text, msg: text) uses console:
     if ceiling_of(cat) >= 3:
         emit_line(3, cat, msg)
@@ -121,7 +121,7 @@ define level_name(level: int) -> text:
 
 # ---- Flight recorder ----
 
-# no example: sets global logging state — proven by the log ring test
+# no example: sets global logging state - proven by the log ring test
 public define log_ring_on():
     slot_set("log:ring:on", 1)
 
@@ -135,7 +135,7 @@ define ring_push(lvl: text, cat: text, msg: text):
         slot_set("log:ring:{i}", orion_persist_text("{lvl} {cat}  {msg}"))
         slot_set("log:ring:n", n + 1)
 
-# no example: prints — an example would be noise in every gate run
+# no example: prints - an example would be noise in every gate run
 public define log_dump() uses console:
     n = if slot_has("log:ring:n") then slot_get_int("log:ring:n") else 0
     count = if n < 128 then n else 128

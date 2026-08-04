@@ -1,5 +1,5 @@
 # The watcher's mechanics (orbs/watch): scan a tree, fingerprint it, name
-# what changed. Real files on a real filesystem — no child processes, so
+# what changed. Real files on a real filesystem - no child processes, so
 # this stays stable however loaded the parallel runner makes the machine.
 # The live loop built on these (stop a stale run, start a fresh one) is
 # tools/orbwatch.or, and the process side is proven by
@@ -10,7 +10,7 @@ use watch
 define main() -> int:
     mkdir_all("dist/.watch/sub")
     mkdir_all("dist/.watch/build")
-    # A previous run may have left the "new file" step behind — start clean.
+    # A previous run may have left the "new file" step behind - start clean.
     junk = remove_file("dist/.watch/c.or")
     w1 = write_file("dist/.watch/a.or", "one")
     w2 = write_file("dist/.watch/sub/b.or", "two")

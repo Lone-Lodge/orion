@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# value_check.sh — do valid programs still compute the RIGHT ANSWER?
+# value_check.sh - do valid programs still compute the RIGHT ANSWER?
 #
 # WHY: look at what the other gates actually measure. fuzz.sh checks how the
 # compiler REACTS to damaged source (hang, crash, unlocated error). The negative
@@ -36,7 +36,7 @@ WORK="$ROOT/dist/.valuecheck"
 FILTER="${1:-}"
 CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 rm -rf "$WORK"; mkdir -p "$WORK"
 
@@ -168,9 +168,9 @@ done
 echo
 # Say what was not covered. A harness that hides its own gaps reads as
 # "everything passed" when it means "everything I looked at passed".
-[ "$skip" -gt 0 ] && echo "  $skip file(s) have no multi-line \`fn main() -> int:\` — not defer-checked"
-[ "$nobuild" -gt 0 ] && echo "  $nobuild file(s) did not build at -O0 — not value-checked"
-[ "$trapped" -gt 0 ] && echo "  $trapped program(s) trap at run time — an abort may skip its defers, not checked"
+[ "$skip" -gt 0 ] && echo "  $skip file(s) have no multi-line \`fn main() -> int:\` - not defer-checked"
+[ "$nobuild" -gt 0 ] && echo "  $nobuild file(s) did not build at -O0 - not value-checked"
+[ "$trapped" -gt 0 ] && echo "  $trapped program(s) trap at run time - an abort may skip its defers, not checked"
 if [ "$fail" = "0" ]; then
     echo "  values: $checks assertion(s) hold across $((pass)) run(s)"
     rm -rf "$WORK"

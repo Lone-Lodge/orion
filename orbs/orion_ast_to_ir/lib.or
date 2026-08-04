@@ -1,7 +1,7 @@
 use orion_ir
 use bytes
 
-# orion_ast_to_ir — lowering: the AST in, typed IR (orion_ir) out. The
+# orion_ast_to_ir - lowering: the AST in, typed IR (orion_ir) out. The
 # compiler's largest stage. Names resolve, types are checked, and the
 # desugarings run here as ordered AST passes (const folding, defer, lambda
 # lift) before the tree is shaped into IR. Diagnostics carry a source line, and
@@ -11,8 +11,8 @@ use bytes
 # --- Symbol table ---
 # Each binding tracks name, ssa-id, and a mut flag.
 #   is_mut == 0 → id is a value (use directly)
-#   is_mut == 1 → id is a ptr (alloca) — emit load to read, store to write
-# loop_headers / loop_ends — parallel stack of enclosing loops for
+#   is_mut == 1 → id is a ptr (alloca) - emit load to read, store to write
+# loop_headers / loop_ends - parallel stack of enclosing loops for
 # break/continue targets. Push when entering a loop, do not pop (immutable scope).
 type Scope: names: [text], ids: [int], mut_flags: [int], loop_headers: [text], loop_ends: [text], fn_sig_names: [text], fn_sig_rets: [text], ds_names: [text], ds_specs: [text], en_names: [text], en_variants: [text]
 
@@ -28,7 +28,7 @@ define scope_add_enum_decl(scope: Scope, enum_name: text, variant_csv: text) -> 
 # Where a bundle line really is: `path/file.or:LINE:COL`.
 #
 # By lowering time the program is ONE concatenated text (drv_collect), so a
-# token's line is its line in that concatenation — a line in no file that
+# token's line is its line in that concatenation - a line in no file that
 # exists on disk. Reporting it raw meant every diagnostic in a project with
 # orbs pointed hundreds of lines past the end of the file the user was editing.
 # The driver records where each chunk starts (`src:map:*`); this walks that
@@ -96,7 +96,7 @@ define otir_where(line: int, col: int) -> text:
     else:
         "{best_path}:{line - best_at}:{col}"
 
-# True if the name contains '$' — synthetic "Enum$Variant" payload
+# True if the name contains '$' - synthetic "Enum$Variant" payload
 # entries in the enum tables, never real enums.
 define contains_dollar(name: text) -> truth:
     bs = bytes_from_text(name)
@@ -417,13 +417,13 @@ define scope_lookup_fn_ret_loc(scope: Scope, fn_name: text, node: table) -> text
     if found == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        # The retired stdlib spellings each name their replacement — a reader
+        # The retired stdlib spellings each name their replacement - a reader
         # coming from v1 gets the new word, not a shrug.
         edit ufn_hint = ""
         if fn_name == "push":
             ufn_hint = " (retired; append to a list with `append`)"
         if fn_name == "push_mut":
-            ufn_hint = " (retired; write `append` — the compiler promotes it in place when safe)"
+            ufn_hint = " (retired; write `append` - the compiler promotes it in place when safe)"
         if fn_name == "map":
             ufn_hint = " (retired; transform each element with `each`)"
         if fn_name == "filter":
@@ -435,10 +435,10 @@ define scope_lookup_fn_ret_loc(scope: Scope, fn_name: text, node: table) -> text
         if fn_name == "println":
             ufn_hint = " (retired; write `print_line`)"
         if fn_name == "assert_eq" or fn_name == "assert_true" or fn_name == "assert_text_eq":
-            ufn_hint = " (retired; ONE `assert(cond, label)` — write the condition with `is`)"
+            ufn_hint = " (retired; ONE `assert(cond, label)` - write the condition with `is`)"
         if fn_name == "size":
             ufn_hint = " (retired; `len` counts everything)"
-        compile_error("orion: ERROR at {otir_where(line, col)} — call to unknown function `{fn_name}`{ufn_hint}")
+        compile_error("orion: ERROR at {otir_where(line, col)} - call to unknown function `{fn_name}`{ufn_hint}")
         result = "i64"
     result
 
@@ -541,7 +541,7 @@ type ConvResult: function: IRFn, scope: Scope, id: int
 
 
 # Convert a text-encoded int literal to int.
-# Use bytes (text[i] returns whole string — Orion bug as of 2026-06).
+# Use bytes (text[i] returns whole string - Orion bug as of 2026-06).
 define parse_int(text: text) -> int:
     byte_list = bytes_from_text(text)
     total = len(byte_list)
@@ -610,20 +610,20 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     total_stmts = len(stmts)
     edit current_fn = fn_value
     # Own copy: bindings here append in place (see scope_bind), so the block
-    # must not mutate the caller's buffer — its locals would leak into the
+    # must not mutate the caller's buffer - its locals would leak into the
     # enclosing scope. One copy per block; binds inside are then O(1).
     edit current_scope = scope_copy(scope)
     # O(1) "is this name bound / is it mut" for the statement loop below. Built
     # once from the incoming scope, then kept in sync at the end of each
     # iteration by adding whatever names that statement appended (any bind path,
-    # not just let/mut). current_scope only grows here — block-scoped sub-
-    # statements revert to it — so the prefix [0, nm_prev_len) never shifts.
+    # not just let/mut). current_scope only grows here - block-scoped sub-
+    # statements revert to it - so the prefix [0, nm_prev_len) never shifts.
     edit nm_seen = build_name_index(current_scope.names)
     edit nm_prev_len = len(current_scope.names)
     edit last_id = 0 - 1
     # Collect deferred expressions in source order. They run in LIFO order
     # at end of block (and before any return). For now defer is block-scope
-    # only — nested scope defer correctness is future work.
+    # only - nested scope defer correctness is future work.
     init_defers = []
     edit defer_exprs = init_defers
     loop index in 0..<total_stmts:
@@ -642,7 +642,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         is_match_stmt = stmt_kind == "Match"
         is_require_stmt = stmt_kind == "Require"
         is_ensure_stmt = stmt_kind == "Ensure"
-        # `example` lines are DOCUMENTATION that the build runs separately —
+        # `example` lines are DOCUMENTATION that the build runs separately -
         # they lower to NOTHING in the function itself.
         if stmt_kind == "Example":
             continue
@@ -654,8 +654,8 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             current_fn = er.function
             current_scope = er.scope
             last_id = er.id
-        # A bare `If` node in statement position — produced by the `match:`
-        # cond-form desugar — is an if-EXPRESSION used as the block value.
+        # A bare `If` node in statement position - produced by the `match:`
+        # cond-form desugar - is an if-EXPRESSION used as the block value.
         # Route it through the expr path (the block-form `if` is `IfBlock`).
         if already_done == 0 and stmt_kind == "If":
             er = ast_expr_to_ir(current_fn, current_scope, stmt)
@@ -664,7 +664,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             last_id = er.id
         if already_done == 0 and is_let:
             name = get(stmt, "name")
-            # `x = append(x, v)` is a plain copying push like every push —
+            # `x = append(x, v)` is a plain copying push like every push -
             # value semantics hold unconditionally. The old implicit
             # in-place rewrite silently mutated shared spines when x was
             # an alias (astra's compile cache, let-destructure envs).
@@ -682,12 +682,12 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 if get(vchk, "kind") == "Int":
                     litval = parse_int(get(vchk, "value"))
                     if not otir_int_fits(litval, dtcn):
-                        compile_error("orion: ERROR — the literal {litval} does not fit `{dtcn}` (write `{litval} as {dtcn}` to wrap it deliberately)")
+                        compile_error("orion: ERROR - the literal {litval} does not fit `{dtcn}` (write `{litval} as {dtcn}` to wrap it deliberately)")
             # If this is MutLet (fresh mut binding): alloca + store + bind as mut.
             # Else if it's LetOrAssign on an existing mut var: just store.
             # Else: regular SSA-style bind (immutable shadowing).
             if stmt_kind == "MutLet":
-                # A `mut x: T = e` annotation sets the slot type directly —
+                # A `mut x: T = e` annotation sets the slot type directly -
                 # inference can't recover the element type of an empty `[]`.
                 value_type = if has(stmt, "decl_type") then ast_type_to_ir_with_scope(get_map(stmt, "decl_type"), current_scope) else get_value_type(current_fn, er.id)
                 pr_alloca = ir_fn_push(current_fn, ir_alloca(value_type))
@@ -716,7 +716,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     if slot_ll != new_ll:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion: ERROR at {otir_where(line, col)} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}`, but the new value is a `{friendly_type(new_type)}`)")
+                        compile_error("orion: ERROR at {otir_where(line, col)} - cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}`, but the new value is a `{friendly_type(new_type)}`)")
                     # Sharpened pointer-subtype rebind guard (mirrors the return
                     # guard): two DIFFERENT concrete pointer shapes (text/list/
                     # struct) are a real type error even though they share ptr
@@ -729,12 +729,12 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     if (not is_unreliable_ptr(current_fn, er.id)) and slot_kind_rb != "" and new_kind_rb != "" and slot_kind_rb != new_kind_rb:
                         line_rb = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col_rb = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion: ERROR at {otir_where(line_rb, col_rb)} — cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}` but the new value is a `{friendly_type(new_type)}`: a {new_kind_rb} where a {slot_kind_rb} was declared)")
+                        compile_error("orion: ERROR at {otir_where(line_rb, col_rb)} - cannot reassign `{name}` (it holds a `{friendly_type(slot_type)}` but the new value is a `{friendly_type(new_type)}`: a {new_kind_rb} where a {slot_kind_rb} was declared)")
                     # Resolve an empty list's element type from the first
                     # concrete value stored into it: `mut x = []` allocates
                     # list:i64 (no element to peek), so `x = append(x, textv)`
                     # reveals list:text. Back-patch the slot so later
-                    # `at(x, i)` reads the right element type — no annotation.
+                    # `at(x, i)` reads the right element type - no annotation.
                     if slot_type == "list:i64" and is_list_type(new_type) and extract_list_elem(new_type) != "i64":
                         patched = Inst{op: alloca_inst.op, type_text: new_type, value: alloca_inst.value, lhs: alloca_inst.lhs, rhs: alloca_inst.rhs, name: alloca_inst.name, args: alloca_inst.args}
                         current_fn = ir_fn_set_inst(current_fn, ptr_id, patched)
@@ -743,14 +743,14 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     last_id = pr_store.id
                 else:
                     # Rebinding a STABLE name is the promise the guide makes
-                    # ("bound once, and the compiler holds you to it") — and the
+                    # ("bound once, and the compiler holds you to it") - and the
                     # single most common beginner trap. Teach the fix, don't
                     # cite a rule.
                     if nm_hit != 0 and not has(stmt, "ia"):
                         rbl = if has(stmt, "line") then get_int(stmt, "line") else 0
                         rbc = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion: ERROR at {otir_where(rbl, rbc)} — `{name}` cannot change: it was bound as a stable value. Choose one: declare it changeable where it is born (`edit {name} = ...`), or give this new value a new name")
-                    # `x: T = e` — the ANNOTATION decides the type. It used to be
+                        compile_error("orion: ERROR at {otir_where(rbl, rbc)} - `{name}` cannot change: it was bound as a stable value. Choose one: declare it changeable where it is born (`edit {name} = ...`), or give this new value a new name")
+                    # `x: T = e` - the ANNOTATION decides the type. It used to be
                     # parsed and dropped here, so `ys: [text] = get_list(m, k)`
                     # looked like it fixed the element type and did nothing (the
                     # `mut` form already worked, because a mut read loads with
@@ -772,7 +772,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                             current_fn = pr_ann_l.function
                             bind_id = pr_ann_l.id
                     if has(stmt, "linear"):
-                        # `move x = e` — bind linear and (re)start its read count.
+                        # `move x = e` - bind linear and (re)start its read count.
                         current_scope = scope_bind_linear(current_scope, name, bind_id)
                         slot_set("otir:move:" + current_fn.name + ":" + name, 0)
                     else:
@@ -830,7 +830,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             current_fn = er.function
             current_scope = er.scope
             last_id = er.id
-        # `require cond` / `ensure cond` — evaluate the condition, then call the
+        # `require cond` / `ensure cond` - evaluate the condition, then call the
         # runtime checker which traps (clear message + exit 70) when it's false.
         # Previously these parsed but had no lowering, so they were dropped.
         if already_done == 0 and (is_require_stmt or is_ensure_stmt):
@@ -851,19 +851,19 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if already_done == 0 and stmt_kind == "Yield":
             yl_line = if has(stmt, "line") then get_int(stmt, "line") else 0
             yl_col = if has(stmt, "col") then get_int(stmt, "col") else 0
-            compile_error("orion: ERROR at {otir_where(yl_line, yl_col)} — `yield` outside a collecting loop; it only works inside `x = loop v in seq:` with an indented body")
+            compile_error("orion: ERROR at {otir_where(yl_line, yl_col)} - `yield` outside a collecting loop; it only works inside `x = loop v in seq:` with an indented body")
         handled = is_expr or is_let or is_if_block or is_for_range or is_for_in or is_loop or is_break or is_continue or is_return or is_defer or is_match_stmt or is_require_stmt or is_ensure_stmt or stmt_kind == "If" or stmt_kind == "Yield"
         if already_done == 0 and not handled:
             line = if has(stmt, "line") then get_int(stmt, "line") else 0
             col = if has(stmt, "col") then get_int(stmt, "col") else 0
-            compile_error("orion: ERROR at {otir_where(line, col)} — unhandled statement kind `{stmt_kind}` (skipping)")
+            compile_error("orion: ERROR at {otir_where(line, col)} - unhandled statement kind `{stmt_kind}` (skipping)")
         # Keep the name index in sync: fold in whatever this statement appended
         # to current_scope (let/mut, destructure, anything). O(1) amortized.
         nm_now = len(current_scope.names)
         loop nk in nm_prev_len..<nm_now:
             nm_seen = set(nm_seen, at(current_scope.names, nk), nk + 1)
         nm_prev_len = nm_now
-    # Emit any pending deferred exprs (LIFO) at end of block — unless the
+    # Emit any pending deferred exprs (LIFO) at end of block - unless the
     # block already terminated via return (in which case defers ran before
     # the return).
     if is_block_terminated(current_fn) == 0:
@@ -877,7 +877,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     ConvResult{function: current_fn, scope: current_scope, id: last_id}
 
 
-# `loop:` — infinite loop with `break`/`continue` for exit.
+# `loop:` - infinite loop with `break`/`continue` for exit.
 define ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     body_node = get(node, "body")
     n = len(fn_value.instructions)
@@ -905,7 +905,7 @@ define ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     ConvResult{function: pr_end.function, scope: scope, id: 0 - 1}
 
 
-# `for var in iter_list:` — iterate over a list value.
+# `for var in iter_list:` - iterate over a list value.
 define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     var_name = get(node, "var")
     index_var_name = get(node, "index_var")
@@ -930,14 +930,14 @@ define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult
     # of the three possible behaviours.
     #
     # So refuse, and say where to go. What iterating text or a map should MEAN
-    # is a design question — bytes or characters, keys or pairs — and answering
+    # is a design question - bytes or characters, keys or pairs - and answering
     # it silently by reinterpreting a header is how the crash got here.
     fin_iter_type = get_value_type(iter_r.function, list_id)
     if not is_list_type(fin_iter_type):
         fin_who = if get(iter_node, "kind") == "Ident" then "`{get(iter_node, "name")}`" else "that value"
         fin_line = if has(iter_node, "line") then get_int(iter_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
         fin_col = if has(iter_node, "col") then get_int(iter_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
-        compile_error("orion: ERROR at {otir_where(fin_line, fin_col)} — cannot loop over {fin_who}: it is `{friendly_type(fin_iter_type)}`, and `loop ... in` walks a list. For text, walk its bytes: `loop b in bytes_from_text(s)`. For a map, `use dict` and walk `keys(m)`. If it is an unannotated parameter, add a type (e.g. `xs: [int]`) — untyped params default to `int`.")
+        compile_error("orion: ERROR at {otir_where(fin_line, fin_col)} - cannot loop over {fin_who}: it is `{friendly_type(fin_iter_type)}`, and `loop ... in` walks a list. For text, walk its bytes: `loop b in bytes_from_text(s)`. For a map, `use dict` and walk `keys(m)`. If it is an unannotated parameter, add a type (e.g. `xs: [int]`) - untyped params default to `int`.")
 
     pr_len = ir_fn_push(iter_r.function, ir_list_len(list_id))
     len_id = pr_len.id
@@ -957,7 +957,7 @@ define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult
     # Body: load element, bind var(s), walk body.
     # continue targets step_lbl so the counter still increments.
     # Carry the element type from a parameterised list ("list:struct:X")
-    # onto the loop variable — otherwise `for r in xs: r.field` loses
+    # onto the loop variable - otherwise `for r in xs: r.field` loses
     # the struct type and field access fails. Same trick as is_at.
     pr_body_lbl = ir_fn_push(pr_br_loop.function, ir_label(body_lbl))
     fin_list_type = get_value_type(pr_body_lbl.function, list_id)
@@ -990,7 +990,7 @@ define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult
     ConvResult{function: pr_end_lbl.function, scope: scope, id: 0 - 1}
 
 
-# `for var in low..<high:` — emit alloca + classic header/body/end blocks.
+# `for var in low..<high:` - emit alloca + classic header/body/end blocks.
 define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     var_name = get(node, "var")
     low_node = get(node, "low")
@@ -1042,7 +1042,7 @@ define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvRes
 
     pr_end_lbl = ir_fn_push(pr_br_back.function, ir_label(end_lbl))
 
-    # For-loop is a statement — return scope as it was BEFORE body
+    # For-loop is a statement - return scope as it was BEFORE body
     # (loop var doesn't leak out).
     ConvResult{function: pr_end_lbl.function, scope: high_r.scope, id: 0 - 1}
 
@@ -1080,7 +1080,7 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_mut = scope_is_mut(scope, name)
     # Linear (`move`) check: a `move x = e` value may be read at most once. Every
     # read is lowered through here, so counting reads (in a per-function slot)
-    # is complete for straight-line code — a second read is a use-after-move.
+    # is complete for straight-line code - a second read is a use-after-move.
     # Scope is per-function, so keying the count by fn name + var is safe.
     if found_id >= 0 and scope_is_linear(scope, name) == 1:
         move_key = "otir:move:" + fn_value.name + ":" + name
@@ -1088,11 +1088,11 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if move_reads >= 1:
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at {otir_where(line, col)} — value `{name}` used after move (`move` values are linear — read exactly once; bind a plain `{name} = …` if you need to reuse it)")
+            compile_error("orion: ERROR at {otir_where(line, col)} - value `{name}` used after move (`move` values are linear - read exactly once; bind a plain `{name} = …` if you need to reuse it)")
         slot_set(move_key, move_reads + 1)
     edit result = ConvResult{function: fn_value, scope: scope, id: found_id}
     if found_id < 0:
-        # Not a local — zero-payload enum variant as a bare ident
+        # Not a local - zero-payload enum variant as a bare ident
         # (`Nop`), then known global fn (fn-ref), then error.
         bare_enum = find_variant_enum(scope, name)
         # Same orb-local resolution a call gets: `register_system(w, "x", f)`
@@ -1104,42 +1104,42 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             result = ast_expr_to_ir(fn_value, scope, vc_node)
         if bare_enum == "" and fn_ret != "":
             # A bare fn name used as a value becomes a plain-fn closure
-            # [fn_ptr, 0] — flag 0 so closure_call invokes it without an env.
+            # [fn_ptr, 0] - flag 0 so closure_call invokes it without an env.
             no_caps = slice([0], 0, 0)
             pr_fnref = ir_fn_push(fn_value, ir_make_closure(fn_name_res, no_caps, 0))
             result = ConvResult{function: pr_fnref.function, scope: scope, id: pr_fnref.id}
         if bare_enum == "" and fn_ret == "":
-            # Unknown ident — likely a `{expr}` interpolation the parser
+            # Unknown ident - likely a `{expr}` interpolation the parser
             # captured as a single ident. Emit a sentinel iconst(0).
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
             # `for` no longer starts a loop, so it reaches here as a bare name.
             # Say what happened instead of "unknown identifier `for`".
             if name == "for":
-                compile_error("orion: ERROR at {otir_where(line, col)} — `for` was retired; the loop keyword is `loop` (`loop x in xs:`, `loop:`, `loop parallel x in xs:`)")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `for` was retired; the loop keyword is `loop` (`loop x in xs:`, `loop:`, `loop parallel x in xs:`)")
             if name == "where":
-                compile_error("orion: ERROR at {otir_where(line, col)} — `where` filters a loop and belongs after its iterable (`loop x in xs where cond:`); it is not a value")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `where` filters a loop and belongs after its iterable (`loop x in xs where cond:`); it is not a value")
             # The v1 spellings are RETIRED (corpus migrated 2026-08-02). Each
             # names its replacement instead of dying as an unknown identifier.
             if name == "fn":
-                compile_error("orion: ERROR at {otir_where(line, col)} — `fn` no longer declares a function; write `define name(...)`. (The anonymous form `fn(x): body` still works.)")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `fn` no longer declares a function; write `define name(...)`. (The anonymous form `fn(x): body` still works.)")
             if name == "mut":
-                compile_error("orion: ERROR at {otir_where(line, col)} — `mut` was retired; a changeable binding is `edit x = 0`")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `mut` was retired; a changeable binding is `edit x = 0`")
             if name == "pub":
-                compile_error("orion: ERROR at {otir_where(line, col)} — `pub` was retired; write `public`")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `pub` was retired; write `public`")
             if name == "extern":
-                compile_error("orion: ERROR at {otir_where(line, col)} — `extern` was retired; write `external`")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `extern` was retired; write `external`")
             if name == "match":
-                compile_error("orion: ERROR at {otir_where(line, col)} — `match` was retired; the branching keyword is `choose` (`choose x:` with `pattern then value` arms)")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `match` was retired; the branching keyword is `choose` (`choose x:` with `pattern then value` arms)")
             if name == "yield":
-                compile_error("orion: ERROR at {otir_where(line, col)} — `yield` was retired; collect out of a loop with `collect` (`loop x in xs: collect x * 2`)")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `yield` was retired; collect out of a loop with `collect` (`loop x in xs: collect x * 2`)")
             if name != "for" and name != "where" and name != "mut" and name != "pub" and name != "extern" and name != "match" and name != "yield" and name != "fn":
-                compile_error("orion: ERROR at {otir_where(line, col)} — unknown identifier `{name}` (interpolation may need a temp var)")
+                compile_error("orion: ERROR at {otir_where(line, col)} - unknown identifier `{name}` (interpolation may need a temp var)")
             pr = ir_fn_push(fn_value, ir_iconst(0))
             result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     is_real_mut = found_id >= 0 and is_mut == 1
     if is_real_mut:
-        # Mut bindings store a ptr (alloca) — read via load with the
+        # Mut bindings store a ptr (alloca) - read via load with the
         # alloca's stored type.
         alloca_inst = at(fn_value.instructions, found_id)
         loaded_type = alloca_inst.type_text
@@ -1186,13 +1186,13 @@ define ast_float_binop_to_ir(fn_in: IRFn, scope: Scope, op: text, left_id: int, 
         fop = "fmul"
     if op == "/":
         fop = "fdiv"
-    # `//` on floats: floor division — divide, then floor the result.
+    # `//` on floats: floor division - divide, then floor the result.
     if op == "//":
         fd_pr = ir_fn_push(current_fn, ir_fbin("fdiv", l_id, r_id))
         fl_pr = ir_fn_push(fd_pr.function, ir_fmath1("floor", fd_pr.id))
         return ConvResult{function: fl_pr.function, scope: scope, id: fl_pr.id}
     if fop == "":
-        compile_error("orion: ERROR — operator `{op}` not supported for f64 operands")
+        compile_error("orion: ERROR - operator `{op}` not supported for f64 operands")
         fop = "fadd"
     pr_f = ir_fn_push(current_fn, ir_fbin(fop, l_id, r_id))
     ConvResult{function: pr_f.function, scope: scope, id: pr_f.id}
@@ -1200,11 +1200,11 @@ define ast_float_binop_to_ir(fn_in: IRFn, scope: Scope, op: text, left_id: int, 
 # Short-circuit `and`/`or` by lowering through the if path: the right
 # operand's instructions live in a branch block, so they DO NOT run
 # when the left already decides the result. `a and b` == `if a then b
-# else false`; `a or b` == `if a then true else b`. Logical semantics —
+# else false`; `a or b` == `if a then true else b`. Logical semantics -
 # `and`/`or` are never bitwise here (the bit machinery uses arithmetic,
 # so no value depended on the old eager iand/ior), and the ubiquitous
 # guard `x and unsafe(x)` is finally safe. (Requires the nested-in-
-# condition label fix in ast_if_to_ir — without it the if these
+# condition label fix in ast_if_to_ir - without it the if these
 # synthesize inside conditions collides on labels.)
 define sc_int(v: text) -> table:
     {"kind": "Int", "value": v}
@@ -1222,13 +1222,13 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if get(divz_r, "kind") == "Int" and get(divz_r, "value") == "0":
             dz_line = if has(node, "line") then get_int(node, "line") else 0
             dz_col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at {otir_where(dz_line, dz_col)} — division by zero (the divisor is the literal `0`)")
+            compile_error("orion: ERROR at {otir_where(dz_line, dz_col)} - division by zero (the divisor is the literal `0`)")
     if op == "and":
         return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "right"), sc_int("0")))
     if op == "or":
-        # `x or default` — value-preserving fallback: the left value if it is
+        # `x or default` - value-preserving fallback: the left value if it is
         # truthy/present, else the right (was `sc_int("1")` = boolean or).
-        # Emit `left` ONCE and bind it to a temp, then branch on the temp —
+        # Emit `left` ONCE and bind it to a temp, then branch on the temp -
         # `sc_if(left, left, right)` would DUPLICATE the left AST and blow up
         # exponentially on left-associative `a or b or c…` chains.
         or_left_r = ast_expr_to_ir(fn_value, scope, get(node, "left"))
@@ -1246,14 +1246,14 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     both_text = left_type == "text" and right_type == "text"
     # Float dispatch FIRST: either operand f64 → float arithmetic/cmp
     # (auto-promoting the int side via sitofp). Must run before the
-    # ptr-shaped strcmp heuristic — an f64 is not ptr-shaped, but it
+    # ptr-shaped strcmp heuristic - an f64 is not ptr-shaped, but it
     # must never fall into the i64 integer ops either.
     either_float = left_type == "f64" or right_type == "f64"
     is_eq_op = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
     if either_float:
         return ast_float_binop_to_ir(right_result.function, right_result.scope, op, left_result.id, left_type, right_result.id, right_type)
     # THE FLIP (the `number` semantics): `/` is REAL division, whatever the
-    # operands — two ints route through the float path (both promoted via
+    # operands - two ints route through the float path (both promoted via
     # sitofp) and the result is f64. `10 / 4` is 2.5; integer division is
     # spelled `//`. The answer never depends on inferred types (P5).
     if op == "/":
@@ -1302,7 +1302,7 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     result
 
 # Find the label of the basic block currently being emitted into.
-# Scans backward from the end and returns on the FIRST label found —
+# Scans backward from the end and returns on the FIRST label found -
 # O(distance from last label to end), amortized O(1) in practice.
 define current_block(fn_value: IRFn) -> text:
     insts = fn_value.instructions
@@ -1323,7 +1323,7 @@ define current_block(fn_value: IRFn) -> text:
                 # `cmrg{id}`, and `id` is the instruction's index (emit numbers
                 # instructions by position). Without this, a phi built from a
                 # branch whose tail is a closure_call named the branch's ENTRY
-                # label as the predecessor, and the value did not dominate it —
+                # label as the predecessor, and the value did not dominate it -
                 # exactly the `if a and o.method(x) then ...` crash.
                 if inst.op == "closure_call":
                     found = "cmrg{from_end}"
@@ -1338,13 +1338,13 @@ define current_block(fn_value: IRFn) -> text:
 #    compiling code can rely on the leak (such IR never verified).
 # 2. Rebinding an OUTER immutable inside a branch/loop is an
 #    ERROR: under block scoping the assignment cannot escape, so
-#    the author's intent silently dies — demand `mut` instead.
+#    the author's intent silently dies - demand `mut` instead.
 define scope_truncate(s: Scope, keep: int) -> Scope:
     Scope{names: slice(s.names, 0, keep), ids: slice(s.ids, 0, keep), mut_flags: slice(s.mut_flags, 0, keep), loop_headers: s.loop_headers, loop_ends: s.loop_ends, fn_sig_names: s.fn_sig_names, fn_sig_rets: s.fn_sig_rets, ds_names: s.ds_names, ds_specs: s.ds_specs, en_names: s.en_names, en_variants: s.en_variants}
 
 # A private copy of the var-binding lists. Since scope_bind now appends IN
 # PLACE (push_mut, so N locals is O(N) not O(N^2)), a block must NOT share its
-# parent's buffer — its bindings would leak out and a later block would see
+# parent's buffer - its bindings would leak out and a later block would see
 # them (a previous loop's `i` re-flagged in the next). Each block starts from
 # its own copy, so it may grow freely without touching the caller; the copy is
 # once per block (O(AST)), not once per binding.
@@ -1353,7 +1353,7 @@ define scope_copy(s: Scope) -> Scope:
 
 # name -> (index + 1) of its MOST RECENT binding in `names` (0 / absent means
 # not bound). Lets the block statement loop answer "is this name already bound,
-# and is it mut?" in O(1) instead of a linear scan of the whole scope — the
+# and is it mut?" in O(1) instead of a linear scan of the whole scope - the
 # difference between O(N^2) and O(N) for a function with N distinct locals.
 # Last write wins, so a shadowed name resolves to its newest slot.
 define build_name_index(names: [text]) -> table:
@@ -1375,7 +1375,7 @@ define check_branch_shadows(before: int, s: Scope, where_txt: text, node: table)
             if outer == 1:
                 line = if has(node, "line") then get_int(node, "line") else 0
                 col = if has(node, "col") then get_int(node, "col") else 0
-                compile_error("orion: ERROR at {otir_where(line, col)} — `{nm}` is reassigned inside a {where_txt}; immutable rebinding cannot cross a block boundary (declare it `mut`, or use an if-expression)")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `{nm}` is reassigned inside a {where_txt}; immutable rebinding cannot cross a block boundary (declare it `mut`, or use an if-expression)")
 
 define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     cond_node = get(node, "cond")
@@ -1387,7 +1387,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     #    label suffix from the instruction count AFTER it keeps these
     #    labels distinct from the condition's. Before, both read the
     #    same count (the outer if had emitted nothing yet) and collided
-    #    on if_N_then/else/merge — invalid IR (duplicate blocks, tangled
+    #    on if_N_then/else/merge - invalid IR (duplicate blocks, tangled
     #    phi predecessors) whenever an if-expression sat in a condition.
     cond_r = ast_expr_to_ir(fn_value, scope, cond_node)
 
@@ -1414,7 +1414,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         pr_then_br = ir_fn_push(then_r.function, ir_br(merge_lbl))
         fn_after_then = pr_then_br.function
 
-    # 4) label else; evaluate B — from the TRUNCATED scope: then's
+    # 4) label else; evaluate B - from the TRUNCATED scope: then's
     # branch-locals are dead here by law.
     pr_else_lbl = ir_fn_push(fn_after_then, ir_label(else_lbl))
     else_r = ast_expr_to_ir(pr_else_lbl.function, scope_truncate(then_r.scope, scope_before), else_node)
@@ -1439,7 +1439,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # Branch types must agree for the phi to be well-typed at the
             # LLVM layer. All ptr-typed values (text/list/map/struct:T) share
             # the same LLVM storage, so we only flag when one side is i64
-            # and the other is ptr-shaped. Skip when either is void —
+            # and the other is ptr-shaped. Skip when either is void -
             # statement-form `if` legitimately has void/i64 mismatch and the
             # value isn't used downstream.
             then_ll = if then_type == "i64" then "i64" else "ptr"
@@ -1456,13 +1456,13 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 col = if has(node, "col") then get_int(node, "col") else 0
                 bad_fn = result_fn.name
                 # int-vs-float is the common case since `/` became real
-                # division — teach `//` right where the confusion happens.
+                # division - teach `//` right where the confusion happens.
                 edit ifm_hint = ""
                 ift_f = friendly_type(then_type)
                 ife_f = friendly_type(else_type)
                 if (ift_f == "int" and ife_f == "float") or (ift_f == "float" and ife_f == "int"):
                     ifm_hint = ". Choose one: make both branches whole numbers (`//` is integer division; `/` is real division and gives a float), or make both floats (`as float`)"
-                compile_error("orion: ERROR in fn {bad_fn} (line {line}:{col}) — if/else branches have different types ({ift_f} vs {ife_f}){ifm_hint}")
+                compile_error("orion: ERROR in fn {bad_fn} (line {line}:{col}) - if/else branches have different types ({ift_f} vs {ife_f}){ifm_hint}")
             pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
             result_id = pr_phi.id
             result_fn = pr_phi.function
@@ -1474,12 +1474,12 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         result_id = else_r.id
     # If both terminated, merge block is dead; result_id stays -1.
 
-    # Branch-locals die at the boundary — the continuation sees the
+    # Branch-locals die at the boundary - the continuation sees the
     # scope as it was before the if (law half 1).
     ConvResult{function: result_fn, scope: scope_truncate(else_r.scope, scope_before), id: result_id}
 
 # Bare enum-variant constructor: `KeyPress(x)` without the EnumName
-# prefix — mirror lodge-orion's variant probe. Returns the enum name
+# prefix - mirror lodge-orion's variant probe. Returns the enum name
 # or "" when the callee is no variant.
 # Float math builtins → libm calls; ln maps to C's log.
 define math_libm_name(callee: text) -> text:
@@ -1517,7 +1517,7 @@ define variant_payload_count(scope: Scope, enum_name: text, variant: text) -> in
     if csv == "" then 0 else len(split_csv(csv))
 
 define find_variant_enum(scope: Scope, callee: text) -> text:
-    # Bare variant names share one global namespace natively — two enums
+    # Bare variant names share one global namespace natively - two enums
     # exporting the same variant resolve differently interp vs native
     # (caught live: atlas Effect::Spawn vs astra Tok::Spawn), so ambiguity
     # is a hard error rather than a silent first-hit.
@@ -1535,7 +1535,7 @@ define find_variant_enum(scope: Scope, callee: text) -> text:
                     else:
                         second_enum = en_name
     if second_enum != "":
-        compile_error("orion: ERROR — ambiguous bare enum variant `{callee}` (defined in both `{found_enum}` and `{second_enum}`) — rename one variant or qualify the use")
+        compile_error("orion: ERROR - ambiguous bare enum variant `{callee}` (defined in both `{found_enum}` and `{second_enum}`) - rename one variant or qualify the use")
     found_enum
 
 # ---- Orb visibility: a private function is ORB-LOCAL ----
@@ -1573,7 +1573,7 @@ define otir_bind_tyvars(decl: table) -> int:
     g = slot_int_or_zero("otir:tvgen") + 1
     slot_set("otir:tvgen", g)
     # The capability contract being compiled: call sites check against it.
-    # Empty = no clause = inferred (unchecked) — a DECLARED clause is held to.
+    # Empty = no clause = inferred (unchecked) - a DECLARED clause is held to.
     gens = if has(decl, "generics") then get_list(decl, "generics") else []
     loop gi in 0..<len(gens):
         slot_set(otir_k1("tv", at(gens, gi)), g)
@@ -1683,9 +1683,9 @@ define otir_resolve(name: text) -> text:
     if hits == 1:
         return slot_get(otir_k2("pub", pick, name))
     if hits > 1:
-        compile_error("orion: ERROR — `{name}` is exported by more than one orb you import ({listed} ) — say which: `use <orb> ({name})`")
+        compile_error("orion: ERROR - `{name}` is exported by more than one orb you import ({listed} ) - say which: `use <orb> ({name})`")
         return name
-    compile_error("orion: ERROR — `{name}` is not visible here; it is exported by{listed} — add `use` for the one you mean")
+    compile_error("orion: ERROR - `{name}` is not visible here; it is exported by{listed} - add `use` for the one you mean")
     name
 
 # How many arguments a BUILTIN needs before it starts indexing them. -1 means
@@ -1693,7 +1693,7 @@ define otir_resolve(name: text) -> text:
 # `otir:arity:` registry; builtins had none, so a truncated call (`append(` at end
 # of file, which the parser accepts as zero arguments) reached a branch that
 # read `args[0]` and tripped the compiler's own runtime guard:
-# "list index 1 out of range (len 1)" — an internal trap where a diagnostic
+# "list index 1 out of range (len 1)" - an internal trap where a diagnostic
 # belongs. A fuzzer found it in the second run.
 define builtin_min_args(callee: text) -> int:
     one = callee == "len" or callee == "print_line" or callee == "print" or callee == "print_raw" or callee == "to_text" or callee == "to_int" or callee == "to_float" or callee == "bytes_from_text" or callee == "bytes_to_text" or callee == "bytes_zeros" or callee == "bytes_length" or callee == "map_keys" or callee == "map_values" or callee == "slot_get" or callee == "slot_has" or callee == "slot_get_int" or callee == "file_read" or callee == "argv" or callee == "resume" or callee == "parse_int"
@@ -1723,7 +1723,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     if bmin > 0 and len(args) < bmin:
         ba_line = if has(node, "line") then get_int(node, "line") else 0
         ba_col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion: ERROR at {otir_where(ba_line, ba_col)} — `{callee}` takes {bmin} argument(s), got {len(args)}")
+        compile_error("orion: ERROR at {otir_where(ba_line, ba_col)} - `{callee}` takes {bmin} argument(s), got {len(args)}")
         pr_bad = ir_fn_push(fn_value, ir_iconst(0))
         return ConvResult{function: pr_bad.function, scope: scope, id: pr_bad.id}
     # Named-argument reorder + default fill: `f(y: 3, x: 5)` → positional
@@ -1761,7 +1761,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     na_filled = set(na_filled, na_d, 1)
         args = na_pos
     # Variant-as-callee → route through the EnumName.Variant(...) sugar
-    # (same MethodCall lowering path). Checked BEFORE builtins/user fns —
+    # (same MethodCall lowering path). Checked BEFORE builtins/user fns -
     # a variant name shadows nothing else by construction.
     vc_enum = find_variant_enum(scope, callee)
     if vc_enum != "":
@@ -1774,7 +1774,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if vc_got != vc_want:
             vc_line = if has(node, "line") then get_int(node, "line") else 0
             vc_col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at {otir_where(vc_line, vc_col)} — variant `{callee}` takes {vc_want} value(s), got {vc_got}")
+            compile_error("orion: ERROR at {otir_where(vc_line, vc_col)} - variant `{callee}` takes {vc_want} value(s), got {vc_got}")
         vc_node = {"kind": "MethodCall", "receiver": {"kind": "Ident", "name": vc_enum}, "method": callee, "args": args}
         return ast_expr_to_ir(fn_value, scope, vc_node)
     # Multi-part string interpolation. The parser hands the parts here as one
@@ -1820,7 +1820,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             if not contains(cu_check, cap_need):
                 capl = if has(node, "line") then get_int(node, "line") else 0
                 capc = if has(node, "col") then get_int(node, "col") else 0
-                compile_error("orion: ERROR at {otir_where(capl, capc)} — `{callee}` needs the `{cap_need}` capability, but this function declares only `uses {cu_check}`")
+                compile_error("orion: ERROR at {otir_where(capl, capc)} - `{callee}` needs the `{cap_need}` capability, but this function declares only `uses {cu_check}`")
     is_print_line = callee == "print_line"
     is_print_raw = callee == "print" or callee == "print_raw"
     is_to_text = callee == "to_text"
@@ -1942,12 +1942,12 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_slot_set = callee == "slot_set"
     is_slot_has = callee == "slot_has"
     is_slot_get_int = callee == "slot_get_int"
-    # Typed map-get variants — explicit types where inference can't reach.
+    # Typed map-get variants - explicit types where inference can't reach.
     is_get_int = callee == "get_int"
     is_get_map = callee == "get_map"
     is_get_list = callee == "get_list"
     # A `Map` holds anything, so `get_list(m, k)` has to pick ONE element type
-    # and it picks `map` — right for the compiler's own AST walking, silently
+    # and it picks `map` - right for the compiler's own AST walking, silently
     # wrong for a list of texts (`len` on an element became a MAP length: no
     # error, a wrong number). These say which one you are reading, so the answer
     # is honest without an annotation. Same lowering, different element type.
@@ -1959,7 +1959,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
         # Closure env read: `at(__env, const)` inside a synth lambda. The env
-        # list is i64, so a text/list/map capture is stored ptr-as-int — read
+        # list is i64, so a text/list/map capture is stored ptr-as-int - read
         # it as i64, then re-type per the code recorded at make_closure.
         edit is_env_cap = false
         edit cap_code = 0
@@ -1985,7 +1985,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         arg_node = at(args, 0)
         arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
         arg_type = get_value_type(arg_r.function, arg_r.id)
-        # len(text) → strlen; len(map) → handle slot 2 (NOT list_len —
+        # len(text) → strlen; len(map) → handle slot 2 (NOT list_len -
         # a map handle's slot 1 is capacity); len(list) → list_len.
         # Untyped args are an ERROR: static dispatch would silently pick
         # the wrong length (strlen on a list header etc).
@@ -1997,13 +1997,13 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 # `dyn` = an element read from an UNANNOTATED `get_list`: taking a
                 # map length here is the documented silent-wrong-answer (it would
                 # read a Text's bytes as a map header). Refuse and point at the fix
-                # — annotating the read. A genuine `Map` (`m: table`, `size(m)`) is
+                # - annotating the read. A genuine `Map` (`m: table`, `size(m)`) is
                 # typed `map`, not `dyn`, so `len(m)` still works.
                 if arg_type == "dyn":
                     dyn_who = if get(arg_node, "kind") == "Ident" then "`" + get(arg_node, "name") + "`" else "this value"
                     dyn_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
                     dyn_col = if has(arg_node, "col") then get_int(arg_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
-                    compile_error("orion: ERROR at {otir_where(dyn_line, dyn_col)} — len({dyn_who}) reads from an untyped map (`get_list` with no annotation), so its element type is unknown — this would take a MAP length even if the value is a Text. Annotate the read: `ys: [text] = get_list(m, k)` (or `[int]` / `[table]`)")
+                    compile_error("orion: ERROR at {otir_where(dyn_line, dyn_col)} - len({dyn_who}) reads from an untyped map (`get_list` with no annotation), so its element type is unknown - this would take a MAP length even if the value is a Text. Annotate the read: `ys: [text] = get_list(m, k)` (or `[int]` / `[table]`)")
                     pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
                 else:
@@ -2018,14 +2018,14 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     # vs a header read). An `int`-typed arg usually means an
                     # unannotated parameter: untyped params default to `int`, so
                     # `fn f(s): len(s)` treats `s` as int. Name it and point at
-                    # the fix — annotate the param — instead of a cryptic message.
+                    # the fix - annotate the param - instead of a cryptic message.
                     len_who = if get(arg_node, "kind") == "Ident" then "`" + get(arg_node, "name") + "`" else "this value"
                     # Point at the argument (an Ident carries its line/col; the
                     # bare `len(...)` call node does not). A fuzzer flagged this
-                    # message as UNLOCATED — every diagnostic must name a place.
+                    # message as UNLOCATED - every diagnostic must name a place.
                     len_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
                     len_col = if has(arg_node, "col") then get_int(arg_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
-                    compile_error("orion: ERROR at {otir_where(len_line, len_col)} — len({len_who}) but {len_who} is `{friendly_type(arg_type)}`, not text or a list. If it is an unannotated parameter, add a type (e.g. `s: text` or `s: [int]`) — untyped params default to `int`.")
+                    compile_error("orion: ERROR at {otir_where(len_line, len_col)} - len({len_who}) but {len_who} is `{friendly_type(arg_type)}`, not text or a list. If it is an unannotated parameter, add a type (e.g. `s: text` or `s: [int]`) - untyped params default to `int`.")
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
@@ -2034,7 +2034,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         map_r = ast_expr_to_ir(fn_value, scope, map_node)
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         # The map's value type rides in its type_text (`map:<T>`), so it
-        # survives mut slots, set-results and copies — unlike the old peek at
+        # survives mut slots, set-results and copies - unlike the old peek at
         # the producing map_lit, which defaulted to `text` for any indirection
         # and made `get(m,a) + get(m,b)` concat int values as pointers (crash).
         get_type = extract_map_val(get_value_type(map_r.function, map_r.id))
@@ -2048,7 +2048,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         pr = ir_fn_push(key_r.function, ir_map_has(map_r.id, key_r.id))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
     if is_set_call:
-        # set(target, key/idx, val) — map when the target types as a map
+        # set(target, key/idx, val) - map when the target types as a map
         # or the key is text; list when the target types as a list or the
         # key is an int index. Mirrors lodge-orion's dynamic dispatch.
         sc_tgt = ast_expr_to_ir(fn_value, scope, at(args, 0))
@@ -2160,7 +2160,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         pr = ir_fn_push(k_r.function, ir_par_madd(a_r.id, b_r.id, k_r.id))
         result = ConvResult{function: pr.function, scope: k_r.scope, id: pr.id}
     if is_par_run:
-        # `par_run(closures, arg)` — run each closure(arg) on a worker thread,
+        # `par_run(closures, arg)` - run each closure(arg) on a worker thread,
         # return the sum of results. Real OS-thread parallelism (orion_rt.c),
         # deterministic. Lowered as a plain call to the runtime symbol.
         prun_a = ast_expr_to_ir(fn_value, scope, at(args, 0))
@@ -2168,7 +2168,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         pr = ir_fn_push(prun_b.function, ir_call("orion_par_run", [prun_a.id, prun_b.id], "i64"))
         result = ConvResult{function: pr.function, scope: prun_b.scope, id: pr.id}
     if is_breakpoint:
-        # `breakpoint()` — stop here, on purpose (orion_rt.c). The argument is
+        # `breakpoint()` - stop here, on purpose (orion_rt.c). The argument is
         # the enclosing function's name: a Call node carries no position, and
         # the --trace trail supplies the rest of the story.
         bp_s = ir_fn_push(fn_value, ir_const_str(friendly_fn_name(fn_value.name)))
@@ -2333,7 +2333,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
     is_user_fn = (is_print_line == false) and (is_print_raw == false) and (is_to_text == false) and (is_to_float == false) and (is_to_int == false) and (is_resume == false) and (is_call_ptr == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_push_inplace == false) and (is_struct_field_int == false) and (is_struct_field_text == false) and (is_map_remove == false) and (is_set_call == false) and (is_map_keys == false) and (is_map_values == false) and (is_get_or == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_slot_has == false) and (is_slot_get_int == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false) and (is_get_text_list == false) and (is_get_int_list == false) and (is_vec_add == false) and (is_vec_addi == false) and (is_vec_madd == false) and (is_par_madd == false) and (is_par_run == false) and (is_breakpoint == false) and (is_vec_sub == false) and (is_vec_mul == false) and (is_vec_dot == false) and (is_time_now_ms == false) and (is_monotonic_ms == false) and (is_sleep_ms == false) and (is_fmath1 == false) and (is_fmath2 == false)
     if is_resume:
-        # One `resume(v)` — pick the int vs text runtime call from the value's
+        # One `resume(v)` - pick the int vs text runtime call from the value's
         # type. (There is intentionally no resume_int / resume_text; one way.)
         arg_r = ast_expr_to_ir(fn_value, scope, at(args, 0))
         rt = get_value_type(arg_r.function, arg_r.id)
@@ -2341,7 +2341,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         pr = ir_fn_push(arg_r.function, ir_call(rfn, [arg_r.id], "void"))
         result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_call_ptr:
-        # `call_ptr(fnptr, arg)` — call a RAW function pointer held as an int,
+        # `call_ptr(fnptr, arg)` - call a RAW function pointer held as an int,
         # e.g. one returned by `dlsym`. Distinct from a normal `f(x)` call,
         # which assumes `f` is a closure (an env-struct list). This is the FFI /
         # hot-reload primitive: load new native code, get its pointer, call it.
@@ -2364,7 +2364,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             arg_r = ast_expr_to_ir(current_fn, current_scope, arg_node)
             current_fn = arg_r.function
             current_scope = arg_r.scope
-            # Call-arg pointer-subtype guard (direct calls only — a closure
+            # Call-arg pointer-subtype guard (direct calls only - a closure
             # callee has no registered param types). Same rule as the return and
             # rebind guards: a reliably-shaped arg of one concrete pointer kind
             # (text/list/struct) passed where a DIFFERENT concrete kind is
@@ -2382,7 +2382,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     if decl_ck_ca != "" and arg_ck_ca != "" and decl_ck_ca != arg_ck_ca and (not is_unreliable_ptr(current_fn, arg_r.id)):
                         ca_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
                         ca_col = if has(arg_node, "col") then get_int(arg_node, "col") else 0
-                        compile_error("orion: ERROR at {otir_where(ca_line, ca_col)} — argument {arg_index + 1} to `{callee}` is a `{friendly_type(arg_ty_ca)}` but the parameter is declared `{friendly_type(decl_pt_ca)}` (a {arg_ck_ca} where a {decl_ck_ca} was expected)")
+                        compile_error("orion: ERROR at {otir_where(ca_line, ca_col)} - argument {arg_index + 1} to `{callee}` is a `{friendly_type(arg_ty_ca)}` but the parameter is declared `{friendly_type(decl_pt_ca)}` (a {arg_ck_ca} where a {decl_ck_ca} was expected)")
                     # NB an i64-arg -> ptr-param check was TRIED here and REVERTED:
                     # erasure means a real list value can carry the type "i64" (a
                     # list that lost its element type through a dynamic getter or
@@ -2394,7 +2394,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             arg_ids = append(arg_ids, arg_r.id)
         if is_local_callee:
             # If the callee is a `fn(...)`-typed param of THIS fn (matched by
-            # name + generation stamp), its declared arity is known — so a call
+            # name + generation stamp), its declared arity is known - so a call
             # with the wrong argument count is a compile error, not a silently
             # ignored extra arg. Params without a spelled-out fn signature (a
             # bare closure local) have no stamp and stay unchecked.
@@ -2405,7 +2405,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 hoc_line = if has(node, "line") then get_int(node, "line") else 0
                 hoc_col = if has(node, "col") then get_int(node, "col") else 0
                 if len(arg_ids) != want_arity:
-                    compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} — `{callee}` expects {want_arity} argument(s) but got {len(arg_ids)}")
+                    compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} - `{callee}` expects {want_arity} argument(s) but got {len(arg_ids)}")
                 # Propagate the declared return type, normalized to its STORAGE
                 # CLASS so the closure call's ABI always matches how the value is
                 # actually returned. There are exactly three classes: a pointer
@@ -2429,7 +2429,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                         hac_aid = at(arg_ids, hac_i)
                         hac_arg = concrete_ptr_kind(get_value_type(current_fn, hac_aid))
                         if hac_decl != "" and hac_arg != "" and hac_decl != hac_arg and (not is_unreliable_ptr(current_fn, hac_aid)):
-                            compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} — argument {hac_i + 1} to `{callee}` is a `{friendly_type(get_value_type(current_fn, hac_aid))}` but the parameter is declared `{friendly_type(slot_get(hac_key))}`")
+                            compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} - argument {hac_i + 1} to `{callee}` is a `{friendly_type(get_value_type(current_fn, hac_aid))}` but the parameter is declared `{friendly_type(slot_get(hac_key))}`")
             # The local holds a closure value ([fn_ptr, flag, caps...]); call
             # through it, with the declared pointer return type when known (see
             # hoc_ret above), else i64.
@@ -2465,7 +2465,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     if cmiss != "":
                         cml = if has(node, "line") then get_int(node, "line") else 0
                         cmc = if has(node, "col") then get_int(node, "col") else 0
-                        compile_error("orion: ERROR at {otir_where(cml, cmc)} — `{callee}` declares `uses {ccal}`; the caller must cover `{cmiss}` in its own uses clause")
+                        compile_error("orion: ERROR at {otir_where(cml, cmc)} - `{callee}` declares `uses {ccal}`; the caller must cover `{cmiss}` in its own uses clause")
             arity_key = "otir:arity:" + callee_g
             if slot_has(arity_key):
                 want = slot_get_int(arity_key)
@@ -2473,7 +2473,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 if got != want:
                     a_line = if has(node, "line") then get_int(node, "line") else 0
                     a_col = if has(node, "col") then get_int(node, "col") else 0
-                    compile_error("orion: ERROR at {otir_where(a_line, a_col)} — `{callee}` takes {want} argument(s), got {got}")
+                    compile_error("orion: ERROR at {otir_where(a_line, a_col)} - `{callee}` takes {want} argument(s), got {got}")
             # The CALLEE's machine signature is the erased one: `[T]` returns a
             # pointer either way (so the refined `list:text` can be stamped
             # straight on the call), but a bare `-> T` returns an i64 slot. When
@@ -2500,7 +2500,7 @@ define ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         ConvResult{function: pr.function, scope: operand_r.scope, id: pr.id}
     else if op == "bnot":
         # `~x` is `x ^ -1`: flip every bit. (`not x` is the LOGICAL one and
-        # coerces to 0/1 — two different operators, and they used to give the
+        # coerces to 0/1 - two different operators, and they used to give the
         # same answer because `~` had no lowering at all.)
         pr_ones = ir_fn_push(operand_r.function, ir_iconst(0 - 1))
         pr_x = ir_fn_push(pr_ones.function, ir_bit_xor(operand_r.id, pr_ones.id))
@@ -2574,16 +2574,16 @@ define ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResu
                 else if ck_kind != anchor_kind:
                     ll_line = if has(node, "line") then get_int(node, "line") else 0
                     ll_col = if has(node, "col") then get_int(node, "col") else 0
-                    compile_error("orion: ERROR at {otir_where(ll_line, ll_col)} — list literal mixes `{friendly_type(anchor_type)}` and `{friendly_type(ck_ty)}` elements (a list holds one element type: a {ck_kind} where a {anchor_kind} was expected)")
+                    compile_error("orion: ERROR at {otir_where(ll_line, ll_col)} - list literal mixes `{friendly_type(anchor_type)}` and `{friendly_type(ck_ty)}` elements (a list holds one element type: a {ck_kind} where a {anchor_kind} was expected)")
     pr = ir_fn_push(current_fn, ir_list_lit(item_ids, elem_type))
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
 
 # Lower a nested sub-pattern in a payload slot (`Some(Ok(x))`). `inner_id`
-# holds that slot — itself an enum struct. Test its tag against the
+# holds that slot - itself an enum struct. Test its tag against the
 # sub-variant and, on a match, bind the sub-pattern's names to ITS payload
 # slots (retyped from the inner variant's spec). A failed test falls through
-# to `next_lbl`, the next arm's test — the same shape a guard uses.
+# to `next_lbl`, the next arm's test - the same shape a guard uses.
 define otir_lower_nested_pat(fn_value: IRFn, scope: Scope, enc: text, inner_id: int, inner_type: text, next_lbl: text, cont_lbl: text) -> ConvResult:
     edit current_fn = fn_value
     edit current_scope = scope
@@ -2592,10 +2592,10 @@ define otir_lower_nested_pat(fn_value: IRFn, scope: Scope, enc: text, inner_id: 
     sub_names = nested_binding_names(enc)
     v_idx = scope_lookup_enum_variant(scope, inner_enum, sub_variant)
     if v_idx < 0:
-        compile_error("orion: ERROR — nested pattern `{sub_variant}(…)` — `{sub_variant}` is not a variant of `{inner_enum}`")
+        compile_error("orion: ERROR - nested pattern `{sub_variant}(…)` - `{sub_variant}` is not a variant of `{inner_enum}`")
     sub_want = variant_payload_count(scope, inner_enum, sub_variant)
     if len(sub_names) != sub_want:
-        compile_error("orion: ERROR — nested pattern `{sub_variant}` binds {len(sub_names)} value(s) but the variant carries {sub_want}")
+        compile_error("orion: ERROR - nested pattern `{sub_variant}` binds {len(sub_names)} value(s) but the variant carries {sub_want}")
     pr_tag = ir_fn_push(current_fn, ir_field_load(inner_id, 0, "i64"))
     current_fn = pr_tag.function
     pr_pat = ir_fn_push(current_fn, ir_iconst(v_idx))
@@ -2629,7 +2629,7 @@ define arm_has_nested(arm: table) -> truth:
 
 # The sub-variant an arm's single nested slot names (`Some(Ok(x))` -> "Ok").
 # An arm nesting in more than one slot is a conjunction, so it covers nothing
-# on its own — report "" and let it need a sibling or a wildcard.
+# on its own - report "" and let it need a sibling or a wildcard.
 define otir_arm_nested_sub(arm: table) -> text:
     binds = if has(arm, "bindings") then get_list(arm, "bindings") else []
     edit sub = ""
@@ -2671,7 +2671,7 @@ define otir_subs_cover(scope: Scope, en: text, variant: text, subs_seen: text) -
 
 # How many variants of `en` do these arms cover? A plain variant arm covers
 # its variant outright; nested arms cover theirs only together (see above).
-# Guarded arms cover nothing — their condition can fail at runtime.
+# Guarded arms cover nothing - their condition can fail at runtime.
 define otir_covered_variants(scope: Scope, arms: [table], en: text) -> int:
     v_names = split_csv(enum_variant_csv(scope, en))
     edit covered = 0
@@ -2709,14 +2709,14 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 
     # Instruction count BEFORE the result-type probe. `ir_fn_push` mutates the
     # instruction spine in place (push_mut), so lowering an arm body during the
-    # probe LEAKS those instructions into the real function — they would then
+    # probe LEAKS those instructions into the real function - they would then
     # execute for real (running a side-effecting first arm twice). After probing
     # we truncate back to this baseline, discarding every leaked emission. The
     # probe reads only the resulting TYPE, never its instructions.
     probe_base = len(scrut_r.function.instructions)
 
     # Result slot type: probe the WILDCARD arm's body by lowering it
-    # against a scratch copy of the fn — IRFn is a value, discarding
+    # against a scratch copy of the fn - IRFn is a value, discarding
     # the probe costs nothing, and wildcard bodies have no pattern
     # bindings so the current scope suffices. This types matches whose
     # arms return structs/enums (astra's Value) correctly instead of
@@ -2734,8 +2734,8 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if n_arms > 0:
             # No wildcard: probe the FIRST arm's body. Bind its pattern
             # variables with their DECLARED payload types (not an i64 scratch)
-            # so a body that IS a payload — `TextV(s) -> s`, `Spawn(comps) ->
-            # comps` — probes as text/map instead of i64. Binding to a generic
+            # so a body that IS a payload - `TextV(s) -> s`, `Spawn(comps) ->
+            # comps` - probes as text/map instead of i64. Binding to a generic
             # i64 dummy mis-typed the whole match, mis-storing the value and
             # tripping the return-type check (and, for map/list payloads,
             # segfaulting at runtime when the i64 was used as a pointer).
@@ -2775,7 +2775,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     bt_p = if bpi < n_pt_p then at(payload_types_p, bpi) else "i64"
                     pr_pl = ir_fn_push(probe_fn, ir_field_load(scrut_id, 1 + bpi, bt_p))
                     probe_fn = pr_pl.function
-                    # Nested slot: bind the SUB-names (typed), not the slot —
+                    # Nested slot: bind the SUB-names (typed), not the slot -
                     # a body like `Some(Ok(x)) -> x` names `x`, never the slot.
                     # The probe's emissions (branches included) are sliced away.
                     if is_nested_binding(at(first_binds, bpi)):
@@ -2802,7 +2802,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     edit current_fn = pr_alloca.function
     edit current_scope = scrut_r.scope
 
-    # Exhaustiveness check — pre-walk arms to detect wildcard + count
+    # Exhaustiveness check - pre-walk arms to detect wildcard + count
     # matched variants. If scrutinee is an enum and no wildcard arm is
     # present, ensure every variant is covered. Emit a compile-time error.
     edit has_wildcard = false
@@ -2825,11 +2825,11 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     matched_count = matched_count + 1
                     matched_enum = en_name_chk
                     chk_is_variant = true
-            # A non-variant bare ident is a binding pattern — covers everything.
+            # A non-variant bare ident is a binding pattern - covers everything.
             if not chk_is_variant:
                 has_wildcard = true
     if not has_wildcard and matched_enum != "":
-        # Look up total variants for this enum (CSV — comma count + 1).
+        # Look up total variants for this enum (CSV - comma count + 1).
         en_total = len(scope.en_names)
         edit total_variants = 0
         loop ei2 in 0..<en_total:
@@ -2849,7 +2849,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             mline = if has(node, "line") then get_int(node, "line") else 0
             mcol = if has(node, "col") then get_int(node, "col") else 0
             missing = total_variants - covered_variants
-            compile_error("orion: ERROR at {otir_where(mline, mcol)} — non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
+            compile_error("orion: ERROR at {otir_where(mline, mcol)} - non-exhaustive match on enum `{matched_enum}` ({missing} variant(s) not covered, no wildcard arm)")
 
     edit arm_index = 0
     loop arm_idx in 0..<n_arms:
@@ -2864,11 +2864,11 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         guard_lbl = "match_{n}_arm_{arm_index}_guard"
         arm_index = arm_index + 1
 
-        # Flat dispatch — deep nested if/else inside this for-loop
+        # Flat dispatch - deep nested if/else inside this for-loop
         # mis-binds (see orion_nesting_bug.md). Each phase guards on
         # is_wildcard / pat_kind via boolean flags.
 
-        # Detect variant pattern — pat_value is a known enum variant.
+        # Detect variant pattern - pat_value is a known enum variant.
         # Capture WHICH enum matched so payload bindings can retype
         # loads with the variant's declared payload types. Synthetic
         # "Enum$Variant" payload entries are skipped via the $ guard.
@@ -2912,10 +2912,10 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             pat_id = pr_pat.id
 
         # Phase 2: emit icmp + branch (skip for wildcard, binding, and tuple
-        # patterns — all irrefutable).
+        # patterns - all irrefutable).
         do_cmp = (not is_wildcard) and (not is_binding_pat) and (not is_tuple_pat_arm)
         # A PLAIN enum (no variant carries a payload) lowers to a bare integer
-        # tag — `Color.Red` IS 0, there is no struct. Reading field 0 off it
+        # tag - `Color.Red` IS 0, there is no struct. Reading field 0 off it
         # dereferences the tag as a pointer (tag 2 -> address 0x2), which is why
         # `match` on such an enum segfaulted. Compare the value itself instead.
         # A TAGGED union really is a struct, so it keeps the tag load.
@@ -2944,7 +2944,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             pr_body_lbl = ir_fn_push(current_fn, ir_label(body_lbl))
             current_fn = pr_body_lbl.function
 
-        # Phase 2b: variant payload bindings — binding i loads slot p{i}
+        # Phase 2b: variant payload bindings - binding i loads slot p{i}
         # (field index 1+i) RETYPED to the variant's declared payload
         # type at that position, so `Spawn(comps) -> do_spawn(s, comps)`
         # types comps as map, `Relate(a, kind, b)` gets i64/text/i64.
@@ -2954,7 +2954,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if do_variant_pat:
             arm_want = variant_payload_count(scope, variant_enum, pat_value)
             if n_arm_bindings != arm_want:
-                compile_error("orion: ERROR — match arm `{pat_value}` binds {n_arm_bindings} value(s) but the variant carries {arm_want}")
+                compile_error("orion: ERROR - match arm `{pat_value}` binds {n_arm_bindings} value(s) but the variant carries {arm_want}")
         if do_variant_pat and n_arm_bindings > 0:
             payload_csv = scope_lookup_variant_payloads(scope, variant_enum, pat_value)
             payload_types = split_csv(payload_csv)
@@ -2999,7 +2999,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             pr_glbl = ir_fn_push(current_fn, ir_label(guard_lbl))
             current_fn = pr_glbl.function
 
-        # Phase 3: body — emit for both wildcard and pattern arms.
+        # Phase 3: body - emit for both wildcard and pattern arms.
         arm_before = len(body_scope.names)
         body_r = ast_expr_to_ir(current_fn, body_scope, body_node)
         check_branch_shadows(arm_before, body_r.scope, "match arm", node)
@@ -3049,7 +3049,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     ConvResult{function: pr_load.function, scope: scrut_r.scope, id: pr_load.id}
 
 
-# `(a, b, ...)` — a tuple. Lower each element (once), then build an anonymous
+# `(a, b, ...)` - a tuple. Lower each element (once), then build an anonymous
 # struct whose shape is derived from the element IR types. Because the fields
 # carry their real per-slot types, a heterogeneous tuple like `(1, "hi")` keeps
 # `_0` as int and `_1` as text (unlike the old homogeneous list lowering).
@@ -3078,7 +3078,7 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
     if spec == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion: ERROR at {otir_where(line, col)} — unknown data type `{struct_name}`")
+        compile_error("orion: ERROR at {otir_where(line, col)} - unknown data type `{struct_name}`")
     parts = parse_data_spec(spec)
     n_fields_decl = len(parts)
     n_provided = len(fields)
@@ -3123,7 +3123,7 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                 if fld_decl_k != "" and fld_val_k != "" and fld_decl_k != fld_val_k and (not is_unreliable_ptr(current_fn, matched_id)):
                     fc_line = if has(prov, "line") then get_int(prov, "line") else (if has(node, "line") then get_int(node, "line") else 0)
                     fc_col = if has(prov, "col") then get_int(prov, "col") else 0
-                    compile_error("orion: ERROR at {otir_where(fc_line, fc_col)} — field `{decl_name}` of `{struct_name}` is declared `{friendly_type(decl_field_type)}` but got a `{friendly_type(fld_val_ty)}` (a {fld_val_k} where a {fld_decl_k} was expected)")
+                    compile_error("orion: ERROR at {otir_where(fc_line, fc_col)} - field `{decl_name}` of `{struct_name}` is declared `{friendly_type(decl_field_type)}` but got a `{friendly_type(fld_val_ty)}` (a {fld_val_k} where a {fld_decl_k} was expected)")
         if matched_id == (0 - 1):
             # Field not written explicitly. With `{..source, ...}` read it from
             # the spread source (`source.field`); otherwise default to 0.
@@ -3145,7 +3145,7 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
 define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     obj_node = get(node, "object")
     field_name = get(node, "field")
-    # Special-case `EnumName.Variant` — obj is an Ident matching a known enum,
+    # Special-case `EnumName.Variant` - obj is an Ident matching a known enum,
     # field is the variant. Lower to iconst(variant_index).
     edit handled_enum = false
     edit enum_result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
@@ -3158,14 +3158,14 @@ define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             if enum_has_payloads(scope, obj_name):
                 # Tagged union: `EnumName.Variant` used as a VALUE (no `(...)`)
                 # builds the full struct (tag + zeroed payload slots), typed
-                # struct:Enum — exactly like the `Variant(args)` MethodCall path.
+                # struct:Enum - exactly like the `Variant(args)` MethodCall path.
                 # Emitting a bare tag int here was the bug that made `Opt.None`
                 # type as `int` and clash with `Opt.Some`.
                 ev_want = variant_payload_count(scope, obj_name, field_name)
                 if ev_want > 0:
                     ev_line = if has(node, "line") then get_int(node, "line") else 0
                     ev_col = if has(node, "col") then get_int(node, "col") else 0
-                    compile_error("orion: ERROR at {otir_where(ev_line, ev_col)} — variant `{field_name}` takes {ev_want} value(s), got 0 (add `(...)`)")
+                    compile_error("orion: ERROR at {otir_where(ev_line, ev_col)} - variant `{field_name}` takes {ev_want} value(s), got 0 (add `(...)`)")
                 ev_spec = scope_lookup_data_spec(scope, obj_name)
                 ev_slots = count_spec_fields(ev_spec) - 1
                 edit ev_fields = [{"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(var_idx)}}]
@@ -3201,7 +3201,7 @@ define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if field_idx < 0:
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at {otir_where(line, col)} — `{struct_name}` has no field `{field_name}`")
+            compile_error("orion: ERROR at {otir_where(line, col)} - `{struct_name}` has no field `{field_name}`")
         pr_load = ir_fn_push(obj_r.function, ir_field_load(obj_r.id, field_idx, field_type))
         result = ConvResult{function: pr_load.function, scope: obj_r.scope, id: pr_load.id}
     result
@@ -3234,7 +3234,7 @@ define ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResul
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
 
-# `x as T` — numeric cast. Native ints are i64 (sized integer widths erase to
+# `x as T` - numeric cast. Native ints are i64 (sized integer widths erase to
 # i64 for now, so int<->int is a value passthrough); int<->float uses sitofp /
 # fptosi. Width-exact sized integers are a native refinement; the wasm backend
 # is width-exact where it matters.
@@ -3279,14 +3279,14 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
     kind = get(node, "kind")
     # `xs[i]` / `m[k]` is sugar for `at(xs, i)` (lists) or `get(m, k)` (maps).
     # Lower the container ONCE, then dispatch on its type and emit the accessor
-    # directly — mirroring is_at / is_get's element typing. An earlier version
+    # directly - mirroring is_at / is_get's element typing. An earlier version
     # probed the container on a throwaway lowering and then re-lowered it inside
     # a synthesized Call; but ir_fn_push mutates the spine in place, so the
     # probe LEAKED (a side-effecting base ran twice) AND the probe's ident read
     # bumped the global move counter (a `move` base tripped a false use-after-
     # move). Lowering once kills both. Nested indexing (`xss[0][1]`) still falls
     # out: the inner Index lowers as this accessor's container. (The is_at
-    # __env-capture special case can't arise here — captures lower as explicit
+    # __env-capture special case can't arise here - captures lower as explicit
     # `at(__env, n)` calls, never `[]` syntax.)
     if kind == "Index":
         idx_obj = get(node, "object")
@@ -3328,7 +3328,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
     if is_make_closure:
         # Lambda closure: lower each captured expr, then pack [fn_ptr, 1, caps].
         # Record each capture's type-code (0 int / 1 text / 2 list / 3 map) so
-        # __lambda_N's prologue reads it back with the right type — the env list
+        # __lambda_N's prologue reads it back with the right type - the env list
         # itself is i64, so a text/list/map capture must be re-typed on read.
         mc_caps = get_list(node, "caps")
         # A lifted lambda is an ordinary fn decl, so it is emitted under its
@@ -3382,7 +3382,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         method = get(node, "method")
         receiver = get(node, "receiver")
         m_args = get_list(node, "args")
-        # Sum type constructor sugar — `EnumName.Variant(arg)` becomes
+        # Sum type constructor sugar - `EnumName.Variant(arg)` becomes
         # EnumName{tag: idx, val_int: arg, val_text: ""} (or val_text: arg).
         # Detect when receiver is an Ident matching a known enum_name.
         edit is_enum_cons = false
@@ -3396,7 +3396,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                 enum_name = rcv_name
                 variant_idx = v_idx
         if is_enum_cons:
-            # Arity check — the qualified `EnumName.Variant(...)` form used to
+            # Arity check - the qualified `EnumName.Variant(...)` form used to
             # silently DROP extra args (the loop below only fills declared
             # slots), so `R.Ok(5)` on `enum R: Ok, Err` dropped the 5 and only
             # a downstream match arm complained. Point at the construction.
@@ -3406,8 +3406,8 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
             if ec_got != ec_want:
                 ec_line = if has(node, "line") then get_int(node, "line") else 0
                 ec_col = if has(node, "col") then get_int(node, "col") else 0
-                compile_error("orion: ERROR at {otir_where(ec_line, ec_col)} — variant `{method}` takes {ec_want} value(s), got {ec_got}")
-            # A PLAIN enum (no variant carries a payload) IS its tag int — that
+                compile_error("orion: ERROR at {otir_where(ec_line, ec_col)} - variant `{method}` takes {ec_want} value(s), got {ec_got}")
+            # A PLAIN enum (no variant carries a payload) IS its tag int - that
             # is what `Enum.Variant` lowers to in ast_field_to_ir. This path is
             # also where a BARE variant ident lands (`ORI` desugars to a
             # zero-arg `Seam.ORI` method call), and it used to build a struct
@@ -3499,7 +3499,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         cur_fn = pr_ret_lbl.function
         pr_ret = ir_fn_push(cur_fn, ir_return(tmp_id))
         cur_fn = pr_ret.function
-        # Continue block — unwrap the success payload (field 1). Type it from
+        # Continue block - unwrap the success payload (field 1). Type it from
         # the enum's tag-0 variant's DECLARED payload, not a bare i64: a
         # Result[text]/[list]/[map] carries a pointer there, and reading it as
         # i64 leaked the raw pointer into downstream text/concat/field use.
@@ -3542,7 +3542,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         if n_pa > 4:
             pf_line = if has(node, "line") then get_int(node, "line") else 0
             pf_col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at {otir_where(pf_line, pf_col)} — `perform {effect_name}.{op_name}` passes {n_pa} arguments; an effect operation takes at most 4")
+            compile_error("orion: ERROR at {otir_where(pf_line, pf_col)} - `perform {effect_name}.{op_name}` passes {n_pa} arguments; an effect operation takes at most 4")
         # Pick perform_int vs perform_text based on handler's return type.
         # Defaults to int when the handler isn't declared (compile error
         # will surface elsewhere).
@@ -3560,7 +3560,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
             if n_pa != pf_want:
                 pfa_line = if has(node, "line") then get_int(node, "line") else 0
                 pfa_col = if has(node, "col") then get_int(node, "col") else 0
-                compile_error("orion: ERROR at {otir_where(pfa_line, pfa_col)} — `{effect_name}.{op_name}` is handled with {pf_want} parameter(s), got {n_pa}")
+                compile_error("orion: ERROR at {otir_where(pfa_line, pfa_col)} - `{effect_name}.{op_name}` is handled with {pf_want} parameter(s), got {n_pa}")
         use_text = handler_ret == "text"
         if use_text:
             pr_perf = ir_fn_push(cur_fn, ir_perform_text(handler_g, perf_arg_ids))
@@ -3581,15 +3581,15 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         # specific than the generic "not valid here" and wins.
         why = if has(node, "why") then get(node, "why") else ""
         if kind == "Error" and why != "":
-            compile_error("orion: ERROR at {otir_where(line, col)} — {why}")
+            compile_error("orion: ERROR at {otir_where(line, col)} - {why}")
         if kind == "Error" and why == "":
             # The hint has to fit the token. Naming the pipe and the lambda for
             # every unexpected byte (a stray `:`, say) is noise that sends the
             # reader looking in the wrong place.
             hint = if found == "|" then " (Orion has one lambda form, `fn(x): body`, and no pipe operator)" else (if found == ":" then " (a match arm is `Pattern -> value`; `:` opens a block after `if`/`loop`/`fn`)" else "")
-            compile_error("orion: ERROR at {otir_where(line, col)} — `{found}` is not valid here, an expression was expected{hint}")
+            compile_error("orion: ERROR at {otir_where(line, col)} - `{found}` is not valid here, an expression was expected{hint}")
         if kind != "Error":
-            compile_error("orion: ERROR at {otir_where(line, col)} — unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
+            compile_error("orion: ERROR at {otir_where(line, col)} - unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
         pr_fallback = ir_fn_push(fn_value, ir_iconst(0))
         result = ConvResult{function: pr_fallback.function, scope: scope, id: pr_fallback.id}
     result
@@ -3769,7 +3769,7 @@ define otir_call_ret_generic(fn_name: text, arg_types: [text], erased_ret: text)
 # The concrete pointer SHAPE for the return-type guard: "text", "list" or
 # "struct", or "" for a WILDCARD kind (map, fn, int, float, generic/unknown)
 # that the guard must not diff. All pointer shapes share i64 storage, so the
-# old i64/ptr bucket check can't tell them apart — yet returning a Text where a
+# old i64/ptr bucket check can't tell them apart - yet returning a Text where a
 # struct is declared (or a list where a Text is) is a real, silent bug. This
 # discriminates the three concrete shapes while leaving `map` as the deliberate
 # dynamic escape (map <-> anything never triggers the guard), which is what
@@ -3813,7 +3813,7 @@ define otir_ret_storage(t: text) -> text:
 # untyped getter: slot_get returns "text" for what is really an untyped pointer
 # (the whole slot store is dynamically typed), and map get/get_or read a dynamic
 # container. Traced through phi merges so `if slot_has(k) then slot_get(k) else
-# []` counts as unreliable. The subtype return guard skips these — only a value
+# []` counts as unreliable. The subtype return guard skips these - only a value
 # with a trustworthy static shape (a literal, a constructor, a typed getter like
 # get_list/get_int) is worth diffing against the declared return type. Recurses
 # only into strictly-earlier value ids so it always terminates.
@@ -3836,7 +3836,7 @@ define is_map_type(type_text: text) -> truth:
     # dynamic, so the compiler cannot know what its values are. It behaves like
     # `map` everywhere (so reading it back as a map still works, and the whole
     # AST-walking machinery is untouched) EXCEPT that `len` on it refuses rather
-    # than silently doing a MAP length on what might be a text — the one place
+    # than silently doing a MAP length on what might be a text - the one place
     # the ambiguity produces a wrong answer. Annotating the read (`ys: [text] =
     # get_list(m, k)`) resolves it.
     if type_text == "map" or type_text == "dyn":
@@ -3850,7 +3850,7 @@ define is_map_type(type_text: text) -> truth:
             false
 
 # The value type from a `map:<T>` type_text. Bare `map` (or non-map) yields
-# `text` — the historic default for untyped maps.
+# `text` - the historic default for untyped maps.
 define extract_map_val(type_text: text) -> text:
     bs = bytes_from_text(type_text)
     n = len(bs)
@@ -3921,16 +3921,16 @@ define friendly_type(t: text) -> text:
 
 define ast_type_to_ir(type_node: table) -> text:
     kind = get(type_node, "kind")
-    # Range types (`0...255`) erase to i64 — refinement checking is a
+    # Range types (`0...255`) erase to i64 - refinement checking is a
     # future pass. Also guard nodes without a name field: a missing map
     # key is a null ptr natively, and strcmp(null) segfaults.
     if kind == "Range":
         return "i64"
-    # `fn(T) -> R` — a spelled-out function type. Erases to the same "fn"
+    # `fn(T) -> R` - a spelled-out function type. Erases to the same "fn"
     # ptr as a bare `fn`; the signature lives in the AST for typeck only.
     if kind == "FnType":
         return "fn"
-    # `(A, B, ...)` — a tuple type. Same synthesized anon-struct as the tuple
+    # `(A, B, ...)` - a tuple type. Same synthesized anon-struct as the tuple
     # literal, so `(int, text)` and `(1, "hi")` share a representation.
     if kind == "TupleType":
         tt_elems = get_list(type_node, "elems")
@@ -3955,16 +3955,16 @@ define ast_type_to_ir(type_node: table) -> text:
         if tv_gen_nc > 0 and slot_int_or_zero(otir_k1("tv", name)) == tv_gen_nc:
             return "i64"
         if name == "Text":
-            compile_error("orion: ERROR — the type is written `text` now (`Text` was retired)")
+            compile_error("orion: ERROR - the type is written `text` now (`Text` was retired)")
         if name == "bool" or name == "Bool":
-            compile_error("orion: ERROR — the truth type is written `truth` now (`bool` was retired)")
+            compile_error("orion: ERROR - the truth type is written `truth` now (`bool` was retired)")
         if name == "text":
             "text"
         else:
             if name == "Map":
-                compile_error("orion: ERROR — the key-value type is written `table` now (`Map` was retired)")
+                compile_error("orion: ERROR - the key-value type is written `table` now (`Map` was retired)")
             if name == "map" or name == "table":
-                # `Map<T>` — the VALUE type, carried as `map:T`. A bare `Map`
+                # `Map<T>` - the VALUE type, carried as `map:T`. A bare `Map`
                 # holds anything, which is why reading out of one had to guess
                 # (and guessed `map`, so a text element got a map's length). The
                 # IR already understood `map:T` and `get` already read it; there
@@ -3978,7 +3978,7 @@ define ast_type_to_ir(type_node: table) -> text:
                 "list"
             else:
                 if name == "fn" or name == "ptr":
-                    # Function pointer / generic pointer — encode as "fn"
+                    # Function pointer / generic pointer - encode as "fn"
                     # so llvm_type_of returns "ptr" in the emit step.
                     "fn"
                 else:
@@ -4037,14 +4037,14 @@ define ast_type_to_ir_with_scope(type_node: table, scope: Scope) -> text:
         if slot_has(alias_key):
             return slot_get(alias_key)
         if name == "Text":
-            compile_error("orion: ERROR — the type is written `text` now (`Text` was retired)")
+            compile_error("orion: ERROR - the type is written `text` now (`Text` was retired)")
         if name == "bool" or name == "Bool":
-            compile_error("orion: ERROR — the truth type is written `truth` now (`bool` was retired)")
+            compile_error("orion: ERROR - the truth type is written `truth` now (`bool` was retired)")
         if name == "text":
             "text"
         else:
             if name == "Map":
-                compile_error("orion: ERROR — the key-value type is written `table` now (`Map` was retired)")
+                compile_error("orion: ERROR - the key-value type is written `table` now (`Map` was retired)")
             if name == "map" or name == "table":
                 # `Map<T>` -> `map:T`, the value type. See ast_type_to_ir.
                 ms_args = if has(type_node, "args") then get_list(type_node, "args") else []
@@ -4123,7 +4123,7 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
             slot_set("otir:fnparam_ret:" + param_name, ast_type_to_ir_with_scope(get_map(param_type_node, "ret"), initial_scope))
     # --trace (orbit debug): prefix the body with a call-trail entry, so a
     # crash, a trap or a breakpoint can say how execution got there. Off by
-    # default — one runtime call per function entry is not free.
+    # default - one runtime call per function entry is not free.
     if slot_int_or_zero("drv:trace") == 1:
         tr_s = ir_fn_push(fn_value, ir_const_str(friendly_fn_name(name)))
         fn_value = tr_s.function
@@ -4133,33 +4133,33 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
     # A block-form fn with zero statements means the body was empty in source
     # (a forgotten body) OR a mis-parse swallowed it (e.g. a keyword used as a
     # variable name that ended the body early). Lowering an empty block just
-    # emits `ret 0` — a silently wrong program. Make it loud instead. Externs
+    # emits `ret 0` - a silently wrong program. Make it loud instead. Externs
     # are a separate ExternFn node and never reach here; short-form `= expr`
     # fns carry a one-statement block, so neither is affected.
     if get(body, "kind") == "Block" and len(get_list(body, "stmts")) == 0:
-        compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} — function `{friendly_fn_name(name)}` has an empty body (add a body, or check for a keyword used as a variable name)")
+        compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} - function `{friendly_fn_name(name)}` has an empty body (add a body, or check for a keyword used as a variable name)")
     body_result = ast_expr_to_ir(fn_value, scope, body)
     # Return-type guard: the tail expression's storage shape (i64 vs pointer)
     # must match the declared return type. Catches `fn f() -> int: "hello"`
     # (returns text) instead of silently returning garbage. Only compares the
-    # i64/ptr bucket, like the reassignment check — text/list/map/struct all
+    # i64/ptr bucket, like the reassignment check - text/list/map/struct all
     # share ptr storage, so no false positive between them. `fn`, `f64` and
     # `Unit` are exempt (bit-punned fn pointers, doubles, void).
     if is_block_terminated(body_result.function) == 0:
         rt_body = get_value_type(body_result.function, body_result.id)
         # A fn with no `-> type` gets the `Unit` sentinel (a void procedure
         # called for its effect). There's no declared return to violate, so
-        # exempt it — only an EXPLICIT return type is a contract to check.
+        # exempt it - only an EXPLICIT return type is a contract to check.
         ret_undeclared = has(ret_type_node, "name") and get(ret_type_node, "name") == "Unit"
         rt_exempt = ret_undeclared or ret_type == "fn" or ret_type == "f64" or ret_type == "Unit" or rt_body == "fn" or rt_body == "f64" or rt_body == "void" or rt_body == "Unit"
         rt_decl_ll = if ret_type == "i64" then "i64" else "ptr"
         rt_body_ll = if rt_body == "i64" then "i64" else "ptr"
         if (not rt_exempt) and rt_decl_ll != rt_body_ll:
-            compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} — function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}`")
+            compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} - function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}`")
         # Sharpened guard: among POINTER shapes, catch confusing two concrete
         # kinds (text/list/struct). `map`/`fn`/generic stay wildcards (kind ""),
         # the deliberate dynamic escape. And we SKIP bodies whose type is
-        # unreliable (slot_get/map get, traced through phis) — so the pervasive
+        # unreliable (slot_get/map get, traced through phis) - so the pervasive
         # `-> [T]: if slot_has(k) then slot_get(k) else []` idiom is never
         # flagged, only a value with a trustworthy static shape. This is the
         # first real pointer-subtype typing, using info the IR already tracks.
@@ -4167,7 +4167,7 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
         body_kind = concrete_ptr_kind(rt_body)
         body_unreliable = is_unreliable_ptr(body_result.function, body_result.id)
         if (not rt_exempt) and (not body_unreliable) and decl_kind != "" and body_kind != "" and decl_kind != body_kind:
-            compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} — function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}` (a {body_kind} where a {decl_kind} was declared)")
+            compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} - function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}` (a {body_kind} where a {decl_kind} was declared)")
         ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
         ret_result.function
     else:
@@ -4179,7 +4179,7 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
 # `defer E` runs E at the end of its block, and before ANY `return` that leaves
 # it, in LIFO order. The lowering collected Defer statements inside the function
 # body's statement loop and replayed them there, which covered the block end and
-# a top-level return — but a `return` inside an `if` or a loop is lowered by its
+# a top-level return - but a `return` inside an `if` or a loop is lowered by its
 # own nested statement loop, which knew nothing about the outer list. So
 #
 #     fn f(x: int) -> int:
@@ -4299,7 +4299,7 @@ define defer_rewrite_block(block: table, inherited: [table]) -> table:
             is_last = i == n - 1
             # The RETURN VALUE is computed first, then the defers run, then the
             # saved value is returned. `defer close(f)` before `return read(f)`
-            # must not close the handle the return expression is about to read —
+            # must not close the handle the return expression is about to read -
             # splicing the defers ahead of the return did exactly that.
             if k == "Return" and len(visible) > 0:
                 tmp = defer_tmp_name()
@@ -4571,7 +4571,7 @@ define subst_expr(node: table, names: [text], exprs: [table]) -> table:
         out = set(out, "right", subst_expr(get(node, "right"), names, exprs))
     if kind == "Unary":
         out = set(out, "operand", subst_expr(get(node, "operand"), names, exprs))
-    # `pi as int` — the Cast node was missing here, so a const read under a
+    # `pi as int` - the Cast node was missing here, so a const read under a
     # cast never substituted and died as "unknown identifier". (Found the day
     # pi became a real cross-orb const.)
     if kind == "Cast":
@@ -4637,8 +4637,8 @@ define subst_stmt(s: table, names: [text], exprs: [table]) -> table:
         out = set(out, "expr", subst_expr(get(s, "expr"), names, exprs))
     if kind == "Defer":
         out = set(out, "expr", subst_expr(get(s, "expr"), names, exprs))
-    # (A `Destroy` branch used to sit here. The parser emits no such statement —
-    # `destroy` was an ECS word that never had syntax — so it was unreachable.
+    # (A `Destroy` branch used to sit here. The parser emits no such statement -
+    # `destroy` was an ECS word that never had syntax - so it was unreachable.
     # Found by diffing the kinds this file HANDLES against the kinds the parser
     # EMITS, which is the same check that found `defer` had gone missing.)
     if kind == "Loop":
@@ -4668,11 +4668,51 @@ define subst_block(block: table, names: [text], exprs: [table]) -> table:
         out = append(out, subst_stmt(at(stmts, i), names, exprs))
     set(block, "stmts", out)
 
+# Every name a fn BINDS locally: parameters, `edit`/plain bindings and loop
+# variables, at any depth. The const pass excludes these from substitution -
+# a local `e` must SHADOW the num orb's `e = 2.718...`, not be overwritten by
+# it (that miscompiled `e = e + 1` into `2.718... + 1`, "cannot reassign").
+# A body that shadows a const and also wants its value gets a loud unknown-
+# identifier error, which beats a silent wrong number. (Match-arm pattern
+# binds are not collected; their names live inside the pattern encoding.)
+define bound_in_block(block: table, acc: [text]) -> [text]:
+    stmts = get_list(block, "stmts")
+    edit out = acc
+    loop i in 0..<len(stmts):
+        s = at(stmts, i)
+        kind = get(s, "kind")
+        if kind == "MutLet" or kind == "LetOrAssign":
+            out = append(out, get(s, "name"))
+        if kind == "ForRange" or kind == "ForIn":
+            out = append(out, get(s, "var"))
+            out = bound_in_block(get(s, "body"), out)
+        if kind == "ForIn":
+            iv = get(s, "index_var")
+            if iv != "":
+                out = append(out, iv)
+        if kind == "Loop":
+            out = bound_in_block(get(s, "body"), out)
+        if kind == "IfBlock":
+            out = bound_in_block(get(s, "then"), out)
+            els = get(s, "else")
+            if get(els, "kind") == "Block":
+                out = bound_in_block(els, out)
+            if get(els, "kind") == "IfBlock":
+                out = bound_in_block({"kind": "Block", "stmts": [els]}, out)
+        if kind == "Match":
+            arms = get_list(s, "arms")
+            loop ai in 0..<len(arms):
+                arm_body = get_map(at(arms, ai), "body")
+                if get(arm_body, "kind") == "Block":
+                    out = bound_in_block(arm_body, out)
+    out
+
+
 
 
 # ---- nested lambda lift (lambda in a call-arg / expression position) -----
 # The main lift handles `name = fn(...)` and bare/returned lambdas. This lifts
-# a lambda that sits deeper — e.g. `apply(fn(n): n+1, x)` — into the same
+# a lambda that sits deeper - e.g. `apply(fn(n): n+1, x)` - into the same
 # closure form. It's additive (own `__nlambda` prefix + slot counter, so it
 # never collides with the main lift's `__lambda`), and only walks the node
 # kinds a call-arg lambda actually reaches.
@@ -4688,7 +4728,7 @@ define nlam_names_has(names: [text], name: text) -> truth:
 # Every Ident an EXPRESSION reads that `bound` does not already cover. This
 # is the whole capture set for an expression-bodied lambda, and the
 # per-statement half of the block walk below. A nested Lambda is NOT
-# descended into — its own lift computes its captures.
+# descended into - its own lift computes its captures.
 define nlam_expr_caps(node: table, bound: [text], caps: [text]) -> [text]:
     init_work = [node]
     edit worklist = init_work
@@ -4762,7 +4802,7 @@ define nlam_expr_caps(node: table, bound: [text], caps: [text]) -> [text]:
 # A BLOCK body (what `loop parallel:` hands a lambda) walked IN ORDER: a name
 # is a capture when it is read before the block binds it. `xs[i] = v`
 # desugars to `xs = set(xs, i, v)`, so the read on the right makes `xs` a
-# capture even though the statement also binds that name — which is exactly
+# capture even though the statement also binds that name - which is exactly
 # what lets a parallel body write into a shared list. A name the block binds
 # first (`total = 0`) is a local, so it is not captured.
 define nlam_block_caps(block: table, bound: [text], caps: [text]) -> table:
@@ -4854,7 +4894,7 @@ define nlam_synth(lam: table) -> table:
     loop cj in 0..<n_caps:
         # The capture reference at the CLOSURE-CONSTRUCTION site. Without a
         # position, an error about a free variable inside a lambda (an
-        # undefined name, say) reported `line 0:0` — the lambda's own position
+        # undefined name, say) reported `line 0:0` - the lambda's own position
         # is the honest answer.
         cap_nodes = append(cap_nodes, {"kind": "Ident", "name": at(caps, cj), "line": if has(lam, "line") then get_int(lam, "line") else 0, "col": if has(lam, "col") then get_int(lam, "col") else 0})
     closure = {"kind": "MakeClosure", "fn": synth_name, "caps": cap_nodes, "is_lambda": 1}
@@ -4888,7 +4928,7 @@ define nlam_lift(node: table) -> table:
             synths = append(synths, at(get_list(lr, "synths"), j))
         loop j in 0..<len(get_list(rr, "synths")):
             synths = append(synths, at(get_list(rr, "synths"), j))
-    # `not any(xs, (x): ...)` — a lambda under a unary operator.
+    # `not any(xs, (x): ...)` - a lambda under a unary operator.
     if kind == "Unary":
         ur = nlam_lift(get(node, "operand"))
         out = set(out, "operand", get(ur, "node"))
@@ -4896,7 +4936,7 @@ define nlam_lift(node: table) -> table:
         loop uj in 0..<len(ursyn):
             synths = append(synths, at(ursyn, uj))
     # A lambda can sit in a struct-construction FIELD (`order{less: (a, b): a > b}`)
-    # or behind a named argument — both were invisible to the lift and died in
+    # or behind a named argument - both were invisible to the lift and died in
     # lowering as "unhandled AST node kind Lambda".
     if kind == "StructCons":
         scf = get_list(node, "fields")
@@ -4957,7 +4997,7 @@ define nlam_lift_stmt(stmt: table) -> table:
                 lpsyn = append(lpsyn, at(hisyn, hij))
         synths = lpsyn
     if kind == "IfBlock":
-        # The CONDITION expression was never walked — a lambda inside a call
+        # The CONDITION expression was never walked - a lambda inside a call
         # in `if at(each(xs, (x): ...), 1) is 4:` died as "unhandled Lambda".
         cnd = nlam_lift(get(stmt, "cond"))
         out = set(out, "cond", get(cnd, "node"))
@@ -5085,7 +5125,7 @@ define upp_fresh(val: table, name: text) -> truth:
             # `slice(xs, a, b)` always allocates a NEW list (value semantics,
             # no views), so the result is unaliased whatever xs is. This is
             # the compiler's own dominant accumulator idiom
-            # (`edit out = slice(stmts, 0, 0)`) — without it, none of those
+            # (`edit out = slice(stmts, 0, 0)`) - without it, none of those
             # loops promoted and the self-compile went quadratic.
             true
         else if callee == "__push_inplace":
@@ -5394,7 +5434,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
 
     # Same reason, one slot the epoch bump missed: the hoisted-lambda counter.
     # It only ever went up, so `__nlambda_N` for a given lambda depended on how
-    # many lambdas the PROCESS had lowered before it — which, in the test
+    # many lambdas the PROCESS had lowered before it - which, in the test
     # runner, is decided by the order list_dir happens to return the test files
     # in. Windows and Linux hand back different orders, so the same source
     # emitted differently-named symbols on the two hosts and the committed IR
@@ -5414,7 +5454,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
         pk = get(pd, "kind")
         if pk == "OrbMark":
             orb_pre = get(pd, "name")
-        # `type Name = T` — pre-resolve the target to its IR type string and
+        # `type Name = T` - pre-resolve the target to its IR type string and
         # stash it. A later `x: Name` looks this up in ast_type_to_ir_with_scope.
         if pk == "TypeAlias":
             slot_set(otir_k1("tyalias", get(pd, "name")), ast_type_to_ir(get(pd, "target")))
@@ -5444,7 +5484,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                     slot_set(otir_k1("defn", ex_name), seen_n + 1)
 
     # Duplicate-function guard. Two `fn name` definitions collide into one
-    # LLVM symbol — most often the same helper defined in two `use`d orbs,
+    # LLVM symbol - most often the same helper defined in two `use`d orbs,
     # since function names are global (no orb namespaces yet). Flag it with a
     # clear message instead of a confusing "unknown function" or a link-time
     # duplicate-symbol error. Externs are declarations, not definitions, so
@@ -5476,7 +5516,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             if dup_already:
                 dd_line = if has(dd, "line") then get_int(dd, "line") else 0
                 dd_col = if has(dd, "col") then get_int(dd, "col") else 0
-                compile_error("orion: ERROR at {otir_where(dd_line, dd_col)} — function `{dnm_raw}` is defined more than once in the same orb (two different orbs may each have one)")
+                compile_error("orion: ERROR at {otir_where(dd_line, dd_col)} - function `{dnm_raw}` is defined more than once in the same orb (two different orbs may each have one)")
             seen_fn_names = append(seen_fn_names, dnm)
 
     # Pass -1.7: `const NAME = expr` inlining. Collect const name->value, then
@@ -5504,17 +5544,32 @@ public define ast_program_to_ir(program: table) -> IRModule:
             cnk = get(cnd2, "kind")
             if cnk != "Const":
                 # (`or cnk == "System"` used to be here. The parser emits no
-                # System decl — the keyword is gone — so the test could only
+                # System decl - the keyword is gone - so the test could only
                 # ever answer false.)
                 if cnk == "Fn":
-                    cnd2 = set(cnd2, "body", subst_block(get(cnd2, "body"), const_name_list, const_expr_list))
+                    # Only substitute names the fn does NOT bind itself: a
+                    # local `e` shadows the num orb's const `e`, it is not
+                    # overwritten by it. See bound_in_block.
+                    edit cn_bound = []
+                    cn_params = get_list(cnd2, "params")
+                    loop cpi in 0..<len(cn_params):
+                        cn_bound = append(cn_bound, get(at(cn_params, cpi), "name"))
+                    cn_bound = bound_in_block(get(cnd2, "body"), cn_bound)
+                    edit cn_keep_names = slice(const_name_list, 0, 0)
+                    edit cn_keep_exprs = slice(const_expr_list, 0, 0)
+                    loop cn_ni in 0..<len(const_name_list):
+                        if subst_find(cn_bound, at(const_name_list, cn_ni)) < 0:
+                            cn_keep_names = append(cn_keep_names, at(const_name_list, cn_ni))
+                            cn_keep_exprs = append(cn_keep_exprs, at(const_expr_list, cn_ni))
+                    if len(cn_keep_names) > 0:
+                        cnd2 = set(cnd2, "body", subst_block(get(cnd2, "body"), cn_keep_names, cn_keep_exprs))
                 cn_out = append(cn_out, cnd2)
         program_const = set(program, "decls", cn_out)
 
     # (Pass -1 was `fact` inlining: reads of a reactive `fact` binding replaced
     # by its defining expression. The `fact` keyword is gone from the parser, so
     # no AST can contain a Fact statement and the pass could never rewrite
-    # anything — it only walked every function body on every compile to decide
+    # anything - it only walked every function body on every compile to decide
     # that. Removed; the substitution machinery it shared with the const pass
     # lives on as `subst_*`.)
 
@@ -5561,7 +5616,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
 
     # Pass 0: lambda lift. For each `name = |params| body` LetOrAssign at
     # top of a fn body, hoist as synthesized __lambda_N global fn. We
-    # pre-scan for any Lambda — if none, take the early-return path that
+    # pre-scan for any Lambda - if none, take the early-return path that
     # leaves decls unmodified (avoids if/else type-mismatch on empty-list
     # initialization, which broke the bundle build before).
     raw_decls = get_list(program_const, "decls")
@@ -5618,7 +5673,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                                         if at(cs_lp, ix) == cs_l_name:
                                             found_in_params = true
                                     if not found_in_params and not captures_warned:
-                                        print_line("orion: WARNING — lambda likely captures `{cs_l_name}` (env-struct closures not yet supported; capture acts as free var)")
+                                        print_line("orion: WARNING - lambda likely captures `{cs_l_name}` (env-struct closures not yet supported; capture acts as free var)")
                                         captures_warned = true
     edit decls = raw_decls
     if has_any_lambda:
@@ -5631,7 +5686,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
         init_synth = [seed]
         edit synth_decls = init_synth
         synth_decls = bytes_slice(synth_decls, 0, 0)
-        # Stmts seed — we need a typed empty list of stmts. Use the seed
+        # Stmts seed - we need a typed empty list of stmts. Use the seed
         # decl's body stmts if it's a Block fn; otherwise we still need
         # some Stmt-typed list. Synthesize using a dummy.
         # Lifted lambdas are appended AFTER every orb's decls, so they cannot
@@ -5661,8 +5716,8 @@ public define ast_program_to_ir(program: table) -> IRModule:
                         if stmt_kind == "LetOrAssign" or stmt_kind == "MutLet":
                             if get(get(stmt, "value"), "kind") == "Lambda":
                                 is_let_lambda = true
-                        # A bare/returned lambda — the last expr of a fn body or
-                        # an explicit `return fn(...)` — lifts the same way; we
+                        # A bare/returned lambda - the last expr of a fn body or
+                        # an explicit `return fn(...)` - lifts the same way; we
                         # place the resulting closure back in expr position.
                         edit is_expr_lambda = false
                         if stmt_kind == "ExprStmt" or stmt_kind == "Return":
@@ -5704,7 +5759,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                                             already = true
                                     # Skip global fn names (heuristic: don't
                                     # capture identifiers that look like
-                                    # known fn names — they're not values).
+                                    # known fn names - they're not values).
                                     # For MVP, accept all non-param idents.
                                     if not is_param and not already:
                                         caps = append(caps, cn)
@@ -5779,7 +5834,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                     new_body = {"kind": "Block", "stmts": new_stmts}
                     # SET the changed fields on the ORIGINAL decl. Rebuilding it
                     # from a literal listed six fields and silently dropped every
-                    # other one — `generics`, `generics_csv`, `modifier`,
+                    # other one - `generics`, `generics_csv`, `modifier`,
                     # positions. This pass touches every function with a block
                     # body whenever the program contains ANY lambda, so a single
                     # closure anywhere erased the generic signatures for the
@@ -5831,7 +5886,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             # is harmless and stays legal (a copy-pasted shared shape).
             dkey = otir_k1("dspec", struct_name)
             if slot_has(dkey) and slot_get(dkey) != spec:
-                compile_error("orion: ERROR — data type `{struct_name}` is defined with two different layouts in this build (a type name is a global layout key, not per-orb — rename one)")
+                compile_error("orion: ERROR - data type `{struct_name}` is defined with two different layouts in this build (a type name is a global layout key, not per-orb - rename one)")
             slot_set(dkey, spec)
             sig_scope = scope_add_data_decl(sig_scope, struct_name, spec)
         if get(decl, "kind") == "Enum":
@@ -5861,7 +5916,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                     pl_csv = "{pl_csv}{pl_sep}{pl_type}"
                 sig_scope = scope_add_enum_decl(sig_scope, "{enum_name}${v_name}", pl_csv)
             sig_scope = scope_add_enum_decl(sig_scope, enum_name, csv)
-            # Sum types with payloads — synthesize a uniform tagged-union
+            # Sum types with payloads - synthesize a uniform tagged-union
             # struct: tag (variant index) + positional i64 payload slots
             # p0..pN (ptr payloads live in i64 slots via ptrtoint; match
             # bindings retype per the variant's payload spec). Minimum 2
@@ -5873,9 +5928,9 @@ public define ast_program_to_ir(program: table) -> IRModule:
                 union_spec = "{union_spec}|p{si}:int"
             sig_scope = scope_add_data_decl(sig_scope, enum_name, union_spec)
     # Pass 1b: collect fn signatures, now with struct-aware ret types.
-    # ExternFn decls register too — their calls type like any fn call
+    # ExternFn decls register too - their calls type like any fn call
     # (no more "unknown function, i64 as guess" for declared externs).
-    # Duplicate fn BODIES are a hard error — orbs share one flat
+    # Duplicate fn BODIES are a hard error - orbs share one flat
     # namespace, and a silent double-emit means whichever definition
     # links last wins (bit us twice: toml/veil line_at, others).
     # Extern re-declares stay legal; that's the cross-orb convention.
@@ -5906,7 +5961,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             if fn_mod == "comptime":
                 ct_line = if has(decl, "mod_line") then get_int(decl, "mod_line") else 0
                 ct_col = if has(decl, "mod_col") then get_int(decl, "mod_col") else 0
-                compile_error("orion: ERROR at {otir_where(ct_line, ct_col)} — `comptime` was cut; it never evaluated anything at compile time. A folded constant is `const NAME = expr` (or a bare top-level `NAME = expr`)")
+                compile_error("orion: ERROR at {otir_where(ct_line, ct_col)} - `comptime` was cut; it never evaluated anything at compile time. A folded constant is `const NAME = expr` (or a bare top-level `NAME = expr`)")
             if fn_mod == "deterministic":
                 dn = slot_int_or_zero(otir_k1("detn", "count"))
                 slot_set(otir_k1("deto", "{dn}"), fn_name)
@@ -5914,17 +5969,17 @@ public define ast_program_to_ir(program: table) -> IRModule:
             if text_list_has(fn_seen, fn_name):
                 dcl_line = if has(decl, "line") then get_int(decl, "line") else 0
                 dcl_col = if has(decl, "col") then get_int(decl, "col") else 0
-                compile_error("orion: ERROR at {otir_where(dcl_line, dcl_col)} — duplicate function `{fn_raw}` (defined twice in the same orb — two orbs may now each have their own)")
+                compile_error("orion: ERROR at {otir_where(dcl_line, dcl_col)} - duplicate function `{fn_raw}` (defined twice in the same orb - two orbs may now each have their own)")
             fn_seen = append(fn_seen, fn_name)
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
             # Arity registry (compiler slots): a call with the wrong
-            # argument count silently shifts every parameter — caught
+            # argument count silently shifts every parameter - caught
             # here instead of as a runtime pointer crash.
             slot_set("otir:arity:" + fn_name, len(get_list(decl, "params")))
             # Capability contract registry: `otir:uses:<fn>` -> csv. A caller
             # with its own declared clause must cover everything its callee
-            # declares — capabilities compose upward through signatures.
+            # declares - capabilities compose upward through signatures.
             if has(decl, "uses"):
                 if get(decl, "uses") != "":
                     slot_set("otir:uses:" + fn_name, get(decl, "uses"))
@@ -5983,12 +6038,12 @@ public define ast_program_to_ir(program: table) -> IRModule:
             rt_word = get(decl, "word")
             rt_line = get_int(decl, "line")
             rt_col = get_int(decl, "col")
-            compile_error("orion: ERROR at {otir_where(rt_line, rt_col)} — `{rt_word}` was retired; `type` declares every type now (`type Name: field: T` for a product, `type Name:` + indented variants for a sum)")
+            compile_error("orion: ERROR at {otir_where(rt_line, rt_col)} - `{rt_word}` was retired; `type` declares every type now (`type Name: field: T` for a product, `type Name:` + indented variants for a sum)")
         if kind == "Unsupported":
             us_word = get(decl, "word")
             us_line = get_int(decl, "line")
             us_col = get_int(decl, "col")
-            compile_error("orion: ERROR at {otir_where(us_line, us_col)} — `{us_word}` is reserved but not implemented; there is no lowering for it (use plain functions over `type` values, and pass behaviour as fn args)")
+            compile_error("orion: ERROR at {otir_where(us_line, us_col)} - `{us_word}` is reserved but not implemented; there is no lowering for it (use plain functions over `type` values, and pass behaviour as fn args)")
         if kind == "Fn":
             fn_pub_2 = if has(decl, "pub") then get_int(decl, "pub") else 1
             orb_of_2 = if has(decl, "orb") then get(decl, "orb") else orb_2

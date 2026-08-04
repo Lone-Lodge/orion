@@ -1,9 +1,9 @@
-# rpn — a reverse-Polish (postfix) calculator, modelled with a real sum type.
+# rpn - a reverse-Polish (postfix) calculator, modelled with a real sum type.
 #
 # Build: orion.exe examples/demos/rpn.or out.ll orbs
 #
 # Where the recursive-descent calculator threads precedence, RPN is a plain
-# left-to-right stack machine — so it shows off a different set of features:
+# left-to-right stack machine - so it shows off a different set of features:
 #   - an `enum` (sum type): a token is EITHER a number OR an operator
 #   - `match` with variant destructuring (`Num(v)`, `Op(o)`) to pull the payload
 #   - a block arm (the `Op` case pops two, applies, pushes) next to an inline arm
@@ -55,7 +55,7 @@ define apply(op: text, a: int, b: int) -> int:
         "*" -> a * b
         _ ->
             if b == 0:
-                print_line("  (rpn: divide by zero — using 0)")
+                print_line("  (rpn: divide by zero - using 0)")
                 0
             else:
                 a // b

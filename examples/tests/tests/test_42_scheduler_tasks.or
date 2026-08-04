@@ -7,7 +7,7 @@ define task_due(t: Task) -> int:
     now = monotonic_ms()
     if t.deadline_ms <= now then 1 else 0
 
-# Hand-written dispatcher — fn_id 0 doubles payload, fn_id 1 negates.
+# Hand-written dispatcher - fn_id 0 doubles payload, fn_id 1 negates.
 define dispatch(t: Task) -> int:
     fid = t.fn_id
     if fid == 0:

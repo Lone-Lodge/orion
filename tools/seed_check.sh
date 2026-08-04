@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# seed_check.sh — can the CHECKED-IN seed still build the CURRENT compiler?
+# seed_check.sh - can the CHECKED-IN seed still build the CURRENT compiler?
 #
 # WHY: tools/seed/orion.ll is the only way a fresh clone gets a first binary.
 # It is a snapshot, so it rots the moment the compiler source starts using
 # syntax the snapshot's parser does not know. Nothing noticed that, because
 # everyday work runs self_bootstrap.sh, which starts from the dist/orion.exe
-# you already have. The rot only surfaces on a machine that has no binary —
+# you already have. The rot only surfaces on a machine that has no binary -
 # i.e. someone else's first clone.
 #
 # This links the seed into a throwaway exe and asks it to compile today's

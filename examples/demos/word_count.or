@@ -1,4 +1,4 @@
-# word_count — count how often each word appears.
+# word_count - count how often each word appears.
 # Build: orion.exe examples/demos/word_count.or out.ll orbs
 #
 # Ties the standard library together: text.split to tokenize, a growing

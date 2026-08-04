@@ -1,5 +1,5 @@
 #!/bin/bash
-# test_workspace.sh — regression for layout-free, name-based orb resolution.
+# test_workspace.sh - regression for layout-free, name-based orb resolution.
 #
 # Builds a throwaway workspace with a deliberately WEIRD folder layout: a
 # `.orbit` marker at the root, an orb buried at libs/deep/nested/orbs/, and a

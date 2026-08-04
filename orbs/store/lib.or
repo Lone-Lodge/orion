@@ -1,7 +1,7 @@
-# store — program state shaped like a database (manifesto P1).
+# store - program state shaped like a database (manifesto P1).
 #
 # Flat records with STABLE ids, not object graphs: games call it ECS,
-# business software calls it relations — same idea. Value semantics makes
+# business software calls it relations - same idea. Value semantics makes
 # pointer graphs impossible; this orb makes tables of entities natural:
 #
 #   w0 = store_new()
@@ -13,7 +13,7 @@
 # `loop ... in items(w) where ...` IS the query. The storage layout (SoA,
 # archetype, whatever) is the compiler's/engine's business, never the code's.
 #
-# The store itself is a RECORD (typed fields), not a bag-of-anything table —
+# The store itself is a RECORD (typed fields), not a bag-of-anything table -
 # heterogeneous tables read through typed getters are a poor man's record,
 # and the language has real ones. Cells stay a `table<table>`: id-text to
 # entity record, homogeneous, so plain typed reads work.
@@ -44,7 +44,7 @@ public define has_id(s: sstore, id: int) -> truth:
     example not has_id(store_new(), 0)
     has(s.cells, "{id}")
 
-# Every live record — the iteration/query source.
+# Every live record - the iteration/query source.
 public define items(s: sstore) -> [table]:
     example len(items(store_new())) is 0
     ks = map_keys(s.cells)

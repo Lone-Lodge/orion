@@ -6,11 +6,11 @@ through an arena the compiler checks for balanced scopes before anything runs.
 You do not write regions yourself; there is no such keyword. The compiler is
 written in Orion and compiles itself.
 
-**[Read the Field Guide](docs/index.html)** — everything you need to write
+**[Read the Field Guide](docs/index.html)** - everything you need to write
 Orion, on one page, in ten minutes. ([svenska](docs/sv.html))
 
 It is a plain HTML page: clone and open `docs/index.html`, no server needed.
-Not published yet — GitHub Pages needs the repository to be public, or the
+Not published yet - GitHub Pages needs the repository to be public, or the
 organisation to be on a paid plan.
 
 ```
@@ -22,7 +22,7 @@ fn main() -> int:
 
 ## Build it
 
-You need `clang`. Nothing else — no Rust, no Node, no package manager.
+You need `clang`. Nothing else - no Rust, no Node, no package manager.
 
 ```sh
 bash tools/bootstrap.sh
@@ -76,7 +76,7 @@ output path ending in `.wasm` uses the wasm backend instead of LLVM:
 orion prog.or prog.wasm orbs
 ```
 
-The `.wasm` is self-contained — the host (JavaScript) provides only capabilities
+The `.wasm` is self-contained - the host (JavaScript) provides only capabilities
 (draw, input, `print`), never data-structure semantics. `examples/wasm_demo/`
 compiles a small program to wasm and animates it on a canvas.
 

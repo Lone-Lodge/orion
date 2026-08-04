@@ -1,4 +1,4 @@
-# orion_ir — typed IR for orion-self.
+# orion_ir - typed IR for orion-self.
 #
 # Design:
 #   - SSA-form: each instruction PRODUCES exactly one value.
@@ -109,7 +109,7 @@ public define ir_print_int(value_id: int) -> Inst:
     Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Select: result = if cond != 0 then then_id else else_id.
-# Branchless via cmov — works for any tree-shaped IR.
+# Branchless via cmov - works for any tree-shaped IR.
 public define ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
     Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
 
@@ -128,15 +128,15 @@ public define ir_call(fn_name: text, arg_ids: [int], ret_type: text) -> Inst:
 public define ir_print_str(text: text) -> Inst:
     Inst{op: "print_str", type_text: "void", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
-# String literal as a value — produces a text-typed SSA value (ptr to global).
+# String literal as a value - produces a text-typed SSA value (ptr to global).
 public define ir_const_str(text: text) -> Inst:
     Inst{op: "const_str", type_text: "text", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
-# Concatenate two text SSA values — calls runtime helper.
+# Concatenate two text SSA values - calls runtime helper.
 public define ir_text_concat(left_id: int, right_id: int) -> Inst:
     Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
-# Convert an i64 to text — calls runtime helper.
+# Convert an i64 to text - calls runtime helper.
 public define ir_int_to_text(value_id: int) -> Inst:
     Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
@@ -149,12 +149,12 @@ public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
 public define ir_text_len(value_id: int) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# slice(text, lo, hi) — substring from byte index lo (inclusive) to hi (exclusive).
+# slice(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
 public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
-# contains(text, sub) — returns i64 1 if sub appears anywhere in text, else 0.
+# contains(text, sub) - returns i64 1 if sub appears anywhere in text, else 0.
 public define ir_text_contains(text_id: int, sub_id: int) -> Inst:
     Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
 
@@ -195,7 +195,7 @@ public define ir_bytes_concat(a_id: int, b_id: int) -> Inst:
 public define ir_bytes_zeros(n_id: int) -> Inst:
     Inst{op: "bytes_zeros", type_text: "list", value: n_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# Global state slots — key→ptr Map. slot_get's caller decides type by usage.
+# Global state slots - key→ptr Map. slot_get's caller decides type by usage.
 # In our orbs, slots store text values; ir_slot_get defaults to text type.
 public define ir_slot_get(key_id: int) -> Inst:
     Inst{op: "slot_get", type_text: "text", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
@@ -206,7 +206,7 @@ public define ir_slot_set(key_id: int, val_id: int) -> Inst:
 
 # --- Lists (int-only for now) ---
 # A list is a ptr to a heap buffer laid out as [i64 length, i64 item0, ...].
-# LIMITATION: only int items work — text lists like ["a", "b"] fail at
+# LIMITATION: only int items work - text lists like ["a", "b"] fail at
 # compile because list_set takes i64, not ptr. Type-aware lists are a
 # future enhancement.
 public define ir_list_lit(item_ids: [int], elem_type: text) -> Inst:
@@ -272,7 +272,7 @@ public define ir_store(ptr_id: int, value_id: int) -> Inst:
 
 # --- Basic blocks (labels + branches + phi) ---
 # These let us emit real if/else with side-effects (recursion, calls)
-# and future loops. Label names are strings — we encode them in `name`.
+# and future loops. Label names are strings - we encode them in `name`.
 
 # Mark a basic-block boundary. name = "label_name".
 public define ir_label(label_name: text) -> Inst:
@@ -370,7 +370,7 @@ public define ir_dump_module(module: IRModule) -> text:
 
 use bytes
 
-# orion_emit_llvm — emit LLVM IR text from typed IR (orion_ir).
+# orion_emit_llvm - emit LLVM IR text from typed IR (orion_ir).
 #
 # Pipeline: orion_ir → orion_emit_llvm → .ll file → clang → .exe
 #
@@ -540,7 +540,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = "    br label %{inst.name}"
 
     if op == "br_if":
-        # name = "then_lbl|else_lbl" — split on '|'.
+        # name = "then_lbl|else_lbl" - split on '|'.
         # Coerce cond from i64 to i1 first.
         labels = split_pipe(inst.name)
         then_lbl = at(labels, 0)
@@ -671,7 +671,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = "    {value_ref(my_id)} = call ptr @orion_slot_get(ptr {value_ref(inst.value)})"
 
     if op == "slot_set":
-        # val_id may be i64 or ptr — cast ptr→i64 for uniform storage.
+        # val_id may be i64 or ptr - cast ptr→i64 for uniform storage.
         val_inst = at(fn_value.instructions, inst.lhs)
         val_ty = llvm_type_of(val_inst.type_text)
         if val_ty == "ptr":
@@ -853,7 +853,7 @@ define llvm_type_of(orion_type: text) -> text:
     if len(bs) >= 7:
         if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
             is_struct = true
-    # `list:T` (parameterised list) — also a ptr at LLVM level.
+    # `list:T` (parameterised list) - also a ptr at LLVM level.
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
@@ -1099,7 +1099,7 @@ define emit_runtime() -> text:
     text = "{text}after:\n"
     text = "{text}  ret ptr %dst\n"
     text = "{text}\}\n\n"
-    # Global slot store — single Map keyed by text. Init on first access.
+    # Global slot store - single Map keyed by text. Init on first access.
     text = "{text}@orion_slots = global ptr null\n\n"
     text = "{text}define ptr @orion_slot_get(ptr %key) \{\n"
     text = "{text}entry:\n"
@@ -1344,7 +1344,7 @@ public define emit_module(module: IRModule) -> text:
         fn_value = at(module.functions, index)
         text = "{text}{emit_fn(fn_value, strings, module)}\n"
     # Wrapper @main: stash argc/argv to globals so argc()/argv(i) can read
-    # them, then delegate to user's orion_main. We always emit this — if
+    # them, then delegate to user's orion_main. We always emit this - if
     # the user didn't define a main, clang will complain about undefined
     # orion_main, which is the correct error.
     text = "{text}@orion_argc = global i64 0\n"

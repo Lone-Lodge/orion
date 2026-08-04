@@ -1,4 +1,4 @@
-# `xs[i]` indexing — sugar for `at(xs, i)`, in every position, including
+# `xs[i]` indexing - sugar for `at(xs, i)`, in every position, including
 # nested (`xss[1][0]`). Previously `[]` parsed but never lowered
 # ("unhandled AST node kind `Index`"); you had to write `at(xs, i)`.
 define main() -> int:

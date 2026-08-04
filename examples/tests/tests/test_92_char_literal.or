@@ -1,5 +1,5 @@
 # Character literals: `'c'` lexes to the byte value, so it's readable
-# notation for an ASCII code — `'+'` is exactly `43`. No new type; the
+# notation for an ASCII code - `'+'` is exactly `43`. No new type; the
 # parser treats it as an int. Escapes work too (`'\n'` = 10, `'\''` = 39).
 define classify(b: int) -> text:
     choose b:

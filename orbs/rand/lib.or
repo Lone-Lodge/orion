@@ -1,4 +1,4 @@
-# rand — a small pseudo-random generator. NOT cryptographic.
+# rand - a small pseudo-random generator. NOT cryptographic.
 #
 #   rand()             ->  a non-negative int
 #   rand_range(1, 7)   ->  1..6 (hi exclusive)
@@ -21,7 +21,7 @@ RAND_DEFAULT = 88172645463325252   # fixed nonzero default seed
 define rand_state() -> int:
     if slot_has("rand:state") then slot_get_int("rand:state") else RAND_DEFAULT
 
-# Fix the sequence. Any int works (0 included — the increment keeps it moving).
+# Fix the sequence. Any int works (0 included - the increment keeps it moving).
 public define srand(seed: int) -> int uses random:
     example srand(42) is 42
     slot_set("rand:state", seed)

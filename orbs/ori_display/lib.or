@@ -42,5 +42,5 @@ public define empty_list() -> DisplayList:
     DisplayList{commands: []}
 
 public define push_cmd(list: DisplayList, cmd: DrawCmd) -> DisplayList:
-    # no example: needs a DrawCmd value — proven by atlas display tests
+    # no example: needs a DrawCmd value - proven by atlas display tests
     DisplayList{commands: append(list.commands, cmd)}

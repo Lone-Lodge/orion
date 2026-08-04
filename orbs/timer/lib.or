@@ -17,7 +17,7 @@ define ts_int(key: text) -> int:
 # --- countdown -------------------------------------------------------------
 
 # Start (or restart) a timer running toward dur_ms.
-# no example: mutates timer state — proven by test_42_timer.or
+# no example: mutates timer state - proven by test_42_timer.or
 public define timer_start(id: text, dur_ms: int) uses clock:
     slot_set("timer:{id}:dur", dur_ms)
     slot_set("timer:{id}:el", 0)
@@ -25,13 +25,13 @@ public define timer_start(id: text, dur_ms: int) uses clock:
     slot_set("timer:{id}:acc", 0)
 
 # Cancel a running timer (elapsed is kept for inspection).
-# no example: mutates timer state — proven by test_42_timer.or
+# no example: mutates timer state - proven by test_42_timer.or
 public define timer_stop(id: text):
     slot_set("timer:{id}:on", 0)
 
 # Rewind to 0 and keep running toward the same duration.
-# no example: mutates timer state — proven by test_42_timer.or
-# no example: mutates timer state — proven by test_42_timer.or
+# no example: mutates timer state - proven by test_42_timer.or
+# no example: mutates timer state - proven by test_42_timer.or
 public define timer_reset(id: text):
     slot_set("timer:{id}:el", 0)
     slot_set("timer:{id}:on", 1)
@@ -86,8 +86,8 @@ public define timer_active(id: text) -> truth:
 # Accumulate dt_ms and report how many whole periods elapsed this tick.
 # Usually 0 or 1; larger dt (or a long period) can fire several. The leftover
 # is carried, so cadence never drifts. Independent of timer_start/tick above.
-# no example: mutates timer state — proven by test_42_timer.or
-# no example: mutates timer state — proven by test_42_timer.or
+# no example: mutates timer state - proven by test_42_timer.or
+# no example: mutates timer state - proven by test_42_timer.or
 public define timer_every(id: text, period_ms: int, dt_ms: int) -> int:
     if period_ms <= 0:
         return 0

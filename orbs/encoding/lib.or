@@ -1,4 +1,4 @@
-# encoding — hex and base64, both directions.
+# encoding - hex and base64, both directions.
 #
 #   hex_encode([255, 16])     ->  "ff10"
 #   hex_decode("ff10")        ->  [255, 16]

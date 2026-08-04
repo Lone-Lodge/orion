@@ -1,4 +1,4 @@
-# `const NAME = expr` — a compile-time constant, inlined at every read site
+# `const NAME = expr` - a compile-time constant, inlined at every read site
 # across all function bodies (not just where it's declared). No runtime slot.
 const TEN = 10
 const SEVEN = 7

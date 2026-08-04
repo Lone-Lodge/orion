@@ -1,4 +1,4 @@
-# The store orb: state as a database — stable ids, loop-as-query.
+# The store orb: state as a database - stable ids, loop-as-query.
 use store
 
 define main() -> int:

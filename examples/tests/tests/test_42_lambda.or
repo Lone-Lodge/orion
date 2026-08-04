@@ -1,5 +1,5 @@
 define main() -> int:
-    # Inline lambda — `fn(params): body`. Lifted to a synthesized fn at
+    # Inline lambda - `fn(params): body`. Lifted to a synthesized fn at
     # compile time.
     double = fn(x): x * 2
     inc = fn(x): x + 1

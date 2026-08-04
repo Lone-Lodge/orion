@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# debug_test.sh — debugger v1, end to end. Proves: `orbit debug` builds with
+# debug_test.sh - debugger v1, end to end. Proves: `orbit debug` builds with
 # the call trail and a trapped run (index out of range here) prints the last
 # calls newest-first; breakpoint() reports its enclosing function and, with
 # stdin at EOF, continues instead of hanging; a plain `orbit run` of the same
@@ -15,7 +15,7 @@ ORBIT="$ROOT/dist/orbit.exe"
 [ -x "$ORBIT" ] || { echo "build orbit first: bash tools/build_orbit.sh"; exit 1; }
 WORK="$ROOT/dist/.dbgtest"
 rm -rf "$WORK"; mkdir -p "$WORK"
-fail() { echo "debug_test: FAIL — $1"; exit 1; }
+fail() { echo "debug_test: FAIL - $1"; exit 1; }
 
 cat > "$WORK/prog.or" <<'EOF'
 define inner(n: int) -> int:

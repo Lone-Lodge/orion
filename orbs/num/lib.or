@@ -1,4 +1,4 @@
-# num — the small integer helpers every program reaches for.
+# num - the small integer helpers every program reaches for.
 #
 #   abs(-3)            ->  3
 #   min(4, 9)          ->  4
@@ -96,7 +96,7 @@ public define is_odd(n: int) -> truth:
 # --- floats ---
 
 
-# Real constants — const crosses the orb boundary (a language limit that
+# Real constants - const crosses the orb boundary (a language limit that
 # died when programs became one concatenated compile; `pi` is a VALUE now).
 public const pi = 3.141592653589793
 public const e = 2.718281828459045

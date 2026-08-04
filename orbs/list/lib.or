@@ -1,4 +1,4 @@
-# list — everyday integer-list helpers that don't need a closure.
+# list - everyday integer-list helpers that don't need a closure.
 # (For map / filter / reduce and friends, see the `iter` orb.)
 #
 #   range(4)              ->  [0, 1, 2, 3]

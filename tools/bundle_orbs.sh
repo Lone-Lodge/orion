@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Bundle all orion-self orbs + a driver into one self-contained .or file.
-# Output: dist/orion_self_bundled.or — compiles standalone via orion-self.
+# Output: dist/orion_self_bundled.or - compiles standalone via orion-self.
 #
-# We strip `use X` lines (the bundle is self-contained — no orb resolution
+# We strip `use X` lines (the bundle is self-contained - no orb resolution
 # needed) and concatenate in dependency order: ir → lex → parse →
 # ast_to_ir → emit_llvm → driver.
 #
@@ -21,7 +21,7 @@ mkdir -p "$ROOT/dist"
 
 strip_uses() {
     # Strip `use orion_*` (bundle resolves these internally). Keep
-    # `use bytes`/`use io` — lodge-orion will load them from target/.
+    # `use bytes`/`use io` - lodge-orion will load them from target/.
     grep -v '^use orion_' "$1" || true
 }
 

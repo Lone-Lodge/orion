@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# orb_reference.sh — generate docs/reference.html from the orbs.
+# orb_reference.sh - generate docs/reference.html from the orbs.
 #
 # WHY: the Field Guide names the libraries but shows no signatures. A reader
 # who wants to build something has to read the source to learn what `net` or

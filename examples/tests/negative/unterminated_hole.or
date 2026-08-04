@@ -1,4 +1,4 @@
-# expect: unterminated_hole.or:8:8 — unterminated `{` in a string
+# expect: unterminated_hole.or:8:8 - unterminated `{` in a string
 # This HUNG THE COMPILER FOREVER. `"{{"` opens an interpolation hole whose
 # content lexes to a bare `{`; that reached the map-literal parser, which had no
 # no-progress guard and spun. A hang is worse than any error message, and

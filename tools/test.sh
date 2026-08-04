@@ -1,5 +1,5 @@
 #!/bin/bash
-# orbit test — run the smoke suite. Builds on examples/tests runner.
+# orbit test - run the smoke suite. Builds on examples/tests runner.
 # Filter via first arg: `tools/test.sh sum_types` runs only matching tests.
 
 set -e
@@ -9,7 +9,7 @@ FILTER="${1:-}"
 ORION_BIN="$ROOT/dist/orbit.exe"
 [ -x "$ORION_BIN" ] || { echo "build orbit first: bash tools/build_orbit.sh"; exit 1; }
 
-# POSIX: raise the stack — `orbit run` recurses deep compiling the runner.
+# POSIX: raise the stack - `orbit run` recurses deep compiling the runner.
 # Windows reserves it in the exe at link (/STACK), so this is POSIX-only.
 case "$(uname -s 2>/dev/null || echo unknown)" in
     MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
@@ -23,7 +23,7 @@ if [ -n "$FILTER" ]; then
 fi
 
 rm -rf target dist build 2>/dev/null
-# Stream the runner's per-test rows live (no grep pipe — a pipe both filters
+# Stream the runner's per-test rows live (no grep pipe - a pipe both filters
 # out the progress rows and block-buffers, so nothing showed until the end).
 # The runner prints one line per test as it finishes, then the Pass/Fail summary.
 "$ORION_BIN" run src/main.or main

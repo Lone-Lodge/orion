@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# combo_test.sh — compile every PAIR of language features in one program.
+# combo_test.sh - compile every PAIR of language features in one program.
 #
 # Why pairs: the suite tests features one at a time, and that is exactly how a
 # real bug survived it. Generic call-site instantiation had a passing test, and
-# it was broken by the presence of ANY closure elsewhere in the file — because
+# it was broken by the presence of ANY closure elsewhere in the file - because
 # the lambda pass rebuilt every declaration and dropped the field the generics
 # depended on. Each feature worked. The pair did not, and nothing looked at
 # pairs.
@@ -24,7 +24,7 @@ CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
 RT="$ROOT/runtime/orion_rt.c"
 FILTER="${1:-}"
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 WORK="$ROOT/dist/.combo"
 rm -rf "$WORK"; mkdir -p "$WORK"

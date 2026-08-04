@@ -1,4 +1,4 @@
-# orion_ast_to_wasm — AST → wasm codegen.
+# orion_ast_to_wasm - AST → wasm codegen.
 #
 # Walks the AST produced by `orion_parse::self_parse` and emits wasm
 # bytes via the `orion_emit_wasm` builder API. Each Fn decl in the
@@ -7,7 +7,7 @@
 #
 # Scope today: i32 arithmetic, local vars (params + bindings), if/else
 # blocks, loops, function calls. No strings (those need linear memory
-# allocation), no closures, no traits — these layers come once the
+# allocation), no closures, no traits - these layers come once the
 # core arithmetic pipeline runs orion-self's own files.
 
 use orion_emit_wasm
@@ -22,7 +22,7 @@ use orion_ir
 # declarations become defined functions. Imports take the low function indices;
 # each name's index goes in a `wfn:<name>` slot so calls resolve to the right
 # one, host import or local fn, during body compilation.
-# A 32-bit value as 4 little-endian bytes — the in-memory word layout for
+# A 32-bit value as 4 little-endian bytes - the in-memory word layout for
 # lengths, the bump pointer, and every i32 field or list element.
 define le32(v: int) -> [int]:
     [v % 256, (v // 256) % 256, (v // 65536) % 256, (v // 16777216) % 256]
@@ -2366,7 +2366,7 @@ define scan_program_hostcalls(decls: [table]):
         if get(d, "kind") == "Fn":
             scan_block_hostcalls(get_map(d, "body"))
 
-# Locals table is a flat list of names — index into the list IS the
+# Locals table is a flat list of names - index into the list IS the
 # local index in wasm. push a name and you get its index for free.
 define build_locals(params: [table]) -> [text]:
     edit locals = []
@@ -2374,7 +2374,7 @@ define build_locals(params: [table]) -> [text]:
         locals = append(locals, get(param, "name"))
     locals
 
-# Find a local's wasm index. Returns -1 if not found — caller emits
+# Find a local's wasm index. Returns -1 if not found - caller emits
 # an error-shaped placeholder so the rest of the body compiles.
 define lookup_local(locals: [text], name: text) -> int:
     edit found = 0 - 1
@@ -2574,7 +2574,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                     if get(value_node, "kind") == "Int":
                         litv = parse_decimal(get(value_node, "value"))
                         if not w_int_fits(litv, dtname):
-                            compile_error("orion: ERROR — the literal {litv} does not fit `{dtname}` (write `{litv} as {dtname}` to wrap it deliberately)")
+                            compile_error("orion: ERROR - the literal {litv} does not fit `{dtname}` (write `{litv} as {dtname}` to wrap it deliberately)")
                     value_node = {"kind": "Cast", "expr": value_node, "type": dtn}
             # A lambda binding names a synthesized top-level fn; the local holds a
             # placeholder int (calls dispatch via lam:<name>).
@@ -2676,7 +2676,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                         edit loop_out_locals = locals
                         loop_out_locals = get(body_res, "locals")
                         end_inner = emit_op(body_fn, op_end())
-                        # `br 0` — branch back to loop start
+                        # `br 0` - branch back to loop start
                         with_br0 = emit_op(end_inner, op_br())
                         with_zero = emit_bytes(with_br0, [0])
                         with_end_loop = emit_op(with_zero, op_end())
@@ -2713,7 +2713,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             with_end_if = emit_op(else_fn, op_end())
                             {"fn": with_end_if, "locals": if_out_locals}
                         else if kind == "ForRange":
-                            # `loop v in low..<high:` — counter loop lowered to
+                            # `loop v in low..<high:` - counter loop lowered to
                             # block { loop { br_if exit when done; body; v++ } }.
                             var_name = get(stmt, "var")
                             existing = lookup_local(locals, var_name)
@@ -2767,7 +2767,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             f = emit_op(f, op_end())
                             {"fn": f, "locals": cur_locals}
                         else if kind == "ForIn":
-                            # `loop x in xs:` — iterate a list. Evaluate xs once
+                            # `loop x in xs:` - iterate a list. Evaluate xs once
                             # into a hidden pointer local, walk a hidden index from
                             # 0 to len, bind the element (and optional index var)
                             # each pass. Hidden locals are numbered so nested
@@ -2790,7 +2790,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             # variable's type and the element stride.
                             iter_et = w_elem_type(get_map(stmt, "iter"))
                             in_stride = if iter_et == "f" then 8 else 4
-                            # The loop variable — reuse its slot if already bound.
+                            # The loop variable - reuse its slot if already bound.
                             var_name = get(stmt, "var")
                             slot_set("ltype:{var_name}", iter_et)
                             edit var_idx = lookup_local(cur_locals, var_name)
@@ -2879,15 +2879,15 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             {"fn": rq6, "locals": locals}
                         else if kind == "Example":
                             # `example` lines are documentation the BUILD runs
-                            # (tools/example_check.sh), not code — they lower
+                            # (tools/example_check.sh), not code - they lower
                             # to nothing here exactly as they do natively.
                             {"fn": fn_value, "locals": locals}
                         else:
-                            # Unsupported statement — report and pass through.
-                            compile_error("orion: ERROR — the wasm backend does not support `{kind}` statements yet")
+                            # Unsupported statement - report and pass through.
+                            compile_error("orion: ERROR - the wasm backend does not support `{kind}` statements yet")
                             {"fn": fn_value, "locals": locals}
 
-# Compile an expression — pushes its result on the wasm stack.
+# Compile an expression - pushes its result on the wasm stack.
 define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
     kind = get(expr_node, "kind")
     if kind == "Int":
@@ -2941,7 +2941,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                 if vcapn == 0:
                     emit_const(fn_value, slot_get_int("wfn:{vlfn}"))
                 else:
-                    compile_error("orion: ERROR — the wasm backend does not support passing the capturing closure `{name}` as a value (only non-capturing lambdas and top-level fns)")
+                    compile_error("orion: ERROR - the wasm backend does not support passing the capturing closure `{name}` as a value (only non-capturing lambdas and top-level fns)")
                     emit_const(fn_value, 0)
             else if index >= 0:
                 emit_local_get(fn_value, index)
@@ -2952,7 +2952,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                 # A bare function name used as a value: its identity-table index.
                 emit_const(fn_value, slot_get_int("wfn:{name}"))
             else:
-                # Unknown identifier — push 0 as placeholder
+                # Unknown identifier - push 0 as placeholder
                 emit_const(fn_value, 0)
         else:
             if kind == "Binary":
@@ -2970,14 +2970,14 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                     # text equality is by CONTENT (__streq), not pointer: two
                     # separate "hi" literals live at different addresses. A side
                     # typed 'i' here is a text POINTER (e.g. a map value read by
-                    # get), so pass it straight to __streq — do not int_to_text it.
+                    # get), so pass it straight to __streq - do not int_to_text it.
                     wl = compile_as_text(fn_value, left, "t", locals)
                     wr = compile_as_text(wl, right, "t", locals)
                     weq = emit_call(wr, slot_get_int("wfn:__streq"))
                     if op == "!=" then emit_op(weq, op_i32_eqz()) else weq
                 else if lt == "f" or rt == "f" or op == "/":
                     # f64 op: promote each side (int / i64 / f32) to f64 first.
-                    # `/` ALWAYS routes here — real division whatever the
+                    # `/` ALWAYS routes here - real division whatever the
                     # operands (the flip); integer division is `//`.
                     wl = w_to_f64(compile_expr(fn_value, left, locals), lt)
                     wr = w_to_f64(compile_expr(wl, right, locals), rt)
@@ -3005,7 +3005,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                     if w_is_cmp(op) then wop else w_emit_mask(wop, rc)
             else:
                 if kind == "Call":
-                    # Calling a host fn or another local fn — for now assume host index 0.
+                    # Calling a host fn or another local fn - for now assume host index 0.
                     args = get_list(expr_node, "args")
                     callee = get(expr_node, "callee")
                     if callee == "len":
@@ -3089,7 +3089,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                     # Bytes are a `[int]` list here, the same as natively: one
                     # i32 element per byte. Text stays the packed [len][u8 ...]
                     # form, so the two bytes_*_text calls are real conversions
-                    # rather than the identity they used to be — that identity
+                    # rather than the identity they used to be - that identity
                     # was the whole "wasm bytes are different" gap, and it made
                     # any code that BUILT bytes from computed ints (encoding,
                     # text case mapping) read the wrong layout.
@@ -3260,7 +3260,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             with_fidx = emit_local_get(current_fn, lookup_local(locals, callee))
                             emit_call_indirect(with_fidx, 0)
                         else:
-                            compile_error("orion: ERROR — the wasm backend does not support calling `{callee}` (unknown function or unsupported builtin)")
+                            compile_error("orion: ERROR - the wasm backend does not support calling `{callee}` (unknown function or unsupported builtin)")
                             current_fn
                 else:
                     if kind == "If":
@@ -3331,7 +3331,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                                  else wcv
                             w_emit_mask(wi, tc)
                         else:
-                            compile_error("orion: ERROR — the wasm backend does not support `as {ctype}` yet")
+                            compile_error("orion: ERROR - the wasm backend does not support `as {ctype}` yet")
                             emit_const(fn_value, 0)
                     else if kind == "Str":
                         # Record the literal for a data segment; push its pointer.
@@ -3507,13 +3507,13 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                     else if kind == "Index":
                         idxnode = get_map(expr_node, "index")
                         if type_of(idxnode) == "t":
-                            # m["key"] — a text index means a map lookup by key.
+                            # m["key"] - a text index means a map lookup by key.
                             wmp = compile_expr(fn_value, get_map(expr_node, "object"), locals)
                             wky = compile_as_text(wmp, idxnode, "t", locals)
                             emit_call(wky, slot_get_int("wfn:__map_get"))
                         else:
                             # x[i] loads element i: mem[ptr + 4 + i*stride], with a
-                            # bounds check first — an out-of-range index traps
+                            # bounds check first - an out-of-range index traps
                             # (unreachable) rather than reading adjacent memory, the
                             # same loud failure the native backend gives.
                             iet = w_elem_type(get_map(expr_node, "object"))
@@ -3732,7 +3732,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         # __handler_Effect_op (the parser turns `handle` into a
                         # plain Fn with that name). Its return value is what perform
                         # yields, whether the handler returned normally or called
-                        # resume(v) — one-shot effects, same as the native path.
+                        # resume(v) - one-shot effects, same as the native path.
                         effect_name = get(expr_node, "effect")
                         op_name = get(expr_node, "op")
                         hname = "__handler_{effect_name}_{op_name}"
@@ -3742,13 +3742,13 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                                 pcur = compile_expr(pcur, parg, locals)
                             emit_call(pcur, slot_get_int("wfn:{hname}"))
                         else:
-                            compile_error("orion: ERROR — the wasm backend found no handler for `perform {effect_name}.{op_name}` (define `handle {effect_name}.{op_name}`)")
+                            compile_error("orion: ERROR - the wasm backend found no handler for `perform {effect_name}.{op_name}` (define `handle {effect_name}.{op_name}`)")
                             emit_const(fn_value, 0)
                     else:
                         # Unsupported expression: report it so the driver refuses
                         # to write invalid wasm (push 0 keeps the stack balanced
                         # so compilation can continue and collect more errors).
-                        compile_error("orion: ERROR — the wasm backend does not support `{kind}` expressions yet")
+                        compile_error("orion: ERROR - the wasm backend does not support `{kind}` expressions yet")
                         emit_const(fn_value, 0)
 
 # A type node -> 'f' for f64/float, 'i' for everything else (i32 or pointer).
@@ -4138,7 +4138,7 @@ define emit_binop(fn_value: WFn, op: text) -> WFn:
         # Unknown op: add, so the stack stays balanced.
         emit_op(fn_value, op_i32_add())
 
-# Parse a decimal integer string (no error handling — invalid input
+# Parse a decimal integer string (no error handling - invalid input
 # returns 0). The Orion `str_to_int` builtin handles edge cases.
 define parse_decimal(text: text) -> int:
     bs = bytes_from_text(text)

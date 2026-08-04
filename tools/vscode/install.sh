@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — copy this extension into the local VS Code extensions dir.
+# install.sh - copy this extension into the local VS Code extensions dir.
 #
 # The extension SOURCE lives here, in the repo. It used to live only in the
 # installed copy under ~/.vscode/extensions, which is how its grammar and its
@@ -21,7 +21,7 @@ if [ ! -d "$DEST/node_modules" ]; then
         cp -r "$PREV/node_modules" "$DEST/"
         echo "  reused node_modules from $(basename "$PREV")"
     else
-        echo "  NOTE: no node_modules — run 'npm install vscode-languageclient' in $DEST"
+        echo "  NOTE: no node_modules - run 'npm install vscode-languageclient' in $DEST"
     fi
 fi
 echo "installed -> $DEST"

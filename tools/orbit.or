@@ -1,26 +1,17 @@
-# orbit — Orion project tool, self-hosted. Compiled by orion.exe, linked
+# orbit - Orion project tool, self-hosted. Compiled by orion.exe, linked
 # with orion_cli.c + orion_rt.c. No lodge-orion, no interpreter.
 use os
 use text
 
-# orbit — Orion's project tool, written in Orion.
-#
-# `new` and `add` are pure Orion (filesystem + TOML manipulation).
-# `build`/`run`/`test` still need the Rust parser/typeck/interpreter,
-# so they call into a tiny set of `__os_orbit_*` primitives that
-# orbit.rs supplies. Once Orion has its own parser/interpreter
-# written in Orion (step 4–6 of the self-hosting plan) those
-# primitives go away and orbit becomes 100 % pure Orion.
-
-# build/run/test are now pure Orion (see cli_build below) — they compile
-# with orion.exe + clang and run the native exe. No Rust interp left.
+# build/run/test are pure Orion (see cli_build below): they compile with
+# orion.exe + clang and run the native exe. No Rust interpreter left.
 external define orion_console_color() -> int
 external define host_self_exe() -> text
 external define host_subdirs(dir: text) -> text
 
 # Self-locating toolchain: orbit and orion.exe ship together in <root>/dist,
 # with the runtime at <root>/runtime. Derive both from orbit's OWN path so a
-# project never has to hard-code the engine location — the workspace can sit
+# project never has to hard-code the engine location - the workspace can sit
 # in any folder layout. Falls back to the legacy sibling default when the
 # self-path is unavailable (or a toml can still override explicitly).
 define self_dist_dir() -> text:
@@ -94,16 +85,7 @@ define second_param() -> text:
     if arg_count() < 4 then "" else arg(3)
 
 define nb_int(t: text, fallback: int) -> int:
-    bs = bytes_from_text(t)
-    n = len(bs)
-    if n == 0:
-        return fallback
-    edit v = 0
-    loop i in 0..<n:
-        c = at(bs, i)
-        if c >= 48 and c <= 57:
-            v = v * 10 + (c - 48)
-    v
+    if t == "" then fallback else int_from_text(t)
 
 # ---------- usage / die ----------
 
@@ -147,7 +129,7 @@ define die(message: text):
     eprint(c_red(message))
     exit_with(1)
 
-# ---------- list helpers (no `contains` in stdlib yet) ----------
+# ---------- list helpers (the builtin `contains` is text-only) ----------
 
 define list_contains(haystack: [text], needle: text) -> truth:
     total = len(haystack)
@@ -196,7 +178,7 @@ define find_template(kind: text) -> text:
 # nested-if-in-for parser bug fmt_walk works around.
 define copy_template(src_dir: text, dst_dir: text, name: text, packages: text):
     mkdir_all(dst_dir)
-    # Files: list_dir. Directories: host_subdirs — the same split
+    # Files: list_dir. Directories: host_subdirs - the same split
     # scan_orb_dirs relies on, since list_dir does not report subdirs.
     entries = list_dir(src_dir)
     entry_count = len(entries)
@@ -235,14 +217,14 @@ define packages_path() -> text:
 define cmd_new_app(name: text):
     template = find_template("app")
     if template == "":
-        die("orbit: no `templates/app` found in this workspace — is the engine present?")
+        die("orbit: no `templates/app` found in this workspace - is the engine present?")
     copy_template(template, name, name, packages_path())
     print_line("created `" + name + "` (atlas app)")
     print_line("  " + name + ".toml          window + config")
     print_line("  features/Fire/        one slice: state + rules + view")
     print_line("  gates/smoke/          a headless proof")
     print_line("")
-    print_line("An app is all declarative — no src/, no .or. The folder layout is")
+    print_line("An app is all declarative - no src/, no .or. The folder layout is")
     print_line("YOURS: any .astra at any depth is a bundle and its path is its")
     print_line("identity, so features are folders, not filename prefixes. The")
     print_line("engine asks only that a bundle holds a TREE or RULES, never both.")
@@ -276,11 +258,11 @@ define cmd_new_orb(name: text):
 # ---------- add ----------
 
 # Insert `<orb_name> = "stdlib"` under the [orbs] section. If the section
-# doesn't exist we append one — matches what the old Rust impl did.
+# doesn't exist we append one - matches what the old Rust impl did.
 define insert_orb_line(existing: text, orb_name: text) -> text:
     new_line = orb_name + " = \"stdlib\"\n"
     if contains(existing, "[orbs]"):
-        # Append after the [orbs] marker — simple text manipulation, no
+        # Append after the [orbs] marker - simple text manipulation, no
         # full TOML round-trip needed for this case.
         existing + new_line
     else:
@@ -294,9 +276,9 @@ define cmd_add():
     if not list_contains(known, orb_name):
         die("orbit: unknown orb `" + orb_name + "`")
     if not file_exists("Orbit.toml"):
-        die("orbit: no Orbit.toml in this directory — run `orbit new` first")
+        die("orbit: no Orbit.toml in this directory - run `orbit new` first")
     existing = read_file("Orbit.toml")
-    # Crude "already there" check — looks for `<name> =` after a newline.
+    # Crude "already there" check - looks for `<name> =` after a newline.
     needle = "\n" + orb_name + " ="
     if contains(existing, needle):
         print_line(orb_name + ": already an orb")
@@ -312,7 +294,7 @@ define resolve_path() -> text:
     edit path = candidate
     if candidate == "":
         path = "src/main.or"
-        # Zero-glue projects have no src/main.or — synthesize the
+        # Zero-glue projects have no src/main.or - synthesize the
         # entry here too, so check/build/test match native/play.
         if not file_exists("src/main.or") and file_exists("Orbit.toml"):
             lines = nb_lines(read_file("Orbit.toml"))
@@ -331,7 +313,7 @@ define cmd_build():
         print_line(c_bold(exe) + " " + c_green("ok"))
 
 define cmd_run():
-    # `orbit run [file.or] [fn] [args...]` — file defaults to src/main.or,
+    # `orbit run [file.or] [fn] [args...]` - file defaults to src/main.or,
     # fn defaults to main. Bare `orbit run` in a project dir Just Works.
     second = first_param()
     has_path = ends_with(second, ".or")
@@ -341,7 +323,7 @@ define cmd_run():
     rest = args_after(fname_index + 1)
     exit_with(__os_orbit_run(path, fname, rest))
 
-# `orbit debug [file.or] [fn] [args...]` — exactly `orbit run`, but the build
+# `orbit debug [file.or] [fn] [args...]` - exactly `orbit run`, but the build
 # carries the call trail: every define's entry is recorded (last 64 kept), and
 # a crash, a require/index trap, or a breakpoint() in the source prints them
 # newest-first. `breakpoint()` also pauses on a terminal (Enter continues,
@@ -358,7 +340,7 @@ define cmd_test():
 
 # ---------- fmt ----------
 #
-# Conservative whitespace formatter — doesn't need a real parser.
+# Conservative whitespace formatter - doesn't need a real parser.
 # Operations: tabs → 4 spaces, trailing whitespace stripped, runs of
 # blank lines collapsed to one, file ends with exactly one newline.
 # A "real" formatter that rewrites expressions / re-indents blocks
@@ -427,7 +409,7 @@ define fmt_walk(directory: text):
         entry_name = at(entries, index)
         full_path = path_join(directory, entry_name)
         is_directory_entry = is_dir(full_path)
-        # Skip target/ — generated output we don't want to rewrite.
+        # Skip target/ - generated output we don't want to rewrite.
         should_recurse = is_directory_entry and entry_name != "target"
         should_format = (not is_directory_entry) and ends_with(entry_name, ".or")
         if should_recurse:
@@ -439,7 +421,7 @@ define fmt_one_file(file_path: text):
     original = read_file(file_path)
     normalized = fmt_normalize(original)
     if normalized == original:
-        # No-op file — don't even rewrite. Keeps mtimes stable.
+        # No-op file - don't even rewrite. Keeps mtimes stable.
         print_line("  unchanged " + file_path)
     else:
         write_file(file_path, normalized)
@@ -488,7 +470,7 @@ define nb_setting(lines: [text], key: text, fallback: text) -> text:
     found
 
 # The `path:` orb dirs a toml names, each resolved against `base` (the dir
-# of the toml being read) so nested tomls compose — a dep written relative
+# of the toml being read) so nested tomls compose - a dep written relative
 # to its own orb becomes relative to the project root as we descend. `base`
 # "" means the current project (paths already root-relative).
 define nb_dep_dirs(lines: [text], base: text) -> [text]:
@@ -504,7 +486,7 @@ define nb_dep_dirs(lines: [text], base: text) -> [text]:
         if contains(line, "\"git:"):
             # A fetched package lives in the PROJECT's orbs_pkg/, wherever
             # the toml naming it sits (transitive git deps are hoisted flat
-            # by `orbit get`) — so this is cwd-relative, not base-relative.
+            # by `orbit get`) - so this is cwd-relative, not base-relative.
             gdir = "orbs_pkg/" + dep_key(line)
             if not list_contains(out, gdir):
                 out = append(out, gdir)
@@ -521,7 +503,7 @@ define nb_dep_dirs(lines: [text], base: text) -> [text]:
 # A package repo IS one orb: lib.or at its root, plus its own Orbit.toml
 # when it has dependencies of its own. `orbit get` clones each dep into
 # orbs_pkg/<name>/ and pins the exact commit in Orbit.lock, so the next
-# `orbit get` — on any machine — checks out the same code. `orbit update
+# `orbit get` - on any machine - checks out the same code. `orbit update
 # [name]` refetches at the ref's newest commit and rewrites the lock.
 # Transitive git deps are fetched FLAT into the same orbs_pkg/ (first name
 # wins), which is also how they resolve at build time. No registry, no
@@ -584,7 +566,7 @@ define pkg_head(dir: text) -> text:
     trim(capture_stdout("git", ["-C", dir, "rev-parse", "HEAD"]))
 
 # Fetch one package. An existing dir is left EXACTLY as it is (get never
-# moves code under you — that is update's job). A locked commit gets a full
+# moves code under you - that is update's job). A locked commit gets a full
 # clone + checkout (the commit may be far behind the ref); an unlocked ref
 # gets a shallow clone of just that ref. Returns the checked-out commit,
 # "" when git failed.
@@ -622,7 +604,7 @@ define cmd_get():
         print_line("orbit: no git deps in Orbit.toml")
         return
     edit seen = []
-    edit lock_out = ["# orbit lock — the exact commit of every fetched package."]
+    edit lock_out = ["# orbit lock - the exact commit of every fetched package."]
     lock_out = append(lock_out, "# `orbit get` reproduces these; `orbit update [name]` moves them.")
     edit failures = 0
     edit idx = 0
@@ -653,14 +635,14 @@ define cmd_get():
     if failures > 0:
         exit_with(1)
 
-# Drop the chosen package dirs and their lock rows, then get fresh — the
+# Drop the chosen package dirs and their lock rows, then get fresh - the
 # refetch lands on the ref's newest commit and the lock is rewritten.
 define cmd_update():
     target = first_param()
     if not file_exists("Orbit.toml"):
         die("orbit: no Orbit.toml in this directory")
     rows = lock_rows()
-    edit kept = ["# orbit lock — the exact commit of every fetched package."]
+    edit kept = ["# orbit lock - the exact commit of every fetched package."]
     kept = append(kept, "# `orbit get` reproduces these; `orbit update [name]` moves them.")
     loop i in 0..<len(rows):
         parts = split(at(rows, i), " ")
@@ -694,7 +676,7 @@ define nb_expand_orb(orb_dir: text, acc: [text]) -> [text]:
 # without the consuming executable re-declaring log. So expand the project's
 # direct deps transitively, then map each orb dir to its parent (the search
 # root) plus that root's orbs_native sibling (native backends win clashes).
-# Walk up (relatively) from the project dir to the workspace root — the dir
+# Walk up (relatively) from the project dir to the workspace root - the dir
 # holding a `.orbit` marker. Returns the relative prefix (".", "./..",
 # "./../.." …) or "" if none. This is what frees the layout: drop `.orbit`
 # at the root and every project below it resolves orbs by NAME, wherever
@@ -714,7 +696,7 @@ define find_workspace_root() -> text:
 define scan_noise(name: text) -> truth:
     name == "build" or name == "dist" or name == "target" or name == ".git" or name == "node_modules" or name == "assets" or name == "saves" or name == "docs" or name == "examples"
 
-# Every `orbs` / `orbs_native` directory under `root` (depth-bounded) — the
+# Every `orbs` / `orbs_native` directory under `root` (depth-bounded) - the
 # exact search dirs the compiler needs to resolve `use X` by name, so a
 # project's [orbs] can list names with no paths.
 define scan_orb_dirs(dir: text, depth: int, acc: [text]) -> [text]:
@@ -763,7 +745,7 @@ define nb_orb_dirs(lines: [text]) -> [text]:
         scanned = scan_orb_dirs(root, 0, [])
         # Native backends win name clashes (a game wants orbs_native/atlas_render,
         # not the wgpu orbs/atlas_render), so add every orbs_native search dir
-        # BEFORE the plain orbs ones — mirroring the path-based order above.
+        # BEFORE the plain orbs ones - mirroring the path-based order above.
         loop n_index in 0..<len(scanned):
             nd = at(scanned, n_index)
             if contains(nd, "orbs_native") and not list_contains(dirs, nd):
@@ -776,7 +758,7 @@ define nb_orb_dirs(lines: [text]) -> [text]:
 
 define nb_clang() -> text:
     # POSIX: clang is on PATH. Windows: prefer PATH, else the default LLVM dir
-    # (`where` is a Windows builtin — it doesn't exist on Linux/Mac, so the
+    # (`where` is a Windows builtin - it doesn't exist on Linux/Mac, so the
     # probe must be Windows-gated or it returns the wrong fallback).
     if os_kind() != 0:
         return "clang"
@@ -838,7 +820,7 @@ define nb_ship_files(name: text) -> text:
 
 # ZERO-GLUE: a game is scripts/ + a toml. When src/main.or is absent,
 # orbit synthesizes the entry (project_run with the package name as
-# config + prefix). An existing src/main.or wins — custom host glue
+# config + prefix). An existing src/main.or wins - custom host glue
 # is an opt-in escape hatch, not a requirement.
 define entry_path(name: text) -> text:
     if file_exists("src/main.or"):
@@ -852,7 +834,7 @@ define entry_path(name: text) -> text:
 
 # Platform link config, keyed by target OS (0 = Windows, 1 = Linux, 2 =
 # macOS). Windowed builds are HOST-selected: you build ON the platform you
-# target (no cross-compile flag — that needs a target sysroot). Adding a
+# target (no cross-compile flag - that needs a target sysroot). Adding a
 # platform = adding its row here + its *_min.c backends under runtime/. An
 # empty c-file set means that platform has no GUI backend yet, and
 # build_native_entry stops with a clear message instead of a link error.
@@ -883,7 +865,7 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     compiler = nb_setting(lines, "compiler", default_compiler())
     runtime = nb_setting(lines, "runtime", default_runtime())
     if not file_exists(compiler):
-        die("orbit: native compiler not found at `" + compiler + "` — set [native] compiler in Orbit.toml")
+        die("orbit: native compiler not found at `" + compiler + "` - set [native] compiler in Orbit.toml")
     mkdir_all("build")
     suffix = if variant == "" then "" else "_" + variant
     exe = "build/" + name + suffix + ".exe"
@@ -899,11 +881,11 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     # Both renderers always link; ogpu_min.c dispatches at og_init from the
     # game toml's `renderer = auto|gdi|gpu` (default auto). The backend C set
     # is host-selected (platform_c_files) so a Linux/macOS host picks its own
-    # once those *_min.c land — no cross-compile flag, you build on-target.
+    # once those *_min.c land - no cross-compile flag, you build on-target.
     target = os_kind()
     cfiles = platform_c_files(runtime, target)
     if len(cfiles) == 0:
-        die("orbit: no GUI backend for " + target_name(target) + " yet — build on Windows, or add runtime/*_min.c backends for " + target_name(target) + " (see BUILD.md)")
+        die("orbit: no GUI backend for " + target_name(target) + " yet - build on Windows, or add runtime/*_min.c backends for " + target_name(target) + " (see BUILD.md)")
     edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/net_min.c"]
     loop cf_index in 0..<len(cfiles):
         link_args = append(link_args, at(cfiles, cf_index))
@@ -919,11 +901,11 @@ define build_native_entry(variant: text, entry_override: text) -> text:
             if rc_rc == 0:
                 link_args = append(link_args, "build/" + name + ".res")
             else:
-                print_line(c_dim("orbit: llvm-rc failed — shipping without icon"))
+                print_line(c_dim("orbit: llvm-rc failed - shipping without icon"))
     link_args = append(link_args, "-Os")
-    # Big stack (Windows default is 1 MB). The render path nests deep —
+    # Big stack (Windows default is 1 MB). The render path nests deep -
     # astra eval recursion, render_bundle, the glyph rasterizer, all under
-    # the supervisor's setjmp frames — and overflows the 1 MB default (a
+    # the supervisor's setjmp frames - and overflows the 1 MB default (a
     # "writing address 0x0" fault in a function prologue). cli_build already
     # does this for the compiler; the game needs it just as much. Windows
     # only: POSIX raises the stack via ulimit at run time.
@@ -952,7 +934,7 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     if variant == "ship":
         remove_file("build/scripts_embed.c")
         # Stage under build/ship/ as <name>.exe (never clobbers the
-        # dev exe) and zip it — the artifact you drag to itch.
+        # dev exe) and zip it - the artifact you drag to itch.
         mkdir_all("build/ship")
         zip_rc = run_command("powershell", ["-NoProfile", "-Command", "Copy-Item build/" + name + "_ship.exe build/ship/" + name + ".exe -Force; Compress-Archive -Force -Path build/ship/" + name + ".exe -DestinationPath build/" + name + "-win64.zip"])
         if zip_rc == 0:
@@ -962,8 +944,8 @@ define build_native_entry(variant: text, entry_override: text) -> text:
 
 # ---------- native build/run/test (replaces the old Rust interp path) ----------
 #
-# Compile `path` with orion.exe — CLI runtime only (orion_rt.c + orion_cli.c),
-# no window/gpu/audio — link, and return the exe path (or "" on failure).
+# Compile `path` with orion.exe - CLI runtime only (orion_rt.c + orion_cli.c),
+# no window/gpu/audio - link, and return the exe path (or "" on failure).
 # The file's own `main` is the entry, so callers pass fname == "main" (test.sh,
 # cubsy, the bundle smoke all do). 64MB stack: `orbit run` on the compiler
 # bundle recurses deep; harmless for small programs.
@@ -1011,7 +993,7 @@ define cli_build(path: text) -> text:
         exe = "build/" + name + "_cli.exe"
         dirs = nb_orb_dirs(lines)
     if not file_exists(compiler):
-        die("orbit: compiler not found at `" + compiler + "` — set [native] compiler in Orbit.toml")
+        die("orbit: compiler not found at `" + compiler + "` - set [native] compiler in Orbit.toml")
     edit compile_args = [path, ll]
     dir_total = len(dirs)
     loop d_index in 0..<dir_total:
@@ -1033,13 +1015,13 @@ define cli_build(path: text) -> text:
         edit txt = read_file(ll)
         # Anchor to the header context so we never rewrite a same-looking
         # substring inside a program string constant (that would desync the
-        # constant's LLVM [N x i8] length prefix — e.g. this file itself
+        # constant's LLVM [N x i8] length prefix - e.g. this file itself
         # carries the Windows-triple literal to do exactly this retarget).
         txt = replace(txt, "datalayout = \"e-m:w", "datalayout = \"e-m:" + mangle)
         txt = replace(txt, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"" + triple + "\"")
         write_file(ll, txt)
     # /STACK is a Windows PE linker flag; POSIX raises the stack via ulimit
-    # (Linux) or a link-time flag (macOS — main-thread stack is capped there).
+    # (Linux) or a link-time flag (macOS - main-thread stack is capped there).
     # -Wno-override-module silences the retargeted-triple note (no-op on Win).
     edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module"]
     if os_kind() == 0:
@@ -1069,7 +1051,7 @@ define __os_orbit_test(path: text) -> int:
         return 1
     run_command(exe, [])
 
-# The stdlib orb names — every orb under the project's declared orb dirs.
+# The stdlib orb names - every orb under the project's declared orb dirs.
 # Used only by `orbit add` to validate `<orb>`.
 define __os_orbit_stdlib_orbs() -> [text]:
     edit out = []
@@ -1092,7 +1074,7 @@ define cmd_native():
         die("usage: orbit native [gpu|ship]")
     build_native(variant)
 
-# Free a locked exe — a running instance blocks the relink. Best-effort:
+# Free a locked exe - a running instance blocks the relink. Best-effort:
 # nothing running is not an error, so the result is ignored. Windows kills
 # by image name, POSIX by command match.
 define kill_running(name: text):
@@ -1101,12 +1083,12 @@ define kill_running(name: text):
     else:
         run_command("pkill", ["-f", name])
 
-# orbit dev [mode] — THE build-and-run loop for a windowed app, one command
+# orbit dev [mode] - THE build-and-run loop for a windowed app, one command
 # on any host (no _gpu dance, no PowerShell): free the locked exe, build
 # native under the canonical name, gate on the headless reference check,
 # then launch. `.astra` edits hot-reload live, so this is only needed after
 # engine/orb changes. The check gate assumes the app's main.or routes a
-# `check` arg to project_check (see atlas-editor/src/main.or) — set
+# `check` arg to project_check (see atlas-editor/src/main.or) - set
 # `[dev] check = 0` in Orbit.toml to skip it.
 define cmd_dev():
     if not file_exists("Orbit.toml"):
@@ -1119,16 +1101,16 @@ define cmd_dev():
     if nb_setting(lines, "check", "1") != "0":
         # A broken show/bind/parent fails HERE, before a window opens.
         if run_command(exe, ["check"]) != 0:
-            die("orbit dev: reference check failed — fix the above, not launched")
+            die("orbit dev: reference check failed - fix the above, not launched")
     edit launch = []
     if mode != "":
         launch = append(launch, mode)
     exit_with(run_command(exe, launch))
 
-# orbit shot [out.bmp] — headless one-frame render to a BMP via the software
+# orbit shot [out.bmp] - headless one-frame render to a BMP via the software
 # backend. Builds the app, then runs its `shot` subcommand. No window opens:
 # a safe screenshot (only the app's own framebuffer, never the desktop) and a
-# way to eyeball layout in CI — the same OS-independent pixel path a Linux or
+# way to eyeball layout in CI - the same OS-independent pixel path a Linux or
 # e-ink present step builds on.
 define cmd_shot():
     if not file_exists("Orbit.toml"):
@@ -1141,7 +1123,7 @@ define cmd_shot():
 # emits/spawns, optionally filtered ("orbit facts score" = which
 # rules touch score).
 # usage: orbit facts [name]
-# orbit memfacts — every slot store in THIS build whose value shape has no
+# orbit memfacts - every slot store in THIS build whose value shape has no
 # copier at the persistence boundary. Those are the sites that abort instead of
 # evacuating if the value turns out to be region-born, and the compiler knows
 # all of them statically. The build already prints the count next to its
@@ -1172,7 +1154,7 @@ define cmd_facts():
 
 # ---- Static analysis commands: the why-engine and scheduler surface,
 # now reachable from the CLI (the project_ functions shipped but were
-# only gate-tested; this wires them). All read declared facts — no
+# only gate-tested; this wires them). All read declared facts - no
 # playthrough needed. why/affects take a symbol; schedule/liveness don't.
 define synth_analysis(fn_name: text, gen: text, arg: text):
     lines = nb_lines(read_file("Orbit.toml"))
@@ -1185,23 +1167,23 @@ define synth_analysis(fn_name: text, gen: text, arg: text):
     exe = build_native_entry(gen, "target/" + gen + "_gen.or")
     exit_with(run_command(exe, []))
 
-# usage: orbit why <symbol> — the backward causal chain to <symbol>.
+# usage: orbit why <symbol> - the backward causal chain to <symbol>.
 define cmd_why():
     synth_analysis("project_why", "why", first_param())
 
-# usage: orbit affects <symbol> — the forward ripple <symbol> causes.
+# usage: orbit affects <symbol> - the forward ripple <symbol> causes.
 define cmd_affects():
     synth_analysis("project_affects", "affects", first_param())
 
-# usage: orbit schedule — hazard-free parallel batches from facts.
+# usage: orbit schedule - hazard-free parallel batches from facts.
 define cmd_schedule():
     synth_analysis("project_schedule", "schedule", "")
 
-# usage: orbit liveness — dead-write audit.
+# usage: orbit liveness - dead-write audit.
 define cmd_liveness():
     synth_analysis("project_liveness", "liveness", "")
 
-# usage: orbit doc [filter] — rules' behavior projected from declared
+# usage: orbit doc [filter] - rules' behavior projected from declared
 # facts (reads/writes/emits). `orbit doc score` filters to one resource.
 # The "*" sentinel keeps the no-filter case on synth_analysis's 3-arg path.
 define cmd_doc():
@@ -1243,7 +1225,7 @@ define cmd_soak():
     exe = build_native_entry("soak", "target/soak_gen.or")
     exit_with(run_command(exe, []))
 
-# Guard-style split — an else after a nested if binds to the inner
+# Guard-style split - an else after a nested if binds to the inner
 # one (interp parser dangling-else).
 define cmd_play():
     mode = first_param()

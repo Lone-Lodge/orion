@@ -4,6 +4,6 @@ define main() -> int:
     tail = bytes_slice(bs, 6, 11)
     joined = bytes_concat(head, bytes_concat(bytes_from_text(" "), tail))
     out = bytes_to_text(joined)
-    # "hello world" — 11 chars, but our test compares len
+    # "hello world" - 11 chars, but our test compares len
     n = len(out)
     n + 31

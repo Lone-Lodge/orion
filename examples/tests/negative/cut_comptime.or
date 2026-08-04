@@ -1,4 +1,4 @@
-# expect: cut_comptime.or:6:27 — `comptime` was cut
+# expect: cut_comptime.or:6:27 - `comptime` was cut
 # `comptime` was accepted in exactly one position (`= comptime EXPR`) where it
 # was skipped and did nothing, while the docs listed "comptime constant folding"
 # under what works. `const NAME = expr` really is folded at its read sites, so

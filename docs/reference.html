@@ -30,7 +30,6 @@
 <li><a href="#net"><code>net</code></a></li>
 <li><a href="#os"><code>os</code></a></li>
 <li><a href="#async"><code>async</code></a></li>
-<li><a href="#scheduler"><code>scheduler</code></a></li>
 <li><a href="#timer"><code>timer</code></a></li>
 <li><a href="#result"><code>result</code></a></li>
 <li><a href="#option"><code>option</code></a></li>
@@ -182,17 +181,7 @@
 <div class="fn"><code class="sig">list_dirs(dir: text) -&gt; [text] uses files = split(orion_dir_subdirs(dir), "\n")</code><p>no example: depends on the filesystem - proven by tools/orbstat.or</p></div>
 <div class="fn"><code class="sig">arguments() -&gt; [text]</code><p>The command line as ONE list of text - <code>arguments()</code> replaces argc()/argv(i) (the literal C names).</p></div>
 <h2 id="async"><code>async</code></h2>
-<p class="orb-blurb">cooperative async helpers built on the new timing primitives.</p>
-<div class="fn"><code class="sig">sleep_until(deadline_ms: int) uses clock</code><p>Sleep until the monotonic clock reaches <code>deadline_ms</code>.</p></div>
-<div class="fn"><code class="sig">delay(duration_ms: int) uses clock</code><p>Sleep for at least <code>duration_ms</code>.</p></div>
-<div class="fn"><code class="sig">deadline_from_now(offset_ms: int) -&gt; int uses clock</code><p>Return the monotonic clock value <code>offset_ms</code> from now.</p></div>
-<div class="fn"><code class="sig">past_deadline(deadline_ms: int) -&gt; truth uses clock</code><p>Did <code>deadline_ms</code> already pass? Plain comparison helper for readability in event loops.</p></div>
-<div class="fn"><code class="sig">time_left(deadline_ms: int) -&gt; int uses clock</code><p>Number of ms remaining until <code>deadline_ms</code>, clamped to 0 if past.</p></div>
-<div class="fn"><code class="sig">timers_new() -&gt; [int]</code><p>Build an empty timer queue.</p></div>
-<div class="fn"><code class="sig">add_timer(timers: [int], offset_ms: int) -&gt; [int]</code><p>Push a timer that fires <code>offset_ms</code> from now.</p></div>
-<div class="fn"><code class="sig">next_due(timers: [int]) -&gt; int</code><p>Earliest deadline in the queue, or -1 if empty.</p></div>
-<div class="fn"><code class="sig">count_due(timers: [int]) -&gt; int</code><p>How many timers have already fired (deadline &lt;= now)?</p></div>
-<div class="fn"><code class="sig">wait_next(timers: [int]) uses clock</code><p>Sleep until the next deadline fires.</p></div>
+<p class="orb-blurb">tasks: real suspension, one stack each.</p>
 <div class="fn"><code class="sig">spawn(f: fn, arg: int) -&gt; int = orion_task_spawn(f, arg)</code><p>Start a task.</p></div>
 <div class="fn"><code class="sig">await(id: int) -&gt; int = orion_task_await(id)</code><p>Run the scheduler until this task finishes, then take its result.</p></div>
 <div class="fn"><code class="sig">yield_now() -&gt; int = orion_task_yield()</code><p>Give the scheduler a turn.</p></div>
@@ -204,18 +193,6 @@
 <div class="fn"><code class="sig">ask(handler: fn, arg: int) -&gt; int = orion_ms_perform(handler, arg)</code><p>Inside a task: hand control to <code>handler</code>, which may resume this point once and then keep working.</p></div>
 <div class="fn"><code class="sig">resume_with(v: int) -&gt; int = orion_ms_resume(v)</code><p>Inside such a handler: run the rest of the task with <code>v</code>, and get its result.</p></div>
 <div class="fn"><code class="sig">resumable_ok() -&gt; truth = orion_ms_supported() is 1</code><p>no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
-<h2 id="scheduler"><code>scheduler</code></h2>
-<p class="orb-blurb">cooperative task abstraction on top of the async orb.</p>
-<h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">Task: deadline_ms: int, fn_id: int, payload: int</code></div>
-<h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">task_new(fire_in_ms: int, fn_id: int, payload: int) -&gt; Task</code></div>
-<div class="fn"><code class="sig">task_deadline(t: Task) -&gt; int</code></div>
-<div class="fn"><code class="sig">task_fn_id(t: Task) -&gt; int</code></div>
-<div class="fn"><code class="sig">task_payload(t: Task) -&gt; int</code></div>
-<div class="fn"><code class="sig">task_due(t: Task) -&gt; truth uses clock</code><p>Is this task ready to run (deadline ≤ now)?</p></div>
-<div class="fn"><code class="sig">await_task(t: Task)</code><p>Sleep until task fires.</p></div>
-<div class="fn"><code class="sig">await_next(tasks: [Task])</code><p>Sleep until the earliest deadline in a list.</p></div>
 <h2 id="timer"><code>timer</code></h2>
 <p class="orb-blurb">deterministic tick-based timers.</p>
 <div class="fn"><code class="sig">timer_start(id: text, dur_ms: int) uses clock</code><p>Start (or restart) a timer running toward dur_ms.</p></div>

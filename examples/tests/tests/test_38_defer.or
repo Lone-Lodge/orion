@@ -1,4 +1,4 @@
-# `defer` — at block end, before ANY return, LIFO, and it must not eat the value.
+# `defer` - at block end, before ANY return, LIFO, and it must not eat the value.
 #
 # This was documented as a core feature and did not exist: the parser had
 # stopped recognising the keyword ("unknown identifier `defer`") while the
@@ -7,7 +7,7 @@
 # Restoring the keyword was not enough. Two things were wrong under it:
 #   1. a `return` inside an `if` skipped the defers entirely (the nested block is
 #      lowered by its own statement loop, which never saw the outer list)
-#   2. running the defers before the return expression is the wrong order —
+#   2. running the defers before the return expression is the wrong order -
 #      `defer close(f)` must not close the handle that `return read(f)` reads
 # so `defer` is now an AST rewrite: save the value, run the defers, then return.
 define note(n: int) -> int:

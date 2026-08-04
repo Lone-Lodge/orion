@@ -3,7 +3,7 @@
 # The point is not that the answers come out right (they would with no scheduler
 # at all, if each task simply ran to completion). The point is the interleaving:
 # each task records its id, yields, and the other one must get the turn. Every
-# task has its own stack — Windows fibers, ucontext elsewhere — which is the
+# task has its own stack - Windows fibers, ucontext elsewhere - which is the
 # thing `orbs/async` and `orbs/scheduler` both listed as "future work".
 #
 # 111222 would mean spawn ran each task to completion. 121212 means they really

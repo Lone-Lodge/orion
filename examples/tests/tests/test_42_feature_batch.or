@@ -1,8 +1,8 @@
 # The readability feature batch:
-#   named arguments with `:`  — greet(times: 2)
-#   parameter defaults        — define f(x, loud = false)
-#   `list of T`               — items: list of int
-#   `given` generics clause   — define first given item (...)
+#   named arguments with `:`  - greet(times: 2)
+#   parameter defaults        - define f(x, loud = false)
+#   `list of T`               - items: list of int
+#   `given` generics clause   - define first given item (...)
 define scaled(base: int, factor = 3) -> int:
     base * factor
 

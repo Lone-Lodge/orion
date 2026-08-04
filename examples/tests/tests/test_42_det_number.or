@@ -1,5 +1,5 @@
 # Bit-exact determinism WITHOUT fixed-point: IEEE basic ops + sqrt/floor are
-# exact on every target, so `number` stays the one type — the compiler just
+# exact on every target, so `number` stays the one type - the compiler just
 # forbids the five libm calls whose last bits differ across platforms.
 deterministic define integrate(pos: float, vel: float, dt: float) -> float:
     pos + vel * dt

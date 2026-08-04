@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lsp_test.sh — drive the language server over a pipe and check its answers.
+# lsp_test.sh - drive the language server over a pipe and check its answers.
 #
 # The old extension shipped `lsp-smoke.test.js`, a node test against a binary
 # nobody could rebuild. This talks to dist/orion-lsp.exe the way an editor does:
@@ -15,7 +15,7 @@ LSP="$ROOT/dist/orion-lsp.exe"
 # process understands: MSYS's `/c/Users/...` is not.
 ORION="$(cygpath -m "$ROOT/dist/orion.exe" 2>/dev/null || echo "$ROOT/dist/orion.exe")"
 WORBS="$(cygpath -m "$ROOT/orbs" 2>/dev/null || echo "$ROOT/orbs")"
-[ -x "$LSP" ] || { echo "no dist/orion-lsp.exe — bash tools/build_lsp.sh"; exit 1; }
+[ -x "$LSP" ] || { echo "no dist/orion-lsp.exe - bash tools/build_lsp.sh"; exit 1; }
 
 TMP="$ROOT/dist/.lsp-test"
 rm -rf "$TMP"; mkdir -p "$TMP"
@@ -36,7 +36,7 @@ ORION
 # The URI must carry the path the OS understands, not the shell's view of it: an
 # MSYS `/c/Users/...` means nothing to a native binary. `cygpath -m` gives
 # `C:/Users/...`, and the drive colon is then percent-encoded the way a real
-# editor sends it — which is exactly the case uri_to_path has to handle.
+# editor sends it - which is exactly the case uri_to_path has to handle.
 WDOC="$(cygpath -m "$DOC" 2>/dev/null || echo "$DOC")"
 case "$WDOC" in
     ?:/*) URI="file:///$(printf '%s' "$WDOC" | sed 's|^\(.\):|\1%3A|')" ;;
@@ -57,7 +57,7 @@ REQ_FILE="$TMP/requests"
     msg "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"textDocument/definition\",\"params\":{\"textDocument\":{\"uri\":\"$URI\"},\"position\":{\"line\":9,\"character\":5}}}"
     msg "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"textDocument/hover\",\"params\":{\"textDocument\":{\"uri\":\"$URI\"},\"position\":{\"line\":9,\"character\":5}}}"
     msg "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"textDocument/completion\",\"params\":{\"textDocument\":{\"uri\":\"$URI\"},\"position\":{\"line\":9,\"character\":4}}}"
-    # Line 3 is `    p.x * p.y` — asking right after `p.` must give what belongs
+    # Line 3 is `    p.x * p.y` - asking right after `p.` must give what belongs
     # to a Point (its fields, and the fns that take one first), not every name.
     msg "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"textDocument/completion\",\"params\":{\"textDocument\":{\"uri\":\"$URI\"},\"position\":{\"line\":3,\"character\":6}}}"
     msg "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"shutdown\",\"params\":{}}"
@@ -92,7 +92,7 @@ check "completion: own declaration"     '"label":"area","kind":3,"detail":"this 
 check "completion: a stdlib orb name"   '"detail":"orb text"'
 check "completion: a keyword"           '"label":"loop","kind":14'
 # Type-aware: after `p.` where p is a Point, the FIELDS of Point and the
-# functions whose first parameter is a Point — `x.f()` is `f(x)`, so both are
+# functions whose first parameter is a Point - `x.f()` is `f(x)`, so both are
 # things you can actually write there.
 check "after a dot: the type's field"   '"label":"x","kind":5,"detail":"field: int"'
 check "after a dot: a fn taking it"     '"label":"area","kind":2,"detail":"Point.area() -> int"'

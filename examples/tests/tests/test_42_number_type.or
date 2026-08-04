@@ -1,4 +1,4 @@
-# `number` — THE numeric surface type (facade v1 = f64 semantics):
+# `number` - THE numeric surface type (facade v1 = f64 semantics):
 #   /  is REAL division whatever the operands (10 / 4 is 2.5)
 #   // is integer/floor division (10 // 4 is 2; 10.0 // 4.0 is 2.0)
 #   `number` accepted in type position (params, returns, bindings)

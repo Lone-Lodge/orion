@@ -1,7 +1,7 @@
 # Value-typed maps (`map:<T>`): a map's value type rides in its type_text so
 # get()/[] recover it through mut slots and set-results. Before, reading two
 # int-valued keys inline after a set/mut (`m["a"] + m["b"]`) typed the values
-# as text and lowered `+` to string-concat — dereferencing ints as pointers,
+# as text and lowered `+` to string-concat - dereferencing ints as pointers,
 # a segfault.
 define main() -> int:
     edit m = {"a": 5, "b": 7}

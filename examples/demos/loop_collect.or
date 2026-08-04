@@ -1,4 +1,4 @@
-# `loop` as an EXPRESSION — one construct for map and filter.
+# `loop` as an EXPRESSION - one construct for map and filter.
 #
 # In expression position `loop x in xs: body` collects into a list. One rule
 # spans one-liner and block: the body's trailing expression is collected, and

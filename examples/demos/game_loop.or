@@ -1,4 +1,4 @@
-# Orion 2026 game demo — showcases the full language stack in one file.
+# Orion 2026 game demo - showcases the full language stack in one file.
 #
 # Features used:
 #   * sum types (enum Tile, Action, Outcome)
@@ -9,7 +9,7 @@
 #
 # The handlers in this file are the PRODUCTION versions. For tests you'd
 # write deterministic handlers (e.g. Random.roll returns fixed sequence)
-# and link those instead — the game code is unchanged.
+# and link those instead - the game code is unchanged.
 
 # ---- Sum types -------------------------------------------------------
 

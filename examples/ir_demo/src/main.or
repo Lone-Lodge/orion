@@ -3,7 +3,7 @@ use io
 
 # Stage 1 demo: build IR for some functions, validate, dump as text.
 #
-# Now using typed `data` structs throughout — no more Map.get hacks,
+# Now using typed `data` structs throughout - no more Map.get hacks,
 # no more ir_to_int. Just clean field access: fn.name, inst.value.
 
 define build_main_42() -> IRFn:

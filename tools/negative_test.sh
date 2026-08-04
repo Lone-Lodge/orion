@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# negative_test.sh — the things that must NOT compile.
+# negative_test.sh - the things that must NOT compile.
 #
 # The positive suite (tools/test.sh) can only prove properties that produce a
 # runnable binary, so every "this is a hard compile error" claim went unchecked:
@@ -17,7 +17,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ORION="$ROOT/dist/orion.exe"
 DIR="$ROOT/examples/tests/negative"
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 TMP="$(mktemp -d)"
 pass=0; fail=0

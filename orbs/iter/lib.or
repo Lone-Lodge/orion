@@ -1,11 +1,11 @@
-# iter — functional list operations, powered by closures.
+# iter - functional list operations, powered by closures.
 #
 # Generic over the element type `T`: map / filter / reduce / … work on a
-# list of ANY type — `[int]`, `[text]`, `[[int]]`, structs. The closure
+# list of ANY type - `[int]`, `[text]`, `[[int]]`, structs. The closure
 # names the element type so its body can use `len` / `at` / `get`:
 #
 #   doubled = each([1, 2, 3], (x): x * 2)               # int, no annotation
-#   lengths = each(words,    fn(s: text): len(s))       # text — annotate `s`
+#   lengths = each(words,    fn(s: text): len(s))       # text - annotate `s`
 #   evens   = keep(xs,       (x): x % 2 is 0)
 #   total   = combine(xs, 0, (acc, x): acc + x)          # sum
 #
@@ -77,7 +77,7 @@ public define count<T>(xs: [T], pred: fn) -> int:
             n = n + 1
     n
 
-# Sum of every element (0 for an empty list). No closure — the workhorse
+# Sum of every element (0 for an empty list). No closure - the workhorse
 # `combine(xs, 0, fn(a, b): a + b)` written once.
 public define sum(xs: [int]) -> int:
     example sum([1, 2, 3]) is 6
@@ -120,7 +120,7 @@ public define min_by(xs: [int], key: fn) -> int:
     best
 
 # Return a new list ordered so that `less(a, b)` means `a` comes first.
-# Stable selection sort — small lists, clarity over speed.
+# Stable selection sort - small lists, clarity over speed.
 #   sorted   = sort_by(xs, fn(a, b): if a < b then 1 else 0)   # ascending
 #   by_score = sort_by(ps, fn(a, b): if score(a) > score(b) then 1 else 0)
 public type order_of: less: fn
@@ -138,7 +138,7 @@ public define sort_by(xs: [int], less: fn) -> [int]:
     example at(sort_by([3, 1, 2], (a, b): a < b), 0) is 1
     sort_generic(xs, less)
 
-# Selection sort, stable, element-type agnostic — the engine both forms use.
+# Selection sort, stable, element-type agnostic - the engine both forms use.
 define sort_generic<T>(xs: [T], less: fn) -> [T]:
     edit rest = xs
     edit out = []

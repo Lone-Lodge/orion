@@ -1,6 +1,6 @@
 # A live-coding watch loop, in Orion. It watches plugin.or; when the source
 # changes it recompiles it to a fresh .so and hot-swaps it into this running
-# program — game state (here just `state`) carries across every reload.
+# program - game state (here just `state`) carries across every reload.
 #
 # This is the whole "less editor, more live" loop in ~25 lines: the running
 # program invokes the self-hosting compiler on the changed file and rebinds the

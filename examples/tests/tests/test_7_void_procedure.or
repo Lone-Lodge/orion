@@ -1,5 +1,5 @@
 # A fn with no `-> type` is a void procedure (Unit return), called for its
-# effect. Its body's tail expression may be any type — here `text` — without
+# effect. Its body's tail expression may be any type - here `text` - without
 # tripping the return-type check, which only guards an EXPLICIT `-> type`.
 define describe(n: int):
     label = "n = {n}"

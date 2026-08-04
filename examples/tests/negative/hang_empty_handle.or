@@ -1,11 +1,11 @@
-# expect: hang_empty_handle.or:20:0 — unknown identifier `handle`
+# expect: hang_empty_handle.or:20:0 - unknown identifier `handle`
 # This HUNG THE COMPILER FOREVER, found by tools/fuzz.sh.
 #
 # A `handle` with an empty body leaves the body parser starting at the NEXT
 # declaration, which sits at the same column, so the dedent rule does not fire
 # and the second `handle` is read as a statement. That statement is
 # `Log.msg(text: text)`, a method call whose argument list stops dead on the
-# `:` — and psr_parse_postfix's argument loop had no no-progress guard, so it
+# `:` - and psr_parse_postfix's argument loop had no no-progress guard, so it
 # spun on a cursor that never moved. Fifth instance of that class of bug
 # (map literal, list literal, psr_parse_call, the statement loop, this).
 #

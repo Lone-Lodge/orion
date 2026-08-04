@@ -1,4 +1,4 @@
-// Orion VS Code extension — launches the orion-lsp Language Server on
+// Orion VS Code extension - launches the orion-lsp Language Server on
 // activation, registers Orbit CLI commands (build/run/test/fmt/new/add),
 // and wires a structure-preserving formatter for `.or` files.
 //
@@ -12,7 +12,7 @@
 // so nobody could rebuild it: an editor confidently underlining correct code
 // with a year-old idea of the grammar. Diagnostics now come from the compiler
 // itself, which is why the server needs to know where orion.exe and the orbs
-// root are — that is what initializationOptions carries below.
+// root are - that is what initializationOptions carries below.
 
 const path = require("path");
 const fs = require("fs");
@@ -48,7 +48,7 @@ function findServer(context) {
       }
     }
   }
-  // 4. Last resort — assume on PATH.
+  // 4. Last resort - assume on PATH.
   return platformBin;
 }
 

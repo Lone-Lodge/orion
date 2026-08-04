@@ -1,4 +1,4 @@
-# csv_table — parse CSV text and print it as an aligned table.
+# csv_table - parse CSV text and print it as an aligned table.
 #
 # Build: orion.exe examples/demos/csv_table.or out.ll orbs
 #

@@ -1,17 +1,17 @@
-# orbwatch — rerun a command when source files change.
+# orbwatch - rerun a command when source files change.
 #
 #   orbit run tools/orbwatch.or main <dir> <command> [args...]
 #   orbit run tools/orbwatch.or main --rounds 50 <dir> <command> [args...]
 #
 # Watches every .or/.c/.toml file under <dir> (recursively, skipping
-# dist/build/target/.git/_archive — see orbs/watch). Runs the command once
+# dist/build/target/.git/_archive - see orbs/watch). Runs the command once
 # at start, then again after every change. A change DURING a run STOPS the
 # run and starts a fresh one, so what you are looking at is never built
 # from stale source. `--rounds N` gives up after N quiet polls (~200 ms
 # each), which is what lets a script or test use this; 0 means forever.
 #
 # The command's output goes to your console. One command at a time by
-# design — this is a watcher, not a job runner.
+# design - this is a watcher, not a job runner.
 use os
 use text
 use watch
@@ -63,16 +63,16 @@ define main() -> int:
         if job >= 0 and finished_within(job, 0):
             code = command_result(job)
             job = 0 - 1
-            print_line("orbwatch: exit {code} — watching")
+            print_line("orbwatch: exit {code} - watching")
         cur = snapshot(root)
         if cur is not snap:
             changed = first_change(snap, cur)
             snap = settled(root)
             if job >= 0:
-                print_line("orbwatch: {changed} changed — restarting")
+                print_line("orbwatch: {changed} changed - restarting")
                 tossed = put_down(job)
             else:
-                print_line("orbwatch: {changed} changed — running")
+                print_line("orbwatch: {changed} changed - running")
             job = start_command(cmd, cmd_args)
             quiet = 0
         else:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# compile_bench.sh — measure COMPILE performance and compare against a baseline.
+# compile_bench.sh - measure COMPILE performance and compare against a baseline.
 #
 # The compiler already printed a human timing line ("compiled 1319 ms (lex … |
 # emit …)"), which is useful while you watch it and useless the next day: there
@@ -21,7 +21,7 @@ BASELINE="$ROOT/tools/compile_baseline.txt"
 REPS="${REPS:-3}"
 THRESHOLD="${THRESHOLD:-25}"
 # GATE=0 prints the numbers and exits 0. The baseline is wall clock recorded on
-# one specific machine, so it can only judge THAT machine — a CI runner is
+# one specific machine, so it can only judge THAT machine - a CI runner is
 # simply slower, and best-of-N does not fix a slower box (measured: `interp` 25
 # ms on the author's laptop, 40 ms on a GitHub Windows runner, both best of 3,
 # neither one a regression). Comparing across hosts turns a gate into a coin
@@ -30,14 +30,14 @@ THRESHOLD="${THRESHOLD:-25}"
 GATE="${GATE:-1}"
 UPDATE=0
 [ "${1:-}" = "--update" ] && UPDATE=1
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 TMP="$ROOT/dist/.bench"
 rm -rf "$TMP"; mkdir -p "$TMP"
 
 # The inputs: the compiler's own bundle is the big one (half a megabyte of
 # Orion, every language feature), then a few demos that lean on different
-# paths — closures/generics, pattern matching, the text stdlib.
+# paths - closures/generics, pattern matching, the text stdlib.
 CASES="bundle:$ROOT/dist/orion_self_bundled.or
 iter:$ROOT/examples/demos/iter_functional.or
 interp:$ROOT/examples/demos/interpreter.or
@@ -89,7 +89,7 @@ fi
 
 if [ ! -f "$BASELINE" ]; then
     echo
-    echo "  no baseline yet — record one: bash tools/compile_bench.sh --update"
+    echo "  no baseline yet - record one: bash tools/compile_bench.sh --update"
     rm -rf "$TMP"
     exit 0
 fi

@@ -1,19 +1,19 @@
-# orion_emit_wasm — emit a WebAssembly module (.wasm binary).
+# orion_emit_wasm - emit a WebAssembly module (.wasm binary).
 #
 # Mirrors `orion_emit_pe` for the browser. Pure Orion produces a
 # bytes-on-disk .wasm whose exports a JS shell calls. No external
-# linker, no wasm-bindgen, no wasm-pack — Orion writes the bytes
+# linker, no wasm-bindgen, no wasm-pack - Orion writes the bytes
 # itself, JS imports them with `WebAssembly.instantiateStreaming`.
 #
 # Spec: https://webassembly.github.io/spec/core/binary/index.html
 #
 # Layout:
 #   "\0asm" + version 1 (8 bytes magic)
-#   Type   section  (id=1)  — function signatures
-#   Func   section  (id=3)  — fn indices into Types
-#   Memory section  (id=5)  — linear memory (1 page = 64 KiB)
-#   Export section  (id=7)  — what JS can call
-#   Code   section  (id=10) — fn bodies as bytecode
+#   Type   section  (id=1)  - function signatures
+#   Func   section  (id=3)  - fn indices into Types
+#   Memory section  (id=5)  - linear memory (1 page = 64 KiB)
+#   Export section  (id=7)  - what JS can call
+#   Code   section  (id=10) - fn bodies as bytecode
 #
 # Today's coverage: int → int functions with arithmetic,
 # locals, calls, return. Strings + memory ops + import tables land
@@ -23,7 +23,7 @@ use bytes
 
 # --- LEB128 encoders ---
 
-# Unsigned LEB128 — the variable-length integer wasm uses for sizes
+# Unsigned LEB128 - the variable-length integer wasm uses for sizes
 # and indices. Encodes one 7-bit chunk per byte, MSB = continuation.
 public define leb_u(value: int) -> [int]:
     edit remaining = value
@@ -41,7 +41,7 @@ public define leb_u(value: int) -> [int]:
             output = append(output, byte_chunk + 128)
     output
 
-# Signed LEB128 — i32.const operand and friends.
+# Signed LEB128 - i32.const operand and friends.
 public define leb_s(value: int) -> [int]:
     edit remaining = value
     edit output = []
@@ -82,7 +82,7 @@ public define concat_all(parts: [int]) -> [int]:
         output = append(output, part_byte)
     output
 
-# Encode a UTF-8 string with a LEB128 length prefix — the WASM "name"
+# Encode a UTF-8 string with a LEB128 length prefix - the WASM "name"
 # vector format for imports/exports.
 public define encode_name(name: text) -> [int]:
     name_bytes = bytes_from_text(name)
@@ -161,11 +161,11 @@ public define op_else() -> int: 5          # 0x05 else
 public define op_br() -> int: 12           # 0x0C br
 public define op_br_if() -> int: 13        # 0x0D br_if (branch when top of stack != 0)
 
-# Blocktype sentinel — "no result". Used after `if`/`block`/`loop`
+# Blocktype sentinel - "no result". Used after `if`/`block`/`loop`
 # when the body doesn't push anything to the stack.
 public define blocktype_void() -> int: 64  # 0x40
 
-# Linear memory ops — the byte-level loads/stores wasm uses to read
+# Linear memory ops - the byte-level loads/stores wasm uses to read
 # and write the module's heap. Used to pass strings (and any other
 # composite data) between the wasm code and the JS host.
 public define op_i32_load() -> int: 40     # 0x28 i32.load
@@ -225,7 +225,7 @@ public define emit_f32_store(fn_value: WFn, offset: int) -> WFn:
         grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-# i64 ops — for the 64-bit `int` and the i64 sized type. Pointers stay i32
+# i64 ops - for the 64-bit `int` and the i64 sized type. Pointers stay i32
 # (wasm32 addresses); a value typed i64/u64 uses these, with wrap/extend at the
 # i32<->i64 boundaries.
 public define op_i64_const() -> int: 66    # 0x42 i64.const
@@ -293,7 +293,7 @@ public define ty_f64() -> int: 124         # 0x7C
 # returning a constant i32. Useful for sanity-testing the encoder
 # end-to-end without an AST in the loop.
 public define build_const_module(return_value: int) -> [int]:
-    # Type section: one type — () -> i32
+    # Type section: one type - () -> i32
     type_section = build_type_section()
     # Function section: one function, type index 0
     func_section = wrap_section(3, [1, 0])
@@ -362,7 +362,7 @@ define build_code_section_const(return_value: int) -> [int]:
     wrap_section(10, wrapped)
 
 # ============================================================
-#  Higher-level builder API — assemble a module from data types
+#  Higher-level builder API - assemble a module from data types
 # ============================================================
 #
 # Instead of poking bytes by hand the user describes the module as
@@ -375,15 +375,15 @@ public type WFn: name: text, param_count: int, body: [int], local_count: int
 
 # One import from the JS host: `module.name`, taking N i32 args,
 # returning either i32 or nothing. The result_count flag is 0 for
-# void, 1 for i32 — same shape as fn types.
+# void, 1 for i32 - same shape as fn types.
 public type WImport: module_name: text, fn_name: text, param_count: int, result_count: int
 
 # One static byte block placed in linear memory at startup. The data
-# section seeds the wasm heap with literal bytes — strings, tables,
-# baked vertex data — without the runtime having to compute them.
+# section seeds the wasm heap with literal bytes - strings, tables,
+# baked vertex data - without the runtime having to compute them.
 public type WDataSegment: offset: int, bytes: [int]
 
-# Whole module — imports + locally-defined functions + data segments.
+# Whole module - imports + locally-defined functions + data segments.
 # Imports get function indices 0..N before locally-defined fns start;
 # data segments populate linear memory at instantiate time.
 public type WModule: imports: [WImport], functions: [WFn], data_segments: [WDataSegment]
@@ -404,7 +404,7 @@ public define add_fn(module: WModule, fn_value: WFn) -> WModule:
     WModule{imports: module.imports, functions: append(module.functions, fn_value), data_segments: module.data_segments}
 
 # Bake a string (or any byte sequence) into linear memory. Returns
-# the new module + the offset the bytes were placed at — callers can
+# the new module + the offset the bytes were placed at - callers can
 # use that offset as the pointer in `i32.load8_u` or hand it to a
 # host import expecting (ptr, len).
 public define add_data(module: WModule, offset: int, bytes_data: [int]) -> WModule:
@@ -457,7 +457,7 @@ public define emit_local_set(fn_value: WFn, index: int) -> WFn:
         grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-# local.tee — like set but leaves the value on the stack (so an
+# local.tee - like set but leaves the value on the stack (so an
 # allocation pointer can be stashed and reused in one instruction).
 public define emit_local_tee(fn_value: WFn, index: int) -> WFn:
     idx_bytes = leb_u(index)
@@ -483,7 +483,7 @@ public define emit_store(fn_value: WFn, offset: int) -> WFn:
         grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-# i32.load8_u / i32.store8 — single byte, for text (UTF-8 byte payloads).
+# i32.load8_u / i32.store8 - single byte, for text (UTF-8 byte payloads).
 public define emit_load8u(fn_value: WFn, offset: int) -> WFn:
     edit grown = append(fn_value.body, op_i32_load8_u())
     grown = append(grown, 0)
@@ -569,7 +569,7 @@ public define encode_module(module: WModule) -> [int]:
     loop byte_value in data_section: output = append(output, byte_value)
     output
 
-# Data section (id 11) — initialises linear memory with literal bytes
+# Data section (id 11) - initialises linear memory with literal bytes
 # at instantiate time. Each segment: memidx (0, the only memory), an
 # i32.const offset expression, then the byte vector.
 define encode_data_section(module: WModule) -> [int]:
@@ -605,7 +605,7 @@ define data_count(module: WModule) -> int:
         count = count + 1
     count
 
-# Import section — id 2. Each entry is module name + fn name + kind
+# Import section - id 2. Each entry is module name + fn name + kind
 # (0x00 = func) + type index. The type vector already includes the
 # import signatures alongside the local function ones.
 define encode_import_section(module: WModule) -> [int]:
@@ -716,7 +716,7 @@ define wtype_char_to_byte(c: int) -> int:
     else:
         ty_i32()
 
-# Type section — one entry per distinct signature across imports + fns.
+# Type section - one entry per distinct signature across imports + fns.
 define encode_type_section(module: WModule) -> [int]:
     signatures = collect_signatures(module)
     edit contents = []
@@ -740,7 +740,7 @@ define encode_type_section(module: WModule) -> [int]:
             contents = append(contents, wtype_char_to_byte(at(bs, ri)))
     wrap_section(1, contents)
 
-# Function section — each fn's index into the type vector.
+# Function section - each fn's index into the type vector.
 define encode_function_section(module: WModule) -> [int]:
     signatures = collect_signatures(module)
     edit contents = []
@@ -760,7 +760,7 @@ define function_count(module: WModule) -> int:
 define total_function_count(module: WModule) -> int:
     import_list_length(module) + function_count(module)
 
-# Table section (id 4) — one funcref table holding every function at its own
+# Table section (id 4) - one funcref table holding every function at its own
 # index (an identity table), so a function value is just its index and
 # call_indirect through it lands on the right function.
 define encode_table_section(module: WModule) -> [int]:
@@ -773,7 +773,7 @@ define encode_table_section(module: WModule) -> [int]:
             contents = append(contents, b)
         wrap_section(4, contents)
 
-# Element section (id 9) — one active segment filling the table with funcidx i
+# Element section (id 9) - one active segment filling the table with funcidx i
 # at slot i, at offset 0.
 define encode_element_section(module: WModule) -> [int]:
     n = total_function_count(module)
@@ -792,7 +792,7 @@ define encode_element_section(module: WModule) -> [int]:
             i = i + 1
         wrap_section(9, contents)
 
-# Export section — local fns indexed AFTER imports. We also export
+# Export section - local fns indexed AFTER imports. We also export
 # the single memory under the name "memory" so JS can `new Uint8Array(
 # instance.exports.memory.buffer)` and read strings the wasm placed.
 define encode_export_section(module: WModule) -> [int]:
@@ -813,7 +813,7 @@ define encode_export_section(module: WModule) -> [int]:
         loop byte_value in idx_bytes:
             contents = append(contents, byte_value)
         index = index + 1
-    # Memory export — kind = 2 (memory), index 0 (only memory).
+    # Memory export - kind = 2 (memory), index 0 (only memory).
     mem_name = encode_name("memory")
     loop byte_value in mem_name:
         contents = append(contents, byte_value)
@@ -821,7 +821,7 @@ define encode_export_section(module: WModule) -> [int]:
     contents = append(contents, 0)
     wrap_section(7, contents)
 
-# Code section — bundled function bodies.
+# Code section - bundled function bodies.
 # Local declaration bytes for a function body. `types` is one char per
 # declared local ('i'/'f') in index order, set by the codegen in wloc:<name>.
 # Consecutive same-type locals are run-length grouped, as wasm requires. When

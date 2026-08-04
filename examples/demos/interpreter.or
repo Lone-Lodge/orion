@@ -1,4 +1,4 @@
-# interpreter — arithmetic WITH variables. Extends the calculator with an
+# interpreter - arithmetic WITH variables. Extends the calculator with an
 # environment: assign with `x = 3`, then use the name in later expressions.
 #
 # Build: orion.exe examples/demos/interpreter.or out.ll orbs
@@ -89,7 +89,7 @@ define tokenize(src: text) -> [table]:
 
 define parse_factor(toks: [table], pos: int, env: table) -> Parsed:
     t = at(toks, pos)
-    # A flat 4-way dispatch — block arms let the `(` and unary-minus cases
+    # A flat 4-way dispatch - block arms let the `(` and unary-minus cases
     # bind an intermediate before returning, so this reads as one `match`
     # instead of a nested if/else ladder.
     choose get(t, "kind"):
@@ -117,7 +117,7 @@ define parse_term(toks: [table], pos: int, env: table) -> Parsed:
             val = val * r.val
         else:
             if r.val == 0:
-                print_line("  (interpreter: divide by zero — using 0)")
+                print_line("  (interpreter: divide by zero - using 0)")
                 val = 0
             else:
                 val = val // r.val
@@ -139,7 +139,7 @@ define parse_expr(toks: [table], pos: int, env: table) -> Parsed:
         i = r.next
     Parsed{val: val, next: i}
 
-# ---- Main — run a little program, carrying the environment forward ---
+# ---- Main - run a little program, carrying the environment forward ---
 
 define is_assign(toks: [table]) -> int:
     if len(toks) >= 2 and get(at(toks, 0), "kind") == "ident" and get(at(toks, 1), "kind") == "assign" then 1 else 0

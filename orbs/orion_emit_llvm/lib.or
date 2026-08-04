@@ -1,7 +1,7 @@
 use orion_ir
 use bytes
 
-# orion_emit_llvm — the backend: typed IR (orion_ir) in, LLVM IR text out.
+# orion_emit_llvm - the backend: typed IR (orion_ir) in, LLVM IR text out.
 #
 # Pipeline: orion_ir -> orion_emit_llvm -> .ll -> clang -> .exe. It always emits
 # a Windows target triple; POSIX hosts retarget the module header before clang
@@ -162,7 +162,7 @@ define icmp_cc(op: text) -> text:
 define find_fn_return_type(module: IRModule, fn_name: text) -> text:
     n = len(module.functions)
     edit result = "i64"
-    # Built-in runtime fns we provide in emit_runtime — return types are
+    # Built-in runtime fns we provide in emit_runtime - return types are
     # known statically, no AST entry exists for them.
     if fn_name == "__orion_resume_int":
         result = "void"
@@ -226,7 +226,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
             sep = if ai == 0 then "" else ", "
             arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
-        # __orion_resume_int / __orion_resume_text return void — emit
+        # __orion_resume_int / __orion_resume_text return void - emit
         # `call void` + dummy SSA. Other fns go through the normal path;
         # their return-type lookup is in find_fn_return_type which
         # defaults non-matches to i64.
@@ -265,7 +265,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = "{pf_pre}    {value_ref(my_id)} = call {pf_ret} @{pf_fam}(ptr @{inst.name}, i64 {pf_n}, {pf_slots})"
 
     if op == "fn_ref":
-        # Function pointer constant — `@<name>` evaluates to a ptr in LLVM.
+        # Function pointer constant - `@<name>` evaluates to a ptr in LLVM.
         # Use getelementptr with 0 offset to force it into an SSA slot.
         result = "    {value_ref(my_id)} = getelementptr i8, ptr @{inst.name}, i64 0"
 
@@ -308,8 +308,8 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         # Load fn-ptr + flag; a lambda is called fn(env, args), a plain fn-ref
         # fn(args). env is the closure list itself.
         # The closure operand must be a ptr to the closure list. It usually is
-        # (a lambda local, a struct field), but a fn-ref reaching us as an i64 —
-        # a `Fn`-typed parameter, or an element read from a list of fn-refs —
+        # (a lambda local, a struct field), but a fn-ref reaching us as an i64 -
+        # a `Fn`-typed parameter, or an element read from a list of fn-refs -
         # holds the pointer BITS as an integer, so recover the ptr first.
         clos_raw = value_ref(inst.value)
         clos_lty = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
@@ -350,7 +350,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = "    br label %{inst.name}"
 
     if op == "br_if":
-        # name = "then_lbl|else_lbl" — split on '|'.
+        # name = "then_lbl|else_lbl" - split on '|'.
         # Coerce cond from i64 to i1 first.
         labels = split_pipe(inst.name)
         then_lbl = at(labels, 0)
@@ -370,7 +370,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = "    {value_ref(my_id)} = phi {phi_ty} [ {value_ref(inst.lhs)}, %{then_lbl} ], [ {value_ref(inst.rhs)}, %{else_lbl} ]"
 
     if op == "fconst":
-        # Exact IEEE-754 bits via strtod at compile time — LLVM rejects
+        # Exact IEEE-754 bits via strtod at compile time - LLVM rejects
         # inexact decimal FP literals (0.1), hex form is always exact.
         hex_bits = orion_f64_literal_hex(inst.name)
         result = "    {value_ref(my_id)} = fadd double {hex_bits}, 0x0000000000000000"
@@ -473,7 +473,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = "{l1}\n{l2}"
 
     if op == "print_str":
-        # Look up the global name for this string and call puts —
+        # Look up the global name for this string and call puts -
         # the bytes start 16 past the H1 header.
         idx = string_list_index(strings, inst.name)
         ps_name = "%v{my_id}.ps"
@@ -521,7 +521,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         l2 = "    {slot_name} = getelementptr ptr, ptr {arr_name}, i64 {value_ref(inst.value)}"
         raw_name = "%v{my_id}.raw"
         l3 = "    {raw_name} = load ptr, ptr {slot_name}"
-        # argv strings are foreign C strings — wrap into headered
+        # argv strings are foreign C strings - wrap into headered
         # texts at the boundary.
         l4 = "    {value_ref(my_id)} = call ptr @orion_text_from_c(ptr {raw_name})"
         result = "{l1}\n{l2}\n{l3}\n{l4}"
@@ -584,7 +584,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
     if op == "slot_set":
         # val_id may be i64 or ptr. Pointer values pass the evacuation
         # boundary: a region-born value deep-copies to the malloc heap
-        # (typed by the static code below) instead of dangling — the
+        # (typed by the static code below) instead of dangling - the
         # old guard's abort survives only for types with no copier.
         val_inst = at(fn_value.instructions, inst.lhs)
         val_ty = llvm_type_of(val_inst.type_text)
@@ -611,7 +611,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
     is_text_cmp = op == "text_eq" or op == "text_ne" or op == "text_lt" or op == "text_le" or op == "text_gt" or op == "text_ge"
     if is_text_cmp:
         if op == "text_eq" or op == "text_ne":
-            # H3 harvest of the H1 headers: equality via orion_text_eq —
+            # H3 harvest of the H1 headers: equality via orion_text_eq -
             # same-ptr, length and cached-hash rejects run before any
             # byte is touched. Ordering below still walks bytes.
             eq_id = "%v{my_id}.e"
@@ -645,19 +645,19 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
 
     if op == "list_lit":
         n = len(inst.args)
-        # `[]` interns to one shared constant: cap 0 forces every push —
-        # plain, push_mut, and the retired implicit rewrite is gone —
+        # `[]` interns to one shared constant: cap 0 forces every push -
+        # plain, push_mut, and the retired implicit rewrite is gone -
         # down the grow/copy path, and bounds-checked list_set rejects
         # all writes. Empty literals in per-frame code otherwise malloc
         # 16 bytes each, forever (~32 B per idle frame in cubsy).
         if n == 0:
             return "    {value_ref(my_id)} = getelementptr i64, ptr @orion_empty_list, i64 0"
         edit text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
-        # Box each element by the LIST's element type — the SAME source
+        # Box each element by the LIST's element type - the SAME source
         # list_at reads back through. Keying off the individual element's
         # SSA type instead desynced store from load (list_lit bitcast a
         # double element that list_at, going by the list type, did NOT
-        # un-bitcast) and corrupted every read — a map value stored that
+        # un-bitcast) and corrupted every read - a map value stored that
         # way came back as garbage bits. list slots are i64: a ptr element
         # is ptrtoint'd, a double stores its bits (list_at bitcasts back),
         # everything else stores as-is.
@@ -1012,11 +1012,11 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                     result = "    ret {ret_ty} {value_ref(inst.value)}"
 
     # An op no branch above handled would silently emit a placeholder
-    # `add i64 0, 0` — valid LLVM, wrong program. If `result` still
+    # `add i64 0, 0` - valid LLVM, wrong program. If `result` still
     # equals the default sentinel, no branch matched: count it as a
     # compile error so drivers refuse to ship the module.
     if result == "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}":
-        compile_error("orion: ERROR — IR op `{op}` has no LLVM lowering (fn `{fn_value.name}`)")
+        compile_error("orion: ERROR - IR op `{op}` has no LLVM lowering (fn `{fn_value.name}`)")
 
     result
 
@@ -1078,7 +1078,7 @@ public define memfacts_list() -> int:
     print_line("")
     0
 
-# Evacuation type code for the slot-store boundary — what
+# Evacuation type code for the slot-store boundary - what
 # orion_slot_evac needs to deep-copy a region-born value. 0 = no
 # copier (opaque struct/fn/ptr): in-region still fails fast.
 define evac_code(orion_type: text) -> int:
@@ -1102,11 +1102,11 @@ define llvm_type_of(orion_type: text) -> text:
     if len(bs) >= 7:
         if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
             is_struct = true
-    # `list:T` (parameterised list) — also a ptr at LLVM level.
+    # `list:T` (parameterised list) - also a ptr at LLVM level.
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
-    # `map:T` (value-typed map) — a map handle, also a ptr.
+    # `map:T` (value-typed map) - a map handle, also a ptr.
     edit is_map_elem = false
     if len(bs) >= 4:
         if at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58:
@@ -1145,7 +1145,7 @@ define emit_param_list(params: [Param]) -> text:
         result = "{result}{sep}{ty} %p{index}"
     result
 
-# Types only (no %pN names) — for `declare` lines.
+# Types only (no %pN names) - for `declare` lines.
 define emit_param_types(params: [Param]) -> text:
     n = len(params)
     edit result = ""
@@ -1169,14 +1169,14 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
         param_list = emit_param_list(fn_value.params)
         is_user_main = name == "main"
         emit_name = if is_user_main then "orion_main" else name
-        # Chunk list + single join, NOT repeated `"{text}{line}"` concat —
+        # Chunk list + single join, NOT repeated `"{text}{line}"` concat -
         # concat re-copies the whole accumulated text per line, O(n²)
         # over a multi-thousand-instruction function body.
         edit chunks = []
         chunks = append(chunks, "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n")
         total = len(fn_value.instructions)
         # HOIST allocas to the entry block. `alloca` reserves a stack slot for
-        # the whole function ONLY when it sits in the entry block — LLVM reuses
+        # the whole function ONLY when it sits in the entry block - LLVM reuses
         # that slot across the function. An alloca left inside a loop body
         # (which is where a `mut` declared in the loop lands) executes every
         # iteration and reserves a FRESH slot each time, so a loop over a few
@@ -1200,7 +1200,7 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
 
 
 # Emit the global for a single string literal, H1-headered:
-# [hash:i64 LE][len:i64 LE][bytes][NUL], align 8 — references GEP
+# [hash:i64 LE][len:i64 LE][bytes][NUL], align 8 - references GEP
 # +16 to the bytes. Hash is BAKED (rodata cannot lazy-write):
 # polynomial base 131 seed 5381 mod 1e9+7, identical to the
 # runtime's orion_text_hash, remapped 0 -> 1.
@@ -1242,7 +1242,7 @@ define hex1(d: int) -> text:
 # stay clang-only without a separate runtime .c file.
 define emit_runtime() -> text:
     edit text = ""
-    # Target Windows x64 MSVC explicitly — needed for setjmp/longjmp ABI
+    # Target Windows x64 MSVC explicitly - needed for setjmp/longjmp ABI
     # to match the linker's MSVCRT. Without this the IR is target-agnostic
     # and _setjmp expands incorrectly.
     text = "{text}target datalayout = \"e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\n"
@@ -1250,7 +1250,7 @@ define emit_runtime() -> text:
     text = "{text}declare i32 @printf(ptr, ...)\n"
     text = "{text}declare i32 @puts(ptr)\n"
     text = "{text}declare ptr @malloc(i64)\n"
-    # Float-literal hex conversion lives in orion_rt.c (strtod) — declare
+    # Float-literal hex conversion lives in orion_rt.c (strtod) - declare
     # here since the orion_ prefix skips the auto-extern-declare path.
     text = "{text}declare ptr @orion_f64_literal_hex(ptr)\n"
     # Parallel closure runner (orion_rt.c): run each closure(arg) on a worker,
@@ -1262,8 +1262,8 @@ define emit_runtime() -> text:
     text = "{text}declare i64 @orion_trail_note_trap()\n"
     text = "{text}declare i64 @orion_breakpoint(ptr)\n"
     # Frame-arena allocator (orion_rt.c): ALL runtime allocations route
-    # through orion_alloc — malloc passthrough unless a game loop turns
-    # the arena on per frame. Control fns declared too — orion_ prefix
+    # through orion_alloc - malloc passthrough unless a game loop turns
+    # the arena on per frame. Control fns declared too - orion_ prefix
     # skips the auto-extern path but these live in C, not inline IR.
     text = "{text}declare ptr @orion_alloc(i64)\n"
     text = "{text}declare ptr @orion_par_madd(ptr, ptr, i64)\n"
@@ -1346,7 +1346,7 @@ define emit_runtime() -> text:
     text = "{text}declare ptr @orion_slot_evac(ptr, ptr, i64)\n"
     text = "{text}declare void @orion_crumb(ptr, ptr, i64)\n"
     text = "{text}declare void @orion_crumb_rule(ptr)\n"
-    # libm — float math builtins lower to these.
+    # libm - float math builtins lower to these.
     text = "{text}declare double @sqrt(double)\n"
     text = "{text}declare double @sin(double)\n"
     text = "{text}declare double @cos(double)\n"
@@ -1359,10 +1359,10 @@ define emit_runtime() -> text:
     text = "{text}declare double @round(double)\n"
     text = "{text}declare double @atan2(double, double)\n"
     text = "{text}declare double @pow(double, double)\n"
-    # Compile-error counter — compiler diagnostics bump this; drivers
+    # Compile-error counter - compiler diagnostics bump this; drivers
     # read it and refuse to write output / exit non-zero when > 0.
     text = "{text}@orion_err_count = global i64 0\n"
-    # Returns i64 (not void) — Orion externs without `->` type as i64
+    # Returns i64 (not void) - Orion externs without `->` type as i64
     # at call sites, and the define must match the call's type.
     text = "{text}define i64 @orion_err_bump() \{\n"
     text = "{text}entry:\n"
@@ -1430,7 +1430,7 @@ define emit_runtime() -> text:
     text = "{text}  ret i64 %l\n"
     text = "{text}\}\n\n"
     # H3 harvest: header-aware text equality. Rejects run cheapest
-    # first — same pointer, then length (one load each), then the
+    # first - same pointer, then length (one load each), then the
     # poly hash (cached in the header; a miss calls the runtime to
     # compute-and-cache, so long-lived texts pay once). Only equal
     # hashes fall through to memcmp. Constants carry baked hashes,
@@ -1483,7 +1483,7 @@ define emit_runtime() -> text:
     text = "{text}declare i32 @strcmp(ptr, ptr)\n"
     text = "{text}declare i32 @snprintf(ptr, i64, ptr, ...)\n"
     # Effects runtime: continuations via setjmp/longjmp. Declared as
-    # externs — the actual implementations come from orion_rt.c which
+    # externs - the actual implementations come from orion_rt.c which
     # the test runner / driver compiles alongside our .ll.
     text = "{text}declare i64 @__orion_perform_int(ptr, i64)\n"
     text = "{text}declare void @__orion_resume_int(i64)\n"
@@ -1510,7 +1510,7 @@ define emit_runtime() -> text:
     text = "{text}\n"
     # Both lengths are O(1) header reads, so the copy is two memcpys.
     # strcpy+strcat re-scanned for the terminator twice (once to find a's
-    # end, once more inside strcat) — work we already knew the answer to,
+    # end, once more inside strcat) - work we already knew the answer to,
     # and a truncation risk: the buffer is sized from tlen, so a text with
     # an embedded NUL made strcat write past what tlen paid for.
     text = "{text}define ptr @orion_text_concat(ptr %a, ptr %b) \{\n"
@@ -1526,12 +1526,12 @@ define emit_runtime() -> text:
     text = "{text}\}\n\n"
     # Digits by hand instead of snprintf. Every `{i}` interpolation lands
     # here, and snprintf costs a format-string parse plus a locale-aware
-    # formatter — ~100ns for what is a handful of divides. Writes the
+    # formatter - ~100ns for what is a handful of divides. Writes the
     # digits backwards into a 24-byte stack scratch (20 digits + sign is
     # the i64 worst case), then allocates the EXACT length: no 31-byte
     # over-allocation and no seal pass (text_alloc already set len and
-    # zeroed the hash). Magnitude is taken unsigned, so i64 MIN — whose
-    # negation overflows — formats correctly too.
+    # zeroed the hash). Magnitude is taken unsigned, so i64 MIN - whose
+    # negation overflows - formats correctly too.
     text = "{text}define ptr @orion_int_to_text(i64 %n) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %scratch = alloca [24 x i8]\n"
@@ -1711,7 +1711,7 @@ define emit_runtime() -> text:
     text = "{text}after:\n"
     text = "{text}  ret ptr %dst\n"
     text = "{text}\}\n\n"
-    # Global slot store — single Map keyed by text. Init on first access.
+    # Global slot store - single Map keyed by text. Init on first access.
     # The store outlives every frame, so its spine, its keys and its init
     # must NEVER touch the arena: growth/init go straight to malloc and
     # keys are copied on insert (callers routinely pass arena-built keys).
@@ -1747,7 +1747,7 @@ define emit_runtime() -> text:
     # a malloc'd i64[imask+1] storing (entry_position + 1); 0 = empty slot. It is
     # an ACCELERATOR: the packed entries array stays the source of truth (keys,
     # values, grow, swap-remove, keys()/values() are unchanged and linear), so a
-    # stale/absent index is always safe — lookups fall back to a linear scan.
+    # stale/absent index is always safe - lookups fall back to a linear scan.
     # Built lazily by set/set_persist once a map crosses 8 entries; the int-keyed
     # (_ik) family and remove stay linear (remove just drops the index).
     # idx_find(map,key) -> entry position, or -1 on miss.
@@ -2098,10 +2098,10 @@ define emit_runtime() -> text:
     text = "{text}\}\n\n"
     # Lists: heap buffer [i64 cap, i64 len, i64 item0, ...].
     # push is amortized O(1): in-place while len < cap, doubling grow
-    # otherwise. Callers MUST rebind (`x = append(x, v)`) — on grow a new
+    # otherwise. Callers MUST rebind (`x = append(x, v)`) - on grow a new
     # buffer is returned; in-place returns the same pointer, so a stale
     # alias may observe the append. The whole codebase uses the rebind
-    # convention. list_new(n) is PRE-SIZED (len = n) — list literals
+    # convention. list_new(n) is PRE-SIZED (len = n) - list literals
     # and bytes builders fill slots 0..n-1 via list_set.
     text = "{text}define ptr @orion_list_new(i64 %cap) \{\n"
     text = "{text}entry:\n"
@@ -2113,7 +2113,7 @@ define emit_runtime() -> text:
     text = "{text}  store i64 %cap, ptr %len_slot\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
-    # Struct field by declaration index — structs are raw i64 slots in
+    # Struct field by declaration index - structs are raw i64 slots in
     # decl order. The text variant re-attaches the pointer type.
     text = "{text}define i64 @orion_struct_field_int(ptr %s, i64 %i) \{\n"
     text = "{text}entry:\n"
@@ -2140,7 +2140,7 @@ define emit_runtime() -> text:
     text = "{text}  %at_len = load i64, ptr %at_len_slot\n"
     # Unsigned compare catches idx < 0 (wraps to a huge value) and idx >= len
     # in one test. Out-of-range indexing used to load adjacent memory and
-    # return garbage with exit 0 — silent wrong answer. Fail loudly instead.
+    # return garbage with exit 0 - silent wrong answer. Fail loudly instead.
     text = "{text}  %at_oob = icmp uge i64 %idx, %at_len\n"
     text = "{text}  br i1 %at_oob, label %at_fail, label %at_ok\n"
     text = "{text}at_fail:\n"
@@ -2210,7 +2210,7 @@ define emit_runtime() -> text:
     text = "{text}eok:\n"
     text = "{text}  ret i64 %c\n"
     text = "{text}\}\n\n"
-    # slice(list, lo, hi) — half-open [lo, hi), bounds clamped like the interp.
+    # slice(list, lo, hi) - half-open [lo, hi), bounds clamped like the interp.
     text = "{text}define ptr @orion_list_slice(ptr %list, i64 %lo, i64 %hi) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %n = call i64 @orion_list_len(ptr %list)\n"
@@ -2257,7 +2257,7 @@ define emit_runtime() -> text:
     text = "{text}skip:\n"
     text = "{text}  ret void\n"
     text = "{text}\}\n\n"
-    # Copying push — persistent value semantics (the result is a FRESH
+    # Copying push - persistent value semantics (the result is a FRESH
     # buffer; the input list is untouched). Used for every push except
     # the `x = append(x, v)` self-rebind statement. Result gets 2x spare
     # capacity so a chain of subsequent self-rebind pushes runs in-place.
@@ -2284,7 +2284,7 @@ define emit_runtime() -> text:
     text = "{text}  store i64 %val, ptr %app_slot\n"
     text = "{text}  ret ptr %new_list\n"
     text = "{text}\}\n\n"
-    # In-place push (amortized O(1)) — the self-rebind fast path.
+    # In-place push (amortized O(1)) - the self-rebind fast path.
     text = "{text}define ptr @orion_list_push_mut(ptr %list, i64 %val) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %cap = load i64, ptr %list\n"
@@ -2305,7 +2305,7 @@ define emit_runtime() -> text:
     text = "{text}\}\n\n"
     # Maps: INDIRECT layout. Handle = [ptr entries, i64 cap, i64 len];
     # entries buffer = [k0_ptr, v0, k1_ptr, v1, ...]. Growth swaps the
-    # inner buffer only, so every held map handle stays valid — the old
+    # inner buffer only, so every held map handle stays valid - the old
     # flat layout had NO capacity check and the 17th append into the
     # cap-16 slot store wrote past its allocation (heap corruption).
     text = "{text}define ptr @orion_map_new(i64 %cap) \{\n"
@@ -2649,7 +2649,7 @@ define emit_runtime() -> text:
     text = "{text}after:\n"
     text = "{text}  ret ptr %out\n"
     text = "{text}\}\n\n"
-    # get_or(map, key, default) — default when the key is absent.
+    # get_or(map, key, default) - default when the key is absent.
     text = "{text}define i64 @orion_map_get_or(ptr %map, ptr %key, i64 %dflt) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %has = call i64 @orion_map_has(ptr %map, ptr %key)\n"
@@ -2696,8 +2696,8 @@ define emit_runtime() -> text:
     # List layout is [i64 cap, i64 len, data...]: the COUNT is at index 1 (len)
     # and data begins at index 2. Reading index 0 (cap) as the count and index 1
     # (len) as the first datum overruns the buffer AND clobbers the length field
-    # (corruption that only surfaced when a later reader trusted len — e.g. a
-    # snapshot/compaction deep-copy — walked past the real elements and crashed).
+    # (corruption that only surfaced when a later reader trusted len - e.g. a
+    # snapshot/compaction deep-copy - walked past the real elements and crashed).
     text = "{text}define ptr @orion_vec_addi(ptr %dst, ptr %src) \{\n"
     text = "{text}entry:\n  %nslot = getelementptr i64, ptr %dst, i64 1\n  %n = load i64, ptr %nslot\n  %db = getelementptr i64, ptr %dst, i64 2\n  %sb = getelementptr i64, ptr %src, i64 2\n  %vend = and i64 %n, -4\n  br label %vhdr\n"
     text = "{text}vhdr:\n  %vi = phi i64 [ 0, %entry ], [ %vin, %vbody ]\n  %vdone = icmp sge i64 %vi, %vend\n  br i1 %vdone, label %shdr, label %vbody\n"
@@ -2730,14 +2730,14 @@ define emit_uses_print_raw(module: IRModule) -> truth:
     found
 
 public define emit_module(module: IRModule) -> text:
-    # Chunk list + one join at the end — repeated concat would re-copy
+    # Chunk list + one join at the end - repeated concat would re-copy
     # the growing megabyte module text once per appended piece.
     edit chunks = []
     chunks = append(chunks, "; orion_emit_llvm output\n")
     chunks = append(chunks, emit_runtime())
     if emit_uses_print_raw(module):
         chunks = append(chunks, "declare void @orion_print_raw(ptr)\n")
-    # Emit declares for every user extern call — any `call @name` where
+    # Emit declares for every user extern call - any `call @name` where
     # `name` isn't a user fn and isn't a runtime helper already declared
     # above. Without these declares clang rejects the .ll before linking.
     externs = collect_extern_calls(module)
@@ -2760,7 +2760,7 @@ public define emit_module(module: IRModule) -> text:
         # resolves at link time (C shim / libc). Runtime symbols skip
         # even the declare: emit_runtime DEFINES those and LLVM rejects
         # declare+define of one name in a module. Guard-if style, not
-        # if/else — lodge-orion's dangling-else binds else to the inner if.
+        # if/else - lodge-orion's dangling-else binds else to the inner if.
         is_extern_decl = len(fn_value.instructions) == 0
         if is_extern_decl:
             if not is_runtime_symbol(fn_value.name):
@@ -2770,7 +2770,7 @@ public define emit_module(module: IRModule) -> text:
             chunks = append(chunks, emit_fn(fn_value, strings, module))
             chunks = append(chunks, "\n")
     # Wrapper @main: stash argc/argv to globals so argc()/argv(i) can read
-    # them, then delegate to user's orion_main. We always emit this — if
+    # them, then delegate to user's orion_main. We always emit this - if
     # the user didn't define a main, clang will complain about undefined
     # orion_main, which is the correct error.
     chunks = append(chunks, "@orion_argc = global i64 0\n")

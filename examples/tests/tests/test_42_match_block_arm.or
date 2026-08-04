@@ -1,5 +1,5 @@
 # A match arm can be an indented block, not just a single expression: bind a
-# local, then the last expression is the arm's value — exactly like an `if`
+# local, then the last expression is the arm's value - exactly like an `if`
 # branch. Inline arms (`-> expr`) still work. Both the scrutinee form and the
 # subjectless cond form (`match:`) support it.
 define score(kind: int) -> int:

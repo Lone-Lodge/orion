@@ -2,7 +2,7 @@
 #
 # `|x| body` lambdas ARE parsed but their lowering needs a tree-walker
 # lift pass (3-5h future work). Until then, use named fns + first-class
-# fn refs — same capabilities, slightly more verbose.
+# fn refs - same capabilities, slightly more verbose.
 
 # ---- Building blocks (named fns) ------------------------------------
 
@@ -26,7 +26,7 @@ define compose_call(g: fn, h: fn, x: int) -> int:
 define twice(f: fn, x: int) -> int:
     f(f(x))
 
-# ---- Main — uses fns as first-class values --------------------------
+# ---- Main - uses fns as first-class values --------------------------
 
 define main() -> int:
     # First-class fn binding
@@ -44,7 +44,7 @@ define main() -> int:
     # Apply twice
     d = twice(inc, 0)       # inc(inc(0)) = 2
 
-    # Chain with plain intermediate variables — readable, top to bottom.
+    # Chain with plain intermediate variables - readable, top to bottom.
     step = double(10)       # 20
     e = inc(step)           # 21
 

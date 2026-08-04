@@ -1,10 +1,10 @@
 # A match arm that produces no value must not crash the compiler.
 #
 # `if let P(x) = e:` desugars to a two-arm match, so its body becomes an arm
-# body. When that body ENDS IN A STATEMENT — a block-form `if`, a loop — the arm
+# body. When that body ENDS IN A STATEMENT - a block-form `if`, a loop - the arm
 # yields no value, and the lowering stored that non-value into the match's
 # result slot. Storing id -1 walked the instruction list backwards and the
-# compiler died with `list index -1 out of range` — an internal trap, on
+# compiler died with `list index -1 out of range` - an internal trap, on
 # ordinary code, with no line number and nothing to act on.
 #
 # A diverging arm (`_ -> break`) was already handled; this is the other way an

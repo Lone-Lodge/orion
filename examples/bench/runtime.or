@@ -1,8 +1,8 @@
-# runtime.or — what the GENERATED code costs, per primitive.
+# runtime.or - what the GENERATED code costs, per primitive.
 #
 # tools/compile_bench.sh answers "did that change make compilation slower?".
 # This answers the other half: "did that change make the compiled program
-# slower?". Same shape — one machine-readable row per case, best-of-N and a
+# slower?". Same shape - one machine-readable row per case, best-of-N and a
 # baseline diff live in the script.
 #
 # Every case is sized to run ~100ms so a 1ms scheduling hiccup is noise, and

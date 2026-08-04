@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bootstrap.sh — bring a fresh clone to a working, tested toolchain from the
+# bootstrap.sh - bring a fresh clone to a working, tested toolchain from the
 # checked-in seed. No lodge-orion, no Rust. See tools/seed/README.md.
 #
 #   seed/orion.exe -> dist/orion.exe -> self-compile (fixpoint) -> orbit -> test
@@ -23,7 +23,7 @@ elif [ -f "$SEED_LL" ]; then
     echo "==> no binary seed; linking tools/seed/orion.ll"
     bash "$ROOT/tools/bootstrap_from_ll.sh"
 else
-    echo "no seed in tools/seed/ — needs orion.exe or orion.ll"
+    echo "no seed in tools/seed/ - needs orion.exe or orion.ll"
     echo "(see tools/seed/README.md). Until then a fresh clone cannot bootstrap."
     exit 1
 fi

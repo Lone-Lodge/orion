@@ -1,6 +1,6 @@
 # Smoke for orion_lex
 
-# orion_self_lex — Orion lexer written in Orion.
+# orion_self_lex - Orion lexer written in Orion.
 #
 # Tokenizes `.or` source text into a list of token Maps with the shape:
 #     {"kind": text, "value": text, "line": int, "col": int}
@@ -11,15 +11,15 @@
 # step 4 (parser in Orion) can consume these tokens directly.
 #
 # Token kinds emitted:
-#   ident      — names and keywords (keyword? lookup later)
-#   int        — integer literal
-#   float      — float literal
-#   str        — string literal (escapes resolved; \{ and \} kept raw)
-#   symbol     — operator or punctuation; `value` is the operator text
-#   newline    — line break (one per consecutive newline run)
-#   eof        — end-of-input marker
+#   ident      - names and keywords (keyword? lookup later)
+#   int        - integer literal
+#   float      - float literal
+#   str        - string literal (escapes resolved; \{ and \} kept raw)
+#   symbol     - operator or punctuation; `value` is the operator text
+#   newline    - line break (one per consecutive newline run)
+#   eof        - end-of-input marker
 #
-# `value` is always a Text — int and float tokens encode their numeric
+# `value` is always a Text - int and float tokens encode their numeric
 # value as text to keep the token type uniform. Step 4 (parser) can
 # str_to_int / str_to_float them.
 
@@ -49,7 +49,7 @@ define slx_is_ident_continue(byte: int) -> truth:
 # --- token construction ---
 
 define slx_make_token(kind: text, value: text, line: int, col: int) -> table:
-    # No return type — Orion typeck treats Map as Unknown when the
+    # No return type - Orion typeck treats Map as Unknown when the
     # annotation is omitted, which is what we want for token records.
     {"kind": kind, "value": value, "line": line, "col": col}
 
@@ -94,7 +94,7 @@ define slx_hex_digit(c: int) -> int:
             else:
                 0 - 1
 
-# `0x1F`, `0b1010`, `0o17` — a leading 0 plus a base marker. Returns the token
+# `0x1F`, `0b1010`, `0o17` - a leading 0 plus a base marker. Returns the token
 # and the new cursor, or next == start when this is not a based literal.
 #
 # These did not lex at all: `0x81` came out as the number 0 followed by an
@@ -152,7 +152,7 @@ define slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col
         if slx_is_digit(current):
             cursor += 1
         else:
-            # A single `.` followed by a digit is a decimal point — anything
+            # A single `.` followed by a digit is a decimal point - anything
             # else terminates the number.
             is_dot_then_digit = current == 46 and (not saw_dot) and cursor + 1 < byte_count and slx_is_digit(byte_at(bytes, cursor + 1))
             if is_dot_then_digit:
@@ -164,7 +164,7 @@ define slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col
     kind = if saw_dot then "float" else "int"
     {"token": slx_make_token(kind, text_value, line, col), "next": cursor}
 
-# Single-byte escape lookup — returns the resolved byte, or -1 to mean
+# Single-byte escape lookup - returns the resolved byte, or -1 to mean
 # "preserve the backslash and the next byte unchanged" (used for \{ and \}).
 define slx_resolve_escape(escape_char: int) -> int:
     edit result = 0 - 1
@@ -178,7 +178,7 @@ define slx_resolve_escape(escape_char: int) -> int:
     result
 
 # Decimal text for a small non-negative int (byte values 0-255). Used to
-# emit a char literal as an ordinary int token — the parser then treats
+# emit a char literal as an ordinary int token - the parser then treats
 # `'+'` exactly like `43`, so no new AST node or type is needed.
 define slx_int_to_text(n: int) -> text:
     if n == 0:
@@ -200,7 +200,7 @@ define slx_int_to_text(n: int) -> text:
     bytes_to_text(out)
 
 # A character literal `'c'` (or an escape like `'\n'`) lexes to an int token
-# holding the byte value. Readable notation for a byte — `match b: '+' -> …`
+# holding the byte value. Readable notation for a byte - `match b: '+' -> …`
 # instead of the magic number `43`.
 define slx_scan_char(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
     edit cursor = start + 1
@@ -224,19 +224,19 @@ define slx_scan_char(bytes: [int], start: int, byte_count: int, line: int, col: 
         {"token": slx_make_token("int", slx_int_to_text(value), line, col), "next": cursor}
     else:
         # Malformed (empty '' or unterminated). Advance one byte so the main
-        # loop can't hang; emit nothing usable — a later parse error follows.
+        # loop can't hang; emit nothing usable - a later parse error follows.
         {"token": slx_make_token("newline", "\n", line, col), "next": start + 1}
 
 define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
     # Consume the opening quote, walk until the closing one. Returns
-    # next=start when the string is unterminated — caller turns that into
+    # next=start when the string is unterminated - caller turns that into
     # a lex error.
     edit cursor = start + 1
     edit buffer = bytes_zeros(0)
     edit closed = false
     # Depth of unescaped `{…}` interpolation braces. A `"` inside braces
     # belongs to an interpolated expression (e.g. a map key `m["k"]`), not
-    # the string terminator — so it doesn't end the literal.
+    # the string terminator - so it doesn't end the literal.
     edit brace_depth = 0
     loop:
         if cursor >= byte_count:
@@ -248,7 +248,7 @@ define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col
             cursor += 1
             break
         if current == 10:
-            # Unterminated — bail out of the loop, leave `closed = false`.
+            # Unterminated - bail out of the loop, leave `closed = false`.
             break
         if current == 92 and cursor + 1 < byte_count:
             next_byte = byte_at(bytes, cursor + 1)
@@ -257,7 +257,7 @@ define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col
                 buffer = append(buffer, resolved)
                 cursor += 2
             else:
-                # Brace escapes are preserved literally — `build_str` in the
+                # Brace escapes are preserved literally - `build_str` in the
                 # Rust pipeline depends on `\{` / `\}` surviving lex.
                 buffer = append(buffer, 92)
                 buffer = append(buffer, next_byte)
@@ -303,9 +303,9 @@ define slx_scan_op(bytes: [int], start: int, byte_count: int) -> text:
     op
 
 define slx_scan_op_short(first: int, second: int) -> text:
-    # Two-char tokens — flat sequential checks, then fall through to single.
+    # Two-char tokens - flat sequential checks, then fall through to single.
     # (Deep nested if/else-as-expression chains trigger the native compiler's
-    # nesting bug — see [[orion_nesting_bug]].)
+    # nesting bug - see [[orion_nesting_bug]].)
     edit result = ""
     if first == 61 and second == 61:
         result = "=="
@@ -328,7 +328,7 @@ define slx_scan_op_short(first: int, second: int) -> text:
     if first == 47 and second == 61:
         result = "/="
     # Bit shifts. `syntax.md` listed `<<` and `>>` among the operators, and the
-    # other four (`&` `|` `^` `~`) really did work — these two never lexed at
+    # other four (`&` `|` `^` `~`) really did work - these two never lexed at
     # all, so `plen >> 8` came out as `>` `>` and died as "not valid here". Real
     # code hit it: atlas_ws builds WebSocket frame headers with shifts.
     if first == 60 and second == 60:
@@ -341,7 +341,7 @@ define slx_scan_op_short(first: int, second: int) -> text:
 
 define slx_scan_op_single(first: int) -> text:
     # Single-char punctuation/operators. Direct table lookup with literal
-    # results — avoids native compiler issues with push-to-bytes-zeros.
+    # results - avoids native compiler issues with push-to-bytes-zeros.
     edit result_text = ""
     if first == 43:
         result_text = "+"
@@ -413,10 +413,10 @@ define slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
 # --- main loop ---
 
 # Push a token, but suppress a duplicate `newline` if the previous token
-# was already one — matches the Rust lexer's behaviour ("never two newlines
+# was already one - matches the Rust lexer's behaviour ("never two newlines
 # in a row, never first"). No type annotations on the params so Orion
 # treats them as Unknown (table isn't a writeable type name).
-# Mutate the token slot in place — O(1) amortised push instead of
+# Mutate the token slot in place - O(1) amortised push instead of
 # the old `append(list, val)` which cloned the entire token list per
 # call (~quadratic for 25k tokens). We track `last_kind` in a
 # separate scalar slot so we never have to read the (now huge)

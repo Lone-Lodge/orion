@@ -1,4 +1,4 @@
-# A closure created inside a loop, capturing the loop variable — the lift
+# A closure created inside a loop, capturing the loop variable - the lift
 # now descends into nested block bodies. g captures i; ap(g, 10) for
 # i = 0,1,2 gives 10 + 11 + 12 = 33.
 define ap(f: fn, x: int) -> int:

@@ -1,6 +1,6 @@
 name = "orion_lex"
 version = "0.0.1"
-description = "Orion self-host — lex"
+description = "Orion self-host - lex"
 
 [orbs]
 bytes = "*"

@@ -1,4 +1,4 @@
-# fizzbuzz — the canonical "can a newcomer write it?" program.
+# fizzbuzz - the canonical "can a newcomer write it?" program.
 # Build: orion.exe examples/demos/fizzbuzz.or out.ll orbs
 #
 # 1..20: multiples of 3 -> "Fizz", of 5 -> "Buzz", of both -> "FizzBuzz",

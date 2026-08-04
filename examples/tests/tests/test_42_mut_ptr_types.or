@@ -3,7 +3,7 @@ define main() -> int:
     edit acc = ""
     acc = "hello"
     acc = acc + " world"
-    # Then a list (also ptr — should be allowed)
+    # Then a list (also ptr - should be allowed)
     edit things = []
     things = append(things, 21)
     things = append(things, 21)

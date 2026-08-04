@@ -1,4 +1,4 @@
-# calculator — a real arithmetic evaluator: tokenize -> parse -> evaluate.
+# calculator - a real arithmetic evaluator: tokenize -> parse -> evaluate.
 #
 # Build: orion.exe examples/demos/calculator.or out.ll orbs
 #
@@ -44,7 +44,7 @@ define tokenize(src: text) -> [table]:
         if i >= n:
             break
         b = at(bs, i)
-        if b == ' ':                        # space — skip
+        if b == ' ':                        # space - skip
             i = i + 1
         else:
             if is_digit(b) == 1:            # a run of digits -> one number
@@ -78,7 +78,7 @@ define parse_factor(toks: [table], pos: int) -> Parsed:
     k = get(t, "kind")
     if k == "lparen":
         inner = parse_expr(toks, pos + 1)
-        # inner.next points at the ')' — step over it
+        # inner.next points at the ')' - step over it
         Parsed{val: inner.val, next: inner.next + 1}
     else:
         if k == "minus":                    # unary minus: -factor
@@ -102,7 +102,7 @@ define parse_term(toks: [table], pos: int) -> Parsed:
             val = val * r.val
         else:
             if r.val == 0:                  # handle it, don't trap
-                print_line("  (calculator: divide by zero — using 0)")
+                print_line("  (calculator: divide by zero - using 0)")
                 val = 0
             else:
                 val = val // r.val

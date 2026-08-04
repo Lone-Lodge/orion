@@ -1,4 +1,4 @@
-# orion_ir — typed IR for orion-self.
+# orion_ir - typed IR for orion-self.
 #
 # Design:
 #   - SSA-form: each instruction PRODUCES exactly one value.
@@ -109,7 +109,7 @@ public define ir_print_int(value_id: int) -> Inst:
     Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Select: result = if cond != 0 then then_id else else_id.
-# Branchless via cmov — works for any tree-shaped IR.
+# Branchless via cmov - works for any tree-shaped IR.
 public define ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
     Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
 
@@ -128,15 +128,15 @@ public define ir_call(fn_name: text, arg_ids: [int], ret_type: text) -> Inst:
 public define ir_print_str(text: text) -> Inst:
     Inst{op: "print_str", type_text: "void", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
-# String literal as a value — produces a text-typed SSA value (ptr to global).
+# String literal as a value - produces a text-typed SSA value (ptr to global).
 public define ir_const_str(text: text) -> Inst:
     Inst{op: "const_str", type_text: "text", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
-# Concatenate two text SSA values — calls runtime helper.
+# Concatenate two text SSA values - calls runtime helper.
 public define ir_text_concat(left_id: int, right_id: int) -> Inst:
     Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
-# Convert an i64 to text — calls runtime helper.
+# Convert an i64 to text - calls runtime helper.
 public define ir_int_to_text(value_id: int) -> Inst:
     Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
@@ -149,12 +149,12 @@ public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
 public define ir_text_len(value_id: int) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# slice(text, lo, hi) — substring from byte index lo (inclusive) to hi (exclusive).
+# slice(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
 public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
-# contains(text, sub) — returns i64 1 if sub appears anywhere in text, else 0.
+# contains(text, sub) - returns i64 1 if sub appears anywhere in text, else 0.
 public define ir_text_contains(text_id: int, sub_id: int) -> Inst:
     Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
 
@@ -195,7 +195,7 @@ public define ir_bytes_concat(a_id: int, b_id: int) -> Inst:
 public define ir_bytes_zeros(n_id: int) -> Inst:
     Inst{op: "bytes_zeros", type_text: "list", value: n_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# Global state slots — key→ptr Map. slot_get's caller decides type by usage.
+# Global state slots - key→ptr Map. slot_get's caller decides type by usage.
 # In our orbs, slots store text values; ir_slot_get defaults to text type.
 public define ir_slot_get(key_id: int) -> Inst:
     Inst{op: "slot_get", type_text: "text", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
@@ -206,7 +206,7 @@ public define ir_slot_set(key_id: int, val_id: int) -> Inst:
 
 # --- Lists (int-only for now) ---
 # A list is a ptr to a heap buffer laid out as [i64 length, i64 item0, ...].
-# LIMITATION: only int items work — text lists like ["a", "b"] fail at
+# LIMITATION: only int items work - text lists like ["a", "b"] fail at
 # compile because list_set takes i64, not ptr. Type-aware lists are a
 # future enhancement.
 public define ir_list_lit(item_ids: [int], elem_type: text) -> Inst:
@@ -272,7 +272,7 @@ public define ir_store(ptr_id: int, value_id: int) -> Inst:
 
 # --- Basic blocks (labels + branches + phi) ---
 # These let us emit real if/else with side-effects (recursion, calls)
-# and future loops. Label names are strings — we encode them in `name`.
+# and future loops. Label names are strings - we encode them in `name`.
 
 # Mark a basic-block boundary. name = "label_name".
 public define ir_label(label_name: text) -> Inst:
@@ -370,7 +370,7 @@ public define ir_dump_module(module: IRModule) -> text:
 
 use bytes
 
-# orion_ast_to_ir — walk Orion AST and emit typed IR.
+# orion_ast_to_ir - walk Orion AST and emit typed IR.
 #
 # Today: ints, arith (+ - * / %), comparisons, and/or/not,
 # if/else (expr + stmt), locals (let/mut), text (literals,
@@ -384,12 +384,12 @@ use bytes
 # --- Symbol table ---
 # Each binding tracks name, ssa-id, and a mut flag.
 #   is_mut == 0 → id is a value (use directly)
-#   is_mut == 1 → id is a ptr (alloca) — emit load to read, store to write
-# loop_headers / loop_ends — parallel stack of enclosing loops for
+#   is_mut == 1 → id is a ptr (alloca) - emit load to read, store to write
+# loop_headers / loop_ends - parallel stack of enclosing loops for
 # break/continue targets. Push when entering a loop, do not pop (immutable scope).
 type Scope: names: [text], ids: [int], mut_flags: [int], loop_headers: [text], loop_ends: [text], fn_sig_names: [text], fn_sig_rets: [text], ds_names: [text], ds_specs: [text], en_names: [text], en_variants: [text]
 
-# Typed map-get aliases — orion-self dispatches their callers to typed
+# Typed map-get aliases - orion-self dispatches their callers to typed
 # runtime helpers, but lodge-orion needs an actual definition to interpret.
 public define get_int(m: table, k: text) -> int: get(m, k)
 public define get_map(m: table, k: text) -> table: get(m, k)
@@ -525,7 +525,7 @@ define scope_lookup_fn_ret(scope: Scope, fn_name: text) -> text:
         if at(scope.fn_sig_names, index) == fn_name:
             result = at(scope.fn_sig_rets, index)
     if result == "":
-        print_line("orion-self: ERROR — call to unknown function `{fn_name}` (returning i64 as guess)")
+        print_line("orion-self: ERROR - call to unknown function `{fn_name}` (returning i64 as guess)")
         result = "i64"
     result
 
@@ -610,7 +610,7 @@ type ConvResult: function: IRFn, scope: Scope, id: int
 
 
 # Convert a text-encoded int literal to int.
-# Use bytes (text[i] returns whole string — Orion bug as of 2026-06).
+# Use bytes (text[i] returns whole string - Orion bug as of 2026-06).
 define parse_int(text: text) -> int:
     byte_list = bytes_from_text(text)
     total = len(byte_list)
@@ -722,7 +722,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     slot_ll = if slot_type == "i64" then "i64" else "ptr"
                     new_ll = if new_type == "i64" then "i64" else "ptr"
                     if slot_ll != new_ll:
-                        print_line("orion-self: ERROR — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                        print_line("orion-self: ERROR - cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
                     pr_store = ir_fn_push(current_fn, ir_store(ptr_id, er.id))
                     current_fn = pr_store.function
                     last_id = pr_store.id
@@ -775,7 +775,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     ConvResult{function: current_fn, scope: current_scope, id: last_id}
 
 
-# `loop:` — infinite loop with `break`/`continue` for exit.
+# `loop:` - infinite loop with `break`/`continue` for exit.
 define ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     body_node = get(node, "body")
     n = len(fn_value.instructions)
@@ -802,7 +802,7 @@ define ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     ConvResult{function: pr_end.function, scope: scope, id: 0 - 1}
 
 
-# `for var in iter_list:` — iterate over a list value.
+# `for var in iter_list:` - iterate over a list value.
 define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     var_name = get(node, "var")
     index_var_name = get(node, "index_var")
@@ -860,7 +860,7 @@ define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult
     ConvResult{function: pr_end_lbl.function, scope: scope, id: 0 - 1}
 
 
-# `for var in low..<high:` — emit alloca + classic header/body/end blocks.
+# `for var in low..<high:` - emit alloca + classic header/body/end blocks.
 define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     var_name = get(node, "var")
     low_node = get(node, "low")
@@ -907,7 +907,7 @@ define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvRes
 
     pr_end_lbl = ir_fn_push(pr_br_back.function, ir_label(end_lbl))
 
-    # For-loop is a statement — return scope as it was BEFORE body
+    # For-loop is a statement - return scope as it was BEFORE body
     # (loop var doesn't leak out).
     ConvResult{function: pr_end_lbl.function, scope: high_r.scope, id: 0 - 1}
 
@@ -922,15 +922,15 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_mut = scope_is_mut(scope, name)
     edit result = ConvResult{function: fn_value, scope: scope, id: found_id}
     if found_id < 0:
-        # Unknown ident — likely a `{expr}` interpolation the parser
+        # Unknown ident - likely a `{expr}` interpolation the parser
         # captured as a single ident. Emit a sentinel iconst(0) so
         # downstream code doesn't panic on at(insts, -1).
-        print_line("orion-self: ERROR — unknown identifier `{name}` (interpolation may need a temp var)")
+        print_line("orion-self: ERROR - unknown identifier `{name}` (interpolation may need a temp var)")
         pr = ir_fn_push(fn_value, ir_iconst(0))
         result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     is_real_mut = found_id >= 0 and is_mut == 1
     if is_real_mut:
-        # Mut bindings store a ptr (alloca) — read via load with the
+        # Mut bindings store a ptr (alloca) - read via load with the
         # alloca's stored type.
         alloca_inst = at(fn_value.instructions, found_id)
         loaded_type = alloca_inst.type_text
@@ -984,7 +984,7 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     result
 
 # Find the label of the basic block currently being emitted into.
-# Scans backward from the end and returns on the FIRST label found —
+# Scans backward from the end and returns on the FIRST label found -
 # O(distance from last label to end), amortized O(1) in practice.
 define current_block(fn_value: IRFn) -> text:
     insts = fn_value.instructions
@@ -1052,7 +1052,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             else_type = get_value_type(result_fn, else_r.id)
             # Branch types must agree for the phi to be well-typed.
             if then_type != else_type:
-                print_line("orion-self: ERROR — if/else branches have different types ({then_type} vs {else_type})")
+                print_line("orion-self: ERROR - if/else branches have different types ({then_type} vs {else_type})")
             pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
             result_id = pr_phi.id
             result_fn = pr_phi.function
@@ -1118,7 +1118,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_b_length = callee == "bytes_length"
     is_slot_get = callee == "slot_get"
     is_slot_set = callee == "slot_set"
-    # Typed map-get variants — explicit types where inference can't reach.
+    # Typed map-get variants - explicit types where inference can't reach.
     is_get_int = callee == "get_int"
     is_get_map = callee == "get_map"
     is_get_list = callee == "get_list"
@@ -1452,7 +1452,7 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
     fields = get(node, "fields")
     spec = scope_lookup_data_spec(scope, struct_name)
     if spec == "":
-        print_line("orion-self: ERROR — unknown data type `{struct_name}`")
+        print_line("orion-self: ERROR - unknown data type `{struct_name}`")
     parts = parse_data_spec(spec)
     n_fields_decl = len(parts)
     n_provided = len(fields)
@@ -1484,7 +1484,7 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                 current_scope = val_r.scope
                 matched_id = val_r.id
         if matched_id == (0 - 1):
-            # Field missing — default to 0
+            # Field missing - default to 0
             pr_default = ir_fn_push(current_fn, ir_iconst(0))
             current_fn = pr_default.function
             matched_id = pr_default.id
@@ -1496,7 +1496,7 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
 define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     obj_node = get(node, "object")
     field_name = get(node, "field")
-    # Special-case `EnumName.Variant` — obj is an Ident matching a known enum,
+    # Special-case `EnumName.Variant` - obj is an Ident matching a known enum,
     # field is the variant. Lower to iconst(variant_index).
     edit handled_enum = false
     edit enum_result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
@@ -1529,7 +1529,7 @@ define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         field_idx = find_field_index(parts, field_name)
         field_type = field_type_at(parts, field_idx)
         if field_idx < 0:
-            print_line("orion-self: ERROR — `{struct_name}` has no field `{field_name}`")
+            print_line("orion-self: ERROR - `{struct_name}` has no field `{field_name}`")
         pr_load = ir_fn_push(obj_r.function, ir_field_load(obj_r.id, field_idx, field_type))
         result = ConvResult{function: pr_load.function, scope: obj_r.scope, id: pr_load.id}
     result

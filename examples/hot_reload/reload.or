@@ -1,9 +1,9 @@
 # Hot reload, Orion-native. This program loads compiled gameplay code from a
 # shared library, runs it, then swaps in a freshly compiled version WITHOUT
-# restarting — game state survives the swap. That is the "less editor, more
+# restarting - game state survives the swap. That is the "less editor, more
 # live" loop: a change becomes visible in the running world immediately.
 #
-# The primitive that makes it work is `call_ptr(fnptr, arg)` — call a raw
+# The primitive that makes it work is `call_ptr(fnptr, arg)` - call a raw
 # function pointer held as an int (here, one returned by `dlsym`). A normal
 # `f(x)` assumes `f` is a closure; `call_ptr` calls loaded native code.
 #

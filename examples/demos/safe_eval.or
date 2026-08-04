@@ -1,17 +1,17 @@
-# safe_eval — an RPN evaluator that REPORTS errors instead of guessing.
+# safe_eval - an RPN evaluator that REPORTS errors instead of guessing.
 #
 # Build: orion.exe examples/demos/safe_eval.or out.ll orbs
 #
 # Where rpn.or substitutes 0 on a bad divide, this one models fallibility
 # honestly with a sum type and propagates failures with the `?` operator:
-#   - `enum Eval: Ok(int), Err(text)` — a result is a value OR a message
+#   - `enum Eval: Ok(int), Err(text)` - a result is a value OR a message
 #   - `apply` returns Err on divide-by-zero / unknown operator
 #   - `expr?` unwraps Ok to the int, or early-returns the Err up the stack
 #   - stack underflow and leftover operands are errors too
 #   - `match` on the result at the top reports Ok / Err
 #
 # `?` is exercised in a spot the tests don't reach: inside a `for` loop, inside
-# a `match` arm — the short-circuit still returns straight out of `eval`.
+# a `match` arm - the short-circuit still returns straight out of `eval`.
 
 type Token: Num(int), Op(text)
 type Eval:  Ok(int), Err(text)

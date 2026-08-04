@@ -1,7 +1,7 @@
-# `or` — value-preserving fallback (Minimal Orion, punkt "or äter unwrap_or").
+# `or` - value-preserving fallback (Minimal Orion, punkt "or äter unwrap_or").
 #
 # `x or default` returns the LEFT value if it is present/truthy, else the RIGHT.
-# Only None and false are absent — everything else is present. So boolean `or`
+# Only None and false are absent - everything else is present. So boolean `or`
 # still works in an `if`, and `hp or 100` yields hp when it is a real value.
 #
 # Run (lodge-orion interp):  orion run or_fallback.or main   → expects 49

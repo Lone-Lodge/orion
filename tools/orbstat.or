@@ -1,4 +1,4 @@
-# orbstat — what does an orb actually expose, and how much of it is proven?
+# orbstat - what does an orb actually expose, and how much of it is proven?
 #
 # A real tool written in the v2 surface, on purpose: it is the dogfood test
 # for `define`/`edit`/`truth`/`is`/`until`/`choose`/`collect`/`where`/`each`/
@@ -35,7 +35,7 @@ define has_contract(line: text) -> truth:
     example not has_contract("public define f():")
     contains(line, " uses ")
 
-# `==`, `!=` and `0..<n` are the retired spellings — this is the measure of
+# `==`, `!=` and `0..<n` are the retired spellings - this is the measure of
 # how much of an orb still reads like v1.
 define is_old_idiom(line: text) -> truth:
     example is_old_idiom("if a == b:")

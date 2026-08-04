@@ -1,5 +1,5 @@
 #!/bin/bash
-# demos_smoke — compile (and link) every examples/demos/*.or and report
+# demos_smoke - compile (and link) every examples/demos/*.or and report
 # pass/fail. Guards the demos against orb renames and compiler changes.
 #
 #   bash tools/demos_smoke.sh
@@ -15,7 +15,7 @@ TMP=$(mktemp -d)
 INCLUDE_NET=0
 [ "${1:-}" = "--all" ] && INCLUDE_NET=1
 
-[ -x "$ORION" ] || { echo "no dist/orion.exe — run tools/bootstrap_from_ll.sh first"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - run tools/bootstrap_from_ll.sh first"; exit 1; }
 
 # The compiler always emits a Windows triple; on POSIX retarget to the host.
 case "$(uname -s 2>/dev/null || echo Linux)" in

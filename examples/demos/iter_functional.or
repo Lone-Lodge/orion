@@ -1,4 +1,4 @@
-# iter — functional list operations with closures.
+# iter - functional list operations with closures.
 # Build: this is a library-using program; compile with the orbs/ root:
 #   orion.exe examples/demos/iter_functional.or out.ll orbs
 #
@@ -10,7 +10,7 @@ define main() -> int:
     scores = [40, 75, 88, 12, 95, 60]
     bonus = 5
 
-    # Plain intermediate variables read top-to-bottom — each line names its
+    # Plain intermediate variables read top-to-bottom - each line names its
     # result, so a newcomer can follow every step. The closures capture
     # `bonus` from the surrounding scope.
     boosted = each(scores, fn(s): s + bonus)                      # [45,80,93,17,100,65]

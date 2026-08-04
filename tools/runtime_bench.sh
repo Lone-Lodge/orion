@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# runtime_bench.sh — measure what the GENERATED code costs, per primitive.
+# runtime_bench.sh - measure what the GENERATED code costs, per primitive.
 #
 # tools/compile_bench.sh gates compile time. This gates the other half: a
 # codegen change that makes the compiler faster and the compiled program
@@ -27,7 +27,7 @@ CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
 UPDATE=0
 [ "${1:-}" = "--update" ] && UPDATE=1
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 TMP="$ROOT/dist/.rtbench"
 mkdir -p "$TMP"
@@ -70,7 +70,7 @@ fi
 
 if [ ! -f "$BASELINE" ]; then
     echo
-    echo "  no baseline yet — record one: bash tools/runtime_bench.sh --update"
+    echo "  no baseline yet - record one: bash tools/runtime_bench.sh --update"
     exit 0
 fi
 

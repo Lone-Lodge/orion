@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fuzz.sh — feed the compiler damaged source and watch how it REACTS.
+# fuzz.sh - feed the compiler damaged source and watch how it REACTS.
 #
 # A fuzzer does not need to know what a program means. It only needs to know
 # what a healthy reaction looks like, and for a compiler there are exactly two:
@@ -9,7 +9,7 @@
 #
 # Anything else is a finding: a hang, a crash, an internal trap ("list index -1
 # out of range"), an error with no location, or silence with no output. Five bugs
-# of exactly that shape turned up BY ACCIDENT while writing tests today — an
+# of exactly that shape turned up BY ACCIDENT while writing tests today - an
 # unterminated interpolation hole that spun forever, an argument list with no
 # no-progress guard, a match arm with no value. This looks for the rest.
 #
@@ -26,7 +26,7 @@ CORPUS="$ROOT/examples/tests/tests"
 ITERS="${ITERS:-200}"
 SEED="${SEED:-1}"
 TIMEOUT="${FUZZ_TIMEOUT:-20}"
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 WORK="$ROOT/dist/.fuzz"
 FIND="$ROOT/dist/.fuzz-findings"
@@ -35,7 +35,7 @@ FIND="$ROOT/dist/.fuzz-findings"
 rm -rf "$WORK" "$FIND"; mkdir -p "$WORK" "$FIND"
 RANDOM=$SEED
 
-# Characters that mean something to the lexer and parser — the ones most likely
+# Characters that mean something to the lexer and parser - the ones most likely
 # to put it in a state nobody wrote code for.
 CHARS='{}():[]"\|><~,.=-+*/#'"'"
 
@@ -97,7 +97,7 @@ for i in $(seq "$ITERS"); do
         *"list index"*|*"out of range"*|*"division by zero"*)
             # The compiler tripping its OWN runtime guard is an internal error:
             # a malformed program deserves a diagnostic, not a trap. But
-            # `ERROR at file:line:col — division by zero` IS the diagnostic —
+            # `ERROR at file:line:col - division by zero` IS the diagnostic -
             # the compiler rejecting a literal `/ 0` in the input. Only the
             # unlocated form is a trap.
             if echo "$out" | grep -qE "ERROR at .+:[0-9]+:[0-9]+"; then
@@ -115,7 +115,7 @@ for i in $(seq "$ITERS"); do
     # shape; `at line 0:0` means the node carried no position.
     if echo "$out" | grep -qE "ERROR at .+:[0-9]+:[0-9]+"; then
         ok=$((ok + 1))
-    elif echo "$out" | grep -qE "ERROR at line 0:0|ERROR —|ERROR -"; then
+    elif echo "$out" | grep -qE "ERROR at line 0:0|ERROR -|ERROR -"; then
         unlocated=$((unlocated + 1)); report UNLOCATED "$case_file" "$(echo "$out" | grep -m1 "ERROR" | cut -c1-70)"
     elif [ -n "$out" ]; then
         ok=$((ok + 1))   # some other loud refusal (missing file, bad args)

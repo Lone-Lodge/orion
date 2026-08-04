@@ -1,110 +1,10 @@
-# async — cooperative async helpers built on the new timing primitives.
+# async - tasks: real suspension, one stack each.
 #
-# This orb is the user-space layer above the runtime builtins:
-#   - time_now_ms()     — wall clock (non-deterministic)
-#   - monotonic_ms()    — monotonic since process start
-#   - sleep_ms(n)       — blocking yield to OS
+# (The deadline helpers and the timer queue that used to open this orb were
+# the pre-task workaround; nothing used them once tasks landed, so they are
+# gone. The runtime builtins monotonic_ms/sleep_ms remain for direct use.)
 #
-# A real preemptive scheduler with non-blocking I/O is future work
-# (libco + IOCP/epoll bindings). What this orb gives you today is the
-# cooperative subset: deadline tracking, periodic ticks, and a
-# `sleep_until` helper that's deadline-stable across loop iterations.
-
-# Sleep until the monotonic clock reaches `deadline_ms`. If we're already
-# past it, returns immediately. Otherwise sleeps the remaining time.
-# no example: sleeps — an example would slow every build
-public define sleep_until(deadline_ms: int) uses clock:
-    now = monotonic_ms()
-    remaining = deadline_ms - now
-    if remaining > 0:
-        sleep_ms(remaining)
-
-# Sleep for at least `duration_ms`. Wrapper that documents intent —
-# `sleep_ms` directly works too, but `delay` reads better in async code.
-# no example: sleeps — an example would slow every build
-public define delay(duration_ms: int) uses clock:
-    if duration_ms > 0:
-        sleep_ms(duration_ms)
-
-# Return the monotonic clock value `offset_ms` from now. Useful for
-# building deadlines: `deadline = deadline_from_now(100)` then later
-# `sleep_until(deadline)`.
-public define deadline_from_now(offset_ms: int) -> int uses clock:
-    example deadline_from_now(0) > 0
-    monotonic_ms() + offset_ms
-
-# Did `deadline_ms` already pass? Plain comparison helper for readability
-# in event loops.
-public define past_deadline(deadline_ms: int) -> truth uses clock:
-    example past_deadline(0)
-    monotonic_ms() >= deadline_ms
-
-# Number of ms remaining until `deadline_ms`, clamped to 0 if past.
-public define time_left(deadline_ms: int) -> int uses clock:
-    example time_left(0) is 0
-    now = monotonic_ms()
-    delta = deadline_ms - now
-    if delta < 0 then 0 else delta
-
-# --- Deadline-driven timer queue ---
-# A poor-person's scheduler: keep deadlines in a list, advance the clock,
-# fire any whose deadline has passed. Pure data — no callbacks. The
-# caller drives the loop and dispatches based on the fired ids.
-#
-# Returns a list of timer-deadlines. Use add_timer / pop_due / next_due.
-
-# Build an empty timer queue.
-public define timers_new() -> [int]:
-    example len(timers_new()) is 0
-    bytes_zeros(0)
-
-# Push a timer that fires `offset_ms` from now. Returns the new queue.
-public define add_timer(timers: [int], offset_ms: int) -> [int]:
-    example len(add_timer(timers_new(), 100)) is 1
-    append(timers, deadline_from_now(offset_ms))
-
-# Earliest deadline in the queue, or -1 if empty.
-public define next_due(timers: [int]) -> int:
-    example next_due(timers_new()) is 0 - 1
-    n = len(timers)
-    if n is 0:
-        return 0 - 1
-    edit best = at(timers, 0)
-    loop i in 1 until n:
-        d = at(timers, i)
-        if d < best:
-            best = d
-    best
-
-# How many timers have already fired (deadline <= now)?
-public define count_due(timers: [int]) -> int:
-    example count_due(timers_new()) is 0
-    n = len(timers)
-    now = monotonic_ms()
-    edit count = 0
-    loop i in 0 until n:
-        if at(timers, i) <= now:
-            count = count + 1
-    count
-
-# Sleep until the next deadline fires. Returns immediately if past or
-# the queue is empty. Caller is expected to dispatch after this returns.
-# no example: sleeps — an example would slow every build
-public define wait_next(timers: [int]) uses clock:
-    nd = next_due(timers)
-    if nd > 0:
-        sleep_until(nd)
-
-# ---- tasks: real suspension, one stack each ---------------------------
-#
-# The comment at the top of this orb used to end with "A real preemptive
-# scheduler with non-blocking I/O is future work (libco + IOCP/epoll
-# bindings)", and everything above is what you get without stack switching:
-# timers. A task could not PARK mid-computation, because the effect machinery is
-# one-shot setjmp/longjmp — it resumes a continuation, it cannot come back to
-# one later.
-#
-# These four give every task its own stack (Windows fibers, ucontext elsewhere),
+# Every task gets its own stack (Windows fibers, ucontext elsewhere),
 # so `yield_now()` suspends and the scheduler resumes exactly where it stopped.
 # Cooperative and single-threaded on purpose: `loop parallel:` is the parallel
 # primitive, this is the concurrency one.
@@ -116,14 +16,14 @@ public define wait_next(timers: [int]) uses clock:
 #
 # and inside a worker:
 #
-#     fn worker(n: int) -> int:
-#         mut total = 0
+#     define worker(n: int) -> int:
+#         edit total = 0
 #         loop i in 0 until n:
 #             total += i
 #             yield_now()           # another task gets a turn here
 #         total
 #
-# A task is awaited ONCE (awaiting it again gives 0 — its stack is gone).
+# A task is awaited ONCE (awaiting it again gives 0 - its stack is gone).
 # Where the platform has no stack switching, spawn runs the closure right away
 # and yield_now() does nothing: a non-yielding task still gives the same answer.
 external define orion_task_spawn(f: fn, arg: int) -> int
@@ -133,30 +33,30 @@ external define orion_task_run_all() -> int
 external define orion_task_state(id: int) -> int
 external define orion_task_live_count() -> int
 
-# Start a task. Returns its id, or -1 if the task table is full (256).
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# Start a task. Returns its id, or -1 if the task table is full (1024).
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define spawn(f: fn, arg: int) -> int = orion_task_spawn(f, arg)
 
 # Run the scheduler until this task finishes, then take its result.
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define await(id: int) -> int = orion_task_await(id)
 
 # Give the scheduler a turn. No-op outside a task.
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define yield_now() -> int = orion_task_yield()
 
 # Drive every ready task to completion; returns how many are finished.
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define run_all() -> int = orion_task_run_all()
 
 # 0 = no such task, 1 = ready, 2 = running, 3 = finished (result not taken yet).
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define task_state(id: int) -> int = orion_task_state(id)
 
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define task_count() -> int = orion_task_live_count()
 
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define is_done(id: int) -> truth = orion_task_state(id) is 3
 
 external define orion_task_sleep(ms: int) -> int
@@ -169,7 +69,7 @@ external define orion_task_sleep(ms: int) -> int
 # This is the difference between concurrency and a queue: with `sleep_ms` inside
 # a task, ten tasks each waiting 100 ms took a second, because the first one
 # parked the whole scheduler in the OS.
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define sleep_task(ms: int) -> int = orion_task_sleep(ms)
 
 # ---- delimited continuations: the handler survives the resume ---------
@@ -192,7 +92,7 @@ public define sleep_task(ms: int) -> int = orion_task_sleep(ms)
 #
 # ONE resume per `ask`. A second one is refused with a message rather than a
 # crash: replaying would mean restoring the task's stack to the perform point,
-# and that invalidates the context the OS parked the fiber at (measured — the
+# and that invalidates the context the OS parked the fiber at (measured - the
 # first resume returns correctly, the second faults at the switch). Real
 # multi-shot needs a context switcher of our own, or per-resume stack copies
 # with every frame pointer relocated. Neither is worth half-building.
@@ -205,12 +105,12 @@ external define orion_ms_supported() -> int
 
 # Inside a task: hand control to `handler`, which may resume this point once and
 # then keep working. Returns the handler's value, or the resumed value.
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define ask(handler: fn, arg: int) -> int = orion_ms_perform(handler, arg)
 
 # Inside such a handler: run the rest of the task with `v`, and get its result.
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define resume_with(v: int) -> int = orion_ms_resume(v)
 
-# no example: needs the running task scheduler — proven by test_42_async_interleave.or
+# no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define resumable_ok() -> truth = orion_ms_supported() is 1

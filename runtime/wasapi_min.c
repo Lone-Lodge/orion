@@ -1,16 +1,16 @@
-/* wasapi_min.c — the in-house potato mixer, v2.
+/* wasapi_min.c - the in-house potato mixer, v2.
  *
  * Raw WASAPI shared mode, one render thread, 32 voices, three buses
  * (0 sfx, 1 music, 2 ui) under a master. WAV assets (PCM16 / f32,
  * mono/stereo, any rate) are converted to device-rate stereo f32 at
- * load — the mix loop is a dumb fused multiply-add, no DSP graph.
+ * load - the mix loop is a dumb fused multiply-add, no DSP graph.
  *
  * v2 adds what a full game needs and nothing more:
- *   - per-voice volume FADES (fade_ms on start, gain change, stop) —
+ *   - per-voice volume FADES (fade_ms on start, gain change, stop) -
  *     crossfades and rule-driven ducking without clicks
  *   - LOOP voices with stable handles (slot+generation) so scripts
  *     can start, retune and stop named loops
- *   - LAYERS: loop voices sample-synced to the music clock — vertical
+ *   - LAYERS: loop voices sample-synced to the music clock - vertical
  *     interactive music driven by gain fades
  *   - voice STEALING: when full, the quietest fading/one-shot dies
  *     (loops and music are never stolen)
@@ -18,7 +18,7 @@
  * This file OVERRIDES the weak no-op stubs in orion_rt.c: link it
  * (orbit native does) and games get sound; leave it out (headless
  * gates) and the same calls count silently. The game-facing seam is
- * atlas_audio — swapping this backend for an FMOD/Wwise adapter
+ * atlas_audio - swapping this backend for an FMOD/Wwise adapter
  * later never touches game code.
  */
 #ifdef _WIN32
@@ -54,7 +54,7 @@ typedef struct {
 
 typedef struct {
     int active;
-    int gen; /* bumps on reuse — stale handles miss */
+    int gen; /* bumps on reuse - stale handles miss */
     int sound;
     int loop;
     int bus;
@@ -103,7 +103,7 @@ static void oa_mix(float *dst, UINT32 nframes) {
          * below would drift per voice; step them here per frame via a
          * precomputed walk instead: apply per-sample in voice loop
          * using a local copy advanced identically for every voice is
-         * overkill for 20ms blocks — step the whole block at once. */
+         * overkill for 20ms blocks - step the whole block at once. */
         float step = oa_bus_step[b] * nframes;
         if (oa_bus_vol[b] < oa_bus_target[b]) {
             oa_bus_vol[b] += step;
@@ -253,7 +253,7 @@ extern const char *orion_embedded_data(const char *path, long long *size);
 long long orion_audio_load(const char *path) {
     if (oa_nsounds >= OA_MAX_SOUNDS) return -1;
     /* Ship builds carry the WAV bytes inside the exe; dev reads disk.
-     * `heap` is NULL for embedded data — free(NULL) is a no-op. */
+     * `heap` is NULL for embedded data - free(NULL) is a no-op. */
     unsigned char *heap = NULL;
     const unsigned char *raw;
     long long sz = 0;
@@ -467,7 +467,7 @@ long long orion_audio_music(long long id, long long gain, long long fade_ms) {
 }
 
 /* Layer: a loop on the music bus, started at the MUSIC VOICE'S exact
- * sample position — equal-length stems stay phase-locked forever.
+ * sample position - equal-length stems stay phase-locked forever.
  * Drive intensity by fading layer gains, never by restarting. */
 long long orion_audio_layer(long long id, long long gain, long long fade_ms) {
     oa_total_plays++;

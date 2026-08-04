@@ -1,4 +1,4 @@
-# stats — parse a line of numbers and report basic statistics.
+# stats - parse a line of numbers and report basic statistics.
 # Build: orion.exe examples/demos/stats.or out.ll orbs
 #
 # Ties the standard library together: text.split + num.parse to read the

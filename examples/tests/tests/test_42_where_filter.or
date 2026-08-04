@@ -1,5 +1,5 @@
 # `where` is BACK (the design kept it; it had been retired): a loop filter
-# that desugars in the parser to wrapping the body in `if cond:` — exactly
+# that desugars in the parser to wrapping the body in `if cond:` - exactly
 # the documented collect-filter, so lowering is untouched.
 #   expression position:  kept = loop v in xs where v > 2: collect v
 #   statement position:   loop v in xs where v != 3: ...
