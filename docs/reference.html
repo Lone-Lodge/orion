@@ -39,8 +39,10 @@
 <li><a href="#ori_geometry"><code>ori_geometry</code></a></li>
 <li><a href="#encoding"><code>encoding</code></a></li>
 <li><a href="#file"><code>file</code></a></li>
+<li><a href="#http"><code>http</code></a></li>
 <li><a href="#rand"><code>rand</code></a></li>
 <li><a href="#store"><code>store</code></a></li>
+<li><a href="#time"><code>time</code></a></li>
 <li><a href="#watch"><code>watch</code></a></li>
 </ol>
 </nav>
@@ -173,6 +175,8 @@
 <div class="fn"><code class="sig">finished_within(id: int, ms: int) -&gt; truth = proc_wait_ready(id, ms) is 1</code><p>Did job <code>id</code> finish within <code>ms</code>? Inside a task this parks the task and lets the others run; outside it is an ordinary wait.</p></div>
 <div class="fn"><code class="sig">command_result(id: int) -&gt; int = proc_result(id)</code><p>Exit code of a finished job, taken ONCE (the job id is dead afterwards).</p></div>
 <div class="fn"><code class="sig">stop_command(id: int) -&gt; truth = proc_stop(id) is 1</code><p>Kill a running job.</p></div>
+<div class="fn"><code class="sig">env(name: text) -&gt; text = env_get(name)</code><p>The environment variable <code>name</code>, or "" when unset.</p></div>
+<div class="fn"><code class="sig">interrupted() -&gt; truth = interrupt_seen() is 1</code><p>Has the user pressed Ctrl+C? The first call arms the handler; from then on one Ctrl+C sets this flag instead of killing (poll it in your loop and shut down cleanly), and a SECOND Ctrl+C kills as normal - a hung program still dies at the keyboard.</p></div>
 <div class="fn"><code class="sig">cpu_count() -&gt; int</code><p>Hardware threads on this machine - what to size a worker pool by.</p></div>
 <div class="fn"><code class="sig">path_join(a: text, b: text) -&gt; text</code><p>---- paths ----</p></div>
 <div class="fn"><code class="sig">path_parent(p: text) -&gt; text</code></div>
@@ -273,6 +277,15 @@
 <div class="fn"><code class="sig">with_append(path: text, body: fn) -&gt; int uses files</code><p>no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
 <div class="fn"><code class="sig">append_line(path: text, line: text) -&gt; int uses files</code><p>--- line-oriented convenience --- Append one line (adds the newline).</p></div>
 <div class="fn"><code class="sig">write_line(handle: int, line: text) -&gt; int uses files</code><p>no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
+<h2 id="http"><code>http</code></h2>
+<p class="orb-blurb">fetch and post over HTTP(S).</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">response = status: int | body: text</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">status_from_headers(header_dump: text) -&gt; int</code><p>The status is read from curl's header dump (-D), not from stdout: the dump is a file of its own, so a stray stderr line can never corrupt it.</p></div>
+<div class="fn"><code class="sig">fetch(url: text) -&gt; response uses net, files</code><p>GET <code>url</code>.</p></div>
+<div class="fn"><code class="sig">post(url: text, content_type: text, payload: text) -&gt; response uses net, files</code><p>POST <code>body</code> to <code>url</code> with the given Content-Type.</p></div>
+<div class="fn"><code class="sig">success(r: response) -&gt; truth</code><p>Did the request reach a server that answered success?</p></div>
 <h2 id="rand"><code>rand</code></h2>
 <p class="orb-blurb">a small pseudo-random generator.</p>
 <div class="fn"><code class="sig">srand(seed: int) -&gt; int uses random</code><p>Fix the sequence.</p></div>
@@ -280,6 +293,8 @@
 <div class="fn"><code class="sig">rand_range(lo: int, hi: int) -&gt; int uses random</code><p>A pseudo-random int in [lo, hi).</p></div>
 <div class="fn"><code class="sig">rand_float() -&gt; float uses random</code><p>A pseudo-random float in [0.0, 1.0).</p></div>
 <div class="fn"><code class="sig">rand_chance(n: int) -&gt; truth uses random</code><p>true with probability 1/n (rand_chance(2) is a coin flip).</p></div>
+<div class="fn"><code class="sig">secure_bytes(n: int) -&gt; [int] uses random</code><p><code>n</code> unpredictable bytes (0..255 each) from the OS.</p></div>
+<div class="fn"><code class="sig">secure_token(n: int) -&gt; text uses random</code><p>An unpredictable hex token of <code>n</code> bytes (2n characters), for session ids and API keys.</p></div>
 <h2 id="store"><code>store</code></h2>
 <p class="orb-blurb">program state shaped like a database (manifesto P1).</p>
 <h3 class="sub">Types</h3>
@@ -291,6 +306,12 @@
 <div class="fn"><code class="sig">entity(s: sstore, id: int) -&gt; table</code><p>The record for <code>id</code>, or {} when it was never inserted / was removed.</p></div>
 <div class="fn"><code class="sig">has_id(s: sstore, id: int) -&gt; truth</code></div>
 <div class="fn"><code class="sig">items(s: sstore) -&gt; [table]</code><p>Every live record - the iteration/query source.</p></div>
+<h2 id="time"><code>time</code></h2>
+<p class="orb-blurb">clock time for humans: unix seconds and formatted dates.</p>
+<div class="fn"><code class="sig">now_unix() -&gt; int uses clock = unix_now()</code><p>Seconds since 1970-01-01 UTC.</p></div>
+<div class="fn"><code class="sig">local_time(unix_s: int, fmt: text) -&gt; text</code><p><code>unix_s</code> formatted with strftime codes, in the machine's local timezone.</p></div>
+<div class="fn"><code class="sig">utc_time(unix_s: int, fmt: text) -&gt; text</code><p><code>unix_s</code> formatted with strftime codes, in UTC.</p></div>
+<div class="fn"><code class="sig">timestamp() -&gt; text uses clock = local_time(unix_now(), "%Y-%m-%d %H:%M:%S")</code><p>The common stamp, local: "2026-08-04 21:30:05".</p></div>
 <h2 id="watch"><code>watch</code></h2>
 <p class="orb-blurb">the mechanics of a file watcher: scan a tree, fingerprint it, name what changed.</p>
 <div class="fn"><code class="sig">scan_tree(dir: text) -&gt; [text] uses files</code><p>Every watched file under <code>dir</code>, recursively, skipping build dirs.</p></div>

@@ -18,9 +18,11 @@
  */
 
 #define _CRT_SECURE_NO_WARNINGS 1
+#define _CRT_RAND_S 1   /* rand_s (OS entropy) needs this before stdlib.h */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 /* orion_rt.c wraps a raw C string into a headered orion Text; without it a
  * returned `const char*` isn't a real Text and `==` against a literal fails. */
@@ -275,6 +277,91 @@ const char *capture(const char *cmd) {
     return orion_text_from_c(cbuf);
 }
 #endif
+
+/* ---- the general-software floor: env, interrupt, entropy, clock time ----
+ * Small, portable, and the pieces almost every program eventually asks for.
+ * All two-branch #ifdef like the rest of this file (see docs/PLATFORMS.md). */
+
+/* Value of an environment variable, "" when unset. */
+const char *env_get(const char *name) {
+    const char *v = getenv(name);
+    return orion_text_from_c(v ? v : "");
+}
+
+/* Ctrl+C as a QUESTION instead of a kill. The first call arms the handler;
+ * from then on one Ctrl+C sets a flag the program polls (a server's loop
+ * asks between requests and shuts down cleanly). A SECOND Ctrl+C restores
+ * the default and kills, so a hung program still dies at the keyboard. */
+static volatile long long orion_interrupt_flag = 0;
+static long long orion_interrupt_armed = 0;
+#ifdef _WIN32
+static int __stdcall orion_ctrl_handler(unsigned long type) {
+    (void)type;
+    orion_interrupt_flag = 1;
+    SetConsoleCtrlHandler((PHANDLER_ROUTINE)orion_ctrl_handler, FALSE);
+    return 1;
+}
+#else
+#include <signal.h>
+static void orion_sigint_handler(int sig) {
+    (void)sig;
+    orion_interrupt_flag = 1;
+    signal(SIGINT, SIG_DFL);
+}
+#endif
+long long interrupt_seen(void) {
+    if (!orion_interrupt_armed) {
+        orion_interrupt_armed = 1;
+#ifdef _WIN32
+        SetConsoleCtrlHandler((PHANDLER_ROUTINE)orion_ctrl_handler, TRUE);
+#else
+        signal(SIGINT, orion_sigint_handler);
+#endif
+    }
+    return orion_interrupt_flag;
+}
+
+/* `n` bytes of OS entropy as a fresh list (the [cap,len,data...] layout every
+ * list uses). For tokens and keys - the rand orb's PRNG is for games/sims. */
+extern void *orion_alloc(long long bytes);
+long long *entropy_bytes(long long n) {
+    if (n < 0) n = 0;
+    long long *out = (long long *)orion_alloc((2 + n) * 8);
+    out[0] = n;
+    out[1] = n;
+#ifdef _WIN32
+    for (long long i = 0; i < n; i++) {
+        unsigned int v = 0;
+        rand_s(&v);   /* CRT wrapper over RtlGenRandom - no extra link dep */
+        out[2 + i] = (long long)(v & 0xFF);
+    }
+#else
+    FILE *u = fopen("/dev/urandom", "rb");
+    for (long long i = 0; i < n; i++) {
+        int c = u ? fgetc(u) : 0;
+        out[2 + i] = (long long)(c & 0xFF);
+    }
+    if (u) fclose(u);
+#endif
+    return out;
+}
+
+/* Unix time in seconds, and strftime-formatting of one - the floor a date
+ * orb builds on. `local` 1 = the machine's timezone, 0 = UTC. */
+long long unix_now(void) { return (long long)time(NULL); }
+
+const char *time_format(long long unix_s, const char *fmt, long long local) {
+    static char buf[256];
+    time_t t = (time_t)unix_s;
+    struct tm tmv;
+#ifdef _WIN32
+    if (local) localtime_s(&tmv, &t); else gmtime_s(&tmv, &t);
+#else
+    if (local) localtime_r(&t, &tmv); else gmtime_r(&t, &tmv);
+#endif
+    if (strftime(buf, sizeof(buf), fmt, &tmv) == 0) buf[0] = 0;
+    return orion_text_from_c(buf);
+}
 
 /* Exit the process with a code. */
 long long exit_with(long long code) {

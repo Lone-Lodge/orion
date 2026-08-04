@@ -132,6 +132,20 @@ public define stop_command(id: int) -> truth = proc_stop(id) is 1
 # (`orion_`-prefixed externs are assumed runtime-internal and skip the
 # emitter's auto-declare, so this one is named like host_os above.)
 external define host_cpus() -> int
+external define env_get(name: text) -> text
+external define interrupt_seen() -> int
+
+# The environment variable `name`, or "" when unset. How PATH, HOME and
+# API keys reach a program.
+# no example: depends on the host environment - proven by test_42_general_floor.or
+public define env(name: text) -> text = env_get(name)
+
+# Has the user pressed Ctrl+C? The first call arms the handler; from then on
+# one Ctrl+C sets this flag instead of killing (poll it in your loop and shut
+# down cleanly), and a SECOND Ctrl+C kills as normal - a hung program still
+# dies at the keyboard.
+# no example: needs a keyboard - proven by test_42_general_floor.or (arm side)
+public define interrupted() -> truth = interrupt_seen() is 1
 
 # Hardware threads on this machine - what to size a worker pool by.
 public define cpu_count() -> int:

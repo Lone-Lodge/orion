@@ -1509,6 +1509,8 @@ retb:
 
 
 @.str_0 = private unnamed_addr constant [27 x i8] c"\F2\2C\D6\1A\00\00\00\00\0A\00\00\00\00\00\00\00rand:state\00", align 8
+@.str_1 = private unnamed_addr constant [33 x i8] c"\D0\3B\2F\29\00\00\00\00\10\00\00\00\00\00\00\000123456789abcdef\00", align 8
+@.str_2 = private unnamed_addr constant [17 x i8] c"\05\15\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00", align 8
 
 define i64 @rand__rand_state() {
 entry:
@@ -1603,6 +1605,75 @@ if_3_else:
 if_3_merge:
     %v14 = phi i64 [ %v5, %if_3_then ], [ %v11, %if_3_else ]
     ret i64 %v14
+}
+
+declare ptr @entropy_bytes(i64)
+
+define ptr @rand__secure_bytes(i64 %p0) {
+entry:
+    %v0 = add i64 0, %p0
+    %v1 = call ptr @entropy_bytes(i64 %v0)
+    ret ptr %v1
+}
+
+define ptr @rand__secure_token(i64 %p0) {
+entry:
+    %v4 = alloca ptr, align 8
+    %v8 = alloca i64, align 8
+    %v0 = add i64 0, %p0
+    %v1 = getelementptr i8, ptr @.str_1, i64 16
+    %v2 = call ptr @entropy_bytes(i64 %v0)
+    %v3 = getelementptr i8, ptr @.str_2, i64 16
+    store ptr %v3, ptr %v4
+    %v5 = add i64 0, 0
+    %v6 = add i64 0, 0
+    %v7 = call i64 @orion_list_len(ptr %v2)
+    store i64 %v6, ptr %v8
+    %v9 = add i64 0, 0
+    br label %for_6_header
+for_6_header:
+    %v12 = load i64, ptr %v8
+    %v13.b = icmp slt i64 %v12, %v7
+    %v13 = zext i1 %v13.b to i64
+    %v14.cb = icmp ne i64 %v13, 0
+    br i1 %v14.cb, label %for_6_body, label %for_6_end
+for_6_body:
+    %v16 = call i64 @orion_list_at(ptr %v2, i64 %v12)
+    %v17 = add i64 0, 16
+    %v18 = call i64 @orion_idiv(i64 %v16, i64 %v17)
+    %v19 = add i64 0, 16
+    %v20 = call i64 @orion_idiv(i64 %v16, i64 %v19)
+    %v21 = add i64 0, 1
+    %v22 = add i64 %v20, %v21
+    %v23 = call ptr @orion_text_slice(ptr %v1, i64 %v18, i64 %v22)
+    %v24 = add i64 0, 16
+    %v25 = call i64 @orion_imod(i64 %v16, i64 %v24)
+    %v26 = add i64 0, 16
+    %v27 = call i64 @orion_imod(i64 %v16, i64 %v26)
+    %v28 = add i64 0, 1
+    %v29 = add i64 %v27, %v28
+    %v30 = call ptr @orion_text_slice(ptr %v1, i64 %v25, i64 %v29)
+    %v31 = load ptr, ptr %v4
+    %v32 = call ptr @orion_list_new(i64 3)
+    %v32.lp0 = ptrtoint ptr %v31 to i64
+    call void @orion_list_set(ptr %v32, i64 0, i64 %v32.lp0)
+    %v32.lp1 = ptrtoint ptr %v23 to i64
+    call void @orion_list_set(ptr %v32, i64 1, i64 %v32.lp1)
+    %v32.lp2 = ptrtoint ptr %v30 to i64
+    call void @orion_list_set(ptr %v32, i64 2, i64 %v32.lp2)
+    %v33 = call ptr @orion_text_join(ptr %v32)
+    store ptr %v33, ptr %v4
+    %v34 = add i64 0, 0
+    br label %for_6_step
+for_6_step:
+    %v37 = add i64 0, 1
+    %v38 = add i64 %v12, %v37
+    store i64 %v38, ptr %v8
+    %v39 = add i64 0, 0
+    br label %for_6_header
+for_6_end:
+    %v42 = load ptr, ptr %v4
+    ret ptr %v42
 }
 
 define i64 @orion_main() {

@@ -6,6 +6,19 @@ Notable changes to Orion. The format follows
 
 ## [Unreleased]
 
+### Added
+- **The general-software floor.** `env(name)` reads environment variables;
+  `interrupted()` turns the first Ctrl+C into a pollable flag (the second
+  one kills as normal); `secure_bytes`/`secure_token` draw OS entropy (the
+  rand PRNG stays for games); a `time` orb tells human time (`now_unix`,
+  `local_time`/`utc_time` via strftime, `timestamp()`); an `http` orb does
+  GET/POST over TLS behind a stable `response{status, body}` interface
+  (curl as the engine today, swappable for a native client later); and
+  `link = "vendor/x.c"` in Orbit.toml links vendored C sources/objects -
+  the door that makes sqlite, native TLS and compression plain orb work.
+  Proven by test_42_general_floor, tools/link_test.sh (both in CI) and the
+  http orb's example-proven header parsing + examples/net_demo/http_fetch.
+
 ### Removed
 - The `scheduler` orb and the async orb's deadline/timer-queue block
   (sleep_until, delay, deadline_from_now, past_deadline, time_left,

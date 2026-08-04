@@ -48,3 +48,28 @@ public define rand_float() -> float uses random:
 public define rand_chance(n: int) -> truth uses random:
     example rand_chance(1)
     if n <= 1 then true else rand_range(0, n) is 0
+
+# ---- OS entropy: for tokens and keys, not for gameplay ----
+# Everything above is a seeded PRNG - fast, replayable, right for sims.
+# These bytes come from the operating system's entropy source and are
+# neither: use them where unpredictability is the point.
+external define entropy_bytes(n: int) -> [int]
+
+# `n` unpredictable bytes (0..255 each) from the OS.
+public define secure_bytes(n: int) -> [int] uses random:
+    example len(secure_bytes(8)) is 8
+    entropy_bytes(n)
+
+# An unpredictable hex token of `n` bytes (2n characters), for session ids
+# and API keys.
+public define secure_token(n: int) -> text uses random:
+    example len(secure_token(8)) is 16
+    digits = "0123456789abcdef"
+    bs = entropy_bytes(n)
+    edit out = ""
+    loop i in 0 until len(bs):
+        b = at(bs, i)
+        hi = slice(digits, b // 16, b // 16 + 1)
+        lo = slice(digits, b % 16, b % 16 + 1)
+        out = "{out}{hi}{lo}"
+    out

@@ -967,6 +967,7 @@ define cli_build(path: text) -> text:
     edit ll = ""
     edit exe = ""
     edit dirs = []
+    edit extra_link = ""
     if standalone:
         if not ends_with(path, ".or"):
             die("orbit: `" + path + "` is not a .or file, and there is no Orbit.toml here")
@@ -992,6 +993,10 @@ define cli_build(path: text) -> text:
         ll = "build/" + name + "_cli.ll"
         exe = "build/" + name + "_cli.exe"
         dirs = nb_orb_dirs(lines)
+        # `link = "vendor/sqlite3.c vendor/other.o"` - extra sources/objects
+        # the project links, space-separated, project-relative. The door to
+        # the C ecosystem: vendor a C file, declare externs, wrap an orb.
+        extra_link = nb_setting(lines, "link", "")
     if not file_exists(compiler):
         die("orbit: compiler not found at `" + compiler + "` - set [native] compiler in Orbit.toml")
     edit compile_args = [path, ll]
@@ -1024,6 +1029,12 @@ define cli_build(path: text) -> text:
     # (Linux) or a link-time flag (macOS - main-thread stack is capped there).
     # -Wno-override-module silences the retargeted-triple note (no-op on Win).
     edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module"]
+    if extra_link != "":
+        extras = split(extra_link, " ")
+        loop x_index in 0..<len(extras):
+            xf = at(extras, x_index)
+            if xf != "":
+                link_args = append(link_args, xf)
     if os_kind() == 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/STACK:67108864")

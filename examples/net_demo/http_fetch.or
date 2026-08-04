@@ -1,0 +1,17 @@
+# http_fetch - the http orb live: GET a real page over TLS.
+#
+#   orbit run examples/net_demo/http_fetch.or
+#
+# Manual proof on purpose: the demo gate runs offline, and a network demo
+# in a gate is a flaky gate. The orb's parsing is example-proven in
+# orbs/http; this is the end-to-end run for a human.
+use http
+
+define main() -> int:
+    r = fetch("https://example.com")
+    print_line("status={r.status} bytes={len(r.body)}")
+    if success(r) and contains(r.body, "Example Domain"):
+        print_line("http orb: live fetch OK")
+        return 0
+    print_line("http orb: fetch failed (offline? curl missing?)")
+    1

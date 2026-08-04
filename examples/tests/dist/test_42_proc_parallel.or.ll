@@ -1786,6 +1786,26 @@ entry:
 
 declare i64 @host_cpus()
 
+declare ptr @env_get(ptr)
+
+declare i64 @interrupt_seen()
+
+define ptr @os__env(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call ptr @env_get(ptr %v0)
+    ret ptr %v1
+}
+
+define i64 @os__interrupted() {
+entry:
+    %v0 = call i64 @interrupt_seen()
+    %v1 = add i64 0, 1
+    %v2.b = icmp eq i64 %v0, %v1
+    %v2 = zext i1 %v2.b to i64
+    ret i64 %v2
+}
+
 define i64 @os__cpu_count() {
 entry:
     %v0 = call i64 @host_cpus()

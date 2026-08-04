@@ -1,0 +1,85 @@
+# http - fetch and post over HTTP(S).
+#
+# The INTERFACE is the commitment: request in, `response{status, body}` out.
+# The engine behind it is curl as a child process (present on Windows 10+,
+# macOS and virtually every Linux), which buys TLS, redirects and proxies
+# for free. A native client (net orb + a TLS layer) can replace the engine
+# later without a caller changing a line.
+#
+# Blocking by design per call - run it inside a task (see the async orb)
+# and the scheduler keeps everything else moving while curl works.
+use os
+use text
+
+type response:
+    status: int
+    body: text
+
+# The scratch file curl writes the body to. Per-call unique via the slot
+# counter, so concurrent tasks never share a file.
+define scratch_path() -> text:
+    n = if slot_has("http:n") then slot_get_int("http:n") else 0
+    slot_set("http:n", n + 1)
+    ".http_body_{n}.txt"
+
+# The status is read from curl's header dump (-D), not from stdout: the
+# dump is a file of its own, so a stray stderr line can never corrupt it.
+# With redirects (-L) the dump holds one block per hop - the LAST status
+# line is the answer.
+public define status_from_headers(header_dump: text) -> int:
+    example status_from_headers("HTTP/1.1 200 OK") is 200
+    example status_from_headers("garbage") is 0
+    rows = lines(header_dump)
+    edit status = 0
+    loop i in 0 until len(rows):
+        row = trim(at(rows, i))
+        if starts_with(row, "HTTP/"):
+            parts = split(row, " ")
+            if len(parts) >= 2:
+                status = int_from_text(at(parts, 1))
+    status
+
+# Run curl with `args`, reading the body from `body_file`. Status 0 means
+# the request itself failed (no network, bad host, curl missing).
+define run_curl(args: [text], body_file: text) -> response:
+    hdr_file = "{body_file}.hdr"
+    log_file = "{body_file}.log"
+    edit all_args = ["-sS", "--max-time", "60", "-L", "-o", body_file, "-D", hdr_file]
+    loop i in 0 until len(args):
+        all_args = append(all_args, at(args, i))
+    job = start_command_to_file("curl", all_args, log_file)
+    if job < 0:
+        return response{status: 0, body: ""}
+    if not finished_within(job, 65000):
+        stopped = stop_command(job)
+        reaped = command_result(job)
+        return response{status: 0, body: ""}
+    rc = command_result(job)
+    status = status_from_headers(read_file(hdr_file))
+    body = read_file(body_file)
+    cleanup1 = remove_file(body_file)
+    cleanup2 = remove_file(hdr_file)
+    cleanup3 = remove_file(log_file)
+    if rc is not 0 then response{status: 0, body: body} else response{status: status, body: body}
+
+# GET `url`. `success(r)` when the request went through AND the server said 2xx.
+# no example: needs the network - proven by examples/demos/httpd.or + manual runs
+public define fetch(url: text) -> response uses net, files:
+    run_curl([url], scratch_path())
+
+# POST `body` to `url` with the given Content-Type.
+# no example: needs the network - proven by manual runs
+public define post(url: text, content_type: text, payload: text) -> response uses net, files:
+    body_file = scratch_path()
+    payload_file = "{body_file}.out"
+    wrote = write_file(payload_file, payload)
+    r = run_curl(["-X", "POST", "-H", "Content-Type: {content_type}", "--data-binary", "@{payload_file}", url], body_file)
+    cleanup = remove_file(payload_file)
+    r
+
+# Did the request reach a server that answered success?
+public define success(r: response) -> truth:
+    example success(response{status: 200, body: ""})
+    example not success(response{status: 404, body: ""})
+    example not success(response{status: 0, body: ""})
+    r.status >= 200 and r.status < 300

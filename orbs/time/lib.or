@@ -1,0 +1,30 @@
+# time - clock time for humans: unix seconds and formatted dates.
+#
+# The runtime already has monotonic_ms/sleep_ms for MEASURING; this orb is
+# for TELLING the time. Formatting rides the C library's strftime, so the
+# usual codes work: %Y-%m-%d %H:%M:%S, %A the weekday, %s the epoch, etc.
+# Timezone support is exactly what the host gives localtime - named zones
+# and offsets beyond "here" and "UTC" are a later, bigger job.
+use text
+
+external define unix_now() -> int
+external define time_format(unix_s: int, fmt: text, local: int) -> text
+
+# Seconds since 1970-01-01 UTC.
+# no example: wall-clock dependent - proven by test_42_general_floor.or
+public define now_unix() -> int uses clock = unix_now()
+
+# `unix_s` formatted with strftime codes, in the machine's local timezone.
+public define local_time(unix_s: int, fmt: text) -> text:
+    example len(local_time(0, "%Y")) is 4
+    time_format(unix_s, fmt, 1)
+
+# `unix_s` formatted with strftime codes, in UTC.
+public define utc_time(unix_s: int, fmt: text) -> text:
+    example utc_time(0, "%Y-%m-%d") is "1970-01-01"
+    example utc_time(86400, "%H:%M:%S") is "00:00:00"
+    time_format(unix_s, fmt, 0)
+
+# The common stamp, local: "2026-08-04 21:30:05".
+# no example: wall-clock dependent - proven by test_42_general_floor.or
+public define timestamp() -> text uses clock = local_time(unix_now(), "%Y-%m-%d %H:%M:%S")
