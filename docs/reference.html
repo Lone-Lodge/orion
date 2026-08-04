@@ -151,6 +151,8 @@
 <div class="fn"><code class="sig">with_listener(port: int, body: fn) -&gt; int uses net</code><p>The same for a listening socket: serve, hand the listener to the body, and close it however the body leaves.</p></div>
 <div class="fn"><code class="sig">set_timeout(sock: int, ms: int) -&gt; int uses net = tcp_set_timeout(sock, ms)</code><p>Give up after <code>ms</code> milliseconds instead of blocking forever: <code>accept</code> then returns -1 and <code>recv</code> returns "" when the deadline passes.</p></div>
 <div class="fn"><code class="sig">accept_within(listener: int, ms: int) -&gt; int uses net = tcp_accept_wait(listener, ms)</code><p>Wait up to <code>ms</code> for a client; -1 when nobody came.</p></div>
+<div class="fn"><code class="sig">connect_within(host: text, port: int, ms: int) -&gt; int uses net</code><p>Connect, but give up after <code>ms</code> instead of blocking.</p></div>
+<div class="fn"><code class="sig">readable_within(sock: int, ms: int) -&gt; truth uses net</code><p>Has <code>sock</code> got anything to read? Waits up to <code>ms</code> for it.</p></div>
 <div class="fn"><code class="sig">timed_out(chunk: text) -&gt; truth</code><p>Did a read time out (or the peer close)? Both surface as "".</p></div>
 <div class="fn"><code class="sig">ok(handle: int) -&gt; truth</code><p>Did the call succeed? Reads better than comparing to -1 at every site.</p></div>
 <h2 id="os"><code>os</code></h2>
@@ -164,6 +166,12 @@
 <div class="fn"><code class="sig">run_command(cmd: text, args: [text]) -&gt; int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))</code><p>no example: runs a child process - proven by orbit itself (build_orbit.sh)</p></div>
 <div class="fn"><code class="sig">run_command_quiet(cmd: text, args: [text]) -&gt; int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))</code><p>no example: runs a child process - proven by orbit itself</p></div>
 <div class="fn"><code class="sig">capture_stdout(cmd: text, args: [text]) -&gt; text = capture(os_join(os_quote(cmd), args, 0))</code><p>no example: runs a child process - proven by tools/lsp_test.sh</p></div>
+<div class="fn"><code class="sig">start_command(cmd: text, args: [text]) -&gt; int = proc_start(os_join(os_quote(win_path(cmd)), args, 0))</code><p>Start a command without waiting.</p></div>
+<div class="fn"><code class="sig">start_command_to_file(cmd: text, args: [text], out_path: text) -&gt; int = proc_start_to_file(os_join(os_quote(win_path(cmd)), args, 0), out_path)</code><p>Same, but the child's stdout+stderr are written to <code>out_path</code> (truncated).</p></div>
+<div class="fn"><code class="sig">finished_within(id: int, ms: int) -&gt; truth = proc_wait_ready(id, ms) is 1</code><p>Did job <code>id</code> finish within <code>ms</code>? Inside a task this parks the task and lets the others run; outside it is an ordinary wait.</p></div>
+<div class="fn"><code class="sig">command_result(id: int) -&gt; int = proc_result(id)</code><p>Exit code of a finished job, taken ONCE (the job id is dead afterwards).</p></div>
+<div class="fn"><code class="sig">stop_command(id: int) -&gt; truth = proc_stop(id) is 1</code><p>Kill a running job.</p></div>
+<div class="fn"><code class="sig">cpu_count() -&gt; int</code><p>Hardware threads on this machine - what to size a worker pool by.</p></div>
 <div class="fn"><code class="sig">path_join(a: text, b: text) -&gt; text</code><p>---- paths ----</p></div>
 <div class="fn"><code class="sig">path_parent(p: text) -&gt; text</code></div>
 <div class="fn"><code class="sig">list_dir(dir: text) -&gt; [text] uses files = split(orion_dir_list(dir), "\n")</code><p>no example: depends on the filesystem - proven by tools/orbstat.or</p></div>

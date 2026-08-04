@@ -7,6 +7,17 @@ Notable changes to Orion. The format follows
 ## [Unreleased]
 
 ### Added
+- **Child processes the scheduler can wait on** (`os` orb):
+  `start_command` / `start_command_to_file` begin a command and return a job
+  id at once; `finished_within` parks the calling TASK until the child exits
+  or a deadline passes (the same bargain as the net orb's `readable_within`,
+  one level up); `command_result` reaps the exit code once; `stop_command`
+  kills a job that blew its deadline; `cpu_count()` sizes a worker pool.
+  Children are real OS processes, so they run in parallel while the
+  single-threaded scheduler coordinates the waiting. Proven by the test
+  runner itself: it now links and runs every test through one worker task
+  per hardware thread — the suite's ~79 s of serial compile became a
+  ~17 s total wall.
 - **Traits as explicit dictionaries.** A struct whose fields are functions is a
   dictionary of operations, and `o.method(args)` now calls the fn-typed field
   `method` on the struct value `o` (instead of desugaring to a UFCS global
