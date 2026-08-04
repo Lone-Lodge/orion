@@ -10,13 +10,13 @@ use bytes
 use process
 
 
-fn int_to_text(value: int) -> Text:
+define int_to_text(value: int) -> text:
     if value == 0:
         "0"
     else:
         digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-        mut n = if value < 0 then 0 - value else value
-        mut chars = ""
+        edit n = if value < 0 then 0 - value else value
+        edit chars = ""
         loop _ in 0..<20:
             if n > 0:
                 d = at(digits, n % 10)
@@ -25,36 +25,36 @@ fn int_to_text(value: int) -> Text:
         if value < 0 then "-{chars}" else chars
 
 
-fn spaces(count: int) -> Text:
-    mut result = ""
+define spaces(count: int) -> text:
+    edit result = ""
     loop _ in 0..<count:
         result = "{result} "
     result
 
 
-fn padr(text: Text, width: int) -> Text:
+define padr(text: text, width: int) -> text:
     cur = len(bytes_from_text(text))
     if cur >= width then text else "{text}{spaces(width - cur)}"
 
 
-fn padl(text: Text, width: int) -> Text:
+define padl(text: text, width: int) -> text:
     cur = len(bytes_from_text(text))
     if cur >= width then text else "{spaces(width - cur)}{text}"
 
 
-fn ms_text(seconds: f64) -> Text:
+define ms_text(seconds: f64) -> text:
     ms_int = to_int(seconds * 1000.0)
     "{padl(int_to_text(ms_int), 4)} ms"
 
 
-fn report_row(label: Text, info: Text, ms_seconds: f64):
+define report_row(label: text, info: text, ms_seconds: f64):
     l = padr(label, 12)
     i = padr(info, 22)
     t = ms_text(ms_seconds)
     print_line("    {l}{i}{t}")
 
 
-pub fn compile_file(input: Text, output: Text):
+public define compile_file(input: text, output: text):
     print_line("")
     print_line("   Compiling  {input} (LLVM backend)")
     print_line("")
@@ -81,7 +81,7 @@ pub fn compile_file(input: Text, output: Text):
     module = ast_program_to_ir(ast)
     d_ir = elapsed(t_ir)
     n_fns = len(module.functions)
-    mut total_insts = 0
+    edit total_insts = 0
     loop fi in 0..<n_fns:
         f = at(module.functions, fi)
         total_insts = total_insts + len(f.instructions)
@@ -123,6 +123,6 @@ pub fn compile_file(input: Text, output: Text):
         print_line("")
 
 
-fn main() -> int:
+define main() -> int:
     compile_file("test_files/demo.or", "dist/demo.exe")
     0

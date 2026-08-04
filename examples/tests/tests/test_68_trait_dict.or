@@ -4,21 +4,21 @@
 # dictionary is passed. Here two Ord instances drive one `minimum`.
 type Ord: lt: fn(int, int) -> int, eq: fn(int, int) -> int
 
-fn int_lt(a: int, b: int) -> int:
+define int_lt(a: int, b: int) -> int:
     if a < b then 1 else 0
-fn int_eq(a: int, b: int) -> int:
+define int_eq(a: int, b: int) -> int:
     if a == b then 1 else 0
-fn desc_lt(a: int, b: int) -> int:
+define desc_lt(a: int, b: int) -> int:
     if a > b then 1 else 0
 
-fn minimum(o: Ord, xs: [int]) -> int:
-    mut best = at(xs, 0)
+define minimum(o: Ord, xs: [int]) -> int:
+    edit best = at(xs, 0)
     loop i in 1..<len(xs):
         if o.lt(at(xs, i), best) == 1:
             best = at(xs, i)
     best
 
-fn main() -> int:
+define main() -> int:
     asc = Ord{lt: int_lt, eq: int_eq}
     desc = Ord{lt: desc_lt, eq: int_eq}
     xs = [30, 10, 50, 20]

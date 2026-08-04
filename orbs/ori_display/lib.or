@@ -13,32 +13,34 @@
 
 use ori_geometry
 
-pub type DrawCmd:
-    DrawRect(Rect, Text, int)
+public type DrawCmd:
+    DrawRect(Rect, text, int)
     # Filled rounded rectangle: rect, colour, corner radius (px), src eid.
     # Backends fill it as horizontal og_rect spans with circular corner
     # insets - the chrome primitive for hover cells, chips, and cards.
-    DrawRoundRect(Rect, Text, int, int)
-    DrawText(Point, Text, Text, int, int)
+    DrawRoundRect(Rect, text, int, int)
+    DrawText(Point, text, text, int, int)
     # point, icon name, pixel size, src eid.
-    DrawIcon(Point, Text, int, int)
+    DrawIcon(Point, text, int, int)
     # path data, colour, src eid.
-    DrawPath(Text, Text, int)
+    DrawPath(text, text, int)
     # A pixel-art sprite: top-left Point, image path, integer scale, src
     # eid. The rect-only backends blit it as og_rect runs (see
     # atlas_sprite); no GPU texture needed.
-    DrawSprite(Point, Text, int, int)
+    DrawSprite(Point, text, int, int)
     # A textured image quad (the modern path): top-left Point, image path,
     # dest width, dest height, tint ("#rrggbb"/"#rrggbbaa" or a named colour;
     # ""=none), blend ("alpha" default, "add" for glow), src eid. Drawn as
     # ONE GPU-sampled quad - any size, scaled, blended. The renderer resolves
     # the tint/blend strings (same palette as DrawText/DrawRect colours).
-    DrawImage(Point, Text, int, int, Text, Text, int)
+    DrawImage(Point, text, int, int, text, text, int)
 
-pub type DisplayList: commands: [DrawCmd]
+public type DisplayList: commands: [DrawCmd]
 
-pub fn empty_list() -> DisplayList:
+public define empty_list() -> DisplayList:
+    example len(empty_list().commands) is 0
     DisplayList{commands: []}
 
-pub fn push_cmd(list: DisplayList, cmd: DrawCmd) -> DisplayList:
-    DisplayList{commands: push(list.commands, cmd)}
+public define push_cmd(list: DisplayList, cmd: DrawCmd) -> DisplayList:
+    # no example: needs a DrawCmd value — proven by atlas display tests
+    DisplayList{commands: append(list.commands, cmd)}

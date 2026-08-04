@@ -6,10 +6,10 @@
 # interpolation (`{counts["the"]}`) to report. Returns the count of "the".
 use text
 
-fn main() -> int:
+define main() -> int:
     words = split("the cat sat on the mat and the cat ran", " ")
 
-    mut counts = {}
+    edit counts = {}
     loop i in 0..<len(words):
         w = at(words, i)
         counts[w] = get_or(counts, w, 0) + 1

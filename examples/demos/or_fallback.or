@@ -6,7 +6,7 @@
 #
 # Run (lodge-orion interp):  orion run or_fallback.or main   → expects 49
 
-fn main() -> int:
+define main() -> int:
     a = 7 or 100        # 7 is present  → 7
     b = false or 42     # false absent  → 42 (the fallback VALUE, not a bool)
     a + b               # 49

@@ -5,7 +5,7 @@
 # dropped everything else on the declaration, including `generics_csv`. That
 # field is what tells the call site which type variables a function has, so:
 #
-#   * a file with NO lambda: `at(filter(words, p), 0)` is a Text (correct)
+#   * a file with NO lambda: `at(keep(words, p), 0)` is a Text (correct)
 #   * add ONE closure anywhere in the program, and the same line became an int
 #
 # The feature had a test, and the test passed, because the test had no closure
@@ -13,25 +13,25 @@
 # time someone adds one; it sets the changed fields on the original decl now.
 use iter
 
-fn is_long(s: Text) -> bool:
+define is_long(s: text) -> truth:
     len(s) > 3
 
-fn apply(f: fn, x: int) -> int:
+define apply(f: fn, x: int) -> int:
     f(x)
 
-fn main() -> int:
+define main() -> int:
     # The closure that used to break everything below it.
     k = 10
     add_k = fn(n): n + k
     bumped = apply(add_k, 5)          # 15
 
     words = ["aa", "bbbb", "cc"]
-    kept = filter(words, is_long)     # -> ["bbbb"], and it must stay [Text]
+    kept = keep(words, is_long)     # -> ["bbbb"], and it must stay [text]
     first = at(kept, 0)
     text_len = len(first)             # 4, only typeable if T bound to Text
 
     # Nested in one expression, same requirement.
-    inline_len = len(at(filter(words, is_long), 0))
+    inline_len = len(at(keep(words, is_long), 0))
 
     print_line("bumped={bumped} text_len={text_len} inline={inline_len}")
     ok = if text_len == 4 and inline_len == 4 and bumped == 15 then 1 else 0

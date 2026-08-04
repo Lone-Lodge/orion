@@ -1,6 +1,6 @@
 type Point: x: int, y: int
 
-fn main() -> int:
+define main() -> int:
     p = Point{x: 18, y: 24}
     # Interpolation with field access
     msg = "p.x={p.x} p.y={p.y}"

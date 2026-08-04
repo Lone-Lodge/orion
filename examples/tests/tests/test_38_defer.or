@@ -10,29 +10,29 @@
 #   2. running the defers before the return expression is the wrong order —
 #      `defer close(f)` must not close the handle that `return read(f)` reads
 # so `defer` is now an AST rewrite: save the value, run the defers, then return.
-fn note(n: int) -> int:
+define note(n: int) -> int:
     prev = if slot_has("trace") then slot_get_int("trace") else 0
     slot_set("trace", prev * 10 + n)
     n
 
 # Body first, then defers in reverse registration order. The block's VALUE is
 # still the body's last expression, not the last deferred call.
-fn block_end() -> int:
+define block_end() -> int:
     defer note(1)
     defer note(2)
     note(3)
 
 # The return expression is evaluated, THEN the defer runs, then the saved value
 # is returned: trace 87, value 8.
-fn nested_return(x: int) -> int:
+define nested_return(x: int) -> int:
     defer note(7)
     if x > 0:
         return note(8)
     note(9)
 
 # A defer inside a loop body belongs to that body: it runs once per iteration.
-fn in_loop() -> int:
-    mut total = 0
+define in_loop() -> int:
+    edit total = 0
     loop i in 0..<3:
         defer note(4)
         total = total + 1
@@ -42,9 +42,9 @@ fn in_loop() -> int:
 # not an ExprStmt. Only ExprStmt got the save-then-run treatment, so the defers
 # were appended AFTER the match and the deferred call became the value: this
 # returned 0 instead of 84.
-fn tail_match() -> int:
+define tail_match() -> int:
     defer note(5)
-    match 1:
+    choose 1:
         1 -> 84
         _ -> 0
 
@@ -53,7 +53,7 @@ fn tail_match() -> int:
 # into a temp. The defers are pushed into each branch instead. Before that, a
 # defer above a tail if/else returned the deferred call's value (0) rather than
 # the branch's.
-fn tail_if() -> int:
+define tail_if() -> int:
     defer note(6)
     x = 18
     if x == 18:
@@ -61,7 +61,7 @@ fn tail_if() -> int:
     else:
         0
 
-fn main() -> int:
+define main() -> int:
     v1 = block_end()
     t1 = if slot_has("trace") then slot_get_int("trace") else 0
     slot_set("trace", 0)

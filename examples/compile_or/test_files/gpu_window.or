@@ -1,19 +1,19 @@
-extern fn win_open(title: Text, w: int, h: int) -> int
-extern fn win_pump() -> int
-extern fn win_close(hwnd: int)
-extern fn win_event_next() -> int
-extern fn win_event_kind() -> int
-extern fn win_event_key() -> int
-extern fn win_event_x() -> int
-extern fn win_event_y() -> int
-extern fn og_init(hwnd: int, w: int, h: int) -> int
-extern fn og_begin(r: int, g: int, b: int)
-extern fn og_rect(x: int, y: int, w: int, h: int, r: int, g: int, b: int)
-extern fn og_present() -> int
-extern fn og_shutdown()
+external define win_open(title: text, w: int, h: int) -> int
+external define win_pump() -> int
+external define win_close(hwnd: int)
+external define win_event_next() -> int
+external define win_event_kind() -> int
+external define win_event_key() -> int
+external define win_event_x() -> int
+external define win_event_y() -> int
+external define og_init(hwnd: int, w: int, h: int) -> int
+external define og_begin(r: int, g: int, b: int)
+external define og_rect(x: int, y: int, w: int, h: int, r: int, g: int, b: int)
+external define og_present() -> int
+external define og_shutdown()
 
 
-fn main() -> int:
+define main() -> int:
     hwnd = win_open("Native Orion + D3D12 - click to place, Esc quits", 800, 600)
     if hwnd == 0:
         print_line("window failed")
@@ -24,11 +24,11 @@ fn main() -> int:
         return 1
     print_line("gpu up - click to place blocks, move mouse, Esc to quit")
 
-    mut running = 1
-    mut mx = 400
-    mut my = 300
-    mut blocks_x = []
-    mut blocks_y = []
+    edit running = 1
+    edit mx = 400
+    edit my = 300
+    edit blocks_x = []
+    edit blocks_y = []
     loop:
         if running == 0:
             break
@@ -44,8 +44,8 @@ fn main() -> int:
                 mx = win_event_x()
                 my = win_event_y()
             if kind == 1:
-                blocks_x = push(blocks_x, win_event_x())
-                blocks_y = push(blocks_y, win_event_y())
+                blocks_x = append(blocks_x, win_event_x())
+                blocks_y = append(blocks_y, win_event_y())
             if kind == 4:
                 if win_event_key() == 27:
                     running = 0

@@ -1530,7 +1530,7 @@ for_7_header:
 for_7_body:
     %v16 = load ptr, ptr %v5
     %v17 = call i64 @orion_list_at(ptr %v0, i64 %v12)
-    %v18 = call ptr @orion_list_push(ptr %v16, i64 %v17)
+    %v18 = call ptr @orion_list_push_mut(ptr %v16, i64 %v17)
     store ptr %v18, ptr %v5
     %v19 = add i64 0, 0
     br label %for_7_step

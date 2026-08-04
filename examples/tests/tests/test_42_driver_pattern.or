@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     # Mirror what orion_driver.or does, except hardcoded paths.
     if argc() < 1:
         99

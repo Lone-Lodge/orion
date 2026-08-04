@@ -1,0 +1,6 @@
+# expect: `Text` was retired
+define greet(name: Text) -> int:
+    len(name)
+
+define main() -> int:
+    greet("hi")

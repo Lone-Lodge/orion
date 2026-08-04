@@ -1514,6 +1514,7 @@ entry:
 
 define i64 @orion_main() {
 entry:
+    %v9 = alloca ptr, align 8
     %v0 = add i64 0, 21
     %v1 = call i64 @prog__double_it(i64 %v0)
     %v2 = getelementptr i8, ptr @.str_0, i64 16
@@ -1525,22 +1526,30 @@ entry:
     %v8 = call ptr @orion_list_new(i64 2)
     call void @orion_list_set(ptr %v8, i64 0, i64 %v6)
     call void @orion_list_set(ptr %v8, i64 1, i64 %v7)
-    %v9 = add i64 0, 3
-    %v10 = call ptr @orion_list_push(ptr %v8, i64 %v9)
-    %v11 = add i64 0, 0
-    %v12 = call i64 @orion_list_at(ptr %v10, i64 %v11)
-    %v13 = add i64 0, 1
-    %v14 = call i64 @orion_list_at(ptr %v10, i64 %v13)
-    %v15 = add i64 %v12, %v14
-    %v16 = add i64 0, 2
-    %v17 = call i64 @orion_list_at(ptr %v10, i64 %v16)
-    %v18 = add i64 %v15, %v17
-    %v19 = add i64 %v1, %v3
-    %v20 = add i64 %v19, %v5
-    %v21 = add i64 %v20, %v18
-    %v22 = add i64 0, 12
-    %v23 = sub i64 %v21, %v22
-    ret i64 %v23
+    store ptr %v8, ptr %v9
+    %v10 = add i64 0, 0
+    %v11 = load ptr, ptr %v9
+    %v12 = add i64 0, 3
+    %v13 = call ptr @orion_list_push(ptr %v11, i64 %v12)
+    store ptr %v13, ptr %v9
+    %v14 = add i64 0, 0
+    %v15 = load ptr, ptr %v9
+    %v16 = add i64 0, 0
+    %v17 = call i64 @orion_list_at(ptr %v15, i64 %v16)
+    %v18 = load ptr, ptr %v9
+    %v19 = add i64 0, 1
+    %v20 = call i64 @orion_list_at(ptr %v18, i64 %v19)
+    %v21 = add i64 %v17, %v20
+    %v22 = load ptr, ptr %v9
+    %v23 = add i64 0, 2
+    %v24 = call i64 @orion_list_at(ptr %v22, i64 %v23)
+    %v25 = add i64 %v21, %v24
+    %v26 = add i64 %v1, %v3
+    %v27 = add i64 %v26, %v5
+    %v28 = add i64 %v27, %v25
+    %v29 = add i64 0, 12
+    %v30 = sub i64 %v28, %v29
+    ret i64 %v30
 }
 
 @orion_argc = global i64 0

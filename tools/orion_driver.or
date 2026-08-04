@@ -2,5 +2,5 @@
 # (orion_driver among them — the single source of truth for the
 # driver logic is orbs/orion_driver/lib.or).
 
-fn main() -> int:
+define main() -> int:
     driver_main()

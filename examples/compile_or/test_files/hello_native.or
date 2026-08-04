@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     print_line("Hello from native Orion")
     src = file_read("hello_input.txt")
     print_line("File contents:")

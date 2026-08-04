@@ -2,12 +2,12 @@
 # each time. Desugars to `loop: match expr: Pattern -> body; _ -> break`.
 type Opt<T>: Some(T) | None
 
-fn dec(n: int) -> Opt<int>:
+define dec(n: int) -> Opt<int>:
     if n > 0 then Opt.Some(n - 1) else Opt.None
 
-fn main() -> int:
-    mut count = 0
-    mut cur = 6
+define main() -> int:
+    edit count = 0
+    edit cur = 6
     loop let Some(next) = dec(cur):
         cur = next
         count = count + 1

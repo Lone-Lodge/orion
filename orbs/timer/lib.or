@@ -11,32 +11,37 @@
 #
 # State lives in global slots under "timer:{id}:..." so a timer is just a name.
 
-fn ts_int(key: Text) -> int:
+define ts_int(key: text) -> int:
     if slot_has(key) then slot_get_int(key) else 0
 
 # --- countdown -------------------------------------------------------------
 
 # Start (or restart) a timer running toward dur_ms.
-pub fn timer_start(id: Text, dur_ms: int):
+# no example: mutates timer state — proven by test_42_timer.or
+public define timer_start(id: text, dur_ms: int) uses clock:
     slot_set("timer:{id}:dur", dur_ms)
     slot_set("timer:{id}:el", 0)
     slot_set("timer:{id}:on", 1)
     slot_set("timer:{id}:acc", 0)
 
 # Cancel a running timer (elapsed is kept for inspection).
-pub fn timer_stop(id: Text):
+# no example: mutates timer state — proven by test_42_timer.or
+public define timer_stop(id: text):
     slot_set("timer:{id}:on", 0)
 
 # Rewind to 0 and keep running toward the same duration.
-pub fn timer_reset(id: Text):
+# no example: mutates timer state — proven by test_42_timer.or
+# no example: mutates timer state — proven by test_42_timer.or
+public define timer_reset(id: text):
     slot_set("timer:{id}:el", 0)
     slot_set("timer:{id}:on", 1)
 
 # Advance by dt_ms. Returns 1 on the single tick it completes, else 0.
 # A completed or stopped timer is inert (returns 0).
-pub fn timer_tick(id: Text, dt_ms: int) -> int:
+public define timer_tick(id: text, dt_ms: int) -> int:
+    example timer_tick("unstarted-timer", 10) is 0
     onkey = "timer:{id}:on"
-    if ts_int(onkey) == 0:
+    if ts_int(onkey) is 0:
         return 0
     elkey = "timer:{id}:el"
     dur = ts_int("timer:{id}:dur")
@@ -47,41 +52,48 @@ pub fn timer_tick(id: Text, dt_ms: int) -> int:
         return 1
     0
 
-pub fn timer_elapsed(id: Text) -> int:
+public define timer_elapsed(id: text) -> int:
+    example timer_elapsed("never-started") is 0
     ts_int("timer:{id}:el")
 
-pub fn timer_remaining(id: Text) -> int:
+public define timer_remaining(id: text) -> int:
+    example timer_remaining("never-started") is 0
     r = ts_int("timer:{id}:dur") - ts_int("timer:{id}:el")
     if r > 0 then r else 0
 
 # Progress as permille (0..1000), clamped. A zero-duration timer reads 1000.
-pub fn timer_progress(id: Text) -> int:
+public define timer_progress(id: text) -> int:
+    example timer_progress("never-started") is 1000
     dur = ts_int("timer:{id}:dur")
     if dur <= 0:
         return 1000
-    p = ts_int("timer:{id}:el") * 1000 / dur
+    p = ts_int("timer:{id}:el") * 1000 // dur
     if p > 1000 then 1000 else p
 
 # 1 once elapsed has reached the duration.
-pub fn timer_done(id: Text) -> int:
+public define timer_done(id: text) -> truth:
+    example not timer_done("never-started")
     dur = ts_int("timer:{id}:dur")
-    if dur > 0 and ts_int("timer:{id}:el") >= dur then 1 else 0
+    dur > 0 and ts_int("timer:{id}:el") >= dur
 
-# 1 while the timer is running (started, not yet completed or stopped).
-pub fn timer_active(id: Text) -> int:
-    ts_int("timer:{id}:on")
+# true while the timer is running (started, not yet completed or stopped).
+public define timer_active(id: text) -> truth:
+    example not timer_active("never-started")
+    ts_int("timer:{id}:on") is 1
 
 # --- cadence (astra `every`) ----------------------------------------------
 
 # Accumulate dt_ms and report how many whole periods elapsed this tick.
 # Usually 0 or 1; larger dt (or a long period) can fire several. The leftover
 # is carried, so cadence never drifts. Independent of timer_start/tick above.
-pub fn timer_every(id: Text, period_ms: int, dt_ms: int) -> int:
+# no example: mutates timer state — proven by test_42_timer.or
+# no example: mutates timer state — proven by test_42_timer.or
+public define timer_every(id: text, period_ms: int, dt_ms: int) -> int:
     if period_ms <= 0:
         return 0
     acckey = "timer:{id}:acc"
-    mut acc = ts_int(acckey) + dt_ms
-    mut count = 0
+    edit acc = ts_int(acckey) + dt_ms
+    edit count = 0
     loop:
         if acc < period_ms:
             break

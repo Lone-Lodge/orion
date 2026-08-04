@@ -4,19 +4,19 @@
 # differs (here `Some(Bad(m))`), and it never counts as full coverage.
 type Res:
     Ok(int)
-    Bad(Text)
+    Bad(text)
 
 type Opt:
     Some(Res)
     None
 
-fn score(v: Opt) -> int:
-    match v:
+define score(v: Opt) -> int:
+    choose v:
         Some(Ok(n)) -> n
         Some(Bad(m)) -> len(m)
         None -> 100
 
-fn main() -> int:
+define main() -> int:
     good = score(Opt.Some(Res.Ok(35)))     # 35
     bad = score(Opt.Some(Res.Bad("abcde")))  # 5
     empty = score(Opt.None)                # 100

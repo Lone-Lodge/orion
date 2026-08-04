@@ -2,6 +2,6 @@
 # diagnostic inside library code points at the LIBRARY file and line. Nothing
 # else compiles this directory: it is only reachable as an extra orb root passed
 # by tools/negative_test.sh.
-pub fn helper(x: int) -> int:
+public define helper(x: int) -> int:
     y = does_not_exist_here
     x + y

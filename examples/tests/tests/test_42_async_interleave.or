@@ -10,8 +10,8 @@
 # parked mid-loop and were resumed.
 use async
 
-fn tick(id: int) -> int:
-    mut count = 0
+define tick(id: int) -> int:
+    edit count = 0
     loop i in 0..<3:
         prev = if slot_has("trace") then slot_get_int("trace") else 0
         slot_set("trace", prev * 10 + id)
@@ -19,7 +19,7 @@ fn tick(id: int) -> int:
         count = count + 1
     count
 
-fn main() -> int:
+define main() -> int:
     t1 = spawn(tick, 1)
     t2 = spawn(tick, 2)
     a = await(t1)

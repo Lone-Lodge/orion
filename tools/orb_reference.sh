@@ -72,9 +72,9 @@ types() {
     awk "$AWK_LIB"'
         function emit(shape){ printf "<div class=\"fn\"><code class=\"sig\">%s</code></div>\n", shape }
         function flush(){ if (intype) { emit(esc(curname) " = " variants); intype = 0 } }
-        /^(pub )?type / {
+        /^(pub |public )?type / {
             flush()
-            line = $0; sub(/^(pub )?type /, "", line)
+            line = $0; sub(/^(pub |public )?type /, "", line)
             nm = line; sub(/[: ].*/, "", nm)
             # Strip the name AND any <T> params, so a generic sum type
             # (`type Result<T>:`) is recognised as multi-line, not printed raw.
@@ -83,6 +83,7 @@ types() {
             next
         }
         /^pub fn / { flush(); next }
+        /^public define / { flush(); next }
         intype && /^[ \t]*#/ { next }
         intype && /^[ \t]+[A-Za-z0-9_(]/ { v = $0; sub(/^[ \t]+/, "", v); variants = (variants == "") ? esc(v) : variants " | " esc(v); next }
         /^[^ \t]/ { flush() }
@@ -95,8 +96,8 @@ types() {
 funcs() {
     awk "$AWK_LIB"'
         /^[ \t]*#/ { l = $0; sub(/^[ \t]*#[ ]?/, "", l); if (!incmt) { allcmt = l; incmt = 1 } else { allcmt = allcmt " " l } next }
-        /^pub fn / {
-            sig = $0; sub(/^pub fn /, "", sig); sub(/:[ \t]*$/, "", sig)
+        /^pub fn |^public define / {
+            sig = $0; sub(/^pub fn /, "", sig); sub(/^public define /, "", sig); sub(/:[ \t]*$/, "", sig)
             doc = firstsentence(allcmt)
             printf "<div class=\"fn\"><code class=\"sig\">%s</code>", esc(sig)
             if (doc != "") printf "<p>%s</p>", codetags(esc(doc))

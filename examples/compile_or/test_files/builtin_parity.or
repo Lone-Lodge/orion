@@ -1,6 +1,6 @@
-fn main() -> int:
+define main() -> int:
     # set on maps (returns the map, value-semantics call style)
-    mut m = {"a": 1}
+    edit m = {"a": 1}
     m = set(m, "b", 2)
     m = set(m, "a", 10)
     print_line(get_int(m, "a"))
@@ -17,7 +17,7 @@ fn main() -> int:
     vs = map_values(m)
     print_line(at(vs, 1))
     # set on lists
-    mut xs = [1, 2, 3]
+    edit xs = [1, 2, 3]
     xs = set(xs, 1, 42)
     print_line(at(xs, 1))
     # float interpolation + to_text(float)

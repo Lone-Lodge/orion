@@ -1,5 +1,5 @@
-fn main() -> int:
-    mut counter = 0
+define main() -> int:
+    edit counter = 0
     loop:
         if counter >= 42:
             break

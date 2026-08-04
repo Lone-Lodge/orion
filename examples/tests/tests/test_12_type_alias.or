@@ -2,9 +2,9 @@
 # resolves to `int` at lowering, in both a return type and a typed binding.
 type Celsius = int
 
-fn make() -> Celsius:
+define make() -> Celsius:
     5
 
-fn main() -> int:
-    mut t: Celsius = make()
+define main() -> int:
+    edit t: Celsius = make()
     t + 7    # 12

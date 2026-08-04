@@ -4,10 +4,11 @@ use orion_ir
 use orion_ast_to_ir
 use orion_emit_llvm
 use os
+use text
 use orion_driver
 
 # 1 when stdout is a TTY: show a live progress bar. 0 when piped (CI): plain rows.
-extern fn orion_console_color() -> int
+external define orion_console_color() -> int
 
 # Orion test runner — LLVM backend.
 #
@@ -20,14 +21,14 @@ extern fn orion_console_color() -> int
 #   5. prints summary table + totals
 
 
-fn parse_expected(filename: Text) -> int:
+define parse_expected(filename: text) -> int:
     b = bytes_from_text(filename)
     total = len(b)
-    mut start = 0
+    edit start = 0
     if total >= 5:
         start = 5
-    mut value = 0
-    mut done = 0
+    edit value = 0
+    edit done = 0
     loop index in start..<total:
         if done == 0:
             ch = at(b, index)
@@ -43,7 +44,7 @@ fn parse_expected(filename: Text) -> int:
 # is ~10x faster than re-compiling orion_rt.c (all of Windows.h) per test.
 # clang_path / mangle / host_triple are host-specific (see main): the compiler
 # always emits a Windows triple, so off Windows we retarget the IR here.
-fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clang_path: Text, mangle: Text, host_triple: Text) -> int:
+define compile_one(src_path: text, ll_path: text, exe_path: text, rt_obj: text, clang_path: text, mangle: text, host_triple: text) -> int:
     raw = read_file(src_path)
     # Resolve `use` the way the real driver does. The runner used to lex the file
     # as-is, so a test could only touch the compiler's own orbs: `use async` or
@@ -65,7 +66,7 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clan
     # is a process-global counter, so compare the delta for THIS file.
     errs_before = compile_errors()
     module = ast_program_to_ir(ast)
-    mut llvm_text = emit_module(module)
+    edit llvm_text = emit_module(module)
     if compile_errors() > errs_before:
         return 0
     # Retarget the baked-in Windows triple to the host (Linux/Mac). The
@@ -84,10 +85,10 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clan
     # artifact must be what the compiler emitted, the same on every machine;
     # the host-specific copy is scratch, so it is scratch on disk too.
     write_file(ll_path, llvm_text)
-    mut link_path = ll_path
+    edit link_path = ll_path
     if mangle != "w":
-        retargeted = str_replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
-        host_text = str_replace(retargeted, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
+        retargeted = replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
+        host_text = replace(retargeted, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
         link_path = "{ll_path}.host.ll"
         write_file(link_path, host_text)
     # Link the pre-built runtime object; -O0 skips the LLVM opt pipeline
@@ -99,13 +100,13 @@ fn compile_one(src_path: Text, ll_path: Text, exe_path: Text, rt_obj: Text, clan
     if exit_code == 0 then 1 else 0
 
 
-fn fmt_ms(seconds: f64) -> Text:
+define fmt_ms(seconds: f64) -> text:
     ms = seconds * 1000.0
     ms_int = to_int(ms)
     "{ms_int}ms"
 
 
-fn main() -> int:
+define main() -> int:
     mkdir_all("dist")
     # Host-specific toolchain bits. The runner works on Windows/Linux/Mac:
     # clang location, the datalayout mangling + target triple to retarget the
@@ -113,9 +114,9 @@ fn main() -> int:
     # rt_c is relative to this project dir (examples/tests), so no absolute,
     # machine-specific path is baked in.
     os = os_kind()
-    mut clang_path = "clang"
-    mut mangle = "e"
-    mut host_triple = "x86_64-unknown-linux-gnu"
+    edit clang_path = "clang"
+    edit mangle = "e"
+    edit host_triple = "x86_64-unknown-linux-gnu"
     if os == 0:
         clang_path = "C:\\Program Files\\LLVM\\bin\\clang.exe"
         mangle = "w"
@@ -135,12 +136,12 @@ fn main() -> int:
     # KNOWN_BUGS.md get fed to the compiler, produce broken-but-not-crashing
     # .exe's, exit=0 happens to match parse_expected()=0, and we get a
     # silent false pass. Filter at the source.
-    mut files = []
+    edit files = []
     loop raw_index in 0..<raw_total:
         raw_name = at(raw_files, raw_index)
         name_bytes = bytes_from_text(raw_name)
         name_len = len(name_bytes)
-        mut is_or_file = false
+        edit is_or_file = false
         if name_len >= 3:
             tail_dot = at(name_bytes, name_len - 3)
             tail_o = at(name_bytes, name_len - 2)
@@ -148,13 +149,13 @@ fn main() -> int:
             if tail_dot == 46 and tail_o == 111 and tail_r == 114:
                 is_or_file = true
         if is_or_file:
-            files = push(files, raw_name)
+            files = append(files, raw_name)
     total_tests = len(files)
 
-    mut pass_count = 0
-    mut fail_count = 0
-    mut total_compile_ms = 0
-    mut total_bytes = 0
+    edit pass_count = 0
+    edit fail_count = 0
+    edit total_compile_ms = 0
+    edit total_bytes = 0
 
     # ANSI colors (ESC = byte 27) — green PASS, red FAIL, dim detail.
     esc = bytes_to_text([27])
@@ -208,15 +209,15 @@ fn main() -> int:
         # permanent rows above it, and `{esc}[K` clears any leftover characters.
         if is_tty:
             if not passed:
-                print_raw("{cr}{esc}[K")
+                print("{cr}{esc}[K")
                 print_line(row)
-            spin = at(frames, file_index - (file_index / 10) * 10)
-            print_raw("{cr}  {c_cyan}{spin}{c_off} {c_dim}{done_n}/{total_tests}{c_off}  {c_green}{pass_count} ok{c_off}  {c_red}{fail_count} fail{c_off}  {c_dim}{filename}{c_off}{esc}[K")
+            spin = at(frames, file_index - (file_index // 10) * 10)
+            print("{cr}  {c_cyan}{spin}{c_off} {c_dim}{done_n}/{total_tests}{c_off}  {c_green}{pass_count} ok{c_off}  {c_red}{fail_count} fail{c_off}  {c_dim}{filename}{c_off}{esc}[K")
         else:
             print_line(row)
 
     if is_tty:
-        print_raw("{cr}{esc}[K")
+        print("{cr}{esc}[K")
 
     print_line("--------------------------------------------------------------------")
     print_line("")
@@ -225,7 +226,7 @@ fn main() -> int:
     print_line("{summary_color}Pass: {pass_count} / {total_tests}{c_off}")
     if fail_count > 0:
         print_line("{c_red}Fail: {fail_count}{c_off}")
-    avg_ms = total_compile_ms / total_tests
+    avg_ms = total_compile_ms // total_tests
     print_line("{c_dim}Total compile: {total_compile_ms}ms   avg: {avg_ms}ms/test   binaries: {total_bytes}b{c_off}")
 
     fail_count

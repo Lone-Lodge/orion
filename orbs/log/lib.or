@@ -27,38 +27,40 @@
 # (~100B a line, dev-only, visible in the session ledger like every
 # other byte).
 
-pub extern fn orion_console_color() -> int
-pub extern fn orion_persist_text(s: Text) -> Text
+public external define orion_console_color() -> int
+public external define orion_persist_text(s: text) -> text
 
 # Local styling fragments (a shared con orb is the day-two refactor).
-fn lsty(code: Text, s: Text) -> Text:
-    if orion_console_color() == 1:
-        e = bytes_to_text(push([], 27))
+define lsty(code: text, s: text) -> text:
+    if orion_console_color() is 1:
+        e = bytes_to_text(append([], 27))
         "{e}[{code}m{s}{e}[0m"
     else:
         s
 
-fn ldim(s: Text) -> Text:
+define ldim(s: text) -> text:
     lsty("2", s)
 
-fn lred(s: Text) -> Text:
+define lred(s: text) -> text:
     lsty("31;1", s)
 
-fn lyellow(s: Text) -> Text:
+define lyellow(s: text) -> text:
     lsty("33", s)
 
-fn lcyan(s: Text) -> Text:
+define lcyan(s: text) -> text:
     lsty("36", s)
 
 # ---- Ceilings ----
 
-pub fn log_set_default(level: int):
+# no example: sets global logging state — proven by the log ring test
+public define log_set_default(level: int):
     slot_set("log:lvl:*", level)
 
-pub fn log_set_level(cat: Text, level: int):
+# no example: sets global logging state — proven by the log ring test
+public define log_set_level(cat: text, level: int):
     slot_set("log:lvl:" + cat, level)
 
-fn ceiling_of(cat: Text) -> int:
+define ceiling_of(cat: text) -> int:
     k = "log:lvl:" + cat
     if slot_has(k):
         slot_get_int(k)
@@ -67,77 +69,83 @@ fn ceiling_of(cat: Text) -> int:
 
 # ---- Emit ----
 
-pub fn error(cat: Text, msg: Text):
+# no example: prints — an example would be noise in every gate run
+public define error(cat: text, msg: text) uses console:
     if ceiling_of(cat) >= 0:
         emit_line(0, cat, msg)
 
-pub fn warn(cat: Text, msg: Text):
+# no example: prints — an example would be noise in every gate run
+public define warn(cat: text, msg: text) uses console:
     if ceiling_of(cat) >= 1:
         emit_line(1, cat, msg)
 
-pub fn info(cat: Text, msg: Text):
+# no example: prints — an example would be noise in every gate run
+public define info(cat: text, msg: text) uses console:
     if ceiling_of(cat) >= 2:
         emit_line(2, cat, msg)
 
-pub fn debug(cat: Text, msg: Text):
+# no example: prints — an example would be noise in every gate run
+public define debug(cat: text, msg: text) uses console:
     if ceiling_of(cat) >= 3:
         emit_line(3, cat, msg)
 
-fn emit_line(level: int, cat: Text, msg: Text):
+define emit_line(level: int, cat: text, msg: text):
     tag = level_tag(level)
     c = ldim(cat)
     print_line("  {tag} {c}  {msg}")
     ring_push(level_name(level), cat, msg)
 
-fn level_tag(level: int) -> Text:
-    if level == 0:
+define level_tag(level: int) -> text:
+    if level is 0:
         lred("error")
     else:
-        if level == 1:
+        if level is 1:
             lyellow(" warn")
         else:
-            if level == 2:
+            if level is 2:
                 lcyan(" info")
             else:
                 ldim("debug")
 
-fn level_name(level: int) -> Text:
-    if level == 0:
+define level_name(level: int) -> text:
+    if level is 0:
         "error"
     else:
-        if level == 1:
+        if level is 1:
             " warn"
         else:
-            if level == 2:
+            if level is 2:
                 " info"
             else:
                 "debug"
 
 # ---- Flight recorder ----
 
-pub fn log_ring_on():
+# no example: sets global logging state — proven by the log ring test
+public define log_ring_on():
     slot_set("log:ring:on", 1)
 
-fn ring_active() -> bool:
-    slot_has("log:ring:on") and slot_get_int("log:ring:on") == 1
+define ring_active() -> truth:
+    slot_has("log:ring:on") and slot_get_int("log:ring:on") is 1
 
-fn ring_push(lvl: Text, cat: Text, msg: Text):
+define ring_push(lvl: text, cat: text, msg: text):
     if ring_active():
         n = if slot_has("log:ring:n") then slot_get_int("log:ring:n") else 0
-        i = n - (n / 128) * 128
+        i = n - (n // 128) * 128
         slot_set("log:ring:{i}", orion_persist_text("{lvl} {cat}  {msg}"))
         slot_set("log:ring:n", n + 1)
 
-pub fn log_dump():
+# no example: prints — an example would be noise in every gate run
+public define log_dump() uses console:
     n = if slot_has("log:ring:n") then slot_get_int("log:ring:n") else 0
     count = if n < 128 then n else 128
     header = ldim("log tail ({count} of {n})")
     print_line("  {header}")
     start = n - count
-    loop j in start..<n:
-        i = j - (j / 128) * 128
+    loop j in start until n:
+        i = j - (j // 128) * 128
         line = ring_line(i)
         print_line("  {line}")
 
-fn ring_line(i: int) -> Text:
+define ring_line(i: int) -> text:
     if slot_has("log:ring:{i}") then slot_get("log:ring:{i}") else ""

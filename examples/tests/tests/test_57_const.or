@@ -3,8 +3,8 @@
 const TEN = 10
 const SEVEN = 7
 
-fn scaled(n: int) -> int:
+define scaled(n: int) -> int:
     n * TEN
 
-fn main() -> int:
+define main() -> int:
     scaled(5) + SEVEN   # 50 + 7 == 57

@@ -1,5 +1,5 @@
-fn main() -> int:
-    mut n = 0
+define main() -> int:
+    edit n = 0
     loop:
         if n >= 5:
             break

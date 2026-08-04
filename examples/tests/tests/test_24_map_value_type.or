@@ -9,17 +9,17 @@
 #
 # Nothing changes at runtime (every value is a 64-bit word). This is the
 # annotation finally reaching the reader.
-fn greeting_len(m: Map<Text>) -> int:
+define greeting_len(m: table<text>) -> int:
     len(get(m, "greeting"))                  # a text, so text length
 
-fn second_word_len(m: Map<[Text]>) -> int:
+define second_word_len(m: table<[text]>) -> int:
     ws = get_list(m, "words")                # list:text, from the map's type
     len(at(ws, 1))
 
-fn total(m: Map<int>) -> int:
+define total(m: table<int>) -> int:
     get_int(m, "a") + get_int(m, "b")
 
-fn main() -> int:
+define main() -> int:
     a = greeting_len({"greeting": "hello"})              # 5
     b = second_word_len({"words": ["ab", "cdef"]})       # 4
     c = total({"a": 6, "b": 8})                          # 14

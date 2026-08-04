@@ -20,6 +20,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#if !defined(_WIN32)
+#include <poll.h>       /* the scheduler waits on parked sockets with one poll */
+#endif
 
 /* ---- Console: color capability + VT enable --------------------------
  * ANSI styling is opt-in per stream state: orion_console_color()
@@ -1253,6 +1256,14 @@ static long long orion_rt_slot(void *p, long long i) {
 }
 
 #ifdef _WIN32
+/* winsock2 must precede windows.h (the classic ordering fix) — the tcp_*
+ * functions at the end of this file are the `net` orb's floor. FD_SETSIZE
+ * must precede winsock2.h too: the default 64 is smaller than the task table,
+ * and the scheduler selects over every socket a task is parked on. */
+#define FD_SETSIZE 1024
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
 #include <windows.h>
 
 /* Crash forensics: on an unhandled fault, print the exception code
@@ -2388,16 +2399,25 @@ long long orion_stderr_line(const char *s) {
  * task that does yield simply does not interleave. That is stated out loud
  * rather than pretending to suspend.
  */
-#define ORION_MAX_TASKS 256
+/* Slots, not stacks: a stack is created on spawn and released on finish, so
+ * this bounds how many tasks are LIVE at once, and the cost of a spare slot
+ * is one small struct. 256 was too tight for the obvious server shape (one
+ * task per connection, plus one per client in a self-driving test) — it ran
+ * out at 130 connections and spawn started returning -1. */
+#define ORION_MAX_TASKS 1024
 #define ORION_TASK_STACK (256 * 1024)
 
-/* 0 = free, 1 = ready, 2 = running, 3 = done, 4 = sleeping until `wake_ms` */
+/* 0 = free, 1 = ready, 2 = running, 3 = done, 4 = sleeping until `wake_ms`,
+ * 5 = parked until `wait_fd` is readable or `wake_ms` passes */
 typedef struct {
     void *stack_ctx;
     void *clos;
     long long arg;
     long long result;
     long long wake_ms;
+    long long wait_fd;
+    int wait_write;     /* 0 = waiting to read, 1 = waiting to write/connect */
+    int wait_ok;
     int state;
 } orion_task_slot;
 
@@ -2413,12 +2433,118 @@ static int orion_task_alloc(void *clos, long long arg) {
             orion_tasks[i].result = 0;
             orion_tasks[i].state = 1;
             orion_tasks[i].wake_ms = 0;
+            orion_tasks[i].wait_fd = -1;
+            orion_tasks[i].wait_write = 0;
+            orion_tasks[i].wait_ok = 0;
             orion_tasks[i].stack_ctx = NULL;
             orion_task_live++;
             return i;
         }
     }
     return -1;
+}
+
+/* ---- Waiting on a SOCKET without holding the scheduler ---------------------
+ * `sleep_task` fixed waiting on time. This fixes waiting on IO, which is the
+ * same bug one level down: without it, a task that wants to read has exactly
+ * one move — give `recv` a small timeout and try again — and every attempt
+ * parks the WHOLE process for that timeout. A round then costs
+ * (live tasks x timeout). Measured on the httpd demo: 80 connections at 5 ms
+ * per recv spent 400 ms per round doing nothing, and the 2-second client
+ * deadline expired before the server had accepted them all.
+ *
+ * State 5 is "parked until this fd is readable, or the deadline passes". The
+ * scheduler waits for all of them in ONE select/poll, so a round costs one
+ * wait no matter how many tasks are in it. */
+static long long orion_sched_io_soonest(void) {
+    long long now = __orion_monotonic_ms();
+    long long soonest = -1;
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 5) continue;
+        long long left = orion_tasks[i].wake_ms - now;
+        if (left < 0) left = 0;
+        if (soonest < 0 || left < soonest) soonest = left;
+    }
+    return soonest;
+}
+
+/* Wait up to `budget` ms for any parked socket. Tasks whose fd became
+ * readable wake with wait_ok = 1; tasks past their deadline wake with 0. */
+static void orion_sched_poll_io(long long budget) {
+    int idxs[ORION_MAX_TASKS];
+    int n = 0;
+    for (int i = 0; i < ORION_MAX_TASKS; i++)
+        if (orion_tasks[i].state == 5) idxs[n++] = i;
+    if (n == 0) return;
+    if (budget < 0) budget = 0;
+#ifdef _WIN32
+    fd_set rd, wr;
+    FD_ZERO(&rd);
+    FD_ZERO(&wr);
+    int highest = 0;
+    int watched = n < FD_SETSIZE ? n : FD_SETSIZE;
+    for (int k = 0; k < watched; k++) {
+        SOCKET s = (SOCKET)orion_tasks[idxs[k]].wait_fd;
+        if (orion_tasks[idxs[k]].wait_write) FD_SET(s, &wr); else FD_SET(s, &rd);
+        if ((int)s > highest) highest = (int)s;
+    }
+    struct timeval tv;
+    tv.tv_sec = (long)(budget / 1000);
+    tv.tv_usec = (long)((budget % 1000) * 1000);
+    select(highest + 1, &rd, &wr, NULL, &tv);
+    long long now = __orion_monotonic_ms();
+    for (int k = 0; k < n; k++) {
+        int i = idxs[k];
+        SOCKET s = (SOCKET)orion_tasks[i].wait_fd;
+        int ready = k < watched &&
+                    (orion_tasks[i].wait_write ? FD_ISSET(s, &wr) : FD_ISSET(s, &rd));
+        if (ready || orion_tasks[i].wake_ms <= now) {
+            orion_tasks[i].wait_ok = ready ? 1 : 0;
+            orion_tasks[i].state = 1;
+        }
+    }
+#else
+    struct pollfd *pf = (struct pollfd *)malloc(sizeof(struct pollfd) * (size_t)n);
+    if (!pf) return;
+    for (int k = 0; k < n; k++) {
+        pf[k].fd = (int)orion_tasks[idxs[k]].wait_fd;
+        pf[k].events = orion_tasks[idxs[k]].wait_write ? POLLOUT : POLLIN;
+        pf[k].revents = 0;
+    }
+    poll(pf, (nfds_t)n, (int)budget);
+    long long now = __orion_monotonic_ms();
+    for (int k = 0; k < n; k++) {
+        int i = idxs[k];
+        int ready = pf[k].revents != 0;
+        if (ready || orion_tasks[i].wake_ms <= now) {
+            orion_tasks[i].wait_ok = ready ? 1 : 0;
+            orion_tasks[i].state = 1;
+        }
+    }
+    free(pf);
+#endif
+}
+
+/* Outside a task there is nobody else to run, so this is an ordinary wait —
+ * which is what makes the same call correct in both places. */
+static long long orion_io_wait_blocking(long long fd, long long ms, int want_write) {
+#ifdef _WIN32
+    fd_set s;
+    FD_ZERO(&s);
+    FD_SET((SOCKET)fd, &s);
+    struct timeval tv;
+    tv.tv_sec = (long)(ms / 1000);
+    tv.tv_usec = (long)((ms % 1000) * 1000);
+    int r = want_write ? select((int)fd + 1, NULL, &s, NULL, &tv)
+                       : select((int)fd + 1, &s, NULL, NULL, &tv);
+    return r > 0 ? 1 : 0;
+#else
+    struct pollfd pf;
+    pf.fd = (int)fd;
+    pf.events = want_write ? POLLOUT : POLLIN;
+    pf.revents = 0;
+    return poll(&pf, 1, (int)ms) > 0 ? 1 : 0;
+#endif
 }
 
 #if defined(_WIN32)
@@ -2517,8 +2643,12 @@ static long long orion_sched_drive(int until_idx) {
         }
         if (!ran) {
             long long wait = orion_sched_wake_due();
-            if (wait <= 0) break;      /* nothing runnable, no timers: stop */
-            __orion_sleep_ms(wait);
+            long long io = orion_sched_io_soonest();
+            /* nothing runnable, no timers, nobody waiting on a socket: stop */
+            if (wait <= 0 && io < 0) break;
+            long long budget = wait;
+            if (budget <= 0 || (io >= 0 && io < budget)) budget = io;
+            if (io >= 0) orion_sched_poll_io(budget); else __orion_sleep_ms(budget);
         }
     }
     return switches;
@@ -2536,6 +2666,20 @@ long long orion_task_sleep(long long ms) {
     orion_tasks[me].state = 4;
     SwitchToFiber(orion_sched_fiber);
     return 1;
+}
+
+/* Park until `fd` is ready (readable, or writable when `want_write`), or `ms`
+ * passes. 1 = ready, 0 = timed out. */
+long long sock_wait_ready(long long fd, long long ms, long long want_write) {
+    int me = orion_task_current;
+    if (me < 0) return orion_io_wait_blocking(fd, ms, (int)want_write);
+    orion_tasks[me].wait_fd = fd;
+    orion_tasks[me].wait_write = want_write ? 1 : 0;
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].wait_ok = 0;
+    orion_tasks[me].state = 5;
+    SwitchToFiber(orion_sched_fiber);
+    return orion_tasks[me].wait_ok;
 }
 
 static void orion_task_release(int idx) {
@@ -2619,8 +2763,11 @@ static long long orion_sched_drive(int until_idx) {
         }
         if (!ran) {
             long long wait = orion_sched_wake_due();
-            if (wait <= 0) break;
-            __orion_sleep_ms(wait);
+            long long io = orion_sched_io_soonest();
+            if (wait <= 0 && io < 0) break;
+            long long budget = wait;
+            if (budget <= 0 || (io >= 0 && io < budget)) budget = io;
+            if (io >= 0) orion_sched_poll_io(budget); else __orion_sleep_ms(budget);
         }
     }
     return switches;
@@ -2636,6 +2783,20 @@ long long orion_task_sleep(long long ms) {
     orion_tasks[me].state = 4;
     swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
     return 1;
+}
+
+/* Park until `fd` is ready (readable, or writable when `want_write`), or `ms`
+ * passes. 1 = ready, 0 = timed out. */
+long long sock_wait_ready(long long fd, long long ms, long long want_write) {
+    int me = orion_task_current;
+    if (me < 0) return orion_io_wait_blocking(fd, ms, (int)want_write);
+    orion_tasks[me].wait_fd = fd;
+    orion_tasks[me].wait_write = want_write ? 1 : 0;
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].wait_ok = 0;
+    orion_tasks[me].state = 5;
+    swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
+    return orion_tasks[me].wait_ok;
 }
 
 static void orion_task_release(int idx) {
@@ -2836,4 +2997,252 @@ long long orion_ms_replay_wanted(int idx) { return orion_ms[idx].replay ? 1 : 0;
 void orion_ms_do_replay(int idx) {
     orion_ms[idx].replay = 0;
     longjmp(orion_ms[idx].ctx, 1);
+}
+
+/* ---- TCP: the `net` orb's floor. ------------------------------------------
+ * Plain synchronous sockets, handles as i64. The ORB carries the `uses net`
+ * contracts; the scoped-resource story (a handler owning the socket's
+ * lifetime) is language-level sugar on top of these. POSIX half mirrors the
+ * Windows half; both return -1 for failure, and tcp_recv returns "" at EOF. */
+#ifdef _WIN32
+static int orion_net_up = 0;
+static void orion_net_init(void) {
+    if (!orion_net_up) { WSADATA w; WSAStartup(MAKEWORD(2, 2), &w); orion_net_up = 1; }
+}
+#define ORION_BADSOCK INVALID_SOCKET
+#define orion_closesock closesocket
+typedef SOCKET orion_sock_t;
+static void orion_sock_nonblock(orion_sock_t s, int on) {
+    u_long m = on ? 1 : 0;
+    ioctlsocket(s, FIONBIO, &m);
+}
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+static void orion_net_init(void) {}
+#define ORION_BADSOCK (-1)
+#define orion_closesock close
+typedef int orion_sock_t;
+static void orion_sock_nonblock(orion_sock_t s, int on) {
+    int f = fcntl(s, F_GETFL, 0);
+    if (f < 0) return;
+    fcntl(s, F_SETFL, on ? (f | O_NONBLOCK) : (f & ~O_NONBLOCK));
+}
+#endif
+
+long long tcp_listen(long long port) {
+    orion_net_init();
+    orion_sock_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == ORION_BADSOCK) return -1;
+    int yes = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    a.sin_port = htons((unsigned short)port);
+    if (bind(s, (struct sockaddr *)&a, sizeof(a)) != 0) { orion_closesock(s); return -1; }
+    /* Backlog 8 deadlocked a single-process demo the moment ten clients
+     * connected before the acceptor got a turn: the ninth connect() blocked,
+     * and a blocked connect holds the whole scheduler. 128 is what a server
+     * that means it asks for. */
+    if (listen(s, 128) != 0) { orion_closesock(s); return -1; }
+    return (long long)s;
+}
+
+long long tcp_accept(long long listener) {
+    orion_sock_t c = accept((orion_sock_t)listener, NULL, NULL);
+    if (c == ORION_BADSOCK) return -1;
+    return (long long)c;
+}
+
+long long tcp_connect(const char *host, long long port) {
+    orion_net_init();
+    orion_sock_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == ORION_BADSOCK) return -1;
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_port = htons((unsigned short)port);
+    inet_pton(AF_INET, host && host[0] ? host : "127.0.0.1", &a.sin_addr);
+    if (connect(s, (struct sockaddr *)&a, sizeof(a)) != 0) { orion_closesock(s); return -1; }
+    return (long long)s;
+}
+
+/* connect() with a deadline. `accept` and `recv` could already give up, but
+ * connect could not — and a blocking connect parks the whole PROCESS, so one
+ * task waiting on a full listen backlog froze every other task with it. This
+ * one goes non-blocking, waits for writability, and returns -1 on timeout so
+ * the caller can sleep_task and try again. The socket is put back into
+ * blocking mode on success, so everything downstream is unchanged. */
+long long tcp_connect_wait(const char *host, long long port, long long ms) {
+    if (ms <= 0) return tcp_connect(host, port);
+    orion_net_init();
+    orion_sock_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == ORION_BADSOCK) return -1;
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_port = htons((unsigned short)port);
+    inet_pton(AF_INET, host && host[0] ? host : "127.0.0.1", &a.sin_addr);
+    orion_sock_nonblock(s, 1);
+    if (connect(s, (struct sockaddr *)&a, sizeof(a)) == 0) {
+        orion_sock_nonblock(s, 0);
+        return (long long)s;
+    }
+#ifdef _WIN32
+    if (WSAGetLastError() != WSAEWOULDBLOCK) { orion_closesock(s); return -1; }
+#else
+    if (errno != EINPROGRESS) { orion_closesock(s); return -1; }
+#endif
+    /* Wait for writability THROUGH the scheduler: inside a task this parks
+     * only that task. Waiting here with a plain select is what turned 300
+     * clients into a twenty-minute serial queue. */
+    if (!sock_wait_ready((long long)s, ms, 1)) { orion_closesock(s); return -1; }
+    int err = 0;
+#ifdef _WIN32
+    int elen = (int)sizeof(err);
+#else
+    socklen_t elen = sizeof(err);
+#endif
+    if (getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&err, &elen) != 0 || err != 0) {
+        orion_closesock(s);
+        return -1;
+    }
+    orion_sock_nonblock(s, 0);
+    return (long long)s;
+}
+
+long long tcp_send(long long conn, const char *data) {
+    if (!data) return 0;
+    long long n = (long long)strlen(data);
+    long long sent = 0;
+    while (sent < n) {
+        int r = send((orion_sock_t)conn, data + sent, (int)(n - sent), 0);
+        if (r <= 0) return -1;
+        sent += r;
+    }
+    return sent;
+}
+
+const char *tcp_recv(long long conn, long long maxlen) {
+    if (maxlen <= 0) maxlen = 4096;
+    if (maxlen > 1 << 20) maxlen = 1 << 20;
+    char *buf = (char *)malloc((size_t)maxlen);
+    if (!buf) return orion_text_empty();
+    int r = recv((orion_sock_t)conn, buf, (int)maxlen, 0);
+    if (r <= 0) { free(buf); return orion_text_empty(); }
+    char *out = orion_text_alloc((long long)r);
+    memcpy(out, buf, (size_t)r);
+    out[r] = 0;
+    free(buf);
+    return out;
+}
+
+long long tcp_close(long long h) {
+    if (h >= 0) orion_closesock((orion_sock_t)h);
+    return 0;
+}
+
+/* ---- Streaming file IO -----------------------------------------------------
+ * Whole-file read/write cannot process anything larger than memory, and a
+ * socket reply had to fit one recv. These are the missing primitives: open a
+ * handle, move bytes a chunk at a time, close it. Handles are i64 (>= 0 is
+ * open, -1 is failure); a read at end-of-stream returns "" — the same
+ * convention tcp_recv uses, so both streams read the same way. */
+#define ORION_MAX_FILES 64
+static FILE *orion_files[ORION_MAX_FILES];
+
+/* mode: 0 read, 1 write (truncate), 2 append. */
+long long file_open(const char *path, long long mode) {
+    if (!path) return -1;
+    const char *m = (mode == 1) ? "wb" : (mode == 2) ? "ab" : "rb";
+    FILE *f = fopen(path, m);
+    if (!f) return -1;
+    for (int i = 0; i < ORION_MAX_FILES; i++) {
+        if (!orion_files[i]) { orion_files[i] = f; return (long long)i; }
+    }
+    fclose(f);
+    return -1;
+}
+
+const char *file_read_chunk(long long h, long long maxlen) {
+    if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h]) return orion_text_empty();
+    if (maxlen <= 0) maxlen = 4096;
+    if (maxlen > (1 << 22)) maxlen = 1 << 22;
+    char *buf = (char *)malloc((size_t)maxlen);
+    if (!buf) return orion_text_empty();
+    size_t n = fread(buf, 1, (size_t)maxlen, orion_files[h]);
+    if (n == 0) { free(buf); return orion_text_empty(); }
+    char *out = orion_text_alloc((long long)n);
+    memcpy(out, buf, n);
+    out[n] = 0;
+    free(buf);
+    return out;
+}
+
+long long file_write_chunk(long long h, const char *data) {
+    if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h] || !data) return -1;
+    size_t n = strlen(data);
+    size_t w = fwrite(data, 1, n, orion_files[h]);
+    return (long long)w;
+}
+
+long long file_close(long long h) {
+    if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h]) return -1;
+    fclose(orion_files[h]);
+    orion_files[h] = NULL;
+    return 0;
+}
+
+/* Bytes in a file without reading it — sizing a buffer, or just reporting. */
+long long file_bytes(const char *path) {
+    if (!path) return -1;
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    fseek(f, 0, SEEK_END);
+    long long n = (long long)ftell(f);
+    fclose(f);
+    return n;
+}
+
+/* Read/write deadline on a socket, in milliseconds (0 = block forever).
+ * Without it a server blocks in accept/recv until someone shows up, which is
+ * the reason "serve N requests and exit" was the only shape a demo could
+ * take. With it, accept returns -1 and recv returns "" when the deadline
+ * passes — the same two failure signals those calls already use. */
+long long tcp_set_timeout(long long sock, long long ms) {
+#ifdef _WIN32
+    DWORD tv = (DWORD)ms;
+    int r1 = setsockopt((orion_sock_t)sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
+    int r2 = setsockopt((orion_sock_t)sock, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof(tv));
+#else
+    struct timeval tv;
+    tv.tv_sec = (long)(ms / 1000);
+    tv.tv_usec = (long)((ms % 1000) * 1000);
+    int r1 = setsockopt((orion_sock_t)sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    int r2 = setsockopt((orion_sock_t)sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+#endif
+    return (r1 == 0 && r2 == 0) ? 0 : -1;
+}
+
+/* accept() with a deadline. SO_RCVTIMEO does NOT apply to accept on Windows,
+ * so waiting for a connection needs select(): block up to `ms`, then accept
+ * only if one is pending. -1 means "nobody came" (or the wait failed), the
+ * same signal a failed accept already gives. ms <= 0 blocks forever. */
+long long tcp_accept_wait(long long listener, long long ms) {
+    if (ms <= 0) return tcp_accept(listener);
+    fd_set rd;
+    FD_ZERO(&rd);
+    FD_SET((orion_sock_t)listener, &rd);
+    struct timeval tv;
+    tv.tv_sec = (long)(ms / 1000);
+    tv.tv_usec = (long)((ms % 1000) * 1000);
+    int r = select((int)listener + 1, &rd, NULL, NULL, &tv);
+    if (r <= 0) return -1;
+    return tcp_accept(listener);
 }

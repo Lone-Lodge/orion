@@ -14,25 +14,30 @@
 
 type Task: deadline_ms: int, fn_id: int, payload: int
 
-pub fn task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
+public define task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
+    example task_fn_id(task_new(0, 5, 0)) is 5
     Task{deadline_ms: monotonic_ms() + fire_in_ms, fn_id: fn_id, payload: payload}
 
-pub fn task_deadline(t: Task) -> int:
+public define task_deadline(t: Task) -> int:
+    example task_deadline(task_new(0, 7, 3)) >= 0
     t.deadline_ms
 
-pub fn task_fn_id(t: Task) -> int:
+public define task_fn_id(t: Task) -> int:
+    example task_fn_id(task_new(0, 7, 3)) is 7
     t.fn_id
 
-pub fn task_payload(t: Task) -> int:
+public define task_payload(t: Task) -> int:
+    example task_payload(task_new(0, 7, 3)) is 3
     t.payload
 
 # Is this task ready to run (deadline ≤ now)?
-pub fn task_due(t: Task) -> int:
-    now = monotonic_ms()
-    if t.deadline_ms <= now then 1 else 0
+public define task_due(t: Task) -> truth uses clock:
+    example task_due(task_new(0, 0, 0))
+    monotonic_ms() >= t.deadline_ms
 
 # Sleep until task fires. Returns immediately if already due.
-pub fn await_task(t: Task):
+# no example: sleeps until a deadline — proven by test_44_async_sleep.or
+public define await_task(t: Task):
     now = monotonic_ms()
     remaining = t.deadline_ms - now
     if remaining > 0:
@@ -40,12 +45,14 @@ pub fn await_task(t: Task):
 
 # Sleep until the earliest deadline in a list. Caller dispatches the
 # fired task(s) by inspecting `task_due` on each entry.
-pub fn await_next(tasks: [Task]):
+# no example: sleeps until a deadline — proven by test_44_async_sleep.or
+# no example: sleeps until the earliest deadline — proven by test_44_async_sleep.or
+public define await_next(tasks: [Task]):
     n = len(tasks)
-    if n == 0:
+    if n is 0:
         return
-    mut earliest = at(tasks, 0).deadline_ms
-    loop i in 1..<n:
+    edit earliest = at(tasks, 0).deadline_ms
+    loop i in 1 until n:
         d = at(tasks, i).deadline_ms
         if d < earliest:
             earliest = d

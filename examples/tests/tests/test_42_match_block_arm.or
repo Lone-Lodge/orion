@@ -2,18 +2,18 @@
 # local, then the last expression is the arm's value — exactly like an `if`
 # branch. Inline arms (`-> expr`) still work. Both the scrutinee form and the
 # subjectless cond form (`match:`) support it.
-fn score(kind: int) -> int:
-    match kind:
+define score(kind: int) -> int:
+    choose kind:
         1 ->
             base = 20
             base * 2 + 2      # 42
         2 -> 7                # inline arm still fine
         _ -> 0
-fn main() -> int:
+define main() -> int:
     a = score(1)              # 42
     b = score(2)              # 7
     n = 9
-    c = match:
+    c = choose:
         n > 100 -> 1
         n > 5 ->
             step = n - 5      # 4

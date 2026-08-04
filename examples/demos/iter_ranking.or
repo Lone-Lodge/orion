@@ -5,7 +5,7 @@
 # every ordering: ascending, descending, or by any computed key.
 use iter
 
-fn main() -> int:
+define main() -> int:
     scores = [40, 75, 88, 12, 95, 60]
 
     # Leaderboard: highest first. The closure IS the ordering.

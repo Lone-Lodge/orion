@@ -6,7 +6,7 @@
 use json
 use text
 
-fn main() -> int:
+define main() -> int:
     src = "\{\"id\":7,\"method\":\"textDocument/didOpen\",\"ok\":true,\"nested\":\{\"deep\":\{\"n\":42\}\},\"items\":[\{\"a\":1\},\{\"a\":2\}],\"esc\":\"tab\\there\\nline\"\}"
     root = json_parse(src)
 

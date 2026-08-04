@@ -10,13 +10,13 @@ use bytes
 use process
 
 
-fn int_to_text(value: int) -> Text:
+define int_to_text(value: int) -> text:
     if value == 0:
         "0"
     else:
         digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-        mut n = if value < 0 then 0 - value else value
-        mut chars = ""
+        edit n = if value < 0 then 0 - value else value
+        edit chars = ""
         loop _ in 0..<20:
             if n > 0:
                 d = at(digits, n % 10)
@@ -25,7 +25,7 @@ fn int_to_text(value: int) -> Text:
         if value < 0 then "-{chars}" else chars
 
 
-fn main() -> int:
+define main() -> int:
     input = "../../dist/orion_self_bundled.or"
     print_line("Reading {input}")
     src = read_file(input)

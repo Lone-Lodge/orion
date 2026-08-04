@@ -1984,31 +1984,30 @@ for_4_body:
     %v14 = load ptr, ptr %v2
     %v15 = call i64 @orion_list_at(ptr %v0, i64 %v10)
     %v16 = call i64 @list__includes(ptr %v14, i64 %v15)
-    %v17 = add i64 0, 0
-    %v18.b = icmp eq i64 %v16, %v17
-    %v18 = zext i1 %v18.b to i64
-    %v19.cb = icmp ne i64 %v18, 0
-    br i1 %v19.cb, label %if_19_then, label %if_19_else
-if_19_then:
-    %v21 = load ptr, ptr %v2
-    %v22 = call i64 @orion_list_at(ptr %v0, i64 %v10)
-    %v23 = call ptr @orion_list_push(ptr %v21, i64 %v22)
-    store ptr %v23, ptr %v2
-    %v24 = add i64 0, 0
-    br label %if_19_merge
-if_19_else:
-    br label %if_19_merge
-if_19_merge:
+    %v17.n = icmp eq i64 %v16, 0
+    %v17 = zext i1 %v17.n to i64
+    %v18.cb = icmp ne i64 %v17, 0
+    br i1 %v18.cb, label %if_18_then, label %if_18_else
+if_18_then:
+    %v20 = load ptr, ptr %v2
+    %v21 = call i64 @orion_list_at(ptr %v0, i64 %v10)
+    %v22 = call ptr @orion_list_push(ptr %v20, i64 %v21)
+    store ptr %v22, ptr %v2
+    %v23 = add i64 0, 0
+    br label %if_18_merge
+if_18_else:
+    br label %if_18_merge
+if_18_merge:
     br label %for_4_step
 for_4_step:
-    %v31 = add i64 0, 1
-    %v32 = add i64 %v10, %v31
-    store i64 %v32, ptr %v6
-    %v33 = add i64 0, 0
+    %v30 = add i64 0, 1
+    %v31 = add i64 %v10, %v30
+    store i64 %v31, ptr %v6
+    %v32 = add i64 0, 0
     br label %for_4_header
 for_4_end:
-    %v36 = load ptr, ptr %v2
-    ret ptr %v36
+    %v35 = load ptr, ptr %v2
+    ret ptr %v35
 }
 
 define ptr @list__take(ptr %p0, i64 %p1) {

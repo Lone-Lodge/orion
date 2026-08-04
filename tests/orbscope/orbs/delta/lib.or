@@ -2,5 +2,5 @@
 # enough precisely because gamma re-exports.
 use gamma
 
-pub fn delta_through_facade() -> Text:
+public define delta_through_facade() -> text:
     beta_label()

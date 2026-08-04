@@ -1,3 +1,0 @@
-name = "closure"
-version = "0.1.0"
-description = "First-class closures via env-struct convention"

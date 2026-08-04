@@ -9,15 +9,15 @@
 #
 # See run.sh: it compiles plugin.or twice (an "edit" in between) and runs this.
 
-extern fn dlopen(path: Text, flag: int) -> int
-extern fn dlsym(handle: int, name: Text) -> int
+external define dlopen(path: text, flag: int) -> int
+external define dlsym(handle: int, name: text) -> int
 
-fn load_tick(path: Text) -> int:
+define load_tick(path: text) -> int:
     h = dlopen(path, 2)                  # RTLD_NOW
     dlsym(h, "tick")                     # the `tick` fn pointer, as an int
 
-fn main() -> int:
-    mut state = 0
+define main() -> int:
+    edit state = 0
 
     tick = load_tick("./plugin_v1.so")   # gameplay code, version 1
     loop i in 0..<3:

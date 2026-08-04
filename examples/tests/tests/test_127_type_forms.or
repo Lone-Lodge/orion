@@ -12,15 +12,15 @@ type Tile: Empty, Wall, Loot
 type Box:
     w: int
     h: int
-    label: Text
+    label: text
 
-fn cost(t: Tile) -> int:
-    match t:
+define cost(t: Tile) -> int:
+    choose t:
         Empty -> 1
         Wall -> 10
         Loot -> 100
 
-fn main() -> int:
+define main() -> int:
     b = Box{w: 3, h: 4, label: "crate"}
     area = b.w * b.h                      # 12
     # Loot is the THIRD variant: it only resolves if commas continued the sum.

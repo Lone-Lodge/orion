@@ -1,2 +1,2 @@
-fn main() -> int:
+define main() -> int:
     (10 + 5) * (20 - 12)

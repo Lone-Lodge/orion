@@ -2,21 +2,21 @@
 # a pointer result (text/list) and an f64 result keep their type instead of
 # collapsing to i64. Each storage class is exercised.
 use text
-fn label(n: int) -> Text:
+define label(n: int) -> text:
     "x={n}"
-fn triple(n: int) -> [int]:
+define triple(n: int) -> [int]:
     [n, n, n]
-fn half(n: int) -> f64:
+define half(n: int) -> f64:
     (n as f64) / 2.0
 
-fn text_of(f: fn(int) -> Text, x: int) -> int:
+define text_of(f: fn(int) -> text, x: int) -> int:
     byte_count(f(x))
-fn list_of(f: fn(int) -> [int], x: int) -> int:
+define list_of(f: fn(int) -> [int], x: int) -> int:
     len(f(x))
-fn float_of(f: fn(int) -> f64, x: int) -> int:
+define float_of(f: fn(int) -> f64, x: int) -> int:
     (f(x) * 4.0) as int
 
-fn main() -> int:
+define main() -> int:
     ok_text = if text_of(label, 7) == 3 then 1 else 0
     ok_list = if list_of(triple, 9) == 3 then 1 else 0
     ok_float = if float_of(half, 5) == 10 then 1 else 0

@@ -9,9 +9,9 @@
 #
 # Run (lodge-orion interp):  orion run match_cond.or main   → expects 1
 
-fn main() -> int:
+define main() -> int:
     score = 120
-    match:
+    choose:
         score > 100: 1     # first true arm wins  → 1
         score > 50:  2
         else:        0

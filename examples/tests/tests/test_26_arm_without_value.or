@@ -11,33 +11,33 @@
 # arm can have nothing to store, and it was not.
 type Opt: Some(int), None
 
-fn from_if_let(o: Opt) -> int:
-    mut score = 0
+define from_if_let(o: Opt) -> int:
+    edit score = 0
     if let Some(v) = o:
         # A nested block-form `if`: this is the shape that crashed.
         if v == 4:
             score = score + 10
     score
 
-fn from_match(o: Opt) -> int:
-    mut hits = 0
-    match o:
+define from_match(o: Opt) -> int:
+    edit hits = 0
+    choose o:
         Some(v) ->
             if v > 0:
                 hits = hits + 1
         None -> hits = hits
     hits
 
-fn from_loop_arm(o: Opt) -> int:
-    mut total = 0
-    match o:
+define from_loop_arm(o: Opt) -> int:
+    edit total = 0
+    choose o:
         Some(n) ->
             loop i in 0..<n:
                 total = total + i
         None -> total = total
     total
 
-fn main() -> int:
+define main() -> int:
     a = from_if_let(Opt.Some(4))      # 10
     b = from_if_let(Opt.None)         # 0
     c = from_match(Opt.Some(9))       # 1

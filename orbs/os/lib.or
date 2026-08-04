@@ -7,35 +7,42 @@
 # With this orb, orbit_main.or compiles under orion-self with zero changes
 # to its call sites — the last piece before a native, lodge-orion-free orbit.
 
-extern fn sys_run(cmd: Text) -> int
-extern fn mkdir_all(path: Text) -> int
-extern fn remove_file(path: Text) -> int
-extern fn file_exists(path: Text) -> int
-extern fn is_dir(path: Text) -> int
-extern fn is_file(path: Text) -> int
-extern fn exit_with(code: int)
-extern fn eprint(s: Text) -> int
-extern fn now() -> int
-extern fn file_size(path: Text) -> int
+use text
+
+external define sys_run(cmd: text) -> int
+external define mkdir_all(path: text) -> int
+external define remove_file(path: text) -> int
+external define file_exists(path: text) -> int
+external define is_dir(path: text) -> int
+external define is_file(path: text) -> int
+external define exit_with(code: int)
+external define eprint(s: text) -> int
+external define now() -> int
+external define file_size(path: text) -> int
 
 # Milliseconds between now() and an earlier now() — timing metric.
-pub fn elapsed(start: int) -> int = now() - start
+# no example: wall-clock dependent — proven by tools/compile_bench.sh
+public define elapsed(start: int) -> int uses clock = now() - start
 
 # orion-self builtins under orbit's names (file_read/argv/argc live in the
 # compiler, not an orb — callable directly).
-pub fn read_file(p: Text) -> Text = file_read(p)
-pub fn arg(i: int) -> Text = argv(i)
-pub fn arg_count() -> int = argc()
+# no example: needs a file on disk — proven by test_42_file_stream.or
+public define read_file(p: text) -> text uses files = file_read(p)
+# no example: depends on the process command line — proven by orbit
+public define arg(i: int) -> text = argv(i)
+# no example: depends on the process command line — proven by orbit
+public define arg_count() -> int = argc()
 
-pub fn write_file(p: Text, c: Text) -> int:
+public define write_file(p: text, c: text) -> int uses files:
+    # no example: writes to disk — proven by test_42_file_stream.or
     file_write(p, c)
     0
 
 # Join a command + its args into one line. Each arg is double-quoted so
 # paths with spaces (e.g. "C:/Program Files/LLVM/...") survive.
-fn os_quote(a: Text) -> Text = "\"{a}\""
+define os_quote(a: text) -> text = "\"{a}\""
 
-fn os_join(acc: Text, args: [Text], i: int) -> Text:
+define os_join(acc: text, args: [text], i: int) -> text:
     if i >= len(args):
         acc
     else:
@@ -48,148 +55,68 @@ fn os_join(acc: Text, args: [Text], i: int) -> Text:
 # paths and linker flags like "/STACK" must stay intact). POSIX shells use
 # forward slashes, so this is a Windows-only fixup — a no-op elsewhere, or it
 # would corrupt every relative path on Linux/Mac.
-extern fn host_os() -> int
+external define host_os() -> int
 # Public wrapper so other orbs can branch on the host without re-declaring the
 # extern (a second `declare` in the bundle is an LLVM redefinition error).
 # 0 = Windows, 1 = Linux, 2 = macOS.
-pub fn os_kind() -> int = host_os()
-fn win_path(p: Text) -> Text = if host_os() == 0 then str_replace(p, "/", "\\") else p
+public define os_kind() -> int:
+    example os_kind() >= 0
+    host_os()
+define win_path(p: text) -> text = if host_os() is 0 then replace(p, "/", "\\") else p
 
-pub fn run_command(cmd: Text, args: [Text]) -> int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))
+# no example: runs a child process — proven by orbit itself (build_orbit.sh)
+public define run_command(cmd: text, args: [text]) -> int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))
 
 # Same, but the child's stdout/stderr are discarded. For running a program when
 # you only care about its exit code and want its output kept off your console.
-extern fn sys_run_quiet(cmd: Text) -> int
-pub fn run_command_quiet(cmd: Text, args: [Text]) -> int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))
+external define sys_run_quiet(cmd: text) -> int
+# no example: runs a child process — proven by orbit itself
+public define run_command_quiet(cmd: text, args: [text]) -> int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))
 
-extern fn capture(cmd: Text) -> Text
-pub fn capture_stdout(cmd: Text, args: [Text]) -> Text = capture(os_join(os_quote(cmd), args, 0))
+external define capture(cmd: text) -> text
+# no example: runs a child process — proven by tools/lsp_test.sh
+public define capture_stdout(cmd: text, args: [text]) -> text = capture(os_join(os_quote(cmd), args, 0))
 
-# ---- string helpers (orion-self has no shared str lib; roll them over
-# bytes, matching the driver's idioms) ----
-
-pub fn str_starts_with(t: Text, p: Text) -> bool:
-    tb = bytes_from_text(t)
-    pb = bytes_from_text(p)
-    pn = len(pb)
-    if len(tb) < pn:
-        return false
-    loop i in 0..<pn:
-        if at(tb, i) != at(pb, i):
-            return false
-    true
-
-pub fn str_ends_with(t: Text, p: Text) -> bool:
-    tb = bytes_from_text(t)
-    pb = bytes_from_text(p)
-    tn = len(tb)
-    pn = len(pb)
-    if tn < pn:
-        return false
-    loop i in 0..<pn:
-        if at(tb, tn - pn + i) != at(pb, i):
-            return false
-    true
-
-pub fn str_contains(t: Text, sub: Text) -> bool:
-    tb = bytes_from_text(t)
-    sb = bytes_from_text(sub)
-    tn = len(tb)
-    sn = len(sb)
-    if sn == 0:
-        return true
-    if tn < sn:
-        return false
-    mut i = 0
-    loop:
-        if i > tn - sn:
-            break
-        mut hit = true
-        loop j in 0..<sn:
-            if at(tb, i + j) != at(sb, j):
-                hit = false
-        if hit:
-            return true
-        i = i + 1
-    false
-
-pub fn str_trim(t: Text) -> Text:
-    bs = bytes_from_text(t)
-    n = len(bs)
-    mut lo = 0
-    loop:
-        if lo >= n:
-            break
-        c = at(bs, lo)
-        if c == 32 or c == 9 or c == 10 or c == 13:
-            lo = lo + 1
-        else:
-            break
-    mut hi = n
-    loop:
-        if hi <= lo:
-            break
-        c2 = at(bs, hi - 1)
-        if c2 == 32 or c2 == 9 or c2 == 10 or c2 == 13:
-            hi = hi - 1
-        else:
-            break
-    bytes_to_text(bytes_slice(bs, lo, hi))
-
-pub fn str_split(t: Text, sep: Text) -> [Text]:
-    tb = bytes_from_text(t)
-    sb = bytes_from_text(sep)
-    tn = len(tb)
-    sn = len(sb)
-    mut out = []
-    if sn == 0:
-        return push(out, t)
-    mut start = 0
-    mut i = 0
-    loop:
-        if i > tn - sn:
-            break
-        mut hit = true
-        loop j in 0..<sn:
-            if at(tb, i + j) != at(sb, j):
-                hit = false
-        if hit:
-            out = push(out, bytes_to_text(bytes_slice(tb, start, i)))
-            i = i + sn
-            start = i
-        else:
-            i = i + 1
-    out = push(out, bytes_to_text(bytes_slice(tb, start, tn)))
-    out
-
-pub fn str_join(parts: [Text], sep: Text) -> Text:
-    n = len(parts)
-    mut out = ""
-    loop i in 0..<n:
-        if i == 0:
-            out = at(parts, i)
-        else:
-            out = "{out}{sep}{at(parts, i)}"
-    out
-
-pub fn str_replace(t: Text, pat: Text, rep: Text) -> Text = str_join(str_split(t, pat), rep)
+# String helpers live in ONE place: the `text` orb (split/join/trim/replace/
+# starts_with/ends_with) plus the `contains` builtin. The str_* copies that
+# used to sit here were bootstrap history from before orbs could share code.
 
 # ---- paths ----
-pub fn path_join(a: Text, b: Text) -> Text = "{a}/{b}"
+public define path_join(a: text, b: text) -> text:
+    example path_join("src", "main.or") is "src/main.or"
+    "{a}/{b}"
 
-pub fn path_parent(p: Text) -> Text:
+public define path_parent(p: text) -> text:
+    example path_parent("a/b/c.or") is "a/b"
+    example path_parent("solo") is "."
     bs = bytes_from_text(p)
     n = len(bs)
-    mut last_sep = 0 - 1
-    loop i in 0..<n:
+    edit last_sep = 0 - 1
+    loop i in 0 until n:
         c = at(bs, i)
-        if c == 47 or c == 92:
+        if c is 47 or c is 92:
             last_sep = i
     if last_sep < 0:
         "."
     else:
         bytes_to_text(bytes_slice(bs, 0, last_sep))
 
-# ---- directory listing (orion_dir_list returns newline-joined names) ----
-extern fn orion_dir_list(dir: Text) -> Text
-pub fn list_dir(dir: Text) -> [Text] = str_split(orion_dir_list(dir), "\n")
+# ---- directory listing (newline-joined names from the runtime) ----
+# `list_dir` gives FILES only; `list_dirs` gives SUBDIRECTORIES. Reaching for
+# the wrong one is silent (an empty result), which is why both are named for
+# what they return.
+external define orion_dir_list(dir: text) -> text
+external define orion_dir_subdirs(dir: text) -> text
+# no example: depends on the filesystem — proven by tools/orbstat.or
+public define list_dir(dir: text) -> [text] uses files = split(orion_dir_list(dir), "\n")
+# no example: depends on the filesystem — proven by tools/orbstat.or
+public define list_dirs(dir: text) -> [text] uses files = split(orion_dir_subdirs(dir), "\n")
+
+# The command line as ONE list of text — `arguments()` replaces argc()/argv(i)
+# (the literal C names). argv/argc stay as the raw boundary underneath.
+public define arguments() -> [text]:
+    # no example: depends on the process command line — proven by tools/orbstat.or
+    edit out = []
+    loop i in 0 until argc():
+        out = append(out, argv(i))
+    out

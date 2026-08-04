@@ -7,14 +7,14 @@ use num
 use list
 use iter
 
-fn main() -> int:
+define main() -> int:
     raw = " 40, 75, 88, 12, 95, 60 "
 
     # text: normalise, then split into fields.
     fields = split(replace(trim(raw), " ", ""), ",")   # ["40","75",...]
 
     # num: parse each field to an int (via iter's map + a closure).
-    scores = map(fields, fn(s: Text): parse(s))         # [40,75,88,12,95,60]
+    scores = each(fields, fn(s: text): parse(s))         # [40,75,88,12,95,60]
 
     # list + num: aggregate.
     total  = sum(scores)                                # 370

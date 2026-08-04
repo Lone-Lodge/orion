@@ -24,13 +24,13 @@ DOC="$TMP/sample.or"
 cat > "$DOC" <<'ORION'
 type Point: x: int, y: int
 
-fn area(p: Point) -> int:
+define area(p: Point) -> int:
     p.x * p.y
 
-fn broken() -> int:
+define broken() -> int:
     oops
 
-fn main() -> int:
+define main() -> int:
     area(Point{x: 2, y: 3})
 ORION
 # The URI must carry the path the OS understands, not the shell's view of it: an
@@ -84,7 +84,7 @@ check "diagnostic is on line 6 (0-based 5)" '"line":5'
 check "outline: the type"               '"name":"Point","kind":23'
 check "outline: a function"             '"name":"area","kind":12'
 check "go-to-definition answers"        '"id":3,"result":{"uri"'
-check "hover shows the declaration"     'fn area(p: Point) -> int:'
+check "hover shows the declaration"     'define area(p: Point) -> int:'
 check "shutdown answered"               '"id":5,"result":null'
 # Completion is declaration-based: names from this file, from the orbs, and the
 # keywords. It does NOT claim to know which would type-check at the cursor.

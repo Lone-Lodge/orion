@@ -2,25 +2,25 @@
 # OS threads (loop parallel); the client sends "ping", the server replies "pong".
 use net
 
-fn serve(server: int) -> Text:
+define serve(server: int) -> text:
   client = accept(server)
   got = recv(client, 64)
   s = send(client, "pong")
   c = close(client)
   got
 
-fn dial(port: int) -> Text:
+define dial(port: int) -> text:
   conn = connect("127.0.0.1", port)
   s = send(conn, "ping")
   got = recv(conn, 64)
   c = close(conn)
   got
 
-fn main() -> int:
+define main() -> int:
   server = listen(0)
   port = local_port(server)
   print_line("listening on 127.0.0.1:{port}")
-  mut out = ["", ""]
+  edit out = ["", ""]
   loop parallel i in 0..<2:
     out[i] = if i == 0 then serve(server) else dial(port)
   cs = close(server)

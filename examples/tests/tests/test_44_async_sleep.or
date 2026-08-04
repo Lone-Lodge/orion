@@ -10,16 +10,16 @@
 # so this distinguishes the two without being a stopwatch test.
 use async
 
-fn napper(id: int) -> int:
+define napper(id: int) -> int:
     sleep_task(50)
     id
 
-fn main() -> int:
+define main() -> int:
     t0 = monotonic_ms()
-    mut ids = slice([0], 0, 0)
+    edit ids = slice([0], 0, 0)
     loop i in 0..<8:
-        ids = push(ids, spawn(napper, i + 1))
-    mut sum = 0
+        ids = append(ids, spawn(napper, i + 1))
+    edit sum = 0
     loop j in 0..<len(ids):
         sum = sum + await(at(ids, j))
     elapsed = monotonic_ms() - t0

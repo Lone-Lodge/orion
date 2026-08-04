@@ -2,7 +2,7 @@
 # and round-trips. Bytes are plain [int] lists here.
 use encoding
 
-fn main() -> int:
+define main() -> int:
     ok_hex = if hex_encode([255, 16, 0, 171]) == "ff1000ab" and at(hex_decode("ff10"), 0) == 255 then 1 else 0
     ok_vec = if base64_encode(bytes_from_text("Man")) == "TWFu" and base64_encode(bytes_from_text("Hi")) == "SGk=" then 1 else 0
     ok_round = if bytes_to_text(base64_decode(base64_encode(bytes_from_text("hello, world!")))) == "hello, world!" then 1 else 0

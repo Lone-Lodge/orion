@@ -1,34 +1,127 @@
-# net — minimal blocking TCP, client and server.
+# net — blocking TCP, client and server. The capability contracts are the
+# point: `uses net` in a signature means you can READ what a function may
+# reach without opening its body.
 #
-# Handles are plain ints: a socket is >= 0, every failure is -1. Backed by
-# runtime/net_min.c (Winsock on Windows, BSD sockets elsewhere; WSAStartup is
-# lazy so a program that opens no socket never touches Winsock). Blocking only
-# for now — `loop parallel` / spawn give you concurrency where you need it.
+# Handles are plain numbers: a socket is >= 0, every failure is -1. Backed by
+# the tcp_* primitives in runtime/orion_rt.c (Winsock on Windows, BSD sockets
+# elsewhere; WSAStartup is lazy, so a program that opens no socket never
+# touches Winsock). Blocking only — `loop parallel` / spawn give you
+# concurrency where you need it.
 #
-#   c = connect("example.com", 80)
+#   c = connect("127.0.0.1", 8080)
 #   send(c, "GET / HTTP/1.0\r\n\r\n")
 #   reply = recv(c, 4096)
 #   close(c)
 #
-#   s = listen(8080)                 # 0 picks an ephemeral port (local_port reads it back)
+#   s = listen(8080)                 # listening socket
 #   client = accept(s)               # blocks until someone connects
-#   msg = recv(client, 4096)
+#   msg = recv(client, 4096)         # "" at end of stream
+#
+# LIFETIME: today a socket is closed by `close` — pair it with
+# `defer close(c)` so an early return cannot leak it. The planned model makes
+# the resource scope-owned (a handler owns the socket; closing happens on
+# scope exit) — see Tema 10 in NEXTGEN-PLAN.md.
 
-extern fn net_connect(host: Text, port: int) -> int
-extern fn net_send(sock: int, data: Text) -> int
-extern fn net_recv(sock: int, maxlen: int) -> Text
-extern fn net_close(sock: int) -> int
-extern fn net_listen(port: int) -> int
-extern fn net_accept(server: int) -> int
-extern fn net_local_port(server: int) -> int
+external define tcp_listen(port: int) -> int
+external define tcp_accept(listener: int) -> int
+external define tcp_connect(host: text, port: int) -> int
+external define tcp_send(conn: int, data: text) -> int
+external define tcp_recv(conn: int, maxlen: int) -> text
+external define tcp_close(handle: int) -> int
+external define tcp_set_timeout(sock: int, ms: int) -> int
+external define tcp_accept_wait(listener: int, ms: int) -> int
+external define tcp_connect_wait(host: text, port: int, ms: int) -> int
+external define sock_wait_ready(sock: int, ms: int, want_write: int) -> int
 
 # --- client ---
-pub fn connect(host: Text, port: int) -> int = net_connect(host, port)
-pub fn send(sock: int, data: Text) -> int = net_send(sock, data)
-pub fn recv(sock: int, maxlen: int) -> Text = net_recv(sock, maxlen)
-pub fn close(sock: int) -> int = net_close(sock)
+public define connect(host: text, port: int) -> int uses net:
+    example not ok(connect("127.0.0.1", 1))
+    tcp_connect(host, port)
+# no example: needs a live peer — proven by test_42_net_loopback.or
+public define send(sock: int, data: text) -> int uses net = tcp_send(sock, data)
+# no example: needs a live peer — proven by test_42_net_timeout.or
+public define recv(sock: int, maxlen: int) -> text uses net = tcp_recv(sock, maxlen)
+public define close(sock: int) -> int uses net:
+    example close(0 - 1) is 0
+    tcp_close(sock)
 
 # --- server ---
-pub fn listen(port: int) -> int = net_listen(port)
-pub fn accept(server: int) -> int = net_accept(server)
-pub fn local_port(server: int) -> int = net_local_port(server)
+# Open a listening socket on `port` (loopback). -1 if the port is taken.
+public define listen(port: int) -> int uses net:
+    example close(listen(58499)) is 0
+    tcp_listen(port)
+# no example: blocks for a client — proven by test_42_net_loopback.or
+public define accept(server: int) -> int uses net = tcp_accept(server)
+
+# --- lifetime-safe forms ---
+# The socket you cannot forget to close: the ORB owns the handle, runs your
+# body with it, and closes on the way out (including when the body returns
+# early — the close is a `defer`). This is the library-level shape of the
+# scope-owned resource model (Tema 10); when the language gains handler-owned
+# resources these become that, with the same call sites.
+#
+#   answer = with_connection("127.0.0.1", 8080, (c): send(c, "hi"))
+# The body gets the socket and returns a number; -1 means the connect failed.
+# no example: needs a live peer — proven by examples/demos/httpd.or
+public define with_connection(host: text, port: int, body: fn) -> int uses net:
+    c = connect(host, port)
+    if not ok(c):
+        return 0 - 1
+    defer close(c)
+    body(c)
+
+# The same for a listening socket: serve, hand the listener to the body, and
+# close it however the body leaves.
+# no example: binds a port — proven by test_42_net_scoped.or
+public define with_listener(port: int, body: fn) -> int uses net:
+    s = listen(port)
+    if not ok(s):
+        return 0 - 1
+    defer close(s)
+    body(s)
+
+# Give up after `ms` milliseconds instead of blocking forever: `accept`
+# then returns -1 and `recv` returns "" when the deadline passes. 0 restores
+# blocking. Set it on a LISTENER before accept, or on a connection before
+# recv — a server that cannot time out cannot do anything else.
+# no example: needs a live socket — proven by test_42_net_timeout.or
+public define set_timeout(sock: int, ms: int) -> int uses net = tcp_set_timeout(sock, ms)
+
+# Wait up to `ms` for a client; -1 when nobody came. This is the one a
+# server loop wants: it can time out, do other work, and come back.
+# no example: needs a listener + timing — proven by test_42_net_timeout.or
+public define accept_within(listener: int, ms: int) -> int uses net = tcp_accept_wait(listener, ms)
+
+# Connect, but give up after `ms` instead of blocking. Plain `connect` is the
+# one socket call that cannot time out, and a blocked connect parks the whole
+# PROCESS — so inside a task it freezes every other task too. That is not
+# theoretical: ten clients against a server whose listen backlog was full
+# deadlocked, because the connect that had to wait was holding the scheduler
+# the acceptor needed. Inside a task, use this and `sleep_task` between tries.
+public define connect_within(host: text, port: int, ms: int) -> int uses net:
+    example not ok(connect_within("127.0.0.1", 1, 50))
+    tcp_connect_wait(host, port, ms)
+
+# Has `sock` got anything to read? Waits up to `ms` for it.
+#
+# This is the call that makes a task-per-connection server scale. Without it
+# the only way to wait is `recv` with a short timeout, retried — and every
+# attempt parks the whole PROCESS, so a round costs (waiting tasks x timeout).
+# Here the task parks and the SCHEDULER waits for every parked socket in one
+# select, so a round costs one wait however many tasks are in it. Outside a
+# task it is an ordinary wait, so the same call is right in both places.
+# no example: needs a live socket — proven by test_42_net_concurrent.or
+public define readable_within(sock: int, ms: int) -> truth uses net:
+    sock_wait_ready(sock, ms, 0) is 1
+
+# Did a read time out (or the peer close)? Both surface as "".
+public define timed_out(chunk: text) -> truth:
+    example timed_out("")
+    example not timed_out("data")
+    len(chunk) is 0
+
+# Did the call succeed? Reads better than comparing to -1 at every site.
+public define ok(handle: int) -> truth:
+    example ok(0 - 1) is false
+    example ok(3)
+    handle >= 0

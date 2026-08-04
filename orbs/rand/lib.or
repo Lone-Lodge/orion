@@ -18,28 +18,33 @@ RAND_C = 1442695040888963407       # LCG increment (both wrap in i64)
 RAND_DEFAULT = 88172645463325252   # fixed nonzero default seed
 
 # Current state, or the default if unseeded.
-fn rand_state() -> int:
+define rand_state() -> int:
     if slot_has("rand:state") then slot_get_int("rand:state") else RAND_DEFAULT
 
 # Fix the sequence. Any int works (0 included — the increment keeps it moving).
-pub fn srand(seed: int) -> int:
+public define srand(seed: int) -> int uses random:
+    example srand(42) is 42
     slot_set("rand:state", seed)
     seed
 
 # Advance the generator and return a non-negative pseudo-random int.
-pub fn rand() -> int:
+public define rand() -> int uses random:
+    example rand() >= 0
     next = rand_state() * RAND_A + RAND_C
     slot_set("rand:state", next)
     next & 0x7FFFFFFFFFFFFFFF
 
 # A pseudo-random int in [lo, hi). Returns lo when the range is empty.
-pub fn rand_range(lo: int, hi: int) -> int:
+public define rand_range(lo: int, hi: int) -> int uses random:
+    example rand_range(5, 6) is 5
     if hi <= lo then lo else lo + (rand() % (hi - lo))
 
 # A pseudo-random float in [0.0, 1.0).
-pub fn rand_float() -> float:
+public define rand_float() -> float uses random:
+    example rand_float() >= 0.0
     (rand() % 1000000000) as float / 1000000000.0
 
 # true with probability 1/n (rand_chance(2) is a coin flip). n <= 1 is always true.
-pub fn rand_chance(n: int) -> bool:
-    if n <= 1 then true else rand_range(0, n) == 0
+public define rand_chance(n: int) -> truth uses random:
+    example rand_chance(1)
+    if n <= 1 then true else rand_range(0, n) is 0

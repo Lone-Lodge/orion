@@ -7,20 +7,20 @@
 # result, without stopping.
 use os
 
-extern fn dlopen(path: Text, flag: int) -> int
-extern fn dlsym(handle: int, name: Text) -> int
+external define dlopen(path: text, flag: int) -> int
+external define dlsym(handle: int, name: text) -> int
 
-fn build_and_load(gen: int) -> int:
+define build_and_load(gen: int) -> int:
     target = "plugin_gen{gen}.so"
     run_command("bash", ["build_so.sh", "plugin.or", target])   # recompile
     h = dlopen("./{target}", 2)                                 # load fresh code
     dlsym(h, "tick")
 
-fn main() -> int:
-    mut state = 0
-    mut last_src = read_file("plugin.or")
-    mut gen = 0
-    mut tick = build_and_load(gen)
+define main() -> int:
+    edit state = 0
+    edit last_src = read_file("plugin.or")
+    edit gen = 0
+    edit tick = build_and_load(gen)
     print_line("watching plugin.or ... (edit it and the running program follows)")
     loop i in 0..<10:
         cur = read_file("plugin.or")

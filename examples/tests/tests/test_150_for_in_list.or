@@ -1,6 +1,6 @@
-fn main() -> int:
+define main() -> int:
     nums = [10, 20, 30, 40, 50]
-    mut total = 0
+    edit total = 0
     loop x in nums:
         total = total + x
     total

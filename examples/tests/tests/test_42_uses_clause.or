@@ -1,0 +1,16 @@
+# The `uses` capability clause: a declared function is HELD to its contract.
+#   define save(...) uses files:  — may write files
+# Reading the signature tells you what a function can touch.
+define log_it(msg: text) uses console:
+    print_line(msg)
+
+define save_and_log(path: text, msg: text) uses files, console:
+    file_write(path, msg)
+    log_it(msg)
+
+define pure_math(a: int, b: int) -> int:
+    a * b
+
+define main() -> int:
+    save_and_log("dist/.uses_test.txt", "hej")
+    pure_math(6, 7)

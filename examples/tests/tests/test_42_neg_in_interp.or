@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     x = -5
     y = -10
     # Just var ref in interp (no expression)

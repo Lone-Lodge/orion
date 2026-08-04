@@ -10,8 +10,8 @@ use orion_lex
 # with no diagnostic. `psr_depth_bump` returns the new depth so the caller can
 # refuse past `PSR_MAX_DEPTH`; `defer psr_depth_drop()` balances it on every
 # exit path. See psr_parse_primary / psr_parse_body_at.
-extern fn psr_depth_bump() -> int
-extern fn psr_depth_drop() -> int
+external define psr_depth_bump() -> int
+external define psr_depth_drop() -> int
 
 # Below any real nesting (the compiler's own bundle peaks in the low tens),
 # far under the depth where recursion faults (~8k for blocks, ~25k for
@@ -29,14 +29,14 @@ const PSR_MAX_DEPTH = 1000
 #
 # AST shape this proof emits:
 #   { "kind": "Program", "decls": [<Fn>...] }
-#   Fn:    { "kind": "Fn", "name": Text, "params": [Param], "ret": Type, "body": Expr }
-#   Param: { "name": Text, "type": Type }
-#   Type:  { "kind": "Named", "name": Text }
+#   Fn:    { "kind": "Fn", "name": text, "params": [Param], "ret": Type, "body": Expr }
+#   Param: { "name": text, "type": Type }
+#   Type:  { "kind": "Named", "name": text }
 #         | { "kind": "List", "elem": Type }
-#   Expr:  { "kind": "Ident",  "name": Text }
-#         | { "kind": "Int",    "value": Text }
-#         | { "kind": "Binary", "op": Text, "left": Expr, "right": Expr }
-#         | { "kind": "Call",   "callee": Text, "args": [Expr] }
+#   Expr:  { "kind": "Ident",  "name": text }
+#         | { "kind": "Int",    "value": text }
+#         | { "kind": "Binary", "op": text, "left": Expr, "right": Expr }
+#         | { "kind": "Call",   "callee": text, "args": [Expr] }
 #
 # Cursor positions are passed through every helper as a plain int — Orion
 # doesn't have references so we return a new cursor in a {"node": …,
@@ -45,12 +45,12 @@ const PSR_MAX_DEPTH = 1000
 # Interpolation arg classification: numeric literals → Int AST, everything
 # else → Ident (caller resolves). Lets `{fn(21)}` work in addition to
 # `{fn(var_name)}`.
-fn psr_arg_to_node(text: Text) -> Map:
+define psr_arg_to_node(text: text) -> table:
     bs = bytes_from_text(text)
     n = bytes_length(bs)
-    mut all_digits = n > 0
-    mut dot_at = 0 - 1
-    mut paren_at = 0 - 1
+    edit all_digits = n > 0
+    edit dot_at = 0 - 1
+    edit paren_at = 0 - 1
     loop ci in 0..<n:
         b = byte_at(bs, ci)
         if b < 48 or b > 57:
@@ -69,9 +69,9 @@ fn psr_arg_to_node(text: Text) -> Map:
             inner = bytes_to_text(bytes_slice(bs, paren_at + 1, n - 1))
             inner_bs = bytes_from_text(inner)
             inner_len = bytes_length(inner_bs)
-            mut inner_args = []
-            mut a_start = 0
-            mut depth = 0
+            edit inner_args = []
+            edit a_start = 0
+            edit depth = 0
             loop ai in 0..<inner_len:
                 bi = byte_at(inner_bs, ai)
                 if bi == 40:
@@ -80,11 +80,11 @@ fn psr_arg_to_node(text: Text) -> Map:
                     depth = depth - 1
                 if bi == 44 and depth == 0:
                     chunk = psr_trim_ws(bytes_to_text(bytes_slice(inner_bs, a_start, ai)))
-                    inner_args = push(inner_args, psr_arg_to_node(chunk))
+                    inner_args = append(inner_args, psr_arg_to_node(chunk))
                     a_start = ai + 1
             if inner_len > 0:
                 tail = psr_trim_ws(bytes_to_text(bytes_slice(inner_bs, a_start, inner_len)))
-                inner_args = push(inner_args, psr_arg_to_node(tail))
+                inner_args = append(inner_args, psr_arg_to_node(tail))
             {"kind": "Call", "callee": callee, "args": inner_args}
         else:
             if has_field:
@@ -97,10 +97,10 @@ fn psr_arg_to_node(text: Text) -> Map:
 
 # Trim leading/trailing whitespace (space, tab, newline, CR). Used by the
 # interpolation parser so `{fn(a, b)}` doesn't yield ` b` with a stray space.
-fn psr_trim_ws(text: Text) -> Text:
+define psr_trim_ws(text: text) -> text:
     bs = bytes_from_text(text)
     n = bytes_length(bs)
-    mut start = 0
+    edit start = 0
     loop:
         if start >= n:
             break
@@ -109,7 +109,7 @@ fn psr_trim_ws(text: Text) -> Text:
         if not is_ws:
             break
         start = start + 1
-    mut stop = n
+    edit stop = n
     loop:
         if stop <= start:
             break
@@ -123,7 +123,7 @@ fn psr_trim_ws(text: Text) -> Text:
 
 # --- token helpers ---
 
-fn psr_peek_kind(tokens: [Map], position: int) -> Text:
+define psr_peek_kind(tokens: [table], position: int) -> text:
     if position >= len(tokens):
         "eof"
     else:
@@ -132,14 +132,14 @@ fn psr_peek_kind(tokens: [Map], position: int) -> Text:
         # declared return type without a bridge.
         get(at(tokens, position), "kind")
 
-fn psr_peek_value(tokens: [Map], position: int) -> Text:
+define psr_peek_value(tokens: [table], position: int) -> text:
     if position >= len(tokens):
         ""
     else:
         get(at(tokens, position), "value")
 
-fn psr_skip_newlines(tokens: [Map], position: int) -> int:
-    mut cursor = position
+define psr_skip_newlines(tokens: [table], position: int) -> int:
+    edit cursor = position
     loop:
         if psr_peek_kind(tokens, cursor) != "newline":
             break
@@ -148,7 +148,7 @@ fn psr_skip_newlines(tokens: [Map], position: int) -> int:
 
 # --- type parser ---
 
-fn psr_parse_type(tokens: [Map], position: int) -> Map:
+define psr_parse_type(tokens: [table], position: int) -> table:
     # `fn(T, ...) -> R` → function type. Bare `fn` (no `(`) stays a Named
     # type ("fn" — an opaque function pointer), so higher-order code that
     # never spelled out the signature keeps working.
@@ -157,9 +157,9 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
         return psr_parse_fn_type(tokens, position)
     # `(A, B, ...)` → tuple type. Same shape the tuple literal builds.
     if psr_peek_kind(tokens, position) == "symbol" and psr_peek_value(tokens, position) == "(":
-        mut tt_cursor = position + 1
+        edit tt_cursor = position + 1
         tt_elems = slice([{"kind": "Named", "name": "int"}], 0, 0)
-        mut tt_list = tt_elems
+        edit tt_list = tt_elems
         loop:
             if psr_peek_kind(tokens, tt_cursor) == "symbol" and psr_peek_value(tokens, tt_cursor) == ")":
                 tt_cursor = tt_cursor + 1
@@ -167,11 +167,17 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
             if psr_peek_kind(tokens, tt_cursor) == "eof":
                 break
             tt_r = psr_parse_type(tokens, tt_cursor)
-            tt_list = push(tt_list, get_map(tt_r, "node"))
+            tt_list = append(tt_list, get_map(tt_r, "node"))
             tt_cursor = get_int(tt_r, "next")
             if psr_peek_kind(tokens, tt_cursor) == "symbol" and psr_peek_value(tokens, tt_cursor) == ",":
                 tt_cursor = tt_cursor + 1
         return {"node": {"kind": "TupleType", "elems": tt_list}, "next": tt_cursor}
+    # `list of T` — the spoken list type: `items: list of enemy`. Same List
+    # node as `[T]`, so nothing downstream changes.
+    is_list_of = psr_peek_kind(tokens, position) == "ident" and psr_peek_value(tokens, position) == "list" and psr_peek_kind(tokens, position + 1) == "ident" and psr_peek_value(tokens, position + 1) == "of"
+    if is_list_of:
+        lo_inner = psr_parse_type(tokens, position + 2)
+        return {"node": {"kind": "List", "elem": get_map(lo_inner, "node")}, "next": get_int(lo_inner, "next")}
     # `[ inner ]` → list type, `name` → named type, `LOW...HIGH` → range type.
     if psr_peek_kind(tokens, position) == "symbol" and psr_peek_value(tokens, position) == "[":
         inner_result = psr_parse_type(tokens, position + 1)
@@ -185,7 +191,7 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
         # A number starting a type is a range: `0...255` or `0..<256`.
         if psr_peek_kind(tokens, position) == "int":
             low_text = psr_peek_value(tokens, position)
-            mut cursor = position + 1
+            edit cursor = position + 1
             op_kind = psr_peek_kind(tokens, cursor)
             op_val = psr_peek_value(tokens, cursor)
             # Range op: ..= (== ...) or ..<
@@ -208,9 +214,9 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
             # erased at lowering (all instantiations share one representation).
             # Bare `Name` (no `<`) is unchanged.
             if psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "<":
-                mut ga_cursor = position + 2
+                edit ga_cursor = position + 2
                 ga_args = slice([{"kind": "Named", "name": "int"}], 0, 0)
-                mut ga_list = ga_args
+                edit ga_list = ga_args
                 loop:
                     if psr_peek_kind(tokens, ga_cursor) == "symbol" and psr_peek_value(tokens, ga_cursor) == ">":
                         ga_cursor = ga_cursor + 1
@@ -218,7 +224,7 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
                     if psr_peek_kind(tokens, ga_cursor) == "eof":
                         break
                     ga_r = psr_parse_type(tokens, ga_cursor)
-                    ga_list = push(ga_list, get_map(ga_r, "node"))
+                    ga_list = append(ga_list, get_map(ga_r, "node"))
                     ga_cursor = get_int(ga_r, "next")
                     if psr_peek_kind(tokens, ga_cursor) == "symbol" and psr_peek_value(tokens, ga_cursor) == ",":
                         ga_cursor = ga_cursor + 1
@@ -231,10 +237,10 @@ fn psr_parse_type(tokens: [Map], position: int) -> Map:
 # Param types collect up to `)`; an omitted `-> R` defaults to Unit. The
 # node carries the full signature so later passes (typeck, generics) can
 # check higher-order calls — lowering still erases it to a plain "fn" ptr.
-fn psr_parse_fn_type(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 2
+define psr_parse_fn_type(tokens: [table], position: int) -> table:
+    edit cursor = position + 2
     param_types = []
-    mut pt_list = param_types
+    edit pt_list = param_types
     loop:
         pk = psr_peek_kind(tokens, cursor)
         pv = psr_peek_value(tokens, cursor)
@@ -244,11 +250,11 @@ fn psr_parse_fn_type(tokens: [Map], position: int) -> Map:
         if pk == "eof":
             break
         pt_r = psr_parse_type(tokens, cursor)
-        pt_list = push(pt_list, get_map(pt_r, "node"))
+        pt_list = append(pt_list, get_map(pt_r, "node"))
         cursor = get_int(pt_r, "next")
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
             cursor = cursor + 1
-    mut ret_node = {"kind": "Named", "name": "Unit"}
+    edit ret_node = {"kind": "Named", "name": "Unit"}
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
         cursor = cursor + 1
         rt_r = psr_parse_type(tokens, cursor)
@@ -262,7 +268,7 @@ fn psr_parse_fn_type(tokens: [Map], position: int) -> Map:
 # value — exactly like an `if` branch. Keeps multi-step arms flat instead of
 # forcing them into nested if/else. Block bodies lower for free (ast_expr_to_ir
 # already yields a Block's last-statement value).
-fn psr_parse_arm_body(tokens: [Map], position: int, arm_col: int) -> Map:
+define psr_parse_arm_body(tokens: [table], position: int, arm_col: int) -> table:
     if psr_peek_kind(tokens, position) == "newline":
         block_start = psr_skip_newlines(tokens, position)
         block_col = psr_peek_col(tokens, block_start)
@@ -289,14 +295,14 @@ fn psr_parse_arm_body(tokens: [Map], position: int, arm_col: int) -> Map:
 # One payload slot of a match-arm pattern. `name` is the ident already read;
 # `cursor` points just past it. A bare name is a plain binding (`Some(x)`);
 # a name followed by `(` is a NESTED sub-pattern (`Some(Ok(x))`), encoded as
-# "@Variant:n1,n2" so `bindings` stays a flat [Text] like every other arm
+# "@Variant:n1,n2" so `bindings` stays a flat [text] like every other arm
 # spec. Returns {enc, next}.
-fn psr_parse_sub_pattern(tokens: [Map], cursor: int, name: Text) -> Map:
-    mut cur = cursor
-    mut enc = name
+define psr_parse_sub_pattern(tokens: [table], cursor: int, name: text) -> table:
+    edit cur = cursor
+    edit enc = name
     if psr_peek_kind(tokens, cur) == "symbol" and psr_peek_value(tokens, cur) == "(":
         cur = cur + 1
-        mut sub_names = ""
+        edit sub_names = ""
         loop:
             sk = psr_peek_kind(tokens, cur)
             sv = psr_peek_value(tokens, cur)
@@ -314,8 +320,8 @@ fn psr_parse_sub_pattern(tokens: [Map], cursor: int, name: Text) -> Map:
 
 # Parse a `match EXPR:` block — used both as statement and as expression.
 # `position` points at the `match` keyword. Returns {node, next}.
-fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
-    mut match_cursor = position + 1
+define psr_parse_match_node(tokens: [table], position: int) -> table:
+    edit match_cursor = position + 1
     # Subjectless cond-form: `match:` (first token is `:`) — arms are
     # `COND: body` (first true wins) + `else: body`, desugared to nested If.
     if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == ":":
@@ -327,7 +333,7 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
     match_cursor = psr_skip_newlines(tokens, match_cursor)
     arm_col = psr_peek_col(tokens, match_cursor)
     arms = []
-    mut arms_list = arms
+    edit arms_list = arms
     loop:
         arm_kind = psr_peek_kind(tokens, match_cursor)
         arm_col_now = psr_peek_col(tokens, match_cursor)
@@ -335,12 +341,12 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
             break
         if arm_col_now < arm_col:
             break
-        mut pat_value = psr_peek_value(tokens, match_cursor)
-        mut pat_kind = psr_peek_kind(tokens, match_cursor)
+        edit pat_value = psr_peek_value(tokens, match_cursor)
+        edit pat_kind = psr_peek_kind(tokens, match_cursor)
         is_tuple_pat = pat_kind == "symbol" and pat_value == "("
         match_cursor = match_cursor + 1
         pat_bindings = []
-        mut pat_binding_list = pat_bindings
+        edit pat_binding_list = pat_bindings
         if is_tuple_pat:
             # Tuple pattern `(a, b) -> ...`: irrefutable, binds each field. The
             # `(` was just consumed; collect field-binding idents up to `)`.
@@ -356,7 +362,7 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
                 if tbk == "eof":
                     break
                 if tbk == "ident":
-                    pat_binding_list = push(pat_binding_list, tbv)
+                    pat_binding_list = append(pat_binding_list, tbv)
                     match_cursor = match_cursor + 1
                 if tbk == "symbol" and tbv == ",":
                     match_cursor = match_cursor + 1
@@ -378,7 +384,7 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
                 # helper consumes it and returns the encoded slot.
                 if bk == "ident":
                     sub_r = psr_parse_sub_pattern(tokens, match_cursor + 1, bv)
-                    pat_binding_list = push(pat_binding_list, get(sub_r, "enc"))
+                    pat_binding_list = append(pat_binding_list, get(sub_r, "enc"))
                     match_cursor = get_int(sub_r, "next")
                 if bk == "symbol" and bv == ",":
                     match_cursor = match_cursor + 1
@@ -392,53 +398,53 @@ fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
         # Alternatives are bare (payload-free variants or literals); a payload
         # on an alternative is not supported.
         alt_positions = slice([0], 0, 0)
-        mut alt_pos_list = alt_positions
+        edit alt_pos_list = alt_positions
         loop:
             if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "|":
                 match_cursor = match_cursor + 1
-                alt_pos_list = push(alt_pos_list, match_cursor)
+                alt_pos_list = append(alt_pos_list, match_cursor)
                 match_cursor = match_cursor + 1
             else:
                 break
         # Optional guard: `Pattern if COND -> body`. The arm matches only when
         # COND (evaluated with the arm's bindings in scope) is also true; a
         # failed guard falls through to the next arm.
-        mut arm_guard = {"kind": "Int", "value": "1"}
-        mut has_guard = false
+        edit arm_guard = {"kind": "Int", "value": "1"}
+        edit has_guard = false
         if psr_peek_kind(tokens, match_cursor) == "ident" and psr_peek_value(tokens, match_cursor) == "if":
             guard_r = psr_parse_expr(tokens, match_cursor + 1)
             arm_guard = get_map(guard_r, "node")
             has_guard = true
             match_cursor = get_int(guard_r, "next")
-        if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "->":
+        if (psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "->") or (psr_peek_kind(tokens, match_cursor) == "ident" and psr_peek_value(tokens, match_cursor) == "then"):
             match_cursor = match_cursor + 1
         body_result = psr_parse_arm_body(tokens, match_cursor, arm_col)
-        mut prim_arm = {"pattern": pat_value, "pat_kind": pat_kind, "bindings": pat_binding_list, "body": get_map(body_result, "node")}
+        edit prim_arm = {"pattern": pat_value, "pat_kind": pat_kind, "bindings": pat_binding_list, "body": get_map(body_result, "node")}
         if has_guard:
             prim_arm = set(prim_arm, "guard", arm_guard)
-        arms_list = push(arms_list, prim_arm)
+        arms_list = append(arms_list, prim_arm)
         # One extra arm per or-alternative, sharing (aliasing) the same body/guard.
         alt_count = len(alt_pos_list)
         loop alt_i in 0..<alt_count:
             alt_pos = at(alt_pos_list, alt_i)
-            mut alt_arm = {"pattern": psr_peek_value(tokens, alt_pos), "pat_kind": psr_peek_kind(tokens, alt_pos), "bindings": slice([""], 0, 0), "body": get_map(body_result, "node")}
+            edit alt_arm = {"pattern": psr_peek_value(tokens, alt_pos), "pat_kind": psr_peek_kind(tokens, alt_pos), "bindings": slice([""], 0, 0), "body": get_map(body_result, "node")}
             if has_guard:
                 alt_arm = set(alt_arm, "guard", arm_guard)
-            arms_list = push(arms_list, alt_arm)
+            arms_list = append(arms_list, alt_arm)
         match_cursor = get_int(body_result, "next")
         match_cursor = psr_skip_newlines(tokens, match_cursor)
     {"node": {"kind": "Match", "scrutinee": get_map(scrutinee_result, "node"), "arms": arms_list, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": match_cursor}
 
 # `match:` cond-form arms — `COND: body` (first true wins) + `else: body`.
 # Desugars to a right-nested If chain, so eval/typeck/emit stay untouched.
-fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
-    mut cursor = psr_skip_newlines(tokens, position)
+define psr_parse_cond_match(tokens: [table], position: int) -> table:
+    edit cursor = psr_skip_newlines(tokens, position)
     arm_col = psr_peek_col(tokens, cursor)
     cm_conds = []
-    mut cm_cond_list = cm_conds
+    edit cm_cond_list = cm_conds
     cm_bodies = []
-    mut cm_body_list = cm_bodies
-    mut cm_else = {"kind": "Int", "value": "0"}
+    edit cm_body_list = cm_bodies
+    edit cm_else = {"kind": "Int", "value": "0"}
     loop:
         # No-progress guard: a malformed arm (a `->` header dropped, an arm body
         # that consumes nothing) left cursor where it was and spun forever — the
@@ -456,7 +462,7 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
             cursor = cursor + 1
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
                 cursor = cursor + 1
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
+            if (psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->") or (psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "then"):
                 cursor = cursor + 1
             eb = psr_parse_arm_body(tokens, cursor, arm_col)
             cm_else = get_map(eb, "node")
@@ -467,17 +473,17 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
         cursor = get_int(cr, "next")
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
             cursor = cursor + 1
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
+        if (psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->") or (psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "then"):
             cursor = cursor + 1
         br = psr_parse_arm_body(tokens, cursor, arm_col)
-        cm_cond_list = push(cm_cond_list, get_map(cr, "node"))
-        cm_body_list = push(cm_body_list, get_map(br, "node"))
+        cm_cond_list = append(cm_cond_list, get_map(cr, "node"))
+        cm_body_list = append(cm_body_list, get_map(br, "node"))
         cursor = get_int(br, "next")
         cursor = psr_skip_newlines(tokens, cursor)
         if cursor == cond_arm_start:
             break
     cm_n = len(cm_cond_list)
-    mut cm_chain = cm_else
+    edit cm_chain = cm_else
     loop cm_i in 0..<cm_n:
         cm_idx = cm_n - 1 - cm_i
         cm_chain = {"kind": "If", "cond": at(cm_cond_list, cm_idx), "then": at(cm_body_list, cm_idx), "else": cm_chain}
@@ -488,18 +494,39 @@ fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
 #   - one-liner  `loop v in seq: expr`      — the trailing expr is yielded,
 #     same "last value is the value" rule as every block in the language.
 #   - block      `loop v in seq:` <newline> — an indented body that yields
-#     explicitly with `yield expr`, and filters with `if cond: yield ...`.
+#     explicitly with `yield expr`, and filters with `if cond: collect ...`.
 # A leading `yield` on the one-liner is accepted too, so both forms read alike.
 # Reuses MutLet/ForIn/push — no ast_to_ir changes. (Filtering is `if: yield`;
 # the old `where` clause is gone.)
-fn psr_parse_for_collect(tokens: [Map], position: int) -> Map:
+define psr_parse_for_collect(tokens: [table], position: int) -> table:
     fc_var = psr_peek_value(tokens, position + 1)
-    mut cursor = position + 2
+    edit cursor = position + 2
     if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "in":
         cursor = cursor + 1
     fc_iter_r = psr_parse_expr(tokens, cursor)
-    fc_iter = get_map(fc_iter_r, "node")
+    edit fc_iter = get_map(fc_iter_r, "node")
     cursor = get_int(fc_iter_r, "next")
+    # A RANGE as the source: `xs = loop i in 1 until n: collect ...`. The
+    # statement loops understood `to`/`until` (and `..<`/`..=`) from the
+    # start; the collecting form did not, so a range only worked when the
+    # loop stood alone. Same Range node the type parser builds, so lowering
+    # is untouched.
+    fc_rop = psr_peek_value(tokens, cursor)
+    fc_is_range = (psr_peek_kind(tokens, cursor) == "symbol" and (fc_rop == "..<" or fc_rop == "..=")) or (psr_peek_kind(tokens, cursor) == "ident" and (fc_rop == "to" or fc_rop == "until"))
+    if fc_is_range:
+        fc_hi_r = psr_parse_expr(tokens, cursor + 1)
+        fc_incl = if fc_rop == "..=" or fc_rop == "to" then 1 else 0
+        fc_iter = {"kind": "RangeIter", "low": fc_iter, "high": get_map(fc_hi_r, "node"), "inclusive": fc_incl}
+        cursor = get_int(fc_hi_r, "next")
+    # `loop x in xs where cond:` — filter sugar. The whole body is wrapped in
+    # `if cond:`, which is exactly the documented desugar (`if cond: collect x`).
+    edit fc_has_where = false
+    edit fc_where_cond = {"kind": "Int", "value": "0"}
+    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "where":
+        fc_where_r = psr_parse_expr(tokens, cursor + 1)
+        fc_where_cond = get_map(fc_where_r, "node")
+        fc_has_where = true
+        cursor = get_int(fc_where_r, "next")
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
         cursor = cursor + 1
     # A newline right after `:` means an indented body; parse it as a block.
@@ -508,61 +535,66 @@ fn psr_parse_for_collect(tokens: [Map], position: int) -> Map:
     # yielded (like every block, its last value is its value), and each `yield`
     # inside the body collects an ADDITIONAL value. So a one-liner yields its
     # expression, a block ending in a bare expression yields that, and
-    # `if cond: yield x` filters. Each collecting loop owns a distinct
+    # `if cond: collect x` filters. Each collecting loop owns a distinct
     # accumulator, keyed by the `loop` token's position, so a collecting loop
     # nested in another's body does not clobber the outer one.
     fc_acc = "__yield_{position}"
     fc_is_block = psr_peek_kind(tokens, cursor) == "newline"
-    mut fc_body_block = {"kind": "Block", "stmts": []}
+    edit fc_body_block = {"kind": "Block", "stmts": []}
     if fc_is_block:
         fc_body_col = psr_peek_col(tokens, psr_skip_newlines(tokens, cursor))
         fc_body_r = psr_parse_body_at(tokens, cursor, fc_body_col)
-        # Rewrite explicit `yield e` to `acc = push(acc, e)`, then make the
+        # Rewrite explicit `yield e` to `acc = append(acc, e)`, then make the
         # block's tail expression (if any) yield too.
         fc_rewritten = psr_rewrite_yields(get_map(fc_body_r, "node"), fc_acc)
         fc_body_block = psr_yield_tail(fc_rewritten, fc_acc)
         cursor = get_int(fc_body_r, "next")
     if not fc_is_block:
-        if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "yield":
+        if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "collect":
             cursor = cursor + 1
         fc_expr_r = psr_parse_expr(tokens, cursor)
         cursor = get_int(fc_expr_r, "next")
         fc_push = {"kind": "Call", "callee": "push", "args": [{"kind": "Ident", "name": fc_acc}, get_map(fc_expr_r, "node")]}
         fc_assign = {"kind": "LetOrAssign", "name": fc_acc, "value": fc_push}
-        fc_body_block = {"kind": "Block", "stmts": push([], fc_assign)}
-    fc_forin = {"kind": "ForIn", "var": fc_var, "index_var": "", "iter": fc_iter, "body": fc_body_block, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}
+        fc_body_block = {"kind": "Block", "stmts": append([], fc_assign)}
+    if fc_has_where:
+        fc_body_block = {"kind": "Block", "stmts": append([], {"kind": "IfBlock", "cond": fc_where_cond, "then": fc_body_block, "else": {"kind": "Block", "stmts": []}})}
+    # A range source becomes a ForRange (counting), anything else a ForIn.
+    edit fc_forin = {"kind": "ForIn", "var": fc_var, "index_var": "", "iter": fc_iter, "body": fc_body_block, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}
+    if fc_is_range:
+        fc_forin = {"kind": "ForRange", "var": fc_var, "low": get_map(fc_iter, "low"), "high": get_map(fc_iter, "high"), "inclusive": get_int(fc_iter, "inclusive"), "body": fc_body_block}
     fc_mutlet = {"kind": "MutLet", "name": fc_acc, "value": {"kind": "ListLit", "items": []}}
     fc_ret = {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": fc_acc}}
-    fc_stmts = push(push(push([], fc_mutlet), fc_forin), fc_ret)
+    fc_stmts = append(append(append([], fc_mutlet), fc_forin), fc_ret)
     {"node": {"kind": "Block", "stmts": fc_stmts}, "next": cursor}
 
 # Replace every `Yield` STATEMENT reachable through ordinary control flow with
-# `target = push(target, expr)`. Recurses through the statement-bearing shapes
+# `target = append(target, expr)`. Recurses through the statement-bearing shapes
 # (blocks, ifs, matches, loops) but never into expression subtrees — a `yield`
 # is only ever a statement — so a nested collecting loop, which sits in an
 # expression position with its own already-rewritten body, is left untouched.
-fn psr_rewrite_yields(node: Map, target: Text) -> Map:
+define psr_rewrite_yields(node: table, target: text) -> table:
     ry_kind = get(node, "kind")
     if ry_kind == "Yield":
         ry_push = {"kind": "Call", "callee": "push", "args": [{"kind": "Ident", "name": target}, get_map(node, "expr")]}
         return {"kind": "LetOrAssign", "name": target, "value": ry_push}
     if ry_kind == "Block":
         ry_stmts = get_list(node, "stmts")
-        mut ry_out = []
+        edit ry_out = []
         loop ry_s in ry_stmts:
-            ry_out = push(ry_out, psr_rewrite_yields(ry_s, target))
+            ry_out = append(ry_out, psr_rewrite_yields(ry_s, target))
         return set(node, "stmts", ry_out)
     if ry_kind == "IfBlock":
-        mut ry_if = set(node, "then", psr_rewrite_yields(get_map(node, "then"), target))
+        edit ry_if = set(node, "then", psr_rewrite_yields(get_map(node, "then"), target))
         ry_if = set(ry_if, "else", psr_rewrite_yields(get_map(node, "else"), target))
         return ry_if
     if ry_kind == "ForIn" or ry_kind == "ForRange" or ry_kind == "Loop":
         return set(node, "body", psr_rewrite_yields(get_map(node, "body"), target))
     if ry_kind == "Match":
         ry_arms = get_list(node, "arms")
-        mut ry_new = []
+        edit ry_new = []
         loop ry_a in ry_arms:
-            ry_new = push(ry_new, set(ry_a, "body", psr_rewrite_yields(get_map(ry_a, "body"), target)))
+            ry_new = append(ry_new, set(ry_a, "body", psr_rewrite_yields(get_map(ry_a, "body"), target)))
         return set(node, "arms", ry_new)
     node
 
@@ -570,7 +602,7 @@ fn psr_rewrite_yields(node: Map, target: Text) -> Map:
 # yielded — the same "last value is the value" rule the one-liner already uses.
 # A block ending in a statement (an `if`, an explicit `yield`, an assignment)
 # has no tail expression, so nothing extra is collected there.
-fn psr_yield_tail(block: Map, target: Text) -> Map:
+define psr_yield_tail(block: table, target: text) -> table:
     yt_stmts = get_list(block, "stmts")
     yt_n = len(yt_stmts)
     if yt_n == 0:
@@ -589,17 +621,17 @@ fn psr_yield_tail(block: Map, target: Text) -> Map:
 # pool. Iterations must be independent (each writes its own slot); shared
 # mutation is a race, and captures are by value so writes to outer locals
 # do not escape the iteration.
-fn psr_parse_par_loop(tokens: [Map], position: int) -> Map:
+define psr_parse_par_loop(tokens: [table], position: int) -> table:
     pl_var = psr_peek_value(tokens, position + 2)
-    mut cursor = position + 3
+    edit cursor = position + 3
     if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "in":
         cursor = cursor + 1
     pl_low_r = psr_parse_expr(tokens, cursor)
     pl_low = get_map(pl_low_r, "node")
     cursor = get_int(pl_low_r, "next")
     pl_range_op = psr_peek_value(tokens, cursor)
-    pl_is_range = psr_peek_kind(tokens, cursor) == "symbol" and (pl_range_op == "..<" or pl_range_op == "..=")
-    mut pl_high = {"kind": "Int", "value": "0"}
+    pl_is_range = (psr_peek_kind(tokens, cursor) == "symbol" and (pl_range_op == "..<" or pl_range_op == "..=")) or (psr_peek_kind(tokens, cursor) == "ident" and (pl_range_op == "to" or pl_range_op == "until"))
+    edit pl_high = {"kind": "Int", "value": "0"}
     if pl_is_range:
         cursor = cursor + 1
         pl_high_r = psr_parse_expr(tokens, cursor)
@@ -609,7 +641,7 @@ fn psr_parse_par_loop(tokens: [Map], position: int) -> Map:
         cursor = cursor + 1
     pl_body_col = psr_peek_col(tokens, cursor)
     pl_body_r = psr_parse_body_at(tokens, cursor, pl_body_col)
-    mut pl_body = get_map(pl_body_r, "node")
+    edit pl_body = get_map(pl_body_r, "node")
     cursor = get_int(pl_body_r, "next")
     # The synthesized closure is declared `-> int`, and the body's own value
     # is discarded (par_run sums results; a parallel loop is run for its
@@ -617,9 +649,9 @@ fn psr_parse_par_loop(tokens: [Map], position: int) -> Map:
     # (whose value is the list) still types as an int-returning closure.
     pl_zero = {"kind": "ExprStmt", "expr": {"kind": "Int", "value": "0"}}
     if get(pl_body, "kind") == "Block":
-        pl_body = set(pl_body, "stmts", push(get_list(pl_body, "stmts"), pl_zero))
+        pl_body = set(pl_body, "stmts", append(get_list(pl_body, "stmts"), pl_zero))
     else:
-        pl_body = {"kind": "Block", "stmts": push(push([], {"kind": "ExprStmt", "expr": pl_body}), pl_zero)}
+        pl_body = {"kind": "Block", "stmts": append(append([], {"kind": "ExprStmt", "expr": pl_body}), pl_zero)}
     # The accumulator name is keyed on the source position, so nested or
     # sibling parallel loops in one fn never collide.
     pl_name = "__par{position}"
@@ -629,13 +661,13 @@ fn psr_parse_par_loop(tokens: [Map], position: int) -> Map:
     pl_lambda = {"kind": "Lambda", "params": ["__pi"], "param_types": [{"kind": "Named", "name": "int"}], "body": pl_body, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}
     pl_push = {"kind": "Call", "callee": "push", "args": [{"kind": "Ident", "name": pl_name}, pl_lambda]}
     pl_assign = {"kind": "LetOrAssign", "name": pl_name, "value": pl_push}
-    pl_inner = {"kind": "Block", "stmts": push([], pl_assign)}
-    mut pl_loop = {"kind": "ForIn", "var": pl_var, "index_var": "", "iter": pl_low, "body": pl_inner, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}
+    pl_inner = {"kind": "Block", "stmts": append([], pl_assign)}
+    edit pl_loop = {"kind": "ForIn", "var": pl_var, "index_var": "", "iter": pl_low, "body": pl_inner, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}
     if pl_is_range:
-        pl_loop = {"kind": "ForRange", "var": pl_var, "low": pl_low, "high": pl_high, "inclusive": if pl_range_op == "..=" then 1 else 0, "body": pl_inner}
+        pl_loop = {"kind": "ForRange", "var": pl_var, "low": pl_low, "high": pl_high, "inclusive": if pl_range_op == "..=" or pl_range_op == "to" then 1 else 0, "body": pl_inner}
     pl_mutlet = {"kind": "MutLet", "name": pl_name, "value": {"kind": "ListLit", "items": []}}
     pl_run = {"kind": "ExprStmt", "expr": {"kind": "Call", "callee": "par_run", "args": [{"kind": "Ident", "name": pl_name}, {"kind": "Int", "value": "0"}]}}
-    pl_stmts = push(push(push([], pl_mutlet), pl_loop), pl_run)
+    pl_stmts = append(append(append([], pl_mutlet), pl_loop), pl_run)
     {"node": {"kind": "Block", "stmts": pl_stmts}, "next": cursor}
 
 # --- expression parser ---
@@ -644,7 +676,7 @@ fn psr_parse_par_loop(tokens: [Map], position: int) -> Map:
 # `+`/`-` for the proof. The real parser uses full operator precedence
 # and unary ops; same pattern, more cases.
 
-fn psr_parse_primary(tokens: [Map], position: int) -> Map:
+define psr_parse_primary(tokens: [table], position: int) -> table:
     # Recursion-depth guard. Every nested expression (parens, unary run, call
     # argument, list/map/tuple element) re-enters here, so one check covers them
     # all. `defer` balances the bump on every exit; on overflow we point `next`
@@ -670,7 +702,7 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     # operator dropped, so `~12` answered 12: the same silent-wrong-value shape
     # the binary bitwise operators had.
     is_bnot = kind == "symbol" and value == "~"
-    mut not_node = {"node": {"kind": "Error", "msg": ""}, "next": position}
+    edit not_node = {"node": {"kind": "Error", "msg": ""}, "next": position}
     # Operand includes the POSTFIX chain — `not s.ok` must negate the
     # field read, not read `.ok` off the negation (which typed as i64
     # and broke every `if not step.ok:` in astra_parser).
@@ -686,6 +718,15 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         op_prim = psr_parse_primary(tokens, position + 1)
         operand_result = psr_parse_postfix(tokens, get_int(op_prim, "next"), get_map(op_prim, "node"))
         not_node = {"node": {"kind": "Unary", "op": "bnot", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
+    # `try expr` — the spoken form of postfix `?`: unwrap ok / propagate the
+    # error to the caller. Same Question node, so lowering is untouched.
+    # Operand scope matches `not`: primary + postfix chain, so
+    # `x = try risky()` reads naturally and `try f() + 1` is (try f()) + 1.
+    is_try = kind == "ident" and value == "try"
+    if is_try:
+        op_prim = psr_parse_primary(tokens, position + 1)
+        operand_result = psr_parse_postfix(tokens, get_int(op_prim, "next"), get_map(op_prim, "node"))
+        not_node = {"node": {"kind": "Question", "inner": get_map(operand_result, "node"), "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": get_int(operand_result, "next")}
     is_ident = kind == "ident"
     is_int = kind == "int"
     is_float = kind == "float"
@@ -697,7 +738,7 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     # `if` and `match` are idents at the lex layer — we recognise them
     # here as keywords so they work in expression position.
     is_if = is_ident and value == "if"
-    is_match_expr = is_ident and value == "match"
+    is_match_expr = is_ident and value == "choose"
     is_for = is_ident and value == "loop"
     # Anonymous fn / lambda in expression position: `fn(params): body`. Reuses
     # the `fn` keyword (a newcomer who knows `fn name(n): ...` can read this),
@@ -711,10 +752,10 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
     # position and the offending text, because "expected an expression" with no
     # location (the old shape) is close to useless — it is the message a reader
     # gets for any syntax the language does not have.
-    mut result = {"node": {"kind": "Error", "msg": "expected an expression", "found": value, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": position}
+    edit result = {"node": {"kind": "Error", "msg": "expected an expression", "found": value, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": position}
     if is_perform:
         pf_effect = psr_peek_value(tokens, position + 1)
-        mut pf_cursor = position + 2
+        edit pf_cursor = position + 2
         if psr_peek_kind(tokens, pf_cursor) == "symbol" and psr_peek_value(tokens, pf_cursor) == ".":
             pf_cursor = pf_cursor + 1
         pf_op = psr_peek_value(tokens, pf_cursor)
@@ -735,11 +776,11 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         # parallel `param_types` list (defaulting to `int` when omitted) so the
         # lambda-lift can give the synthesized fn's param its real type — that's
         # what lets a closure use `len`/`at` on a captured or passed text/list.
-        mut fl_cursor = position + 2
+        edit fl_cursor = position + 2
         fl_params = []
-        mut fl_list = fl_params
+        edit fl_list = fl_params
         fl_ptypes = []
-        mut fl_types = fl_ptypes
+        edit fl_types = fl_ptypes
         loop:
             # No-progress guard. A token that is neither `)`, eof, an ident nor
             # a comma left the cursor where it was and this loop spun forever:
@@ -754,16 +795,16 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
             if fk == "eof":
                 break
             if fk == "ident":
-                fl_list = push(fl_list, fv)
+                fl_list = append(fl_list, fv)
                 fl_cursor = fl_cursor + 1
                 # Optional `: type` — parse it, else default to `int`.
                 if psr_peek_kind(tokens, fl_cursor) == "symbol" and psr_peek_value(tokens, fl_cursor) == ":":
                     fl_cursor = fl_cursor + 1
                     fl_ty_r = psr_parse_type(tokens, fl_cursor)
-                    fl_types = push(fl_types, get_map(fl_ty_r, "node"))
+                    fl_types = append(fl_types, get_map(fl_ty_r, "node"))
                     fl_cursor = get_int(fl_ty_r, "next")
                 else:
-                    fl_types = push(fl_types, {"kind": "Named", "name": "int"})
+                    fl_types = append(fl_types, {"kind": "Named", "name": "int"})
             if fk == "symbol" and fv == ",":
                 fl_cursor = fl_cursor + 1
             if fl_cursor == fl_before:
@@ -780,12 +821,12 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         next_kind = psr_peek_kind(tokens, position + 1)
         next_value = psr_peek_value(tokens, position + 1)
         value_bytes = bytes_from_text(value)
-        mut starts_capital = false
+        edit starts_capital = false
         if len(value_bytes) > 0:
             first_byte = at(value_bytes, 0)
             if first_byte >= 65 and first_byte <= 90:
                 starts_capital = true
-        is_struct_cons = next_kind == "symbol" and next_value == "\{" and starts_capital
+        is_struct_cons = next_kind == "symbol" and next_value == "\{"
         # Capture source position so ast_to_ir can include line:col in errors.
         ident_tok = at(tokens, position)
         ident_line = get_int(ident_tok, "line")
@@ -825,16 +866,83 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
         result = not_node
     if is_bnot:
         result = not_node
+    if is_try:
+        result = not_node
+    # `(n): body` — the LIGHT anonymous function, no keyword: `each(xs, (n): n * 2)`.
+    # Detected by scanning `( ident[, ident]* ) :` — no other expression is
+    # ever followed by `:` right after its closing paren. Bare idents only;
+    # a TYPED param still uses the `fn(s: text): body` form.
+    edit ll_is = false
+    edit ll_params = []
+    edit ll_after = position
     if is_lparen:
+        edit ll_scan = position + 1
+        edit ll_ok = true
+        loop:
+            ll_before = ll_scan
+            lk = psr_peek_kind(tokens, ll_scan)
+            lv = psr_peek_value(tokens, ll_scan)
+            if lk == "symbol" and lv == ")":
+                break
+            if lk == "ident":
+                ll_params = append(ll_params, lv)
+                ll_scan = ll_scan + 1
+                # An optional `: type` — `(s: orbstat): s.field`. Without it a
+                # light-lambda param defaults to int, so reading a field off
+                # one was "`` has no field x". Scan past the type here; the
+                # real parse happens below.
+                if psr_peek_kind(tokens, ll_scan) == "symbol" and psr_peek_value(tokens, ll_scan) == ":" and psr_peek_kind(tokens, ll_scan + 1) == "ident":
+                    ll_ty_scan = psr_parse_type(tokens, ll_scan + 1)
+                    ll_scan = get_int(ll_ty_scan, "next")
+                ll_nk = psr_peek_kind(tokens, ll_scan)
+                ll_nv = psr_peek_value(tokens, ll_scan)
+                if ll_nk == "symbol" and ll_nv == ",":
+                    ll_scan = ll_scan + 1
+                else if ll_nk == "symbol" and ll_nv == ")":
+                    # fine — the `)` branch ends the scan next iteration
+                    ll_scan = ll_scan
+                else:
+                    # `(not x):`, `(a + b):` — an expression, not a param list
+                    ll_ok = false
+                    break
+            else:
+                ll_ok = false
+                break
+            if ll_scan == ll_before:
+                break
+        ll_is = ll_ok and psr_peek_kind(tokens, ll_scan) == "symbol" and psr_peek_value(tokens, ll_scan) == ")" and psr_peek_kind(tokens, ll_scan + 1) == "symbol" and psr_peek_value(tokens, ll_scan + 1) == ":"
+        ll_after = ll_scan + 2
+    if ll_is:
+        # Re-walk the params for real, keeping any `: type` the scan saw.
+        ll_types = []
+        edit ll_tlist = ll_types
+        edit ll_tcur = position + 1
+        loop:
+            if psr_peek_kind(tokens, ll_tcur) != "ident":
+                break
+            ll_tcur = ll_tcur + 1
+            if psr_peek_kind(tokens, ll_tcur) == "symbol" and psr_peek_value(tokens, ll_tcur) == ":" and psr_peek_kind(tokens, ll_tcur + 1) == "ident":
+                ll_tr = psr_parse_type(tokens, ll_tcur + 1)
+                ll_tlist = append(ll_tlist, get_map(ll_tr, "node"))
+                ll_tcur = get_int(ll_tr, "next")
+            else:
+                ll_tlist = append(ll_tlist, {"kind": "Named", "name": "int"})
+            if psr_peek_kind(tokens, ll_tcur) == "symbol" and psr_peek_value(tokens, ll_tcur) == ",":
+                ll_tcur = ll_tcur + 1
+            else:
+                break
+        ll_body = psr_parse_expr(tokens, ll_after)
+        result = {"node": {"kind": "Lambda", "params": ll_params, "param_types": ll_tlist, "body": get_map(ll_body, "node"), "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": get_int(ll_body, "next")}
+    if is_lparen and not ll_is:
         inner = psr_parse_expr(tokens, position + 1)
-        mut inner_next = get_int(inner, "next")
+        edit inner_next = get_int(inner, "next")
         # `(a, b, ...)` — a tuple. One or more commas turns the parens into a
         # tuple; a single expression `(a)` stays plain grouping. Tuples lower
         # to a list literal (homogeneous for now; a mixed-type tuple trips the
         # existing "list mixes types" check — heterogeneous anon-struct tuples
         # are a later step).
-        mut tuple_items = push(slice([inner], 0, 0), get_map(inner, "node"))
-        mut saw_comma = false
+        edit tuple_items = append(slice([inner], 0, 0), get_map(inner, "node"))
+        edit saw_comma = false
         loop:
             if psr_peek_kind(tokens, inner_next) == "symbol" and psr_peek_value(tokens, inner_next) == ",":
                 saw_comma = true
@@ -842,7 +950,7 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
                 if psr_peek_kind(tokens, inner_next) == "symbol" and psr_peek_value(tokens, inner_next) == ")":
                     break
                 nxt = psr_parse_expr(tokens, inner_next)
-                tuple_items = push(tuple_items, get_map(nxt, "node"))
+                tuple_items = append(tuple_items, get_map(nxt, "node"))
                 inner_next = get_int(nxt, "next")
             else:
                 break
@@ -856,16 +964,16 @@ fn psr_parse_primary(tokens: [Map], position: int) -> Map:
 
 # `TypeName{field: value, ...}` — struct construction. The leading `{`
 # is already consumed; position is at the first field name (or `}`).
-fn psr_parse_struct_cons(tokens: [Map], position: int, type_name: Text) -> Map:
-    mut cursor = position
+define psr_parse_struct_cons(tokens: [table], position: int, type_name: text) -> table:
+    edit cursor = position
     # Position of the `\{` that opens the literal. `unknown data type `Tas``
     # had nowhere to point without it, and printed `at line 0:0`.
     sc_line = psr_peek_line(tokens, position)
     sc_col = psr_peek_col(tokens, position)
     fields = []
-    mut field_list = fields
-    mut spread_node = {"kind": "Int", "value": "0"}
-    mut has_spread = false
+    edit field_list = fields
+    edit spread_node = {"kind": "Int", "value": "0"}
+    edit has_spread = false
     loop:
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
@@ -896,7 +1004,7 @@ fn psr_parse_struct_cons(tokens: [Map], position: int, type_name: Text) -> Map:
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
                 cursor = cursor + 1
             value_result = psr_parse_expr(tokens, cursor)
-            field_list = push(field_list, {"name": field_name, "value": get_map(value_result, "node")})
+            field_list = append(field_list, {"name": field_name, "value": get_map(value_result, "node")})
             cursor = get_int(value_result, "next")
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
                 cursor = cursor + 1
@@ -905,7 +1013,7 @@ fn psr_parse_struct_cons(tokens: [Map], position: int, type_name: Text) -> Map:
         is_advanced = is_close or is_nl or is_id or is_spread
         if not is_advanced:
             cursor = cursor + 1
-    mut sc_node = {"kind": "StructCons", "name": type_name, "fields": field_list, "line": sc_line, "col": sc_col}
+    edit sc_node = {"kind": "StructCons", "name": type_name, "fields": field_list, "line": sc_line, "col": sc_col}
     if has_spread:
         sc_node = set(sc_node, "spread", spread_node)
     {"node": sc_node, "next": cursor}
@@ -923,8 +1031,8 @@ fn psr_parse_struct_cons(tokens: [Map], position: int, type_name: Text) -> Map:
 # interpolation hole, whose tokens are lexed separately and therefore start
 # counting at line 0: without this, an error anywhere inside `"{a + nope}"` had
 # no line to point at.
-fn psr_stamp_pos(node: Map, line: int, col: int) -> Map:
-    mut out = set(set(node, "line", line), "col", col)
+define psr_stamp_pos(node: table, line: int, col: int) -> table:
+    edit out = set(set(node, "line", line), "col", col)
     # Every child is reached through `has` first. Reading a key a node does not
     # carry hands back a null map, and recursing into that killed the compiler
     # with "reading address 0x0" — guessing at field names is not something to
@@ -937,29 +1045,29 @@ fn psr_stamp_pos(node: Map, line: int, col: int) -> Map:
             out = set(out, key, psr_stamp_pos(get_map(node, key), line, col))
     if has(node, "args"):
         call_args = get_list(node, "args")
-        mut stamped = slice(call_args, 0, 0)
+        edit stamped = slice(call_args, 0, 0)
         loop ai in 0..<len(call_args):
             arg_node = at(call_args, ai)
-            stamped = push(stamped, if has(arg_node, "kind") then psr_stamp_pos(arg_node, line, col) else arg_node)
+            stamped = append(stamped, if has(arg_node, "kind") then psr_stamp_pos(arg_node, line, col) else arg_node)
         out = set(out, "args", stamped)
     out
 
-fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
+define psr_interpolate_str(raw_text: text, str_line: int, str_col: int) -> table:
     raw_bytes = bytes_from_text(raw_text)
     total_len = bytes_length(raw_bytes)
     # Scan once to confirm any UNESCAPED `{` exists; `\{` is a literal brace.
     # If no real interp braces, strip escapes and emit a plain Str.
-    mut has_brace = 0
+    edit has_brace = 0
     loop scan_index in 0..<total_len:
         b = byte_at(raw_bytes, scan_index)
         prev_b = if scan_index > 0 then byte_at(raw_bytes, scan_index - 1) else 0
         if b == 123 and prev_b != 92:
             has_brace = 1
-    mut plain_value = raw_text
+    edit plain_value = raw_text
     if has_brace == 0:
         # Strip `\{` → `{` and `\}` → `}` so the runtime sees literal braces.
-        mut plain_buf = bytes_zeros(0)
-        mut pi = 0
+        edit plain_buf = bytes_zeros(0)
+        edit pi = 0
         loop:
             if pi >= total_len:
                 break
@@ -976,21 +1084,21 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                 plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi, pi + 1))
                 pi = pi + 1
         plain_value = bytes_to_text(plain_buf)
-    mut result_node = {"kind": "Str", "value": plain_value}
+    edit result_node = {"kind": "Str", "value": plain_value}
 
     if has_brace == 1:
         # Walk and split: every `{` flushes the literal so far and captures
         # the ident up to `}`. Build a left-associative `+` tree.
-        mut current_node = {"kind": "Str", "value": ""}
-        mut node_started = 0
+        edit current_node = {"kind": "Str", "value": ""}
+        edit node_started = 0
         # The parts, in order, alongside the `+` tree. Three or more of them
         # lower to one `__interp_join` call (one allocation) instead of the
         # tree (one allocation per link, each re-copying the prefix). One and
         # two parts keep the tree: a bare `"{t}"` must stay the SAME pointer,
         # and a single concat already allocates only once.
-        mut parts = []
-        mut literal_buf = bytes_zeros(0)
-        mut scan_index2 = 0
+        edit parts = []
+        edit literal_buf = bytes_zeros(0)
+        edit scan_index2 = 0
         loop:
             if scan_index2 >= total_len:
                 break
@@ -1010,7 +1118,7 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                 # Flush literal-so-far as a Str part if non-empty.
                 if bytes_length(literal_buf) > 0:
                     literal_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
-                    parts = push(parts, literal_part)
+                    parts = append(parts, literal_part)
                     started_before_flush = node_started
                     if started_before_flush == 0:
                         current_node = literal_part
@@ -1018,14 +1126,31 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                     if started_before_flush == 1:
                         current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": literal_part}
                 literal_buf = bytes_zeros(0)
-                # Read the ident up to `}`.
+                # Read the hole's expression up to its MATCHING `}`. The scan
+                # is brace- AND quote-aware: a hole may contain a string
+                # (`{pad_left(n, 3, " ")}`) and that string may itself
+                # interpolate (`{pad_left("{count}", 3, sp)}`). Stopping at
+                # the first `}` cut those in half and the fragment lexed as
+                # an unterminated string — which is why formatting a table
+                # was impossible.
                 scan_index2 = scan_index2 + 1
                 ident_start = scan_index2
+                edit hole_depth = 0
+                edit in_quote = false
                 loop:
                     if scan_index2 >= total_len:
                         break
-                    if byte_at(raw_bytes, scan_index2) == 125:
-                        break
+                    hb = byte_at(raw_bytes, scan_index2)
+                    hprev = if scan_index2 > 0 then byte_at(raw_bytes, scan_index2 - 1) else 0
+                    if hb == 34 and hprev != 92:
+                        in_quote = not in_quote
+                    if not in_quote:
+                        if hb == 123:
+                            hole_depth = hole_depth + 1
+                        if hb == 125:
+                            if hole_depth == 0:
+                                break
+                            hole_depth = hole_depth - 1
                     scan_index2 = scan_index2 + 1
                 ident_text = bytes_to_text(bytes_slice(raw_bytes, ident_start, scan_index2))
                 # Parse the `{...}` content as a REAL expression: lex it, then
@@ -1034,7 +1159,7 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                 # old hand-rolled `name(...)` / `obj.field` special cases.
                 # (A nested string literal with `"` still can't appear, since
                 # the outer lexer ends the string at the first inner quote.)
-                mut raw_ident = {"kind": "Ident", "name": ident_text, "line": str_line, "col": str_col}
+                edit raw_ident = {"kind": "Ident", "name": ident_text, "line": str_line, "col": str_col}
                 if bytes_length(bytes_from_text(ident_text)) > 0:
                     interp_tokens = self_lex(ident_text)
                     interp_parsed = psr_parse_expr(interp_tokens, 0)
@@ -1045,7 +1170,7 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                     raw_ident = psr_stamp_pos(get_map(interp_parsed, "node"), str_line, str_col)
                 # Wrap in to_text so ints get fmt'd and strings flow through.
                 ident_node = {"kind": "Call", "callee": "to_text", "args": [raw_ident], "line": str_line, "col": str_col}
-                parts = push(parts, ident_node)
+                parts = append(parts, ident_node)
                 started_before_ident = node_started
                 if started_before_ident == 0:
                     current_node = ident_node
@@ -1056,7 +1181,7 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
                     scan_index2 = scan_index2 + 1
         if bytes_length(literal_buf) > 0:
             tail_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
-            parts = push(parts, tail_part)
+            parts = append(parts, tail_part)
             started_before_tail = node_started
             if started_before_tail == 0:
                 current_node = tail_part
@@ -1067,9 +1192,9 @@ fn psr_interpolate_str(raw_text: Text, str_line: int, str_col: int) -> Map:
             result_node = {"kind": "Call", "callee": "__interp_join", "args": parts, "line": str_line, "col": str_col}
     result_node
 
-fn psr_parse_map_literal(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
-    mut pairs = []
+define psr_parse_map_literal(tokens: [table], position: int) -> table:
+    edit cursor = position + 1
+    edit pairs = []
     loop:
         # NO-PROGRESS GUARD. A token that is neither `}`, eof, nor a string key
         # used to fall through every branch and leave the cursor where it was,
@@ -1095,7 +1220,7 @@ fn psr_parse_map_literal(tokens: [Map], position: int) -> Map:
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
                 cursor += 1
             value_result = psr_parse_expr(tokens, cursor)
-            pairs = push(pairs, {"key": key_text, "value": get_map(value_result, "node")})
+            pairs = append(pairs, {"key": key_text, "value": get_map(value_result, "node")})
             cursor = get_int(value_result, "next")
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
                 cursor += 1
@@ -1104,9 +1229,9 @@ fn psr_parse_map_literal(tokens: [Map], position: int) -> Map:
     {"node": {"kind": "MapLit", "pairs": pairs}, "next": cursor}
 
 # `[ expr, expr, ... ]` — list literal. Trailing comma optional.
-fn psr_parse_list_literal(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
-    mut items = []
+define psr_parse_list_literal(tokens: [table], position: int) -> table:
+    edit cursor = position + 1
+    edit items = []
     loop:
         # Same no-progress guard as the map literal: `psr_parse_expr` returns
         # `next == position` for a token that starts no expression, so without
@@ -1122,7 +1247,7 @@ fn psr_parse_list_literal(tokens: [Map], position: int) -> Map:
         if is_eof:
             break
         item_result = psr_parse_expr(tokens, cursor)
-        items = push(items, get_map(item_result, "node"))
+        items = append(items, get_map(item_result, "node"))
         cursor = get_int(item_result, "next")
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
             cursor += 1
@@ -1133,7 +1258,7 @@ fn psr_parse_list_literal(tokens: [Map], position: int) -> Map:
 # `if COND then THEN else ELSE` — single-line expression form (the
 # block form `if cond:\n    body\nelse:\n    body` needs the offside
 # layout rules, which a future pass tackles).
-fn psr_parse_if(tokens: [Map], position: int) -> Map:
+define psr_parse_if(tokens: [table], position: int) -> table:
     # We're on `if`.
     # NOTE: adding line/col capture here (if_tok = at(tokens, position)
     # etc.) made gen1 DROP those statements — an engine-divergence bug
@@ -1141,9 +1266,34 @@ fn psr_parse_if(tokens: [Map], position: int) -> Map:
     # reintroducing; see memory notes 2026-07-02.
     cond_result = psr_parse_expr(tokens, position + 1)
     cursor_after_cond = get_int(cond_result, "next")
+    # BLOCK form as an EXPRESSION — everything is an expression:
+    #     x = if cond:
+    #         a
+    #     else:
+    #         b
+    # Branches parse as arm bodies (inline value or indented block), the node
+    # is the same `If` the subjectless choose desugars to, so lowering is
+    # untouched.
+    if psr_peek_kind(tokens, cursor_after_cond) == "symbol" and psr_peek_value(tokens, cursor_after_cond) == ":":
+        # The branch block's own indentation defines it (the `if` may sit
+        # mid-line after `x =`, so ITS column is useless as a bound).
+        bt_col = psr_peek_col(tokens, cursor_after_cond + 1)
+        bt = psr_parse_body_at(tokens, cursor_after_cond + 1, bt_col)
+        edit bi_cursor = get_int(bt, "next")
+        bi_peek = psr_skip_newlines(tokens, bi_cursor)
+        edit bi_else = {"kind": "Int", "value": "0"}
+        if psr_peek_kind(tokens, bi_peek) == "ident" and psr_peek_value(tokens, bi_peek) == "else":
+            edit be_cursor = bi_peek + 1
+            if psr_peek_kind(tokens, be_cursor) == "symbol" and psr_peek_value(tokens, be_cursor) == ":":
+                be_cursor = be_cursor + 1
+            be_col = psr_peek_col(tokens, be_cursor)
+            be = psr_parse_body_at(tokens, be_cursor, be_col)
+            bi_else = get_map(be, "node")
+            bi_cursor = get_int(be, "next")
+        return {"node": {"kind": "If", "cond": get_map(cond_result, "node"), "then": get_map(bt, "node"), "else": bi_else}, "next": bi_cursor}
     # Expect `then`.
     has_then = psr_peek_kind(tokens, cursor_after_cond) == "ident" and psr_peek_value(tokens, cursor_after_cond) == "then"
-    mut cursor = cursor_after_cond
+    edit cursor = cursor_after_cond
     if has_then:
         cursor = cursor_after_cond + 1
     then_result = psr_parse_expr(tokens, cursor)
@@ -1160,24 +1310,24 @@ fn psr_parse_if(tokens: [Map], position: int) -> Map:
     # enclosing `if cond:` — never steal it for the expression form.
     peek_is_block_else = peek_is_else and psr_peek_kind(tokens, peek_cursor + 1) == "symbol" and psr_peek_value(tokens, peek_cursor + 1) == ":"
     has_else = peek_is_else and (not peek_is_block_else)
-    mut else_node = {"kind": "Int", "value": "0"}
+    edit else_node = {"kind": "Int", "value": "0"}
     if has_else:
         else_result = psr_parse_expr(tokens, peek_cursor + 1)
         else_node = get_map(else_result, "node")
         cursor = get_int(else_result, "next")
     {"node": {"kind": "If", "cond": get_map(cond_result, "node"), "then": get_map(then_result, "node"), "else": else_node}, "next": cursor}
 
-# Typed accessor for the else-if ladder lists ([Map] elements).
-fn psr_ifchain_at(xs: [Map], i: int) -> Map:
+# Typed accessor for the else-if ladder lists ([table] elements).
+define psr_ifchain_at(xs: [table], i: int) -> table:
     at(xs, i)
 
-fn psr_parse_call(tokens: [Map], position: int, callee_name: Text) -> Map:
+define psr_parse_call(tokens: [table], position: int, callee_name: text) -> table:
     # We're at the ident; `position+1` is `(`. Capture ident's line/col.
     callee_tok = at(tokens, position)
     callee_line = get_int(callee_tok, "line")
     callee_col = get_int(callee_tok, "col")
-    mut cursor = position + 2
-    mut args = []
+    edit cursor = position + 2
+    edit args = []
     loop:
         # NO-PROGRESS GUARD, same as the map/list literal loops. An argument that
         # starts no expression leaves the cursor where it was — `f(a >> b)` with
@@ -1189,16 +1339,17 @@ fn psr_parse_call(tokens: [Map], position: int, callee_name: Text) -> Map:
             break
         if psr_peek_kind(tokens, cursor) == "eof":
             break
-        # Named argument: `IDENT = EXPR` binds by name (reordered at lowering).
-        is_named_arg = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
+        # Named argument: `IDENT: EXPR` (the spoken form — reads like the
+        # declaration) or `IDENT = EXPR` bind by name (reordered at lowering).
+        is_named_arg = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and (psr_peek_value(tokens, cursor + 1) == "=" or psr_peek_value(tokens, cursor + 1) == ":")
         if is_named_arg:
             na_name = psr_peek_value(tokens, cursor)
             na_val = psr_parse_expr(tokens, cursor + 2)
-            args = push(args, {"kind": "NamedArg", "name": na_name, "value": get_map(na_val, "node")})
+            args = append(args, {"kind": "NamedArg", "name": na_name, "value": get_map(na_val, "node")})
             cursor = get_int(na_val, "next")
         else:
             arg_result = psr_parse_expr(tokens, cursor)
-            args = push(args, get_map(arg_result, "node"))
+            args = append(args, get_map(arg_result, "node"))
             cursor = get_int(arg_result, "next")
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
             cursor += 1
@@ -1209,10 +1360,10 @@ fn psr_parse_call(tokens: [Map], position: int, callee_name: Text) -> Map:
 # Precedence table — higher binds tighter. Returns 0 for non-operator.
 # `and` and `or` are keywords (idents at the lex layer), everything
 # else is a symbol token.
-fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
+define psr_op_prec(op_kind: text, op_value: text) -> int:
     # Flat — deep nested inline if/then/else triggers a known native-codegen
     # bug. We accumulate into `mut precedence` and let the first match win.
-    mut precedence = 0
+    edit precedence = 0
     is_ident = op_kind == "ident"
     is_symbol = op_kind == "symbol"
     if is_ident and op_value == "or":
@@ -1222,7 +1373,7 @@ fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
     if is_symbol:
         is_cmp = op_value == "==" or op_value == "!=" or op_value == "<" or op_value == ">" or op_value == "<=" or op_value == ">="
         is_add = op_value == "+" or op_value == "-"
-        is_mul = op_value == "*" or op_value == "/" or op_value == "%"
+        is_mul = op_value == "*" or op_value == "/" or op_value == "//" or op_value == "%"
         # Bitwise had NO entry here at all, so `a & b` parsed as just `a` and the
         # rest was dropped: `12 & 10` answered 12. They bind TIGHTER than
         # comparison on purpose — `flags & MASK == 0` reads the way it looks,
@@ -1249,9 +1400,9 @@ fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
 
 # After parsing a primary, look for postfix forms: `.field`, `.method(args)`,
 # `[index]`. They all bind tighter than binary ops.
-fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
-    mut node = current_node
-    mut cursor = position
+define psr_parse_postfix(tokens: [table], position: int, current_node: table) -> table:
+    edit node = current_node
+    edit cursor = position
     loop:
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
@@ -1268,7 +1419,7 @@ fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
                 cursor = cursor + 1
                 args = []
-                mut args_list = args
+                edit args_list = args
                 loop:
                     # Same no-progress guard as `psr_parse_call`: a token that
                     # ends no argument and closes no list — `a.b(n: int)` stops
@@ -1284,7 +1435,7 @@ fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
                     if arg_kind == "eof":
                         break
                     arg_result = psr_parse_expr(tokens, cursor)
-                    args_list = push(args_list, get_map(arg_result, "node"))
+                    args_list = append(args_list, get_map(arg_result, "node"))
                     cursor = get_int(arg_result, "next")
                     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
                         cursor = cursor + 1
@@ -1322,16 +1473,45 @@ fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
 # Precedence-climbing (Pratt-lite). Parses primary then while the next
 # token is an op with precedence >= min_prec, consumes it and recurses
 # at higher precedence to gather the right-hand side.
-fn psr_parse_expr_at(tokens: [Map], position: int, min_prec: int) -> Map:
+define psr_parse_expr_at(tokens: [table], position: int, min_prec: int) -> table:
     primary_result = psr_parse_primary(tokens, position)
     # Apply postfix (.field, [idx], .method(args)) before binary ops.
     postfix_result = psr_parse_postfix(tokens, get_int(primary_result, "next"), get_map(primary_result, "node"))
-    mut current_node = get_map(postfix_result, "node")
-    mut cursor = get_int(postfix_result, "next")
+    edit current_node = get_map(postfix_result, "node")
+    edit cursor = get_int(postfix_result, "next")
     loop:
         op_kind = psr_peek_kind(tokens, cursor)
-        op_value = psr_peek_value(tokens, cursor)
-        prec = psr_op_prec(op_kind, op_value)
+        edit op_value = psr_peek_value(tokens, cursor)
+        # The SPOKEN comparison family: `is` / `is not` / `is less than` /
+        # `is more than` / `is at most` / `is at least` read as words but ARE
+        # the comparison operators. Canonicalize to the symbol here and note
+        # how many tokens the phrase spans — everything downstream (lowering,
+        # precedence, both backends) only ever sees `==`, `!=`, `<`, `>`,
+        # `<=`, `>=`. Fires only in operator position, where a bare ident
+        # would have ended the expression anyway.
+        edit op_span = 1
+        edit op_lookup = op_kind
+        if op_kind == "ident" and op_value == "is":
+            w1 = psr_peek_value(tokens, cursor + 1)
+            w2 = psr_peek_value(tokens, cursor + 2)
+            op_value = "=="
+            op_lookup = "symbol"
+            if w1 == "not":
+                op_value = "!="
+                op_span = 2
+            else if w1 == "less" and w2 == "than":
+                op_value = "<"
+                op_span = 3
+            else if w1 == "more" and w2 == "than":
+                op_value = ">"
+                op_span = 3
+            else if w1 == "at" and w2 == "most":
+                op_value = "<="
+                op_span = 3
+            else if w1 == "at" and w2 == "least":
+                op_value = ">="
+                op_span = 3
+        prec = psr_op_prec(op_lookup, op_value)
         if prec == 0 or prec < min_prec:
             break
         # Left-associative — RHS uses prec+1 so we don't gather more at
@@ -1339,19 +1519,19 @@ fn psr_parse_expr_at(tokens: [Map], position: int, min_prec: int) -> Map:
         # Position of the OPERATOR, so `x / 0` points at the `/`.
         op_line = psr_peek_line(tokens, cursor)
         op_col = psr_peek_col(tokens, cursor)
-        rhs_result = psr_parse_expr_at(tokens, cursor + 1, prec + 1)
+        rhs_result = psr_parse_expr_at(tokens, cursor + op_span, prec + 1)
         current_node = {"kind": "Binary", "op": op_value, "left": current_node, "right": get_map(rhs_result, "node"), "line": op_line, "col": op_col}
         cursor = get_int(rhs_result, "next")
     {"node": current_node, "next": cursor}
 
-fn psr_parse_expr(tokens: [Map], position: int) -> Map:
+define psr_parse_expr(tokens: [table], position: int) -> table:
     psr_parse_expr_at(tokens, position, 1)
 
 # --- fn declaration parser ---
 
-fn psr_parse_params(tokens: [Map], position: int) -> Map:
-    mut cursor = position
-    mut params = []
+define psr_parse_params(tokens: [table], position: int) -> table:
+    edit cursor = position
+    edit params = []
     loop:
         # EOF and no-progress guards. A file cut off mid-signature
         # (`fn f(a: int, ` and then end of file) left this loop reading past the
@@ -1369,13 +1549,21 @@ fn psr_parse_params(tokens: [Map], position: int) -> Map:
         cursor += 1
         # Optional `: type`. Untyped params default to Unknown.
         has_type = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":"
+        edit p_type = {"kind": "Unknown"}
         if has_type:
             cursor += 1
             type_result = psr_parse_type(tokens, cursor)
-            params = push(params, {"name": param_name, "type": get_map(type_result, "node")})
+            p_type = get_map(type_result, "node")
             cursor = get_int(type_result, "next")
-        if not has_type:
-            params = push(params, {"name": param_name, "type": {"kind": "Unknown"}})
+        # Optional default: `name = expr` / `name: type = expr`. The expression
+        # is recorded on the param; a call that omits the argument gets it.
+        has_default = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "="
+        if has_default:
+            dflt_r = psr_parse_expr(tokens, cursor + 1)
+            params = append(params, {"name": param_name, "type": p_type, "default": get_map(dflt_r, "node")})
+            cursor = get_int(dflt_r, "next")
+        if not has_default:
+            params = append(params, {"name": param_name, "type": p_type})
         # Optional comma.
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
             cursor += 1
@@ -1385,14 +1573,14 @@ fn psr_parse_params(tokens: [Map], position: int) -> Map:
 
 # Peek the column of the next non-newline token. Used to find the
 # indent level of an indented block.
-fn psr_peek_col(tokens: [Map], position: int) -> int:
+define psr_peek_col(tokens: [table], position: int) -> int:
     cursor = psr_skip_newlines(tokens, position)
     if cursor >= len(tokens):
         0
     else:
         get_int(at(tokens, cursor), "col")
 
-fn psr_peek_line(tokens: [Map], position: int) -> int:
+define psr_peek_line(tokens: [table], position: int) -> int:
     cursor = psr_skip_newlines(tokens, position)
     if cursor >= len(tokens):
         0
@@ -1402,11 +1590,11 @@ fn psr_peek_line(tokens: [Map], position: int) -> int:
 # Index of the `]` that closes the `[` at `open_idx` (nesting-aware), or -1.
 # Used to spot `IDENT[idx] = …` element assignment: scan to the matching
 # bracket, then check whether `=` follows.
-fn psr_match_bracket(tokens: [Map], open_idx: int) -> int:
+define psr_match_bracket(tokens: [table], open_idx: int) -> int:
     total = len(tokens)
-    mut depth = 0
-    mut result = 0 - 1
-    mut i = open_idx
+    edit depth = 0
+    edit result = 0 - 1
+    edit i = open_idx
     loop:
         if i >= total or result >= 0:
             break
@@ -1433,7 +1621,7 @@ fn psr_match_bracket(tokens: [Map], open_idx: int) -> int:
 #
 # Termination: eof OR a top-level decl (`fn`/`pub`) OR a token whose
 # col is strictly less than `min_col` (offside rule).
-fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
+define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
     # Recursion-depth guard for indented blocks — the other way in (a nested
     # `if:` / `loop:` body re-enters here per level). Shares the counter with
     # psr_parse_primary, so it reflects the real native stack. On overflow,
@@ -1443,9 +1631,9 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
     defer psr_depth_drop()
     if depth_now > PSR_MAX_DEPTH:
         err_stmt = {"kind": "ExprStmt", "expr": {"kind": "Error", "why": "blocks nested too deeply (over {PSR_MAX_DEPTH} levels)", "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}}
-        return {"node": {"kind": "Block", "stmts": push([], err_stmt)}, "next": len(tokens) - 1}
-    mut cursor = psr_skip_newlines(tokens, position)
-    mut statements = []
+        return {"node": {"kind": "Block", "stmts": append([], err_stmt)}, "next": len(tokens) - 1}
+    edit cursor = psr_skip_newlines(tokens, position)
+    edit statements = []
     loop:
         # Statement-level no-progress guard. There was one INSIDE the plain-
         # expression branch, which left every other statement form free to
@@ -1474,39 +1662,39 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # followed by `=` is an assignment to a same-named variable, not a
         # decl — never silently end the body on it.
         next_is_assign = psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
-        other_decl_here = (((value_here == "fn") and not fn_is_lambda) or value_here == "pub" or value_here == "use" or value_here == "extern") and not next_is_assign
+        other_decl_here = ((value_here == "define" and not fn_is_lambda) or value_here == "public" or value_here == "use" or value_here == "external") and not next_is_assign
         starts_new_decl = kind_here == "ident" and (named_decl_here or other_decl_here)
         dedented = col_here < min_col
         if is_eof or starts_new_decl or dedented:
             break
         # `mut name = expr` — declare-and-mark-mutable.
-        is_mut_decl = kind_here == "ident" and value_here == "mut" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
+        is_mut_decl = kind_here == "ident" and value_here == "edit" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == "="
         # `mut name: Type = expr` — typed mut binding. The annotation sets the
         # slot's element type, which inference can't recover for `[]` (an empty
         # list has no element to peek). `mut`-led, so no keyword-clash risk.
-        is_typed_mut_decl = kind_here == "ident" and value_here == "mut" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == ":"
+        is_typed_mut_decl = kind_here == "ident" and value_here == "edit" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_kind(tokens, cursor + 2) == "symbol" and psr_peek_value(tokens, cursor + 2) == ":"
         # `name: Type = expr` — an IMMUTABLE typed binding (the symmetric partner
         # of `mut name: Type = expr`). Signalled by `ident :` with an inline type
         # (not a newline, which would be a `match:`/`loop:` block). Keywords that
         # can be followed by `:` are excluded.
-        is_typed_let = kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ":" and psr_peek_kind(tokens, cursor + 2) != "newline" and value_here != "mut" and value_here != "match" and value_here != "loop" and value_here != "for" and value_here != "else"
+        is_typed_let = kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ":" and psr_peek_kind(tokens, cursor + 2) != "newline" and value_here != "mut" and value_here != "edit" and value_here != "match" and value_here != "choose" and value_here != "loop" and value_here != "for" and value_here != "else"
         # `name = expr` — either immutable let OR reassignment, decided
         # by the codegen scope tracker.
         is_let_or_assign = (not is_mut_decl) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
         # `a, b = expr` — tuple destructuring bind. Collect comma-separated
         # target idents; a following `=` confirms it. We record token POSITIONS,
         # not the name strings, so each name is re-read as real Text later
-        # (an at() on a [Text] built here would come back mis-typed as i64).
-        mut is_destructure = false
+        # (an at() on a [text] built here would come back mis-typed as i64).
+        edit is_destructure = false
         de_positions = slice([0], 0, 0)
-        mut de_pos_list = de_positions
-        mut de_rhs_at = cursor
+        edit de_pos_list = de_positions
+        edit de_rhs_at = cursor
         if (not is_let_or_assign) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ",":
-            mut de_ok = true
-            mut de_sc = cursor
+            edit de_ok = true
+            edit de_sc = cursor
             loop:
                 if psr_peek_kind(tokens, de_sc) == "ident":
-                    de_pos_list = push(de_pos_list, de_sc)
+                    de_pos_list = append(de_pos_list, de_sc)
                     de_sc = de_sc + 1
                 else:
                     de_ok = false
@@ -1521,13 +1709,13 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # `Name{a, b} = expr` — struct destructuring bind. Bare field idents (a
         # `:` means it's a construction, not a destructure) then `}` then `=`.
         # Desugars to a temp plus one `field = temp.field` read per name.
-        mut is_struct_destr = false
+        edit is_struct_destr = false
         sd_positions = slice([0], 0, 0)
-        mut sd_pos_list = sd_positions
-        mut sd_rhs_at = cursor
+        edit sd_pos_list = sd_positions
+        edit sd_rhs_at = cursor
         if kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "\{":
-            mut sd_ok = true
-            mut sd_sc = cursor + 2
+            edit sd_ok = true
+            edit sd_sc = cursor + 2
             loop:
                 sdk = psr_peek_kind(tokens, sd_sc)
                 sdv = psr_peek_value(tokens, sd_sc)
@@ -1538,7 +1726,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                     sd_ok = false
                     break
                 if sdk == "ident":
-                    sd_pos_list = push(sd_pos_list, sd_sc)
+                    sd_pos_list = append(sd_pos_list, sd_sc)
                     sd_sc = sd_sc + 1
                 else:
                     if sdk == "symbol" and sdv == ",":
@@ -1567,8 +1755,9 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # Only meaningful inside `x = loop v in seq:` with an indented body;
         # it desugars to a push onto that loop's `__yield` accumulator. Used
         # anywhere else, `__yield` is unbound and the checker says so.
-        is_yield = kind_here == "ident" and value_here == "yield"
+        is_yield = kind_here == "ident" and value_here == "collect"
         is_require = kind_here == "ident" and value_here == "require"
+        is_example = kind_here == "ident" and value_here == "example"
         is_ensure = kind_here == "ident" and value_here == "ensure"
         # `defer <expr>` — run at block end, and before any `return`, in LIFO
         # order. The LOWERING for this never went away (ast_fn_to_ir collects
@@ -1600,11 +1789,11 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
         # `loop VAR in LOW..<HIGH:` / `loop VAR in list:` — counted loop.
         is_for = kind_here == "ident" and value_here == "loop" and psr_peek_kind(tokens, cursor + 1) == "ident" and psr_peek_value(tokens, cursor + 1) != "let" and (not is_par_for)
         # `match expr:` — pattern match block.
-        is_match = kind_here == "ident" and value_here == "match"
+        is_match = kind_here == "ident" and value_here == "choose"
         if is_mut_decl:
             mut_name = psr_peek_value(tokens, cursor + 1)
             mut_expr_result = psr_parse_expr(tokens, cursor + 3)
-            statements = push_mut(statements, {"kind": "MutLet", "name": mut_name, "value": get_map(mut_expr_result, "node")})
+            statements = append(statements, {"kind": "MutLet", "name": mut_name, "value": get_map(mut_expr_result, "node")})
             cursor = get_int(mut_expr_result, "next")
         if is_typed_mut_decl:
             tm_name = psr_peek_value(tokens, cursor + 1)
@@ -1612,17 +1801,17 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             tm_type_result = psr_parse_type(tokens, cursor + 3)
             tm_after_type = get_int(tm_type_result, "next")
             tm_expr_result = psr_parse_expr(tokens, tm_after_type + 1)
-            statements = push_mut(statements, {"kind": "MutLet", "name": tm_name, "value": get_map(tm_expr_result, "node"), "decl_type": get_map(tm_type_result, "node")})
+            statements = append(statements, {"kind": "MutLet", "name": tm_name, "value": get_map(tm_expr_result, "node"), "decl_type": get_map(tm_type_result, "node")})
             cursor = get_int(tm_expr_result, "next")
         if is_typed_let:
             # `name: Type = expr` — immutable, carries a decl_type like typed mut.
             tl_name = value_here
             tl_type_result = psr_parse_type(tokens, cursor + 2)
-            mut tl_after = get_int(tl_type_result, "next")
+            edit tl_after = get_int(tl_type_result, "next")
             if psr_peek_kind(tokens, tl_after) == "symbol" and psr_peek_value(tokens, tl_after) == "=":
                 tl_after = tl_after + 1
             tl_expr_result = psr_parse_expr(tokens, tl_after)
-            statements = push_mut(statements, {"kind": "LetOrAssign", "name": tl_name, "value": get_map(tl_expr_result, "node"), "decl_type": get_map(tl_type_result, "node")})
+            statements = append(statements, {"kind": "LetOrAssign", "name": tl_name, "value": get_map(tl_expr_result, "node"), "decl_type": get_map(tl_type_result, "node")})
             cursor = get_int(tl_expr_result, "next")
         if is_let_or_assign:
             assign_name = value_here
@@ -1630,7 +1819,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             assign_line = get_int(assign_tok, "line")
             assign_col = get_int(assign_tok, "col")
             assign_expr_result = psr_parse_expr(tokens, cursor + 2)
-            statements = push_mut(statements, {"kind": "LetOrAssign", "name": assign_name, "value": get_map(assign_expr_result, "node"), "line": assign_line, "col": assign_col})
+            statements = append(statements, {"kind": "LetOrAssign", "name": assign_name, "value": get_map(assign_expr_result, "node"), "line": assign_line, "col": assign_col})
             cursor = get_int(assign_expr_result, "next")
         if is_destructure:
             # Desugar `a, b = expr` to a temp bind plus one `name = at(temp, i)`
@@ -1638,24 +1827,24 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             # is itself a list literal (see the `(` parser), so `at` reads work.
             de_rhs_r = psr_parse_expr(tokens, de_rhs_at)
             de_temp = "__td_{cursor}"
-            statements = push_mut(statements, {"kind": "MutLet", "name": de_temp, "value": get_map(de_rhs_r, "node")})
+            statements = append(statements, {"kind": "MutLet", "name": de_temp, "value": get_map(de_rhs_r, "node")})
             de_count = len(de_pos_list)
             loop de_i in 0..<de_count:
                 de_nm = psr_peek_value(tokens, at(de_pos_list, de_i))
                 de_read = {"kind": "Field", "object": {"kind": "Ident", "name": de_temp}, "field": "_{de_i}"}
-                statements = push_mut(statements, {"kind": "LetOrAssign", "name": de_nm, "value": de_read})
+                statements = append(statements, {"kind": "LetOrAssign", "name": de_nm, "value": de_read})
             cursor = get_int(de_rhs_r, "next")
         if is_struct_destr:
             # `Name{a, b} = expr` -> temp bind + one `field = temp.field` read.
             # The temp carries the struct type from `expr`, so `.field` resolves.
             sd_rhs_r = psr_parse_expr(tokens, sd_rhs_at)
             sd_temp = "__sd_{cursor}"
-            statements = push_mut(statements, {"kind": "MutLet", "name": sd_temp, "value": get_map(sd_rhs_r, "node")})
+            statements = append(statements, {"kind": "MutLet", "name": sd_temp, "value": get_map(sd_rhs_r, "node")})
             sd_count = len(sd_pos_list)
             loop sd_i in 0..<sd_count:
                 sd_fname = psr_peek_value(tokens, at(sd_pos_list, sd_i))
                 sd_field = {"kind": "Field", "object": {"kind": "Ident", "name": sd_temp}, "field": sd_fname}
-                statements = push_mut(statements, {"kind": "LetOrAssign", "name": sd_fname, "value": sd_field})
+                statements = append(statements, {"kind": "LetOrAssign", "name": sd_fname, "value": sd_field})
             cursor = get_int(sd_rhs_r, "next")
         if is_index_assign:
             ia_name = value_here
@@ -1667,7 +1856,11 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             ia_line = psr_peek_line(tokens, cursor)
             ia_col = psr_peek_col(tokens, cursor)
             ia_set = {"kind": "Call", "callee": "set", "args": [{"kind": "Ident", "name": ia_name, "line": ia_line, "col": ia_col}, get_map(ia_idx_result, "node"), get_map(ia_val_result, "node")], "line": ia_line, "col": ia_col}
-            statements = push_mut(statements, {"kind": "LetOrAssign", "name": ia_name, "value": ia_set, "line": ia_line, "col": ia_col})
+            # "ia": index-assign desugar — slot mutation through `set`, not a
+            # rebinding of the name. The bound-once check must not flag it
+            # (inside a hoisted lambda the list arrives as a captured param,
+            # and writing your own slot is the sanctioned par_run pattern).
+            statements = append(statements, {"kind": "LetOrAssign", "name": ia_name, "value": ia_set, "ia": 1, "line": ia_line, "col": ia_col})
             cursor = get_int(ia_val_result, "next")
         if is_compound_assign:
             compound_name = value_here
@@ -1675,7 +1868,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             compound_rhs_result = psr_parse_expr(tokens, cursor + 2)
             compound_rhs_node = get_map(compound_rhs_result, "node")
             # Pick the binary op character from the compound symbol.
-            mut actual_op = "+"
+            edit actual_op = "+"
             if compound_op_text == "-=":
                 actual_op = "-"
             if compound_op_text == "*=":
@@ -1689,13 +1882,13 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             ca_col = psr_peek_col(tokens, cursor)
             ident_ref = {"kind": "Ident", "name": compound_name, "line": ca_line, "col": ca_col}
             binop_node = {"kind": "Binary", "op": actual_op, "left": ident_ref, "right": compound_rhs_node, "line": ca_line, "col": ca_col}
-            statements = push_mut(statements, {"kind": "LetOrAssign", "name": compound_name, "value": binop_node, "line": ca_line, "col": ca_col})
+            statements = append(statements, {"kind": "LetOrAssign", "name": compound_name, "value": binop_node, "line": ca_line, "col": ca_col})
             cursor = get_int(compound_rhs_result, "next")
         if is_break:
-            statements = push_mut(statements, {"kind": "Break"})
+            statements = append(statements, {"kind": "Break"})
             cursor = cursor + 1
         if is_continue:
-            statements = push_mut(statements, {"kind": "Continue"})
+            statements = append(statements, {"kind": "Continue"})
             cursor = cursor + 1
         if is_yield:
             yld_line = psr_peek_line(tokens, cursor)
@@ -1704,28 +1897,42 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             # A first-class Yield node. The enclosing collecting loop rewrites it
             # to a push onto its own accumulator (see psr_rewrite_yields); one
             # that reaches the checker was written outside any such loop.
-            statements = push_mut(statements, {"kind": "Yield", "expr": get_map(yld_result, "node"), "line": yld_line, "col": yld_col})
+            statements = append(statements, {"kind": "Yield", "expr": get_map(yld_result, "node"), "line": yld_line, "col": yld_col})
             cursor = get_int(yld_result, "next")
         if is_require:
             req_result = psr_parse_expr(tokens, cursor + 1)
-            statements = push_mut(statements, {"kind": "Require", "expr": get_map(req_result, "node")})
+            statements = append(statements, {"kind": "Require", "expr": get_map(req_result, "node")})
             cursor = get_int(req_result, "next")
         if is_ensure:
             ens_result = psr_parse_expr(tokens, cursor + 1)
-            statements = push_mut(statements, {"kind": "Ensure", "expr": get_map(ens_result, "node")})
+            statements = append(statements, {"kind": "Ensure", "expr": get_map(ens_result, "node")})
             cursor = get_int(ens_result, "next")
+        if is_example:
+            exm_result = psr_parse_expr(tokens, cursor + 1)
+            statements = append(statements, {"kind": "Example", "expr": get_map(exm_result, "node")})
+            cursor = get_int(exm_result, "next")
         if is_defer:
             def_result = psr_parse_expr(tokens, cursor + 1)
-            statements = push_mut(statements, {"kind": "Defer", "expr": get_map(def_result, "node")})
+            statements = append(statements, {"kind": "Defer", "expr": get_map(def_result, "node")})
             cursor = get_int(def_result, "next")
         if is_return:
-            ret_result = psr_parse_expr(tokens, cursor + 1)
-            statements = push_mut(statements, {"kind": "Return", "expr": get_map(ret_result, "node")})
-            cursor = get_int(ret_result, "next")
+            # A BARE `return` (nothing after it on the line) leaves a function
+            # that yields no value — `if done: return` is the natural early
+            # exit. It used to hand the newline to the expression parser and
+            # die with "`\n` is not valid here"; the shape lived in the
+            # scheduler orb, which nothing compiled until examples arrived.
+            ret_bare = psr_peek_kind(tokens, cursor + 1) == "newline" or psr_peek_kind(tokens, cursor + 1) == "eof"
+            if ret_bare:
+                statements = append(statements, {"kind": "Return", "expr": {"kind": "Int", "value": "0"}, "bare": 1})
+                cursor = cursor + 1
+            else:
+                ret_result = psr_parse_expr(tokens, cursor + 1)
+                statements = append(statements, {"kind": "Return", "expr": get_map(ret_result, "node")})
+                cursor = get_int(ret_result, "next")
         if is_loop:
             inner_col = psr_peek_col(tokens, cursor + 2)
             inner_result = psr_parse_body_at(tokens, cursor + 2, inner_col)
-            statements = push_mut(statements, {"kind": "Loop", "body": get_map(inner_result, "node")})
+            statements = append(statements, {"kind": "Loop", "body": get_map(inner_result, "node")})
             cursor = get_int(inner_result, "next")
         if is_par_for:
             # Splice the desugar's statements in flat, rather than as one
@@ -1734,13 +1941,13 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             pf_result = psr_parse_par_loop(tokens, cursor)
             pf_stmts = get_list(get_map(pf_result, "node"), "stmts")
             loop pfi in 0..<len(pf_stmts):
-                statements = push_mut(statements, at(pf_stmts, pfi))
+                statements = append(statements, at(pf_stmts, pfi))
             cursor = get_int(pf_result, "next")
         if is_for:
             # for VAR in EXPR:  OR  for IDX, VAR in EXPR:  OR  for VAR with Component, Component2:
-            mut for_var_name = psr_peek_value(tokens, cursor + 1)
-            mut for_cursor = cursor + 2
-            mut for_index_name = ""
+            edit for_var_name = psr_peek_value(tokens, cursor + 1)
+            edit for_cursor = cursor + 2
+            edit for_index_name = ""
             # Detect `for IDX, VAR in ...`: comma after first ident means
             # the first ident is the index variable, the second is the value.
             after_first_kind = psr_peek_kind(tokens, for_cursor)
@@ -1762,36 +1969,56 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             # Detect `..<` or `..=` to produce ForRange directly.
             range_op_kind = psr_peek_kind(tokens, for_cursor)
             range_op_val = psr_peek_value(tokens, for_cursor)
-            is_range = range_op_kind == "symbol" and (range_op_val == "..<" or range_op_val == "..=")
+            is_range = (range_op_kind == "symbol" and (range_op_val == "..<" or range_op_val == "..=")) or (range_op_kind == "ident" and (range_op_val == "to" or range_op_val == "until"))
             if is_range:
                 for_cursor = for_cursor + 1
                 high_result = psr_parse_expr(tokens, for_cursor)
                 for_cursor = get_int(high_result, "next")
+                edit fr_has_where = false
+                edit fr_where_cond = {"kind": "Int", "value": "0"}
+                if psr_peek_kind(tokens, for_cursor) == "ident" and psr_peek_value(tokens, for_cursor) == "where":
+                    frw_r = psr_parse_expr(tokens, for_cursor + 1)
+                    fr_where_cond = get_map(frw_r, "node")
+                    fr_has_where = true
+                    for_cursor = get_int(frw_r, "next")
                 if psr_peek_kind(tokens, for_cursor) == "symbol" and psr_peek_value(tokens, for_cursor) == ":":
                     for_cursor = for_cursor + 1
                 for_body_col = psr_peek_col(tokens, for_cursor)
                 for_body_result = psr_parse_body_at(tokens, for_cursor, for_body_col)
-                statements = push_mut(statements, {"kind": "ForRange", "var": for_var_name, "low": get_map(low_result, "node"), "high": get_map(high_result, "node"), "inclusive": if range_op_val == "..=" then 1 else 0, "body": get_map(for_body_result, "node")})
+                edit fr_body = get_map(for_body_result, "node")
+                if fr_has_where:
+                    fr_body = {"kind": "Block", "stmts": append([], {"kind": "IfBlock", "cond": fr_where_cond, "then": fr_body, "else": {"kind": "Block", "stmts": []}})}
+                statements = append(statements, {"kind": "ForRange", "var": for_var_name, "low": get_map(low_result, "node"), "high": get_map(high_result, "node"), "inclusive": if range_op_val == "..=" or range_op_val == "to" then 1 else 0, "body": fr_body})
                 cursor = get_int(for_body_result, "next")
             if not is_range:
+                edit fi_has_where = false
+                edit fi_where_cond = {"kind": "Int", "value": "0"}
+                if psr_peek_kind(tokens, for_cursor) == "ident" and psr_peek_value(tokens, for_cursor) == "where":
+                    fiw_r = psr_parse_expr(tokens, for_cursor + 1)
+                    fi_where_cond = get_map(fiw_r, "node")
+                    fi_has_where = true
+                    for_cursor = get_int(fiw_r, "next")
                 if psr_peek_kind(tokens, for_cursor) == "symbol" and psr_peek_value(tokens, for_cursor) == ":":
                     for_cursor = for_cursor + 1
                 for_body_col = psr_peek_col(tokens, for_cursor)
                 for_body_result = psr_parse_body_at(tokens, for_cursor, for_body_col)
-                statements = push_mut(statements, {"kind": "ForIn", "var": for_var_name, "index_var": for_index_name, "iter": get_map(low_result, "node"), "body": get_map(for_body_result, "node"), "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
+                edit fi_body = get_map(for_body_result, "node")
+                if fi_has_where:
+                    fi_body = {"kind": "Block", "stmts": append([], {"kind": "IfBlock", "cond": fi_where_cond, "then": fi_body, "else": {"kind": "Block", "stmts": []}})}
+                statements = append(statements, {"kind": "ForIn", "var": for_var_name, "index_var": for_index_name, "iter": get_map(low_result, "node"), "body": fi_body, "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
                 cursor = get_int(for_body_result, "next")
         if is_match:
             # Delegate to shared helper so match can also be used as an expression.
             match_result = psr_parse_match_node(tokens, cursor)
-            statements = push_mut(statements, get_map(match_result, "node"))
+            statements = append(statements, get_map(match_result, "node"))
             cursor = get_int(match_result, "next")
         if is_if_let:
             # `if let Pat(binds) = expr:` [`else:`] -> two-arm match.
             il_pat = psr_peek_value(tokens, cursor + 2)
             il_pat_kind = psr_peek_kind(tokens, cursor + 2)
-            mut il_cursor = cursor + 3
+            edit il_cursor = cursor + 3
             il_binds = slice([""], 0, 0)
-            mut il_bind_list = il_binds
+            edit il_bind_list = il_binds
             if psr_peek_kind(tokens, il_cursor) == "symbol" and psr_peek_value(tokens, il_cursor) == "(":
                 il_cursor = il_cursor + 1
                 loop:
@@ -1803,7 +2030,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                     if bk == "eof":
                         break
                     if bk == "ident":
-                        il_bind_list = push(il_bind_list, bv)
+                        il_bind_list = append(il_bind_list, bv)
                     il_cursor = il_cursor + 1
             if psr_peek_kind(tokens, il_cursor) == "symbol" and psr_peek_value(tokens, il_cursor) == "=":
                 il_cursor = il_cursor + 1
@@ -1815,10 +2042,10 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             il_body_r = psr_parse_body_at(tokens, il_cursor, il_body_col)
             il_cursor = get_int(il_body_r, "next")
             il_noop = {"kind": "ExprStmt", "expr": {"kind": "Int", "value": "0"}}
-            mut il_else_body = {"kind": "Block", "stmts": push(slice([il_noop], 0, 0), il_noop)}
+            edit il_else_body = {"kind": "Block", "stmts": append(slice([il_noop], 0, 0), il_noop)}
             il_after = psr_skip_newlines(tokens, il_cursor)
             if psr_peek_kind(tokens, il_after) == "ident" and psr_peek_value(tokens, il_after) == "else" and psr_peek_col(tokens, il_after) == col_here:
-                mut el_cursor = il_after + 1
+                edit el_cursor = il_after + 1
                 if psr_peek_kind(tokens, el_cursor) == "symbol" and psr_peek_value(tokens, el_cursor) == ":":
                     el_cursor = el_cursor + 1
                 el_body_col = psr_peek_col(tokens, el_cursor)
@@ -1827,18 +2054,18 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                 il_cursor = get_int(el_body_r, "next")
             il_arm1 = {"pattern": il_pat, "pat_kind": il_pat_kind, "bindings": il_bind_list, "body": get_map(il_body_r, "node")}
             il_arm2 = {"pattern": "_", "pat_kind": "ident", "bindings": slice([""], 0, 0), "body": il_else_body}
-            mut il_arms = slice([il_arm1], 0, 0)
-            il_arms = push(il_arms, il_arm1)
-            il_arms = push(il_arms, il_arm2)
-            statements = push_mut(statements, {"kind": "Match", "scrutinee": get_map(il_scrut, "node"), "arms": il_arms})
+            edit il_arms = slice([il_arm1], 0, 0)
+            il_arms = append(il_arms, il_arm1)
+            il_arms = append(il_arms, il_arm2)
+            statements = append(statements, {"kind": "Match", "scrutinee": get_map(il_scrut, "node"), "arms": il_arms})
             cursor = il_cursor
         if is_loop_let:
             # `loop let Pat(binds) = expr:` -> `loop: match expr: Pat -> body; _ -> break`.
             ll_pat = psr_peek_value(tokens, cursor + 2)
             ll_pat_kind = psr_peek_kind(tokens, cursor + 2)
-            mut ll_cursor = cursor + 3
+            edit ll_cursor = cursor + 3
             ll_binds = slice([""], 0, 0)
-            mut ll_bind_list = ll_binds
+            edit ll_bind_list = ll_binds
             if psr_peek_kind(tokens, ll_cursor) == "symbol" and psr_peek_value(tokens, ll_cursor) == "(":
                 ll_cursor = ll_cursor + 1
                 loop:
@@ -1850,7 +2077,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                     if lbk == "eof":
                         break
                     if lbk == "ident":
-                        ll_bind_list = push(ll_bind_list, lbv)
+                        ll_bind_list = append(ll_bind_list, lbv)
                     ll_cursor = ll_cursor + 1
             if psr_peek_kind(tokens, ll_cursor) == "symbol" and psr_peek_value(tokens, ll_cursor) == "=":
                 ll_cursor = ll_cursor + 1
@@ -1864,20 +2091,20 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             # Clean desugar now that `break` inside a match arm works: the `_`
             # arm simply breaks out of the loop.
             ll_brk = {"kind": "Break"}
-            ll_break_body = {"kind": "Block", "stmts": push(slice([ll_brk], 0, 0), ll_brk)}
+            ll_break_body = {"kind": "Block", "stmts": append(slice([ll_brk], 0, 0), ll_brk)}
             ll_arm1 = {"pattern": ll_pat, "pat_kind": ll_pat_kind, "bindings": ll_bind_list, "body": get_map(ll_body_r, "node")}
             ll_arm2 = {"pattern": "_", "pat_kind": "ident", "bindings": slice([""], 0, 0), "body": ll_break_body}
-            mut ll_arms = slice([ll_arm1], 0, 0)
-            ll_arms = push(ll_arms, ll_arm1)
-            ll_arms = push(ll_arms, ll_arm2)
+            edit ll_arms = slice([ll_arm1], 0, 0)
+            ll_arms = append(ll_arms, ll_arm1)
+            ll_arms = append(ll_arms, ll_arm2)
             ll_match = {"kind": "Match", "scrutinee": get_map(ll_scrut, "node"), "arms": ll_arms}
-            ll_loop_body = {"kind": "Block", "stmts": push(slice([ll_match], 0, 0), ll_match)}
-            statements = push_mut(statements, {"kind": "Loop", "body": ll_loop_body})
+            ll_loop_body = {"kind": "Block", "stmts": append(slice([ll_match], 0, 0), ll_match)}
+            statements = append(statements, {"kind": "Loop", "body": ll_loop_body})
             cursor = ll_cursor
         # Detect the block-form `if cond:` by looking for `:` AFTER
         # the condition expression. Inline `if cond then ...` is still
         # an expression, handled by psr_parse_if.
-        mut actually_if_block = false
+        edit actually_if_block = false
         if is_if_block:
             cond_probe = psr_parse_expr(tokens, cursor + 1)
             probe_next = get_int(cond_probe, "next")
@@ -1886,7 +2113,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                 actually_if_block = true
                 # Parse the block-form if.
                 if_col = psr_peek_col(tokens, cursor)
-                mut if_cursor = probe_next + 1   # skip `:`
+                edit if_cursor = probe_next + 1   # skip `:`
                 then_body_col = psr_peek_col(tokens, if_cursor)
                 then_body_result = psr_parse_body_at(tokens, if_cursor, then_body_col)
                 if_cursor = get_int(then_body_result, "next")
@@ -1898,9 +2125,9 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                 # link: it continues THIS if, so every later else at
                 # this column still anchors here. An else that matches
                 # no if's column is an orphan and fails loud.
-                mut else_node = {"kind": "Block", "stmts": []}
-                mut chain_conds = []
-                mut chain_bodies = []
+                edit else_node = {"kind": "Block", "stmts": []}
+                edit chain_conds = []
+                edit chain_bodies = []
                 loop:
                     if_cursor = psr_skip_newlines(tokens, if_cursor)
                     el_here = psr_peek_kind(tokens, if_cursor) == "ident" and psr_peek_value(tokens, if_cursor) == "else" and psr_peek_col(tokens, if_cursor) == if_col
@@ -1916,7 +2143,7 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                         else_node = get_map(else_body_result, "node")
                         if_cursor = get_int(else_body_result, "next")
                         break
-                    mut chained = false
+                    edit chained = false
                     if el_chain:
                         cc = psr_parse_expr(tokens, if_cursor + 1)
                         cc_next = get_int(cc, "next")
@@ -1924,8 +2151,8 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                             chained = true
                             cb_col = psr_peek_col(tokens, cc_next + 1)
                             cb = psr_parse_body_at(tokens, cc_next + 1, cb_col)
-                            chain_conds = push(chain_conds, get_map(cc, "node"))
-                            chain_bodies = push(chain_bodies, get_map(cb, "node"))
+                            chain_conds = append(chain_conds, get_map(cc, "node"))
+                            chain_bodies = append(chain_bodies, get_map(cb, "node"))
                             if_cursor = get_int(cb, "next")
                     if not chained:
                         # `else` followed by neither `:` nor a block-if
@@ -1939,16 +2166,16 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
                 # Fold ladder links right-to-left under the final else.
                 # Each link wraps in a Block — an else body is always
                 # a Block node downstream.
-                mut ci = len(chain_conds) - 1
+                edit ci = len(chain_conds) - 1
                 loop:
                     if ci < 0:
                         break
                     link = {"kind": "IfBlock", "cond": psr_ifchain_at(chain_conds, ci), "then": psr_ifchain_at(chain_bodies, ci), "else": else_node}
-                    else_node = {"kind": "Block", "stmts": push([], link)}
+                    else_node = {"kind": "Block", "stmts": append([], link)}
                     ci = ci - 1
-                statements = push_mut(statements, {"kind": "IfBlock", "cond": get_map(cond_probe, "node"), "then": get_map(then_body_result, "node"), "else": else_node})
+                statements = append(statements, {"kind": "IfBlock", "cond": get_map(cond_probe, "node"), "then": get_map(then_body_result, "node"), "else": else_node})
                 cursor = if_cursor
-        is_plain_expr = not (is_mut_decl or is_typed_mut_decl or is_typed_let or is_let_or_assign or is_destructure or is_struct_destr or is_index_assign or is_break or is_continue or is_yield or is_require or is_ensure or is_defer or is_return or is_loop or is_for or is_par_for or is_match or is_if_let or is_loop_let or actually_if_block)
+        is_plain_expr = not (is_example or is_mut_decl or is_typed_mut_decl or is_typed_let or is_let_or_assign or is_destructure or is_struct_destr or is_index_assign or is_break or is_continue or is_yield or is_require or is_ensure or is_defer or is_return or is_loop or is_for or is_par_for or is_match or is_if_let or is_loop_let or actually_if_block)
         if is_plain_expr:
             expr_result = psr_parse_expr(tokens, cursor)
             expr_next = get_int(expr_result, "next")
@@ -1959,26 +2186,26 @@ fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
             if expr_next == cursor:
                 cursor = cursor + 1
             else:
-                statements = push_mut(statements, {"kind": "ExprStmt", "expr": get_map(expr_result, "node")})
+                statements = append(statements, {"kind": "ExprStmt", "expr": get_map(expr_result, "node")})
                 cursor = expr_next
         cursor = psr_skip_newlines(tokens, cursor)
         if cursor == stmt_start:
             break
     {"node": {"kind": "Block", "stmts": statements}, "next": cursor}
 
-fn psr_parse_body(tokens: [Map], position: int) -> Map:
+define psr_parse_body(tokens: [table], position: int) -> table:
     body_col = psr_peek_col(tokens, position)
     psr_parse_body_at(tokens, position, body_col)
 
 # `type Name<T, E>: Ok(T) | Err(E)` — the INLINE sum form: variants on one
 # line, `|`-separated, each optionally carrying a `(payload, ...)`. Produces
 # the same Enum node as the indented form. `position` is on the keyword.
-fn psr_parse_enum_inline(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
+define psr_parse_enum_inline(tokens: [table], position: int) -> table:
+    edit cursor = position + 1
     name = psr_peek_value(tokens, cursor)
     cursor += 1
     enum_generics = slice([""], 0, 0)
-    mut enum_gen_list = enum_generics
+    edit enum_gen_list = enum_generics
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
         cursor = cursor + 1
         loop:
@@ -1990,19 +2217,19 @@ fn psr_parse_enum_inline(tokens: [Map], position: int) -> Map:
             if gk == "eof":
                 break
             if gk == "ident":
-                enum_gen_list = push(enum_gen_list, gv)
+                enum_gen_list = append(enum_gen_list, gv)
             cursor = cursor + 1
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
         cursor += 1
     variants = []
-    mut variant_list = variants
+    edit variant_list = variants
     loop:
         if psr_peek_kind(tokens, cursor) != "ident":
             break
         variant_name = psr_peek_value(tokens, cursor)
         cursor = cursor + 1
         payload = []
-        mut payload_list = payload
+        edit payload_list = payload
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
             cursor = cursor + 1
             loop:
@@ -2012,11 +2239,11 @@ fn psr_parse_enum_inline(tokens: [Map], position: int) -> Map:
                 if psr_peek_kind(tokens, cursor) == "eof" or psr_peek_kind(tokens, cursor) == "newline":
                     break
                 pt_result = psr_parse_type(tokens, cursor)
-                payload_list = push(payload_list, get_map(pt_result, "node"))
+                payload_list = append(payload_list, get_map(pt_result, "node"))
                 cursor = get_int(pt_result, "next")
                 if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
                     cursor = cursor + 1
-        variant_list = push(variant_list, {"name": variant_name, "payload": payload_list})
+        variant_list = append(variant_list, {"name": variant_name, "payload": payload_list})
         # `|` or `,` continues the sum; anything else ends it. Both spellings
         # are real: `type R: Ok(T) | Err(E)` reads as a sum, and the older
         # comma form (`type Tile: Empty, Wall, Loot`) is what the whole corpus
@@ -2032,14 +2259,14 @@ fn psr_parse_enum_inline(tokens: [Map], position: int) -> Map:
 # --- data decls ---
 # Form 1: `data Name: field1: Type, field2: Type, ...`  (single-line)
 # Form 2: `pub data Name: ...`
-fn psr_parse_data(tokens: [Map], position: int) -> Map:
+define psr_parse_data(tokens: [table], position: int) -> table:
     # Sitting on `data` (or `type`). Advance past it.
-    mut cursor = position + 1
+    edit cursor = position + 1
     name = psr_peek_value(tokens, cursor)
     cursor += 1
     # Optional generic type params: `type Wrapper<T>: inner: T`.
     data_generics = slice([""], 0, 0)
-    mut data_gen_list = data_generics
+    edit data_gen_list = data_generics
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
         cursor = cursor + 1
         loop:
@@ -2051,7 +2278,7 @@ fn psr_parse_data(tokens: [Map], position: int) -> Map:
             if gk == "eof":
                 break
             if gk == "ident":
-                data_gen_list = push(data_gen_list, gv)
+                data_gen_list = append(data_gen_list, gv)
             cursor = cursor + 1
     # Skip `:`
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
@@ -2061,12 +2288,12 @@ fn psr_parse_data(tokens: [Map], position: int) -> Map:
     # reading past newlines, bounded by the body's column — breaking at the
     # first newline is what used to give a multi-line struct zero fields.
     indented = psr_peek_kind(tokens, cursor) == "newline"
-    mut body_col = 0
+    edit body_col = 0
     if indented:
         cursor = psr_skip_newlines(tokens, cursor)
         body_col = psr_peek_col(tokens, cursor)
     fields = []
-    mut field_list = fields
+    edit field_list = fields
     loop:
         if indented:
             cursor = psr_skip_newlines(tokens, cursor)
@@ -2085,7 +2312,7 @@ fn psr_parse_data(tokens: [Map], position: int) -> Map:
             if colon_kind == "symbol" and colon_val == ":":
                 cursor = cursor + 1
             type_result = psr_parse_type(tokens, cursor)
-            field_list = push(field_list, {"name": field_name, "type": get_map(type_result, "node")})
+            field_list = append(field_list, {"name": field_name, "type": get_map(type_result, "node")})
             cursor = get_int(type_result, "next")
             comma_kind = psr_peek_kind(tokens, cursor)
             comma_val = psr_peek_value(tokens, cursor)
@@ -2097,13 +2324,13 @@ fn psr_parse_data(tokens: [Map], position: int) -> Map:
 
 # --- enum decls ---
 # `enum Name: Variant1, Variant2(int), ...` — indented block of variants
-fn psr_parse_enum(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
+define psr_parse_enum(tokens: [table], position: int) -> table:
+    edit cursor = position + 1
     name = psr_peek_value(tokens, cursor)
     cursor += 1
     # Optional generic type params: `type Result<T, E>: Ok(T) | Err(E)`.
     enum_generics = slice([""], 0, 0)
-    mut enum_gen_list = enum_generics
+    edit enum_gen_list = enum_generics
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
         cursor = cursor + 1
         loop:
@@ -2115,13 +2342,13 @@ fn psr_parse_enum(tokens: [Map], position: int) -> Map:
             if gk == "eof":
                 break
             if gk == "ident":
-                enum_gen_list = push(enum_gen_list, gv)
+                enum_gen_list = append(enum_gen_list, gv)
             cursor = cursor + 1
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
         cursor += 1
     cursor = psr_skip_newlines(tokens, cursor)
     variants = []
-    mut variant_list = variants
+    edit variant_list = variants
     # Variants are indented one level
     first_col = psr_peek_col(tokens, cursor)
     loop:
@@ -2138,8 +2365,8 @@ fn psr_parse_enum(tokens: [Map], position: int) -> Map:
             variant_name = psr_peek_value(tokens, cursor)
             cursor += 1
             payload = []
-            mut payload_list = payload
-            # Optional payload: `Variant(int, Text)`
+            edit payload_list = payload
+            # Optional payload: `Variant(int, text)`
             if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
                 cursor += 1
                 loop:
@@ -2151,17 +2378,17 @@ fn psr_parse_enum(tokens: [Map], position: int) -> Map:
                     if payload_kind == "eof":
                         break
                     type_result = psr_parse_type(tokens, cursor)
-                    payload_list = push(payload_list, get_map(type_result, "node"))
+                    payload_list = append(payload_list, get_map(type_result, "node"))
                     cursor = get_int(type_result, "next")
                     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
                         cursor += 1
-            variant_list = push(variant_list, {"name": variant_name, "payload": payload_list})
+            variant_list = append(variant_list, {"name": variant_name, "payload": payload_list})
             cursor = psr_skip_newlines(tokens, cursor)
     {"node": {"kind": "Enum", "name": name, "generics": enum_gen_list, "variants": variant_list}, "next": cursor}
 
-fn psr_parse_fn(tokens: [Map], position: int) -> Map:
+define psr_parse_fn(tokens: [table], position: int) -> table:
     # We're sitting on `fn`. Advance past it.
-    mut cursor = position + 1
+    edit cursor = position + 1
     name = psr_peek_value(tokens, cursor)
     # Where this declaration starts. The whole-program checks (empty body,
     # duplicate definition, declared return type vs body) had NO position at
@@ -2179,12 +2406,53 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
     # an undeclared struct. Bounds (`<T: Ord>`) are not a thing under the
     # operation-passing model — a `:` here is tolerated and skipped.
     generic_names = []
-    mut generic_list = generic_names
+    edit generic_list = generic_names
     # Also as one comma-joined Text. Lowering needs the names to instantiate a
     # generic call's result type, and reading them back out of the list there
     # gets the element type wrong (a map value's list is typed list-of-map
     # regardless of what it holds), so hand it a string it can use directly.
-    mut generic_csv = ""
+    edit generic_csv = ""
+    # `given item, other` — the spoken generics clause: the type variables are
+    # readable WORDS introduced before the parameter list.
+    #   define first given item (items: list of item) -> item:
+    # Same recording as `<T>`; lowering is untouched.
+    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "given":
+        cursor = cursor + 1
+        loop:
+            gv_kind = psr_peek_kind(tokens, cursor)
+            gv_val = psr_peek_value(tokens, cursor)
+            if gv_kind != "ident":
+                break
+            if gv_val == "requires":
+                break
+            generic_list = append(generic_list, gv_val)
+            generic_csv = if generic_csv == "" then gv_val else "{generic_csv},{gv_val}"
+            cursor = cursor + 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+                cursor = cursor + 1
+            else:
+                break
+    # `requires order, shows` — trait sugar over operation-passing: each name
+    # is BOTH a record type (of the operations) and an implicit trailing
+    # parameter of that type. The caller hands the record as a named argument
+    # (`largest(xs, order: number_order)`), the body reads operations off it
+    # (`cmp = order.less` then `cmp(a, b)`). Dictionary-passing made visible —
+    # no resolution magic, no instance coherence rules, just a record.
+    req_names = []
+    edit req_list = req_names
+    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "requires":
+        cursor = cursor + 1
+        loop:
+            rq_kind = psr_peek_kind(tokens, cursor)
+            rq_val = psr_peek_value(tokens, cursor)
+            if rq_kind != "ident":
+                break
+            req_list = append(req_list, rq_val)
+            cursor = cursor + 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+                cursor = cursor + 1
+            else:
+                break
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
         cursor = cursor + 1
         loop:
@@ -2196,7 +2464,7 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
             if tp_kind == "eof":
                 break
             if tp_kind == "ident":
-                generic_list = push(generic_list, tp_val)
+                generic_list = append(generic_list, tp_val)
                 sep_g = if generic_csv == "" then "" else ","
                 generic_csv = generic_csv + sep_g + tp_val
             # commas / stray tokens just advance the cursor
@@ -2204,16 +2472,41 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
     # Skip `(`.
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
         cursor += 1
-    params_result = psr_parse_params(tokens, cursor)
+    edit params_result = psr_parse_params(tokens, cursor)
     cursor = get_int(params_result, "next")
+    # Splice the `requires` records in as trailing params.
+    if len(req_list) > 0:
+        edit fn_params_node = get_list(params_result, "node")
+        loop rqi in 0..<len(req_list):
+            rq_nm = at(req_list, rqi)
+            fn_params_node = append(fn_params_node, {"name": rq_nm, "type": {"kind": "Named", "name": rq_nm}})
+        params_result = set(params_result, "node", fn_params_node)
     # Optional `-> type`.
-    mut return_node = {"kind": "Named", "name": "Unit"}
+    edit return_node = {"kind": "Named", "name": "Unit"}
     has_arrow = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->"
     if has_arrow:
         cursor += 1
         ret_result = psr_parse_type(tokens, cursor)
         return_node = get_map(ret_result, "node")
         cursor = get_int(ret_result, "next")
+    # `uses cap1, cap2` — the capability clause: what of the outside world
+    # this function may touch (console, files, net, clock, random). Recorded
+    # as a csv; the sig pass registers it and the call checker holds a
+    # declared function to it.
+    edit uses_csv = ""
+    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "uses":
+        cursor += 1
+        loop:
+            uk = psr_peek_kind(tokens, cursor)
+            uv = psr_peek_value(tokens, cursor)
+            if uk != "ident":
+                break
+            uses_csv = if uses_csv == "" then uv else "{uses_csv},{uv}"
+            cursor += 1
+            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
+                cursor += 1
+            else:
+                break
     # `fn name(...) -> int = EXPR` short form vs `:` block form. Must
     # be one if/else so the last branch's value flows out as the fn
     # return value (Orion has no `return`).
@@ -2228,25 +2521,25 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
         # is folded at its read sites. Recognise the word only to report it -
         # recorded as the `comptime` modifier, which ast_to_ir already rejects.
         saw_comptime = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "comptime"
-        mut ct_line = 0
-        mut ct_col = 0
+        edit ct_line = 0
+        edit ct_col = 0
         if saw_comptime:
             ct_line = psr_peek_line(tokens, cursor)
             ct_col = psr_peek_col(tokens, cursor)
             cursor += 1
         expr_result = psr_parse_expr(tokens, cursor)
-        body_node = {"kind": "Block", "stmts": push([], {"kind": "ExprStmt", "expr": get_map(expr_result, "node")})}
+        body_node = {"kind": "Block", "stmts": append([], {"kind": "ExprStmt", "expr": get_map(expr_result, "node")})}
         cursor = get_int(expr_result, "next")
         cursor = psr_skip_newlines(tokens, cursor)
         short_mod = if saw_comptime then "comptime" else ""
-        {"node": {"kind": "Fn", "name": name, "generics": generic_list, "generics_csv": generic_csv, "params": get_map(params_result, "node"), "ret": return_node, "body": body_node, "modifier": short_mod, "mod_line": ct_line, "mod_col": ct_col, "line": fn_line, "col": fn_col}, "next": cursor}
+        {"node": {"kind": "Fn", "name": name, "generics": generic_list, "generics_csv": generic_csv, "params": get_map(params_result, "node"), "ret": return_node, "body": body_node, "modifier": short_mod, "mod_line": ct_line, "mod_col": ct_col, "uses": uses_csv, "line": fn_line, "col": fn_col}, "next": cursor}
     else:
         if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
             cursor += 1
         cursor = psr_skip_newlines(tokens, cursor)
         body_result = psr_parse_body(tokens, cursor)
         cursor = get_int(body_result, "next")
-        {"node": {"kind": "Fn", "name": name, "generics": generic_list, "generics_csv": generic_csv, "params": get_map(params_result, "node"), "ret": return_node, "body": get_map(body_result, "node"), "line": fn_line, "col": fn_col}, "next": cursor}
+        {"node": {"kind": "Fn", "name": name, "generics": generic_list, "generics_csv": generic_csv, "params": get_map(params_result, "node"), "ret": return_node, "body": get_map(body_result, "node"), "uses": uses_csv, "line": fn_line, "col": fn_col}, "next": cursor}
 
 
 # `handle Effect.op(params) -> ret:` — the handler for one effect operation.
@@ -2254,13 +2547,13 @@ fn psr_parse_fn(tokens: [Map], position: int) -> Map:
 # `perform Effect.op(x)` resolves to it (ast_to_ir builds the same
 # `__handler_<Effect>_<op>` name at the perform site). `resume(v)` inside the
 # body returns a value to that site.
-fn psr_parse_handle(tokens: [Map], position: int) -> Map:
+define psr_parse_handle(tokens: [table], position: int) -> table:
     # Position of the `handle` keyword, carried onto the synthesised handler Fn
     # so a diagnostic about it (e.g. a return-type mismatch) names a real place
     # instead of `line 0:0` — regular fns already carry this, handlers did not.
     handle_line = psr_peek_line(tokens, position)
     handle_col = psr_peek_col(tokens, position)
-    mut cursor = position + 1
+    edit cursor = position + 1
     eff_name = psr_peek_value(tokens, cursor)
     cursor = cursor + 1
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ".":
@@ -2271,7 +2564,7 @@ fn psr_parse_handle(tokens: [Map], position: int) -> Map:
         cursor = cursor + 1
     params_result = psr_parse_params(tokens, cursor)
     cursor = get_int(params_result, "next")
-    mut return_node = {"kind": "Named", "name": "Unit"}
+    edit return_node = {"kind": "Named", "name": "Unit"}
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
         cursor = cursor + 1
         ret_result = psr_parse_type(tokens, cursor)
@@ -2291,9 +2584,9 @@ fn psr_parse_handle(tokens: [Map], position: int) -> Map:
 # skipped. Skipping it is not cosmetic: the `fn(...)` inside an op signature
 # was otherwise picked up by the decl loop as a nameless top-level fn, which
 # is what made an effect declaration hang the compiler.
-fn psr_skip_effect(tokens: [Map], position: int) -> int:
+define psr_skip_effect(tokens: [table], position: int) -> int:
     base_col = psr_peek_col(tokens, position)
-    mut cursor = position + 1
+    edit cursor = position + 1
     loop:
         k = psr_peek_kind(tokens, cursor)
         if k == "eof":
@@ -2318,16 +2611,16 @@ fn psr_skip_effect(tokens: [Map], position: int) -> int:
 # The signature matters: ast_to_ir uses the return type so extern calls
 # are typed correctly (ptr for Text, i64 for int) instead of guessed,
 # and emit declares the real LLVM signature.
-fn psr_parse_extern_fn(tokens: [Map], position: int) -> Map:
+define psr_parse_extern_fn(tokens: [table], position: int) -> table:
     # Already past `extern fn`; sitting on the name.
-    mut cursor = position
+    edit cursor = position
     name = psr_peek_value(tokens, cursor)
     cursor = cursor + 1
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
         cursor = cursor + 1
     params_result = psr_parse_params(tokens, cursor)
     cursor = get_int(params_result, "next")
-    mut return_node = {"kind": "Named", "name": "Unit"}
+    edit return_node = {"kind": "Named", "name": "Unit"}
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
         cursor = cursor + 1
         ret_result = psr_parse_type(tokens, cursor)
@@ -2336,8 +2629,8 @@ fn psr_parse_extern_fn(tokens: [Map], position: int) -> Map:
     {"node": {"kind": "ExternFn", "name": name, "params": get_map(params_result, "node"), "ret": return_node}, "next": cursor}
 
 # Skip `use NAME` — one line.
-fn psr_skip_use(tokens: [Map], position: int) -> int:
-    mut cursor = position + 1
+define psr_skip_use(tokens: [table], position: int) -> int:
+    edit cursor = position + 1
     loop:
         if psr_peek_kind(tokens, cursor) == "newline" or psr_peek_kind(tokens, cursor) == "eof":
             break
@@ -2349,10 +2642,10 @@ fn psr_skip_use(tokens: [Map], position: int) -> int:
 # has to change. The list form is how a caller says WHICH orb it means when two
 # of them export the same name (`use option (unwrap)`), which is otherwise an
 # ambiguity the compiler cannot resolve for you.
-fn psr_parse_use(tokens: [Map], position: int) -> Map:
+define psr_parse_use(tokens: [table], position: int) -> table:
     name = psr_peek_value(tokens, position + 1)
-    mut cursor = position + 2
-    mut only = slice([""], 0, 0)
+    edit cursor = position + 2
+    edit only = slice([""], 0, 0)
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
         cursor = cursor + 1
         loop:
@@ -2362,24 +2655,24 @@ fn psr_parse_use(tokens: [Map], position: int) -> Map:
                 cursor = cursor + 1
                 break
             if psr_peek_kind(tokens, cursor) == "ident":
-                only = push(only, psr_peek_value(tokens, cursor))
+                only = append(only, psr_peek_value(tokens, cursor))
             cursor = cursor + 1
     {"node": {"kind": "UseDecl", "name": name, "only": only}, "next": psr_skip_use(tokens, position)}
 
-pub fn self_parse(tokens: [Map]) -> Map:
-    mut cursor = psr_skip_newlines(tokens, 0)
-    mut decls = []
+public define self_parse(tokens: [table]) -> table:
+    edit cursor = psr_skip_newlines(tokens, 0)
+    edit decls = []
     loop:
         # Where this iteration started. Any declaration parser that consumes
         # NOTHING — an empty `handle` body hands back the cursor it was given —
         # would otherwise be re-parsed forever. One guard here covers every decl
         # form, present and future, which is better than trusting each of them.
         decl_start = cursor
-        mut kind_here = psr_peek_kind(tokens, cursor)
-        mut value_here = psr_peek_value(tokens, cursor)
+        edit kind_here = psr_peek_kind(tokens, cursor)
+        edit value_here = psr_peek_value(tokens, cursor)
         if kind_here == "eof":
             break
-        is_pub = kind_here == "ident" and value_here == "pub"
+        is_pub = kind_here == "ident" and value_here == "public"
         # `pub` is now RECORDED on the decl (it used to be parsed and dropped:
         # "purely a visibility marker"). ast_to_ir uses it to make non-pub
         # functions ORB-LOCAL, so two orbs can each have a private `contains_text`
@@ -2389,7 +2682,7 @@ pub fn self_parse(tokens: [Map]) -> Map:
             cursor = cursor + 1
             kind_here = psr_peek_kind(tokens, cursor)
             value_here = psr_peek_value(tokens, cursor)
-        mut is_fn = kind_here == "ident" and value_here == "fn"
+        edit is_fn = kind_here == "ident" and value_here == "define"
         # `data` / `enum` are RETIRED (the corpus was migrated 2026-07-26). They
         # are still recognised here — but only to consume the declaration and
         # report it, so the old spelling fails loudly instead of being skipped
@@ -2401,7 +2694,7 @@ pub fn self_parse(tokens: [Map]) -> Map:
         # got skipped a token at a time, and the FUNCTION AFTER it was reported
         # as having an empty body. Recognise them, swallow the block, and say so.
         is_unsupported_decl = kind_here == "ident" and (value_here == "trait" or value_here == "impl" or value_here == "system") and psr_peek_kind(tokens, cursor + 1) == "ident"
-        is_extern = kind_here == "ident" and value_here == "extern"
+        is_extern = kind_here == "ident" and value_here == "external"
         is_use = kind_here == "ident" and value_here == "use"
         # `type Name ...` — ONE keyword for every type declaration. The RHS form
         # dispatches: `= T` is an alias, inline `field: T` is a product (data),
@@ -2432,9 +2725,9 @@ pub fn self_parse(tokens: [Map]) -> Map:
         # `deterministic` is enforced (the fn may not transitively touch io /
         # time / platform / audio), `comptime` is rejected (not implemented, so
         # it must not masquerade as working).
-        mut fn_modifier = ""
-        mut fn_mod_line = 0
-        mut fn_mod_col = 0
+        edit fn_modifier = ""
+        edit fn_mod_line = 0
+        edit fn_mod_col = 0
         if is_comptime or is_deterministic:
             fn_modifier = if is_comptime then "comptime" else "deterministic"
             fn_mod_line = psr_peek_line(tokens, cursor)
@@ -2442,7 +2735,7 @@ pub fn self_parse(tokens: [Map]) -> Map:
             cursor = cursor + 1
             kind_here = psr_peek_kind(tokens, cursor)
             value_here = psr_peek_value(tokens, cursor)
-            is_fn = kind_here == "ident" and value_here == "fn"
+            is_fn = kind_here == "ident" and value_here == "define"
         if is_fn:
             decl_result = psr_parse_fn(tokens, cursor)
             fn_node = set(get_map(decl_result, "node"), "pub", if is_pub then 1 else 0)
@@ -2451,49 +2744,49 @@ pub fn self_parse(tokens: [Map]) -> Map:
             # unconditionally would erase it.
             inner_mod = if has(fn_node, "modifier") then get(fn_node, "modifier") else ""
             final_mod = if fn_modifier != "" then fn_modifier else inner_mod
-            mut fn_node_m = set(fn_node, "modifier", final_mod)
+            edit fn_node_m = set(fn_node, "modifier", final_mod)
             if fn_modifier != "":
                 fn_node_m = set(fn_node_m, "mod_line", fn_mod_line)
                 fn_node_m = set(fn_node_m, "mod_col", fn_mod_col)
-            decls = push(decls, fn_node_m)
+            decls = append(decls, fn_node_m)
             cursor = get_int(decl_result, "next")
         # Consume the retired declaration with the real parser (so the cursor
         # lands on the next decl and the file keeps parsing), but hand ast_to_ir
         # a Retired marker instead of the type: one clear error per site.
         if is_unsupported_decl:
-            decls = push(decls, {"kind": "Unsupported", "word": value_here, "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
+            decls = append(decls, {"kind": "Unsupported", "word": value_here, "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
             cursor = psr_skip_effect(tokens, cursor)
         if is_data:
             decl_result = psr_parse_data(tokens, cursor)
-            decls = push(decls, {"kind": "Retired", "word": "data", "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
+            decls = append(decls, {"kind": "Retired", "word": "data", "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
             cursor = get_int(decl_result, "next")
         if is_enum:
             decl_result = psr_parse_enum(tokens, cursor)
-            decls = push(decls, {"kind": "Retired", "word": "enum", "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
+            decls = append(decls, {"kind": "Retired", "word": "enum", "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
             cursor = get_int(decl_result, "next")
         if is_extern:
             cursor = cursor + 1
-            if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "fn":
+            if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "define":
                 cursor = cursor + 1
             decl_result = psr_parse_extern_fn(tokens, cursor)
-            decls = push(decls, get_map(decl_result, "node"))
+            decls = append(decls, get_map(decl_result, "node"))
             cursor = get_int(decl_result, "next")
         if is_use:
             # `pub use X` RE-EXPORTS: whoever imports this orb also sees X's
             # exports. That is what makes a facade orb (`veil`, `astra`: a file
             # of nothing but imports) work once each orb is its own namespace.
             use_result = psr_parse_use(tokens, cursor)
-            decls = push(decls, set(get_map(use_result, "node"), "reexport", if is_pub then 1 else 0))
+            decls = append(decls, set(get_map(use_result, "node"), "reexport", if is_pub then 1 else 0))
             cursor = get_int(use_result, "next")
         if is_orbmark:
-            decls = push(decls, {"kind": "OrbMark", "name": psr_peek_value(tokens, cursor + 1)})
+            decls = append(decls, {"kind": "OrbMark", "name": psr_peek_value(tokens, cursor + 1)})
             cursor = cursor + 2
         if is_type_decl:
             # Dispatch on what follows the name: `=` -> alias; `:` then newline
             # -> indented sum (enum); `:` then inline -> product (data). The
             # data/enum parsers read the name after the keyword, so pointing
             # them at `type` works unchanged.
-            mut td_after = cursor + 2
+            edit td_after = cursor + 2
             # Skip an optional `<T, E>` generic-param list before deciding form.
             if psr_peek_kind(tokens, td_after) == "symbol" and psr_peek_value(tokens, td_after) == "<":
                 td_after = td_after + 1
@@ -2511,7 +2804,7 @@ pub fn self_parse(tokens: [Map]) -> Map:
             # is a product written over several lines — dispatching that to the
             # enum parser used to produce an enum whose "variants" were the
             # field names, silently.
-            mut td_body = td_after + 1
+            edit td_body = td_after + 1
             loop:
                 if psr_peek_kind(tokens, td_body) != "newline":
                     break
@@ -2523,37 +2816,37 @@ pub fn self_parse(tokens: [Map]) -> Map:
             td_is_inline_sum = td_colon and (not td_is_sum) and psr_peek_kind(tokens, td_after + 1) == "ident" and not (psr_peek_kind(tokens, td_after + 2) == "symbol" and psr_peek_value(tokens, td_after + 2) == ":")
             if td_is_alias:
                 ta_type = psr_parse_type(tokens, td_after + 1)
-                decls = push(decls, {"kind": "TypeAlias", "name": psr_peek_value(tokens, cursor + 1), "target": get_map(ta_type, "node")})
+                decls = append(decls, {"kind": "TypeAlias", "name": psr_peek_value(tokens, cursor + 1), "target": get_map(ta_type, "node")})
                 cursor = get_int(ta_type, "next")
             if (not td_is_alias) and td_is_sum:
                 decl_result = psr_parse_enum(tokens, cursor)
-                decls = push(decls, get_map(decl_result, "node"))
+                decls = append(decls, get_map(decl_result, "node"))
                 cursor = get_int(decl_result, "next")
             if (not td_is_alias) and td_is_inline_sum:
                 decl_result = psr_parse_enum_inline(tokens, cursor)
-                decls = push(decls, get_map(decl_result, "node"))
+                decls = append(decls, get_map(decl_result, "node"))
                 cursor = get_int(decl_result, "next")
             if (not td_is_alias) and (not td_is_sum) and (not td_is_inline_sum):
                 decl_result = psr_parse_data(tokens, cursor)
-                decls = push(decls, get_map(decl_result, "node"))
+                decls = append(decls, get_map(decl_result, "node"))
                 cursor = get_int(decl_result, "next")
         if is_const:
             cn_name = psr_peek_value(tokens, cursor + 1)
-            mut cn_cursor = cursor + 2
+            edit cn_cursor = cursor + 2
             if psr_peek_kind(tokens, cn_cursor) == "symbol" and psr_peek_value(tokens, cn_cursor) == "=":
                 cn_cursor = cn_cursor + 1
             cn_val = psr_parse_expr(tokens, cn_cursor)
-            decls = push(decls, {"kind": "Const", "name": cn_name, "value": get_map(cn_val, "node")})
+            decls = append(decls, {"kind": "Const", "name": cn_name, "value": get_map(cn_val, "node")})
             cursor = get_int(cn_val, "next")
         if is_top_const:
             tc_val = psr_parse_expr(tokens, cursor + 2)
-            decls = push(decls, {"kind": "Const", "name": value_here, "value": get_map(tc_val, "node")})
+            decls = append(decls, {"kind": "Const", "name": value_here, "value": get_map(tc_val, "node")})
             cursor = get_int(tc_val, "next")
         if is_effect:
             cursor = psr_skip_effect(tokens, cursor)
         if is_handle:
             handle_result = psr_parse_handle(tokens, cursor)
-            decls = push(decls, set(get_map(handle_result, "node"), "pub", if is_pub then 1 else 0))
+            decls = append(decls, set(get_map(handle_result, "node"), "pub", if is_pub then 1 else 0))
             cursor = get_int(handle_result, "next")
         not_recognized = not (is_fn or is_data or is_enum or is_unsupported_decl or is_extern or is_use or is_orbmark or is_type_decl or is_const or is_top_const or is_effect or is_handle)
         if not_recognized:

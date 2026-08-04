@@ -1,0 +1,15 @@
+# `number` — THE numeric surface type (facade v1 = f64 semantics):
+#   /  is REAL division whatever the operands (10 / 4 is 2.5)
+#   // is integer/floor division (10 // 4 is 2; 10.0 // 4.0 is 2.0)
+#   `number` accepted in type position (params, returns, bindings)
+define area(w: number, h: number) -> number:
+    w * h
+
+define main() -> int:
+    half = 10 / 4
+    q = 10.0 // 4.0
+    a = area(6.0, 7.0)
+    ok1 = if half is 2.5 then 1 else 0
+    ok2 = if q is 2.0 then 1 else 0
+    ok3 = if a is 42.0 then 1 else 0
+    ok1 * 20 + ok2 * 12 + ok3 * 10

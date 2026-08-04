@@ -1,9 +1,9 @@
-extern fn win_open(title: Text, w: int, h: int) -> int
-extern fn win_pump() -> int
-extern fn win_close(hwnd: int)
+external define win_open(title: text, w: int, h: int) -> int
+external define win_pump() -> int
+external define win_close(hwnd: int)
 
 
-fn main() -> int:
+define main() -> int:
     print_line("Opening native Orion window...")
     hwnd = win_open("Hello from native Orion", 640, 480)
     if hwnd == 0:

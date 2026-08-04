@@ -2,7 +2,7 @@ use net
 
 # net orb demo — safe (won't hit real network during smoke runs).
 # Run manually with: orbit run net_demo.or main
-fn main() -> int:
+define main() -> int:
     # Try a TCP connect to a closed port — returns -1, doesn't crash.
     handle = tcp_connect("127.0.0.1", 65535)
     if handle < 0:

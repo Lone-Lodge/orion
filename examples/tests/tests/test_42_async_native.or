@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     t0 = monotonic_ms()
     sleep_ms(40)
     t1 = monotonic_ms()

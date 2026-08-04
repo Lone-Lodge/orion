@@ -3,7 +3,7 @@
 # int-valued keys inline after a set/mut (`m["a"] + m["b"]`) typed the values
 # as text and lowered `+` to string-concat — dereferencing ints as pointers,
 # a segfault.
-fn main() -> int:
-    mut m = {"a": 5, "b": 7}
+define main() -> int:
+    edit m = {"a": 5, "b": 7}
     m["c"] = 12                    # add a key via `[]=` (set)
     m["a"] + m["b"] + m["c"]       # 5 + 7 + 12 = 24

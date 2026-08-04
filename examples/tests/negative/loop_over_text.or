@@ -2,8 +2,8 @@
 # Text is not a list. This compiled without complaint and then died with an
 # ACCESS VIOLATION at run time: the loop took the text's leading bytes as a
 # length and indexed off the end of the allocation.
-fn main() -> int:
-    mut n = 0
+define main() -> int:
+    edit n = 0
     loop c in "abc":
         n += 1
     n

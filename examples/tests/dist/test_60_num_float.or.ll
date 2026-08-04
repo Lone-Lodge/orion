@@ -1830,17 +1830,7 @@ entry:
     %v3 = add i64 0, 0
     %v4.b = icmp eq i64 %v2, %v3
     %v4 = zext i1 %v4.b to i64
-    %v5.cb = icmp ne i64 %v4, 0
-    br i1 %v5.cb, label %if_5_then, label %if_5_else
-if_5_then:
-    %v7 = add i64 0, 1
-    br label %if_5_merge
-if_5_else:
-    %v10 = add i64 0, 0
-    br label %if_5_merge
-if_5_merge:
-    %v13 = phi i64 [ %v7, %if_5_then ], [ %v10, %if_5_else ]
-    ret i64 %v13
+    ret i64 %v4
 }
 
 define i64 @num__is_odd(i64 %p0) {
@@ -1849,31 +1839,9 @@ entry:
     %v1 = add i64 0, 2
     %v2 = call i64 @orion_imod(i64 %v0, i64 %v1)
     %v3 = add i64 0, 0
-    %v4.b = icmp eq i64 %v2, %v3
+    %v4.b = icmp ne i64 %v2, %v3
     %v4 = zext i1 %v4.b to i64
-    %v5.cb = icmp ne i64 %v4, 0
-    br i1 %v5.cb, label %if_5_then, label %if_5_else
-if_5_then:
-    %v7 = add i64 0, 0
-    br label %if_5_merge
-if_5_else:
-    %v10 = add i64 0, 1
-    br label %if_5_merge
-if_5_merge:
-    %v13 = phi i64 [ %v7, %if_5_then ], [ %v10, %if_5_else ]
-    ret i64 %v13
-}
-
-define double @num__pi() {
-entry:
-    %v0 = fadd double 0x400921FB54442D18, 0x0000000000000000
-    ret double %v0
-}
-
-define double @num__e() {
-entry:
-    %v0 = fadd double 0x4005BF0A8B145769, 0x0000000000000000
-    ret double %v0
+    ret i64 %v4
 }
 
 define double @num__fabs(double %p0) {
@@ -2408,7 +2376,7 @@ if_49_else:
     br label %if_49_merge
 if_49_merge:
     %v57 = phi i64 [ %v51, %if_49_then ], [ %v54, %if_49_else ]
-    %v58 = call double @num__pi()
+    %v58 = fadd double 0x400921FB54442D18, 0x0000000000000000
     %v59 = fptosi double %v58 to i64
     %v60 = add i64 0, 3
     %v61.b = icmp eq i64 %v59, %v60

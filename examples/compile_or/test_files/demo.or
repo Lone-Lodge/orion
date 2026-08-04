@@ -1,286 +1,63 @@
-use bytes
-type Inst: op: Text, type_text: Text, value: int, lhs: int, rhs: int, name: Text, args: [int]
-type Param: name: Text, type_text: Text
-type IRFn: name: Text, return_type: Text, params: [Param], instructions: [Inst]
-type IRModule: functions: [IRFn]
-type PushResult: function: IRFn, id: int
-pub fn ir_type_i64() -> Text: "i64"
-pub fn ir_type_ptr() -> Text: "ptr"
-pub fn ir_type_bool() -> Text: "bool"
-pub fn ir_type_void() -> Text: "void"
-pub extern fn orion_err_bump() -> int
-pub extern fn orion_err_get() -> int
-pub extern fn orion_text_join(parts: [Text]) -> Text
-pub extern fn orion_f64_literal_hex(s: Text) -> Text
-pub extern fn orion_arena_init(bytes: int) -> int
-pub extern fn orion_arena_on() -> int
-pub extern fn orion_arena_off() -> int
-pub extern fn orion_arena_reset() -> int
-pub extern fn orion_arena_used() -> int
-pub fn compile_error(msg: Text):
-    print_line(msg)
-    orion_err_bump()
-pub fn compile_errors() -> int:
-    orion_err_get()
-pub fn ir_iconst(value: int) -> Inst:
-    Inst{op: "iconst", type_text: "i64", value: value, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_iadd(lhs: int, rhs: int) -> Inst:
-    Inst{op: "iadd", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_isub(lhs: int, rhs: int) -> Inst:
-    Inst{op: "isub", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_imul(lhs: int, rhs: int) -> Inst:
-    Inst{op: "imul", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_idiv(lhs: int, rhs: int) -> Inst:
-    Inst{op: "idiv", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_imod(lhs: int, rhs: int) -> Inst:
-    Inst{op: "imod", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_iand(lhs: int, rhs: int) -> Inst:
-    Inst{op: "iand", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_ior(lhs: int, rhs: int) -> Inst:
-    Inst{op: "ior", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_inot(value_id: int) -> Inst:
-    Inst{op: "inot", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_icmp_eq(lhs: int, rhs: int) -> Inst:
-    Inst{op: "icmp_eq", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_icmp_ne(lhs: int, rhs: int) -> Inst:
-    Inst{op: "icmp_ne", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_icmp_lt(lhs: int, rhs: int) -> Inst:
-    Inst{op: "icmp_lt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_icmp_le(lhs: int, rhs: int) -> Inst:
-    Inst{op: "icmp_le", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_icmp_gt(lhs: int, rhs: int) -> Inst:
-    Inst{op: "icmp_gt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_icmp_ge(lhs: int, rhs: int) -> Inst:
-    Inst{op: "icmp_ge", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_return(value_id: int) -> Inst:
-    Inst{op: "return", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_return_void() -> Inst:
-    Inst{op: "return", type_text: "void", value: 0 - 1, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_print_int(value_id: int) -> Inst:
-    Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_print_float(value_id: int) -> Inst:
-    Inst{op: "print_float", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
-    Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
-pub fn ir_fconst(literal: Text) -> Inst:
-    Inst{op: "fconst", type_text: "f64", value: 0, lhs: 0, rhs: 0, name: literal, args: []}
-pub fn ir_fbin(op_name: Text, lhs: int, rhs: int) -> Inst:
-    Inst{op: op_name, type_text: "f64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
-pub fn ir_fcmp(cc: Text, lhs: int, rhs: int) -> Inst:
-    Inst{op: "fcmp", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: cc, args: []}
-pub fn ir_sitofp(value_id: int) -> Inst:
-    Inst{op: "sitofp", type_text: "f64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_fptosi(value_id: int) -> Inst:
-    Inst{op: "fptosi", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_call(fn_name: Text, arg_ids: [int], ret_type: Text) -> Inst:
-    Inst{op: "call", type_text: ret_type, value: 0, lhs: 0, rhs: 0, name: fn_name, args: arg_ids}
-pub fn ir_print_str(text: Text) -> Inst:
-    Inst{op: "print_str", type_text: "void", value: 0, lhs: 0, rhs: 0, name: text, args: []}
-pub fn ir_const_str(text: Text) -> Inst:
-    Inst{op: "const_str", type_text: "text", value: 0, lhs: 0, rhs: 0, name: text, args: []}
-pub fn ir_text_concat(left_id: int, right_id: int) -> Inst:
-    Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
-pub fn ir_int_to_text(value_id: int) -> Inst:
-    Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_text_cmp(op_name: Text, left_id: int, right_id: int) -> Inst:
-    Inst{op: op_name, type_text: "i64", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
-pub fn ir_text_len(value_id: int) -> Inst:
-    Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
-    Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
-pub fn ir_list_slice(list_id: int, lo_id: int, hi_id: int, list_type: Text) -> Inst:
-    Inst{op: "list_slice", type_text: list_type, value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
-pub fn ir_fmath1(libm: Text, arg_id: int) -> Inst:
-    Inst{op: "fmath1", type_text: "f64", value: arg_id, lhs: 0, rhs: 0, name: libm, args: []}
-pub fn ir_fmath2(libm: Text, a_id: int, b_id: int) -> Inst:
-    Inst{op: "fmath2", type_text: "f64", value: a_id, lhs: b_id, rhs: 0, name: libm, args: []}
-pub fn ir_text_contains(text_id: int, sub_id: int) -> Inst:
-    Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
-pub fn ir_file_read(path_id: int) -> Inst:
-    Inst{op: "file_read", type_text: "text", value: path_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_file_write(path_id: int, content_id: int) -> Inst:
-    Inst{op: "file_write", type_text: "i64", value: path_id, lhs: content_id, rhs: 0, name: "", args: []}
-pub fn ir_argc() -> Inst:
-    Inst{op: "argc", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_argv(idx_id: int) -> Inst:
-    Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_bytes_from_text(text_id: int) -> Inst:
-    Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_bytes_to_text(list_id: int) -> Inst:
-    Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
-    Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
-pub fn ir_bytes_concat(a_id: int, b_id: int) -> Inst:
-    Inst{op: "bytes_concat", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
-pub fn ir_bytes_zeros(n_id: int) -> Inst:
-    Inst{op: "bytes_zeros", type_text: "list", value: n_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_slot_get(key_id: int) -> Inst:
-    Inst{op: "slot_get", type_text: "text", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_slot_set(key_id: int, val_id: int) -> Inst:
-    Inst{op: "slot_set", type_text: "i64", value: key_id, lhs: val_id, rhs: 0, name: "", args: []}
-pub fn ir_list_lit(item_ids: [int], elem_type: Text) -> Inst:
-    Inst{op: "list_lit", type_text: "list:{elem_type}", value: 0, lhs: 0, rhs: 0, name: "", args: item_ids}
-pub fn ir_list_at(list_id: int, index_id: int) -> Inst:
-    Inst{op: "list_at", type_text: "i64", value: list_id, lhs: index_id, rhs: 0, name: "", args: []}
-pub fn ir_list_len(list_id: int) -> Inst:
-    Inst{op: "list_len", type_text: "i64", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_list_push(list_id: int, val_id: int) -> Inst:
-    Inst{op: "list_push", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
-pub fn ir_list_push_mut(list_id: int, val_id: int) -> Inst:
-    Inst{op: "list_push_mut", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
-pub fn ir_vec_add(a_id: int, b_id: int) -> Inst:
-    Inst{op: "vec_add", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
-pub fn ir_vec_addi(a_id: int, b_id: int) -> Inst:
-    Inst{op: "vec_addi", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
-pub fn ir_vec_madd(dst_id: int, src_id: int, k_id: int) -> Inst:
-    Inst{op: "vec_madd", type_text: "list", value: dst_id, lhs: src_id, rhs: k_id, name: "", args: []}
-pub fn ir_par_madd(dst_id: int, src_id: int, k_id: int) -> Inst:
-    Inst{op: "par_madd", type_text: "list", value: dst_id, lhs: src_id, rhs: k_id, name: "", args: []}
-pub fn ir_vec_sub(a_id: int, b_id: int) -> Inst:
-    Inst{op: "vec_sub", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
-pub fn ir_vec_mul(a_id: int, b_id: int) -> Inst:
-    Inst{op: "vec_mul", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
-pub fn ir_vec_dot(a_id: int, b_id: int) -> Inst:
-    Inst{op: "vec_dot", type_text: "i64", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
-pub fn ir_time_now_ms() -> Inst:
-    Inst{op: "time_now_ms", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_monotonic_ms() -> Inst:
-    Inst{op: "monotonic_ms", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_sleep_ms(ms_id: int) -> Inst:
-    Inst{op: "sleep_ms", type_text: "void", value: ms_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_map_lit(pair_ids: [int], val_type: Text) -> Inst:
-    Inst{op: "map_lit", type_text: "map:{val_type}", value: 0, lhs: 0, rhs: 0, name: "", args: pair_ids}
-pub fn ir_map_get(map_id: int, key_id: int, value_type: Text) -> Inst:
-    Inst{op: "map_get", type_text: value_type, value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
-pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
-    Inst{op: "map_has", type_text: "i64", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
-pub fn ir_map_set_val(map_id: int, key_id: int, val_id: int, map_type: Text) -> Inst:
-    Inst{op: "map_set_val", type_text: map_type, value: map_id, lhs: key_id, rhs: val_id, name: "", args: []}
-pub fn ir_map_remove(map_id: int, key_id: int) -> Inst:
-    Inst{op: "map_remove", type_text: "map", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
-pub fn ir_list_set_val(list_id: int, idx_id: int, val_id: int, list_type: Text) -> Inst:
-    Inst{op: "list_set_val", type_text: list_type, value: list_id, lhs: idx_id, rhs: val_id, name: "", args: []}
-pub fn ir_slot_has(key_id: int) -> Inst:
-    Inst{op: "slot_has", type_text: "i64", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_slot_get_int(key_id: int) -> Inst:
-    Inst{op: "slot_get_int", type_text: "i64", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_map_len(map_id: int) -> Inst:
-    Inst{op: "map_len", type_text: "i64", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_map_keys(map_id: int) -> Inst:
-    Inst{op: "map_keys", type_text: "list:text", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_map_values(map_id: int) -> Inst:
-    Inst{op: "map_values", type_text: "list", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_map_get_or(map_id: int, key_id: int, dflt_id: int, value_type: Text) -> Inst:
-    Inst{op: "map_get_or", type_text: value_type, value: map_id, lhs: key_id, rhs: dflt_id, name: "", args: []}
-pub fn ir_f64_to_text(value_id: int) -> Inst:
-    Inst{op: "f64_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_struct_cons(struct_name: Text, n_fields: int, value_ids: [int]) -> Inst:
-    Inst{op: "struct_cons", type_text: "struct:{struct_name}", value: n_fields, lhs: 0, rhs: 0, name: struct_name, args: value_ids}
-pub fn ir_field_load(struct_id: int, field_index: int, field_type: Text) -> Inst:
-    Inst{op: "field_load", type_text: field_type, value: struct_id, lhs: field_index, rhs: 0, name: "", args: []}
-pub fn ir_print_text(value_id: int) -> Inst:
-    Inst{op: "print_text", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_alloca(stored_type: Text) -> Inst:
-    Inst{op: "alloca", type_text: stored_type, value: 0, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_load(ptr_id: int, loaded_type: Text) -> Inst:
-    Inst{op: "load", type_text: loaded_type, value: ptr_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_store(ptr_id: int, value_id: int) -> Inst:
-    Inst{op: "store", type_text: "void", value: ptr_id, lhs: value_id, rhs: 0, name: "", args: []}
-pub fn ir_label(label_name: Text) -> Inst:
-    Inst{op: "label", type_text: "void", value: 0, lhs: 0, rhs: 0, name: label_name, args: []}
-pub fn ir_br(target_label: Text) -> Inst:
-    Inst{op: "br", type_text: "void", value: 0, lhs: 0, rhs: 0, name: target_label, args: []}
-pub fn ir_br_if(cond_id: int, then_label: Text, else_label: Text) -> Inst:
-    Inst{op: "br_if", type_text: "void", value: cond_id, lhs: 0, rhs: 0, name: "{then_label}|{else_label}", args: []}
-pub fn ir_phi(then_val_id: int, then_label: Text, else_val_id: int, else_label: Text, phi_type: Text) -> Inst:
-    Inst{op: "phi", type_text: phi_type, value: 0, lhs: then_val_id, rhs: else_val_id, name: "{then_label}|{else_label}", args: []}
-pub fn ir_param(param_index: int, param_type: Text) -> Inst:
-    Inst{op: "param", type_text: param_type, value: param_index, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_fn_new(name: Text, return_type: Text) -> IRFn:
-    IRFn{name: name, return_type: return_type, params: [], instructions: []}
-pub fn ir_fn_add_param(fn_value: IRFn, param_name: Text, param_type: Text) -> IRFn:
-    new_param = Param{name: param_name, type_text: param_type}
-    new_params = push(fn_value.params, new_param)
-    IRFn{name: fn_value.name, return_type: fn_value.return_type, params: new_params, instructions: fn_value.instructions}
-pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
-    mut insts = fn_value.instructions
-    new_id = len(insts)
-    insts = push_mut(insts, inst)
-    new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
-    PushResult{function: new_fn, id: new_id}
-pub fn ir_fn_set_inst(fn_value: IRFn, idx: int, inst: Inst) -> IRFn:
-    mut insts = fn_value.instructions
-    insts = set(insts, idx, inst)
-    IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
-pub fn ir_module_new() -> IRModule:
-    IRModule{functions: []}
-pub fn ir_module_add_fn(module: IRModule, fn_value: IRFn) -> IRModule:
-    new_functions = push(module.functions, fn_value)
-    IRModule{functions: new_functions}
-pub fn ir_dump_value_ref(value_id: int) -> Text:
-    if value_id < 0:
-        "void"
-    else:
-        "v{value_id}"
-pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
-    prefix = "{ir_dump_value_ref(my_id)} = "
-    op = inst.op
-    if op == "iconst":
-        "{prefix}iconst.{inst.type_text} {inst.value}"
-    else:
-        if op == "return":
-            "return {ir_dump_value_ref(inst.value)}"
-        else:
-            lhs_ref = ir_dump_value_ref(inst.lhs)
-            rhs_ref = ir_dump_value_ref(inst.rhs)
-            "{prefix}{op}.{inst.type_text} {lhs_ref}, {rhs_ref}"
-pub fn ir_perform_int(handler_name: Text, arg_id: int) -> Inst:
-    Inst{op: "perform_int", type_text: "i64", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
-pub fn ir_perform_text(handler_name: Text, arg_id: int) -> Inst:
-    Inst{op: "perform_text", type_text: "text", value: 0, lhs: arg_id, rhs: 0, name: handler_name, args: []}
-pub fn ir_fn_ref(fn_name: Text) -> Inst:
-    Inst{op: "fn_ref", type_text: "ptr", value: 0, lhs: 0, rhs: 0, name: fn_name, args: []}
-pub fn ir_indirect_call(callee_id: int, arg_ids: [int], ret_type: Text) -> Inst:
-    Inst{op: "indirect_call", type_text: ret_type, value: callee_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
-pub fn ir_make_closure(fn_name: Text, cap_ids: [int], is_lambda: int) -> Inst:
-    Inst{op: "make_closure", type_text: "ptr", value: 0, lhs: is_lambda, rhs: 0, name: fn_name, args: cap_ids}
-pub fn ir_closure_call(closure_id: int, arg_ids: [int], ret_type: Text) -> Inst:
-    Inst{op: "closure_call", type_text: ret_type, value: closure_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
-pub fn ir_int_to_ptr(src_id: int, type_text: Text) -> Inst:
-    Inst{op: "int_to_ptr", type_text: type_text, value: src_id, lhs: 0, rhs: 0, name: "", args: []}
-pub fn ir_dump_fn(fn_value: IRFn) -> Text:
-    mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
-    total = len(fn_value.instructions)
-    loop idx in 0..<total:
-        inst = at(fn_value.instructions, idx)
-        line = ir_dump_instruction(inst, idx)
-        text = "{text}    {line}\n"
-    text
-pub fn ir_dump_module(module: IRModule) -> Text:
-    mut text = "; orion_ir module dump\n"
-    total = len(module.functions)
-    loop idx in 0..<total:
-        fn_value = at(module.functions, idx)
-        text = "{text}{ir_dump_fn(fn_value)}\n"
-    text
-fn slx_is_space(byte: int) -> bool:
+# Smoke for orion_lex
+
+# orion_self_lex — Orion lexer written in Orion.
+#
+# Tokenizes `.or` source text into a list of token Maps with the shape:
+#     {"kind": text, "value": text, "line": int, "col": int}
+#
+# This is step 3 of the self-hosting plan (see [[orion-pure-orion-goal]]).
+# Goal: feature-complete enough that the Rust lexer's output and this
+# lexer's output agree on real Orion source files. Once that's true,
+# step 4 (parser in Orion) can consume these tokens directly.
+#
+# Token kinds emitted:
+#   ident      — names and keywords (keyword? lookup later)
+#   int        — integer literal
+#   float      — float literal
+#   str        — string literal (escapes resolved; \{ and \} kept raw)
+#   symbol     — operator or punctuation; `value` is the operator text
+#   newline    — line break (one per consecutive newline run)
+#   eof        — end-of-input marker
+#
+# `value` is always a Text — int and float tokens encode their numeric
+# value as text to keep the token type uniform. Step 4 (parser) can
+# str_to_int / str_to_float them.
+
+# --- byte-class predicates ---
+
+define slx_is_space(byte: int) -> truth:
     byte == 32 or byte == 9 or byte == 13
-fn slx_is_newline(byte: int) -> bool:
+
+define slx_is_newline(byte: int) -> truth:
     byte == 10
-fn slx_is_digit(byte: int) -> bool:
+
+define slx_is_digit(byte: int) -> truth:
     byte >= 48 and byte <= 57
-fn slx_is_lower(byte: int) -> bool:
+
+define slx_is_lower(byte: int) -> truth:
     byte >= 97 and byte <= 122
-fn slx_is_upper(byte: int) -> bool:
+
+define slx_is_upper(byte: int) -> truth:
     byte >= 65 and byte <= 90
-fn slx_is_ident_start(byte: int) -> bool:
+
+define slx_is_ident_start(byte: int) -> truth:
     slx_is_lower(byte) or slx_is_upper(byte) or byte == 95
-fn slx_is_ident_continue(byte: int) -> bool:
+
+define slx_is_ident_continue(byte: int) -> truth:
     slx_is_ident_start(byte) or slx_is_digit(byte)
-fn slx_make_token(kind: Text, value: Text, line: int, col: int) -> Map:
+
+# --- token construction ---
+
+define slx_make_token(kind: text, value: text, line: int, col: int) -> table:
+    # No return type — Orion typeck treats Map as Unknown when the
+    # annotation is omitted, which is what we want for token records.
     {"kind": kind, "value": value, "line": line, "col": col}
-fn slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
-    mut cursor = start
+
+# --- scanners ---
+# Each scanner returns a Map: {"token": <token Map>, "next": <next byte index>}.
+
+define slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+    edit cursor = start
     loop:
         if cursor >= byte_count:
             break
@@ -288,24 +65,86 @@ fn slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col: int
             break
         cursor += 1
     text_value = bytes_to_text(bytes_slice(bytes, start, cursor))
+    # Every word lexes as `ident`. The PARSER decides what is a keyword, by
+    # comparing the value in the position where that keyword is meaningful,
+    # which is what lets `type`, `loop` or `data` also be ordinary variable
+    # names elsewhere.
+    #
+    # There used to be a `slx_keyword_table` / `slx_keyword_kind` pair here,
+    # kept "in case the parser wants to skip its string comparisons". Nothing
+    # ever called it, so it drifted into a second, WRONG answer to "what is a
+    # keyword": it listed `data`/`enum`/`for` (retired), 15 words with no
+    # implementation (trait, impl, system, with, spawn, destroy, scope, job,
+    # raw, frame, before, after, as, none, self) and was missing 8 real ones
+    # (type, const, effect, handle, perform, defer, move, let). A dead list
+    # that looks authoritative is worse than no list: deleted. The parser is
+    # the single source of truth, and `tools/negative_test.sh` is where a
+    # reserved-but-unimplemented word gets its behaviour pinned.
     {"token": slx_make_token("ident", text_value, line, col), "next": cursor}
-fn slx_keyword_table() -> [Text]:
-    ["fn", "kw_fn", "data", "kw_data", "enum", "kw_enum", "trait", "kw_trait", "impl", "kw_impl", "system", "kw_system", "use", "kw_use", "pub", "kw_pub", "mut", "kw_mut", "if", "kw_if", "else", "kw_else", "for", "kw_for", "in", "kw_in", "with", "kw_with", "where", "kw_where", "loop", "kw_loop", "break", "kw_break", "continue", "kw_continue", "match", "kw_match", "true", "kw_true", "false", "kw_false", "and", "kw_and", "or", "kw_or", "not", "kw_not", "extern", "kw_extern", "comptime", "kw_comptime", "deterministic", "kw_deterministic", "parallel", "kw_parallel", "spawn", "kw_spawn", "destroy", "kw_destroy", "require", "kw_require", "ensure", "kw_ensure", "scope", "kw_scope", "job", "kw_job", "raw", "kw_raw", "frame", "kw_frame", "before", "kw_before", "after", "kw_after", "as", "kw_as", "return", "kw_return", "none", "kw_none", "self", "kw_self"]
-fn slx_keyword_kind(word: Text) -> Text:
-    table = slx_keyword_table()
-    table_length = len(table)
-    mut found = "ident"
-    mut index = 0
+
+define slx_hex_digit(c: int) -> int:
+    if c >= 48 and c <= 57:
+        c - 48
+    else:
+        if c >= 97 and c <= 102:
+            c - 87
+        else:
+            if c >= 65 and c <= 70:
+                c - 55
+            else:
+                0 - 1
+
+# `0x1F`, `0b1010`, `0o17` — a leading 0 plus a base marker. Returns the token
+# and the new cursor, or next == start when this is not a based literal.
+#
+# These did not lex at all: `0x81` came out as the number 0 followed by an
+# identifier `x81`, so a mask like `& 0xFF` was a syntax error two tokens later.
+# Real in-tree code uses them (atlas_ws builds WebSocket frame headers), and the
+# editor grammar highlighted them, which made the gap look like a bug in the
+# file rather than in the lexer.
+define slx_scan_based(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+    if start + 2 >= byte_count:
+        return {"token": slx_make_token("int", "0", line, col), "next": start}
+    if byte_at(bytes, start) != 48:
+        return {"token": slx_make_token("int", "0", line, col), "next": start}
+    marker = byte_at(bytes, start + 1)
+    edit base = 0
+    if marker == 120 or marker == 88:
+        base = 16
+    if marker == 98 or marker == 66:
+        base = 2
+    if marker == 111 or marker == 79:
+        base = 8
+    if base == 0:
+        return {"token": slx_make_token("int", "0", line, col), "next": start}
+    edit cursor = start + 2
+    edit value = 0
+    edit digits = 0
     loop:
-        if index >= table_length:
+        if cursor >= byte_count:
             break
-        if at(table, index) == word:
-            found = at(table, index + 1)
-        index += 2
-    found
-fn slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
-    mut cursor = start
-    mut saw_dot = false
+        c = byte_at(bytes, cursor)
+        if c == 95:
+            cursor = cursor + 1
+            continue
+        d = slx_hex_digit(c)
+        if d < 0 or d >= base:
+            break
+        value = value * base + d
+        digits = digits + 1
+        cursor = cursor + 1
+    if digits == 0:
+        return {"token": slx_make_token("int", "0", line, col), "next": start}
+    # Emitted as a decimal int token: the parser and every later stage only ever
+    # see the VALUE, so no base survives past here.
+    {"token": slx_make_token("int", "{value}", line, col), "next": cursor}
+
+define slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+    based = slx_scan_based(bytes, start, byte_count, line, col)
+    if get_int(based, "next") > start:
+        return based
+    edit cursor = start
+    edit saw_dot = false
     loop:
         if cursor >= byte_count:
             break
@@ -313,6 +152,8 @@ fn slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col: in
         if slx_is_digit(current):
             cursor += 1
         else:
+            # A single `.` followed by a digit is a decimal point — anything
+            # else terminates the number.
             is_dot_then_digit = current == 46 and (not saw_dot) and cursor + 1 < byte_count and slx_is_digit(byte_at(bytes, cursor + 1))
             if is_dot_then_digit:
                 saw_dot = true
@@ -322,8 +163,11 @@ fn slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col: in
     text_value = bytes_to_text(bytes_slice(bytes, start, cursor))
     kind = if saw_dot then "float" else "int"
     {"token": slx_make_token(kind, text_value, line, col), "next": cursor}
-fn slx_resolve_escape(escape_char: int) -> int:
-    mut result = 0 - 1
+
+# Single-byte escape lookup — returns the resolved byte, or -1 to mean
+# "preserve the backslash and the next byte unchanged" (used for \{ and \}).
+define slx_resolve_escape(escape_char: int) -> int:
+    edit result = 0 - 1
     if escape_char == 34: result = 34
     if escape_char == 92: result = 92
     if escape_char == 110: result = 10
@@ -332,28 +176,36 @@ fn slx_resolve_escape(escape_char: int) -> int:
     if escape_char == 48: result = 0
     if escape_char == 39: result = 39
     result
-fn slx_int_to_text(n: int) -> Text:
+
+# Decimal text for a small non-negative int (byte values 0-255). Used to
+# emit a char literal as an ordinary int token — the parser then treats
+# `'+'` exactly like `43`, so no new AST node or type is needed.
+define slx_int_to_text(n: int) -> text:
     if n == 0:
         return "0"
-    mut digits = bytes_zeros(0)
-    mut v = n
+    edit digits = bytes_zeros(0)
+    edit v = n
     loop:
         if v <= 0:
             break
-        digits = push(digits, 48 + (v % 10))
-        v = v / 10
-    mut out = bytes_zeros(0)
-    mut i = len(digits) - 1
+        digits = append(digits, 48 + (v % 10))
+        v = v // 10
+    edit out = bytes_zeros(0)
+    edit i = len(digits) - 1
     loop:
         if i < 0:
             break
-        out = push(out, at(digits, i))
+        out = append(out, at(digits, i))
         i = i - 1
     bytes_to_text(out)
-fn slx_scan_char(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
-    mut cursor = start + 1
-    mut value = 0
-    mut ok = false
+
+# A character literal `'c'` (or an escape like `'\n'`) lexes to an int token
+# holding the byte value. Readable notation for a byte — `match b: '+' -> …`
+# instead of the magic number `43`.
+define slx_scan_char(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+    edit cursor = start + 1
+    edit value = 0
+    edit ok = false
     if cursor < byte_count:
         c = byte_at(bytes, cursor)
         if c == 92 and cursor + 1 < byte_count:
@@ -371,12 +223,21 @@ fn slx_scan_char(bytes: [int], start: int, byte_count: int, line: int, col: int)
         cursor += 1
         {"token": slx_make_token("int", slx_int_to_text(value), line, col), "next": cursor}
     else:
+        # Malformed (empty '' or unterminated). Advance one byte so the main
+        # loop can't hang; emit nothing usable — a later parse error follows.
         {"token": slx_make_token("newline", "\n", line, col), "next": start + 1}
-fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: int) -> Map:
-    mut cursor = start + 1
-    mut buffer = bytes_zeros(0)
-    mut closed = false
-    mut brace_depth = 0
+
+define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+    # Consume the opening quote, walk until the closing one. Returns
+    # next=start when the string is unterminated — caller turns that into
+    # a lex error.
+    edit cursor = start + 1
+    edit buffer = bytes_zeros(0)
+    edit closed = false
+    # Depth of unescaped `{…}` interpolation braces. A `"` inside braces
+    # belongs to an interpolated expression (e.g. a map key `m["k"]`), not
+    # the string terminator — so it doesn't end the literal.
+    edit brace_depth = 0
     loop:
         if cursor >= byte_count:
             break
@@ -387,35 +248,52 @@ fn slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: in
             cursor += 1
             break
         if current == 10:
+            # Unterminated — bail out of the loop, leave `closed = false`.
             break
         if current == 92 and cursor + 1 < byte_count:
             next_byte = byte_at(bytes, cursor + 1)
             resolved = slx_resolve_escape(next_byte)
             if resolved >= 0:
-                buffer = push(buffer, resolved)
+                buffer = append(buffer, resolved)
                 cursor += 2
             else:
-                buffer = push(buffer, 92)
-                buffer = push(buffer, next_byte)
+                # Brace escapes are preserved literally — `build_str` in the
+                # Rust pipeline depends on `\{` / `\}` surviving lex.
+                buffer = append(buffer, 92)
+                buffer = append(buffer, next_byte)
                 cursor += 2
         else:
+            # Track interpolation depth on unescaped braces (escaped `\{` is
+            # handled above and never reaches here).
             if current == 123:
                 brace_depth = brace_depth + 1
             if current == 125 and brace_depth > 0:
                 brace_depth = brace_depth - 1
-            buffer = push(buffer, current)
+            buffer = append(buffer, current)
             cursor += 1
     text_value = bytes_to_text(buffer)
-    {"token": slx_make_token("str", text_value, line, col), "next": cursor, "closed": closed}
-fn slx_scan_op(bytes: [int], start: int, byte_count: int) -> Text:
+    # `holes` = interpolation braces still open at the end of the literal. The
+    # scanner already counts them; carrying the count out is what lets the
+    # parser reject `"{{"` with a message. (Before, the unterminated hole was
+    # handed to the expression parser as a bare `{`, which the map-literal loop
+    # then spun on forever.)
+    str_token = set(slx_make_token("str", text_value, line, col), "holes", brace_depth)
+    {"token": str_token, "next": cursor, "closed": closed}
+
+# --- multi-char symbol detection ---
+
+# Returns the operator text + how many bytes to consume. Returns "" for
+# unrecognized characters so the main loop can produce a useful error.
+define slx_scan_op(bytes: [int], start: int, byte_count: int) -> text:
     first = byte_at(bytes, start)
-    mut second = 0
+    edit second = 0
     if start + 1 < byte_count:
         second = byte_at(bytes, start + 1)
-    mut third = 0
+    edit third = 0
     if start + 2 < byte_count:
         third = byte_at(bytes, start + 2)
-    mut op = ""
+    # Three-char tokens first so `..=` doesn't get scanned as `..` then `=`.
+    edit op = ""
     if first == 46 and second == 46 and third == 60:
         op = "..<"
     if first == 46 and second == 46 and third == 61:
@@ -423,8 +301,12 @@ fn slx_scan_op(bytes: [int], start: int, byte_count: int) -> Text:
     if op == "":
         op = slx_scan_op_short(first, second)
     op
-fn slx_scan_op_short(first: int, second: int) -> Text:
-    mut result = ""
+
+define slx_scan_op_short(first: int, second: int) -> text:
+    # Two-char tokens — flat sequential checks, then fall through to single.
+    # (Deep nested if/else-as-expression chains trigger the native compiler's
+    # nesting bug — see [[orion_nesting_bug]].)
+    edit result = ""
     if first == 61 and second == 61:
         result = "=="
     if first == 33 and second == 61:
@@ -441,13 +323,26 @@ fn slx_scan_op_short(first: int, second: int) -> Text:
         result = "-="
     if first == 42 and second == 61:
         result = "*="
+    if first == 47 and second == 47:
+        result = "//"
     if first == 47 and second == 61:
         result = "/="
+    # Bit shifts. `syntax.md` listed `<<` and `>>` among the operators, and the
+    # other four (`&` `|` `^` `~`) really did work — these two never lexed at
+    # all, so `plen >> 8` came out as `>` `>` and died as "not valid here". Real
+    # code hit it: atlas_ws builds WebSocket frame headers with shifts.
+    if first == 60 and second == 60:
+        result = "<<"
+    if first == 62 and second == 62:
+        result = ">>"
     if result == "":
         result = slx_scan_op_single(first)
     result
-fn slx_scan_op_single(first: int) -> Text:
-    mut result_text = ""
+
+define slx_scan_op_single(first: int) -> text:
+    # Single-char punctuation/operators. Direct table lookup with literal
+    # results — avoids native compiler issues with push-to-bytes-zeros.
+    edit result_text = ""
     if first == 43:
         result_text = "+"
     if first == 45:
@@ -496,9 +391,17 @@ fn slx_scan_op_single(first: int) -> Text:
         result_text = "^"
     if first == 37:
         result_text = "%"
+    # `~` (126) was missing from this table entirely, so it lexed as nothing and
+    # `~x` came through as a bare `x`: the operator vanished before the parser
+    # ever saw it, and `~12` answered 12.
+    if first == 126:
+        result_text = "~"
     result_text
-fn slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
-    mut cursor = start
+
+# --- comment skip ---
+
+define slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
+    edit cursor = start
     loop:
         if cursor >= byte_count:
             break
@@ -506,24 +409,42 @@ fn slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
             break
         cursor += 1
     cursor
-fn slx_push_token(tokens_in: [Map], token: Map) -> [Map]:
+
+# --- main loop ---
+
+# Push a token, but suppress a duplicate `newline` if the previous token
+# was already one — matches the Rust lexer's behaviour ("never two newlines
+# in a row, never first"). No type annotations on the params so Orion
+# treats them as Unknown (table isn't a writeable type name).
+# Mutate the token slot in place — O(1) amortised push instead of
+# the old `append(list, val)` which cloned the entire token list per
+# call (~quadratic for 25k tokens). We track `last_kind` in a
+# separate scalar slot so we never have to read the (now huge)
+# token list back just to peek at its last element.
+define slx_push_token(tokens_in: [table], token: table) -> [table]:
     last_kind = slot_get("slx:last_kind")
     is_newline = get(token, "kind") == "newline"
     last_was_newline = last_kind == "newline" or last_kind == ""
     suppress = is_newline and last_was_newline
-    mut tokens = tokens_in
+    edit tokens = tokens_in
     if not suppress:
-        tokens = push_mut(tokens, token)
+        # Explicit in-place push (__push_inplace = the compiler-internal
+        # spelling; the promotion pass cannot see across this function
+        # boundary). Audited: every caller rebinds
+        # `tokens = slx_push_token(tokens, t)` so the old list has no
+        # live alias.
+        tokens = __push_inplace(tokens, token)
         slot_set("slx:last_kind", get(token, "kind"))
     tokens
-pub fn self_lex(source: Text) -> [Map]:
+
+public define self_lex(source: text) -> [table]:
     bytes = bytes_from_text(source)
     byte_count = bytes_length(bytes)
     slot_set("slx:last_kind", "")
-    mut tokens = []
-    mut cursor = 0
-    mut line = 1
-    mut line_start = 0
+    edit tokens = []
+    edit cursor = 0
+    edit line = 1
+    edit line_start = 0
     loop:
         if cursor >= byte_count:
             break
@@ -572,929 +493,14 @@ pub fn self_lex(source: Text) -> [Map]:
                 cursor += op_length
     tokens = slx_push_token(tokens, slx_make_token("newline", "\n", line, byte_count - line_start))
     eof_token = slx_make_token("eof", "", line, byte_count - line_start)
-    tokens = push(tokens, eof_token)
+    tokens = append(tokens, eof_token)
     tokens
-fn psr_arg_to_node(text: Text) -> Map:
-    bs = bytes_from_text(text)
-    n = bytes_length(bs)
-    mut all_digits = n > 0
-    mut dot_at = 0 - 1
-    mut paren_at = 0 - 1
-    loop ci in 0..<n:
-        b = byte_at(bs, ci)
-        if b < 48 or b > 57:
-            all_digits = false
-        if b == 46 and dot_at == (0 - 1):
-            dot_at = ci
-        if b == 40 and paren_at == (0 - 1):
-            paren_at = ci
-    has_call = paren_at > 0
-    has_field = dot_at > 0 and not all_digits and not has_call
-    if all_digits:
-        {"kind": "Int", "value": text}
-    else:
-        if has_call:
-            callee = psr_trim_ws(bytes_to_text(bytes_slice(bs, 0, paren_at)))
-            inner = bytes_to_text(bytes_slice(bs, paren_at + 1, n - 1))
-            inner_bs = bytes_from_text(inner)
-            inner_len = bytes_length(inner_bs)
-            mut inner_args = []
-            mut a_start = 0
-            mut depth = 0
-            loop ai in 0..<inner_len:
-                bi = byte_at(inner_bs, ai)
-                if bi == 40:
-                    depth = depth + 1
-                if bi == 41:
-                    depth = depth - 1
-                if bi == 44 and depth == 0:
-                    chunk = psr_trim_ws(bytes_to_text(bytes_slice(inner_bs, a_start, ai)))
-                    inner_args = push(inner_args, psr_arg_to_node(chunk))
-                    a_start = ai + 1
-            if inner_len > 0:
-                tail = psr_trim_ws(bytes_to_text(bytes_slice(inner_bs, a_start, inner_len)))
-                inner_args = push(inner_args, psr_arg_to_node(tail))
-            {"kind": "Call", "callee": callee, "args": inner_args}
-        else:
-            if has_field:
-                obj_name = psr_trim_ws(bytes_to_text(bytes_slice(bs, 0, dot_at)))
-                field_name = psr_trim_ws(bytes_to_text(bytes_slice(bs, dot_at + 1, n)))
-                {"kind": "Field", "object": {"kind": "Ident", "name": obj_name}, "field": field_name}
-            else:
-                {"kind": "Ident", "name": text}
-fn psr_trim_ws(text: Text) -> Text:
-    bs = bytes_from_text(text)
-    n = bytes_length(bs)
-    mut start = 0
-    loop:
-        if start >= n:
-            break
-        b = byte_at(bs, start)
-        is_ws = b == 32 or b == 9 or b == 10 or b == 13
-        if not is_ws:
-            break
-        start = start + 1
-    mut stop = n
-    loop:
-        if stop <= start:
-            break
-        b = byte_at(bs, stop - 1)
-        is_ws = b == 32 or b == 9 or b == 10 or b == 13
-        if not is_ws:
-            break
-        stop = stop - 1
-    bytes_to_text(bytes_slice(bs, start, stop))
-fn psr_peek_kind(tokens: [Map], position: int) -> Text:
-    if position >= len(tokens):
-        "eof"
-    else:
-        get(at(tokens, position), "kind")
-fn psr_peek_value(tokens: [Map], position: int) -> Text:
-    if position >= len(tokens):
-        ""
-    else:
-        get(at(tokens, position), "value")
-fn psr_skip_newlines(tokens: [Map], position: int) -> int:
-    mut cursor = position
-    loop:
-        if psr_peek_kind(tokens, cursor) != "newline":
-            break
-        cursor += 1
-    cursor
-fn psr_parse_type(tokens: [Map], position: int) -> Map:
-    is_fn_type = psr_peek_kind(tokens, position) == "ident" and psr_peek_value(tokens, position) == "fn" and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
-    if is_fn_type:
-        return psr_parse_fn_type(tokens, position)
-    if psr_peek_kind(tokens, position) == "symbol" and psr_peek_value(tokens, position) == "(":
-        mut tt_cursor = position + 1
-        tt_elems = slice([{"kind": "Named", "name": "int"}], 0, 0)
-        mut tt_list = tt_elems
-        loop:
-            if psr_peek_kind(tokens, tt_cursor) == "symbol" and psr_peek_value(tokens, tt_cursor) == ")":
-                tt_cursor = tt_cursor + 1
-                break
-            if psr_peek_kind(tokens, tt_cursor) == "eof":
-                break
-            tt_r = psr_parse_type(tokens, tt_cursor)
-            tt_list = push(tt_list, get_map(tt_r, "node"))
-            tt_cursor = get_int(tt_r, "next")
-            if psr_peek_kind(tokens, tt_cursor) == "symbol" and psr_peek_value(tokens, tt_cursor) == ",":
-                tt_cursor = tt_cursor + 1
-        return {"node": {"kind": "TupleType", "elems": tt_list}, "next": tt_cursor}
-    if psr_peek_kind(tokens, position) == "symbol" and psr_peek_value(tokens, position) == "[":
-        inner_result = psr_parse_type(tokens, position + 1)
-        next_position = get_int(inner_result, "next")
-        if psr_peek_kind(tokens, next_position) == "symbol" and psr_peek_value(tokens, next_position) == "]":
-            {"node": {"kind": "List", "elem": get_map(inner_result, "node")}, "next": next_position + 1}
-        else:
-            {"node": {"kind": "Error", "msg": "expected `]` to close list type"}, "next": next_position}
-    else:
-        if psr_peek_kind(tokens, position) == "int":
-            low_text = psr_peek_value(tokens, position)
-            mut cursor = position + 1
-            op_kind = psr_peek_kind(tokens, cursor)
-            op_val = psr_peek_value(tokens, cursor)
-            is_range_op = op_kind == "symbol" and (op_val == "..=" or op_val == "..<")
-            if is_range_op:
-                cursor = cursor + 1
-                if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ".":
-                    cursor = cursor + 1
-                high_text = psr_peek_value(tokens, cursor)
-                cursor = cursor + 1
-                inclusive = op_val == "..="
-                {"node": {"kind": "Range", "low": low_text, "high": high_text, "inclusive": inclusive}, "next": cursor}
-            else:
-                {"node": {"kind": "Named", "name": low_text}, "next": position + 1}
-        else:
-            name_text = psr_peek_value(tokens, position)
-            if psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "<":
-                mut ga_cursor = position + 2
-                ga_args = slice([{"kind": "Named", "name": "int"}], 0, 0)
-                mut ga_list = ga_args
-                loop:
-                    if psr_peek_kind(tokens, ga_cursor) == "symbol" and psr_peek_value(tokens, ga_cursor) == ">":
-                        ga_cursor = ga_cursor + 1
-                        break
-                    if psr_peek_kind(tokens, ga_cursor) == "eof":
-                        break
-                    ga_r = psr_parse_type(tokens, ga_cursor)
-                    ga_list = push(ga_list, get_map(ga_r, "node"))
-                    ga_cursor = get_int(ga_r, "next")
-                    if psr_peek_kind(tokens, ga_cursor) == "symbol" and psr_peek_value(tokens, ga_cursor) == ",":
-                        ga_cursor = ga_cursor + 1
-                {"node": {"kind": "Named", "name": name_text, "args": ga_list}, "next": ga_cursor}
-            else:
-                {"node": {"kind": "Named", "name": name_text}, "next": position + 1}
-fn psr_parse_fn_type(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 2
-    param_types = []
-    mut pt_list = param_types
-    loop:
-        pk = psr_peek_kind(tokens, cursor)
-        pv = psr_peek_value(tokens, cursor)
-        if pk == "symbol" and pv == ")":
-            cursor = cursor + 1
-            break
-        if pk == "eof":
-            break
-        pt_r = psr_parse_type(tokens, cursor)
-        pt_list = push(pt_list, get_map(pt_r, "node"))
-        cursor = get_int(pt_r, "next")
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-            cursor = cursor + 1
-    mut ret_node = {"kind": "Named", "name": "Unit"}
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
-        cursor = cursor + 1
-        rt_r = psr_parse_type(tokens, cursor)
-        ret_node = get_map(rt_r, "node")
-        cursor = get_int(rt_r, "next")
-    {"node": {"kind": "FnType", "params": pt_list, "ret": ret_node}, "next": cursor}
-fn psr_parse_arm_body(tokens: [Map], position: int, arm_col: int) -> Map:
-    if psr_peek_kind(tokens, position) == "newline":
-        block_start = psr_skip_newlines(tokens, position)
-        block_col = psr_peek_col(tokens, block_start)
-        if block_col > arm_col:
-            return psr_parse_body_at(tokens, block_start, block_col)
-    if psr_peek_kind(tokens, position) == "ident" and psr_peek_kind(tokens, position + 1) == "symbol":
-        nxt = psr_peek_value(tokens, position + 1)
-        if nxt == "=" or nxt == "+=" or nxt == "-=" or nxt == "*=" or nxt == "/=":
-            return psr_parse_body_at(tokens, position, psr_peek_col(tokens, position))
-    if psr_peek_kind(tokens, position) == "ident":
-        arm_kw = psr_peek_value(tokens, position)
-        if arm_kw == "break" or arm_kw == "continue" or arm_kw == "return":
-            return psr_parse_body_at(tokens, position, psr_peek_col(tokens, position))
-    psr_parse_expr(tokens, position)
-fn psr_parse_sub_pattern(tokens: [Map], cursor: int, name: Text) -> Map:
-    mut cur = cursor
-    mut enc = name
-    if psr_peek_kind(tokens, cur) == "symbol" and psr_peek_value(tokens, cur) == "(":
-        cur = cur + 1
-        mut sub_names = ""
-        loop:
-            sk = psr_peek_kind(tokens, cur)
-            sv = psr_peek_value(tokens, cur)
-            if sk == "eof":
-                break
-            if sk == "symbol" and sv == ")":
-                cur = cur + 1
-                break
-            if sk == "ident":
-                sep = if len(sub_names) == 0 then "" else ","
-                sub_names = "{sub_names}{sep}{sv}"
-            cur = cur + 1
-        enc = "@{name}:{sub_names}"
-    {"enc": enc, "next": cur}
-fn psr_parse_match_node(tokens: [Map], position: int) -> Map:
-    mut match_cursor = position + 1
-    if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == ":":
-        return psr_parse_cond_match(tokens, match_cursor + 1)
-    scrutinee_result = psr_parse_expr(tokens, match_cursor)
-    match_cursor = get_int(scrutinee_result, "next")
-    if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == ":":
-        match_cursor = match_cursor + 1
-    match_cursor = psr_skip_newlines(tokens, match_cursor)
-    arm_col = psr_peek_col(tokens, match_cursor)
-    arms = []
-    mut arms_list = arms
-    loop:
-        arm_kind = psr_peek_kind(tokens, match_cursor)
-        arm_col_now = psr_peek_col(tokens, match_cursor)
-        if arm_kind == "eof":
-            break
-        if arm_col_now < arm_col:
-            break
-        mut pat_value = psr_peek_value(tokens, match_cursor)
-        mut pat_kind = psr_peek_kind(tokens, match_cursor)
-        is_tuple_pat = pat_kind == "symbol" and pat_value == "("
-        match_cursor = match_cursor + 1
-        pat_bindings = []
-        mut pat_binding_list = pat_bindings
-        if is_tuple_pat:
-            pat_kind = "tuple"
-            pat_value = "tuple"
-            loop:
-                tbk = psr_peek_kind(tokens, match_cursor)
-                tbv = psr_peek_value(tokens, match_cursor)
-                tbpos = match_cursor
-                if tbk == "symbol" and tbv == ")":
-                    match_cursor = match_cursor + 1
-                    break
-                if tbk == "eof":
-                    break
-                if tbk == "ident":
-                    pat_binding_list = push(pat_binding_list, tbv)
-                    match_cursor = match_cursor + 1
-                if tbk == "symbol" and tbv == ",":
-                    match_cursor = match_cursor + 1
-                if match_cursor == tbpos:
-                    match_cursor = match_cursor + 1
-        if (not is_tuple_pat) and psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "(":
-            match_cursor = match_cursor + 1
-            loop:
-                bk = psr_peek_kind(tokens, match_cursor)
-                bv = psr_peek_value(tokens, match_cursor)
-                bpos = match_cursor
-                if bk == "symbol" and bv == ")":
-                    match_cursor = match_cursor + 1
-                    break
-                if bk == "eof":
-                    break
-                if bk == "ident":
-                    sub_r = psr_parse_sub_pattern(tokens, match_cursor + 1, bv)
-                    pat_binding_list = push(pat_binding_list, get(sub_r, "enc"))
-                    match_cursor = get_int(sub_r, "next")
-                if bk == "symbol" and bv == ",":
-                    match_cursor = match_cursor + 1
-                if match_cursor == bpos:
-                    match_cursor = match_cursor + 1
-        alt_positions = slice([0], 0, 0)
-        mut alt_pos_list = alt_positions
-        loop:
-            if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "|":
-                match_cursor = match_cursor + 1
-                alt_pos_list = push(alt_pos_list, match_cursor)
-                match_cursor = match_cursor + 1
-            else:
-                break
-        mut arm_guard = {"kind": "Int", "value": "1"}
-        mut has_guard = false
-        if psr_peek_kind(tokens, match_cursor) == "ident" and psr_peek_value(tokens, match_cursor) == "if":
-            guard_r = psr_parse_expr(tokens, match_cursor + 1)
-            arm_guard = get_map(guard_r, "node")
-            has_guard = true
-            match_cursor = get_int(guard_r, "next")
-        if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "->":
-            match_cursor = match_cursor + 1
-        body_result = psr_parse_arm_body(tokens, match_cursor, arm_col)
-        mut prim_arm = {"pattern": pat_value, "pat_kind": pat_kind, "bindings": pat_binding_list, "body": get_map(body_result, "node")}
-        if has_guard:
-            prim_arm = set(prim_arm, "guard", arm_guard)
-        arms_list = push(arms_list, prim_arm)
-        alt_count = len(alt_pos_list)
-        loop alt_i in 0..<alt_count:
-            alt_pos = at(alt_pos_list, alt_i)
-            mut alt_arm = {"pattern": psr_peek_value(tokens, alt_pos), "pat_kind": psr_peek_kind(tokens, alt_pos), "bindings": slice([""], 0, 0), "body": get_map(body_result, "node")}
-            if has_guard:
-                alt_arm = set(alt_arm, "guard", arm_guard)
-            arms_list = push(arms_list, alt_arm)
-        match_cursor = get_int(body_result, "next")
-        match_cursor = psr_skip_newlines(tokens, match_cursor)
-    {"node": {"kind": "Match", "scrutinee": get_map(scrutinee_result, "node"), "arms": arms_list}, "next": match_cursor}
-fn psr_parse_cond_match(tokens: [Map], position: int) -> Map:
-    mut cursor = psr_skip_newlines(tokens, position)
-    arm_col = psr_peek_col(tokens, cursor)
-    cm_conds = []
-    mut cm_cond_list = cm_conds
-    cm_bodies = []
-    mut cm_body_list = cm_bodies
-    mut cm_else = {"kind": "Int", "value": "0"}
-    loop:
-        k = psr_peek_kind(tokens, cursor)
-        c = psr_peek_col(tokens, cursor)
-        if k == "eof":
-            break
-        if c < arm_col:
-            break
-        is_else = k == "ident" and psr_peek_value(tokens, cursor) == "else"
-        if is_else:
-            cursor = cursor + 1
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-                cursor = cursor + 1
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
-                cursor = cursor + 1
-            eb = psr_parse_arm_body(tokens, cursor, arm_col)
-            cm_else = get_map(eb, "node")
-            cursor = get_int(eb, "next")
-            cursor = psr_skip_newlines(tokens, cursor)
-            break
-        cr = psr_parse_expr(tokens, cursor)
-        cursor = get_int(cr, "next")
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-            cursor = cursor + 1
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "->":
-            cursor = cursor + 1
-        br = psr_parse_arm_body(tokens, cursor, arm_col)
-        cm_cond_list = push(cm_cond_list, get_map(cr, "node"))
-        cm_body_list = push(cm_body_list, get_map(br, "node"))
-        cursor = get_int(br, "next")
-        cursor = psr_skip_newlines(tokens, cursor)
-    cm_n = len(cm_cond_list)
-    mut cm_chain = cm_else
-    loop cm_i in 0..<cm_n:
-        cm_idx = cm_n - 1 - cm_i
-        cm_chain = {"kind": "If", "cond": at(cm_cond_list, cm_idx), "then": at(cm_body_list, cm_idx), "else": cm_chain}
-    {"node": cm_chain, "next": cursor}
-fn psr_parse_for_collect(tokens: [Map], position: int) -> Map:
-    fc_var = psr_peek_value(tokens, position + 1)
-    mut cursor = position + 2
-    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "in":
-        cursor = cursor + 1
-    fc_iter_r = psr_parse_expr(tokens, cursor)
-    fc_iter = get_map(fc_iter_r, "node")
-    cursor = get_int(fc_iter_r, "next")
-    fc_has_where = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "where"
-    mut fc_filter = {"kind": "Int", "value": "1"}
-    if fc_has_where:
-        cursor = cursor + 1
-        fc_where_r = psr_parse_expr(tokens, cursor)
-        fc_filter = get_map(fc_where_r, "node")
-        cursor = get_int(fc_where_r, "next")
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-        cursor = cursor + 1
-    fc_body_r = psr_parse_expr(tokens, cursor)
-    fc_body = get_map(fc_body_r, "node")
-    cursor = get_int(fc_body_r, "next")
-    fc_push = {"kind": "Call", "callee": "push", "args": [{"kind": "Ident", "name": "__fc"}, fc_body]}
-    fc_assign = {"kind": "LetOrAssign", "name": "__fc", "value": fc_push}
-    mut fc_inner = fc_assign
-    if fc_has_where:
-        fc_inner = {"kind": "IfBlock", "cond": fc_filter, "then": {"kind": "Block", "stmts": push([], fc_assign)}, "else": {"kind": "Block", "stmts": []}}
-    fc_forin = {"kind": "ForIn", "var": fc_var, "index_var": "", "iter": fc_iter, "body": {"kind": "Block", "stmts": push([], fc_inner)}}
-    fc_mutlet = {"kind": "MutLet", "name": "__fc", "value": {"kind": "ListLit", "items": []}}
-    fc_ret = {"kind": "ExprStmt", "expr": {"kind": "Ident", "name": "__fc"}}
-    fc_stmts = push(push(push([], fc_mutlet), fc_forin), fc_ret)
-    {"node": {"kind": "Block", "stmts": fc_stmts}, "next": cursor}
-fn psr_parse_par_loop(tokens: [Map], position: int) -> Map:
-    pl_var = psr_peek_value(tokens, position + 2)
-    mut cursor = position + 3
-    if psr_peek_kind(tokens, cursor) == "ident" and psr_peek_value(tokens, cursor) == "in":
-        cursor = cursor + 1
-    pl_low_r = psr_parse_expr(tokens, cursor)
-    pl_low = get_map(pl_low_r, "node")
-    cursor = get_int(pl_low_r, "next")
-    pl_range_op = psr_peek_value(tokens, cursor)
-    pl_is_range = psr_peek_kind(tokens, cursor) == "symbol" and (pl_range_op == "..<" or pl_range_op == "..=")
-    mut pl_high = {"kind": "Int", "value": "0"}
-    if pl_is_range:
-        cursor = cursor + 1
-        pl_high_r = psr_parse_expr(tokens, cursor)
-        pl_high = get_map(pl_high_r, "node")
-        cursor = get_int(pl_high_r, "next")
-    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-        cursor = cursor + 1
-    pl_body_col = psr_peek_col(tokens, cursor)
-    pl_body_r = psr_parse_body_at(tokens, cursor, pl_body_col)
-    mut pl_body = get_map(pl_body_r, "node")
-    cursor = get_int(pl_body_r, "next")
-    pl_zero = {"kind": "ExprStmt", "expr": {"kind": "Int", "value": "0"}}
-    if get(pl_body, "kind") == "Block":
-        pl_body = set(pl_body, "stmts", push(get_list(pl_body, "stmts"), pl_zero))
-    else:
-        pl_body = {"kind": "Block", "stmts": push(push([], {"kind": "ExprStmt", "expr": pl_body}), pl_zero)}
-    pl_name = "__par{position}"
-    pl_lambda = {"kind": "Lambda", "params": ["__pi"], "param_types": [{"kind": "Named", "name": "int"}], "body": pl_body}
-    pl_push = {"kind": "Call", "callee": "push", "args": [{"kind": "Ident", "name": pl_name}, pl_lambda]}
-    pl_assign = {"kind": "LetOrAssign", "name": pl_name, "value": pl_push}
-    pl_inner = {"kind": "Block", "stmts": push([], pl_assign)}
-    mut pl_loop = {"kind": "ForIn", "var": pl_var, "index_var": "", "iter": pl_low, "body": pl_inner}
-    if pl_is_range:
-        pl_loop = {"kind": "ForRange", "var": pl_var, "low": pl_low, "high": pl_high, "inclusive": if pl_range_op == "..=" then 1 else 0, "body": pl_inner}
-    pl_mutlet = {"kind": "MutLet", "name": pl_name, "value": {"kind": "ListLit", "items": []}}
-    pl_run = {"kind": "ExprStmt", "expr": {"kind": "Call", "callee": "par_run", "args": [{"kind": "Ident", "name": pl_name}, {"kind": "Int", "value": "0"}]}}
-    pl_stmts = push(push(push([], pl_mutlet), pl_loop), pl_run)
-    {"node": {"kind": "Block", "stmts": pl_stmts}, "next": cursor}
-fn psr_parse_primary(tokens: [Map], position: int) -> Map:
-    kind = psr_peek_kind(tokens, position)
-    value = psr_peek_value(tokens, position)
-    is_not = kind == "ident" and value == "not"
-    is_neg = kind == "symbol" and value == "-"
-    mut not_node = {"node": {"kind": "Error", "msg": ""}, "next": position}
-    if is_not:
-        op_prim = psr_parse_primary(tokens, position + 1)
-        operand_result = psr_parse_postfix(tokens, get_int(op_prim, "next"), get_map(op_prim, "node"))
-        not_node = {"node": {"kind": "Unary", "op": "not", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
-    if is_neg:
-        op_prim = psr_parse_primary(tokens, position + 1)
-        operand_result = psr_parse_postfix(tokens, get_int(op_prim, "next"), get_map(op_prim, "node"))
-        not_node = {"node": {"kind": "Unary", "op": "neg", "operand": get_map(operand_result, "node")}, "next": get_int(operand_result, "next")}
-    is_ident = kind == "ident"
-    is_int = kind == "int"
-    is_float = kind == "float"
-    is_str = kind == "str"
-    is_lbracket = kind == "symbol" and value == "["
-    is_lbrace = kind == "symbol" and value == "\{"
-    is_lparen = kind == "symbol" and value == "("
-    is_if = is_ident and value == "if"
-    is_match_expr = is_ident and value == "match"
-    is_for = is_ident and value == "loop"
-    is_fn_lambda = is_ident and value == "fn" and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
-    is_perform = is_ident and value == "perform" and psr_peek_kind(tokens, position + 1) == "ident"
-    is_call = is_ident and not is_if and not is_not and not is_match_expr and not is_for and not is_fn_lambda and not is_perform and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
-    mut result = {"node": {"kind": "Error", "msg": "expected an expression"}, "next": position}
-    if is_perform:
-        pf_effect = psr_peek_value(tokens, position + 1)
-        mut pf_cursor = position + 2
-        if psr_peek_kind(tokens, pf_cursor) == "symbol" and psr_peek_value(tokens, pf_cursor) == ".":
-            pf_cursor = pf_cursor + 1
-        pf_op = psr_peek_value(tokens, pf_cursor)
-        pf_call = psr_parse_call(tokens, pf_cursor, pf_op)
-        pf_args = get_list(get_map(pf_call, "node"), "args")
-        result = {"node": {"kind": "Perform", "effect": pf_effect, "op": pf_op, "args": pf_args}, "next": get_int(pf_call, "next")}
-    if is_if:
-        result = psr_parse_if(tokens, position)
-    if is_for:
-        result = psr_parse_for_collect(tokens, position)
-    if is_match_expr:
-        result = psr_parse_match_node(tokens, position)
-    if is_fn_lambda:
-        mut fl_cursor = position + 2
-        fl_params = []
-        mut fl_list = fl_params
-        fl_ptypes = []
-        mut fl_types = fl_ptypes
-        loop:
-            fk = psr_peek_kind(tokens, fl_cursor)
-            fv = psr_peek_value(tokens, fl_cursor)
-            if fk == "symbol" and fv == ")":
-                fl_cursor = fl_cursor + 1
-                break
-            if fk == "eof":
-                break
-            if fk == "ident":
-                fl_list = push(fl_list, fv)
-                fl_cursor = fl_cursor + 1
-                if psr_peek_kind(tokens, fl_cursor) == "symbol" and psr_peek_value(tokens, fl_cursor) == ":":
-                    fl_cursor = fl_cursor + 1
-                    fl_ty_r = psr_parse_type(tokens, fl_cursor)
-                    fl_types = push(fl_types, get_map(fl_ty_r, "node"))
-                    fl_cursor = get_int(fl_ty_r, "next")
-                else:
-                    fl_types = push(fl_types, {"kind": "Named", "name": "int"})
-            if fk == "symbol" and fv == ",":
-                fl_cursor = fl_cursor + 1
-        if psr_peek_kind(tokens, fl_cursor) == "symbol" and psr_peek_value(tokens, fl_cursor) == ":":
-            fl_cursor = fl_cursor + 1
-        fl_body = psr_parse_expr(tokens, fl_cursor)
-        result = {"node": {"kind": "Lambda", "params": fl_list, "param_types": fl_types, "body": get_map(fl_body, "node")}, "next": get_int(fl_body, "next")}
-    if is_call:
-        result = psr_parse_call(tokens, position, value)
-    is_true = is_ident and value == "true"
-    is_false = is_ident and value == "false"
-    if is_ident and not is_call and not is_if and not is_match_expr and not is_for and not is_fn_lambda and not is_true and not is_false and not is_perform:
-        next_kind = psr_peek_kind(tokens, position + 1)
-        next_value = psr_peek_value(tokens, position + 1)
-        value_bytes = bytes_from_text(value)
-        mut starts_capital = false
-        if len(value_bytes) > 0:
-            first_byte = at(value_bytes, 0)
-            if first_byte >= 65 and first_byte <= 90:
-                starts_capital = true
-        is_struct_cons = next_kind == "symbol" and next_value == "\{" and starts_capital
-        ident_tok = at(tokens, position)
-        ident_line = get_int(ident_tok, "line")
-        ident_col = get_int(ident_tok, "col")
-        if is_struct_cons:
-            result = psr_parse_struct_cons(tokens, position + 2, value)
-        else:
-            result = {"node": {"kind": "Ident", "name": value, "line": ident_line, "col": ident_col}, "next": position + 1}
-    if is_true:
-        result = {"node": {"kind": "Int", "value": "1"}, "next": position + 1}
-    if is_false:
-        result = {"node": {"kind": "Int", "value": "0"}, "next": position + 1}
-    if is_int:
-        result = {"node": {"kind": "Int", "value": value}, "next": position + 1}
-    if is_float:
-        result = {"node": {"kind": "Float", "value": value}, "next": position + 1}
-    if is_str:
-        result = {"node": psr_interpolate_str(value), "next": position + 1}
-    if is_lbracket:
-        result = psr_parse_list_literal(tokens, position)
-    if is_lbrace:
-        result = psr_parse_map_literal(tokens, position)
-    if is_not:
-        result = not_node
-    if is_neg:
-        result = not_node
-    if is_lparen:
-        inner = psr_parse_expr(tokens, position + 1)
-        mut inner_next = get_int(inner, "next")
-        mut tuple_items = push(slice([inner], 0, 0), get_map(inner, "node"))
-        mut saw_comma = false
-        loop:
-            if psr_peek_kind(tokens, inner_next) == "symbol" and psr_peek_value(tokens, inner_next) == ",":
-                saw_comma = true
-                inner_next = inner_next + 1
-                if psr_peek_kind(tokens, inner_next) == "symbol" and psr_peek_value(tokens, inner_next) == ")":
-                    break
-                nxt = psr_parse_expr(tokens, inner_next)
-                tuple_items = push(tuple_items, get_map(nxt, "node"))
-                inner_next = get_int(nxt, "next")
-            else:
-                break
-        if psr_peek_kind(tokens, inner_next) == "symbol" and psr_peek_value(tokens, inner_next) == ")":
-            inner_next = inner_next + 1
-        if saw_comma:
-            result = {"node": {"kind": "Tuple", "items": tuple_items}, "next": inner_next}
-        else:
-            result = {"node": get_map(inner, "node"), "next": inner_next}
-    result
-fn psr_parse_struct_cons(tokens: [Map], position: int, type_name: Text) -> Map:
-    mut cursor = position
-    fields = []
-    mut field_list = fields
-    mut spread_node = {"kind": "Int", "value": "0"}
-    mut has_spread = false
-    loop:
-        kind_here = psr_peek_kind(tokens, cursor)
-        value_here = psr_peek_value(tokens, cursor)
-        is_close = kind_here == "symbol" and value_here == "\}"
-        is_eof = kind_here == "eof"
-        is_nl = kind_here == "newline"
-        is_id = kind_here == "ident"
-        is_spread = kind_here == "symbol" and value_here == "." and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "."
-        if is_close:
-            cursor = cursor + 1
-            break
-        if is_eof:
-            break
-        if is_nl:
-            cursor = cursor + 1
-        if is_spread:
-            sp_result = psr_parse_expr(tokens, cursor + 2)
-            spread_node = get_map(sp_result, "node")
-            has_spread = true
-            cursor = get_int(sp_result, "next")
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-                cursor = cursor + 1
-        if is_id:
-            field_name = value_here
-            cursor = cursor + 1
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-                cursor = cursor + 1
-            value_result = psr_parse_expr(tokens, cursor)
-            field_list = push(field_list, {"name": field_name, "value": get_map(value_result, "node")})
-            cursor = get_int(value_result, "next")
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-                cursor = cursor + 1
-        is_advanced = is_close or is_nl or is_id or is_spread
-        if not is_advanced:
-            cursor = cursor + 1
-    mut sc_node = {"kind": "StructCons", "name": type_name, "fields": field_list}
-    if has_spread:
-        sc_node = set(sc_node, "spread", spread_node)
-    {"node": sc_node, "next": cursor}
-fn psr_interpolate_str(raw_text: Text) -> Map:
-    raw_bytes = bytes_from_text(raw_text)
-    total_len = bytes_length(raw_bytes)
-    mut has_brace = 0
-    loop scan_index in 0..<total_len:
-        b = byte_at(raw_bytes, scan_index)
-        prev_b = if scan_index > 0 then byte_at(raw_bytes, scan_index - 1) else 0
-        if b == 123 and prev_b != 92:
-            has_brace = 1
-    mut plain_value = raw_text
-    if has_brace == 0:
-        mut plain_buf = bytes_zeros(0)
-        mut pi = 0
-        loop:
-            if pi >= total_len:
-                break
-            bp = byte_at(raw_bytes, pi)
-            if bp == 92 and pi + 1 < total_len:
-                nxt = byte_at(raw_bytes, pi + 1)
-                if nxt == 123 or nxt == 125:
-                    plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi + 1, pi + 2))
-                    pi = pi + 2
-                else:
-                    plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi, pi + 1))
-                    pi = pi + 1
-            else:
-                plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi, pi + 1))
-                pi = pi + 1
-        plain_value = bytes_to_text(plain_buf)
-    mut result_node = {"kind": "Str", "value": plain_value}
-    if has_brace == 1:
-        mut current_node = {"kind": "Str", "value": ""}
-        mut node_started = 0
-        mut literal_buf = bytes_zeros(0)
-        mut scan_index2 = 0
-        loop:
-            if scan_index2 >= total_len:
-                break
-            current_byte = byte_at(raw_bytes, scan_index2)
-            nx_b = if current_byte == 92 and scan_index2 + 1 < total_len then byte_at(raw_bytes, scan_index2 + 1) else 0
-            is_escaped_brace = current_byte == 92 and (nx_b == 123 or nx_b == 125)
-            if is_escaped_brace:
-                literal_buf = bytes_concat(literal_buf, bytes_slice(raw_bytes, scan_index2 + 1, scan_index2 + 2))
-                scan_index2 = scan_index2 + 2
-            is_open = current_byte == 123 and not is_escaped_brace
-            if not is_open and not is_escaped_brace:
-                literal_buf = bytes_concat(literal_buf, bytes_slice(raw_bytes, scan_index2, scan_index2 + 1))
-                scan_index2 = scan_index2 + 1
-            if is_open:
-                if bytes_length(literal_buf) > 0:
-                    literal_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
-                    started_before_flush = node_started
-                    if started_before_flush == 0:
-                        current_node = literal_part
-                        node_started = 1
-                    if started_before_flush == 1:
-                        current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": literal_part}
-                literal_buf = bytes_zeros(0)
-                scan_index2 = scan_index2 + 1
-                ident_start = scan_index2
-                loop:
-                    if scan_index2 >= total_len:
-                        break
-                    if byte_at(raw_bytes, scan_index2) == 125:
-                        break
-                    scan_index2 = scan_index2 + 1
-                ident_text = bytes_to_text(bytes_slice(raw_bytes, ident_start, scan_index2))
-                mut raw_ident = {"kind": "Ident", "name": ident_text}
-                if bytes_length(bytes_from_text(ident_text)) > 0:
-                    interp_tokens = self_lex(ident_text)
-                    interp_parsed = psr_parse_expr(interp_tokens, 0)
-                    raw_ident = get_map(interp_parsed, "node")
-                ident_node = {"kind": "Call", "callee": "to_text", "args": [raw_ident]}
-                started_before_ident = node_started
-                if started_before_ident == 0:
-                    current_node = ident_node
-                    node_started = 1
-                if started_before_ident == 1:
-                    current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": ident_node}
-                if scan_index2 < total_len:
-                    scan_index2 = scan_index2 + 1
-        if bytes_length(literal_buf) > 0:
-            tail_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
-            started_before_tail = node_started
-            if started_before_tail == 0:
-                current_node = tail_part
-            if started_before_tail == 1:
-                current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": tail_part}
-        result_node = current_node
-    result_node
-fn psr_parse_map_literal(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
-    mut pairs = []
-    loop:
-        kind_here = psr_peek_kind(tokens, cursor)
-        value_here = psr_peek_value(tokens, cursor)
-        is_close = kind_here == "symbol" and value_here == "\}"
-        is_eof = kind_here == "eof"
-        if is_close:
-            cursor += 1
-            break
-        if is_eof:
-            break
-        if kind_here == "str":
-            key_text = value_here
-            cursor += 1
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":":
-                cursor += 1
-            value_result = psr_parse_expr(tokens, cursor)
-            pairs = push(pairs, {"key": key_text, "value": get_map(value_result, "node")})
-            cursor = get_int(value_result, "next")
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-                cursor += 1
-    {"node": {"kind": "MapLit", "pairs": pairs}, "next": cursor}
-fn psr_parse_list_literal(tokens: [Map], position: int) -> Map:
-    mut cursor = position + 1
-    mut items = []
-    loop:
-        kind_here = psr_peek_kind(tokens, cursor)
-        value_here = psr_peek_value(tokens, cursor)
-        is_close = kind_here == "symbol" and value_here == "]"
-        is_eof = kind_here == "eof"
-        if is_close:
-            cursor += 1
-            break
-        if is_eof:
-            break
-        item_result = psr_parse_expr(tokens, cursor)
-        items = push(items, get_map(item_result, "node"))
-        cursor = get_int(item_result, "next")
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-            cursor += 1
-    {"node": {"kind": "ListLit", "items": items}, "next": cursor}
-fn psr_parse_if(tokens: [Map], position: int) -> Map:
-    cond_result = psr_parse_expr(tokens, position + 1)
-    cursor_after_cond = get_int(cond_result, "next")
-    has_then = psr_peek_kind(tokens, cursor_after_cond) == "ident" and psr_peek_value(tokens, cursor_after_cond) == "then"
-    mut cursor = cursor_after_cond
-    if has_then:
-        cursor = cursor_after_cond + 1
-    then_result = psr_parse_expr(tokens, cursor)
-    cursor = get_int(then_result, "next")
-    peek_cursor = psr_skip_newlines(tokens, cursor)
-    peek_is_else = psr_peek_kind(tokens, peek_cursor) == "ident" and psr_peek_value(tokens, peek_cursor) == "else"
-    peek_is_block_else = peek_is_else and psr_peek_kind(tokens, peek_cursor + 1) == "symbol" and psr_peek_value(tokens, peek_cursor + 1) == ":"
-    has_else = peek_is_else and (not peek_is_block_else)
-    mut else_node = {"kind": "Int", "value": "0"}
-    if has_else:
-        else_result = psr_parse_expr(tokens, peek_cursor + 1)
-        else_node = get_map(else_result, "node")
-        cursor = get_int(else_result, "next")
-    {"node": {"kind": "If", "cond": get_map(cond_result, "node"), "then": get_map(then_result, "node"), "else": else_node}, "next": cursor}
-fn psr_ifchain_at(xs: [Map], i: int) -> Map:
-    at(xs, i)
-fn psr_parse_call(tokens: [Map], position: int, callee_name: Text) -> Map:
-    callee_tok = at(tokens, position)
-    callee_line = get_int(callee_tok, "line")
-    callee_col = get_int(callee_tok, "col")
-    mut cursor = position + 2
-    mut args = []
-    loop:
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ")":
-            cursor += 1
-            break
-        if psr_peek_kind(tokens, cursor) == "eof":
-            break
-        is_named_arg = psr_peek_kind(tokens, cursor) == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "="
-        if is_named_arg:
-            na_name = psr_peek_value(tokens, cursor)
-            na_val = psr_parse_expr(tokens, cursor + 2)
-            args = push(args, {"kind": "NamedArg", "name": na_name, "value": get_map(na_val, "node")})
-            cursor = get_int(na_val, "next")
-        else:
-            arg_result = psr_parse_expr(tokens, cursor)
-            args = push(args, get_map(arg_result, "node"))
-            cursor = get_int(arg_result, "next")
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-            cursor += 1
-    {"node": {"kind": "Call", "callee": callee_name, "args": args, "line": callee_line, "col": callee_col}, "next": cursor}
-fn psr_op_prec(op_kind: Text, op_value: Text) -> int:
-    mut precedence = 0
-    is_ident = op_kind == "ident"
-    is_symbol = op_kind == "symbol"
-    if is_ident and op_value == "or":
-        precedence = 5
-    if is_ident and op_value == "and":
-        precedence = 7
-    if is_symbol:
-        is_cmp = op_value == "==" or op_value == "!=" or op_value == "<" or op_value == ">" or op_value == "<=" or op_value == ">="
-        is_add = op_value == "+" or op_value == "-"
-        is_mul = op_value == "*" or op_value == "/" or op_value == "%"
-        if is_cmp:
-            precedence = 10
-        if is_add:
-            precedence = 20
-        if is_mul:
-            precedence = 30
-    precedence
-fn psr_parse_postfix(tokens: [Map], position: int, current_node: Map) -> Map:
-    mut node = current_node
-    mut cursor = position
-    loop:
-        kind_here = psr_peek_kind(tokens, cursor)
-        value_here = psr_peek_value(tokens, cursor)
-        is_dot = kind_here == "symbol" and value_here == "."
-        dot_tok = at(tokens, cursor)
-        dot_line = if is_dot then get_int(dot_tok, "line") else 0
-        dot_col = if is_dot then get_int(dot_tok, "col") else 0
-        if is_dot:
-            field_name = psr_peek_value(tokens, cursor + 1)
-            cursor = cursor + 2
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
-                cursor = cursor + 1
-                args = []
-                mut args_list = args
-                loop:
-                    arg_kind = psr_peek_kind(tokens, cursor)
-                    arg_val = psr_peek_value(tokens, cursor)
-                    if arg_kind == "symbol" and arg_val == ")":
-                        cursor = cursor + 1
-                        break
-                    if arg_kind == "eof":
-                        break
-                    arg_result = psr_parse_expr(tokens, cursor)
-                    args_list = push(args_list, get_map(arg_result, "node"))
-                    cursor = get_int(arg_result, "next")
-                    if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-                        cursor = cursor + 1
-                node = {"kind": "MethodCall", "receiver": node, "method": field_name, "args": args_list, "line": dot_line, "col": dot_col}
-            else:
-                node = {"kind": "Field", "object": node, "field": field_name, "line": dot_line, "col": dot_col}
-        is_lbracket = kind_here == "symbol" and value_here == "["
-        if is_lbracket:
-            idx_result = psr_parse_expr(tokens, cursor + 1)
-            cursor = get_int(idx_result, "next")
-            if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "]":
-                cursor = cursor + 1
-            node = {"kind": "Index", "object": node, "index": get_map(idx_result, "node")}
-        is_question = kind_here == "symbol" and value_here == "?"
-        if is_question:
-            node = {"kind": "Question", "inner": node}
-            cursor = cursor + 1
-        if not is_dot and not is_lbracket and not is_question:
-            break
-    {"node": node, "next": cursor}
-fn psr_parse_expr_at(tokens: [Map], position: int, min_prec: int) -> Map:
-    primary_result = psr_parse_primary(tokens, position)
-    postfix_result = psr_parse_postfix(tokens, get_int(primary_result, "next"), get_map(primary_result, "node"))
-    mut current_node = get_map(postfix_result, "node")
-    mut cursor = get_int(postfix_result, "next")
-    loop:
-        op_kind = psr_peek_kind(tokens, cursor)
-        op_value = psr_peek_value(tokens, cursor)
-        prec = psr_op_prec(op_kind, op_value)
-        if prec == 0 or prec < min_prec:
-            break
-        rhs_result = psr_parse_expr_at(tokens, cursor + 1, prec + 1)
-        current_node = {"kind": "Binary", "op": op_value, "left": current_node, "right": get_map(rhs_result, "node")}
-        cursor = get_int(rhs_result, "next")
-    {"node": current_node, "next": cursor}
-fn psr_parse_expr(tokens: [Map], position: int) -> Map:
-    psr_parse_expr_at(tokens, position, 1)
-fn psr_parse_params(tokens: [Map], position: int) -> Map:
-    mut cursor = position
-    mut params = []
-    loop:
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ")":
-            cursor += 1
-            break
-        param_name = psr_peek_value(tokens, cursor)
-        cursor += 1
-        has_type = psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ":"
-        if has_type:
-            cursor += 1
-            type_result = psr_parse_type(tokens, cursor)
-            params = push(params, {"name": param_name, "type": get_map(type_result, "node")})
-            cursor = get_int(type_result, "next")
-        if not has_type:
-            params = push(params, {"name": param_name, "type": {"kind": "Unknown"}})
-        if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == ",":
-            cursor += 1
-    {"node": params, "next": cursor}
-fn psr_peek_col(tokens: [Map], position: int) -> int:
-    cursor = psr_skip_newlines(tokens, position)
-    if cursor >= len(tokens):
-        0
-    else:
-        get_int(at(tokens, cursor), "col")
-fn psr_peek_line(tokens: [Map], position: int) -> int:
-    cursor = psr_skip_newlines(tokens, position)
-    if cursor >= len(tokens):
-        0
-    else:
-        get_int(at(tokens, cursor), "line")
-fn psr_match_bracket(tokens: [Map], open_idx: int) -> int:
-    total = len(tokens)
-    mut depth = 0
-    mut result = 0 - 1
-    mut i = open_idx
-    loop:
-        if i >= total or result >= 0:
-            break
-        k = psr_peek_kind(tokens, i)
-        v = psr_peek_value(tokens, i)
-        if k == "eof":
-            break
-        if k == "symbol" and v == "[":
-            depth = depth + 1
-        if k == "symbol" and v == "]":
-            depth = depth - 1
-            if depth == 0:
-                result = i
-        i = i + 1
-    result
-fn psr_parse_body_at(tokens: [Map], position: int, min_col: int) -> Map:
-    mut cursor = psr_skip_newlines(tokens, position)
-    mut statements = []
-    loop:
-        cursor = psr_skip_newlines(tokens, cursor)
-        kind_here = psr_peek_kind(tokens, cursor)
-        value_here = psr_peek_value(tokens, cursor)
-        col_here = if cursor >= len(tokens) then 0 else get_int(at(tokens, cursor), "col")
-        is_eof = kind_here == "eof"
-        fn_is_lambda = value_here == "fn" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "("
-        names_a_decl = value_here == "type"
+
+fn main() -> int:
+    src = "42 + 0"
+    toks = self_lex(src)
+    first = at(toks, 0)
+    # `42` `+` `0` plus the newline/eof the lexer appends. Assert the shape that
+    # matters (an int token first, at least the three real ones), not a count.
+    ok = if len(toks) >= 3 and get(first, "value") == "42" and get(first, "kind") == "int" then 1 else 0
+    ok * 42

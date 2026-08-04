@@ -5,5 +5,5 @@
 trait Drawable:
     draw: fn() -> int
 
-fn main() -> int:
+define main() -> int:
     7

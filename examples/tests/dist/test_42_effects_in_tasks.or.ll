@@ -1557,17 +1557,7 @@ entry:
     %v1 = call i64 @__orion_monotonic_ms()
     %v2.b = icmp sge i64 %v1, %v0
     %v2 = zext i1 %v2.b to i64
-    %v3.cb = icmp ne i64 %v2, 0
-    br i1 %v3.cb, label %if_3_then, label %if_3_else
-if_3_then:
-    %v5 = add i64 0, 1
-    br label %if_3_merge
-if_3_else:
-    %v8 = add i64 0, 0
-    br label %if_3_merge
-if_3_merge:
-    %v11 = phi i64 [ %v5, %if_3_then ], [ %v8, %if_3_else ]
-    ret i64 %v11
+    ret i64 %v2
 }
 
 define i64 @async__time_left(i64 %p0) {

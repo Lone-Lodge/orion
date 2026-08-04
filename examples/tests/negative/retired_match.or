@@ -1,0 +1,5 @@
+# expect: `match` was retired
+define main() -> int:
+    match 5:
+        5 -> 1
+        _ -> 0

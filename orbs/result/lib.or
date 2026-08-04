@@ -7,7 +7,7 @@
 #   use result
 #
 #   fn safe_div(a: int, b: int) -> Result<int>:
-#       if b == 0 then Result.Err("divide by zero") else Result.Ok(a / b)
+#       if b is 0 then Result.Err("divide by zero") else Result.Ok(a / b)
 #
 #   match safe_div(10, 0):
 #       Ok(v)  -> print_line("got {v}")
@@ -25,30 +25,36 @@
 # could only lie and hand back a zero. Use `match`, `if let`, `?` or
 # `unwrap_or`.
 
-pub type Result<T>:
+public type Result<T>:
     Ok(T)
-    Err(Text)
+    Err(text)
 
 # The payload, or `default` if this is an Err.
-pub fn unwrap_or<T>(r: Result<T>, default: T) -> T:
-    match r:
+public define unwrap_or<T>(r: Result<T>, default: T) -> T:
+    example unwrap_or(Result.Ok(7), 0) is 7
+    example unwrap_or(Result.Err("x"), 9) is 9
+    choose r:
         Ok(v) -> v
         Err(m) -> default
 
 # 1 if this is an Ok, else 0.
-pub fn is_ok<T>(r: Result<T>) -> int:
-    match r:
-        Ok(v) -> 1
-        Err(m) -> 0
+public define is_ok<T>(r: Result<T>) -> truth:
+    example is_ok(Result.Ok(5))
+    example not is_ok(Result.Err("no"))
+    choose r:
+        Ok(v) then true
+        Err(m) then false
 
-# 1 if this is an Err, else 0.
-pub fn is_err<T>(r: Result<T>) -> int:
-    match r:
-        Ok(v) -> 0
-        Err(m) -> 1
+# true if this is an Err.
+public define is_err<T>(r: Result<T>) -> truth:
+    example is_err(Result.Err("boom"))
+    choose r:
+        Ok(v) then false
+        Err(m) then true
 
 # The error message, or "" if this is an Ok.
-pub fn err_msg<T>(r: Result<T>) -> Text:
-    match r:
-        Ok(v) -> ""
-        Err(m) -> m
+public define err_msg<T>(r: Result<T>) -> text:
+    example err_msg(Result.Err("boom")) is "boom"
+    choose r:
+        Ok(v) then ""
+        Err(m) then m

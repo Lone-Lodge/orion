@@ -1,6 +1,6 @@
-fn main() -> int:
+define main() -> int:
     s = "hello world"
-    mut score = 0
+    edit score = 0
     if contains(s, "world"):
         score = score + 1
     if not contains(s, "xyz"):

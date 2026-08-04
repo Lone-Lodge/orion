@@ -1,28 +1,28 @@
-fn deadline_from_now(offset_ms: int) -> int:
+define deadline_from_now(offset_ms: int) -> int:
     monotonic_ms() + offset_ms
 
-fn sleep_until(deadline_ms: int):
+define sleep_until(deadline_ms: int):
     now = monotonic_ms()
     remaining = deadline_ms - now
     if remaining > 0:
         sleep_ms(remaining)
 
-fn count_due(timers: [int]) -> int:
+define count_due(timers: [int]) -> int:
     n = len(timers)
     now = monotonic_ms()
-    mut count = 0
+    edit count = 0
     loop i in 0..<n:
         if at(timers, i) <= now:
             count = count + 1
     count
 
-fn main() -> int:
+define main() -> int:
     start = monotonic_ms()
     # Three timers: 10ms, 25ms, 50ms from now.
-    mut timers = bytes_zeros(0)
-    timers = push(timers, deadline_from_now(10))
-    timers = push(timers, deadline_from_now(25))
-    timers = push(timers, deadline_from_now(50))
+    edit timers = bytes_zeros(0)
+    timers = append(timers, deadline_from_now(10))
+    timers = append(timers, deadline_from_now(25))
+    timers = append(timers, deadline_from_now(50))
     # Sleep past all three.
     sleep_ms(60)
     # All three should be due.

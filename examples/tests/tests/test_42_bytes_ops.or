@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     bs = bytes_from_text("hello world")
     head = bytes_slice(bs, 0, 5)
     tail = bytes_slice(bs, 6, 11)

@@ -17,3 +17,6 @@ build/crash.*
 
 # host-retargeted scratch copies (the tracked .ll is the compiler output)
 *.host.ll
+
+# test scratch written into the tracked dist dir
+examples/tests/dist/.*.txt

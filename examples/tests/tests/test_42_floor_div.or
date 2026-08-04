@@ -1,0 +1,8 @@
+# `//` — floor/integer division (stage 1 of the `number` plan, additive).
+# `/` keeps its current meaning until the corpus is migrated; then `/`
+# becomes real division. Float `//` is a compile error until then.
+define main() -> int:
+    a = 17 // 5          # 3
+    b = 84 // 2          # 42
+    c = (a * 0) + b // 7 # 6 — precedence: like / and %
+    a * 3 + c * 5 + 3    # 9 + 30 + 3 = 42

@@ -17,7 +17,9 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ORION="$ROOT/dist/orion.exe"
 WORK="$ROOT/dist/.docscheck"
-PAGES="index.html sv.html"
+# One guide, one language for it. sv.html is archived; a second translation of
+# the same samples drifts by construction.
+PAGES="index.html"
 
 [ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
 rm -rf "$WORK"; mkdir -p "$WORK"
@@ -180,7 +182,7 @@ fi
 
 echo
 if [ "$fail" = "0" ]; then
-    echo "  docs: $count sample(s) compile, translations agree, contrast is AAA"
+    echo "  docs: $count sample(s) compile, contrast is AAA, reference up to date"
     rm -rf "$WORK"
     exit 0
 fi

@@ -1630,14 +1630,14 @@ for_6_body:
     %v20 = add i64 0, 15
     %v21 = and i64 %v19, %v20
     %v22 = call i64 @orion_list_at(ptr %v2, i64 %v21)
-    %v23 = call ptr @orion_list_push(ptr %v17, i64 %v22)
+    %v23 = call ptr @orion_list_push_mut(ptr %v17, i64 %v22)
     store ptr %v23, ptr %v4
     %v24 = add i64 0, 0
     %v25 = load ptr, ptr %v4
     %v26 = add i64 0, 15
     %v27 = and i64 %v16, %v26
     %v28 = call i64 @orion_list_at(ptr %v2, i64 %v27)
-    %v29 = call ptr @orion_list_push(ptr %v25, i64 %v28)
+    %v29 = call ptr @orion_list_push_mut(ptr %v25, i64 %v28)
     store ptr %v29, ptr %v4
     %v30 = add i64 0, 0
     br label %for_6_step
@@ -1913,7 +1913,7 @@ if_42_merge:
     %v57 = add i64 0, 63
     %v58 = and i64 %v56, %v57
     %v59 = call i64 @orion_list_at(ptr %v2, i64 %v58)
-    %v60 = call ptr @orion_list_push(ptr %v54, i64 %v59)
+    %v60 = call ptr @orion_list_push_mut(ptr %v54, i64 %v59)
     store ptr %v60, ptr %v5
     %v61 = add i64 0, 0
     %v62 = load ptr, ptr %v5
@@ -1925,7 +1925,7 @@ if_42_merge:
     %v68 = add i64 0, 63
     %v69 = and i64 %v67, %v68
     %v70 = call i64 @orion_list_at(ptr %v2, i64 %v69)
-    %v71 = call ptr @orion_list_push(ptr %v62, i64 %v70)
+    %v71 = call ptr @orion_list_push_mut(ptr %v62, i64 %v70)
     store ptr %v71, ptr %v5
     %v72 = add i64 0, 0
     %v73 = load ptr, ptr %v5
@@ -1946,7 +1946,7 @@ if_74_else:
     br label %if_74_merge
 if_74_merge:
     %v89 = phi i64 [ %v83, %if_74_then ], [ %v86, %if_74_else ]
-    %v90 = call ptr @orion_list_push(ptr %v73, i64 %v89)
+    %v90 = call ptr @orion_list_push_mut(ptr %v73, i64 %v89)
     store ptr %v90, ptr %v5
     %v91 = add i64 0, 0
     %v92 = load ptr, ptr %v5
@@ -1962,7 +1962,7 @@ if_93_else:
     br label %if_93_merge
 if_93_merge:
     %v103 = phi i64 [ %v97, %if_93_then ], [ %v100, %if_93_else ]
-    %v104 = call ptr @orion_list_push(ptr %v92, i64 %v103)
+    %v104 = call ptr @orion_list_push_mut(ptr %v92, i64 %v103)
     store ptr %v104, ptr %v5
     %v105 = add i64 0, 0
     %v106 = load i64, ptr %v8

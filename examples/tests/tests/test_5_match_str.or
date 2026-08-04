@@ -1,8 +1,8 @@
-fn day_score(day: Text) -> int:
-    match day:
+define day_score(day: text) -> int:
+    choose day:
         "mon" -> 1
         "fri" -> 5
         _ -> 0
 
-fn main() -> int:
+define main() -> int:
     day_score("fri")

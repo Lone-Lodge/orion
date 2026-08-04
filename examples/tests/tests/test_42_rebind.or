@@ -1,4 +1,4 @@
-fn main() -> int:
-    mut x = 10
+define main() -> int:
+    edit x = 10
     x = x + 32
     x

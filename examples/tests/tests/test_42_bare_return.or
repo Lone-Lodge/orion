@@ -1,0 +1,17 @@
+# Bare `return` — the natural early exit from a function that yields nothing.
+define guard(n: int) -> int:
+    edit hits = 0
+    if n < 0:
+        return 0
+    hits = n * 2
+    hits
+
+define noisy(n: int):
+    if n is 0:
+        return
+    print_line("{n}")
+
+define main() -> int:
+    noisy(0)
+    noisy(7)
+    guard(21) + guard(0 - 5)

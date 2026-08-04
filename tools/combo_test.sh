@@ -43,27 +43,27 @@ feat() {
 }
 
 feat closure "" 15 "cmb_apply(cmb_adder(), 5)" <<'ORION'
-fn cmb_apply(f: fn, x: int) -> int:
+define cmb_apply(f: fn, x: int) -> int:
     f(x)
 
-fn cmb_adder() -> fn:
+define cmb_adder() -> fn:
     k = 10
     fn(n): n + k
 ORION
 
-feat generic "iter" 4 "len(at(filter(cmb_words(), cmb_is_long), 0))" <<'ORION'
-fn cmb_words() -> [Text]:
+feat generic "iter" 4 "len(at(keep(cmb_words(), cmb_is_long), 0))" <<'ORION'
+define cmb_words() -> [text]:
     ["aa", "bbbb", "cc"]
 
-fn cmb_is_long(s: Text) -> bool:
+define cmb_is_long(s: text) -> truth:
     len(s) > 3
 ORION
 
 feat iflet "" 10 "cmb_iflet(CmbOpt.Some(4))" <<'ORION'
 type CmbOpt: Some(int), None
 
-fn cmb_iflet(o: CmbOpt) -> int:
-    mut score = 0
+define cmb_iflet(o: CmbOpt) -> int:
+    edit score = 0
     if let Some(v) = o:
         if v == 4:
             score = score + 10
@@ -71,12 +71,12 @@ fn cmb_iflet(o: CmbOpt) -> int:
 ORION
 
 feat defer_ "" 3 "cmb_defer()" <<'ORION'
-fn cmb_note(n: int) -> int:
+define cmb_note(n: int) -> int:
     prev = if slot_has("cmb:trace") then slot_get_int("cmb:trace") else 0
     slot_set("cmb:trace", prev * 10 + n)
     n
 
-fn cmb_defer() -> int:
+define cmb_defer() -> int:
     defer cmb_note(1)
     cmb_note(3)
 ORION
@@ -90,8 +90,8 @@ handle CmbAsk.n(x: int) -> int:
 ORION
 
 feat task "async" 12 "await(spawn(cmb_worker, 4))" <<'ORION'
-fn cmb_worker(n: int) -> int:
-    mut total = 0
+define cmb_worker(n: int) -> int:
+    edit total = 0
     loop i in 0..<n:
         total = total + i
         yield_now()
@@ -99,7 +99,7 @@ fn cmb_worker(n: int) -> int:
 ORION
 
 feat mapt "" 5 "len(get(cmb_map(), \"greeting\"))" <<'ORION'
-fn cmb_map() -> Map<Text>:
+define cmb_map() -> table<text>:
     {"greeting": "hello"}
 ORION
 
@@ -107,7 +107,7 @@ feat bitwise "" 8 "12 & 10" <<'ORION'
 ORION
 
 feat tuple "" 7 "cmb_tuple()" <<'ORION'
-fn cmb_tuple() -> int:
+define cmb_tuple() -> int:
     pair = (7, "seven")
     a, b = pair
     if len(b) == 5 then a else 0
@@ -116,22 +116,22 @@ ORION
 feat spread "" 9 "cmb_spread()" <<'ORION'
 type CmbPoint: x: int, y: int
 
-fn cmb_spread() -> int:
+define cmb_spread() -> int:
     p = CmbPoint{x: 1, y: 2}
     q = CmbPoint{..p, x: 9}
     if q.y == 2 then q.x else 0
 ORION
 
 feat guard "" 3 "cmb_guard(500)" <<'ORION'
-fn cmb_guard(x: int) -> int:
-    match x:
+define cmb_guard(x: int) -> int:
+    choose x:
         n if n > 100 -> 3
         n if n > 10 -> 2
         _ -> 1
 ORION
 
 feat interp "" 5 "len(cmb_interp())" <<'ORION'
-fn cmb_interp() -> Text:
+define cmb_interp() -> text:
     a = 1
     b = 2
     "sum={a + b}"
@@ -157,7 +157,7 @@ for a in $FEATURES; do
             echo ""
             cat "$WORK/$b.decls"
             echo ""
-            echo "fn main() -> int:"
+            echo "define main() -> int:"
             echo "    x = $(cat "$WORK/$a.contrib")"
             echo "    y = $(cat "$WORK/$b.contrib")"
             echo "    x + y"

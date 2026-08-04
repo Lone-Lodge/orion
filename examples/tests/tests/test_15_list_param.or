@@ -1,8 +1,8 @@
-fn sum_list(xs: [int]) -> int:
-    mut total = 0
+define sum_list(xs: [int]) -> int:
+    edit total = 0
     loop x in xs:
         total = total + x
     total
 
-fn main() -> int:
+define main() -> int:
     sum_list([1, 2, 3, 4, 5])

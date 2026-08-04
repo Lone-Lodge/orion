@@ -7,5 +7,5 @@ effect Math:
 handle Math.add(a: int, b: int) -> int:
     resume(a + b)
 
-fn main() -> int:
+define main() -> int:
     perform Math.add(40)

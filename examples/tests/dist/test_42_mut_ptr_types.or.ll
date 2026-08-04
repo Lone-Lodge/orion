@@ -1528,12 +1528,12 @@ entry:
     %v11 = add i64 0, 0
     %v12 = load ptr, ptr %v10
     %v13 = add i64 0, 21
-    %v14 = call ptr @orion_list_push(ptr %v12, i64 %v13)
+    %v14 = call ptr @orion_list_push_mut(ptr %v12, i64 %v13)
     store ptr %v14, ptr %v10
     %v15 = add i64 0, 0
     %v16 = load ptr, ptr %v10
     %v17 = add i64 0, 21
-    %v18 = call ptr @orion_list_push(ptr %v16, i64 %v17)
+    %v18 = call ptr @orion_list_push_mut(ptr %v16, i64 %v17)
     store ptr %v18, ptr %v10
     %v19 = add i64 0, 0
     %v20 = add i64 0, 0

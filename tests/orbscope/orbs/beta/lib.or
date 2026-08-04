@@ -2,17 +2,17 @@
 # `pub` wrapper must reach ITS OWN private, not the other's - that is the
 # property this gate exists to prove.
 
-fn label() -> Text:
+define label() -> text:
     "beta"
 
-fn run(n: int) -> int:
+define run(n: int) -> int:
     n + 100
 
-pub fn beta_label() -> Text:
+public define beta_label() -> text:
     label()
 
-pub fn beta_run(n: int) -> int:
+public define beta_run(n: int) -> int:
     run(n)
 
-pub fn shared_label() -> Text:
+public define shared_label() -> text:
     "beta-shared"

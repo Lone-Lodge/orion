@@ -5,34 +5,34 @@
 # A workout for the text standard library: `lines` to split rows, `split` on
 # commas for cells, `trim` to clean them, `byte_count` to measure column
 # widths, `pad_right` to align, `join` to glue a row back together, and
-# `num.parse` to total a numeric column. Data lives in a `[[Text]]` grid.
+# `num.parse` to total a numeric column. Data lives in a `[[text]]` grid.
 
 use text
 use num
 
 # Parse the raw CSV into a grid of trimmed cells.
-fn parse_grid(csv: Text) -> [[Text]]:
-    mut grid = []
+define parse_grid(csv: text) -> [[text]]:
+    edit grid = []
     loop row in lines(csv):
-        mut cells = []
+        edit cells = []
         loop cell in split(row, ","):
-            cells = push(cells, trim(cell))
-        grid = push(grid, cells)
+            cells = append(cells, trim(cell))
+        grid = append(grid, cells)
     grid
 
 # Width of each column = the widest cell in it.
-fn column_widths(grid: [[Text]], ncols: int) -> [int]:
-    mut widths = []
+define column_widths(grid: [[text]], ncols: int) -> [int]:
+    edit widths = []
     loop ci in 0..<ncols:
-        mut w = 0
+        edit w = 0
         loop row in grid:
             cw = byte_count(at(row, ci))
             if cw > w:
                 w = cw
-        widths = push(widths, w)
+        widths = append(widths, w)
     widths
 
-fn main() -> int:
+define main() -> int:
     csv = "fruit, qty, price\napple, 15, 30\nbanana, 20, 10\ncherry, 7, 100"
 
     grid = parse_grid(csv)
@@ -40,22 +40,22 @@ fn main() -> int:
     widths = column_widths(grid, ncols)
 
     # Print every row with each cell padded to its column width.
-    mut ri = 0
+    edit ri = 0
     loop row in grid:
-        mut parts = []
+        edit parts = []
         loop ci in 0..<ncols:
-            parts = push(parts, pad_right(at(row, ci), at(widths, ci), " "))
+            parts = append(parts, pad_right(at(row, ci), at(widths, ci), " "))
         print_line(join(parts, " | "))
         # a rule under the header
         if ri == 0:
-            mut rule = []
+            edit rule = []
             loop ci in 0..<ncols:
-                rule = push(rule, repeat("-", at(widths, ci)))
+                rule = append(rule, repeat("-", at(widths, ci)))
             print_line(join(rule, "-+-"))
         ri = ri + 1
 
     # Total the `qty` column (index 1), skipping the header row.
-    mut total = 0
+    edit total = 0
     loop di in 1..<len(grid):
         total = total + parse(at(at(grid, di), 1))
     print_line("")

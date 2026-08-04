@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     a = ["x"]
     b = slice(a, 0, 0)
     len(b)

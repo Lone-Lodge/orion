@@ -1,7 +1,7 @@
-fn scale(v: float, factor: float) -> float:
+define scale(v: float, factor: float) -> float:
     v * factor
 
-fn main() -> int:
+define main() -> int:
     a = 0.1
     b = 0.2
     sum = a + b
@@ -14,7 +14,7 @@ fn main() -> int:
     print_line(scaled)
     big = to_float(7)
     print_line(big)
-    mut acc = 0.0
+    edit acc = 0.0
     loop i in 0..<4:
         acc = acc + 0.25
     print_line(acc)

@@ -6,15 +6,15 @@ effect Random:
     roll: fn(max: int) -> int
 
 effect Log:
-    msg: fn(text: Text) -> Text
+    msg: fn(text: text) -> text
 
 handle Random.roll(max: int) -> int:
-    resume(max / 5)
+    resume(max // 5)
 
-handle Log.msg(message: Text) -> Text:
+handle Log.msg(message: text) -> text:
     resume("ok")
 
-fn main() -> int:
+define main() -> int:
     r = perform Random.roll(100)     # 20
     s = perform Log.msg("hello")     # "ok"
     r + len(s) * 11                  # 20 + 2*11 == 42

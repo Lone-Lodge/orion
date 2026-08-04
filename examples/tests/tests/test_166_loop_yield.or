@@ -4,22 +4,22 @@
 # iteration, a leading `yield` on a one-liner, and a NESTED collecting loop
 # (each loop's own `__yield` accumulator, so the inner map does not leak out).
 
-fn sum(xs: [int]) -> int:
-    mut s = 0
+define sum(xs: [int]) -> int:
+    edit s = 0
     loop v in xs:
         s = s + v
     s
 
-fn main() -> int:
+define main() -> int:
     xs = [1, 2, 3, 4]
     doubled = loop x in xs: x * 2                 # [2, 4, 6, 8]      -> 20
     big = loop x in xs:
-        if x > 2: yield x                          # [3, 4]           -> 7
+        if x > 2: collect x                          # [3, 4]           -> 7
     pairs = loop x in [1, 2]:
-        yield x
-        yield x * 10                               # [1, 10, 2, 20]   -> 33
-    inline_y = loop x in xs: yield x + 1           # [2, 3, 4, 5]     -> 14
+        collect x
+        collect x * 10                               # [1, 10, 2, 20]   -> 33
+    inline_y = loop x in xs: collect x + 1           # [2, 3, 4, 5]     -> 14
     grid = loop r in [1, 2]:
         row = loop c in [10, 20]: r * c            # inner map, its own accumulator
-        yield sum(row)                             # [30, 60]         -> 90
+        collect sum(row)                             # [30, 60]         -> 90
     sum(doubled) + sum(big) + sum(pairs) + sum(inline_y) + sum(grid) + len(big)

@@ -1503,75 +1503,32 @@ retb:
 
 
 @.str_0 = private unnamed_addr constant [32 x i8] c"\93\0D\14\24\00\00\00\00\0F\00\00\00\00\00\00\00ASSERT FAILED: \00", align 8
-@.str_1 = private unnamed_addr constant [31 x i8] c"\79\0A\D6\17\00\00\00\00\0E\00\00\00\00\00\00\00 \E2\80\94 expected \00", align 8
-@.str_2 = private unnamed_addr constant [23 x i8] c"\06\EF\67\23\00\00\00\00\06\00\00\00\00\00\00\00, got \00", align 8
-@.str_3 = private unnamed_addr constant [31 x i8] c"\6D\29\EB\07\00\00\00\00\0E\00\00\00\00\00\00\00trivially true\00", align 8
-@.str_4 = private unnamed_addr constant [27 x i8] c"\3B\56\18\1F\00\00\00\00\0A\00\00\00\00\00\00\00equal ints\00", align 8
-@.str_5 = private unnamed_addr constant [21 x i8] c"\71\D6\AB\38\00\00\00\00\04\00\00\00\00\00\00\00math\00", align 8
+@.str_1 = private unnamed_addr constant [31 x i8] c"\6D\29\EB\07\00\00\00\00\0E\00\00\00\00\00\00\00trivially true\00", align 8
+@.str_2 = private unnamed_addr constant [27 x i8] c"\3B\56\18\1F\00\00\00\00\0A\00\00\00\00\00\00\00equal ints\00", align 8
+@.str_3 = private unnamed_addr constant [21 x i8] c"\71\D6\AB\38\00\00\00\00\04\00\00\00\00\00\00\00math\00", align 8
+@.str_4 = private unnamed_addr constant [19 x i8] c"\CE\41\81\05\00\00\00\00\02\00\00\00\00\00\00\00hi\00", align 8
+@.str_5 = private unnamed_addr constant [28 x i8] c"\62\40\69\21\00\00\00\00\0B\00\00\00\00\00\00\00equal texts\00", align 8
+@.str_6 = private unnamed_addr constant [30 x i8] c"\76\D6\6D\2B\00\00\00\00\0D\00\00\00\00\00\00\00words compose\00", align 8
 
-define i64 @prog__assert_true(i64 %p0, ptr %p1) {
+define i64 @assert__assert(i64 %p0, ptr %p1) {
 entry:
     %v0 = add i64 0, %p0
     %v1 = getelementptr i8, ptr %p1, i64 0
-    %v2 = add i64 0, 0
-    %v3.b = icmp eq i64 %v0, %v2
-    %v3 = zext i1 %v3.b to i64
-    %v4.cb = icmp ne i64 %v3, 0
-    br i1 %v4.cb, label %if_4_then, label %if_4_else
-if_4_then:
-    %v6 = getelementptr i8, ptr @.str_0, i64 16
-    %v7 = call ptr @orion_text_concat(ptr %v6, ptr %v1)
-    call i32 @puts(ptr %v7)
-    %v8 = add i64 0, 0
+    %v2.cb = icmp ne i64 %v0, 0
+    br i1 %v2.cb, label %if_2_then, label %if_2_else
+if_2_then:
+    %v4 = add i64 0, 1
+    br label %if_2_merge
+if_2_else:
+    %v7 = getelementptr i8, ptr @.str_0, i64 16
+    %v8 = call ptr @orion_text_concat(ptr %v7, ptr %v1)
+    call i32 @puts(ptr %v8)
     %v9 = add i64 0, 0
-    br label %if_4_merge
-if_4_else:
-    %v12 = add i64 0, 1
-    br label %if_4_merge
-if_4_merge:
-    %v15 = phi i64 [ %v9, %if_4_then ], [ %v12, %if_4_else ]
-    ret i64 %v15
-}
-
-define i64 @prog__assert_eq(i64 %p0, i64 %p1, ptr %p2) {
-entry:
-    %v0 = add i64 0, %p0
-    %v1 = add i64 0, %p1
-    %v2 = getelementptr i8, ptr %p2, i64 0
-    %v3.b = icmp eq i64 %v0, %v1
-    %v3 = zext i1 %v3.b to i64
-    %v4.cb = icmp ne i64 %v3, 0
-    br i1 %v4.cb, label %if_4_then, label %if_4_else
-if_4_then:
-    %v6 = add i64 0, 1
-    br label %if_4_merge
-if_4_else:
-    %v9 = getelementptr i8, ptr @.str_0, i64 16
-    %v10 = getelementptr i8, ptr @.str_1, i64 16
-    %v11 = call ptr @orion_int_to_text(i64 %v1)
-    %v12 = getelementptr i8, ptr @.str_2, i64 16
-    %v13 = call ptr @orion_int_to_text(i64 %v0)
-    %v14 = call ptr @orion_list_new(i64 6)
-    %v14.lp0 = ptrtoint ptr %v9 to i64
-    call void @orion_list_set(ptr %v14, i64 0, i64 %v14.lp0)
-    %v14.lp1 = ptrtoint ptr %v2 to i64
-    call void @orion_list_set(ptr %v14, i64 1, i64 %v14.lp1)
-    %v14.lp2 = ptrtoint ptr %v10 to i64
-    call void @orion_list_set(ptr %v14, i64 2, i64 %v14.lp2)
-    %v14.lp3 = ptrtoint ptr %v11 to i64
-    call void @orion_list_set(ptr %v14, i64 3, i64 %v14.lp3)
-    %v14.lp4 = ptrtoint ptr %v12 to i64
-    call void @orion_list_set(ptr %v14, i64 4, i64 %v14.lp4)
-    %v14.lp5 = ptrtoint ptr %v13 to i64
-    call void @orion_list_set(ptr %v14, i64 5, i64 %v14.lp5)
-    %v15 = call ptr @orion_text_join(ptr %v14)
-    call i32 @puts(ptr %v15)
-    %v16 = add i64 0, 0
-    %v17 = add i64 0, 0
-    br label %if_4_merge
-if_4_merge:
-    %v20 = phi i64 [ %v6, %if_4_then ], [ %v17, %if_4_else ]
-    ret i64 %v20
+    %v10 = add i64 0, 0
+    br label %if_2_merge
+if_2_merge:
+    %v13 = phi i64 [ %v4, %if_2_then ], [ %v10, %if_2_else ]
+    ret i64 %v13
 }
 
 define i64 @orion_main() {
@@ -1582,33 +1539,72 @@ entry:
     %v2 = add i64 0, 0
     %v3 = load i64, ptr %v1
     %v4 = add i64 0, 1
-    %v5 = getelementptr i8, ptr @.str_3, i64 16
-    %v6 = call i64 @prog__assert_true(i64 %v4, ptr %v5)
+    %v5 = getelementptr i8, ptr @.str_1, i64 16
+    %v6 = call i64 @assert__assert(i64 %v4, ptr %v5)
     %v7 = add i64 %v3, %v6
     store i64 %v7, ptr %v1
     %v8 = add i64 0, 0
     %v9 = load i64, ptr %v1
     %v10 = add i64 0, 42
     %v11 = add i64 0, 42
-    %v12 = getelementptr i8, ptr @.str_4, i64 16
-    %v13 = call i64 @prog__assert_eq(i64 %v10, i64 %v11, ptr %v12)
-    %v14 = add i64 %v9, %v13
-    store i64 %v14, ptr %v1
-    %v15 = add i64 0, 0
-    %v16 = load i64, ptr %v1
-    %v17 = add i64 0, 2
+    %v12.b = icmp eq i64 %v10, %v11
+    %v12 = zext i1 %v12.b to i64
+    %v13 = getelementptr i8, ptr @.str_2, i64 16
+    %v14 = call i64 @assert__assert(i64 %v12, ptr %v13)
+    %v15 = add i64 %v9, %v14
+    store i64 %v15, ptr %v1
+    %v16 = add i64 0, 0
+    %v17 = load i64, ptr %v1
     %v18 = add i64 0, 2
-    %v19 = add i64 %v17, %v18
-    %v20 = add i64 0, 4
-    %v21 = getelementptr i8, ptr @.str_5, i64 16
-    %v22 = call i64 @prog__assert_eq(i64 %v19, i64 %v20, ptr %v21)
-    %v23 = add i64 %v16, %v22
-    store i64 %v23, ptr %v1
-    %v24 = add i64 0, 0
-    %v25 = load i64, ptr %v1
-    %v26 = add i64 0, 14
-    %v27 = mul i64 %v25, %v26
-    ret i64 %v27
+    %v19 = add i64 0, 2
+    %v20 = add i64 %v18, %v19
+    %v21 = add i64 0, 4
+    %v22.b = icmp eq i64 %v20, %v21
+    %v22 = zext i1 %v22.b to i64
+    %v23 = getelementptr i8, ptr @.str_3, i64 16
+    %v24 = call i64 @assert__assert(i64 %v22, ptr %v23)
+    %v25 = add i64 %v17, %v24
+    store i64 %v25, ptr %v1
+    %v26 = add i64 0, 0
+    %v27 = load i64, ptr %v1
+    %v28 = getelementptr i8, ptr @.str_4, i64 16
+    %v29 = getelementptr i8, ptr @.str_4, i64 16
+    %v30.e = call i64 @orion_text_eq(ptr %v28, ptr %v29)
+    %v30 = add i64 %v30.e, 0
+    %v31 = getelementptr i8, ptr @.str_5, i64 16
+    %v32 = call i64 @assert__assert(i64 %v30, ptr %v31)
+    %v33 = add i64 %v27, %v32
+    store i64 %v33, ptr %v1
+    %v34 = add i64 0, 0
+    %v35 = load i64, ptr %v1
+    %v36 = add i64 0, 1
+    %v37 = add i64 0, 2
+    %v38.b = icmp slt i64 %v36, %v37
+    %v38 = zext i1 %v38.b to i64
+    %v39.cb = icmp ne i64 %v38, 0
+    br i1 %v39.cb, label %if_39_then, label %if_39_else
+if_39_then:
+    %v41 = add i64 0, 3
+    %v42 = add i64 0, 3
+    %v43.b = icmp sge i64 %v41, %v42
+    %v43 = zext i1 %v43.b to i64
+    br label %if_39_merge
+if_39_else:
+    %v46 = add i64 0, 0
+    br label %if_39_merge
+if_39_merge:
+    %v49 = phi i64 [ %v43, %if_39_then ], [ %v46, %if_39_else ]
+    %v50 = getelementptr i8, ptr @.str_6, i64 16
+    %v51 = call i64 @assert__assert(i64 %v49, ptr %v50)
+    %v52 = add i64 %v35, %v51
+    store i64 %v52, ptr %v1
+    %v53 = add i64 0, 0
+    %v54 = load i64, ptr %v1
+    %v55 = add i64 0, 8
+    %v56 = mul i64 %v54, %v55
+    %v57 = add i64 0, 2
+    %v58 = add i64 %v56, %v57
+    ret i64 %v58
 }
 
 @orion_argc = global i64 0

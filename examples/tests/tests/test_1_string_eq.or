@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     a = "hello"
     b = "hello"
     if a == b then 1 else 0

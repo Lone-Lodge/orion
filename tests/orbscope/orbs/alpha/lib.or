@@ -3,19 +3,19 @@
 # namespace this build was impossible ("function `label` is defined more than
 # once"); each orb now owns its privates.
 
-fn label() -> Text:
+define label() -> text:
     "alpha"
 
-fn run(n: int) -> int:
+define run(n: int) -> int:
     n * 2
 
-pub fn alpha_label() -> Text:
+public define alpha_label() -> text:
     label()
 
-pub fn alpha_run(n: int) -> int:
+public define alpha_run(n: int) -> int:
     run(n)
 
 # Deliberately the SAME pub name beta exports. Two orbs may now both offer it;
 # a consumer that imports both says which one it means with an import list.
-pub fn shared_label() -> Text:
+public define shared_label() -> text:
     "alpha-shared"

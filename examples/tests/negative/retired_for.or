@@ -2,8 +2,8 @@
 # The loop keyword is `loop`. `for` used to be an accepted alias; the corpus was
 # migrated 2026-07-26 and the alias removed, so this must fail LOUDLY rather
 # than parse `for` as a bare identifier.
-fn main() -> int:
-    mut total = 0
+define main() -> int:
+    edit total = 0
     for i in 0..<3:
         total += i
     total

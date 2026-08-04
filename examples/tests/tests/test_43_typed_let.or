@@ -2,7 +2,7 @@
 # `mut name: Type = expr`. Works with a builtin type and a type alias.
 type Meters = int
 
-fn main() -> int:
+define main() -> int:
     x: int = 40
     y: Meters = 3
     x + y      # 43

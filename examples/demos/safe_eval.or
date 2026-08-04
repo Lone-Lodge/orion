@@ -4,7 +4,7 @@
 #
 # Where rpn.or substitutes 0 on a bad divide, this one models fallibility
 # honestly with a sum type and propagates failures with the `?` operator:
-#   - `enum Eval: Ok(int), Err(Text)` — a result is a value OR a message
+#   - `enum Eval: Ok(int), Err(text)` — a result is a value OR a message
 #   - `apply` returns Err on divide-by-zero / unknown operator
 #   - `expr?` unwraps Ok to the int, or early-returns the Err up the stack
 #   - stack underflow and leftover operands are errors too
@@ -16,16 +16,16 @@
 type Token: Num(int), Op(text)
 type Eval:  Ok(int), Err(text)
 
-fn is_digit(b: int) -> int:
+define is_digit(b: int) -> int:
     if b >= '0' and b <= '9' then 1 else 0
 
 # ---- Tokenizer -------------------------------------------------------
 
-fn tokenize(src: Text) -> [Token]:
+define tokenize(src: text) -> [Token]:
     bs = bytes_from_text(src)
     n = len(bs)
-    mut toks = []
-    mut i = 0
+    edit toks = []
+    edit i = 0
     loop:
         if i >= n:
             break
@@ -34,7 +34,7 @@ fn tokenize(src: Text) -> [Token]:
             i = i + 1
         else:
             if is_digit(b) == 1:
-                mut num = 0
+                edit num = 0
                 loop:
                     if i >= n:
                         break
@@ -43,16 +43,16 @@ fn tokenize(src: Text) -> [Token]:
                         break
                     num = num * 10 + (d - '0')
                     i = i + 1
-                toks = push(toks, Token.Num(num))
+                toks = append(toks, Token.Num(num))
             else:
-                toks = push(toks, Token.Op(bytes_to_text(push([], b))))
+                toks = append(toks, Token.Op(bytes_to_text(append([], b))))
                 i = i + 1
     toks
 
 # ---- A fallible operator ---------------------------------------------
 
-fn apply(op: Text, a: int, b: int) -> Eval:
-    match op:
+define apply(op: text, a: int, b: int) -> Eval:
+    choose op:
         "+" -> Eval.Ok(a + b)
         "-" -> Eval.Ok(a - b)
         "*" -> Eval.Ok(a * b)
@@ -65,11 +65,11 @@ fn apply(op: Text, a: int, b: int) -> Eval:
 
 # ---- Evaluator: errors bubble up via `?` -----------------------------
 
-fn eval(toks: [Token]) -> Eval:
-    mut stack = []
+define eval(toks: [Token]) -> Eval:
+    edit stack = []
     loop t in toks:
-        match t:
-            Num(v) -> stack = push(stack, v)
+        choose t:
+            Num(v) -> stack = append(stack, v)
             Op(o) ->
                 if len(stack) < 2:
                     return Eval.Err("stack underflow at '{o}'")
@@ -78,13 +78,13 @@ fn eval(toks: [Token]) -> Eval:
                 a = at(stack, top - 2)
                 stack = slice(stack, 0, top - 2)
                 val = apply(o, a, b)?           # unwrap Ok, or return the Err
-                stack = push(stack, val)
+                stack = append(stack, val)
     if len(stack) != 1:
         return Eval.Err("expected one result, stack has {len(stack)}")
     Eval.Ok(at(stack, 0))
 
-fn run(src: Text) -> int:
-    match eval(tokenize(src)):
+define run(src: text) -> int:
+    choose eval(tokenize(src)):
         Ok(v) ->
             print_line("{src}   =>  {v}")
             v
@@ -94,7 +94,7 @@ fn run(src: Text) -> int:
 
 # ---- Main ------------------------------------------------------------
 
-fn main() -> int:
+define main() -> int:
     a = run("3 4 + 5 *")        # ok:  (3 + 4) * 5 = 35
     run("10 0 /")               # err: division by zero
     run("1 +")                  # err: stack underflow

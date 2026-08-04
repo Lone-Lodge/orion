@@ -12,7 +12,7 @@
 #
 # Bitwise binds TIGHTER than comparison here, deliberately: `flags & MASK == 0`
 # reads the way it looks. C binds it the other way and that is a famous trap.
-fn main() -> int:
+define main() -> int:
     a = 12                      # 1100
     b = 10                      # 1010
     and_ = a & b                # 1000 = 8

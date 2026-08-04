@@ -1,32 +1,21 @@
-# assert — minimal assertion helper for Orion.
+# assert — ONE assertion for Orion.
 #
-# Doesn't abort the process (we don't have panic yet), but prints to stderr
-# and returns a sentinel so tests can detect failures.
+# Doesn't abort the process (no panic by design — failure is data), but
+# prints the label and returns a sentinel so tests can detect failures.
 #
 # Usage:
-#   assert_eq(x, 42, "x should be 42")
-#   assert_true(is_some(opt), "opt was None")
+#   assert(x is 42, "x should be 42")
+#   assert(is_some(opt), "opt was None")
 #
-# Convention: assertion success returns 1, failure returns 0. A test fn can
-# count assertion results and return 0 if any failed.
+# Convention: success returns 1, failure returns 0. A test fn can count
+# assertion results and return 0 if any failed. Comparisons read as words:
+# `assert(a is b, ...)` replaced the old assert_eq/assert_true/assert_text_eq
+# trio — one word, any condition.
 
-pub fn assert_true(cond: int, label: Text) -> int:
-    if cond == 0:
+public define assert(cond: truth, label: text) -> int:
+    example assert(true, "holds") is 1
+    if cond:
+        1
+    else:
         print_line("ASSERT FAILED: {label}")
-        0
-    else:
-        1
-
-pub fn assert_eq(actual: int, expected: int, label: Text) -> int:
-    if actual == expected:
-        1
-    else:
-        print_line("ASSERT FAILED: {label} — expected {expected}, got {actual}")
-        0
-
-pub fn assert_text_eq(actual: Text, expected: Text, label: Text) -> int:
-    if actual == expected:
-        1
-    else:
-        print_line("ASSERT FAILED: {label} — expected `{expected}`, got `{actual}`")
         0

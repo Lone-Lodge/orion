@@ -1,0 +1,13 @@
+# The store orb: state as a database — stable ids, loop-as-query.
+use store
+
+define main() -> int:
+    w0 = store_new()
+    w1, a = insert(w0, {"hp": 10, "x": 1})
+    w2, b = insert(w1, {"hp": 3, "x": 2})
+    w3, c = insert(w2, {"hp": 8, "x": 3})
+    w4 = remove(w3, b)
+    weak = loop e in items(w4) where get_int(e, "hp") < 9: collect e
+    gone = if has_id(w4, b) then 0 else 7
+    # 2 live * 10 + 1 weak * 5 + hp(a)=10 + gone 7 = 42
+    len(items(w4)) * 10 + len(weak) * 5 + get_int(entity(w4, a), "hp") + gone

@@ -2,11 +2,11 @@
 # a left-associative chain of text_concat (one allocation, not one per link).
 # Same bytes out — that is what this pins. It also covers the hand-rolled
 # int_to_text: zero, a negative sign, and a long multi-digit value.
-fn main() -> int:
+define main() -> int:
     x = 1
     y = 2
     name = "orion"
-    mut score = 0
+    edit score = 0
 
     a = "a{x}b{y}c"
     if a == "a1b2c":

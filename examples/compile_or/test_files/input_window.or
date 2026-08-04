@@ -1,20 +1,20 @@
-extern fn win_open(title: Text, w: int, h: int) -> int
-extern fn win_pump() -> int
-extern fn win_close(hwnd: int)
-extern fn win_event_next() -> int
-extern fn win_event_kind() -> int
-extern fn win_event_key() -> int
-extern fn win_event_x() -> int
-extern fn win_event_y() -> int
+external define win_open(title: text, w: int, h: int) -> int
+external define win_pump() -> int
+external define win_close(hwnd: int)
+external define win_event_next() -> int
+external define win_event_kind() -> int
+external define win_event_key() -> int
+external define win_event_x() -> int
+external define win_event_y() -> int
 
 
-fn main() -> int:
+define main() -> int:
     hwnd = win_open("Orion input test - click, type, press Esc", 640, 480)
     if hwnd == 0:
         print_line("window failed")
         return 1
     print_line("window open - click/type in it; Esc or close to exit")
-    mut running = 1
+    edit running = 1
     loop:
         if running == 0:
             break

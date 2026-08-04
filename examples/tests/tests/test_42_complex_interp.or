@@ -1,9 +1,9 @@
-type Item: name: Text, value: int
+type Item: name: text, value: int
 
-fn describe(item: Item) -> Text:
+define describe(item: Item) -> text:
     "{item.name}: {item.value}"
 
-fn main() -> int:
+define main() -> int:
     a = Item{name: "x", value: 21}
     msg = describe(a)
     # describe should produce "x: 21"

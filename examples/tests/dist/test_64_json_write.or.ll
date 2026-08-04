@@ -1832,7 +1832,7 @@ if_16_merge:
     br i1 %v26.cb, label %if_26_then, label %if_26_else
 if_26_then:
     %v28 = load ptr, ptr %v8
-    %v29 = call ptr @orion_list_push(ptr %v28, i64 %v23)
+    %v29 = call ptr @orion_list_push_mut(ptr %v28, i64 %v23)
     store ptr %v29, ptr %v8
     %v30 = add i64 0, 0
     %v31 = load i64, ptr %v10
@@ -1874,7 +1874,7 @@ if_41_else:
 if_59_then:
     %v61 = load ptr, ptr %v8
     %v62 = add i64 0, 10
-    %v63 = call ptr @orion_list_push(ptr %v61, i64 %v62)
+    %v63 = call ptr @orion_list_push_mut(ptr %v61, i64 %v62)
     store ptr %v63, ptr %v8
     %v64 = add i64 0, 0
     br label %if_59_merge
@@ -1889,7 +1889,7 @@ if_59_merge:
 if_71_then:
     %v73 = load ptr, ptr %v8
     %v74 = add i64 0, 13
-    %v75 = call ptr @orion_list_push(ptr %v73, i64 %v74)
+    %v75 = call ptr @orion_list_push_mut(ptr %v73, i64 %v74)
     store ptr %v75, ptr %v8
     %v76 = add i64 0, 0
     br label %if_71_merge
@@ -1904,7 +1904,7 @@ if_71_merge:
 if_83_then:
     %v85 = load ptr, ptr %v8
     %v86 = add i64 0, 9
-    %v87 = call ptr @orion_list_push(ptr %v85, i64 %v86)
+    %v87 = call ptr @orion_list_push_mut(ptr %v85, i64 %v86)
     store ptr %v87, ptr %v8
     %v88 = add i64 0, 0
     br label %if_83_merge
@@ -1919,7 +1919,7 @@ if_83_merge:
 if_95_then:
     %v97 = load ptr, ptr %v8
     %v98 = add i64 0, 8
-    %v99 = call ptr @orion_list_push(ptr %v97, i64 %v98)
+    %v99 = call ptr @orion_list_push_mut(ptr %v97, i64 %v98)
     store ptr %v99, ptr %v8
     %v100 = add i64 0, 0
     br label %if_95_merge
@@ -1934,7 +1934,7 @@ if_95_merge:
 if_107_then:
     %v109 = load ptr, ptr %v8
     %v110 = add i64 0, 12
-    %v111 = call ptr @orion_list_push(ptr %v109, i64 %v110)
+    %v111 = call ptr @orion_list_push_mut(ptr %v109, i64 %v110)
     store ptr %v111, ptr %v8
     %v112 = add i64 0, 0
     br label %if_107_merge
@@ -1949,7 +1949,7 @@ if_107_merge:
 if_119_then:
     %v121 = load ptr, ptr %v8
     %v122 = add i64 0, 34
-    %v123 = call ptr @orion_list_push(ptr %v121, i64 %v122)
+    %v123 = call ptr @orion_list_push_mut(ptr %v121, i64 %v122)
     store ptr %v123, ptr %v8
     %v124 = add i64 0, 0
     br label %if_119_merge
@@ -1964,7 +1964,7 @@ if_119_merge:
 if_131_then:
     %v133 = load ptr, ptr %v8
     %v134 = add i64 0, 92
-    %v135 = call ptr @orion_list_push(ptr %v133, i64 %v134)
+    %v135 = call ptr @orion_list_push_mut(ptr %v133, i64 %v134)
     store ptr %v135, ptr %v8
     %v136 = add i64 0, 0
     br label %if_131_merge
@@ -1979,7 +1979,7 @@ if_131_merge:
 if_143_then:
     %v145 = load ptr, ptr %v8
     %v146 = add i64 0, 47
-    %v147 = call ptr @orion_list_push(ptr %v145, i64 %v146)
+    %v147 = call ptr @orion_list_push_mut(ptr %v145, i64 %v146)
     store ptr %v147, ptr %v8
     %v148 = add i64 0, 0
     br label %if_143_merge
@@ -2039,7 +2039,7 @@ if_161_then:
     br i1 %v196.cb, label %if_196_then, label %if_196_else
 if_196_then:
     %v198 = load ptr, ptr %v8
-    %v199 = call ptr @orion_list_push(ptr %v198, i64 %v189)
+    %v199 = call ptr @orion_list_push_mut(ptr %v198, i64 %v189)
     store ptr %v199, ptr %v8
     %v200 = add i64 0, 0
     br label %if_196_merge
@@ -2055,7 +2055,7 @@ if_205_then:
     %v209 = add i64 0, 64
     %v210 = call i64 @orion_idiv(i64 %v189, i64 %v209)
     %v211 = add i64 %v208, %v210
-    %v212 = call ptr @orion_list_push(ptr %v207, i64 %v211)
+    %v212 = call ptr @orion_list_push_mut(ptr %v207, i64 %v211)
     store ptr %v212, ptr %v8
     %v213 = add i64 0, 0
     %v214 = load ptr, ptr %v8
@@ -2066,7 +2066,7 @@ if_205_then:
     %v219 = add i64 0, 64
     %v220 = mul i64 %v218, %v219
     %v221 = sub i64 %v216, %v220
-    %v222 = call ptr @orion_list_push(ptr %v214, i64 %v221)
+    %v222 = call ptr @orion_list_push_mut(ptr %v214, i64 %v221)
     store ptr %v222, ptr %v8
     %v223 = add i64 0, 0
     br label %if_205_merge
@@ -2087,19 +2087,19 @@ if_205_else:
     %v239 = load ptr, ptr %v8
     %v240 = add i64 0, 224
     %v241 = add i64 %v240, %v227
-    %v242 = call ptr @orion_list_push(ptr %v239, i64 %v241)
+    %v242 = call ptr @orion_list_push_mut(ptr %v239, i64 %v241)
     store ptr %v242, ptr %v8
     %v243 = add i64 0, 0
     %v244 = load ptr, ptr %v8
     %v245 = add i64 0, 128
     %v246 = add i64 %v245, %v232
-    %v247 = call ptr @orion_list_push(ptr %v244, i64 %v246)
+    %v247 = call ptr @orion_list_push_mut(ptr %v244, i64 %v246)
     store ptr %v247, ptr %v8
     %v248 = add i64 0, 0
     %v249 = load ptr, ptr %v8
     %v250 = add i64 0, 128
     %v251 = add i64 %v250, %v238
-    %v252 = call ptr @orion_list_push(ptr %v249, i64 %v251)
+    %v252 = call ptr @orion_list_push_mut(ptr %v249, i64 %v251)
     store ptr %v252, ptr %v8
     %v253 = add i64 0, 0
     br label %if_205_merge
@@ -2698,7 +2698,7 @@ if_39_merge:
     %v53.isnull = icmp eq i64 %v53.i, 0
     %v53 = select i1 %v53.isnull, ptr getelementptr(i8, ptr @.str_empty_h, i64 16), ptr %v53.raw
     %v54.p = ptrtoint ptr %v53 to i64
-    %v54 = call ptr @orion_list_push(ptr %v51, i64 %v54.p)
+    %v54 = call ptr @orion_list_push_mut(ptr %v51, i64 %v54.p)
     store ptr %v54, ptr %v4
     %v55 = add i64 0, 0
     %v56 = getelementptr i8, ptr @.str_1, i64 16
@@ -2856,12 +2856,12 @@ for_10_body:
 if_22_then:
     %v24 = load ptr, ptr %v8
     %v25 = add i64 0, 92
-    %v26 = call ptr @orion_list_push(ptr %v24, i64 %v25)
+    %v26 = call ptr @orion_list_push_mut(ptr %v24, i64 %v25)
     store ptr %v26, ptr %v8
     %v27 = add i64 0, 0
     %v28 = load ptr, ptr %v8
     %v29 = add i64 0, 34
-    %v30 = call ptr @orion_list_push(ptr %v28, i64 %v29)
+    %v30 = call ptr @orion_list_push_mut(ptr %v28, i64 %v29)
     store ptr %v30, ptr %v8
     %v31 = add i64 0, 0
     br label %if_22_merge
@@ -2874,12 +2874,12 @@ if_22_else:
 if_36_then:
     %v38 = load ptr, ptr %v8
     %v39 = add i64 0, 92
-    %v40 = call ptr @orion_list_push(ptr %v38, i64 %v39)
+    %v40 = call ptr @orion_list_push_mut(ptr %v38, i64 %v39)
     store ptr %v40, ptr %v8
     %v41 = add i64 0, 0
     %v42 = load ptr, ptr %v8
     %v43 = add i64 0, 92
-    %v44 = call ptr @orion_list_push(ptr %v42, i64 %v43)
+    %v44 = call ptr @orion_list_push_mut(ptr %v42, i64 %v43)
     store ptr %v44, ptr %v8
     %v45 = add i64 0, 0
     br label %if_36_merge
@@ -2892,12 +2892,12 @@ if_36_else:
 if_50_then:
     %v52 = load ptr, ptr %v8
     %v53 = add i64 0, 92
-    %v54 = call ptr @orion_list_push(ptr %v52, i64 %v53)
+    %v54 = call ptr @orion_list_push_mut(ptr %v52, i64 %v53)
     store ptr %v54, ptr %v8
     %v55 = add i64 0, 0
     %v56 = load ptr, ptr %v8
     %v57 = add i64 0, 110
-    %v58 = call ptr @orion_list_push(ptr %v56, i64 %v57)
+    %v58 = call ptr @orion_list_push_mut(ptr %v56, i64 %v57)
     store ptr %v58, ptr %v8
     %v59 = add i64 0, 0
     br label %if_50_merge
@@ -2910,12 +2910,12 @@ if_50_else:
 if_64_then:
     %v66 = load ptr, ptr %v8
     %v67 = add i64 0, 92
-    %v68 = call ptr @orion_list_push(ptr %v66, i64 %v67)
+    %v68 = call ptr @orion_list_push_mut(ptr %v66, i64 %v67)
     store ptr %v68, ptr %v8
     %v69 = add i64 0, 0
     %v70 = load ptr, ptr %v8
     %v71 = add i64 0, 114
-    %v72 = call ptr @orion_list_push(ptr %v70, i64 %v71)
+    %v72 = call ptr @orion_list_push_mut(ptr %v70, i64 %v71)
     store ptr %v72, ptr %v8
     %v73 = add i64 0, 0
     br label %if_64_merge
@@ -2928,12 +2928,12 @@ if_64_else:
 if_78_then:
     %v80 = load ptr, ptr %v8
     %v81 = add i64 0, 92
-    %v82 = call ptr @orion_list_push(ptr %v80, i64 %v81)
+    %v82 = call ptr @orion_list_push_mut(ptr %v80, i64 %v81)
     store ptr %v82, ptr %v8
     %v83 = add i64 0, 0
     %v84 = load ptr, ptr %v8
     %v85 = add i64 0, 116
-    %v86 = call ptr @orion_list_push(ptr %v84, i64 %v85)
+    %v86 = call ptr @orion_list_push_mut(ptr %v84, i64 %v85)
     store ptr %v86, ptr %v8
     %v87 = add i64 0, 0
     br label %if_78_merge
@@ -2948,29 +2948,29 @@ if_92_then:
     %v95 = call ptr @orion_bytes_from_text(ptr %v94)
     %v96 = load ptr, ptr %v8
     %v97 = add i64 0, 92
-    %v98 = call ptr @orion_list_push(ptr %v96, i64 %v97)
+    %v98 = call ptr @orion_list_push_mut(ptr %v96, i64 %v97)
     store ptr %v98, ptr %v8
     %v99 = add i64 0, 0
     %v100 = load ptr, ptr %v8
     %v101 = add i64 0, 117
-    %v102 = call ptr @orion_list_push(ptr %v100, i64 %v101)
+    %v102 = call ptr @orion_list_push_mut(ptr %v100, i64 %v101)
     store ptr %v102, ptr %v8
     %v103 = add i64 0, 0
     %v104 = load ptr, ptr %v8
     %v105 = add i64 0, 48
-    %v106 = call ptr @orion_list_push(ptr %v104, i64 %v105)
+    %v106 = call ptr @orion_list_push_mut(ptr %v104, i64 %v105)
     store ptr %v106, ptr %v8
     %v107 = add i64 0, 0
     %v108 = load ptr, ptr %v8
     %v109 = add i64 0, 48
-    %v110 = call ptr @orion_list_push(ptr %v108, i64 %v109)
+    %v110 = call ptr @orion_list_push_mut(ptr %v108, i64 %v109)
     store ptr %v110, ptr %v8
     %v111 = add i64 0, 0
     %v112 = load ptr, ptr %v8
     %v113 = add i64 0, 16
     %v114 = call i64 @orion_idiv(i64 %v19, i64 %v113)
     %v115 = call i64 @orion_list_at(ptr %v95, i64 %v114)
-    %v116 = call ptr @orion_list_push(ptr %v112, i64 %v115)
+    %v116 = call ptr @orion_list_push_mut(ptr %v112, i64 %v115)
     store ptr %v116, ptr %v8
     %v117 = add i64 0, 0
     %v118 = load ptr, ptr %v8
@@ -2980,13 +2980,13 @@ if_92_then:
     %v122 = mul i64 %v120, %v121
     %v123 = sub i64 %v19, %v122
     %v124 = call i64 @orion_list_at(ptr %v95, i64 %v123)
-    %v125 = call ptr @orion_list_push(ptr %v118, i64 %v124)
+    %v125 = call ptr @orion_list_push_mut(ptr %v118, i64 %v124)
     store ptr %v125, ptr %v8
     %v126 = add i64 0, 0
     br label %if_92_merge
 if_92_else:
     %v129 = load ptr, ptr %v8
-    %v130 = call ptr @orion_list_push(ptr %v129, i64 %v19)
+    %v130 = call ptr @orion_list_push_mut(ptr %v129, i64 %v19)
     store ptr %v130, ptr %v8
     %v131 = add i64 0, 0
     br label %if_92_merge

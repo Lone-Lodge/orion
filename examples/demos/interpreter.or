@@ -17,30 +17,30 @@
 
 use text
 
-fn tok_num(v: int) -> Map:
+define tok_num(v: int) -> table:
     {"kind": "num", "val": v, "name": ""}
 
-fn tok_op(k: Text) -> Map:
+define tok_op(k: text) -> table:
     {"kind": k, "val": 0, "name": ""}
 
-fn tok_ident(nm: Text) -> Map:
+define tok_ident(nm: text) -> table:
     {"kind": "ident", "val": 0, "name": nm}
 
 type Parsed: val: int, next: int
 
-fn is_digit(b: int) -> int:
+define is_digit(b: int) -> int:
     if b >= '0' and b <= '9' then 1 else 0
 
-fn is_alpha(b: int) -> int:
+define is_alpha(b: int) -> int:
     if (b >= 'a' and b <= 'z') or (b >= 'A' and b <= 'Z') then 1 else 0
 
 # ---- Tokenizer -------------------------------------------------------
 
-fn tokenize(src: Text) -> [Map]:
+define tokenize(src: text) -> [table]:
     bs = bytes_from_text(src)
     n = len(bs)
-    mut toks = []
-    mut i = 0
+    edit toks = []
+    edit i = 0
     loop:
         if i >= n:
             break
@@ -49,7 +49,7 @@ fn tokenize(src: Text) -> [Map]:
             i = i + 1
         else:
             if is_digit(b) == 1:                # a run of digits -> number
-                mut num = 0
+                edit num = 0
                 loop:
                     if i >= n:
                         break
@@ -58,21 +58,21 @@ fn tokenize(src: Text) -> [Map]:
                         break
                     num = num * 10 + (d - '0')
                     i = i + 1
-                toks = push(toks, tok_num(num))
+                toks = append(toks, tok_num(num))
             else:
                 if is_alpha(b) == 1:            # a run of letters -> identifier
-                    mut chars = []
+                    edit chars = []
                     loop:
                         if i >= n:
                             break
                         c = at(bs, i)
                         if is_alpha(c) == 0:
                             break
-                        chars = push(chars, c)
+                        chars = append(chars, c)
                         i = i + 1
-                    toks = push(toks, tok_ident(bytes_to_text(chars)))
+                    toks = append(toks, tok_ident(bytes_to_text(chars)))
                 else:
-                    kind = match b:
+                    kind = choose b:
                         '+' -> "plus"
                         '-' -> "minus"
                         '*' -> "star"
@@ -81,18 +81,18 @@ fn tokenize(src: Text) -> [Map]:
                         ')' -> "rparen"
                         '=' -> "assign"
                         _ -> "bad"
-                    toks = push(toks, tok_op(kind))
+                    toks = append(toks, tok_op(kind))
                     i = i + 1
     toks
 
 # ---- Recursive-descent evaluator (env threaded through) --------------
 
-fn parse_factor(toks: [Map], pos: int, env: Map) -> Parsed:
+define parse_factor(toks: [table], pos: int, env: table) -> Parsed:
     t = at(toks, pos)
     # A flat 4-way dispatch — block arms let the `(` and unary-minus cases
     # bind an intermediate before returning, so this reads as one `match`
     # instead of a nested if/else ladder.
-    match get(t, "kind"):
+    choose get(t, "kind"):
         "lparen" ->
             inner = parse_expr(toks, pos + 1, env)
             Parsed{val: inner.val, next: inner.next + 1}
@@ -102,10 +102,10 @@ fn parse_factor(toks: [Map], pos: int, env: Map) -> Parsed:
         "ident" -> Parsed{val: get_or(env, get(t, "name"), 0), next: pos + 1}
         _ -> Parsed{val: get(t, "val"), next: pos + 1}
 
-fn parse_term(toks: [Map], pos: int, env: Map) -> Parsed:
+define parse_term(toks: [table], pos: int, env: table) -> Parsed:
     left = parse_factor(toks, pos, env)
-    mut val = left.val
-    mut i = left.next
+    edit val = left.val
+    edit i = left.next
     loop:
         if i >= len(toks):
             break
@@ -120,14 +120,14 @@ fn parse_term(toks: [Map], pos: int, env: Map) -> Parsed:
                 print_line("  (interpreter: divide by zero — using 0)")
                 val = 0
             else:
-                val = val / r.val
+                val = val // r.val
         i = r.next
     Parsed{val: val, next: i}
 
-fn parse_expr(toks: [Map], pos: int, env: Map) -> Parsed:
+define parse_expr(toks: [table], pos: int, env: table) -> Parsed:
     left = parse_term(toks, pos, env)
-    mut val = left.val
-    mut i = left.next
+    edit val = left.val
+    edit i = left.next
     loop:
         if i >= len(toks):
             break
@@ -141,14 +141,14 @@ fn parse_expr(toks: [Map], pos: int, env: Map) -> Parsed:
 
 # ---- Main — run a little program, carrying the environment forward ---
 
-fn is_assign(toks: [Map]) -> int:
+define is_assign(toks: [table]) -> int:
     if len(toks) >= 2 and get(at(toks, 0), "kind") == "ident" and get(at(toks, 1), "kind") == "assign" then 1 else 0
 
-fn main() -> int:
+define main() -> int:
     program = ["x = 3", "y = x * 2 + 1", "z = (x + y) * 2", "z - x"]
 
-    mut env = {}
-    mut result = 0
+    edit env = {}
+    edit result = 0
     loop stmt in program:
         toks = tokenize(stmt)
         if is_assign(toks) == 1:

@@ -5,8 +5,8 @@ type Shape:
     Circle(int)
     Rect(int, int)
 
-fn main() -> int:
-    mut total = 0
+define main() -> int:
+    edit total = 0
     if let Circle(r) = Shape.Circle(6):
         total = r * r          # matches -> 36
     else:

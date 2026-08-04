@@ -1,10 +1,10 @@
 # Tuples are anonymous structs now, so they can be HETEROGENEOUS: each slot
 # keeps its own type. `(5, "hello")` gives an int and a text, and `len(s)`
 # type-checks on the text slot. Multi-return uses a tuple type `(int, int)`.
-fn divmod(a: int, b: int) -> (int, int):
-    (a / b, a % b)
+define divmod(a: int, b: int) -> (int, int):
+    (a // b, a % b)
 
-fn main() -> int:
+define main() -> int:
     q, r = divmod(17, 5)      # q=3, r=2
     n, s = (5, "hello")       # heterogeneous: n is int, s is text
     q * 10 + r + n + len(s)   # 32 + 5 + 5 == 42

@@ -3,19 +3,19 @@
 # match, `?` propagation, a Text payload, and the generic-default `unwrap_or`.
 use option
 
-fn find(k: int) -> Option<int>:
+define find(k: int) -> Option<int>:
     if k > 0 then Option.Some(k * 10) else Option.None
 
-fn name(k: int) -> Option<Text>:
+define name(k: int) -> Option<text>:
     if k > 0 then Option.Some("abc") else Option.None
 
-fn twice(k: int) -> Option<int>:
+define twice(k: int) -> Option<int>:
     v = find(k)?                 # returns None out of twice
     Option.Some(v * 2)
 
-fn main() -> int:
-    mut total = 0
-    match find(0):
+define main() -> int:
+    edit total = 0
+    choose find(0):
         Some(v) -> total = total + v
         None -> total = total + 1                       # 1
     total = total + unwrap_or(find(2), 0)               # 21
