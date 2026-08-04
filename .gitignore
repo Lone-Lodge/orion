@@ -26,3 +26,4 @@ examples/tests/dist/.*.bat
 examples/tests/dist/.watch/
 build/autosave.txt
 build/*.map
+__pycache__/
