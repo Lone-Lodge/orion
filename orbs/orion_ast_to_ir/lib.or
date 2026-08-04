@@ -564,6 +564,20 @@ define parse_int(text: text) -> int:
 
 # Walk an expression node, append IR instructions to the function,
 # return the SSA id of the result.
+# Lower a binding's value; a SIZED integer annotation coerces it - wrap to
+# width and carry the type - so `x: u8 = 200` then `x + 100` wraps (44,
+# matching wasm) instead of drifting off as plain i64.
+define let_value_to_ir(fn_in: IRFn, scope_in: Scope, stmt: table, value_node: table) -> ConvResult:
+    base = ast_expr_to_ir(fn_in, scope_in, value_node)
+    if not has(stmt, "decl_type"):
+        return base
+    dt = get_map(stmt, "decl_type")
+    dtn = if get(dt, "kind") == "Named" then get(dt, "name") else ""
+    if not is_sized_int_name(dtn):
+        return base
+    pm = otir_mask_to(base.function, base.id, dtn)
+    ConvResult{function: pm.function, scope: base.scope, id: pm.id}
+
 define ast_binary_to_ir(fn2: IRFn, scope: Scope, op: text, left_id: int, right_id: int) -> ConvResult:
     edit pr = PushResult{function: fn2, id: 0 - 1}
     if op == "+":
@@ -603,6 +617,17 @@ define ast_binary_to_ir(fn2: IRFn, scope: Scope, op: text, left_id: int, right_i
         pr = ir_fn_push(fn2, ir_icmp_gt(left_id, right_id))
     if op == ">=":
         pr = ir_fn_push(fn2, ir_icmp_ge(left_id, right_id))
+    # Width-exact sized integers: when either side carries a sized type, the
+    # result wraps to the peer width - natively matching what the wasm
+    # backend has always done (`x: u8 = 200` then `x + 100` is 44, not 300).
+    # Comparisons and the truth ops stay unmasked: their result is 0/1, and
+    # sub-64 sized values in i64 storage are always in signed range anyway.
+    wrapping = op == "+" or op == "-" or op == "*" or op == "//" or op == "%" or op == "&" or op == "|" or op == "^" or op == "<<"
+    if wrapping and pr.id >= 0:
+        peer = sized_peer(get_value_type(pr.function, left_id), get_value_type(pr.function, right_id))
+        if peer != "":
+            pm = otir_mask_to(pr.function, pr.id, peer)
+            return ConvResult{function: pm.function, scope: scope, id: pm.id}
     ConvResult{function: pr.function, scope: scope, id: pr.id}
 
 define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
@@ -670,7 +695,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # an alias (astra's compile cache, let-destructure envs).
             # Audited hot accumulators opt into `append(x, v)`.
             value_node = get(stmt, "value")
-            er = ast_expr_to_ir(current_fn, current_scope, value_node)
+            er = let_value_to_ir(current_fn, current_scope, stmt, value_node)
             current_fn = er.function
             current_scope = er.scope
             # A literal that does not fit its declared sized type is a compile
@@ -711,8 +736,11 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     # All ptr-typed values (text/list/map/struct:T/list:T) share
                     # the same LLVM storage. Only flag a mismatch when one side
                     # is i64 and the other is ptr-shaped.
-                    slot_ll = if slot_type == "i64" then "i64" else "ptr"
-                    new_ll = if new_type == "i64" then "i64" else "ptr"
+                    # Storage bucket, not exact name: a sized int (u8...) and a
+                    # plain i64 share i64 storage and must interassign - only a
+                    # genuine int/float/pointer mismatch is the error here.
+                    slot_ll = if slot_type == "f64" then "f64" else if is_ptr_ir_type(slot_type) then "ptr" else "i64"
+                    new_ll = if new_type == "f64" then "f64" else if is_ptr_ir_type(new_type) then "ptr" else "i64"
                     if slot_ll != new_ll:
                         line = if has(stmt, "line") then get_int(stmt, "line") else 0
                         col = if has(stmt, "col") then get_int(stmt, "col") else 0
@@ -3238,6 +3266,54 @@ define ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResul
 # i64 for now, so int<->int is a value passthrough); int<->float uses sitofp /
 # fptosi. Width-exact sized integers are a native refinement; the wasm backend
 # is width-exact where it matters.
+
+# The sub-64 sized integer names. i64/u64 are NOT here: they are the storage
+# itself, nothing to wrap to. (u64 values past 2^63 are not representable in
+# the i64 storage - the same standing limit the wasm backend has.)
+define is_sized_int_name(name: text) -> truth:
+    name == "i8" or name == "u8" or name == "i16" or name == "u16" or name == "i32" or name == "u32" or name == "u64"
+
+define sized_width(t: text) -> int:
+    if t == "i8" or t == "u8":
+        return 8
+    if t == "i16" or t == "u16":
+        return 16
+    if t == "i32" or t == "u32":
+        return 32
+    0
+
+# The type a two-sided integer op computes IN: a sized side captures a plain
+# i64 side (that is how a literal takes the sized type in arithmetic), the
+# wider of two sized sides wins, anything else means "leave it alone".
+define sized_peer(lt: text, rt: text) -> text:
+    lw = sized_width(lt)
+    rw = sized_width(rt)
+    if lw > 0 and (rw > 0 or rt == "i64"):
+        return if rw > lw then rt else lt
+    if rw > 0 and lt == "i64":
+        return rt
+    ""
+
+# Wrap `id` to `tname`'s width, and TYPE the result as `tname` so the next
+# op in a chain wraps too: unsigned masks with AND, signed sign-extends via
+# shl+ashr by 64-width. The one shared wrap path - the cast below and every
+# sized binary result go through here.
+define otir_mask_to(fn_in: IRFn, id: int, tname: text) -> PushResult:
+    w = sized_width(tname)
+    if w == 0:
+        return PushResult{function: fn_in, id: id}
+    uns = tname == "u8" or tname == "u16" or tname == "u32"
+    if uns:
+        mask_val = if w == 8 then 255 else if w == 16 then 65535 else 4294967295
+        pc = ir_fn_push(fn_in, ir_iconst(mask_val))
+        ir_fn_push(pc.function, Inst{op: "bit_and", type_text: tname, value: 0, lhs: id, rhs: pc.id, name: "", args: []})
+    else:
+        sh = 64 - w
+        pc = ir_fn_push(fn_in, ir_iconst(sh))
+        ps = ir_fn_push(pc.function, ir_shl(id, pc.id))
+        pc2 = ir_fn_push(ps.function, ir_iconst(sh))
+        ir_fn_push(pc2.function, Inst{op: "shr", type_text: tname, value: 0, lhs: ps.id, rhs: pc2.id, name: "", args: []})
+
 define ast_cast_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     inner = ast_expr_to_ir(fn_value, scope, get_map(node, "expr"))
     tn = get_map(node, "type")
@@ -3256,24 +3332,11 @@ define ast_cast_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if src == "f64":
             pr = ir_fn_push(inner.function, ir_fptosi(inner.id))
             base = ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
-        # Then narrow to a sized target's width (native ints are i64): unsigned
-        # masks with AND, signed sign-extends via shl/ashr by 64-width.
-        w = if tname == "i8" or tname == "u8" then 8 else if tname == "i16" or tname == "u16" then 16 else if tname == "i32" or tname == "u32" then 32 else 64
-        uns = tname == "u8" or tname == "u16" or tname == "u32"
-        if w >= 64:
-            base
-        else if uns:
-            mask_val = if w == 8 then 255 else if w == 16 then 65535 else 4294967295
-            pc = ir_fn_push(base.function, ir_iconst(mask_val))
-            pa = ir_fn_push(pc.function, ir_bit_and(base.id, pc.id))
-            ConvResult{function: pa.function, scope: base.scope, id: pa.id}
-        else:
-            sh = 64 - w
-            pc = ir_fn_push(base.function, ir_iconst(sh))
-            ps = ir_fn_push(pc.function, ir_shl(base.id, pc.id))
-            pc2 = ir_fn_push(ps.function, ir_iconst(sh))
-            pr2 = ir_fn_push(pc2.function, ir_shr(ps.id, pc2.id))
-            ConvResult{function: pr2.function, scope: base.scope, id: pr2.id}
+        # Then narrow to a sized target's width (native ints are i64) - the
+        # shared wrap path, which also TYPES the result as the target so
+        # later arithmetic keeps wrapping.
+        pm = otir_mask_to(base.function, base.id, tname)
+        ConvResult{function: pm.function, scope: base.scope, id: pm.id}
 
 public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     kind = get(node, "kind")
@@ -3982,6 +4045,12 @@ define ast_type_to_ir(type_node: table) -> text:
                     # so llvm_type_of returns "ptr" in the emit step.
                     "fn"
                 else:
+                    # A sized integer KEEPS its name as the IR type: storage
+                    # stays i64 (llvm_type_of maps any unknown scalar there),
+                    # but the width survives so arithmetic can wrap exactly
+                    # (see otir_mask_to). i64/u64 erase - they ARE the storage.
+                    if is_sized_int_name(name):
+                        return name
                     if name == "float" or name == "f64" or name == "number":
                         "f64"
                     else:
@@ -4058,6 +4127,9 @@ define ast_type_to_ir_with_scope(type_node: table, scope: Scope) -> text:
                 if name == "fn" or name == "ptr":
                     "fn"
                 else:
+                    # Sized integers keep their width (see ast_type_to_ir).
+                    if is_sized_int_name(name):
+                        return name
                     if name == "float" or name == "f64" or name == "number":
                         "f64"
                     else:
@@ -4152,8 +4224,9 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
         # exempt it - only an EXPLICIT return type is a contract to check.
         ret_undeclared = has(ret_type_node, "name") and get(ret_type_node, "name") == "Unit"
         rt_exempt = ret_undeclared or ret_type == "fn" or ret_type == "f64" or ret_type == "Unit" or rt_body == "fn" or rt_body == "f64" or rt_body == "void" or rt_body == "Unit"
-        rt_decl_ll = if ret_type == "i64" then "i64" else "ptr"
-        rt_body_ll = if rt_body == "i64" then "i64" else "ptr"
+        # Bucket by STORAGE: a sized int (u8...) and i64 are the same slot.
+        rt_decl_ll = if is_ptr_ir_type(ret_type) then "ptr" else "i64"
+        rt_body_ll = if is_ptr_ir_type(rt_body) then "ptr" else "i64"
         if (not rt_exempt) and rt_decl_ll != rt_body_ll:
             compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} - function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}`")
         # Sharpened guard: among POINTER shapes, catch confusing two concrete

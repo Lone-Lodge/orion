@@ -1,0 +1,26 @@
+# Width-exact sized-integer ARITHMETIC, natively - the wasm backend's
+# semantics, now one semantics. A sized binding wraps every op to its
+# width: u8 200+100 is 44 (not 300), i8 100+100 is -56, and a CHAIN keeps
+# wrapping because the result carries its type. A literal in arithmetic
+# takes the sized peer's type. Plain int stays untouched 64-bit.
+define main() -> int:
+    x: u8 = 200
+    a = x + 100
+    y: i8 = 100
+    b = y + 100
+    z: u8 = 200
+    c = z // 3
+    chain: u8 = 250
+    d = chain + 3 + 3
+    m: u16 = 60000
+    e = m * 2
+    plain = 200 + 100
+    w = (1000 as u8) + 0
+    p1 = if a == 44 then 7 else 0
+    p2 = if b == 0 - 56 then 7 else 0
+    p3 = if c == 66 then 7 else 0
+    p4 = if d == 0 then 7 else 0
+    p5 = if e == 54464 then 7 else 0
+    p6 = if plain == 300 and w == 232 then 7 else 0
+    print_line("a={a} b={b} c={c} d={d} e={e} plain={plain} w={w}")
+    p1 + p2 + p3 + p4 + p5 + p6

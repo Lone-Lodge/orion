@@ -4041,14 +4041,22 @@ define w_int_width(c: text) -> int:
     else:
         0
 
-# Peer type of two integer operand codes: the wider dominates; a plain i32 int
-# ("i", also a small literal's type) yields to a sized partner of equal width.
+# Peer type of two integer operand codes. A DEFAULT int ("i"/"l" - what a
+# bare literal or plain `int` is) always yields to a sized partner: that is
+# how `x + 100` on a u8 stays u8 and wraps, matching the native backend.
+# Between two sized partners the wider dominates.
 define w_peer(a: text, b: text) -> text:
     wa = w_int_width(a)
     wb = w_int_width(b)
+    a_default = a == "i" or a == "l"
+    b_default = b == "i" or b == "l"
     if wa == 0:
         b
     else if wb == 0:
+        a
+    else if a_default and not b_default:
+        b
+    else if b_default and not a_default:
         a
     else if wb > wa:
         b
