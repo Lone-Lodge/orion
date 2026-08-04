@@ -31,7 +31,10 @@ for f in "$DIR"/*.or; do
     # spin forever (an unterminated interpolation hole did exactly that), and a
     # hang in the compiler is worse than a bad message. A case that does not
     # finish in 30s is a failure.
-    out="$(timeout 30 "$ORION" "$f" "$TMP/out.ll" "$DIR/orbs" "$ROOT/orbs" 2>&1)"
+    # macOS ships no `timeout` (coreutils calls it gtimeout) - without this
+    # probe every fixture "failed" with `timeout: command not found`.
+    TO="$(command -v timeout || command -v gtimeout || true)"
+    out="$(${TO:+"$TO" 30} "$ORION" "$f" "$TMP/out.ll" "$DIR/orbs" "$ROOT/orbs" 2>&1)"
     code=$?
     if [ "$code" = "124" ]; then
         printf "  %-22s HUNG (30s timeout)\n" "$name"

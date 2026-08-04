@@ -16,6 +16,10 @@ CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
 WORK="$ROOT/dist/.examples"
 rm -rf "$WORK"; mkdir -p "$WORK"
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) LIBM="" ;;
+    *) LIBM="-lm" ;;
+esac
 
 fail=0; count=0; nodoc=0; excused=0
 for orbdir in "$ROOT"/orbs/*/; do
@@ -72,7 +76,9 @@ EOF
             printf "  %-28s COMPILE FAILED\n" "$orb #$n"; echo FAIL >> "$WORK/fails"
             continue
         fi
-        if ! "$CLANG" "$WORK/p.ll" "$ROOT/runtime/orion_cli.c" "$ROOT/runtime/orion_rt.c" -o "$WORK/p.exe" > /dev/null 2>&1; then
+        # -lm: the num orb's transcendentals need libm on Linux. NOT on
+        # Windows - lld-link then demands an m.lib that does not exist.
+        if ! "$CLANG" "$WORK/p.ll" "$ROOT/runtime/orion_cli.c" "$ROOT/runtime/orion_rt.c" $LIBM -o "$WORK/p.exe" > /dev/null 2>&1; then
             printf "  %-28s LINK FAILED\n" "$orb #$n"; echo FAIL >> "$WORK/fails"
             continue
         fi
