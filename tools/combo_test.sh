@@ -19,6 +19,13 @@
 # Exit code is the number of failing combinations.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The compiler recurses deep; Windows reserves stack in the exe (/STACK),
+# POSIX raises it here - without this, arm64 macOS segfaulted SILENTLY on
+# the deepest compiles (closure combos) while linux squeaked by on 8 MB.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
+esac
 ORION="$ROOT/dist/orion.exe"
 CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
@@ -164,7 +171,10 @@ for a in $FEATURES; do
         } > "$src"
 
         if ! timeout 60 "$ORION" "$src" "$WORK/$name.ll" "$ROOT/orbs" > "$WORK/$name.log" 2>&1; then
+            # An empty log means the compiler DIED (signal, no message) -
+            # say so instead of printing nothing to debug by.
             printf "  %-24s COMPILE FAILED: %s\n" "$name" "$(grep -m1 -iE 'error|list index' "$WORK/$name.log" | cut -c1-90)"
+            [ -s "$WORK/$name.log" ] || echo "      (empty log: compiler crashed - signal, or stack)"
             fail=$((fail + 1)); continue
         fi
         if ! "$CLANG" "$WORK/$name.ll" "$RT" -o "$WORK/$name.exe" >> "$WORK/$name.log" 2>&1; then

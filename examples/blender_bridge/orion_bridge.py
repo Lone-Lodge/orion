@@ -140,14 +140,17 @@ def chat_worker(prompt, entry):
                      "instruera anvandaren. Vill du ge anvandaren kod att kora "
                      "i panelen, lagg den i ETT python-kodblock. "
                      "Svara kort, pa svenska.")
+            # The prompt goes via STDIN, never as an argument: the .CMD shim
+            # routes argv through cmd.exe, which truncates at the first
+            # newline (the multi-line scene context arrived empty that way).
             flags = ["-p", "--output-format", "json",
-                     "--append-system-prompt", cmd_safe(brief), cmd_safe(prompt)]
-            run = subprocess.run([exe, "-c"] + flags, cwd=CHAT_DIR,
+                     "--append-system-prompt", cmd_safe(brief)]
+            run = subprocess.run([exe, "-c"] + flags, input=prompt, cwd=CHAT_DIR,
                                  capture_output=True, text=True, encoding="utf-8",
                                  errors="replace", timeout=600,
                                  creationflags=CREATE_NO_WINDOW)
             if run.returncode != 0:
-                run = subprocess.run([exe] + flags, cwd=CHAT_DIR,
+                run = subprocess.run([exe] + flags, input=prompt, cwd=CHAT_DIR,
                                      capture_output=True, text=True, encoding="utf-8",
                                      errors="replace", timeout=600,
                                      creationflags=CREATE_NO_WINDOW)
@@ -258,6 +261,16 @@ def plain(text):
             stripped = "•  " + stripped[2:]
         lines.append(stripped)
     return "\n".join(lines)
+
+
+# The row label for a snippet: the first line that DOES something -
+# "import bpy" tells you nothing about what the snippet is.
+def code_label(code):
+    for line in code.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith(("import ", "from ")):
+            return stripped
+    return code.splitlines()[0].strip() if code else ""
 
 
 # A snippet earns a "kor igen" row only if it actually touches the scene -
@@ -448,8 +461,7 @@ if bpy is not None:
                 layout.separator(factor=0.3)
                 again = layout.column(align=True)
                 for index, code in enumerate(codes):
-                    code_line = code.splitlines()[0][:34]
-                    rerun = again.operator("orion.rerun", text=code_line,
+                    rerun = again.operator("orion.rerun", text=code_label(code)[:34],
                                            icon="LOOP_BACK")
                     rerun.index = index
 
@@ -510,15 +522,16 @@ if bpy is not None:
                     # a bridge run: one dimmed action row, like the app's tool rows
                     action = layout.row()
                     action.active = False
-                    code_line = entry["code"].splitlines()[0] if entry["code"] else ""
-                    action.label(text=code_line[:44],
+                    action.label(text=code_label(entry["code"])[:44],
                                  icon="CHECKMARK" if entry["ok"] else "CANCEL")
-                    if not entry["ok"] and entry["output"]:
-                        reason = layout.row()
-                        reason.active = False
-                        reason.alert = True
-                        reason.label(text=entry["output"].splitlines()[-1][:48],
-                                     icon="BLANK1")
+                    if entry["output"]:
+                        result_lines = entry["output"].splitlines()
+                        for out_line in (result_lines[:3] if entry["ok"]
+                                         else result_lines[-1:]):
+                            reason = layout.row()
+                            reason.active = False
+                            reason.alert = not entry["ok"]
+                            reason.label(text=out_line[:48], icon="BLANK1")
                     continue
                 # your message: a right-aligned bubble
                 split = layout.split(factor=0.22)

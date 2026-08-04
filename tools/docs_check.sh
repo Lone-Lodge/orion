@@ -15,6 +15,13 @@
 #   bash tools/docs_check.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The compiler recurses deep; Windows reserves stack in the exe (/STACK),
+# POSIX raises it here - without this, arm64 macOS segfaulted SILENTLY on
+# the deepest compiles (closure combos) while linux squeaked by on 8 MB.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
+esac
 ORION="$ROOT/dist/orion.exe"
 WORK="$ROOT/dist/.docscheck"
 # One guide, one language for it. sv.html is archived; a second translation of
@@ -168,7 +175,12 @@ awk '
 # it fresh and compare: if it differs, the committed page is out of date.
 echo
 if bash "$ROOT/tools/orb_reference.sh" --stdout > "$WORK/reference.html" 2> "$WORK/reflog.txt"; then
-    if diff -q "$ROOT/docs/reference.html" "$WORK/reference.html" > /dev/null 2>&1; then
+    # Compare with line endings normalized: a CI checkout with autocrlf=true
+    # hands us a CRLF copy of the committed page and the freshly generated
+    # one is LF - same content, and that must not read as "stale".
+    tr -d '\r' < "$ROOT/docs/reference.html" > "$WORK/ref_committed.norm"
+    tr -d '\r' < "$WORK/reference.html" > "$WORK/ref_fresh.norm"
+    if diff -q "$WORK/ref_committed.norm" "$WORK/ref_fresh.norm" > /dev/null 2>&1; then
         echo "  reference: up to date with orbs/"
     else
         echo "  reference: STALE - run bash tools/orb_reference.sh"

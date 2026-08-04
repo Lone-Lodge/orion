@@ -15,6 +15,13 @@
 # Exit code is the number of failing cases.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The compiler recurses deep; Windows reserves stack in the exe (/STACK),
+# POSIX raises it here - without this, arm64 macOS segfaulted SILENTLY on
+# the deepest compiles (closure combos) while linux squeaked by on 8 MB.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
+esac
 ORION="$ROOT/dist/orion.exe"
 DIR="$ROOT/examples/tests/negative"
 [ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
