@@ -240,9 +240,18 @@ def wrap_chars(context):
     return max(24, int((width - 48) / 7))
 
 
-# Replies arrive as markdown - strip the tokens Blender cannot render.
+# Replies arrive as markdown - strip the tokens Blender cannot render and
+# turn list dashes into bullets, so the text reads clean in plain labels.
 def plain(text):
-    return text.replace("**", "").replace("`", "")
+    lines = []
+    for raw_line in text.replace("**", "").replace("`", "").splitlines():
+        stripped = raw_line.strip()
+        if stripped.startswith("#"):
+            stripped = stripped.lstrip("#").strip()
+        if stripped.startswith("- "):
+            stripped = "•  " + stripped[2:]
+        lines.append(stripped)
+    return "\n".join(lines)
 
 
 class ORION_PT_bridge(bpy.types.Panel if bpy else object):
@@ -281,31 +290,32 @@ class ORION_PT_chat(bpy.types.Panel if bpy else object):
             hint.active = False
             hint.label(text="Skriv nedan sa bygger Claude i scenen.")
         for entry in exchanges:
-            user_box = layout.box()
-            user_col = user_box.column(align=True)
-            user_col.active = False  # your words dimmed, the reply carries the weight
-            user_col.label(text=f"Du  ·  {entry['when']}", icon="USER")
-            for line in wrapped(entry["code"], chars):
-                user_col.label(text=line)
-            reply_box = layout.box()
-            reply_col = reply_box.column(align=True)
+            # your message: a right-aligned bubble, like the chat apps
+            split = layout.split(factor=0.22)
+            split.label(text="")
+            bubble = split.box().column(align=True)
+            for line in wrapped(entry["code"], max(16, int(chars * 0.7))):
+                bubble_row = bubble.row()
+                bubble_row.alignment = "RIGHT"
+                bubble_row.label(text=line)
+            layout.separator(factor=0.4)
+            # the reply: plain full-width text, no box - the words carry it
             if entry.get("pending"):
-                waiting = reply_col.row()
+                waiting = layout.row()
                 waiting.active = False
-                waiting.label(text=entry["output"], icon="SORTTIME")
-                continue
-            head = reply_col.row()
-            head.active = False
-            head.label(text="Claude", icon="SOLO_ON")
-            body = reply_col.column(align=True)
-            body.alert = not entry["ok"]
-            for line in wrapped(plain(entry["output"]), chars)[:40]:
-                body.label(text=line)
-            if entry.get("meta"):
-                foot = reply_col.row()
-                foot.active = False
-                foot.label(text=entry["meta"])
+                waiting.label(text=entry["output"], icon="SOLO_ON")
+            else:
+                body = layout.column(align=True)
+                body.alert = not entry["ok"]
+                for line in wrapped(plain(entry["output"]), chars)[:40]:
+                    body.label(text=line)
+                if entry.get("meta"):
+                    foot = layout.row()
+                    foot.active = False
+                    foot.label(text=entry["meta"], icon="SOLO_ON")
+            layout.separator(factor=0.8)
         send = layout.row(align=True)
+        send.scale_y = 1.2
         send.enabled = not chat_is_busy()
         send.prop(context.window_manager, "orion_prompt", text="",
                   placeholder="Fraga Claude...")
