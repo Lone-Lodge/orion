@@ -912,6 +912,11 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     if target == 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/STACK:67108864")
+        # UTF-8 as the process code page - see runtime/orion.manifest for why.
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "-MANIFEST:EMBED")
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "-MANIFESTINPUT:" + runtime + "/orion.manifest")
     link_args = append(link_args, "-o")
     link_args = append(link_args, exe)
     if target == 0:
@@ -1038,6 +1043,11 @@ define cli_build(path: text) -> text:
     if os_kind() == 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/STACK:67108864")
+        # UTF-8 as the process code page - see runtime/orion.manifest for why.
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "-MANIFEST:EMBED")
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "-MANIFESTINPUT:" + runtime + "/orion.manifest")
     link_args = append(link_args, "-o")
     link_args = append(link_args, exe)
     if run_command(nb_clang(), link_args) != 0:

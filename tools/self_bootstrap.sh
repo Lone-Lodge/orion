@@ -46,7 +46,10 @@ case "$HOST_OS" in
         fi
         MANGLE="o" ;;
     MINGW*|MSYS*|CYGWIN*|Windows*)
-        RETARGET=0; STACK_LINK="-Xlinker /STACK:67108864" ;;
+        # The compiler needs the same UTF-8 code page as everything orbit
+        # links, or the UTF-8 paths orbit hands it read back as cp1252
+        # (see runtime/orion.manifest). Dash-prefixed so MSYS leaves it alone.
+        RETARGET=0; STACK_LINK="-Xlinker /STACK:67108864 -Xlinker -MANIFEST:EMBED -Xlinker -MANIFESTINPUT:$ROOT/runtime/orion.manifest" ;;
     *)
         # Unknown POSIX-ish host: assume ELF/Linux conventions.
         HOST_TRIPLE="x86_64-unknown-linux-gnu"; MANGLE="e" ;;

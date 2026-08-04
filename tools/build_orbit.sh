@@ -25,7 +25,13 @@ case "$(uname -s 2>/dev/null || echo unknown)" in
     Darwin)
         if [ "$(uname -m)" = "arm64" ]; then HOST_TRIPLE="arm64-apple-macosx"; else HOST_TRIPLE="x86_64-apple-macosx"; fi
         MANGLE="o"; RETARGET=1; STACK_LINK="" ;;
-    MINGW*|MSYS*|CYGWIN*|Windows*) RETARGET=0; STACK_LINK="-Xlinker /STACK:67108864" ;;
+    MINGW*|MSYS*|CYGWIN*|Windows*)
+        RETARGET=0
+        # UTF-8 code page for orbit itself, same as every exe it links
+        # (see runtime/orion.manifest).
+        # Dash-prefixed so MSYS/Git-Bash does not mistake "/MANIFESTINPUT:path"
+        # for a POSIX path list and rewrite it. lld-link takes either prefix.
+        STACK_LINK="-Xlinker /STACK:67108864 -Xlinker -MANIFEST:EMBED -Xlinker -MANIFESTINPUT:$ROOT/runtime/orion.manifest" ;;
     *)      HOST_TRIPLE="x86_64-unknown-linux-gnu"; MANGLE="e"; RETARGET=1; STACK_LINK="" ;;
 esac
 
