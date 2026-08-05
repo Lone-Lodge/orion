@@ -690,6 +690,8 @@ long long win_set_opacity(const char *needle, long long percent) {
  * window, and win_set_opacity knows not to strip that bit while this is on.)
  * 1 = clicking through, 0 = solid, -1 = no such window. */
 static void ow_through_hotkey(void *h, int on);   /* defined with the own-window block */
+static int ow_is_own_window(void *h);
+static long long ow_ghost_query(void *h);
 long long win_set_click_through(const char *needle, long long on) {
     void *h = win_by_title(needle);
     LONG_PTR ex;
@@ -703,10 +705,13 @@ long long win_set_click_through(const char *needle, long long on) {
     ow_through_hotkey(h, on ? 1 : 0);
     return on ? 1 : 0;
 }
-/* Whether it is clicking through right now (1/0), or -1 for no such window. */
+/* Whether it is clicking through right now (1/0), or -1 for no such window.
+ * An own window in ghost mode answers yes even while the cursor is over an
+ * interactive island - the MODE is on, which is what the page asks about. */
 long long win_click_through_on(const char *needle) {
     void *h = win_by_title(needle);
     if (!h || !wt_GetWindowLongPtr) return -1;
+    if (ow_is_own_window(h) && ow_ghost_query(h)) return 1;
     return (wt_GetWindowLongPtr(h, -20) & 0x00000020) ? 1 : 0;
 }
 /* Take the frame off, so the page IS the window and can draw its own bar.
@@ -863,6 +868,7 @@ typedef HRESULT (__stdcall *ow_fn1)(void *);
 typedef HRESULT (__stdcall *ow_fn2)(void *, void *);
 typedef HRESULT (__stdcall *ow_fn3)(void *, void *, void *);
 typedef HRESULT (__stdcall *ow_bounds_fn)(void *, RECT);
+typedef struct { unsigned char a, r, g, b; } ow_color;   /* COREWEBVIEW2_COLOR */
 static void *ow_vt(void *obj, int i) { return (*(void ***)obj)[i]; }
 
 /* user32/ole32 by GetProcAddress, same reason as the wt_ block above: a
@@ -887,6 +893,14 @@ static int (__stdcall *owu_GetMonitorInfoW)(HMONITOR, MONITORINFO *);
 static int (__stdcall *owu_SetWindowPos)(HWND, HWND, int, int, int, int, UINT);
 static int (__stdcall *owu_RegisterHotKey)(HWND, int, UINT, UINT);
 static int (__stdcall *owu_UnregisterHotKey)(HWND, int);
+static HCURSOR (__stdcall *owu_SetCursor)(HCURSOR);
+static UINT_PTR (__stdcall *owu_SetTimer)(HWND, UINT_PTR, UINT, void *);
+static int (__stdcall *owu_KillTimer)(HWND, UINT_PTR);
+static int (__stdcall *owu_GetCursorPos)(POINT *);
+static int (__stdcall *owu_ScreenToClient)(HWND, POINT *);
+static HWND (__stdcall *owu_SetCapture)(HWND);
+static int (__stdcall *owu_ReleaseCapture)(void);
+static int (__stdcall *owu_TrackMouseEvent)(TRACKMOUSEEVENT *);
 static HRESULT (__stdcall *owu_CoInitializeEx)(void *, DWORD);
 static void (__stdcall *owu_CoTaskMemFree)(void *);
 
@@ -932,6 +946,14 @@ static int ow_load_user(void) {
     owu_SetWindowPos = (int (__stdcall *)(HWND, HWND, int, int, int, int, UINT))(void *)GetProcAddress(u, "SetWindowPos");
     owu_RegisterHotKey = (int (__stdcall *)(HWND, int, UINT, UINT))(void *)GetProcAddress(u, "RegisterHotKey");
     owu_UnregisterHotKey = (int (__stdcall *)(HWND, int))(void *)GetProcAddress(u, "UnregisterHotKey");
+    owu_SetCursor = (HCURSOR (__stdcall *)(HCURSOR))(void *)GetProcAddress(u, "SetCursor");
+    owu_SetTimer = (UINT_PTR (__stdcall *)(HWND, UINT_PTR, UINT, void *))(void *)GetProcAddress(u, "SetTimer");
+    owu_KillTimer = (int (__stdcall *)(HWND, UINT_PTR))(void *)GetProcAddress(u, "KillTimer");
+    owu_GetCursorPos = (int (__stdcall *)(POINT *))(void *)GetProcAddress(u, "GetCursorPos");
+    owu_ScreenToClient = (int (__stdcall *)(HWND, POINT *))(void *)GetProcAddress(u, "ScreenToClient");
+    owu_SetCapture = (HWND (__stdcall *)(HWND))(void *)GetProcAddress(u, "SetCapture");
+    owu_ReleaseCapture = (int (__stdcall *)(void))(void *)GetProcAddress(u, "ReleaseCapture");
+    owu_TrackMouseEvent = (int (__stdcall *)(TRACKMOUSEEVENT *))(void *)GetProcAddress(u, "TrackMouseEvent");
     owu_CoInitializeEx = (HRESULT (__stdcall *)(void *, DWORD))(void *)GetProcAddress(o, "CoInitializeEx");
     owu_CoTaskMemFree = (void (__stdcall *)(void *))(void *)GetProcAddress(o, "CoTaskMemFree");
     return owu_RegisterClassW && owu_CreateWindowExW && owu_DefWindowProcW && owu_GetMessageW && owu_CoInitializeEx;
@@ -953,6 +975,123 @@ static void *ow_handler_vtbl[4] = { (void *)ow_h_qi, (void *)ow_h_addref, (void 
 
 static HWND ow_hwnd;
 static int ow_is_own_window(void *h) { return h && h == (void *)ow_hwnd; }
+
+/* ---- visual hosting: DirectComposition, so pixels can be HOLES ----
+ * hwnd hosting puts the webview in a child window: whole-window alpha works,
+ * per-pixel does not (colorkey measured dead - the child composes past the
+ * redirection surface). Visual hosting hands the webview a DComp visual on a
+ * WS_EX_NOREDIRECTIONBITMAP window instead: where the page paints nothing,
+ * there IS nothing - the work shows through at 100%. The price is that input
+ * becomes ours to forward (mouse + cursor below); the prize is ghost mode. */
+typedef struct { unsigned long a; unsigned short b, c; unsigned char d[8]; } ow_guid;
+static const ow_guid OW_IID_ENV3 = {0x80A22AE3, 0xBE7C, 0x4CE2, {0xAF, 0xE1, 0x5A, 0x50, 0x05, 0x6C, 0xDE, 0xEB}};
+static const ow_guid OW_IID_CONTROLLER = {0x4D00C0D1, 0x9434, 0x4EB6, {0x80, 0x78, 0x86, 0x97, 0xA5, 0x60, 0x33, 0x4F}};
+static const ow_guid OW_IID_CONTROLLER2 = {0xC979903E, 0xD4CA, 0x4228, {0x92, 0xEB, 0x47, 0xEE, 0x3F, 0xA9, 0x6E, 0xAB}};
+static const ow_guid OW_IID_DXGI_DEVICE = {0x54EC77FA, 0x1377, 0x44E6, {0x8C, 0x32, 0x88, 0xFD, 0x5F, 0x44, 0xC8, 0x4C}};
+static const ow_guid OW_IID_DCOMP_DEVICE = {0xC37EA93A, 0xE7AA, 0x450D, {0xB1, 0x6F, 0x97, 0x46, 0xCB, 0x04, 0x07, 0xF3}};
+static HRESULT ow_qi(void *obj, const ow_guid *iid, void **out) {
+    *out = NULL;
+    return ((HRESULT (__stdcall *)(void *, const void *, void **))ow_vt(obj, 0))(obj, iid, out);
+}
+
+static void *ow_dcdev, *ow_dctarget, *ow_dcvisual;
+static void *ow_comp;                   /* ICoreWebView2CompositionController */
+static int ow_visual;                   /* 1 = visual hosting is live */
+static void ow_dcommit(void) {
+    if (ow_dcdev) ((ow_fn1)ow_vt(ow_dcdev, 3 /* Commit */))(ow_dcdev);
+}
+/* D3D device -> DXGI -> DComp device -> target for our hwnd -> root visual.
+ * All dynamic (d3d11.dll / dcomp.dll); any miss means hwnd hosting instead. */
+static int ow_dcomp_init(HWND hwnd) {
+    HMODULE d3d = LoadLibraryA("d3d11.dll"), dc = LoadLibraryA("dcomp.dll");
+    HRESULT (__stdcall *create_d3d)(void *, int, HMODULE, UINT, const int *, UINT, UINT, void **, int *, void **);
+    HRESULT (__stdcall *create_dcomp)(void *, const void *, void **);
+    void *dev = NULL, *dxgi = NULL;
+    if (!d3d || !dc) return 0;
+    create_d3d = (HRESULT (__stdcall *)(void *, int, HMODULE, UINT, const int *, UINT, UINT, void **, int *, void **))(void *)GetProcAddress(d3d, "D3D11CreateDevice");
+    create_dcomp = (HRESULT (__stdcall *)(void *, const void *, void **))(void *)GetProcAddress(dc, "DCompositionCreateDevice");
+    if (!create_d3d || !create_dcomp) return 0;
+    if (create_d3d(NULL, 1 /* HARDWARE */, NULL, 0x20 /* BGRA_SUPPORT */, NULL, 0, 7 /* D3D11_SDK_VERSION */, &dev, NULL, NULL) != 0 || !dev) return 0;
+    if (ow_qi(dev, &OW_IID_DXGI_DEVICE, &dxgi) != 0 || !dxgi) return 0;
+    if (create_dcomp(dxgi, &OW_IID_DCOMP_DEVICE, &ow_dcdev) != 0 || !ow_dcdev) return 0;
+    if (((HRESULT (__stdcall *)(void *, HWND, int, void **))ow_vt(ow_dcdev, 6 /* CreateTargetForHwnd */))(ow_dcdev, hwnd, 1, &ow_dctarget) != 0 || !ow_dctarget) return 0;
+    if (((ow_fn2)ow_vt(ow_dcdev, 7 /* CreateVisual */))(ow_dcdev, (void *)&ow_dcvisual) != 0 || !ow_dcvisual) return 0;
+    if (((ow_fn2)ow_vt(ow_dctarget, 3 /* SetRoot */))(ow_dctarget, ow_dcvisual) != 0) return 0;
+    ow_dcommit();
+    return 1;
+}
+
+/* ---- ghost mode: the background is a hole, the images are solid ----
+ * The page sends the rectangles that should stay INTERACTIVE (items + bar)
+ * in device pixels, client coords. A 30ms timer follows the cursor: over a
+ * rect the window takes input as usual; over the void it wears
+ * WS_EX_TRANSPARENT and the click lands on the work underneath. ctrl+alt+c
+ * ends the mode from anywhere, and the page's state poll follows. */
+#define OW_MSG_GHOST (0x8000 + 42)     /* WM_APP + 42, lparam = malloc'd csv */
+#define OW_GHOST_TIMER 7
+static int ow_rects[256][4];
+static int ow_rect_count;
+static volatile LONG ow_ghost_on;
+static long long ow_ghost_query(void *h) { (void)h; return ow_ghost_on ? 1 : 0; }
+static void ow_ghost_styles(HWND h, int transparent) {
+    LONG_PTR ex;
+    if (!wt_GetWindowLongPtr || !wt_SetWindowLongPtr) return;
+    ex = wt_GetWindowLongPtr(h, -20 /* GWL_EXSTYLE */);
+    if (transparent) ex |= 0x00080000 | 0x00000020;      /* LAYERED|TRANSPARENT */
+    else ex &= ~(LONG_PTR)(0x00080000 | 0x00000020);
+    wt_SetWindowLongPtr(h, -20, ex);
+}
+static void ow_ghost_apply(HWND h, const char *csv) {
+    const char *p = csv;
+    ow_rect_count = 0;
+    while (*p && ow_rect_count < 256) {
+        int *r = ow_rects[ow_rect_count];
+        r[0] = (int)strtol(p, (char **)&p, 10); if (*p == ',') p++;
+        r[1] = (int)strtol(p, (char **)&p, 10); if (*p == ',') p++;
+        r[2] = (int)strtol(p, (char **)&p, 10); if (*p == ',') p++;
+        r[3] = (int)strtol(p, (char **)&p, 10);
+        ow_rect_count++;
+        while (*p && *p != ';') p++;
+        if (*p == ';') p++;
+    }
+    if (csv[0]) {
+        if (!ow_ghost_on) {
+            InterlockedExchange(&ow_ghost_on, 1);
+            if (owu_SetTimer) owu_SetTimer(h, OW_GHOST_TIMER, 30, NULL);
+            if (owu_RegisterHotKey) owu_RegisterHotKey(h, 1, 0x0002 | 0x0001, 'C');
+        }
+    } else if (ow_ghost_on) {
+        InterlockedExchange(&ow_ghost_on, 0);
+        ow_rect_count = 0;
+        if (owu_KillTimer) owu_KillTimer(h, OW_GHOST_TIMER);
+        if (owu_UnregisterHotKey) owu_UnregisterHotKey(h, 1);
+        ow_ghost_styles(h, 0);
+    }
+}
+static void ow_ghost_tick(HWND h) {
+    POINT p;
+    int i, inside = 0;
+    if (!ow_ghost_on || !owu_GetCursorPos || !owu_ScreenToClient) return;
+    owu_GetCursorPos(&p);
+    owu_ScreenToClient(h, &p);
+    for (i = 0; i < ow_rect_count; i++) {
+        if (p.x >= ow_rects[i][0] && p.x < ow_rects[i][0] + ow_rects[i][2] &&
+            p.y >= ow_rects[i][1] && p.y < ow_rects[i][1] + ow_rects[i][3]) { inside = 1; break; }
+    }
+    ow_ghost_styles(h, !inside);
+}
+/* The page's seam: rectangles that stay interactive, "" turns ghost off.
+ * Own windows only - the borrowed Edge window cannot make holes. */
+long long win_ghost(const char *needle, const char *rects) {
+    void *h = win_by_title(needle);
+    char *copy;
+    if (!h || !ow_is_own_window(h) || !ow_visual || !wt_PostMessageW) return -1;
+    copy = (char *)malloc(strlen(rects) + 1);
+    if (!copy) return -1;
+    strcpy(copy, rects);
+    wt_PostMessageW(h, OW_MSG_GHOST, 0, (LPARAM)copy);
+    return 0;
+}
 /* The hotkey must be registered from the thread that pumps the window's
  * messages (WM_HOTKEY lands in the registrar's queue), and click-through is
  * flipped from the app's server thread - so this only POSTS; the window
@@ -985,15 +1124,37 @@ static HRESULT __stdcall ow_title_changed(ow_handler *self, void *sender, void *
     }
     return 0;
 }
-/* controller arrived: keep it, size it, find the webview, navigate */
+/* controller arrived: keep it, size it, find the webview, navigate. Under
+ * visual hosting the arg is the COMPOSITION controller: hand it our root
+ * visual, QI the plain controller out of it, and clear the default
+ * background so the page's transparent pixels really are holes. */
 static HRESULT __stdcall ow_controller_done(ow_handler *self, void *hr, void *controller) {
     long long token[2] = {0, 0};
     (void)self;
     ow_log("controller_done hr", (long long)(intptr_t)hr);
     if ((int)(intptr_t)hr != 0 || !controller) { InterlockedExchange(&ow_ready, -1); return 0; }
-    ((ow_fn1)ow_vt(controller, 1 /* AddRef */))(controller);
-    ow_controller = controller;
-    ((ow_fn2)ow_vt(controller, 25 /* get_CoreWebView2 */))(controller, (void *)&ow_webview);
+    if (ow_visual) {
+        ((ow_fn1)ow_vt(controller, 1 /* AddRef */))(controller);
+        ow_comp = controller;
+        if (ow_qi(controller, &OW_IID_CONTROLLER, (void **)&ow_controller) != 0 || !ow_controller) {
+            ow_log("controller qi failed", -1);
+            InterlockedExchange(&ow_ready, -1);
+            return 0;
+        }
+        ((ow_fn2)ow_vt(ow_comp, 4 /* put_RootVisualTarget */))(ow_comp, ow_dcvisual);
+        ow_dcommit();
+        {
+            void *c2 = NULL;
+            if (ow_qi(ow_controller, &OW_IID_CONTROLLER2, &c2) == 0 && c2) {
+                ow_color clear = {0, 0, 0, 0};
+                ((HRESULT (__stdcall *)(void *, ow_color))ow_vt(c2, 27 /* put_DefaultBackgroundColor */))(c2, clear);
+            }
+        }
+    } else {
+        ((ow_fn1)ow_vt(controller, 1 /* AddRef */))(controller);
+        ow_controller = controller;
+    }
+    ((ow_fn2)ow_vt(ow_controller, 25 /* get_CoreWebView2 */))(ow_controller, (void *)&ow_webview);
     if (!ow_webview) { InterlockedExchange(&ow_ready, -1); return 0; }
     ((ow_fn1)ow_vt(ow_webview, 1 /* AddRef */))(ow_webview);
     ow_fit_webview();
@@ -1001,22 +1162,93 @@ static HRESULT __stdcall ow_controller_done(ow_handler *self, void *hr, void *co
     ow_on_title.invoke = ow_title_changed;
     ((ow_fn3)ow_vt(ow_webview, 46 /* add_DocumentTitleChanged */))(ow_webview, &ow_on_title, token);
     ow_log("navigate hr", (long long)((ow_fn2)ow_vt(ow_webview, 5 /* Navigate */))(ow_webview, ow_url));
+    ((HRESULT (__stdcall *)(void *, int))ow_vt(ow_controller, 12 /* MoveFocus */))(ow_controller, 0);
     InterlockedExchange(&ow_ready, 1);
     return 0;
 }
-/* environment arrived: ask it for a controller on our window */
+/* environment arrived: ask it for a controller on our window - the visual
+ * kind when DComp is up and the runtime speaks Environment3, else the
+ * child-window kind (no ghost mode there, everything else identical). */
 static HRESULT __stdcall ow_env_done(ow_handler *self, void *hr, void *env) {
+    void *env3 = NULL;
     (void)self;
     ow_log("env_done hr", (long long)(intptr_t)hr);
     if ((int)(intptr_t)hr != 0 || !env) { InterlockedExchange(&ow_ready, -1); return 0; }
     ow_on_controller.vtbl = ow_handler_vtbl;
     ow_on_controller.invoke = ow_controller_done;
-    ((ow_fn3)ow_vt(env, 3 /* CreateCoreWebView2Controller */))(env, ow_hwnd, &ow_on_controller);
+    if (ow_dcvisual && ow_qi(env, &OW_IID_ENV3, &env3) == 0 && env3) {
+        ow_visual = 1;
+        ow_log("hosting visual", 1);
+        ((ow_fn3)ow_vt(env3, 9 /* CreateCoreWebView2CompositionController */))(env3, ow_hwnd, &ow_on_controller);
+    } else {
+        ow_log("hosting hwnd", 0);
+        ((ow_fn3)ow_vt(env, 3 /* CreateCoreWebView2Controller */))(env, ow_hwnd, &ow_on_controller);
+    }
     return 0;
+}
+/* Mouse, forwarded: visual hosting has no input child window - every event
+ * the window gets is ours to hand the webview, message id and all (the
+ * event-kind values ARE the WM_ numbers). Wheels arrive in screen coords. */
+static int ow_track;
+static void ow_send_mouse(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+    POINT pt;
+    UINT vk = (UINT)(wp & 0xFFFF), mdata = 0;
+    if (!ow_comp) return;
+    pt.x = (int)(short)(lp & 0xFFFF);
+    pt.y = (int)(short)((lp >> 16) & 0xFFFF);
+    if (m == 0x020A /* WHEEL */ || m == 0x020E /* HWHEEL */) {
+        mdata = (UINT)(int)(short)((wp >> 16) & 0xFFFF);
+        if (owu_ScreenToClient) owu_ScreenToClient(h, &pt);
+    }
+    if (m == 0x020B || m == 0x020C || m == 0x020D)   /* xbutton down/up/dbl */
+        mdata = (UINT)((wp >> 16) & 0xFFFF);
+    if (m == 0x02A3 /* LEAVE */) { pt.x = 0; pt.y = 0; vk = 0; }
+    ((HRESULT (__stdcall *)(void *, UINT, UINT, UINT, POINT))ow_vt(ow_comp, 5 /* SendMouseInput */))(ow_comp, m, vk, mdata, pt);
 }
 
 static LRESULT __stdcall ow_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+    /* visual hosting: the mouse is ours to forward, buttons capture so a
+       drag that leaves the window keeps reporting, and a leave is tracked
+       so hover states let go */
+    if (ow_visual && ((m >= 0x0200 && m <= 0x020E) || m == 0x02A3 /* MOUSELEAVE */)) {
+        if (m == 0x0200 && !ow_track && owu_TrackMouseEvent) {
+            TRACKMOUSEEVENT t;
+            t.cbSize = sizeof t; t.dwFlags = 2 /* TME_LEAVE */; t.hwndTrack = h; t.dwHoverTime = 0;
+            owu_TrackMouseEvent(&t);
+            ow_track = 1;
+        }
+        if (m == 0x02A3) ow_track = 0;
+        if ((m == 0x0201 || m == 0x0204 || m == 0x0207 || m == 0x020B) && owu_SetCapture) owu_SetCapture(h);
+        if ((m == 0x0202 || m == 0x0205 || m == 0x0208 || m == 0x020C) && owu_ReleaseCapture) owu_ReleaseCapture();
+        ow_send_mouse(h, m, wp, lp);
+        return 0;
+    }
     switch (m) {
+    case WM_ERASEBKGND:
+        return 1;
+    case WM_SETCURSOR:
+        /* no child window means no one else sets the pointer - ask the
+           webview what it wants the cursor to be */
+        if (ow_visual && ow_comp && (lp & 0xFFFF) == 1 /* HTCLIENT */ && owu_SetCursor) {
+            void *cur = NULL;
+            if (((ow_fn2)ow_vt(ow_comp, 7 /* get_Cursor */))(ow_comp, (void *)&cur) == 0 && cur) {
+                owu_SetCursor((HCURSOR)cur);
+                return 1;
+            }
+        }
+        break;
+    case WM_SETFOCUS:
+        if (ow_controller)
+            ((HRESULT (__stdcall *)(void *, int))ow_vt(ow_controller, 12 /* MoveFocus */))(ow_controller, 0);
+        return 0;
+    case WM_TIMER:
+        if (wp == OW_GHOST_TIMER) { ow_ghost_tick(h); return 0; }
+        break;
+    case OW_MSG_GHOST: {
+        char *csv = (char *)lp;
+        if (csv) { ow_ghost_apply(h, csv); free(csv); }
+        return 0;
+    }
     case WM_NCCALCSIZE:
         /* keep the resize borders, remove only the caption: run the default
            calc, then give the top edge back to the client area */
@@ -1058,11 +1290,15 @@ static LRESULT __stdcall ow_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
         }
         return 0;
     case WM_HOTKEY:
-        /* ctrl+alt+c from anywhere: solid again. The page polls the window's
-           state while clicking through and follows suit. */
-        if (wp == 1 && wt_GetWindowLongPtr && wt_SetWindowLongPtr) {
-            wt_SetWindowLongPtr(h, -20, wt_GetWindowLongPtr(h, -20) & ~(LONG_PTR)0x00000020);
-            if (owu_UnregisterHotKey) owu_UnregisterHotKey(h, 1);
+        /* ctrl+alt+c from anywhere: solid again - whichever mode was on.
+           The page polls the window's state and follows suit. */
+        if (wp == 1) {
+            if (ow_ghost_on) {
+                ow_ghost_apply(h, "");
+            } else if (wt_GetWindowLongPtr && wt_SetWindowLongPtr) {
+                wt_SetWindowLongPtr(h, -20, wt_GetWindowLongPtr(h, -20) & ~(LONG_PTR)0x00000020);
+                if (owu_UnregisterHotKey) owu_UnregisterHotKey(h, 1);
+            }
         }
         return 0;
     case WM_CLOSE:
@@ -1128,9 +1364,14 @@ static DWORD __stdcall ow_thread(LPVOID unused) {
     sh = owu_GetSystemMetrics(1 /* SM_CYSCREEN */);
     x = (sw - ow_w) / 2; if (x < 0) x = 0;
     y = (sh - ow_h) / 2; if (y < 0) y = 0;
-    ow_hwnd = owu_CreateWindowExW(0, L"OrionOwnWindow", ow_title, WS_OVERLAPPEDWINDOW,
+    /* NOREDIRECTIONBITMAP: the window has no surface of its own - what the
+       DComp visual shows is ALL there is, so unpainted pixels are holes.
+       (Harmless under hwnd hosting: the child carries its own surface.) */
+    ow_hwnd = owu_CreateWindowExW(0x00200000 /* WS_EX_NOREDIRECTIONBITMAP */,
+                                  L"OrionOwnWindow", ow_title, WS_OVERLAPPEDWINDOW,
                                   x, y, ow_w, ow_h, NULL, NULL, wc.hInstance, NULL);
     if (!ow_hwnd) { InterlockedExchange(&ow_ready, -1); return 0; }
+    ow_log("dcomp", (long long)ow_dcomp_init(ow_hwnd));
     /* creation-time WM_NCCALCSIZE comes with wparam FALSE, which our caption
        removal does not touch - ask for the frame calc again now that the
        window exists, this time the TRUE way */

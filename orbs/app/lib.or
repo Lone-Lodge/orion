@@ -338,6 +338,7 @@ external define win_click_through_on(needle: text) -> int
 external define win_move(needle: text, x: int, y: int) -> int
 external define win_command(needle: text, what: text) -> int
 external define win_resize(needle: text, w: int, h: int) -> int
+external define win_ghost(needle: text, rects: text) -> int
 
 # Keep the window above every other window, or let it back down.
 # no example: window state - proven by folio's pin feature
@@ -381,6 +382,15 @@ public define window_move(title: text, x: int, y: int) -> truth uses console = w
 # an installer's first move.
 # no example: window state - proven by the setup stub
 public define window_size(title: text, w: int, h: int) -> truth uses console = win_resize(title, w, h) is 0
+
+# Ghost mode, own windows only: the page hands over the rectangles that stay
+# INTERACTIVE ("x,y,w,h;..." in device pixels, client coords) - everything
+# else is a hole: invisible where the page painted nothing, and clicks fall
+# through to the work underneath. "" turns it off. False on the borrowed
+# Edge window, where holes are impossible - the caller falls back to
+# translucent click-through.
+# no example: window state - proven by folio's ghost mode
+public define window_ghost(title: text, rects: text) -> truth uses console = win_ghost(title, rects) is 0
 
 public define window_minimize(title: text) -> truth uses console = win_command(title, "min") is 0
 public define window_maximize(title: text) -> truth uses console = win_command(title, "max") is 0
