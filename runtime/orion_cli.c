@@ -30,6 +30,7 @@ extern const char *orion_text_from_c(const char *s);
 
 #ifdef _WIN32
 #include <windows.h>
+#include <wchar.h>   /* wcsstr - window titles are matched wide, not ANSI */
 
 /* Run a command line synchronously; return its exit code (-1 on spawn
  * failure). CreateProcessA needs a mutable command buffer. The os orb's
@@ -488,51 +489,211 @@ const char *sha256_hex(const char *msg) {
     return orion_text_from_c(out);
 }
 
-/* Pin the window whose TITLE contains `needle` above every other window
- * (0 = found and pinned). How folio's "image on top" works: the popup names
- * itself after the image, then asks the server to hoist it. Windows-only -
- * elsewhere it answers -1 and the app says so. */
+/* Every knob on the window whose TITLE contains `needle`: keep it above every
+ * other window, how solid it is, whether a frame is drawn around it, where it
+ * sits, and the three buttons a frameless window has to answer for itself.
+ * Together they are what a local web app needs to look like a native one: its
+ * own translucent bar, floating over the work at 60%.
+ * All answer 0 when the window was found, -1 when it was not. Windows-only -
+ * elsewhere they answer -1 and the app says so. */
 /* user32 loads DYNAMICALLY: linking it statically would make every CLI
  * program (and every test probe) demand -luser32 - measured, it broke the
- * whole battery. LoadLibrary costs one call on first pin. */
+ * whole battery. LoadLibrary costs one call on the first use. */
+/* Titles go through the WIDE calls: GetWindowTextA would hand back the local
+ * codepage and "Skärmbild" from the browser is UTF-8, so the two never match. */
 #ifdef _WIN32
 typedef int (__stdcall *wt_enum_fn)(void *, LONG_PTR);
 static int (__stdcall *wt_EnumWindows)(wt_enum_fn, LONG_PTR);
 static int (__stdcall *wt_IsWindowVisible)(void *);
-static int (__stdcall *wt_GetWindowTextA)(void *, char *, int);
+static int (__stdcall *wt_GetWindowTextW)(void *, wchar_t *, int);
 static int (__stdcall *wt_SetWindowPos)(void *, void *, int, int, int, int, unsigned int);
-static char win_topmost_needle[256];
-static long long win_topmost_hit;
-static int __stdcall win_topmost_scan(void *h, LONG_PTR unused) {
-    char title[512];
+static LONG_PTR (__stdcall *wt_GetWindowLongPtr)(void *, int);
+static LONG_PTR (__stdcall *wt_SetWindowLongPtr)(void *, int, LONG_PTR);
+static int (__stdcall *wt_SetLayeredWindowAttributes)(void *, unsigned long, unsigned char, unsigned long);
+static int (__stdcall *wt_ShowWindow)(void *, int);
+static LRESULT (__stdcall *wt_PostMessageW)(void *, unsigned int, WPARAM, LPARAM);
+static int (__stdcall *wt_IsZoomed)(void *);
+static int (__stdcall *wt_GetWindowRect)(void *, RECT *);
+static int (__stdcall *wt_SetWindowRgn)(void *, void *, int);
+static void *(__stdcall *wt_MonitorFromWindow)(void *, unsigned long);
+static int (__stdcall *wt_GetMonitorInfoW)(void *, MONITORINFO *);
+static int (__stdcall *wt_GetClientRect)(void *, RECT *);
+static int (__stdcall *wt_ClientToScreen)(void *, POINT *);
+static void *(__stdcall *wt_CreateRoundRectRgn)(int, int, int, int, int, int);
+static wchar_t win_needle[256];
+static void *win_found;
+static int __stdcall win_find_scan(void *h, LONG_PTR unused) {
+    wchar_t title[512];
     (void)unused;
     if (!wt_IsWindowVisible(h)) return 1;
-    wt_GetWindowTextA(h, title, sizeof title);
-    if (title[0] && strstr(title, win_topmost_needle)) {
-        wt_SetWindowPos(h, (void *)(intptr_t)-1 /* HWND_TOPMOST */, 0, 0, 0, 0,
-                        0x0001 | 0x0002 /* SWP_NOSIZE|SWP_NOMOVE */);
-        win_topmost_hit = 0;
-        return 0;
-    }
+    title[0] = 0;
+    wt_GetWindowTextW(h, title, 512);
+    if (title[0] && wcsstr(title, win_needle)) { win_found = h; return 0; }
     return 1;
 }
-long long win_set_topmost(const char *needle) {
+/* The window itself, or NULL. Loads user32 on the first call. */
+static void *win_by_title(const char *needle) {
     if (!wt_EnumWindows) {
         HMODULE u = LoadLibraryA("user32.dll");
-        if (!u) return -1;
+        if (!u) return NULL;
         wt_EnumWindows = (int (__stdcall *)(wt_enum_fn, LONG_PTR))(void *)GetProcAddress(u, "EnumWindows");
         wt_IsWindowVisible = (int (__stdcall *)(void *))(void *)GetProcAddress(u, "IsWindowVisible");
-        wt_GetWindowTextA = (int (__stdcall *)(void *, char *, int))(void *)GetProcAddress(u, "GetWindowTextA");
+        wt_GetWindowTextW = (int (__stdcall *)(void *, wchar_t *, int))(void *)GetProcAddress(u, "GetWindowTextW");
         wt_SetWindowPos = (int (__stdcall *)(void *, void *, int, int, int, int, unsigned int))(void *)GetProcAddress(u, "SetWindowPos");
-        if (!wt_EnumWindows || !wt_IsWindowVisible || !wt_GetWindowTextA || !wt_SetWindowPos) return -1;
+        /* 64-bit exports the Ptr forms; 32-bit only has the plain ones. */
+        wt_GetWindowLongPtr = (LONG_PTR (__stdcall *)(void *, int))(void *)GetProcAddress(u, "GetWindowLongPtrA");
+        if (!wt_GetWindowLongPtr) wt_GetWindowLongPtr = (LONG_PTR (__stdcall *)(void *, int))(void *)GetProcAddress(u, "GetWindowLongA");
+        wt_SetWindowLongPtr = (LONG_PTR (__stdcall *)(void *, int, LONG_PTR))(void *)GetProcAddress(u, "SetWindowLongPtrA");
+        if (!wt_SetWindowLongPtr) wt_SetWindowLongPtr = (LONG_PTR (__stdcall *)(void *, int, LONG_PTR))(void *)GetProcAddress(u, "SetWindowLongA");
+        wt_SetLayeredWindowAttributes = (int (__stdcall *)(void *, unsigned long, unsigned char, unsigned long))(void *)GetProcAddress(u, "SetLayeredWindowAttributes");
+        wt_ShowWindow = (int (__stdcall *)(void *, int))(void *)GetProcAddress(u, "ShowWindow");
+        wt_PostMessageW = (LRESULT (__stdcall *)(void *, unsigned int, WPARAM, LPARAM))(void *)GetProcAddress(u, "PostMessageW");
+        wt_IsZoomed = (int (__stdcall *)(void *))(void *)GetProcAddress(u, "IsZoomed");
+        wt_GetWindowRect = (int (__stdcall *)(void *, RECT *))(void *)GetProcAddress(u, "GetWindowRect");
+        wt_SetWindowRgn = (int (__stdcall *)(void *, void *, int))(void *)GetProcAddress(u, "SetWindowRgn");
+        wt_GetClientRect = (int (__stdcall *)(void *, RECT *))(void *)GetProcAddress(u, "GetClientRect");
+        wt_ClientToScreen = (int (__stdcall *)(void *, POINT *))(void *)GetProcAddress(u, "ClientToScreen");
+        wt_MonitorFromWindow = (void *(__stdcall *)(void *, unsigned long))(void *)GetProcAddress(u, "MonitorFromWindow");
+        wt_GetMonitorInfoW = (int (__stdcall *)(void *, MONITORINFO *))(void *)GetProcAddress(u, "GetMonitorInfoW");
+        {   /* the rounded region itself is gdi32's */
+            HMODULE gdi = LoadLibraryA("gdi32.dll");
+            if (gdi) wt_CreateRoundRectRgn = (void *(__stdcall *)(int, int, int, int, int, int))(void *)GetProcAddress(gdi, "CreateRoundRectRgn");
+        }
+        if (!wt_EnumWindows || !wt_IsWindowVisible || !wt_GetWindowTextW || !wt_SetWindowPos) return NULL;
     }
-    snprintf(win_topmost_needle, sizeof win_topmost_needle, "%s", needle);
-    win_topmost_hit = -1;
-    wt_EnumWindows(win_topmost_scan, 0);
-    return win_topmost_hit;
+    win_needle[0] = 0;
+    MultiByteToWideChar(CP_UTF8, 0, needle, -1, win_needle, 256);
+    win_found = NULL;
+    wt_EnumWindows(win_find_scan, 0);
+    return win_found;
+}
+long long win_set_topmost(const char *needle, long long on) {
+    void *h = win_by_title(needle);
+    if (!h) return -1;
+    wt_SetWindowPos(h, (void *)(intptr_t)(on ? -1 : -2) /* HWND_TOPMOST : HWND_NOTOPMOST */,
+                    0, 0, 0, 0, 0x0001 | 0x0002 /* SWP_NOSIZE|SWP_NOMOVE */);
+    return 0;
+}
+/* percent 100 takes the layered style back off, so a solid window pays
+ * nothing for having once been faded. */
+long long win_set_opacity(const char *needle, long long percent) {
+    void *h = win_by_title(needle);
+    LONG_PTR ex;
+    if (!h || !wt_GetWindowLongPtr || !wt_SetWindowLongPtr || !wt_SetLayeredWindowAttributes) return -1;
+    if (percent < 10) percent = 10;
+    if (percent > 100) percent = 100;
+    ex = wt_GetWindowLongPtr(h, -20 /* GWL_EXSTYLE */);
+    if (percent >= 100) {
+        wt_SetWindowLongPtr(h, -20, ex & ~(LONG_PTR)0x00080000 /* WS_EX_LAYERED */);
+        return 0;
+    }
+    wt_SetWindowLongPtr(h, -20, ex | 0x00080000);
+    wt_SetLayeredWindowAttributes(h, 0, (unsigned char)(percent * 255 / 100), 0x2 /* LWA_ALPHA */);
+    return 0;
+}
+/* Take the frame off, so the page IS the window and can draw its own bar.
+ *
+ * The browser draws its title strip INSIDE the window, so no style bit can
+ * remove it - clearing WS_CAPTION only takes the buttons away. What does work
+ * is a window REGION: everything above the page's own viewport is clipped, and
+ * clipped pixels are neither drawn nor hit-tested. The strip is simply gone.
+ *
+ * The page sends `view_h`, the height of its own viewport in device pixels
+ * (innerHeight * devicePixelRatio). Everything else is measured here: the
+ * client area minus that viewport IS the strip, and the client area's offset
+ * inside the window frame is the rest. Nothing guesses a caption height, at
+ * any DPI. The region is in window coordinates and does not follow a resize,
+ * so the page re-asks on resize - which is also where a native snap-maximise
+ * gets turned into ours. */
+static int win_clip;                 /* how much is being clipped, 0 = framed */
+static RECT win_restore;             /* the size to come back to from maximised */
+static int win_maxed;
+static void win_pseudo_max(void *h, int clip) {
+    MONITORINFO mi;
+    void *mon;
+    if (!wt_MonitorFromWindow || !wt_GetMonitorInfoW) return;
+    mi.cbSize = sizeof mi;
+    mon = wt_MonitorFromWindow(h, 2 /* MONITOR_DEFAULTTONEAREST */);
+    if (!mon || !wt_GetMonitorInfoW(mon, &mi)) return;
+    wt_SetWindowPos(h, NULL, mi.rcWork.left, mi.rcWork.top - clip,
+                    mi.rcWork.right - mi.rcWork.left,
+                    mi.rcWork.bottom - mi.rcWork.top + clip, 0x0004 /* SWP_NOZORDER */);
+}
+long long win_set_frameless(const char *needle, long long on, long long view_h) {
+    void *h = win_by_title(needle);
+    RECT r, c;
+    POINT o;
+    int strip;
+    void *rgn;
+    if (!h || !wt_SetWindowRgn || !wt_GetWindowRect || !wt_CreateRoundRectRgn) return -1;
+    if (!wt_GetClientRect || !wt_ClientToScreen) return -1;
+    if (!on) {
+        win_clip = 0; win_maxed = 0;
+        wt_SetWindowRgn(h, NULL, 1);
+        return 0;
+    }
+    /* a native maximise would leave the clipped strip as a gap at the top of
+       the screen, so take it over: come back down, and the resize this causes
+       brings the page here again with fresh numbers */
+    if (wt_IsZoomed && wt_IsZoomed(h)) {
+        wt_ShowWindow(h, 9 /* SW_RESTORE */);
+        win_maxed = 1;
+        return 0;
+    }
+    wt_GetWindowRect(h, &r);
+    wt_GetClientRect(h, &c);
+    o.x = 0; o.y = 0;
+    wt_ClientToScreen(h, &o);
+    strip = (c.bottom - c.top) - (int)view_h;      /* what the browser draws */
+    if (strip < 0) strip = 0;
+    win_clip = (o.y - r.top) + strip;
+    if (win_maxed) { win_pseudo_max(h, win_clip); wt_GetWindowRect(h, &r); }
+    rgn = wt_CreateRoundRectRgn(0, win_clip, r.right - r.left + 1, r.bottom - r.top + 1, 12, 12);
+    wt_SetWindowRgn(h, rgn, 1);      /* the window owns the region from here */
+    return 0;
+}
+/* Put the window's top-left corner at x,y (device pixels). The bar drags with
+ * this: the browser owns the pointer and will not let another process start
+ * the OS move loop for it (neither WM_NCLBUTTONDOWN nor SC_MOVE - measured),
+ * so the page follows its own pointer and says where to be. */
+long long win_move(const char *needle, long long x, long long y) {
+    void *h = win_by_title(needle);
+    if (!h) return -1;
+    wt_SetWindowPos(h, NULL, (int)x, (int)y, 0, 0,
+                    0x0001 | 0x0004 /* SWP_NOSIZE|SWP_NOZORDER */);
+    return 0;
+}
+/* The rest of what a frameless window's own bar needs: the three buttons. */
+long long win_command(const char *needle, const char *what) {
+    void *h = win_by_title(needle);
+    if (!h || !wt_ShowWindow || !wt_PostMessageW) return -1;
+    if (!strcmp(what, "min")) { wt_ShowWindow(h, 6 /* SW_MINIMIZE */); return 0; }
+    if (!strcmp(what, "max")) {
+        if (!win_clip) {          /* framed: the OS knows how to do this */
+            wt_ShowWindow(h, wt_IsZoomed && wt_IsZoomed(h) ? 9 /* SW_RESTORE */ : 3 /* SW_MAXIMIZE */);
+            return 0;
+        }
+        if (win_maxed) {
+            win_maxed = 0;
+            wt_SetWindowPos(h, NULL, win_restore.left, win_restore.top,
+                            win_restore.right - win_restore.left,
+                            win_restore.bottom - win_restore.top, 0x0004 /* SWP_NOZORDER */);
+        } else {
+            wt_GetWindowRect(h, &win_restore);
+            win_maxed = 1;
+            win_pseudo_max(h, win_clip);
+        }
+        return 0;               /* the resize brings the page back to re-clip */
+    }
+    if (!strcmp(what, "close")) { wt_PostMessageW(h, 0x0010 /* WM_CLOSE */, 0, 0); return 0; }
+    return -1;
 }
 #else
-long long win_set_topmost(const char *needle) { (void)needle; return -1; }
+long long win_set_topmost(const char *needle, long long on) { (void)needle; (void)on; return -1; }
+long long win_set_opacity(const char *needle, long long percent) { (void)needle; (void)percent; return -1; }
+long long win_set_frameless(const char *needle, long long on, long long view_h) { (void)needle; (void)on; (void)view_h; return -1; }
+long long win_move(const char *needle, long long x, long long y) { (void)needle; (void)x; (void)y; return -1; }
+long long win_command(const char *needle, const char *what) { (void)needle; (void)what; return -1; }
 #endif
 
 /* Exit the process with a code. */

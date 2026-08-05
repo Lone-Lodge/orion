@@ -30,6 +30,9 @@ Rules that keep layers thin:
   consumer, so reuse is demonstrated, never claimed.
 
 First proof outside the engine: the `app` orb (serve + routes + window +
-run-until-interrupted) with Folio on top. The engine's endpoint is the same
+run-until-interrupted) with Folio on top. Its window layer is the reason a
+local web app can look native: `window_frameless` clips the browser's own
+title strip away at the window level, and the page draws the bar instead -
+plus on-top, opacity, move and the three buttons. The engine's endpoint is the same
 model: atlas = baseplate orb + block orbs + a thin `game` shell orb, and
 existing blocks migrate seam by seam as they are touched - never big-bang.

@@ -250,9 +250,40 @@ public define query_of(req: request, key: text) -> text:
             found = percent_decode(replace(at(kv, 1), "+", " "))
     found
 
-external define win_set_topmost(needle: text) -> int
+# --- the window itself -------------------------------------------------
+# Everything below finds the window by a piece of its TITLE, which is how a
+# page reaches its own window: it names itself, then asks the server. All
+# answer true when that window was found. Windows-only today; elsewhere false.
+external define win_set_topmost(needle: text, on: int) -> int
+external define win_set_opacity(needle: text, percent: int) -> int
+external define win_set_frameless(needle: text, on: int, view_h: int) -> int
+external define win_move(needle: text, x: int, y: int) -> int
+external define win_command(needle: text, what: text) -> int
 
-# Pin the window whose title contains `needle` above every other window.
-# true when found. Windows-only today; elsewhere always false.
+# Keep the window above every other window, or let it back down.
 # no example: window state - proven by folio's pin feature
-public define window_on_top(title: text) -> truth uses console = win_set_topmost(title) is 0
+public define window_on_top(title: text, on: truth) -> truth uses console = win_set_topmost(title, if on then 1 else 0) is 0
+
+# How solid the window is, 10..100. 100 is fully opaque and costs nothing.
+# no example: window state - proven by folio's opacity slider
+public define window_opacity(title: text, percent: int) -> truth uses console = win_set_opacity(title, percent) is 0
+
+# Take the frame off, so the page IS the window - the modern app look. The
+# browser paints its title strip inside the window, so this clips it away at
+# the window level: send `view_h`, the page's own viewport height in device
+# pixels (innerHeight * devicePixelRatio), and everything the browser draws
+# above it stops existing. The page must then draw its own bar and call
+# window_move/minimize/maximize/close from it, and re-ask on every resize -
+# the region is fixed to a size.
+# no example: window state - proven by folio's own top bar
+public define window_frameless(title: text, on: truth, view_h: int) -> truth uses console = win_set_frameless(title, if on then 1 else 0, view_h) is 0
+
+# Put the window's top-left corner at x,y in device pixels - a frameless
+# window's bar drags with this. The browser keeps the pointer to itself and
+# will not let us hand the drag to the OS move loop, so the page follows its
+# own pointer and says where the window should be.
+# no example: window state - proven by folio's own top bar
+public define window_move(title: text, x: int, y: int) -> truth uses console = win_move(title, x, y) is 0
+public define window_minimize(title: text) -> truth uses console = win_command(title, "min") is 0
+public define window_maximize(title: text) -> truth uses console = win_command(title, "max") is 0
+public define window_close(title: text) -> truth uses console = win_command(title, "close") is 0
