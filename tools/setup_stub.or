@@ -166,6 +166,14 @@ define main() -> int:
     edit srv = serve(0)
     if not ok(srv):
         return 1
-    w = open_window("http://127.0.0.1:{local_port(srv)}/")
+    # A single-file setup has its webview loader inside the payload zip - put
+    # it where open_app_window looks (%TEMP%\orion-webview) before opening.
+    # Every step best-effort: without it the window falls back to Edge.
+    boot_zip = env("TEMP") + "/{name}-setup-boot.zip"
+    unpacked = unpack_setup(boot_zip)
+    made = mkdir_all(env("TEMP") + "/orion-webview")
+    pulled = run_command_quiet("C:/Windows/System32/tar.exe", ["-x", "-f", boot_zip, "-C", env("TEMP") + "/orion-webview", "--strip-components", "1", "{name}/WebView2Loader.dll"])
+    dropped = remove_file(boot_zip)
+    w = open_app_window("http://127.0.0.1:{local_port(srv)}/", "{name} setup", 380, 540)
     run_until_interrupted(srv, routes, "")
     0

@@ -424,6 +424,11 @@ define cmd_package():
                 file_copy_or_die(asset_path, path_join(out, asset_path))
             else:
                 die("orbit: no such asset `" + asset_path + "`")
+    # The webview loader ships beside the exe: open_app_window looks for it
+    # there first, and falls back to the borrowed Edge window without it.
+    loader = default_runtime() + "/WebView2Loader.dll"
+    if os_kind() == 0 and file_exists(loader):
+        loader_copied = copy_file(loader, path_join(out, "WebView2Loader.dll"))
     print_line(c_bold(shipped) + " " + c_green("ok"))
     # The archive is a convenience, not the deliverable: if the system has no
     # tar the folder above is still what ships, so say so and stop there.
@@ -1232,6 +1237,12 @@ define cli_build(path: text) -> text:
     if run_command(nb_clang(), link_args) != 0:
         return ""
     remove_file(ll)
+    # A project build gets the webview loader beside its exe, so a dev run's
+    # open_app_window finds it the same way a shipped one does.
+    if not standalone and os_kind() == 0:
+        loader = runtime + "/WebView2Loader.dll"
+        if file_exists(loader):
+            loader_beside = copy_file(loader, "build/WebView2Loader.dll")
     exe
 
 # Returns the PROGRAM's exit code, not a pass/fail. Every Orion main returns an

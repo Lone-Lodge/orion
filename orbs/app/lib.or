@@ -234,6 +234,9 @@ public define run_until_interrupted(srv: int, routes: [route], static_dir: text)
         said = int_from_text(slot_get("app:bye"))
         if said > 0 and monotonic_ms() - said > 2500:
             break
+        # our own window closing says it even more plainly
+        if own_window_gone() is 1:
+            break
     closed = close(srv)
     print_line("app: stopped cleanly")
 
@@ -245,14 +248,28 @@ define spawn_conn(conn: int, routes: [route], static_dir: text) -> int uses net,
 # The OS's app window at `url`: Edge's --app mode - no address bar, no tabs,
 # just the app. Edge is launched by its well-known install path (CreateProcess
 # directly - routing through `cmd /c start` trips cmd's quote rules), with the
-# 32/64-bit locations both tried. Swappable for an embedded WebView2 later
-# without a caller changing.
+# 32/64-bit locations both tried. The borrowed window carries Edge's own strip,
+# which frameless can only clip into a see-through band - open_app_window is
+# the real thing when the WebView2 pieces are on the machine.
 # no example: opens a window - proven by folio
 public define open_window(url: text) -> int uses net:
     a = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
     b = "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
     exe = if file_exists(a) then a else b
     start_command(exe, ["--app={url}"])
+
+external define own_window_open(url: text, title: text, w: int, h: int) -> int
+external define own_window_gone() -> int
+
+# OUR window with the OS webview inside - the Tauri model. No browser strip,
+# nothing to clip: the page fills the window from its first pixel, the OS
+# title follows document.title (so every title-needle verb below keeps
+# working), and closing the window ends the serve loop. Where the WebView2
+# pieces are missing it falls back to the borrowed Edge window, so a caller
+# needs no plan B. One own window per program.
+# no example: opens a window - proven by folio
+public define open_app_window(url: text, title: text, w: int, h: int) -> int uses net:
+    if own_window_open(url, title, w, h) is 0 then 1 else open_window(url)
 
 # The value of `key` in the request's query string, "" when absent. Decoded the
 # form-urlencoded way: "+" is a space, then the %XX triples.

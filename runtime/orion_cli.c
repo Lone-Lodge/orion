@@ -733,12 +733,16 @@ static void win_pseudo_max(void *h, int clip) {
                     mi.rcWork.right - mi.rcWork.left,
                     mi.rcWork.bottom - mi.rcWork.top + clip, 0x0004 /* SWP_NOZORDER */);
 }
+static int ow_is_own_window(void *h);   /* defined with the own-window block below */
 long long win_set_frameless(const char *needle, long long on, long long view_h) {
     void *h = win_by_title(needle);
     RECT r, c;
     POINT o;
     int strip;
     void *rgn;
+    /* our own webview window has no browser strip: nothing to clip, and a
+       GDI region would cost it DWM's rounded corners and shadow */
+    if (h && ow_is_own_window(h)) return 0;
     if (!h || !wt_SetWindowRgn || !wt_GetWindowRect || !wt_CreateRoundRectRgn) return -1;
     if (!wt_GetClientRect || !wt_ClientToScreen) return -1;
     if (!on) {
@@ -832,6 +836,328 @@ long long win_click_through_on(const char *needle) { (void)needle; return -1; }
 long long win_move(const char *needle, long long x, long long y) { (void)needle; (void)x; (void)y; return -1; }
 long long win_command(const char *needle, const char *what) { (void)needle; (void)what; return -1; }
 long long win_resize(const char *needle, long long w, long long h) { (void)needle; (void)w; (void)h; return -1; }
+#endif
+
+/* ---- our own window, the OS webview inside: the Tauri model ----
+ * open_window borrows an Edge --app window, which carries a browser strip
+ * the app can only CLIP away - leaving a see-through band the window still
+ * reserves. This is the real thing instead: a window WE create (so there is
+ * no strip and nothing to clip) with the system WebView2 inside filling the
+ * whole client area. The caption is removed in WM_NCCALCSIZE (left/right/
+ * bottom resize borders kept); DWM still rounds and shadows it; the title
+ * FOLLOWS document.title so the app orb's title-needle verbs (topmost,
+ * opacity, move, min/max/close) keep working unchanged on it.
+ *
+ * WebView2Loader.dll (vendored beside the runtime, shipped beside a packaged
+ * exe) is looked up beside the exe, on the normal search path, then in
+ * %TEMP%\orion-webview\ - where a single-file setup exe unpacks it. All COM
+ * is spoken raw through vtable indices: three tiny handlers, no SDK headers.
+ * One own-window per process; own_window_gone() is how the app's serve loop
+ * learns the person closed it. */
+#ifdef _WIN32
+typedef HRESULT (__stdcall *ow_fn1)(void *);
+typedef HRESULT (__stdcall *ow_fn2)(void *, void *);
+typedef HRESULT (__stdcall *ow_fn3)(void *, void *, void *);
+typedef HRESULT (__stdcall *ow_bounds_fn)(void *, RECT);
+static void *ow_vt(void *obj, int i) { return (*(void ***)obj)[i]; }
+
+/* user32/ole32 by GetProcAddress, same reason as the wt_ block above: a
+ * static -luser32 would be demanded by every CLI program and test probe. */
+static ATOM (__stdcall *owu_RegisterClassW)(const WNDCLASSW *);
+static HWND (__stdcall *owu_CreateWindowExW)(DWORD, const wchar_t *, const wchar_t *, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, void *);
+static LRESULT (__stdcall *owu_DefWindowProcW)(HWND, UINT, WPARAM, LPARAM);
+static int (__stdcall *owu_DestroyWindow)(HWND);
+static int (__stdcall *owu_ShowWindow)(HWND, int);
+static int (__stdcall *owu_GetMessageW)(MSG *, HWND, UINT, UINT);
+static int (__stdcall *owu_TranslateMessage)(const MSG *);
+static LRESULT (__stdcall *owu_DispatchMessageW)(const MSG *);
+static void (__stdcall *owu_PostQuitMessage)(int);
+static int (__stdcall *owu_GetClientRect)(HWND, RECT *);
+static int (__stdcall *owu_SetWindowTextW)(HWND, const wchar_t *);
+static HCURSOR (__stdcall *owu_LoadCursorW)(HINSTANCE, const wchar_t *);
+static HICON (__stdcall *owu_LoadIconA)(HINSTANCE, const char *);
+static HICON (__stdcall *owu_LoadIconW)(HINSTANCE, const wchar_t *);
+static int (__stdcall *owu_GetSystemMetrics)(int);
+static HMONITOR (__stdcall *owu_MonitorFromWindow)(HWND, DWORD);
+static int (__stdcall *owu_GetMonitorInfoW)(HMONITOR, MONITORINFO *);
+static int (__stdcall *owu_SetWindowPos)(HWND, HWND, int, int, int, int, UINT);
+static HRESULT (__stdcall *owu_CoInitializeEx)(void *, DWORD);
+static void (__stdcall *owu_CoTaskMemFree)(void *);
+
+/* What the host did, stage by stage, in %TEMP%\orion-webview\host.log - the
+ * window is async COM across a browser process, and when it comes up blank
+ * in the field this file is the only witness. */
+static void ow_log(const char *what, long long v) {
+    const char *tmp = getenv("TEMP");
+    char path[1024];
+    FILE *f;
+    if (!tmp) return;
+    snprintf(path, sizeof path, "%s\\orion-webview", tmp);
+    CreateDirectoryA(path, NULL);
+    snprintf(path, sizeof path, "%s\\orion-webview\\host.log", tmp);
+    f = fopen(path, "a");
+    if (!f) return;
+    fprintf(f, "%s %lld\n", what, v);
+    fclose(f);
+}
+static int ow_load_user(void) {
+    HMODULE u, o;
+    if (owu_CreateWindowExW) return 1;
+    u = LoadLibraryA("user32.dll");
+    o = LoadLibraryA("ole32.dll");
+    if (!u || !o) return 0;
+    owu_RegisterClassW = (ATOM (__stdcall *)(const WNDCLASSW *))(void *)GetProcAddress(u, "RegisterClassW");
+    owu_CreateWindowExW = (HWND (__stdcall *)(DWORD, const wchar_t *, const wchar_t *, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, void *))(void *)GetProcAddress(u, "CreateWindowExW");
+    owu_DefWindowProcW = (LRESULT (__stdcall *)(HWND, UINT, WPARAM, LPARAM))(void *)GetProcAddress(u, "DefWindowProcW");
+    owu_DestroyWindow = (int (__stdcall *)(HWND))(void *)GetProcAddress(u, "DestroyWindow");
+    owu_ShowWindow = (int (__stdcall *)(HWND, int))(void *)GetProcAddress(u, "ShowWindow");
+    owu_GetMessageW = (int (__stdcall *)(MSG *, HWND, UINT, UINT))(void *)GetProcAddress(u, "GetMessageW");
+    owu_TranslateMessage = (int (__stdcall *)(const MSG *))(void *)GetProcAddress(u, "TranslateMessage");
+    owu_DispatchMessageW = (LRESULT (__stdcall *)(const MSG *))(void *)GetProcAddress(u, "DispatchMessageW");
+    owu_PostQuitMessage = (void (__stdcall *)(int))(void *)GetProcAddress(u, "PostQuitMessage");
+    owu_GetClientRect = (int (__stdcall *)(HWND, RECT *))(void *)GetProcAddress(u, "GetClientRect");
+    owu_SetWindowTextW = (int (__stdcall *)(HWND, const wchar_t *))(void *)GetProcAddress(u, "SetWindowTextW");
+    owu_LoadCursorW = (HCURSOR (__stdcall *)(HINSTANCE, const wchar_t *))(void *)GetProcAddress(u, "LoadCursorW");
+    owu_LoadIconA = (HICON (__stdcall *)(HINSTANCE, const char *))(void *)GetProcAddress(u, "LoadIconA");
+    owu_LoadIconW = (HICON (__stdcall *)(HINSTANCE, const wchar_t *))(void *)GetProcAddress(u, "LoadIconW");
+    owu_GetSystemMetrics = (int (__stdcall *)(int))(void *)GetProcAddress(u, "GetSystemMetrics");
+    owu_MonitorFromWindow = (HMONITOR (__stdcall *)(HWND, DWORD))(void *)GetProcAddress(u, "MonitorFromWindow");
+    owu_GetMonitorInfoW = (int (__stdcall *)(HMONITOR, MONITORINFO *))(void *)GetProcAddress(u, "GetMonitorInfoW");
+    owu_SetWindowPos = (int (__stdcall *)(HWND, HWND, int, int, int, int, UINT))(void *)GetProcAddress(u, "SetWindowPos");
+    owu_CoInitializeEx = (HRESULT (__stdcall *)(void *, DWORD))(void *)GetProcAddress(o, "CoInitializeEx");
+    owu_CoTaskMemFree = (void (__stdcall *)(void *))(void *)GetProcAddress(o, "CoTaskMemFree");
+    return owu_RegisterClassW && owu_CreateWindowExW && owu_DefWindowProcW && owu_GetMessageW && owu_CoInitializeEx;
+}
+
+typedef struct ow_handler {
+    void **vtbl;
+    HRESULT (__stdcall *invoke)(struct ow_handler *, void *, void *);
+} ow_handler;
+static HRESULT __stdcall ow_h_qi(ow_handler *self, const void *riid, void **out) {
+    (void)riid; *out = self; return 0;
+}
+static ULONG __stdcall ow_h_addref(ow_handler *self) { (void)self; return 1; }
+static ULONG __stdcall ow_h_release(ow_handler *self) { (void)self; return 1; }
+static HRESULT __stdcall ow_h_invoke(ow_handler *self, void *a, void *b) {
+    return self->invoke(self, a, b);
+}
+static void *ow_handler_vtbl[4] = { (void *)ow_h_qi, (void *)ow_h_addref, (void *)ow_h_release, (void *)ow_h_invoke };
+
+static HWND ow_hwnd;
+static int ow_is_own_window(void *h) { return h && h == (void *)ow_hwnd; }
+static void *ow_controller, *ow_webview;
+static volatile LONG ow_state;          /* 0 never opened, 1 open, 2 gone */
+static volatile LONG ow_ready;          /* 0 pending, 1 ok, -1 failed */
+static wchar_t ow_url[2048], ow_title[256];
+static int ow_w, ow_h;
+static ow_handler ow_on_env, ow_on_controller, ow_on_title;
+
+static void ow_fit_webview(void) {
+    RECT c;
+    if (!ow_controller || !ow_hwnd) return;
+    owu_GetClientRect(ow_hwnd, &c);
+    ((ow_bounds_fn)ow_vt(ow_controller, 6 /* put_Bounds */))(ow_controller, c);
+}
+/* ICoreWebView2: 46 add_DocumentTitleChanged, 48 get_DocumentTitle */
+static HRESULT __stdcall ow_title_changed(ow_handler *self, void *sender, void *args) {
+    wchar_t *title = NULL;
+    (void)self; (void)args;
+    if (((ow_fn2)ow_vt(sender, 48))(sender, (void *)&title) == 0 && title) {
+        owu_SetWindowTextW(ow_hwnd, title);
+        owu_CoTaskMemFree(title);
+    }
+    return 0;
+}
+/* controller arrived: keep it, size it, find the webview, navigate */
+static HRESULT __stdcall ow_controller_done(ow_handler *self, void *hr, void *controller) {
+    long long token[2] = {0, 0};
+    (void)self;
+    ow_log("controller_done hr", (long long)(intptr_t)hr);
+    if ((int)(intptr_t)hr != 0 || !controller) { InterlockedExchange(&ow_ready, -1); return 0; }
+    ((ow_fn1)ow_vt(controller, 1 /* AddRef */))(controller);
+    ow_controller = controller;
+    ((ow_fn2)ow_vt(controller, 25 /* get_CoreWebView2 */))(controller, (void *)&ow_webview);
+    if (!ow_webview) { InterlockedExchange(&ow_ready, -1); return 0; }
+    ((ow_fn1)ow_vt(ow_webview, 1 /* AddRef */))(ow_webview);
+    ow_fit_webview();
+    ow_on_title.vtbl = ow_handler_vtbl;
+    ow_on_title.invoke = ow_title_changed;
+    ((ow_fn3)ow_vt(ow_webview, 46 /* add_DocumentTitleChanged */))(ow_webview, &ow_on_title, token);
+    ow_log("navigate hr", (long long)((ow_fn2)ow_vt(ow_webview, 5 /* Navigate */))(ow_webview, ow_url));
+    InterlockedExchange(&ow_ready, 1);
+    return 0;
+}
+/* environment arrived: ask it for a controller on our window */
+static HRESULT __stdcall ow_env_done(ow_handler *self, void *hr, void *env) {
+    (void)self;
+    ow_log("env_done hr", (long long)(intptr_t)hr);
+    if ((int)(intptr_t)hr != 0 || !env) { InterlockedExchange(&ow_ready, -1); return 0; }
+    ow_on_controller.vtbl = ow_handler_vtbl;
+    ow_on_controller.invoke = ow_controller_done;
+    ((ow_fn3)ow_vt(env, 3 /* CreateCoreWebView2Controller */))(env, ow_hwnd, &ow_on_controller);
+    return 0;
+}
+
+static LRESULT __stdcall ow_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+    switch (m) {
+    case WM_NCCALCSIZE:
+        /* keep the resize borders, remove only the caption: run the default
+           calc, then give the top edge back to the client area */
+        if (wp) {
+            NCCALCSIZE_PARAMS *p = (NCCALCSIZE_PARAMS *)lp;
+            int top = p->rgrc[0].top;
+            owu_DefWindowProcW(h, m, wp, lp);
+            p->rgrc[0].top = top;
+            return 0;
+        }
+        break;
+    case WM_GETMINMAXINFO: {
+        /* a maximised borderless window must stop at the work area, not
+           hang its (removed) frame past the screen edges */
+        MONITORINFO mi;
+        HMONITOR mon = owu_MonitorFromWindow(h, 2 /* MONITOR_DEFAULTTONEAREST */);
+        mi.cbSize = sizeof mi;
+        if (mon && owu_GetMonitorInfoW(mon, &mi)) {
+            MINMAXINFO *mm = (MINMAXINFO *)lp;
+            mm->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
+            mm->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
+            mm->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
+            mm->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+            return 0;
+        }
+        break;
+    }
+    case WM_SIZE:
+        ow_fit_webview();
+        return 0;
+    case WM_MOVE:
+        if (ow_controller)
+            ((ow_fn1)ow_vt(ow_controller, 23 /* NotifyParentWindowPositionChanged */))(ow_controller);
+        return 0;
+    case WM_CLOSE:
+        owu_DestroyWindow(h);
+        return 0;
+    case WM_DESTROY:
+        InterlockedExchange(&ow_state, 2);
+        owu_PostQuitMessage(0);
+        return 0;
+    }
+    return owu_DefWindowProcW(h, m, wp, lp);
+}
+
+/* WebView2Loader.dll: beside the exe, on the search path, or where a
+ * single-file setup exe unpacked it. */
+static HMODULE ow_loader(void) {
+    char path[4096];
+    const char *me = exe_path();
+    HMODULE lib = NULL;
+    if (me[0]) {
+        size_t n = strlen(me);
+        while (n > 0 && me[n-1] != '\\' && me[n-1] != '/') n--;
+        if (n + 20 < sizeof path) {
+            memcpy(path, me, n);
+            strcpy(path + n, "WebView2Loader.dll");
+            lib = LoadLibraryA(path);
+        }
+    }
+    if (!lib) lib = LoadLibraryA("WebView2Loader.dll");
+    if (!lib) {
+        const char *tmp = getenv("TEMP");
+        if (tmp && strlen(tmp) + 40 < sizeof path) {
+            snprintf(path, sizeof path, "%s\\orion-webview\\WebView2Loader.dll", tmp);
+            lib = LoadLibraryA(path);
+        }
+    }
+    return lib;
+}
+
+static DWORD __stdcall ow_thread(LPVOID unused) {
+    WNDCLASSW wc;
+    MSG msg;
+    HRESULT (__stdcall *create_env)(const wchar_t *, const wchar_t *, void *, void *);
+    HMODULE lib = ow_loader();
+    wchar_t data_dir[1024];
+    const char *local;
+    int sw, sh, x, y;
+    (void)unused;
+    if (!lib || !ow_load_user()) { InterlockedExchange(&ow_ready, -1); return 0; }
+    create_env = (HRESULT (__stdcall *)(const wchar_t *, const wchar_t *, void *, void *))
+        (void *)GetProcAddress(lib, "CreateCoreWebView2EnvironmentWithOptions");
+    if (!create_env) { InterlockedExchange(&ow_ready, -1); return 0; }
+    owu_CoInitializeEx(NULL, 0x2 /* APARTMENTTHREADED */);
+    memset(&wc, 0, sizeof wc);
+    wc.lpfnWndProc = (WNDPROC)ow_wndproc;
+    wc.hInstance = GetModuleHandleW(NULL);
+    wc.hCursor = owu_LoadCursorW(NULL, (const wchar_t *)(uintptr_t)32512 /* IDC_ARROW */);
+    wc.hIcon = owu_LoadIconA(GetModuleHandleA(NULL), (const char *)(uintptr_t)1); /* orbit's icon.rc */
+    if (!wc.hIcon) wc.hIcon = owu_LoadIconW(NULL, (const wchar_t *)(uintptr_t)32512 /* IDI_APPLICATION */);
+    wc.lpszClassName = L"OrionOwnWindow";
+    owu_RegisterClassW(&wc);
+    sw = owu_GetSystemMetrics(0 /* SM_CXSCREEN */);
+    sh = owu_GetSystemMetrics(1 /* SM_CYSCREEN */);
+    x = (sw - ow_w) / 2; if (x < 0) x = 0;
+    y = (sh - ow_h) / 2; if (y < 0) y = 0;
+    ow_hwnd = owu_CreateWindowExW(0, L"OrionOwnWindow", ow_title, WS_OVERLAPPEDWINDOW,
+                                  x, y, ow_w, ow_h, NULL, NULL, wc.hInstance, NULL);
+    if (!ow_hwnd) { InterlockedExchange(&ow_ready, -1); return 0; }
+    /* creation-time WM_NCCALCSIZE comes with wparam FALSE, which our caption
+       removal does not touch - ask for the frame calc again now that the
+       window exists, this time the TRUE way */
+    if (owu_SetWindowPos)
+        owu_SetWindowPos(ow_hwnd, NULL, 0, 0, 0, 0,
+                         0x0001 | 0x0002 | 0x0004 | 0x0020 /* NOSIZE|NOMOVE|NOZORDER|FRAMECHANGED */);
+    owu_ShowWindow(ow_hwnd, 1 /* SW_SHOWNORMAL */);
+    /* the profile lives per user, shared by every orion app window */
+    local = getenv("LOCALAPPDATA");
+    data_dir[0] = 0;
+    if (local) {
+        wchar_t wl[900];
+        MultiByteToWideChar(CP_UTF8, 0, local, -1, wl, 900);
+        _snwprintf(data_dir, 1024, L"%s\\orion-webview", wl);
+    }
+    ow_on_env.vtbl = ow_handler_vtbl;
+    ow_on_env.invoke = ow_env_done;
+    {
+        HRESULT ce = create_env(NULL, data_dir[0] ? data_dir : NULL, NULL, &ow_on_env);
+        ow_log("create_env hr", (long long)ce);
+        if (ce != 0) {
+            owu_DestroyWindow(ow_hwnd);
+            InterlockedExchange(&ow_ready, -1);
+            return 0;
+        }
+    }
+    InterlockedExchange(&ow_state, 1);
+    while (owu_GetMessageW(&msg, NULL, 0, 0) > 0) {
+        owu_TranslateMessage(&msg);
+        owu_DispatchMessageW(&msg);
+    }
+    if (ow_controller) ((ow_fn1)ow_vt(ow_controller, 24 /* Close */))(ow_controller);
+    return 0;
+}
+
+/* Open our own webview window at url. 0 when it is up (webview navigating),
+ * -1 when the pieces are missing - the caller falls back to open_window. */
+long long own_window_open(const char *url, const char *title, long long w, long long h) {
+    HANDLE t;
+    int waited = 0;
+    if (ow_state == 1) return -1;              /* one per process */
+    MultiByteToWideChar(CP_UTF8, 0, url, -1, ow_url, 2048);
+    MultiByteToWideChar(CP_UTF8, 0, title, -1, ow_title, 256);
+    ow_w = (int)w; ow_h = (int)h;
+    InterlockedExchange(&ow_ready, 0);
+    t = CreateThread(NULL, 0, ow_thread, NULL, 0, NULL);
+    if (!t) return -1;
+    CloseHandle(t);
+    while (ow_ready == 0 && waited < 10000) { Sleep(20); waited += 20; }
+    return ow_ready == 1 ? 0 : -1;
+}
+/* 1 once an own window was opened and then closed - the serve loop's cue. */
+long long own_window_gone(void) { return ow_state == 2 ? 1 : 0; }
+#else
+long long own_window_open(const char *url, const char *title, long long w, long long h) {
+    (void)url; (void)title; (void)w; (void)h; return -1;
+}
+long long own_window_gone(void) { return 0; }
 #endif
 
 /* ---- setup payload: an installer exe carries its app in its own tail ----
