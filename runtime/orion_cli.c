@@ -689,6 +689,7 @@ long long win_set_opacity(const char *needle, long long percent) {
  * testing; it needs WS_EX_LAYERED beside it to hold for a composited
  * window, and win_set_opacity knows not to strip that bit while this is on.)
  * 1 = clicking through, 0 = solid, -1 = no such window. */
+static void ow_through_hotkey(void *h, int on);   /* defined with the own-window block */
 long long win_set_click_through(const char *needle, long long on) {
     void *h = win_by_title(needle);
     LONG_PTR ex;
@@ -697,6 +698,9 @@ long long win_set_click_through(const char *needle, long long on) {
     if (on) ex |= 0x00080000 | 0x00000020;   /* WS_EX_LAYERED|WS_EX_TRANSPARENT */
     else ex &= ~(LONG_PTR)0x00000020;
     wt_SetWindowLongPtr(h, -20, ex);
+    /* a window the mouse cannot reach needs a way back the keyboard owns
+       from ANYWHERE - our own window arms ctrl+alt+c while this is on */
+    ow_through_hotkey(h, on ? 1 : 0);
     return on ? 1 : 0;
 }
 /* Whether it is clicking through right now (1/0), or -1 for no such window. */
@@ -881,6 +885,8 @@ static int (__stdcall *owu_GetSystemMetrics)(int);
 static HMONITOR (__stdcall *owu_MonitorFromWindow)(HWND, DWORD);
 static int (__stdcall *owu_GetMonitorInfoW)(HMONITOR, MONITORINFO *);
 static int (__stdcall *owu_SetWindowPos)(HWND, HWND, int, int, int, int, UINT);
+static int (__stdcall *owu_RegisterHotKey)(HWND, int, UINT, UINT);
+static int (__stdcall *owu_UnregisterHotKey)(HWND, int);
 static HRESULT (__stdcall *owu_CoInitializeEx)(void *, DWORD);
 static void (__stdcall *owu_CoTaskMemFree)(void *);
 
@@ -924,6 +930,8 @@ static int ow_load_user(void) {
     owu_MonitorFromWindow = (HMONITOR (__stdcall *)(HWND, DWORD))(void *)GetProcAddress(u, "MonitorFromWindow");
     owu_GetMonitorInfoW = (int (__stdcall *)(HMONITOR, MONITORINFO *))(void *)GetProcAddress(u, "GetMonitorInfoW");
     owu_SetWindowPos = (int (__stdcall *)(HWND, HWND, int, int, int, int, UINT))(void *)GetProcAddress(u, "SetWindowPos");
+    owu_RegisterHotKey = (int (__stdcall *)(HWND, int, UINT, UINT))(void *)GetProcAddress(u, "RegisterHotKey");
+    owu_UnregisterHotKey = (int (__stdcall *)(HWND, int))(void *)GetProcAddress(u, "UnregisterHotKey");
     owu_CoInitializeEx = (HRESULT (__stdcall *)(void *, DWORD))(void *)GetProcAddress(o, "CoInitializeEx");
     owu_CoTaskMemFree = (void (__stdcall *)(void *))(void *)GetProcAddress(o, "CoTaskMemFree");
     return owu_RegisterClassW && owu_CreateWindowExW && owu_DefWindowProcW && owu_GetMessageW && owu_CoInitializeEx;
@@ -945,6 +953,15 @@ static void *ow_handler_vtbl[4] = { (void *)ow_h_qi, (void *)ow_h_addref, (void 
 
 static HWND ow_hwnd;
 static int ow_is_own_window(void *h) { return h && h == (void *)ow_hwnd; }
+/* The hotkey must be registered from the thread that pumps the window's
+ * messages (WM_HOTKEY lands in the registrar's queue), and click-through is
+ * flipped from the app's server thread - so this only POSTS; the window
+ * thread does the registering in its wndproc. */
+#define OW_MSG_THROUGH (0x8000 + 41)   /* WM_APP + 41 */
+static void ow_through_hotkey(void *h, int on) {
+    if (ow_is_own_window(h) && wt_PostMessageW)
+        wt_PostMessageW(h, OW_MSG_THROUGH, (WPARAM)on, 0);
+}
 static void *ow_controller, *ow_webview;
 static volatile LONG ow_state;          /* 0 never opened, 1 open, 2 gone */
 static volatile LONG ow_ready;          /* 0 pending, 1 ok, -1 failed */
@@ -1033,6 +1050,20 @@ static LRESULT __stdcall ow_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
     case WM_MOVE:
         if (ow_controller)
             ((ow_fn1)ow_vt(ow_controller, 23 /* NotifyParentWindowPositionChanged */))(ow_controller);
+        return 0;
+    case OW_MSG_THROUGH:
+        if (owu_RegisterHotKey && owu_UnregisterHotKey) {
+            if (wp) ow_log("hotkey reg", owu_RegisterHotKey(h, 1, 0x0002 | 0x0001 /* MOD_CONTROL|MOD_ALT */, 'C'));
+            else owu_UnregisterHotKey(h, 1);
+        }
+        return 0;
+    case WM_HOTKEY:
+        /* ctrl+alt+c from anywhere: solid again. The page polls the window's
+           state while clicking through and follows suit. */
+        if (wp == 1 && wt_GetWindowLongPtr && wt_SetWindowLongPtr) {
+            wt_SetWindowLongPtr(h, -20, wt_GetWindowLongPtr(h, -20) & ~(LONG_PTR)0x00000020);
+            if (owu_UnregisterHotKey) owu_UnregisterHotKey(h, 1);
+        }
         return 0;
     case WM_CLOSE:
         owu_DestroyWindow(h);
