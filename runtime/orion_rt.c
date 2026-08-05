@@ -3580,8 +3580,11 @@ const char *file_read_chunk(long long h, long long maxlen) {
 
 long long file_write_chunk(long long h, const char *data) {
     if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h] || !data) return -1;
-    size_t n = strlen(data);
-    size_t w = fwrite(data, 1, n, orion_files[h]);
+    /* the text's OWN length, not strlen: a chunk read from a file or built
+       from bytes carries NULs (every PNG does by byte 9), and write must be
+       the mirror of read_chunk - byte-true both ways */
+    long long n = orion_tlen_c(data);
+    size_t w = fwrite(data, 1, (size_t)n, orion_files[h]);
     return (long long)w;
 }
 

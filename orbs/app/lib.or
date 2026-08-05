@@ -149,7 +149,19 @@ public define dispatch(req: request, routes: [route]) -> response:
             hit = true
     found
 
-# Serve one accepted connection: read the head, dispatch, answer, close.
+# The declared body length, 0 when none - what a POST promises to send.
+# no example: private - proven by folio's paste path (byte-true PNG upload)
+define header_length(head: text) -> int:
+    edit n = 0
+    loop line in lines(head):
+        kv = split(line, ":")
+        if len(kv) > 1 and (at(kv, 0) is "Content-Length" or at(kv, 0) is "content-length"):
+            n = int_from_text(trim(at(kv, 1)))
+    n
+
+# Serve one accepted connection: read the head, then as much body as the
+# head promised (bodies are TEXT - a page sends binary as base64), dispatch,
+# answer, close.
 define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files, clock:
     deadline = monotonic_ms() + 5000
     edit raw = ""
@@ -164,7 +176,23 @@ define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files,
             raw = "{raw}{chunk}"
             if contains(raw, "\r\n\r\n"):
                 break
-    req = parse_request(raw)
+    halves = split(raw, "\r\n\r\n")
+    head = at(halves, 0)
+    edit body = if len(halves) > 1 then at(halves, 1) else ""
+    want = header_length(head)
+    loop:
+        if len(body) >= want:
+            break
+        left2 = deadline - monotonic_ms()
+        if left2 <= 0:
+            break
+        if readable_within(conn, left2):
+            more = recv(conn, 65536)
+            if timed_out(more):
+                break
+            body = "{body}{more}"
+    first = parse_request(head)
+    req = request{method: first.method, path: first.path, query: first.query, body: body}
     # The one path the shell answers itself: the page says goodbye when its
     # window goes (navigator.sendBeacon on pagehide), and the loop below stops
     # a moment later. A reload says goodbye too, so the moment is a grace
