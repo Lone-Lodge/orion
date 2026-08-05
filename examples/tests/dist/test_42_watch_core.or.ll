@@ -1914,6 +1914,15 @@ if_46_merge:
 
 declare ptr @exe_path()
 
+declare ptr @pick_folder(ptr)
+
+define ptr @os__choose_folder(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call ptr @pick_folder(ptr %v0)
+    ret ptr %v1
+}
+
 define ptr @os__program_path() {
 entry:
     %v0 = call ptr @exe_path()

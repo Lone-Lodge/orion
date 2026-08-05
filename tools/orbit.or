@@ -370,6 +370,25 @@ define file_copy_or_die(src: text, dst: text):
 define os_tag() -> text:
     if os_kind() == 0 then "win" else if os_kind() == 2 then "macos" else "linux"
 
+# `icon = "assets/app.ico"` becomes a linked resource. llvm-rc ships beside
+# clang, so if we can compile the program we can compile this.
+define build_icon(icon: text) -> text:
+    if icon == "" or os_kind() != 0:
+        return ""
+    if not file_exists(icon):
+        die("orbit: no such icon `" + icon + "`")
+    rc_path = "build/icon.rc"
+    res_path = "build/icon.res"
+    write_file(rc_path, "1 ICON \"" + replace(icon, "\\", "/") + "\"\n")
+    rc_tool = path_parent(nb_clang()) + "/llvm-rc.exe"
+    if not file_exists(rc_tool):
+        print_line(c_dim("(no llvm-rc beside clang - the exe keeps the default icon)"))
+        return ""
+    if run_command_quiet(rc_tool, ["/fo", res_path, rc_path]) != 0:
+        print_line(c_dim("(llvm-rc could not compile the icon - keeping the default)"))
+        return ""
+    res_path
+
 define cmd_package():
     if not file_exists("Orbit.toml"):
         die("orbit: no Orbit.toml here - `package` works on a project")
@@ -380,6 +399,10 @@ define cmd_package():
     out = "dist/" + name
     remove_tree(out)
     mkdir_all(out)
+    mkdir_all("build")
+    res = build_icon(nb_setting(lines, "icon", ""))
+    if res != "":
+        slot_set("orbit:res", res)
     # No console window for a shipped app - see cli_build.
     slot_set("orbit:windowless", 1)
     built = cli_build(resolve_path())
@@ -401,6 +424,7 @@ define cmd_package():
                 file_copy_or_die(asset_path, path_join(out, asset_path))
             else:
                 die("orbit: no such asset `" + asset_path + "`")
+    write_installer(name, out)
     print_line(c_bold(shipped) + " " + c_green("ok"))
     # The archive is a convenience, not the deliverable: if the system has no
     # tar the folder above is still what ships, so say so and stop there.
@@ -409,6 +433,23 @@ define cmd_package():
         print_line(c_bold(zipped) + " " + c_green("ok"))
     else:
         print_line(c_dim("(no archive - tar not available; ship the folder)"))
+
+# An installed app is a folder somewhere permanent plus a shortcut in the
+# Start menu. That is all Windows means by "installed", so that is all this
+# does - and uninstall is deleting the folder, which the script says out loud.
+define write_installer(name: text, out: text):
+    if os_kind() != 0:
+        return
+    edit s = "@echo off\r\n"
+    s = s + "setlocal\r\n"
+    s = s + "set \"DEST=%LOCALAPPDATA%\\Programs\\" + name + "\"\r\n"
+    s = s + "echo Installing " + name + " to \"%DEST%\"\r\n"
+    s = s + "robocopy \"%~dp0.\" \"%DEST%\" /e /njh /njs /ndl /nc /ns /nfl >nul\r\n"
+    s = s + "del \"%DEST%\\install.cmd\" >nul 2>&1\r\n"
+    s = s + "powershell -NoProfile -Command \"$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Programs')+'\\" + name + ".lnk'); $s.TargetPath='%DEST%\\" + name + ".exe'; $s.WorkingDirectory='%DEST%'; $s.Save()\"\r\n"
+    s = s + "echo Done. " + name + " is in the Start menu. To uninstall, delete \"%DEST%\".\r\n"
+    s = s + "pause\r\n"
+    wrote = write_file(out + "/install.cmd", s)
 
 define pack_archive(name: text, version: text) -> text:
     stem = "dist/" + name + "-" + version + "-" + os_tag()
@@ -1135,6 +1176,10 @@ define cli_build(path: text) -> text:
             xf = at(extras, x_index)
             if xf != "":
                 link_args = append(link_args, xf)
+    # `orbit package` gives the exe its icon: a compiled resource, linked in
+    # like any other object.
+    if slot_has("orbit:res") and os_kind() == 0:
+        link_args = append(link_args, slot_get("orbit:res"))
     # `orbit package` links a shipped app without a console window. The entry
     # point stays main() - /SUBSYSTEM:WINDOWS alone would send the linker
     # looking for WinMain.

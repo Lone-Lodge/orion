@@ -177,6 +177,12 @@ public define path_parent(p: text) -> text:
         bytes_to_text(bytes_slice(bs, 0, last_sep))
 
 external define exe_path() -> text
+external define pick_folder(title: text) -> text
+
+# Ask which folder, and get its path back ("" if they said no). A program
+# started from a shortcut has no arguments to read; this is how it asks.
+# no example: opens a dialog - proven by folio started without a folder
+public define choose_folder(prompt: text) -> text uses files = pick_folder(prompt)
 
 # This program's own file, in full. `arg(0)` is only what the caller typed,
 # so a shipped program that has to find the files beside it asks here.

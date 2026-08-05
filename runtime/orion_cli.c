@@ -425,6 +425,58 @@ const char *fs_cwd(void) {
     return orion_text_from_c(buf);
 }
 
+/* Ask the person which folder, and answer with its path ("" if they said no).
+ * A program started from a Start-menu shortcut has no arguments to read, so
+ * this is how it finds out what to work on. Windows-only today; elsewhere ""
+ * and the caller falls back to an argument. */
+#ifdef _WIN32
+typedef struct {                       /* BROWSEINFOW, without shlobj.h */
+    void *hwndOwner;
+    const void *pidlRoot;
+    wchar_t *pszDisplayName;
+    const wchar_t *lpszTitle;
+    unsigned int ulFlags;
+    void *lpfn;
+    LPARAM lParam;
+    int iImage;
+} pf_browseinfo;
+const char *pick_folder(const char *title) {
+    static char out[4096];
+    wchar_t wtitle[256], wpath[4096];
+    pf_browseinfo bi;
+    void *pidl;
+    void *(__stdcall *SHBrowse)(pf_browseinfo *);
+    int (__stdcall *SHGetPath)(const void *, wchar_t *);
+    void (__stdcall *CoFree)(void *);
+    HMODULE shell = LoadLibraryA("shell32.dll"), ole = LoadLibraryA("ole32.dll");
+    out[0] = 0;
+    if (!shell || !ole) return orion_text_from_c(out);
+    SHBrowse = (void *(__stdcall *)(pf_browseinfo *))(void *)GetProcAddress(shell, "SHBrowseForFolderW");
+    SHGetPath = (int (__stdcall *)(const void *, wchar_t *))(void *)GetProcAddress(shell, "SHGetPathFromIDListW");
+    CoFree = (void (__stdcall *)(void *))(void *)GetProcAddress(ole, "CoTaskMemFree");
+    if (!SHBrowse || !SHGetPath || !CoFree) return orion_text_from_c(out);
+    { /* the dialog is COM; a GUI app that never called this would get nothing */
+        HRESULT (__stdcall *CoInit)(void *, unsigned long) =
+            (HRESULT (__stdcall *)(void *, unsigned long))(void *)GetProcAddress(ole, "CoInitializeEx");
+        if (CoInit) CoInit(NULL, 0x2 /* APARTMENTTHREADED */);
+    }
+    wtitle[0] = 0;
+    MultiByteToWideChar(CP_UTF8, 0, title, -1, wtitle, 256);
+    memset(&bi, 0, sizeof bi);
+    bi.lpszTitle = wtitle;
+    bi.ulFlags = 0x0001 /* RETURNONLYFSDIRS */ | 0x0040 /* NEWDIALOGSTYLE */;
+    pidl = SHBrowse(&bi);
+    if (!pidl) return orion_text_from_c(out);
+    wpath[0] = 0;
+    if (SHGetPath(pidl, wpath))
+        WideCharToMultiByte(CP_UTF8, 0, wpath, -1, out, sizeof out, NULL, NULL);
+    CoFree(pidl);
+    return orion_text_from_c(out);
+}
+#else
+const char *pick_folder(const char *title) { (void)title; return orion_text_from_c(""); }
+#endif
+
 /* This program's own file, in full, "" on failure. argv[0] is whatever the
  * caller typed and can be relative or a bare name, so a shipped app cannot
  * use it to find the files that ship beside it - this can. */
