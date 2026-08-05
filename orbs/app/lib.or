@@ -257,6 +257,8 @@ public define query_of(req: request, key: text) -> text:
 external define win_set_topmost(needle: text, on: int) -> int
 external define win_set_opacity(needle: text, percent: int) -> int
 external define win_set_frameless(needle: text, on: int, view_h: int) -> int
+external define win_set_click_through(needle: text, on: int) -> int
+external define win_click_through_on(needle: text) -> int
 external define win_move(needle: text, x: int, y: int) -> int
 external define win_command(needle: text, what: text) -> int
 
@@ -277,6 +279,18 @@ public define window_opacity(title: text, percent: int) -> truth uses console = 
 # the region is fixed to a size.
 # no example: window state - proven by folio's own top bar
 public define window_frameless(title: text, on: truth, view_h: int) -> truth uses console = win_set_frameless(title, if on then 1 else 0, view_h) is 0
+
+# Let the mouse fall through the window to whatever is under it: a reference
+# board you can paint and click straight through. The keyboard still arrives,
+# so alt-tab back and the page's own keys are the way out - without that, a
+# window that takes no clicks could not be turned off from inside.
+# no example: window state - proven by folio's click-through
+public define window_click_through(title: text, on: truth) -> truth uses console = win_set_click_through(title, if on then 1 else 0) >= 0
+
+# Whether it is clicking through right now - the page asks while it is on,
+# since the way out does not go through the page.
+# no example: window state - proven by folio's click-through
+public define clicks_through(title: text) -> truth uses console = win_click_through_on(title) is 1
 
 # Put the window's top-left corner at x,y in device pixels - a frameless
 # window's bar drags with this. The browser keeps the pointer to itself and

@@ -524,8 +524,12 @@ static wchar_t win_needle[256];
 static void *win_found;
 static int __stdcall win_find_scan(void *h, LONG_PTR unused) {
     wchar_t title[512];
+    RECT r;
     (void)unused;
     if (!wt_IsWindowVisible(h)) return 1;
+    /* a window on its way out keeps its title for a moment while its rect
+       collapses to nothing - it must not shadow the live one */
+    if (wt_GetWindowRect && wt_GetWindowRect(h, &r) && r.right <= r.left) return 1;
     title[0] = 0;
     wt_GetWindowTextW(h, title, 512);
     if (title[0] && wcsstr(title, win_needle)) { win_found = h; return 0; }
@@ -575,7 +579,8 @@ long long win_set_topmost(const char *needle, long long on) {
     return 0;
 }
 /* percent 100 takes the layered style back off, so a solid window pays
- * nothing for having once been faded. */
+ * nothing for having once been faded - unless it is clicking through, which
+ * is built on the same style bit. */
 long long win_set_opacity(const char *needle, long long percent) {
     void *h = win_by_title(needle);
     LONG_PTR ex;
@@ -584,12 +589,39 @@ long long win_set_opacity(const char *needle, long long percent) {
     if (percent > 100) percent = 100;
     ex = wt_GetWindowLongPtr(h, -20 /* GWL_EXSTYLE */);
     if (percent >= 100) {
-        wt_SetWindowLongPtr(h, -20, ex & ~(LONG_PTR)0x00080000 /* WS_EX_LAYERED */);
+        if (ex & 0x00000020 /* WS_EX_TRANSPARENT */)
+            wt_SetLayeredWindowAttributes(h, 0, 255, 0x2 /* LWA_ALPHA */);
+        else
+            wt_SetWindowLongPtr(h, -20, ex & ~(LONG_PTR)0x00080000 /* WS_EX_LAYERED */);
         return 0;
     }
     wt_SetWindowLongPtr(h, -20, ex | 0x00080000);
     wt_SetLayeredWindowAttributes(h, 0, (unsigned char)(percent * 255 / 100), 0x2 /* LWA_ALPHA */);
     return 0;
+}
+/* Let the mouse fall straight through the window to whatever is under it -
+ * the reference-board trick: the board floats over the work and you paint,
+ * click and drag as if it were not there. The KEYBOARD still arrives, which
+ * is the way back: alt-tab to the window and the page's own key handler can
+ * turn this off. (WS_EX_TRANSPARENT only takes the window out of mouse hit
+ * testing; it needs WS_EX_LAYERED beside it to hold for a composited
+ * window, and win_set_opacity knows not to strip that bit while this is on.)
+ * 1 = clicking through, 0 = solid, -1 = no such window. */
+long long win_set_click_through(const char *needle, long long on) {
+    void *h = win_by_title(needle);
+    LONG_PTR ex;
+    if (!h || !wt_GetWindowLongPtr || !wt_SetWindowLongPtr) return -1;
+    ex = wt_GetWindowLongPtr(h, -20 /* GWL_EXSTYLE */);
+    if (on) ex |= 0x00080000 | 0x00000020;   /* WS_EX_LAYERED|WS_EX_TRANSPARENT */
+    else ex &= ~(LONG_PTR)0x00000020;
+    wt_SetWindowLongPtr(h, -20, ex);
+    return on ? 1 : 0;
+}
+/* Whether it is clicking through right now (1/0), or -1 for no such window. */
+long long win_click_through_on(const char *needle) {
+    void *h = win_by_title(needle);
+    if (!h || !wt_GetWindowLongPtr) return -1;
+    return (wt_GetWindowLongPtr(h, -20) & 0x00000020) ? 1 : 0;
 }
 /* Take the frame off, so the page IS the window and can draw its own bar.
  *
@@ -692,6 +724,8 @@ long long win_command(const char *needle, const char *what) {
 long long win_set_topmost(const char *needle, long long on) { (void)needle; (void)on; return -1; }
 long long win_set_opacity(const char *needle, long long percent) { (void)needle; (void)percent; return -1; }
 long long win_set_frameless(const char *needle, long long on, long long view_h) { (void)needle; (void)on; (void)view_h; return -1; }
+long long win_set_click_through(const char *needle, long long on) { (void)needle; (void)on; return -1; }
+long long win_click_through_on(const char *needle) { (void)needle; return -1; }
 long long win_move(const char *needle, long long x, long long y) { (void)needle; (void)x; (void)y; return -1; }
 long long win_command(const char *needle, const char *what) { (void)needle; (void)what; return -1; }
 #endif
