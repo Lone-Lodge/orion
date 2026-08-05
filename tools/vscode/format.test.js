@@ -47,4 +47,4 @@ test("does not touch content inside lines", () => {
   assert.strictEqual(out, 'fn f() -> Text = "hello  world  with  spaces"\n');
 });
 
-console.log("orion formatter — done.");
+console.log("orion formatter - done.");

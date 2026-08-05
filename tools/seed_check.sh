@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# seed_check.sh — can the CHECKED-IN seed still build the CURRENT compiler?
+# seed_check.sh - can the CHECKED-IN seed still build the CURRENT compiler?
 #
 # WHY: tools/seed/orion.ll is the only way a fresh clone gets a first binary.
 # It is a snapshot, so it rots the moment the compiler source starts using
 # syntax the snapshot's parser does not know. Nothing noticed that, because
 # everyday work runs self_bootstrap.sh, which starts from the dist/orion.exe
-# you already have. The rot only surfaces on a machine that has no binary —
+# you already have. The rot only surfaces on a machine that has no binary -
 # i.e. someone else's first clone.
 #
 # This links the seed into a throwaway exe and asks it to compile today's
@@ -44,6 +44,15 @@ case "$(uname -s 2>/dev/null || echo Linux)" in
         sed -e "2s#e-m:w#e-m:e#" -e "3s#x86_64-pc-windows-msvc[0-9.]*#x86_64-unknown-linux-gnu#" \
             "$SEED_LL" > "$WORK/seed.host.ll"
         "$CLANG" "$WORK/seed.host.ll" "$ROOT/runtime/orion_rt.c" -Os -o "$WORK/seed.exe" ;;
+esac
+
+# The compiler recurses deep; Windows reserves a big stack in the exe
+# (/STACK above), POSIX raises it at run time. Without this the seed exe
+# SEGFAULTS on the grown bundle and reports as "stale" - which is exactly
+# what CI showed on ubuntu/macos while Windows stayed green.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
 esac
 
 echo "==> the seed compiles today's bundle"

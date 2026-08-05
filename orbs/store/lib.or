@@ -1,0 +1,54 @@
+# store - program state shaped like a database (manifesto P1).
+#
+# Flat records with STABLE ids, not object graphs: games call it ECS,
+# business software calls it relations - same idea. Value semantics makes
+# pointer graphs impossible; this orb makes tables of entities natural:
+#
+#   w0 = store_new()
+#   w1, id = insert(w0, {"hp": 10})        # id is stable for the entity's life
+#   w2 = remove(w1, id)
+#   e  = entity(w, id)                     # {} when absent
+#   hurt = loop e in items(w) where get_int(e, "hp") < 10: collect e
+#
+# `loop ... in items(w) where ...` IS the query. The storage layout (SoA,
+# archetype, whatever) is the compiler's/engine's business, never the code's.
+#
+# The store itself is a RECORD (typed fields), not a bag-of-anything table -
+# heterogeneous tables read through typed getters are a poor man's record,
+# and the language has real ones. Cells stay a `table<table>`: id-text to
+# entity record, homogeneous, so plain typed reads work.
+
+type sstore: seq: int, cells: table<table>
+
+public define store_new() -> sstore:
+    example len(items(store_new())) is 0
+    example store_new().seq is 0
+    sstore{seq: 0, cells: {}}
+
+# Add a record; returns (new store, its id). Ids are never reused.
+public define insert(s: sstore, cell: table) -> (sstore, int):
+    example len(items(store_new())) is 0
+    id = s.seq
+    (sstore{seq: id + 1, cells: set(s.cells, "{id}", cell)}, id)
+
+public define remove(s: sstore, id: int) -> sstore:
+    example len(items(remove(store_new(), 0))) is 0
+    sstore{seq: s.seq, cells: map_remove(s.cells, "{id}")}
+
+# The record for `id`, or {} when it was never inserted / was removed.
+public define entity(s: sstore, id: int) -> table:
+    example not has_id(store_new(), 9)
+    get(s.cells, "{id}")
+
+public define has_id(s: sstore, id: int) -> truth:
+    example not has_id(store_new(), 0)
+    has(s.cells, "{id}")
+
+# Every live record - the iteration/query source.
+public define items(s: sstore) -> [table]:
+    example len(items(store_new())) is 0
+    ks = map_keys(s.cells)
+    edit out = []
+    loop i in 0 until len(ks):
+        out = append(out, get(s.cells, at(ks, i)))
+    out

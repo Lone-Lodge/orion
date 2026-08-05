@@ -1,6 +1,6 @@
-fn main() -> int:
+define main() -> int:
     m = {"kind": "Block", "name": "main"}
-    mut score = 0
+    edit score = 0
     if get(m, "kind") == "Block":
         score = score + 1
     if get(m, "name") == "main":

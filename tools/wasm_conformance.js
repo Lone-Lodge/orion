@@ -28,8 +28,7 @@ const feats = {};
 for (const f of files) {
   const exp = expectedOf(f);
   if (exp === null) continue;
-  let src = fs.readFileSync(path.join(TESTS, f), 'utf8');
-  src = src.replace(/^[ \t]*use[ \t]+(text|iter|bytes)[ \t]*\r?$/gm, '');
+  const src = fs.readFileSync(path.join(TESTS, f), 'utf8');
   const sf = path.join(TMP, f), wf = sf.replace(/\.or$/, '.wasm');
   try { fs.unlinkSync(wf); } catch {}
   fs.writeFileSync(sf, src);
@@ -66,4 +65,35 @@ for (const k of ['MISMATCH', 'TRAP', 'HANG', 'FAIL']) {
 }
 if (cats.UNSUPPORTED.length && filter) {
   console.log('\n-- UNSUPPORTED --'); cats.UNSUPPORTED.forEach(x => console.log('  ' + x));
+}
+
+// Regression gate (only when run over the whole suite, i.e. no filter). The
+// wasm backend is secondary and has known-unsupported features, so we do NOT
+// require 100%. Instead: the OK count must not drop below a baseline, and there
+// must be no MISMATCH (wrong answer) or FAIL (compile/link crash). Expected
+// runtime aborts (divide-by-zero, out-of-range, require) land in TRAP and are
+// tolerated. Bump BASELINE_OK when real coverage rises.
+// 142 -> 141 on 2026-08-04: test_42_general_floor gained copy/move/cwd and
+// moved OK -> UNSUPPORTED (honestly native-only). Not a lost capability.
+const BASELINE_OK = 141;
+// Tests that are correct natively but rely on an idiom the wasm backend does
+// not share, each with a tracked reason. They must NOT silently count as
+// regressions, but they are listed loudly so the set cannot grow unnoticed.
+const KNOWN_GAPS = {};
+if (!filter) {
+  const isGap = (line) => Object.keys(KNOWN_GAPS).some((f) => line.startsWith(f));
+  const unexpected = [...cats.MISMATCH, ...cats.FAIL].filter((x) => !isGap(x));
+  const okCount = cats.OK.length;
+  const regressed = okCount < BASELINE_OK;
+  if (Object.keys(KNOWN_GAPS).length) {
+    console.log('\n-- known wasm gaps (tolerated, tracked) --');
+    for (const [f, why] of Object.entries(KNOWN_GAPS)) console.log(`  ${f}: ${why}`);
+  }
+  if (regressed) console.log(`\nREGRESSION: OK ${okCount} < baseline ${BASELINE_OK}`);
+  if (unexpected.length) {
+    console.log(`\nREGRESSION: ${unexpected.length} unexpected MISMATCH/FAIL (must be 0):`);
+    unexpected.forEach((x) => console.log('  ' + x));
+  }
+  if (regressed || unexpected.length) process.exit(1);
+  console.log(`\nwasm gate OK: ${okCount} pass (>= ${BASELINE_OK}), no unexpected mismatch/fail`);
 }

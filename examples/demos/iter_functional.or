@@ -1,4 +1,4 @@
-# iter — functional list operations with closures.
+# iter - functional list operations with closures.
 # Build: this is a library-using program; compile with the orbs/ root:
 #   orion.exe examples/demos/iter_functional.or out.ll orbs
 #
@@ -6,16 +6,16 @@
 # a closure that captures a local (`bonus`).
 use iter
 
-fn main() -> int:
+define main() -> int:
     scores = [40, 75, 88, 12, 95, 60]
     bonus = 5
 
-    # Plain intermediate variables read top-to-bottom — each line names its
+    # Plain intermediate variables read top-to-bottom - each line names its
     # result, so a newcomer can follow every step. The closures capture
     # `bonus` from the surrounding scope.
-    boosted = map(scores, fn(s): s + bonus)                      # [45,80,93,17,100,65]
-    passing = filter(boosted, fn(s): if s >= 65 then 1 else 0)   # [80,93,100,65]
-    total   = reduce(passing, 0, fn(acc, s): acc + s)            # 338
+    boosted = each(scores, fn(s): s + bonus)                      # [45,80,93,17,100,65]
+    passing = keep(boosted, fn(s): if s >= 65 then 1 else 0)   # [80,93,100,65]
+    total   = combine(passing, 0, fn(acc, s): acc + s)            # 338
 
     # count how many were perfect (100), same boosted values.
     perfect = count(boosted, fn(s): if s == 100 then 1 else 0)   # 1

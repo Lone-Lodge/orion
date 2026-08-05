@@ -1,0 +1,10 @@
+# expect: the caller must cover `files`
+define writer(p: text) uses files:
+    file_write(p, "x")
+
+define caller(p: text) uses console:
+    writer(p)
+
+define main() -> int:
+    caller("t.txt")
+    0

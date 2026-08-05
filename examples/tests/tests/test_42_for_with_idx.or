@@ -1,6 +1,6 @@
-fn main() -> int:
+define main() -> int:
     vals = [10, 20, 30, 5]
-    mut sum = 0
+    edit sum = 0
     loop idx, v in vals:
         if idx == 3:
             sum = sum + v

@@ -1,0 +1,34 @@
+# The spoken operator family (Runda B):
+#   is / is not / is less than / is more than / is at most / is at least
+#   ranges: `1 to 3` (inclusive) / `0 until 3` (exclusive)
+#   choose arms: `pattern then body` (alias of ->)
+#   try expr (prefix form of postfix ?)
+type res:
+    Ok(int)
+    Err(text)
+
+define halve(n: int) -> res:
+    if n - (n // 2) * 2 is 0:
+        res.Ok(n // 2)
+    else:
+        res.Err("odd")
+
+define doubled_half(n: int) -> res:
+    v = try halve(n)
+    res.Ok(v * 2)
+
+define main() -> int:
+    edit total = 0
+    loop i in 1 to 3:
+        total += i
+    loop i in 0 until 3:
+        total += i
+    if total is 9 and total is not 8 and total is at least 9 and total is at most 9 and total is more than 8 and total is less than 10:
+        total += 1
+    extra = choose doubled_half(8):
+        Ok(v)  then v
+        Err(_) then 0
+    bad = choose doubled_half(3):
+        Ok(v)  then 0
+        Err(_) then 24
+    total + extra + bad

@@ -1,0 +1,16 @@
+# `where` is BACK (the design kept it; it had been retired): a loop filter
+# that desugars in the parser to wrapping the body in `if cond:` - exactly
+# the documented collect-filter, so lowering is untouched.
+#   expression position:  kept = loop v in xs where v > 2: collect v
+#   statement position:   loop v in xs where v != 3: ...
+#   range:                loop i in 1 to 10 where ...
+define main() -> int:
+    xs = [1, 2, 3, 4, 5]
+    kept = loop v in xs where v > 2: collect v          # [3, 4, 5]
+    edit sum = 0
+    loop v in xs where v != 3:                          # 1+2+4+5 = 12
+        sum += v
+    edit evens = 0
+    loop i in 1 to 10 where i - (i // 2) * 2 is 0:       # 2+4+6+8+10 = 30
+        evens += i
+    len(kept) * 0 + sum + evens                         # 12 + 30 = 42

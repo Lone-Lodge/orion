@@ -17,3 +17,13 @@ build/crash.*
 
 # host-retargeted scratch copies (the tracked .ll is the compiler output)
 *.host.ll
+
+# test scratch written into the tracked dist dir
+examples/tests/.*.txt
+examples/tests/dist/.*.txt
+examples/tests/.*.bat
+examples/tests/dist/.*.bat
+examples/tests/dist/.watch/
+build/autosave.txt
+build/*.map
+__pycache__/

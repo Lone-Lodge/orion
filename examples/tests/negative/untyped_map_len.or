@@ -2,8 +2,8 @@
 # Reading a list out of an untyped (dynamic) map and taking the length of an
 # element is the documented silent-wrong-answer: it would compute a MAP length
 # even if the element is a Text. The fix is to annotate the read.
-fn word_len(m: Map) -> int:
+define word_len(m: table) -> int:
   ys = get_list(m, "words")
   len(ys[0])
-fn main() -> int:
+define main() -> int:
   0

@@ -1,12 +1,12 @@
 # Character literals: `'c'` lexes to the byte value, so it's readable
-# notation for an ASCII code — `'+'` is exactly `43`. No new type; the
+# notation for an ASCII code - `'+'` is exactly `43`. No new type; the
 # parser treats it as an int. Escapes work too (`'\n'` = 10, `'\''` = 39).
-fn classify(b: int) -> Text:
-    match b:
+define classify(b: int) -> text:
+    choose b:
         '+' -> "plus"
         '-' -> "minus"
         _ -> "other"
-fn main() -> int:
+define main() -> int:
     p = classify('+')
     # '+'=43, '\n'=10, '\''=39  -> 92; guarded by the match result
     if p == "plus" then '+' + '\n' + '\'' else 0

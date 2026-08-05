@@ -1,10 +1,10 @@
-# ast_eval — parse arithmetic into a REAL tree, then evaluate the tree.
+# ast_eval - parse arithmetic into a REAL tree, then evaluate the tree.
 #
 # Build: orion.exe examples/demos/ast_eval.or out.ll orbs
 #
 # The calculator evaluates while it parses. This one separates the phases like
 # a real compiler: parse builds an AST, then a recursive pass walks it. The
-# tree is an ARENA — every node lives in one `[Node]` list and refers to its
+# tree is an ARENA - every node lives in one `[Node]` list and refers to its
 # children by index. That's the data-oriented shape (Orion's whole ethos) and
 # the natural way to model a recursive structure with an `enum` whose payloads
 # are plain ints:
@@ -21,19 +21,19 @@ type Node: Num(int), Neg(int), Add(int, int), Sub(int, int), Mul(int, int), Div(
 # through by return value rather than mutated in place.
 type PR: arena: [Node], idx: int, next: int
 
-fn tok(kind: Text, val: int) -> Map:
+define tok(kind: text, val: int) -> table:
     {"kind": kind, "val": val}
 
-fn is_digit(b: int) -> int:
+define is_digit(b: int) -> int:
     if b >= '0' and b <= '9' then 1 else 0
 
 # ---- Tokenizer -------------------------------------------------------
 
-fn tokenize(src: Text) -> [Map]:
+define tokenize(src: text) -> [table]:
     bs = bytes_from_text(src)
     n = len(bs)
-    mut toks = []
-    mut i = 0
+    edit toks = []
+    edit i = 0
     loop:
         if i >= n:
             break
@@ -42,7 +42,7 @@ fn tokenize(src: Text) -> [Map]:
             i = i + 1
         else:
             if is_digit(b) == 1:
-                mut num = 0
+                edit num = 0
                 loop:
                     if i >= n:
                         break
@@ -51,9 +51,9 @@ fn tokenize(src: Text) -> [Map]:
                         break
                     num = num * 10 + (d - '0')
                     i = i + 1
-                toks = push(toks, tok("num", num))
+                toks = append(toks, tok("num", num))
             else:
-                kind = match b:
+                kind = choose b:
                     '+' -> "plus"
                     '-' -> "minus"
                     '*' -> "star"
@@ -61,20 +61,20 @@ fn tokenize(src: Text) -> [Map]:
                     '(' -> "lparen"
                     ')' -> "rparen"
                     _ -> "bad"
-                toks = push(toks, tok(kind, 0))
+                toks = append(toks, tok(kind, 0))
                 i = i + 1
     toks
 
 # ---- Parser: tokens -> arena of Nodes, returning the root index ------
 
 # push a node, return its index (its position in the arena after the push)
-fn add_node(arena: [Node], node: Node) -> PR:
-    grown = push(arena, node)
+define add_node(arena: [Node], node: Node) -> PR:
+    grown = append(arena, node)
     PR{arena: grown, idx: len(grown) - 1, next: 0}
 
-fn parse_factor(toks: [Map], pos: int, arena: [Node]) -> PR:
+define parse_factor(toks: [table], pos: int, arena: [Node]) -> PR:
     t = at(toks, pos)
-    match get(t, "kind"):
+    choose get(t, "kind"):
         "lparen" ->
             inner = parse_expr(toks, pos + 1, arena)
             PR{arena: inner.arena, idx: inner.idx, next: inner.next + 1}   # skip ')'
@@ -86,11 +86,11 @@ fn parse_factor(toks: [Map], pos: int, arena: [Node]) -> PR:
             made = add_node(arena, Node.Num(get(t, "val")))
             PR{arena: made.arena, idx: made.idx, next: pos + 1}
 
-fn parse_term(toks: [Map], pos: int, arena: [Node]) -> PR:
+define parse_term(toks: [table], pos: int, arena: [Node]) -> PR:
     left = parse_factor(toks, pos, arena)
-    mut a = left.arena
-    mut node_i = left.idx
-    mut i = left.next
+    edit a = left.arena
+    edit node_i = left.idx
+    edit i = left.next
     loop:
         if i >= len(toks):
             break
@@ -105,11 +105,11 @@ fn parse_term(toks: [Map], pos: int, arena: [Node]) -> PR:
         i = right.next
     PR{arena: a, idx: node_i, next: i}
 
-fn parse_expr(toks: [Map], pos: int, arena: [Node]) -> PR:
+define parse_expr(toks: [table], pos: int, arena: [Node]) -> PR:
     left = parse_term(toks, pos, arena)
-    mut a = left.arena
-    mut node_i = left.idx
-    mut i = left.next
+    edit a = left.arena
+    edit node_i = left.idx
+    edit i = left.next
     loop:
         if i >= len(toks):
             break
@@ -126,8 +126,8 @@ fn parse_expr(toks: [Map], pos: int, arena: [Node]) -> PR:
 
 # ---- Evaluator: walk the arena by index ------------------------------
 
-fn eval(arena: [Node], idx: int) -> int:
-    match at(arena, idx):
+define eval(arena: [Node], idx: int) -> int:
+    choose at(arena, idx):
         Num(v) -> v
         Neg(c) -> 0 - eval(arena, c)
         Add(l, r) -> eval(arena, l) + eval(arena, r)
@@ -135,9 +135,9 @@ fn eval(arena: [Node], idx: int) -> int:
         Mul(l, r) -> eval(arena, l) * eval(arena, r)
         Div(l, r) ->
             d = eval(arena, r)
-            if d == 0 then 0 else eval(arena, l) / d
+            if d == 0 then 0 else eval(arena, l) // d
 
-fn run(src: Text) -> int:
+define run(src: text) -> int:
     parsed = parse_expr(tokenize(src), 0, [])
     v = eval(parsed.arena, parsed.idx)
     print_line("{src}   =  {v}   ({len(parsed.arena)} nodes)")
@@ -145,7 +145,7 @@ fn run(src: Text) -> int:
 
 # ---- Main ------------------------------------------------------------
 
-fn main() -> int:
+define main() -> int:
     a = run("2 * (3 + 4)")      # 14
     b = run("100 / (2 + 3)")    # 20
     c = run("-5 + 13")          # 8

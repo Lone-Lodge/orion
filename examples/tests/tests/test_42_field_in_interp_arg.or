@@ -1,9 +1,9 @@
-type Inst: value: int, kind: Text
+type Inst: value: int, kind: text
 
-fn value_ref(x: int) -> Text:
+define value_ref(x: int) -> text:
     "v{x}"
 
-fn main() -> int:
+define main() -> int:
     inst = Inst{value: 21, kind: "iconst"}
     # This was the bug: {value_ref(inst.value)} captured `inst.value`
     # as a single Ident name, exploding ast_to_ir with "unknown identifier".

@@ -1,11 +1,11 @@
-/* png_min.c — minimal PNG loader for the atlas sprite path.
+/* png_min.c - minimal PNG loader for the atlas sprite path.
  *
  * #included from orion_rt.c (so it links into both the CLI runtime and the
  * native GPU build). Decodes an 8-bit PNG (grayscale / RGB / RGBA / gray+alpha
  * / palette) into a flat RGBA blob and returns it as a length-headered orion
  * Text: 8-byte header (width LE32, height LE32) followed by width*height*4
  * RGBA bytes. On any failure returns the empty text (len 0) so callers just
- * check the length. Self-contained DEFLATE (RFC 1951) — no zlib dependency.
+ * check the length. Self-contained DEFLATE (RFC 1951) - no zlib dependency.
  *
  * The engine has no GPU sampler; sprites are blitted as og_rects (one per
  * run of same-colour pixels). This loader is the CPU half of that, and being
@@ -209,7 +209,7 @@ static int png_abs(int v) { return v < 0 ? -v : v; }
 
 /* An orion Text built on RAW malloc (not orion_alloc): immortal and safe to
  * cache across frames. orion_text_alloc would route through the arena during
- * a render and be freed at reset — a dangling cache. Layout matches: header
+ * a render and be freed at reset - a dangling cache. Layout matches: header
  * [hash=0][len] then data then NUL. */
 static char *png_text_immortal(long long len) {
     char *base = (char *)malloc((size_t)len + 17);
@@ -300,7 +300,7 @@ const char *host_image_load_path(const char *path) {
     fclose(f);
     static const unsigned char SIG[8] = {137,80,78,71,13,10,26,10};
     if (memcmp(buf, SIG, 8) != 0) {
-        png_reason = "not a PNG (bad signature) — only PNG is supported";
+        png_reason = "not a PNG (bad signature) - only PNG is supported";
         free(buf); return orion_text_empty();
     }
 
@@ -351,11 +351,11 @@ const char *host_image_load_path(const char *path) {
         free(buf); free(idat); return orion_text_empty();
     }
     if (interlace != 0) {
-        png_reason = "interlaced PNG not supported — re-export non-interlaced";
+        png_reason = "interlaced PNG not supported - re-export non-interlaced";
         free(buf); free(idat); return orion_text_empty();
     }
     if (bitdepth != 8) {
-        png_reason = "not 8-bit — re-export as 8-bit (not 16-bit or <8-bit indexed)";
+        png_reason = "not 8-bit - re-export as 8-bit (not 16-bit or <8-bit indexed)";
         free(buf); free(idat); return orion_text_empty();
     }
     int ch = colortype == 2 ? 3 : colortype == 6 ? 4 : colortype == 0 ? 1 :

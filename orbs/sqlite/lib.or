@@ -1,0 +1,91 @@
+# sqlite - a real SQL database in one file, no server.
+#
+# The engine is the vendored sqlite3 amalgamation; a project that uses this
+# orb names BOTH C files in its Orbit.toml:
+#
+#     link = "vendor/sqlite3.c vendor/orion_sqlite.c"
+#
+# (copy them from orion/vendor/, or precompile sqlite3.c to a .o once with
+# `clang -c -Os` and name the .o instead - it takes the ~30 s sqlite compile
+# out of every build.)
+#
+#     db = db_open("game.db")
+#     ok1 = db_run(db, "CREATE TABLE IF NOT EXISTS scores(name TEXT, points INTEGER)")
+#     ok2 = db_run_with(db, "INSERT INTO scores VALUES (?, ?)", ["mio", "42"])
+#     loop row in db_rows(db, "SELECT name, points FROM scores ORDER BY points DESC"):
+#         cells = columns(row)
+#
+# Parameters ALWAYS bind through `?` placeholders (never paste values into
+# the SQL text - that is how injection happens). They bind as text; the
+# column's declared type converts numbers on the way in.
+use text
+
+external define sq_open(path: text) -> int
+external define sq_close(h: int) -> int
+external define sq_exec(h: int, sql: text, params: text) -> int
+external define sq_query(h: int, sql: text, params: text) -> text
+external define sq_failed() -> int
+external define sq_error(h: int) -> text
+external define sq_changes(h: int) -> int
+external define sq_last_id(h: int) -> int
+
+# The 0x1f unit separator the bridge joins columns with - a byte no real
+# text contains.
+define unit_sep() -> text = bytes_to_text([31])
+
+define join_params(params: [text]) -> text:
+    join(params, unit_sep())
+
+# Open (or create) the database file. A handle, or -1 - ask db_error(-1)
+# for nothing; a failed open names its reason on the handle it tried.
+# no example: opens a file on disk - proven by tools/sqlite_test.sh
+public define db_open(path: text) -> int uses files = sq_open(path)
+
+# no example: closes a handle - proven by tools/sqlite_test.sh
+public define db_close(db: int) -> int uses files = sq_close(db)
+
+# Run SQL that yields no rows (CREATE, INSERT, UPDATE, DELETE). false on
+# error - db_error(db) says why.
+# no example: writes to a database file - proven by tools/sqlite_test.sh
+public define db_run(db: int, sql: text) -> truth uses files = sq_exec(db, sql, "") is 0
+
+# Same, with `?` placeholders bound from `params`, in order. The ONLY way
+# user input should ever reach SQL.
+# no example: writes to a database file - proven by tools/sqlite_test.sh
+public define db_run_with(db: int, sql: text, params: [text]) -> truth uses files = sq_exec(db, sql, join_params(params)) is 0
+
+# All result rows, one text per row. Split a row's cells with columns().
+# Empty result is []; on error it is also [] and db_error(db) says why.
+# no example: reads a database file - proven by tools/sqlite_test.sh
+public define db_rows(db: int, sql: text) -> [text] uses files:
+    raw = sq_query(db, sql, "")
+    if raw is "" then [] else split(raw, "\n")
+
+# no example: reads a database file - proven by tools/sqlite_test.sh
+public define db_rows_with(db: int, sql: text, params: [text]) -> [text] uses files:
+    raw = sq_query(db, sql, join_params(params))
+    if raw is "" then [] else split(raw, "\n")
+
+# One row's cells. NULL comes back as "".
+public define columns(row: text) -> [text]:
+    example len(columns("a")) is 1
+    split(row, unit_sep())
+
+# The first cell of the first row - the shape of COUNT(*) and friends.
+# "" when the query gave nothing.
+# no example: reads a database file - proven by tools/sqlite_test.sh
+public define db_one(db: int, sql: text) -> text uses files:
+    rows = db_rows(db, sql)
+    if len(rows) is 0 then "" else at(columns(at(rows, 0)), 0)
+
+# Why the last call on this handle failed, "" when it did not.
+# no example: database state - proven by tools/sqlite_test.sh
+public define db_error(db: int) -> text uses files = sq_error(db)
+
+# Rows changed by the last INSERT/UPDATE/DELETE.
+# no example: database state - proven by tools/sqlite_test.sh
+public define db_changes(db: int) -> int uses files = sq_changes(db)
+
+# The rowid the last INSERT got.
+# no example: database state - proven by tools/sqlite_test.sh
+public define db_last_id(db: int) -> int uses files = sq_last_id(db)

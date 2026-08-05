@@ -1,4 +1,4 @@
-# orion_ir — typed IR for orion-self.
+# orion_ir - typed IR for orion-self.
 #
 # Design:
 #   - SSA-form: each instruction PRODUCES exactly one value.
@@ -22,13 +22,13 @@
 # An IR instruction. All fields present; unused ones zero/empty.
 # - name: fn name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
-type Inst: op: Text, type_text: Text, value: int, lhs: int, rhs: int, name: Text, args: [int]
+type Inst: op: text, type_text: text, value: int, lhs: int, rhs: int, name: text, args: [int]
 
 # A function parameter.
-type Param: name: Text, type_text: Text
+type Param: name: text, type_text: text
 
 # A function: name, return type, params, and a list of instructions.
-type IRFn: name: Text, return_type: Text, params: [Param], instructions: [Inst]
+type IRFn: name: text, return_type: text, params: [Param], instructions: [Inst]
 
 # A module is a list of functions.
 type IRModule: functions: [IRFn]
@@ -38,79 +38,79 @@ type IRModule: functions: [IRFn]
 type PushResult: function: IRFn, id: int
 
 
-# --- Value types (Text constants) ---
+# --- Value types (text constants) ---
 
-pub fn ir_type_i64() -> Text: "i64"
-pub fn ir_type_ptr() -> Text: "ptr"
-pub fn ir_type_bool() -> Text: "bool"
-pub fn ir_type_void() -> Text: "void"
+public define ir_type_i64() -> text: "i64"
+public define ir_type_ptr() -> text: "ptr"
+public define ir_type_bool() -> text: "bool"
+public define ir_type_void() -> text: "void"
 
 
 # --- Instruction builders ---
 
-pub fn ir_iconst(value: int) -> Inst:
+public define ir_iconst(value: int) -> Inst:
     Inst{op: "iconst", type_text: "i64", value: value, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_iadd(lhs: int, rhs: int) -> Inst:
+public define ir_iadd(lhs: int, rhs: int) -> Inst:
     Inst{op: "iadd", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_isub(lhs: int, rhs: int) -> Inst:
+public define ir_isub(lhs: int, rhs: int) -> Inst:
     Inst{op: "isub", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_imul(lhs: int, rhs: int) -> Inst:
+public define ir_imul(lhs: int, rhs: int) -> Inst:
     Inst{op: "imul", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_idiv(lhs: int, rhs: int) -> Inst:
+public define ir_idiv(lhs: int, rhs: int) -> Inst:
     Inst{op: "idiv", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_imod(lhs: int, rhs: int) -> Inst:
+public define ir_imod(lhs: int, rhs: int) -> Inst:
     Inst{op: "imod", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical and/or: each operand is coerced to 0/1 (any nonzero → 1),
 # then bitwise AND/OR. Result is 0 or 1.
-pub fn ir_iand(lhs: int, rhs: int) -> Inst:
+public define ir_iand(lhs: int, rhs: int) -> Inst:
     Inst{op: "iand", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_ior(lhs: int, rhs: int) -> Inst:
+public define ir_ior(lhs: int, rhs: int) -> Inst:
     Inst{op: "ior", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical NOT: 0 → 1, non-zero → 0.
-pub fn ir_inot(value_id: int) -> Inst:
+public define ir_inot(value_id: int) -> Inst:
     Inst{op: "inot", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Comparison ops. Produce i64 with value 0 (false) or 1 (true).
-pub fn ir_icmp_eq(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_eq(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_eq", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_ne(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_ne(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_ne", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_lt(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_lt(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_lt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_le(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_le(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_le", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_gt(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_gt(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_gt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_ge(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_ge(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_ge", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_return(value_id: int) -> Inst:
+public define ir_return(value_id: int) -> Inst:
     Inst{op: "return", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_return_void() -> Inst:
+public define ir_return_void() -> Inst:
     Inst{op: "return", type_text: "void", value: 0 - 1, lhs: 0, rhs: 0, name: "", args: []}
 
 # Print an i64 value as decimal text + newline to stdout.
 # Produces a void value (the instruction has no SSA-id consumers).
-pub fn ir_print_int(value_id: int) -> Inst:
+public define ir_print_int(value_id: int) -> Inst:
     Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Select: result = if cond != 0 then then_id else else_id.
-# Branchless via cmov — works for any tree-shaped IR.
-pub fn ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
+# Branchless via cmov - works for any tree-shaped IR.
+public define ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
     Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
 
 
@@ -119,108 +119,108 @@ pub fn ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
 # Call user-defined function `fn_name` with arg-value-ids.
 # ret_type lets later passes (binop type-detection, phi, etc.) see the
 # call's actual return type without needing a module lookup.
-pub fn ir_call(fn_name: Text, arg_ids: [int], ret_type: Text) -> Inst:
+public define ir_call(fn_name: text, arg_ids: [int], ret_type: text) -> Inst:
     Inst{op: "call", type_text: ret_type, value: 0, lhs: 0, rhs: 0, name: fn_name, args: arg_ids}
 
 
 # Print a string literal followed by newline (uses libc puts).
 # name = the string text (raw, no escapes processed).
-pub fn ir_print_str(text: Text) -> Inst:
+public define ir_print_str(text: text) -> Inst:
     Inst{op: "print_str", type_text: "void", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
-# String literal as a value — produces a text-typed SSA value (ptr to global).
-pub fn ir_const_str(text: Text) -> Inst:
+# String literal as a value - produces a text-typed SSA value (ptr to global).
+public define ir_const_str(text: text) -> Inst:
     Inst{op: "const_str", type_text: "text", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
-# Concatenate two text SSA values — calls runtime helper.
-pub fn ir_text_concat(left_id: int, right_id: int) -> Inst:
+# Concatenate two text SSA values - calls runtime helper.
+public define ir_text_concat(left_id: int, right_id: int) -> Inst:
     Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
-# Convert an i64 to text — calls runtime helper.
-pub fn ir_int_to_text(value_id: int) -> Inst:
+# Convert an i64 to text - calls runtime helper.
+public define ir_int_to_text(value_id: int) -> Inst:
     Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Text equality / inequality / lexicographic compare via strcmp.
 # Result is i64 0/1.
-pub fn ir_text_cmp(op_name: Text, left_id: int, right_id: int) -> Inst:
+public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
     Inst{op: op_name, type_text: "i64", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
 # Length of a text string (calls libc strlen).
-pub fn ir_text_len(value_id: int) -> Inst:
+public define ir_text_len(value_id: int) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# slice(text, lo, hi) — substring from byte index lo (inclusive) to hi (exclusive).
+# slice(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
-pub fn ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
+public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
-# contains(text, sub) — returns i64 1 if sub appears anywhere in text, else 0.
-pub fn ir_text_contains(text_id: int, sub_id: int) -> Inst:
+# contains(text, sub) - returns i64 1 if sub appears anywhere in text, else 0.
+public define ir_text_contains(text_id: int, sub_id: int) -> Inst:
     Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
 
 
 # --- File I/O (libc fopen/fread/fwrite) ---
-pub fn ir_file_read(path_id: int) -> Inst:
+public define ir_file_read(path_id: int) -> Inst:
     Inst{op: "file_read", type_text: "text", value: path_id, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_file_write(path_id: int, content_id: int) -> Inst:
+public define ir_file_write(path_id: int, content_id: int) -> Inst:
     Inst{op: "file_write", type_text: "i64", value: path_id, lhs: content_id, rhs: 0, name: "", args: []}
 
 
 # CLI args. argc() → count, argv(i) → ith arg as Text.
-pub fn ir_argc() -> Inst:
+public define ir_argc() -> Inst:
     Inst{op: "argc", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_argv(idx_id: int) -> Inst:
+public define ir_argv(idx_id: int) -> Inst:
     Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # bytes_from_text(t) → [int] of byte values
-pub fn ir_bytes_from_text(text_id: int) -> Inst:
+public define ir_bytes_from_text(text_id: int) -> Inst:
     Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # bytes_to_text(list) → Text from list of byte values
-pub fn ir_bytes_to_text(list_id: int) -> Inst:
+public define ir_bytes_to_text(list_id: int) -> Inst:
     Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # bytes_slice(list, lo, hi) → new list with items [lo, hi)
-pub fn ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
+public define ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
 # bytes_concat(a, b) → new list with items of a followed by items of b
-pub fn ir_bytes_concat(a_id: int, b_id: int) -> Inst:
+public define ir_bytes_concat(a_id: int, b_id: int) -> Inst:
     Inst{op: "bytes_concat", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 
 # bytes_zeros(n) → list of n zeros
-pub fn ir_bytes_zeros(n_id: int) -> Inst:
+public define ir_bytes_zeros(n_id: int) -> Inst:
     Inst{op: "bytes_zeros", type_text: "list", value: n_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# Global state slots — key→ptr Map. slot_get's caller decides type by usage.
+# Global state slots - key→ptr Map. slot_get's caller decides type by usage.
 # In our orbs, slots store text values; ir_slot_get defaults to text type.
-pub fn ir_slot_get(key_id: int) -> Inst:
+public define ir_slot_get(key_id: int) -> Inst:
     Inst{op: "slot_get", type_text: "text", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_slot_set(key_id: int, val_id: int) -> Inst:
+public define ir_slot_set(key_id: int, val_id: int) -> Inst:
     Inst{op: "slot_set", type_text: "i64", value: key_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 
 # --- Lists (int-only for now) ---
 # A list is a ptr to a heap buffer laid out as [i64 length, i64 item0, ...].
-# LIMITATION: only int items work — text lists like ["a", "b"] fail at
+# LIMITATION: only int items work - text lists like ["a", "b"] fail at
 # compile because list_set takes i64, not ptr. Type-aware lists are a
 # future enhancement.
-pub fn ir_list_lit(item_ids: [int], elem_type: Text) -> Inst:
+public define ir_list_lit(item_ids: [int], elem_type: text) -> Inst:
     Inst{op: "list_lit", type_text: "list:{elem_type}", value: 0, lhs: 0, rhs: 0, name: "", args: item_ids}
 
-pub fn ir_list_at(list_id: int, index_id: int) -> Inst:
+public define ir_list_at(list_id: int, index_id: int) -> Inst:
     Inst{op: "list_at", type_text: "i64", value: list_id, lhs: index_id, rhs: 0, name: "", args: []}
 
-pub fn ir_list_len(list_id: int) -> Inst:
+public define ir_list_len(list_id: int) -> Inst:
     Inst{op: "list_len", type_text: "i64", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Push: copy all items + append val, return new list ptr.
-# Caller pattern: `xs = push(xs, val)`.
-pub fn ir_list_push(list_id: int, val_id: int) -> Inst:
+# Caller pattern: `xs = append(xs, val)`.
+public define ir_list_push(list_id: int, val_id: int) -> Inst:
     Inst{op: "list_push", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 
@@ -229,13 +229,13 @@ pub fn ir_list_push(list_id: int, val_id: int) -> Inst:
 #   [i64 length, i64 key0_ptr, i64 val0, i64 key1_ptr, i64 val1, ...]
 # Keys are text pointers stored as i64 (lossless on 64-bit).
 # args alternates: [key0_id, val0_id, key1_id, val1_id, ...].
-pub fn ir_map_lit(pair_ids: [int]) -> Inst:
+public define ir_map_lit(pair_ids: [int]) -> Inst:
     Inst{op: "map_lit", type_text: "map", value: 0, lhs: 0, rhs: 0, name: "", args: pair_ids}
 
-pub fn ir_map_get(map_id: int, key_id: int, value_type: Text) -> Inst:
+public define ir_map_get(map_id: int, key_id: int, value_type: text) -> Inst:
     Inst{op: "map_get", type_text: value_type, value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
-pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
+public define ir_map_has(map_id: int, key_id: int) -> Inst:
     Inst{op: "map_has", type_text: "i64", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
 
@@ -243,100 +243,100 @@ pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
 # A struct value is a ptr to a heap buffer of i64 slots, one per field.
 # type_text encodes the struct name as "struct:Player".
 # Field args carry the SSA value ids in declared field order.
-pub fn ir_struct_cons(struct_name: Text, n_fields: int, value_ids: [int]) -> Inst:
+public define ir_struct_cons(struct_name: text, n_fields: int, value_ids: [int]) -> Inst:
     Inst{op: "struct_cons", type_text: "struct:{struct_name}", value: n_fields, lhs: 0, rhs: 0, name: struct_name, args: value_ids}
 
 # Load a field from a struct by index. field_type tells emit what type to load.
-pub fn ir_field_load(struct_id: int, field_index: int, field_type: Text) -> Inst:
+public define ir_field_load(struct_id: int, field_index: int, field_type: text) -> Inst:
     Inst{op: "field_load", type_text: field_type, value: struct_id, lhs: field_index, rhs: 0, name: "", args: []}
 
 # Print a dynamically-computed text value (calls puts on the ptr).
-pub fn ir_print_text(value_id: int) -> Inst:
+public define ir_print_text(value_id: int) -> Inst:
     Inst{op: "print_text", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # --- Memory ops (for mutable variables and loop counters) ---
 # alloca produces a slot for `stored_type` ("i64" or "text").
 # type_text records the STORED type; the SSA result itself is always ptr.
-pub fn ir_alloca(stored_type: Text) -> Inst:
+public define ir_alloca(stored_type: text) -> Inst:
     Inst{op: "alloca", type_text: stored_type, value: 0, lhs: 0, rhs: 0, name: "", args: []}
 
 # Load value of `loaded_type` from ptr SSA id.
-pub fn ir_load(ptr_id: int, loaded_type: Text) -> Inst:
+public define ir_load(ptr_id: int, loaded_type: text) -> Inst:
     Inst{op: "load", type_text: loaded_type, value: ptr_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Store value_id to ptr_id. Void. The stored type is inferred from value's type.
-pub fn ir_store(ptr_id: int, value_id: int) -> Inst:
+public define ir_store(ptr_id: int, value_id: int) -> Inst:
     Inst{op: "store", type_text: "void", value: ptr_id, lhs: value_id, rhs: 0, name: "", args: []}
 
 
 # --- Basic blocks (labels + branches + phi) ---
 # These let us emit real if/else with side-effects (recursion, calls)
-# and future loops. Label names are strings — we encode them in `name`.
+# and future loops. Label names are strings - we encode them in `name`.
 
 # Mark a basic-block boundary. name = "label_name".
-pub fn ir_label(label_name: Text) -> Inst:
+public define ir_label(label_name: text) -> Inst:
     Inst{op: "label", type_text: "void", value: 0, lhs: 0, rhs: 0, name: label_name, args: []}
 
 # Unconditional jump to label. name = "target".
-pub fn ir_br(target_label: Text) -> Inst:
+public define ir_br(target_label: text) -> Inst:
     Inst{op: "br", type_text: "void", value: 0, lhs: 0, rhs: 0, name: target_label, args: []}
 
 # Conditional jump. value = cond ssa-id (i64 0/1).
 # name = "then_label|else_label" (pipe-separated).
-pub fn ir_br_if(cond_id: int, then_label: Text, else_label: Text) -> Inst:
+public define ir_br_if(cond_id: int, then_label: text, else_label: text) -> Inst:
     Inst{op: "br_if", type_text: "void", value: cond_id, lhs: 0, rhs: 0, name: "{then_label}|{else_label}", args: []}
 
 # Phi node merging two predecessors.
 # lhs = then-value-id, rhs = else-value-id.
 # name = "then_label|else_label" (pipe-separated).
 # type_text is set at emit time from the operand types.
-pub fn ir_phi(then_val_id: int, then_label: Text, else_val_id: int, else_label: Text, phi_type: Text) -> Inst:
+public define ir_phi(then_val_id: int, then_label: text, else_val_id: int, else_label: text, phi_type: text) -> Inst:
     Inst{op: "phi", type_text: phi_type, value: 0, lhs: then_val_id, rhs: else_val_id, name: "{then_label}|{else_label}", args: []}
 
 
 # Reference a function parameter by index (0-based). type_text matches
 # the param's declared type ("i64" or "text").
-pub fn ir_param(param_index: int, param_type: Text) -> Inst:
+public define ir_param(param_index: int, param_type: text) -> Inst:
     Inst{op: "param", type_text: param_type, value: param_index, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # --- Function builders ---
 
-pub fn ir_fn_new(name: Text, return_type: Text) -> IRFn:
+public define ir_fn_new(name: text, return_type: text) -> IRFn:
     IRFn{name: name, return_type: return_type, params: [], instructions: []}
 
-pub fn ir_fn_add_param(fn_value: IRFn, param_name: Text, param_type: Text) -> IRFn:
+public define ir_fn_add_param(fn_value: IRFn, param_name: text, param_type: text) -> IRFn:
     new_param = Param{name: param_name, type_text: param_type}
-    new_params = push(fn_value.params, new_param)
+    new_params = append(fn_value.params, new_param)
     IRFn{name: fn_value.name, return_type: fn_value.return_type, params: new_params, instructions: fn_value.instructions}
 
-pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
+public define ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
     new_id = len(fn_value.instructions)
-    new_instructions = push(fn_value.instructions, inst)
+    new_instructions = append(fn_value.instructions, inst)
     new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: new_instructions}
     PushResult{function: new_fn, id: new_id}
 
 
 # --- Module builders ---
 
-pub fn ir_module_new() -> IRModule:
+public define ir_module_new() -> IRModule:
     IRModule{functions: []}
 
-pub fn ir_module_add_fn(module: IRModule, fn_value: IRFn) -> IRModule:
-    new_functions = push(module.functions, fn_value)
+public define ir_module_add_fn(module: IRModule, fn_value: IRFn) -> IRModule:
+    new_functions = append(module.functions, fn_value)
     IRModule{functions: new_functions}
 
 
 # --- Text dumper (Cranelift CLIF-style) ---
 
-pub fn ir_dump_value_ref(value_id: int) -> Text:
+public define ir_dump_value_ref(value_id: int) -> text:
     if value_id < 0:
         "void"
     else:
         "v{value_id}"
 
-pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
+public define ir_dump_instruction(inst: Inst, my_id: int) -> text:
     prefix = "{ir_dump_value_ref(my_id)} = "
     op = inst.op
     if op == "iconst":
@@ -349,8 +349,8 @@ pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
             rhs_ref = ir_dump_value_ref(inst.rhs)
             "{prefix}{op}.{inst.type_text} {lhs_ref}, {rhs_ref}"
 
-pub fn ir_dump_fn(fn_value: IRFn) -> Text:
-    mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
+public define ir_dump_fn(fn_value: IRFn) -> text:
+    edit text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
     loop idx in 0..<total:
         inst = at(fn_value.instructions, idx)
@@ -358,8 +358,8 @@ pub fn ir_dump_fn(fn_value: IRFn) -> Text:
         text = "{text}    {line}\n"
     text
 
-pub fn ir_dump_module(module: IRModule) -> Text:
-    mut text = "; orion_ir module dump\n"
+public define ir_dump_module(module: IRModule) -> text:
+    edit text = "; orion_ir module dump\n"
     total = len(module.functions)
     loop idx in 0..<total:
         fn_value = at(module.functions, idx)
@@ -370,7 +370,7 @@ pub fn ir_dump_module(module: IRModule) -> Text:
 
 use bytes
 
-# orion_ast_to_ir — walk Orion AST and emit typed IR.
+# orion_ast_to_ir - walk Orion AST and emit typed IR.
 #
 # Today: ints, arith (+ - * / %), comparisons, and/or/not,
 # if/else (expr + stmt), locals (let/mut), text (literals,
@@ -384,38 +384,38 @@ use bytes
 # --- Symbol table ---
 # Each binding tracks name, ssa-id, and a mut flag.
 #   is_mut == 0 → id is a value (use directly)
-#   is_mut == 1 → id is a ptr (alloca) — emit load to read, store to write
-# loop_headers / loop_ends — parallel stack of enclosing loops for
+#   is_mut == 1 → id is a ptr (alloca) - emit load to read, store to write
+# loop_headers / loop_ends - parallel stack of enclosing loops for
 # break/continue targets. Push when entering a loop, do not pop (immutable scope).
-type Scope: names: [Text], ids: [int], mut_flags: [int], loop_headers: [Text], loop_ends: [Text], fn_sig_names: [Text], fn_sig_rets: [Text], ds_names: [Text], ds_specs: [Text], en_names: [Text], en_variants: [Text]
+type Scope: names: [text], ids: [int], mut_flags: [int], loop_headers: [text], loop_ends: [text], fn_sig_names: [text], fn_sig_rets: [text], ds_names: [text], ds_specs: [text], en_names: [text], en_variants: [text]
 
-# Typed map-get aliases — orion-self dispatches their callers to typed
+# Typed map-get aliases - orion-self dispatches their callers to typed
 # runtime helpers, but lodge-orion needs an actual definition to interpret.
-pub fn get_int(m: Map, k: Text) -> int: get(m, k)
-pub fn get_map(m: Map, k: Text) -> Map: get(m, k)
-pub fn get_list(m: Map, k: Text) -> [Map]: get(m, k)
+public define get_int(m: table, k: text) -> int: get(m, k)
+public define get_map(m: table, k: text) -> table: get(m, k)
+public define get_list(m: table, k: text) -> [table]: get(m, k)
 
-fn scope_empty() -> Scope:
+define scope_empty() -> Scope:
     Scope{names: [], ids: [], mut_flags: [], loop_headers: [], loop_ends: [], fn_sig_names: [], fn_sig_rets: [], ds_names: [], ds_specs: [], en_names: [], en_variants: []}
 
 # Register an enum: variant_csv = "Active,Idle,Done" (comma-joined names).
-fn scope_add_enum_decl(scope: Scope, enum_name: Text, variant_csv: Text) -> Scope:
-    new_names = push(scope.en_names, enum_name)
-    new_vars = push(scope.en_variants, variant_csv)
+define scope_add_enum_decl(scope: Scope, enum_name: text, variant_csv: text) -> Scope:
+    new_names = append(scope.en_names, enum_name)
+    new_vars = append(scope.en_variants, variant_csv)
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: new_names, en_variants: new_vars}
 
 # Find the index of a variant in an enum. -1 if not enum or no match.
-fn scope_lookup_enum_variant(scope: Scope, enum_name: Text, variant: Text) -> int:
+define scope_lookup_enum_variant(scope: Scope, enum_name: text, variant: text) -> int:
     total = len(scope.en_names)
-    mut result = 0 - 1
+    edit result = 0 - 1
     loop index in 0..<total:
         if at(scope.en_names, index) == enum_name:
             csv = at(scope.en_variants, index)
             csv_bytes = bytes_from_text(csv)
             n = len(csv_bytes)
-            mut current = ""
-            mut found_at = 0 - 1
-            mut idx_count = 0
+            edit current = ""
+            edit found_at = 0 - 1
+            edit idx_count = 0
             loop ci in 0..<n:
                 b = at(csv_bytes, ci)
                 if b == 44:
@@ -434,14 +434,14 @@ fn scope_lookup_enum_variant(scope: Scope, enum_name: Text, variant: Text) -> in
 
 # Encode a data decl's fields as "name1:type1|name2:type2|..." text for
 # easy parallel storage in Scope.
-fn scope_add_data_decl(scope: Scope, struct_name: Text, spec: Text) -> Scope:
-    new_names = push(scope.ds_names, struct_name)
-    new_specs = push(scope.ds_specs, spec)
+define scope_add_data_decl(scope: Scope, struct_name: text, spec: text) -> Scope:
+    new_names = append(scope.ds_names, struct_name)
+    new_specs = append(scope.ds_specs, spec)
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: new_names, ds_specs: new_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
-fn scope_lookup_data_spec(scope: Scope, struct_name: Text) -> Text:
+define scope_lookup_data_spec(scope: Scope, struct_name: text) -> text:
     total = len(scope.ds_names)
-    mut result = ""
+    edit result = ""
     loop index in 0..<total:
         if at(scope.ds_names, index) == struct_name:
             result = at(scope.ds_specs, index)
@@ -449,36 +449,36 @@ fn scope_lookup_data_spec(scope: Scope, struct_name: Text) -> Text:
 
 
 # Parse "name:type|name:type|..." into parallel lists.
-fn parse_data_spec(spec: Text) -> [Text]:
+define parse_data_spec(spec: text) -> [text]:
     bs = bytes_from_text(spec)
     total = len(bs)
-    mut parts = []
-    mut current = ""
+    edit parts = []
+    edit current = ""
     loop index in 0..<total:
         b = at(bs, index)
         if b == 124:  # '|'
-            parts = push(parts, current)
+            parts = append(parts, current)
             current = ""
         else:
             single = bytes_to_text([b])
             current = "{current}{single}"
     if len(bytes_from_text(current)) > 0:
-        parts = push(parts, current)
+        parts = append(parts, current)
     parts
 
 
 # Given parsed parts ["name:type", ...] find the index of field_name.
 # Returns -1 if not found.
-fn find_field_index(parts: [Text], field_name: Text) -> int:
+define find_field_index(parts: [text], field_name: text) -> int:
     n = len(parts)
-    mut result = 0 - 1
+    edit result = 0 - 1
     loop index in 0..<n:
         part = at(parts, index)
         # Split on ':' to get name
         bs = bytes_from_text(part)
         bs_n = len(bs)
-        mut name_buf = ""
-        mut found_colon = 0
+        edit name_buf = ""
+        edit found_colon = 0
         loop ci in 0..<bs_n:
             b = at(bs, ci)
             if found_colon == 0:
@@ -493,7 +493,7 @@ fn find_field_index(parts: [Text], field_name: Text) -> int:
 
 
 # Given parsed parts and an index, return the type after ':'.
-fn field_type_at(parts: [Text], idx: int) -> Text:
+define field_type_at(parts: [text], idx: int) -> text:
     n = len(parts)
     if idx < 0 or idx >= n:
         "i64"
@@ -501,8 +501,8 @@ fn field_type_at(parts: [Text], idx: int) -> Text:
         part = at(parts, idx)
         bs = bytes_from_text(part)
         bs_n = len(bs)
-        mut type_buf = ""
-        mut found_colon = 0
+        edit type_buf = ""
+        edit found_colon = 0
         loop ci in 0..<bs_n:
             b = at(bs, ci)
             if found_colon == 1:
@@ -513,56 +513,56 @@ fn field_type_at(parts: [Text], idx: int) -> Text:
                     found_colon = 1
         type_buf
 
-fn scope_add_fn_sig(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
-    new_names = push(scope.fn_sig_names, fn_name)
-    new_rets = push(scope.fn_sig_rets, ret_type)
+define scope_add_fn_sig(scope: Scope, fn_name: text, ret_type: text) -> Scope:
+    new_names = append(scope.fn_sig_names, fn_name)
+    new_rets = append(scope.fn_sig_rets, ret_type)
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
-fn scope_lookup_fn_ret(scope: Scope, fn_name: Text) -> Text:
+define scope_lookup_fn_ret(scope: Scope, fn_name: text) -> text:
     total = len(scope.fn_sig_names)
-    mut result = ""
+    edit result = ""
     loop index in 0..<total:
         if at(scope.fn_sig_names, index) == fn_name:
             result = at(scope.fn_sig_rets, index)
     if result == "":
-        print_line("orion-self: ERROR — call to unknown function `{fn_name}` (returning i64 as guess)")
+        print_line("orion-self: ERROR - call to unknown function `{fn_name}` (returning i64 as guess)")
         result = "i64"
     result
 
-fn scope_bind(scope: Scope, name: Text, id: int) -> Scope:
-    new_names = push(scope.names, name)
-    new_ids = push(scope.ids, id)
-    new_flags = push(scope.mut_flags, 0)
+define scope_bind(scope: Scope, name: text, id: int) -> Scope:
+    new_names = append(scope.names, name)
+    new_ids = append(scope.ids, id)
+    new_flags = append(scope.mut_flags, 0)
     Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
-fn scope_bind_mut(scope: Scope, name: Text, ptr_id: int) -> Scope:
-    new_names = push(scope.names, name)
-    new_ids = push(scope.ids, ptr_id)
-    new_flags = push(scope.mut_flags, 1)
+define scope_bind_mut(scope: Scope, name: text, ptr_id: int) -> Scope:
+    new_names = append(scope.names, name)
+    new_ids = append(scope.ids, ptr_id)
+    new_flags = append(scope.mut_flags, 1)
     Scope{names: new_names, ids: new_ids, mut_flags: new_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
 
-fn scope_add_fn_sig_keep_data(scope: Scope, fn_name: Text, ret_type: Text) -> Scope:
-    new_names = push(scope.fn_sig_names, fn_name)
-    new_rets = push(scope.fn_sig_rets, ret_type)
+define scope_add_fn_sig_keep_data(scope: Scope, fn_name: text, ret_type: text) -> Scope:
+    new_names = append(scope.fn_sig_names, fn_name)
+    new_rets = append(scope.fn_sig_rets, ret_type)
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
-fn scope_push_loop(scope: Scope, header_lbl: Text, end_lbl: Text) -> Scope:
-    new_headers = push(scope.loop_headers, header_lbl)
-    new_ends = push(scope.loop_ends, end_lbl)
+define scope_push_loop(scope: Scope, header_lbl: text, end_lbl: text) -> Scope:
+    new_headers = append(scope.loop_headers, header_lbl)
+    new_ends = append(scope.loop_ends, end_lbl)
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: new_headers, loop_ends: new_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
-fn scope_top_loop_header(scope: Scope) -> Text:
+define scope_top_loop_header(scope: Scope) -> text:
     n = len(scope.loop_headers)
     if n == 0 then "" else at(scope.loop_headers, n - 1)
 
-fn scope_top_loop_end(scope: Scope) -> Text:
+define scope_top_loop_end(scope: Scope) -> text:
     n = len(scope.loop_ends)
     if n == 0 then "" else at(scope.loop_ends, n - 1)
 
-fn scope_lookup(scope: Scope, name: Text) -> int:
+define scope_lookup(scope: Scope, name: text) -> int:
     total = len(scope.names)
-    mut result = 0 - 1
+    edit result = 0 - 1
     loop index in 0..<total:
         from_end = total - 1 - index
         candidate = at(scope.names, from_end)
@@ -570,10 +570,10 @@ fn scope_lookup(scope: Scope, name: Text) -> int:
             result = at(scope.ids, from_end)
     result
 
-fn scope_is_mut(scope: Scope, name: Text) -> int:
+define scope_is_mut(scope: Scope, name: text) -> int:
     total = len(scope.names)
-    mut result = 0
-    mut found = 0
+    edit result = 0
+    edit found = 0
     loop index in 0..<total:
         from_end = total - 1 - index
         candidate = at(scope.names, from_end)
@@ -586,12 +586,12 @@ fn scope_is_mut(scope: Scope, name: Text) -> int:
 # --- Block terminator detection ---
 # A block is terminated if its last instruction is a `br` or `return`.
 # We use this to avoid emitting redundant branches (which LLVM rejects).
-fn last_op(fn_value: IRFn) -> Text:
+define last_op(fn_value: IRFn) -> text:
     insts = fn_value.instructions
     n = len(insts)
     if n == 0 then "" else at(insts, n - 1).op
 
-fn is_block_terminated(fn_value: IRFn) -> int:
+define is_block_terminated(fn_value: IRFn) -> int:
     op = last_op(fn_value)
     if op == "br" or op == "return" then 1 else 0
 
@@ -602,21 +602,21 @@ type ConvResult: function: IRFn, scope: Scope, id: int
 # AST is Maps with "kind" field:
 #   Program: {"kind": "Program", "decls": [Fn]}
 #   Fn:      {"kind": "Fn", "name", "params", "ret", "body"}
-#   Int:     {"kind": "Int", "value": Text}
-#   Binary:  {"kind": "Binary", "op": Text, "left": Expr, "right": Expr}
-#   Ident:   {"kind": "Ident", "name": Text}
+#   Int:     {"kind": "Int", "value": text}
+#   Binary:  {"kind": "Binary", "op": text, "left": Expr, "right": Expr}
+#   Ident:   {"kind": "Ident", "name": text}
 #
 # We return PushResult{function, id} so caller can chain.
 
 
 # Convert a text-encoded int literal to int.
-# Use bytes (text[i] returns whole string — Orion bug as of 2026-06).
-fn parse_int(text: Text) -> int:
+# Use bytes (text[i] returns whole string - Orion bug as of 2026-06).
+define parse_int(text: text) -> int:
     byte_list = bytes_from_text(text)
     total = len(byte_list)
-    mut value = 0
-    mut start = 0
-    mut is_neg = false
+    edit value = 0
+    edit start = 0
+    edit is_neg = false
     if total > 0:
         first = at(byte_list, 0)
         # '-' = 45
@@ -633,8 +633,8 @@ fn parse_int(text: Text) -> int:
 
 # Walk an expression node, append IR instructions to the function,
 # return the SSA id of the result.
-fn ast_binary_to_ir(fn2: IRFn, scope: Scope, op: Text, left_id: int, right_id: int) -> ConvResult:
-    mut pr = PushResult{function: fn2, id: 0 - 1}
+define ast_binary_to_ir(fn2: IRFn, scope: Scope, op: text, left_id: int, right_id: int) -> ConvResult:
+    edit pr = PushResult{function: fn2, id: 0 - 1}
     if op == "+":
         pr = ir_fn_push(fn2, ir_iadd(left_id, right_id))
     if op == "-":
@@ -663,12 +663,12 @@ fn ast_binary_to_ir(fn2: IRFn, scope: Scope, op: Text, left_id: int, right_id: i
         pr = ir_fn_push(fn2, ir_icmp_ge(left_id, right_id))
     ConvResult{function: pr.function, scope: scope, id: pr.id}
 
-fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     stmts = get_list(node, "stmts")
     total_stmts = len(stmts)
-    mut current_fn = fn_value
-    mut current_scope = scope
-    mut last_id = 0 - 1
+    edit current_fn = fn_value
+    edit current_scope = scope
+    edit last_id = 0 - 1
     loop index in 0..<total_stmts:
         stmt = at(stmts, index)
         stmt_kind = get(stmt, "kind")
@@ -722,7 +722,7 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     slot_ll = if slot_type == "i64" then "i64" else "ptr"
                     new_ll = if new_type == "i64" then "i64" else "ptr"
                     if slot_ll != new_ll:
-                        print_line("orion-self: ERROR — cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
+                        print_line("orion-self: ERROR - cannot reassign `{name}` (slot is {slot_type}, new value is {new_type})")
                     pr_store = ir_fn_push(current_fn, ir_store(ptr_id, er.id))
                     current_fn = pr_store.function
                     last_id = pr_store.id
@@ -775,8 +775,8 @@ fn ast_block_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     ConvResult{function: current_fn, scope: current_scope, id: last_id}
 
 
-# `loop:` — infinite loop with `break`/`continue` for exit.
-fn ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+# `loop:` - infinite loop with `break`/`continue` for exit.
+define ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     body_node = get(node, "body")
     n = len(fn_value.instructions)
     header_lbl = "loop_{n}_header"
@@ -793,7 +793,7 @@ fn ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     # 3) Walk body inside loop scope.
     body_r = ast_expr_to_ir(pr_header.function, body_scope, body_node)
     # 4) If body didn't terminate (no break/continue at end), loop back.
-    mut fn_after_body = body_r.function
+    edit fn_after_body = body_r.function
     if is_block_terminated(fn_after_body) == 0:
         pr_br_back = ir_fn_push(fn_after_body, ir_br(header_lbl))
         fn_after_body = pr_br_back.function
@@ -802,8 +802,8 @@ fn ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     ConvResult{function: pr_end.function, scope: scope, id: 0 - 1}
 
 
-# `for var in iter_list:` — iterate over a list value.
-fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+# `for var in iter_list:` - iterate over a list value.
+define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     var_name = get(node, "var")
     index_var_name = get(node, "index_var")
     iter_node = get(node, "iter")
@@ -837,14 +837,14 @@ fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     pr_body_lbl = ir_fn_push(pr_br_loop.function, ir_label(body_lbl))
     pr_at = ir_fn_push(pr_body_lbl.function, ir_list_at(list_id, cur_id))
     elem_id = pr_at.id
-    mut body_scope = scope_bind(iter_r.scope, var_name, elem_id)
+    edit body_scope = scope_bind(iter_r.scope, var_name, elem_id)
     if index_var_name != "":
         body_scope = scope_bind(body_scope, index_var_name, cur_id)
     body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
     body_r = ast_expr_to_ir(pr_at.function, body_scope, body_node)
 
     # Fall through from body into step block.
-    mut fn_after_body = body_r.function
+    edit fn_after_body = body_r.function
     if is_block_terminated(fn_after_body) == 0:
         pr_br_to_step = ir_fn_push(fn_after_body, ir_br(step_lbl))
         fn_after_body = pr_br_to_step.function
@@ -860,8 +860,8 @@ fn ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     ConvResult{function: pr_end_lbl.function, scope: scope, id: 0 - 1}
 
 
-# `for var in low..<high:` — emit alloca + classic header/body/end blocks.
-fn ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+# `for var in low..<high:` - emit alloca + classic header/body/end blocks.
+define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     var_name = get(node, "var")
     low_node = get(node, "low")
     high_node = get(node, "high")
@@ -888,12 +888,12 @@ fn ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
     # Body block. continue → step (so counter increments).
     pr_body_lbl = ir_fn_push(pr_br_loop.function, ir_label(body_lbl))
-    mut body_scope = scope_bind(high_r.scope, var_name, cur_id)
+    edit body_scope = scope_bind(high_r.scope, var_name, cur_id)
     body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
     body_r = ast_expr_to_ir(pr_body_lbl.function, body_scope, body_node)
 
     # Fall through from body into step block.
-    mut fn_after_body = body_r.function
+    edit fn_after_body = body_r.function
     if is_block_terminated(fn_after_body) == 0:
         pr_br_to_step = ir_fn_push(fn_after_body, ir_br(step_lbl))
         fn_after_body = pr_br_to_step.function
@@ -907,30 +907,30 @@ fn ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
     pr_end_lbl = ir_fn_push(pr_br_back.function, ir_label(end_lbl))
 
-    # For-loop is a statement — return scope as it was BEFORE body
+    # For-loop is a statement - return scope as it was BEFORE body
     # (loop var doesn't leak out).
     ConvResult{function: pr_end_lbl.function, scope: high_r.scope, id: 0 - 1}
 
-fn ast_int_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_int_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     value_text = get(node, "value")
     pr = ir_fn_push(fn_value, ir_iconst(parse_int(value_text)))
     ConvResult{function: pr.function, scope: scope, id: pr.id}
 
-fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     name = get(node, "name")
     found_id = scope_lookup(scope, name)
     is_mut = scope_is_mut(scope, name)
-    mut result = ConvResult{function: fn_value, scope: scope, id: found_id}
+    edit result = ConvResult{function: fn_value, scope: scope, id: found_id}
     if found_id < 0:
-        # Unknown ident — likely a `{expr}` interpolation the parser
+        # Unknown ident - likely a `{expr}` interpolation the parser
         # captured as a single ident. Emit a sentinel iconst(0) so
         # downstream code doesn't panic on at(insts, -1).
-        print_line("orion-self: ERROR — unknown identifier `{name}` (interpolation may need a temp var)")
+        print_line("orion-self: ERROR - unknown identifier `{name}` (interpolation may need a temp var)")
         pr = ir_fn_push(fn_value, ir_iconst(0))
         result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     is_real_mut = found_id >= 0 and is_mut == 1
     if is_real_mut:
-        # Mut bindings store a ptr (alloca) — read via load with the
+        # Mut bindings store a ptr (alloca) - read via load with the
         # alloca's stored type.
         alloca_inst = at(fn_value.instructions, found_id)
         loaded_type = alloca_inst.type_text
@@ -938,7 +938,7 @@ fn ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     result
 
-fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     op = get(node, "op")
     left_result = ast_expr_to_ir(fn_value, scope, get(node, "left"))
     right_result = ast_expr_to_ir(left_result.function, left_result.scope, get(node, "right"))
@@ -949,9 +949,9 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_eq_op = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
     is_text_cmp = is_eq_op and both_text
     is_text_concat = op == "+" and either_text
-    mut result = ConvResult{function: right_result.function, scope: right_result.scope, id: 0 - 1}
+    edit result = ConvResult{function: right_result.function, scope: right_result.scope, id: 0 - 1}
     if is_text_cmp:
-        mut ir_op = "text_eq"
+        edit ir_op = "text_eq"
         if op == "!=":
             ir_op = "text_ne"
         if op == "<":
@@ -965,9 +965,9 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         pr = ir_fn_push(right_result.function, ir_text_cmp(ir_op, left_result.id, right_result.id))
         result = ConvResult{function: pr.function, scope: right_result.scope, id: pr.id}
     if is_text_concat:
-        mut current_fn = right_result.function
-        mut left_id = left_result.id
-        mut right_id = right_result.id
+        edit current_fn = right_result.function
+        edit left_id = left_result.id
+        edit right_id = right_result.id
         if left_type != "text":
             pr_l = ir_fn_push(current_fn, ir_int_to_text(left_id))
             current_fn = pr_l.function
@@ -984,13 +984,13 @@ fn ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     result
 
 # Find the label of the basic block currently being emitted into.
-# Scans backward from the end and returns on the FIRST label found —
+# Scans backward from the end and returns on the FIRST label found -
 # O(distance from last label to end), amortized O(1) in practice.
-fn current_block(fn_value: IRFn) -> Text:
+define current_block(fn_value: IRFn) -> text:
     insts = fn_value.instructions
     total = len(insts)
-    mut found = "entry"
-    mut done = 0
+    edit found = "entry"
+    edit done = 0
     loop index in 0..<total:
         if done == 0:
             from_end = total - 1 - index
@@ -1001,7 +1001,7 @@ fn current_block(fn_value: IRFn) -> Text:
     found
 
 
-fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     cond_node = get(node, "cond")
     then_node = get(node, "then")
     else_node = get(node, "else")
@@ -1023,8 +1023,8 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     pr_then_lbl = ir_fn_push(fn_after_br, ir_label(then_lbl))
     then_r = ast_expr_to_ir(pr_then_lbl.function, cond_r.scope, then_node)
     then_terminated = is_block_terminated(then_r.function)
-    mut then_end_block = ""
-    mut fn_after_then = then_r.function
+    edit then_end_block = ""
+    edit fn_after_then = then_r.function
     if then_terminated == 0:
         then_end_block = current_block(then_r.function)
         pr_then_br = ir_fn_push(then_r.function, ir_br(merge_lbl))
@@ -1034,8 +1034,8 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     pr_else_lbl = ir_fn_push(fn_after_then, ir_label(else_lbl))
     else_r = ast_expr_to_ir(pr_else_lbl.function, then_r.scope, else_node)
     else_terminated = is_block_terminated(else_r.function)
-    mut else_end_block = ""
-    mut fn_after_else = else_r.function
+    edit else_end_block = ""
+    edit fn_after_else = else_r.function
     if else_terminated == 0:
         else_end_block = current_block(else_r.function)
         pr_else_br = ir_fn_push(else_r.function, ir_br(merge_lbl))
@@ -1043,8 +1043,8 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
     # 5) Merge label. Emit phi only if at least one branch reaches it.
     pr_merge_lbl = ir_fn_push(fn_after_else, ir_label(merge_lbl))
-    mut result_id = 0 - 1
-    mut result_fn = pr_merge_lbl.function
+    edit result_id = 0 - 1
+    edit result_fn = pr_merge_lbl.function
     if then_terminated == 0 and else_terminated == 0:
         both_have_value = then_r.id >= 0 and else_r.id >= 0
         if both_have_value:
@@ -1052,7 +1052,7 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             else_type = get_value_type(result_fn, else_r.id)
             # Branch types must agree for the phi to be well-typed.
             if then_type != else_type:
-                print_line("orion-self: ERROR — if/else branches have different types ({then_type} vs {else_type})")
+                print_line("orion-self: ERROR - if/else branches have different types ({then_type} vs {else_type})")
             pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
             result_id = pr_phi.id
             result_fn = pr_phi.function
@@ -1066,12 +1066,12 @@ fn ast_if_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
     ConvResult{function: result_fn, scope: else_r.scope, id: result_id}
 
-fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     callee = get(node, "callee")
     args = get_list(node, "args")
     is_print_line = callee == "print_line"
     is_to_text = callee == "to_text"
-    mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    edit result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
     if is_print_line:
         arg0 = at(args, 0)
         arg_kind = get(arg0, "kind")
@@ -1118,7 +1118,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_b_length = callee == "bytes_length"
     is_slot_get = callee == "slot_get"
     is_slot_set = callee == "slot_set"
-    # Typed map-get variants — explicit types where inference can't reach.
+    # Typed map-get variants - explicit types where inference can't reach.
     is_get_int = callee == "get_int"
     is_get_map = callee == "get_map"
     is_get_list = callee == "get_list"
@@ -1153,7 +1153,7 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         key_r = ast_expr_to_ir(map_r.function, map_r.scope, key_node)
         # Infer value type by peeking the source map's first value.
         # Maps in our codebase are usually homogeneous: all-text or all-int.
-        mut get_type = "text"
+        edit get_type = "text"
         map_fn = map_r.function
         map_insts = map_fn.instructions
         map_inst = at(map_insts, map_r.id)
@@ -1295,21 +1295,21 @@ fn ast_call_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     if is_user_fn:
         # User-defined fn call. Evaluate each arg and collect SSA ids.
         total_args = len(args)
-        mut current_fn = fn_value
-        mut current_scope = scope
-        mut arg_ids = []
+        edit current_fn = fn_value
+        edit current_scope = scope
+        edit arg_ids = []
         loop arg_index in 0..<total_args:
             arg_node = at(args, arg_index)
             arg_r = ast_expr_to_ir(current_fn, current_scope, arg_node)
             current_fn = arg_r.function
             current_scope = arg_r.scope
-            arg_ids = push(arg_ids, arg_r.id)
+            arg_ids = append(arg_ids, arg_r.id)
         call_ret_type = scope_lookup_fn_ret(scope, callee)
         pr = ir_fn_push(current_fn, ir_call(callee, arg_ids, call_ret_type))
         result = ConvResult{function: pr.function, scope: current_scope, id: pr.id}
     result
 
-fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     op = get(node, "op")
     operand_r = ast_expr_to_ir(fn_value, scope, get(node, "operand"))
     if op == "not":
@@ -1320,7 +1320,7 @@ fn ast_unary_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         operand_r
 
 # Get the result type ("i64" / "text" / "ptr" / "void") of an SSA value.
-fn get_value_type(fn_value: IRFn, value_id: int) -> Text:
+define get_value_type(fn_value: IRFn, value_id: int) -> text:
     if value_id < 0:
         "void"
     else:
@@ -1328,26 +1328,26 @@ fn get_value_type(fn_value: IRFn, value_id: int) -> Text:
         inst.type_text
 
 
-fn ast_str_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_str_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     text = get(node, "value")
     pr = ir_fn_push(fn_value, ir_const_str(text))
     ConvResult{function: pr.function, scope: scope, id: pr.id}
 
 
-fn ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     items = get_list(node, "items")
     n_items = len(items)
-    mut current_fn = fn_value
-    mut current_scope = scope
-    mut item_ids = []
+    edit current_fn = fn_value
+    edit current_scope = scope
+    edit item_ids = []
     loop index in 0..<n_items:
         item_node = at(items, index)
         item_r = ast_expr_to_ir(current_fn, current_scope, item_node)
         current_fn = item_r.function
         current_scope = item_r.scope
-        item_ids = push(item_ids, item_r.id)
+        item_ids = append(item_ids, item_r.id)
     # Peek first item's type to encode "list:T". Default i64 for empty lists.
-    mut elem_type = "i64"
+    edit elem_type = "i64"
     if n_items > 0:
         first_id = at(item_ids, 0)
         elem_type = get_value_type(current_fn, first_id)
@@ -1357,7 +1357,7 @@ fn ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
 # `match scrutinee: <pattern> -> <body>, ..., _ -> <default>`
 # Lower to a chain of if-tests storing into a result slot.
-fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     scrutinee_node = get(node, "scrutinee")
     arms = get(node, "arms")
     n_arms = len(arms)
@@ -1370,7 +1370,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
     # Result slot. Best-effort type guess from the first arm body's kind.
     # Str → text, Int → i64, else i64 default.
-    mut result_type = "i64"
+    edit result_type = "i64"
     if n_arms > 0:
         first_body = get(at(arms, 0), "body")
         first_kind = get(first_body, "kind")
@@ -1378,10 +1378,10 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             result_type = "text"
     pr_alloca = ir_fn_push(scrut_r.function, ir_alloca(result_type))
     result_ptr_id = pr_alloca.id
-    mut current_fn = pr_alloca.function
-    mut current_scope = scrut_r.scope
+    edit current_fn = pr_alloca.function
+    edit current_scope = scrut_r.scope
 
-    mut arm_index = 0
+    edit arm_index = 0
     loop arm_idx in 0..<n_arms:
         arm = at(arms, arm_idx)
         pat_kind = get(arm, "pat_kind")
@@ -1401,7 +1401,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             current_fn = pr_br.function
         else:
             # Compare scrutinee against pattern.
-            mut pat_id = 0 - 1
+            edit pat_id = 0 - 1
             if pat_kind == "int":
                 pr_pat = ir_fn_push(current_fn, ir_iconst(parse_int(pat_value)))
                 current_fn = pr_pat.function
@@ -1411,7 +1411,7 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 current_fn = pr_pat.function
                 pat_id = pr_pat.id
             # Choose eq op based on type.
-            mut pr_eq = PushResult{function: current_fn, id: 0 - 1}
+            edit pr_eq = PushResult{function: current_fn, id: 0 - 1}
             if scrut_type == "text":
                 pr_eq = ir_fn_push(current_fn, ir_text_cmp("text_eq", scrut_id, pat_id))
             else:
@@ -1447,24 +1447,24 @@ fn ast_match_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     ConvResult{function: pr_load.function, scope: scrut_r.scope, id: pr_load.id}
 
 
-fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     struct_name = get(node, "name")
     fields = get(node, "fields")
     spec = scope_lookup_data_spec(scope, struct_name)
     if spec == "":
-        print_line("orion-self: ERROR — unknown data type `{struct_name}`")
+        print_line("orion-self: ERROR - unknown data type `{struct_name}`")
     parts = parse_data_spec(spec)
     n_fields_decl = len(parts)
     n_provided = len(fields)
     # Build value_ids in declared field order.
-    mut current_fn = fn_value
-    mut current_scope = scope
-    mut value_ids = []
+    edit current_fn = fn_value
+    edit current_scope = scope
+    edit value_ids = []
     loop di in 0..<n_fields_decl:
         decl_part = at(parts, di)
         decl_bs = bytes_from_text(decl_part)
-        mut decl_name = ""
-        mut found_colon = 0
+        edit decl_name = ""
+        edit found_colon = 0
         decl_bs_n = len(decl_bs)
         loop ci in 0..<decl_bs_n:
             b = at(decl_bs, ci)
@@ -1475,7 +1475,7 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                     single = bytes_to_text([b])
                     decl_name = "{decl_name}{single}"
         # Search provided fields for decl_name.
-        mut matched_id = 0 - 1
+        edit matched_id = 0 - 1
         loop pi in 0..<n_provided:
             prov = at(fields, pi)
             if get(prov, "name") == decl_name and matched_id == (0 - 1):
@@ -1484,22 +1484,22 @@ fn ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
                 current_scope = val_r.scope
                 matched_id = val_r.id
         if matched_id == (0 - 1):
-            # Field missing — default to 0
+            # Field missing - default to 0
             pr_default = ir_fn_push(current_fn, ir_iconst(0))
             current_fn = pr_default.function
             matched_id = pr_default.id
-        value_ids = push(value_ids, matched_id)
+        value_ids = append(value_ids, matched_id)
     pr = ir_fn_push(current_fn, ir_struct_cons(struct_name, n_fields_decl, value_ids))
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
 
-fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     obj_node = get(node, "object")
     field_name = get(node, "field")
-    # Special-case `EnumName.Variant` — obj is an Ident matching a known enum,
+    # Special-case `EnumName.Variant` - obj is an Ident matching a known enum,
     # field is the variant. Lower to iconst(variant_index).
-    mut handled_enum = false
-    mut enum_result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    edit handled_enum = false
+    edit enum_result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
     obj_kind = get(obj_node, "kind")
     if obj_kind == "Ident":
         obj_name = get(obj_node, "name")
@@ -1508,14 +1508,14 @@ fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
             pr = ir_fn_push(fn_value, ir_iconst(var_idx))
             handled_enum = true
             enum_result = ConvResult{function: pr.function, scope: scope, id: pr.id}
-    mut result = enum_result
+    edit result = enum_result
     if not handled_enum:
         obj_r = ast_expr_to_ir(fn_value, scope, obj_node)
         obj_type = get_value_type(obj_r.function, obj_r.id)
-        mut struct_name = ""
+        edit struct_name = ""
         obj_bytes = bytes_from_text(obj_type)
         n = len(obj_bytes)
-        mut past_colon = 0
+        edit past_colon = 0
         loop ci in 0..<n:
             b = at(obj_bytes, ci)
             if past_colon == 1:
@@ -1529,18 +1529,18 @@ fn ast_field_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         field_idx = find_field_index(parts, field_name)
         field_type = field_type_at(parts, field_idx)
         if field_idx < 0:
-            print_line("orion-self: ERROR — `{struct_name}` has no field `{field_name}`")
+            print_line("orion-self: ERROR - `{struct_name}` has no field `{field_name}`")
         pr_load = ir_fn_push(obj_r.function, ir_field_load(obj_r.id, field_idx, field_type))
         result = ConvResult{function: pr_load.function, scope: obj_r.scope, id: pr_load.id}
     result
 
 
-fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+define ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     pairs = get(node, "pairs")
     n_pairs = len(pairs)
-    mut current_fn = fn_value
-    mut current_scope = scope
-    mut pair_ids = []
+    edit current_fn = fn_value
+    edit current_scope = scope
+    edit pair_ids = []
     loop index in 0..<n_pairs:
         pair = at(pairs, index)
         key_text = get(pair, "key")
@@ -1551,13 +1551,13 @@ fn ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
         val_r = ast_expr_to_ir(current_fn, current_scope, val_node)
         current_fn = val_r.function
         current_scope = val_r.scope
-        pair_ids = push(pair_ids, pr_key.id)
-        pair_ids = push(pair_ids, val_r.id)
+        pair_ids = append(pair_ids, pr_key.id)
+        pair_ids = append(pair_ids, val_r.id)
     pr = ir_fn_push(current_fn, ir_map_lit(pair_ids))
     ConvResult{function: pr.function, scope: current_scope, id: pr.id}
 
 
-pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
+public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     kind = get(node, "kind")
     is_block = kind == "Block"
     is_int = kind == "Int"
@@ -1572,7 +1572,7 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
     is_match = kind == "Match"
     is_struct_cons = kind == "StructCons"
     is_field = kind == "Field"
-    mut result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
+    edit result = ConvResult{function: fn_value, scope: scope, id: 0 - 1}
     if is_block:
         result = ast_block_to_ir(fn_value, scope, node)
     if is_int:
@@ -1604,24 +1604,24 @@ pub fn ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: Map) -> ConvResult:
 
 # Map a parser type-node to an IR type string ("text" / "list" / "i64").
 # Given a "list:T" encoding, return T. Fallback "i64" for plain "list".
-fn extract_list_elem(type_text: Text) -> Text:
+define extract_list_elem(type_text: text) -> text:
     bs = bytes_from_text(type_text)
     n = len(bs)
-    mut is_param = false
+    edit is_param = false
     if n >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_param = true
     if not is_param:
         "i64"
     else:
-        mut result = ""
+        edit result = ""
         loop ci in 5..<n:
             single = bytes_to_text([at(bs, ci)])
             result = "{result}{single}"
         result
 
 
-fn ast_type_to_ir(type_node) -> Text:
+define ast_type_to_ir(type_node) -> text:
     kind = get(type_node, "kind")
     if kind == "List":
         elem_node = get(type_node, "elem")
@@ -1639,7 +1639,7 @@ fn ast_type_to_ir(type_node) -> Text:
                 # to be data-struct types. Snake-case / lowercase names
                 # (int, bool, void) get the i64 default.
                 name_bs = bytes_from_text(name)
-                mut starts_cap = false
+                edit starts_cap = false
                 if len(name_bs) > 0:
                     first = at(name_bs, 0)
                     if first >= 65 and first <= 90:
@@ -1649,7 +1649,7 @@ fn ast_type_to_ir(type_node) -> Text:
 
 # Same as ast_type_to_ir but knows about data structs declared in scope.
 # A Named type whose name matches a struct decl becomes "struct:Name".
-fn ast_type_to_ir_with_scope(type_node, scope: Scope) -> Text:
+define ast_type_to_ir_with_scope(type_node, scope: Scope) -> text:
     kind = get(type_node, "kind")
     if kind == "List":
         # Encode element type so list_at can return the right thing.
@@ -1666,21 +1666,21 @@ fn ast_type_to_ir_with_scope(type_node, scope: Scope) -> Text:
             else:
                 ds_names = scope.ds_names
                 n_structs = len(ds_names)
-                mut is_struct = false
+                edit is_struct = false
                 loop si in 0..<n_structs:
                     if at(ds_names, si) == name:
                         is_struct = true
                 if is_struct then "struct:{name}" else "i64"
 
 
-pub fn ast_fn_to_ir(ast_fn, initial_scope: Scope) -> IRFn:
+public define ast_fn_to_ir(ast_fn, initial_scope: Scope) -> IRFn:
     name = get(ast_fn, "name")
     ret_type_node = get(ast_fn, "ret")
     ret_type = ast_type_to_ir_with_scope(ret_type_node, initial_scope)
-    mut fn_value = ir_fn_new(name, ret_type)
+    edit fn_value = ir_fn_new(name, ret_type)
     params = get(ast_fn, "params")
     n_params = len(params)
-    mut scope = initial_scope
+    edit scope = initial_scope
     loop index in 0..<n_params:
         param = at(params, index)
         param_name = get(param, "name")
@@ -1701,20 +1701,20 @@ pub fn ast_fn_to_ir(ast_fn, initial_scope: Scope) -> IRFn:
         body_result.function
 
 
-pub fn ast_program_to_ir(program) -> IRModule:
+public define ast_program_to_ir(program) -> IRModule:
     decls = get(program, "decls")
     total = len(decls)
     # Pass 1a: collect Data decls and Enum decls first. Pass 1b uses them so
     # fn ret types like `-> Inst` correctly become "struct:Inst" not "i64",
     # and `EnumName.Variant` expressions resolve to variant indices.
-    mut sig_scope = scope_empty()
+    edit sig_scope = scope_empty()
     loop index in 0..<total:
         decl = at(decls, index)
         if get(decl, "kind") == "Data":
             struct_name = get(decl, "name")
             data_fields = get(decl, "fields")
             n_df = len(data_fields)
-            mut spec = ""
+            edit spec = ""
             loop fi in 0..<n_df:
                 fld = at(data_fields, fi)
                 fld_name = get(fld, "name")
@@ -1726,7 +1726,7 @@ pub fn ast_program_to_ir(program) -> IRModule:
             enum_name = get(decl, "name")
             variants = get(decl, "variants")
             n_vars = len(variants)
-            mut csv = ""
+            edit csv = ""
             loop vi in 0..<n_vars:
                 v = at(variants, vi)
                 v_name = get(v, "name")
@@ -1742,8 +1742,8 @@ pub fn ast_program_to_ir(program) -> IRModule:
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
 
     # Pass 2: build each fn's body with the signature scope available.
-    mut module = ir_module_new()
-    mut has_main = 0
+    edit module = ir_module_new()
+    edit has_main = 0
     loop index in 0..<total:
         decl = at(decls, index)
         kind = get(decl, "kind")
@@ -1753,7 +1753,7 @@ pub fn ast_program_to_ir(program) -> IRModule:
             if fn_ir.name == "main":
                 has_main = 1
     if has_main == 0:
-        mut stub = ir_fn_new("main", "i64")
+        edit stub = ir_fn_new("main", "i64")
         zero = ir_fn_push(stub, ir_iconst(0))
         ret = ir_fn_push(zero.function, ir_return(zero.id))
         module = ir_module_add_fn(module, ret.function)
@@ -1761,7 +1761,7 @@ pub fn ast_program_to_ir(program) -> IRModule:
 
 
 
-fn main() -> int:
+define main() -> int:
     int_node = {"kind": "Int", "value": "42"}
     expr_stmt = {"kind": "ExprStmt", "expr": int_node}
     block_node = {"kind": "Block", "stmts": [expr_stmt]}

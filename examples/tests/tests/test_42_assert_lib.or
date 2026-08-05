@@ -1,21 +1,13 @@
-fn assert_true(cond: int, label: Text) -> int:
-    if cond == 0:
-        print_line("ASSERT FAILED: {label}")
-        0
-    else:
-        1
+# ONE assert: any condition, spoken comparisons. The old assert_true /
+# assert_eq / assert_text_eq trio collapsed into it.
+use assert
 
-fn assert_eq(actual: int, expected: int, label: Text) -> int:
-    if actual == expected:
-        1
-    else:
-        print_line("ASSERT FAILED: {label} — expected {expected}, got {actual}")
-        0
-
-fn main() -> int:
-    mut passes = 0
-    passes = passes + assert_true(1, "trivially true")
-    passes = passes + assert_eq(42, 42, "equal ints")
-    passes = passes + assert_eq(2 + 2, 4, "math")
-    # 3 asserts × 14 = 42
-    passes * 14
+define main() -> int:
+    edit passes = 0
+    passes = passes + assert(true, "trivially true")
+    passes = passes + assert(42 is 42, "equal ints")
+    passes = passes + assert(2 + 2 is 4, "math")
+    passes = passes + assert("hi" is "hi", "equal texts")
+    passes = passes + assert(1 < 2 and 3 is at least 3, "words compose")
+    # 5 asserts, but exit must stay 42: 5 * 8 + 2
+    passes * 8 + 2

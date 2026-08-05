@@ -3,9 +3,9 @@
 # every turn and a multi-million-iteration loop overflowed the stack (this is
 # what crashed the compiler itself on any source over ~4 MB). Allocas are now
 # hoisted to the entry block. Five million iterations must simply finish.
-fn main() -> int:
-  mut total = 0
+define main() -> int:
+  edit total = 0
   loop i in 0..<5000000:
-    mut step = 1
+    edit step = 1
     total = total + step
   if total == 5000000 then 42 else 1

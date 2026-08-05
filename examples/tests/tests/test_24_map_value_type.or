@@ -1,30 +1,30 @@
-# `Map<T>` — a map that says what it holds.
+# `Map<T>` - a map that says what it holds.
 #
 # A bare `Map` holds anything, so every read out of one had to GUESS an element
 # type. It guessed `map`, which is right for walking an AST and silently wrong
 # for a list of texts: `len` on an element became a map's length and returned a
 # wrong number with no error. The IR already understood `map:T` and `get` already
-# read it — there was simply no way to say it in source, and the helper that
+# read it - there was simply no way to say it in source, and the helper that
 # extracts it had no callers.
 #
 # Nothing changes at runtime (every value is a 64-bit word). This is the
 # annotation finally reaching the reader.
-fn greeting_len(m: Map<Text>) -> int:
+define greeting_len(m: table<text>) -> int:
     len(get(m, "greeting"))                  # a text, so text length
 
-fn second_word_len(m: Map<[Text]>) -> int:
+define second_word_len(m: table<[text]>) -> int:
     ws = get_list(m, "words")                # list:text, from the map's type
     len(at(ws, 1))
 
-fn total(m: Map<int>) -> int:
+define total(m: table<int>) -> int:
     get_int(m, "a") + get_int(m, "b")
 
-fn main() -> int:
+define main() -> int:
     a = greeting_len({"greeting": "hello"})              # 5
     b = second_word_len({"words": ["ab", "cdef"]})       # 4
     c = total({"a": 6, "b": 8})                          # 14
     # An UNTYPED map keeps the old default (a list of maps), which is what the
-    # compiler's own AST walking relies on — this is additive, not a change.
+    # compiler's own AST walking relies on - this is additive, not a change.
     plain = {"nodes": [{"kind": "Leaf"}]}
     d = len(get_list(plain, "nodes"))                     # 1
     print_line("a={a} b={b} c={c} d={d}")

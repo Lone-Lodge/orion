@@ -6,11 +6,11 @@ through an arena the compiler checks for balanced scopes before anything runs.
 You do not write regions yourself; there is no such keyword. The compiler is
 written in Orion and compiles itself.
 
-**[Read the Field Guide](docs/index.html)** — everything you need to write
+**[Read the Field Guide](docs/index.html)** - everything you need to write
 Orion, on one page, in ten minutes. ([svenska](docs/sv.html))
 
 It is a plain HTML page: clone and open `docs/index.html`, no server needed.
-Not published yet — GitHub Pages needs the repository to be public, or the
+Not published yet - GitHub Pages needs the repository to be public, or the
 organisation to be on a paid plan.
 
 ```
@@ -22,7 +22,7 @@ fn main() -> int:
 
 ## Build it
 
-You need `clang`. Nothing else — no Rust, no Node, no package manager.
+You need `clang`. Nothing else - no Rust, no Node, no package manager.
 
 ```sh
 bash tools/bootstrap.sh
@@ -30,9 +30,10 @@ bash tools/bootstrap.sh
 
 That goes from a bare checkout to a working toolchain: the checked-in seed IR
 builds a first compiler, that compiler rebuilds itself to a fixpoint, `orbit`
-is built, and the smoke suite runs. Verified on Linux and Windows by CI on
-every push. The macOS paths are written but have never been run anywhere, so
-treat them as untested rather than supported.
+is built, and the smoke suite runs. Verified on Linux, Windows and macOS by CI
+on every push; macOS is the one leg that exercises the arm64/Mach-O retarget and
+the tight main-thread stack. I do not develop on a Mac, so mac-only regressions
+are caught by CI rather than hand-verified.
 
 Then compile a program:
 
@@ -52,18 +53,19 @@ Every gate the repo owns, and what each one is for:
 | | |
 |---|---|
 | `tools/seed_check.sh` | the committed seed can still build the compiler, so a fresh clone can bootstrap |
-| `tools/test.sh` | 151 smoke tests, one feature each |
-| `tools/negative_test.sh` | 23 programs that must be *rejected*, with the right message |
+| `tools/test.sh` | 155 smoke tests, one feature each |
+| `tools/negative_test.sh` | 26 programs that must be *rejected*, with the right message |
 | `tools/combo_test.sh` | 66 pairs of features used together |
 | `tools/demos_smoke.sh` | the 21 demo programs still run |
 | `tools/docs_check.sh` | every code sample in the Field Guide compiles |
+| `tools/wasm_conformance.sh` | the wasm backend does not regress (OK count holds, no unexpected wrong answers; known gaps allowlisted) |
 | `tools/lsp_test.sh` | the editor server answers the way an editor asks |
 | `tools/region_shrink_test.sh` | the arena gives memory back and does not thrash |
 | `tools/compile_bench.sh` | how fast the compiler runs |
 | `tools/runtime_bench.sh` | how fast the code it emits runs |
 
-CI runs all of them on Linux and Windows, starting from a checkout with no
-binary on disk.
+CI runs all of them on Linux, Windows and macOS, starting from a checkout with
+no binary on disk.
 
 ## WebAssembly
 
@@ -74,7 +76,7 @@ output path ending in `.wasm` uses the wasm backend instead of LLVM:
 orion prog.or prog.wasm orbs
 ```
 
-The `.wasm` is self-contained — the host (JavaScript) provides only capabilities
+The `.wasm` is self-contained - the host (JavaScript) provides only capabilities
 (draw, input, `print`), never data-structure semantics. `examples/wasm_demo/`
 compiles a small program to wasm and animates it on a canvas.
 
@@ -90,6 +92,15 @@ order, one-shot algebraic effects (`perform`/`resume`), the full control flow,
 and an in-browser IO sandbox. All 12 Field Guide samples run in the browser. The
 async scheduler (`spawn`/`await` with parked tasks) needs real stack switching
 and stays native.
+
+It is a secondary backend, not a mirror of the native one: `tools/wasm_conformance.sh`
+runs the whole smoke suite through wasm and currently gets the right answer on
+141 of them, with the rest either using an unsupported feature or being a
+must-fail runtime test that aborts. CI gates it against regression, not against
+100%. A "bytes" value is a `[int]` list in both backends: wasm keeps text packed
+and converts at `bytes_from_text` / `bytes_to_text`, so code that BUILDS bytes
+from computed ints (the `encoding` orb, `text`'s case mapping) means the same
+thing in the browser as it does natively.
 
 ## Layout
 
@@ -113,8 +124,12 @@ Known gaps, stated plainly rather than left to be discovered:
   is linear with no annotation. When uniqueness cannot be proven (x is aliased,
   stored, or captured) it stays a copy; reach for `push_mut` there if the copy
   shows up in a profile.
-- Effects that resume (`ask` / `resume_with`) use Windows fibers. Elsewhere
-  `resumable_ok()` reports 0 and `ask` refuses rather than pretending.
+- Effects come in two tiers. One-shot (`perform` / `handle` / `resume`, resume
+  exactly once, synchronously) is the supported core and works everywhere.
+  Multi-shot (`ask` / `resume_with`, a handler that outlives its own resume) is
+  **experimental**: it is the same machinery async needs, and it runs on Windows
+  fibers. Elsewhere `resumable_ok()` reports 0 and `ask` refuses rather than
+  pretending. Do not build on it until it is cross-platform.
 - Interactive terminal input (`orion_console_readline`) works on Windows and
   through a pipe anywhere; on a POSIX TTY it returns nothing.
 

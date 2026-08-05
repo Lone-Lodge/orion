@@ -1,12 +1,12 @@
 #!/bin/bash
-# smoke_all_orbs — compile a compiler orb on its own, with a small driver, as a
+# smoke_all_orbs - compile a compiler orb on its own, with a small driver, as a
 # fast check that the language layer still swallows it. Two orbs today
 # (orion_ir, orion_lex); the header used to claim five.
 #
 # Each driver must exit 42. Say what you are asserting: the lex driver used to
 # encode its expectation as `len(toks) * 14`, which stopped meaning "3 tokens"
 # the moment the lexer started emitting newline/eof tokens, and then reported
-# exit 70 — indistinguishable at a glance from Orion's runtime trap code.
+# exit 70 - indistinguishable at a glance from Orion's runtime trap code.
 
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)

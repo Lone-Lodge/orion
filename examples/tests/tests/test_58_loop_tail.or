@@ -1,0 +1,20 @@
+# A collecting loop's block yields its TAIL expression, the same rule the
+# one-liner uses. Explicit `yield` collects additional values on top. A block
+# ending in a statement (an `if`) collects only what it yields.
+
+define sum(xs: [int]) -> int:
+    edit s = 0
+    loop v in xs:
+        s = s + v
+    s
+
+define main() -> int:
+    a = loop x in [1, 2, 3]:
+        d = x * 2
+        d + 1                      # tail expr yielded -> [3, 5, 7]     -> 15
+    b = loop x in [1, 2]:
+        collect x
+        x * 10                     # yield x AND tail x*10 -> [1,10,2,20] -> 33
+    c = loop x in [1, 2, 3, 4]:
+        if x > 2: collect x          # ends in a statement -> [3, 4]      -> 7
+    sum(a) + sum(b) + sum(c) + len(a)   # 15 + 33 + 7 + 3 = 58

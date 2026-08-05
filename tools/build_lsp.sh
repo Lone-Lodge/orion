@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build_lsp.sh — build dist/orion-lsp.exe from tools/orion_lsp.or.
+# build_lsp.sh - build dist/orion-lsp.exe from tools/orion_lsp.or.
 #
 # Same recipe as build_orbit.sh: orion.exe compiles the entry point, clang links
 # it with the CLI runtime (orion_cli.c gives the server `capture_stdout`, which
@@ -12,7 +12,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ORION="$ROOT/dist/orion.exe"
 CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 case "$(uname -s 2>/dev/null || echo unknown)" in
     Linux)  HOST_TRIPLE="x86_64-unknown-linux-gnu"; MANGLE="e"; RETARGET=1; STACK_LINK="" ;;

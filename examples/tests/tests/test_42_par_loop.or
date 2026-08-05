@@ -1,11 +1,11 @@
-# `loop parallel i in ...:` — one worker thread per iteration, on top of the
+# `loop parallel i in ...:` - one worker thread per iteration, on top of the
 # verified par_run primitive. Each iteration's closure captures ITS OWN index
 # by value and writes only its own slot, so the result is deterministic.
-fn main() -> int:
-    mut out = [0, 0, 0, 0, 0, 0, 0]
+define main() -> int:
+    edit out = [0, 0, 0, 0, 0, 0, 0]
     loop parallel i in 0..<7:
         out[i] = i * 2
-    mut total = 0
+    edit total = 0
     loop v in out:
         total += v          # 0+2+4+6+8+10+12 == 42
     total

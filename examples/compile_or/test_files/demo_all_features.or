@@ -5,14 +5,14 @@
 # Lambdas/closures with captures work via the native compile path (orion-self
 # orbs → LLVM); demo_closure.or has that flavour.
 
-fn id<T>(value: T) -> T:
+define id<T>(value: T) -> T:
     value
 
-fn pair_first<A, B>(left: A, right: B) -> A:
+define pair_first<A, B>(left: A, right: B) -> A:
     left
 
-fn main() -> int:
-    # Generics — type vars erased to int/ptr.
+define main() -> int:
+    # Generics - type vars erased to int/ptr.
     a = id(20)
     b = pair_first(22, 999)
 
@@ -22,14 +22,14 @@ fn main() -> int:
     dot = vec_dot(xs, ys)
     sum = vec_add(xs, ys)
 
-    print("generics a:")
-    print(a)
-    print("generics b:")
-    print(b)
-    print("simd dot:")
-    print(dot)
-    print("simd vec_add[0]:")
-    print(at(sum, 0))
+    print_line("generics a:")
+    print_line(a)
+    print_line("generics b:")
+    print_line(b)
+    print_line("simd dot:")
+    print_line(dot)
+    print_line("simd vec_add[0]:")
+    print_line(at(sum, 0))
 
     # Combine: a (20) + b (22) = 42
     a + b

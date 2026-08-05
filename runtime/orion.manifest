@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Every Orion exe on Windows runs with UTF-8 as its process code page.
+
+     Without this the "ANSI" C and Win32 calls the runtime is built on -
+     fopen, FindFirstFileA, CreateProcessA - speak the legacy code page
+     (1252 on a Swedish machine). A file named "Skarmbild.png" with an a-ring
+     then comes out of a directory listing as one 0xE4 byte, which is not
+     valid UTF-8: it corrupts every text that name touches, and reopening the
+     file with the UTF-8 spelling fails. One switch fixes the whole ANSI
+     surface at once, so no call site has to convert.
+
+     Windows 10 1903 and newer. Older Windows ignores the setting and falls
+     back to the legacy code page - the same behavior as before this file. -->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings xmlns:ws2="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
+      <ws2:activeCodePage>UTF-8</ws2:activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

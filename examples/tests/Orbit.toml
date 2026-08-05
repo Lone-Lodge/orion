@@ -14,7 +14,7 @@ orion_emit_llvm = "path:../../orbs/orion_emit_llvm"
 os = "path:../../orbs/os"
 orion_driver = "path:../../orbs/orion_driver"
 # The stdlib, so the suite can test it too. A test that says `use async` or
-# `use iter` could not compile here before — which is why the async scheduler and
+# `use iter` could not compile here before - which is why the async scheduler and
 # the generic-element fix both had to be proven by hand instead of by the suite.
 # An orb costs nothing until a test actually uses it.
 async = "path:../../orbs/async"

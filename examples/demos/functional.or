@@ -2,33 +2,33 @@
 #
 # `|x| body` lambdas ARE parsed but their lowering needs a tree-walker
 # lift pass (3-5h future work). Until then, use named fns + first-class
-# fn refs — same capabilities, slightly more verbose.
+# fn refs - same capabilities, slightly more verbose.
 
 # ---- Building blocks (named fns) ------------------------------------
 
-fn double(x: int) -> int:
+define double(x: int) -> int:
     x * 2
 
-fn inc(x: int) -> int:
+define inc(x: int) -> int:
     x + 1
 
-fn add(a: int, b: int) -> int:
+define add(a: int, b: int) -> int:
     a + b
 
 # ---- Higher-order helpers ------------------------------------------
 
-fn apply(f: fn, x: int) -> int:
+define apply(f: fn, x: int) -> int:
     f(x)
 
-fn compose_call(g: fn, h: fn, x: int) -> int:
+define compose_call(g: fn, h: fn, x: int) -> int:
     g(h(x))   # g(h(x))
 
-fn twice(f: fn, x: int) -> int:
+define twice(f: fn, x: int) -> int:
     f(f(x))
 
-# ---- Main — uses fns as first-class values --------------------------
+# ---- Main - uses fns as first-class values --------------------------
 
-fn main() -> int:
+define main() -> int:
     # First-class fn binding
     op = inc
 
@@ -44,7 +44,7 @@ fn main() -> int:
     # Apply twice
     d = twice(inc, 0)       # inc(inc(0)) = 2
 
-    # Chain with plain intermediate variables — readable, top to bottom.
+    # Chain with plain intermediate variables - readable, top to bottom.
     step = double(10)       # 20
     e = inc(step)           # 21
 

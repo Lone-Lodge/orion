@@ -3,9 +3,9 @@
 # header as [cap, len, data...] and index it -- so a two-entry map walked its
 # flat key/value storage and counted FOUR. A silent wrong answer, which is
 # worse than a crash because nothing tells you.
-fn main() -> int:
+define main() -> int:
     m = {"a": 1, "b": 2}
-    mut n = 0
+    edit n = 0
     loop k in m:
         n += 1
     n

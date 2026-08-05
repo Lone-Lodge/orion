@@ -6,6 +6,9 @@ declare i32 @puts(ptr)
 declare ptr @malloc(i64)
 declare ptr @orion_f64_literal_hex(ptr)
 declare i64 @orion_par_run(ptr, i64)
+declare i64 @orion_trace_enter(ptr)
+declare i64 @orion_trail_note_trap()
+declare i64 @orion_breakpoint(ptr)
 declare ptr @orion_alloc(i64)
 declare ptr @orion_par_madd(ptr, ptr, i64)
 declare i64 @orion_arena_init(i64)
@@ -829,6 +832,7 @@ entry:
   br i1 %at_oob, label %at_fail, label %at_ok
 at_fail:
   %_atp = call i32 (ptr, ...) @printf(ptr @.msg_oob, i64 %idx, i64 %at_len)
+  %_att = call i64 @orion_trail_note_trap()
   call void @exit(i32 70)
   unreachable
 at_ok:
@@ -870,6 +874,7 @@ entry:
   br i1 %rq, label %rfail, label %rok
 rfail:
   %_rp = call i32 (ptr, ...) @printf(ptr @.msg_require)
+  %_rt = call i64 @orion_trail_note_trap()
   call void @exit(i32 70)
   unreachable
 rok:
@@ -882,6 +887,7 @@ entry:
   br i1 %eq0, label %efail, label %eok
 efail:
   %_ep = call i32 (ptr, ...) @printf(ptr @.msg_ensure)
+  %_et = call i64 @orion_trail_note_trap()
   call void @exit(i32 70)
   unreachable
 eok:
@@ -1509,7 +1515,7 @@ retb:
 @.str_4 = private unnamed_addr constant [27 x i8] c"\FE\F1\60\2D\00\00\00\00\0A\00\00\00\00\00\00\00 text_len=\00", align 8
 @.str_5 = private unnamed_addr constant [25 x i8] c"\E5\0C\42\10\00\00\00\00\08\00\00\00\00\00\00\00 inline=\00", align 8
 
-define ptr @iter__map(ptr %p0, ptr %p1) {
+define ptr @iter__each(ptr %p0, ptr %p1) {
 entry:
     %v3 = alloca ptr, align 8
     %v7 = alloca i64, align 8
@@ -1560,7 +1566,7 @@ for_5_end:
     ret ptr %v27
 }
 
-define ptr @iter__filter(ptr %p0, ptr %p1) {
+define ptr @iter__keep(ptr %p0, ptr %p1) {
 entry:
     %v3 = alloca ptr, align 8
     %v7 = alloca i64, align 8
@@ -1595,33 +1601,30 @@ cpln16:
     br label %cmrg16
 cmrg16:
     %v16 = phi i64 [ %v16.r1, %clam16 ], [ %v16.r2, %cpln16 ]
-    %v17 = add i64 0, 1
-    %v18.b = icmp eq i64 %v16, %v17
-    %v18 = zext i1 %v18.b to i64
-    %v19.cb = icmp ne i64 %v18, 0
-    br i1 %v19.cb, label %if_19_then, label %if_19_else
-if_19_then:
-    %v21 = load ptr, ptr %v3
-    %v22 = call ptr @orion_list_push_mut(ptr %v21, i64 %v15)
-    store ptr %v22, ptr %v3
-    %v23 = add i64 0, 0
-    br label %if_19_merge
-if_19_else:
-    br label %if_19_merge
-if_19_merge:
+    %v17.cb = icmp ne i64 %v16, 0
+    br i1 %v17.cb, label %if_17_then, label %if_17_else
+if_17_then:
+    %v19 = load ptr, ptr %v3
+    %v20 = call ptr @orion_list_push_mut(ptr %v19, i64 %v15)
+    store ptr %v20, ptr %v3
+    %v21 = add i64 0, 0
+    br label %if_17_merge
+if_17_else:
+    br label %if_17_merge
+if_17_merge:
     br label %for_5_step
 for_5_step:
-    %v30 = add i64 0, 1
-    %v31 = add i64 %v11, %v30
-    store i64 %v31, ptr %v7
-    %v32 = add i64 0, 0
+    %v28 = add i64 0, 1
+    %v29 = add i64 %v11, %v28
+    store i64 %v29, ptr %v7
+    %v30 = add i64 0, 0
     br label %for_5_header
 for_5_end:
-    %v35 = load ptr, ptr %v3
-    ret ptr %v35
+    %v33 = load ptr, ptr %v3
+    ret ptr %v33
 }
 
-define i64 @iter__reduce(ptr %p0, i64 %p1, ptr %p2) {
+define i64 @iter__combine(ptr %p0, i64 %p1, ptr %p2) {
 entry:
     %v3 = alloca i64, align 8
     %v7 = alloca i64, align 8
@@ -1706,29 +1709,26 @@ cpln16:
     br label %cmrg16
 cmrg16:
     %v16 = phi i64 [ %v16.r1, %clam16 ], [ %v16.r2, %cpln16 ]
-    %v17 = add i64 0, 1
-    %v18.b = icmp eq i64 %v16, %v17
-    %v18 = zext i1 %v18.b to i64
-    %v19.cb = icmp ne i64 %v18, 0
-    br i1 %v19.cb, label %if_19_then, label %if_19_else
-if_19_then:
-    %v21 = add i64 0, 1
-    store i64 %v21, ptr %v3
-    %v22 = add i64 0, 0
-    br label %if_19_merge
-if_19_else:
-    br label %if_19_merge
-if_19_merge:
+    %v17.cb = icmp ne i64 %v16, 0
+    br i1 %v17.cb, label %if_17_then, label %if_17_else
+if_17_then:
+    %v19 = add i64 0, 1
+    store i64 %v19, ptr %v3
+    %v20 = add i64 0, 0
+    br label %if_17_merge
+if_17_else:
+    br label %if_17_merge
+if_17_merge:
     br label %for_5_step
 for_5_step:
-    %v29 = add i64 0, 1
-    %v30 = add i64 %v11, %v29
-    store i64 %v30, ptr %v7
-    %v31 = add i64 0, 0
+    %v27 = add i64 0, 1
+    %v28 = add i64 %v11, %v27
+    store i64 %v28, ptr %v7
+    %v29 = add i64 0, 0
     br label %for_5_header
 for_5_end:
-    %v34 = load i64, ptr %v3
-    ret i64 %v34
+    %v32 = load i64, ptr %v3
+    ret i64 %v32
 }
 
 define i64 @iter__all(ptr %p0, ptr %p1) {
@@ -1766,29 +1766,28 @@ cpln16:
     br label %cmrg16
 cmrg16:
     %v16 = phi i64 [ %v16.r1, %clam16 ], [ %v16.r2, %cpln16 ]
-    %v17 = add i64 0, 0
-    %v18.b = icmp eq i64 %v16, %v17
-    %v18 = zext i1 %v18.b to i64
-    %v19.cb = icmp ne i64 %v18, 0
-    br i1 %v19.cb, label %if_19_then, label %if_19_else
-if_19_then:
+    %v17.n = icmp eq i64 %v16, 0
+    %v17 = zext i1 %v17.n to i64
+    %v18.cb = icmp ne i64 %v17, 0
+    br i1 %v18.cb, label %if_18_then, label %if_18_else
+if_18_then:
+    %v20 = add i64 0, 0
+    store i64 %v20, ptr %v3
     %v21 = add i64 0, 0
-    store i64 %v21, ptr %v3
-    %v22 = add i64 0, 0
-    br label %if_19_merge
-if_19_else:
-    br label %if_19_merge
-if_19_merge:
+    br label %if_18_merge
+if_18_else:
+    br label %if_18_merge
+if_18_merge:
     br label %for_5_step
 for_5_step:
-    %v29 = add i64 0, 1
-    %v30 = add i64 %v11, %v29
-    store i64 %v30, ptr %v7
-    %v31 = add i64 0, 0
+    %v28 = add i64 0, 1
+    %v29 = add i64 %v11, %v28
+    store i64 %v29, ptr %v7
+    %v30 = add i64 0, 0
     br label %for_5_header
 for_5_end:
-    %v34 = load i64, ptr %v3
-    ret i64 %v34
+    %v33 = load i64, ptr %v3
+    ret i64 %v33
 }
 
 define i64 @iter__find_index(ptr %p0, ptr %p1) {
@@ -1835,32 +1834,29 @@ cpln23:
     br label %cmrg23
 cmrg23:
     %v23 = phi i64 [ %v23.r1, %clam23 ], [ %v23.r2, %cpln23 ]
-    %v24 = add i64 0, 1
-    %v25.b = icmp eq i64 %v23, %v24
-    %v25 = zext i1 %v25.b to i64
-    %v26.cb = icmp ne i64 %v25, 0
-    br i1 %v26.cb, label %if_26_then, label %if_26_else
-if_26_then:
+    %v24.cb = icmp ne i64 %v23, 0
+    br i1 %v24.cb, label %if_24_then, label %if_24_else
+if_24_then:
     store i64 %v13, ptr %v5
-    %v28 = add i64 0, 0
-    br label %if_26_merge
-if_26_else:
-    br label %if_26_merge
-if_26_merge:
+    %v26 = add i64 0, 0
+    br label %if_24_merge
+if_24_else:
+    br label %if_24_merge
+if_24_merge:
     br label %if_20_merge
 if_20_else:
     br label %if_20_merge
 if_20_merge:
     br label %for_7_step
 for_7_step:
-    %v39 = add i64 0, 1
-    %v40 = add i64 %v13, %v39
-    store i64 %v40, ptr %v9
-    %v41 = add i64 0, 0
+    %v37 = add i64 0, 1
+    %v38 = add i64 %v13, %v37
+    store i64 %v38, ptr %v9
+    %v39 = add i64 0, 0
     br label %for_7_header
 for_7_end:
-    %v44 = load i64, ptr %v5
-    ret i64 %v44
+    %v42 = load i64, ptr %v5
+    ret i64 %v42
 }
 
 define i64 @iter__count(ptr %p0, ptr %p1) {
@@ -1898,31 +1894,28 @@ cpln16:
     br label %cmrg16
 cmrg16:
     %v16 = phi i64 [ %v16.r1, %clam16 ], [ %v16.r2, %cpln16 ]
-    %v17 = add i64 0, 1
-    %v18.b = icmp eq i64 %v16, %v17
-    %v18 = zext i1 %v18.b to i64
-    %v19.cb = icmp ne i64 %v18, 0
-    br i1 %v19.cb, label %if_19_then, label %if_19_else
-if_19_then:
-    %v21 = load i64, ptr %v3
-    %v22 = add i64 0, 1
-    %v23 = add i64 %v21, %v22
-    store i64 %v23, ptr %v3
-    %v24 = add i64 0, 0
-    br label %if_19_merge
-if_19_else:
-    br label %if_19_merge
-if_19_merge:
+    %v17.cb = icmp ne i64 %v16, 0
+    br i1 %v17.cb, label %if_17_then, label %if_17_else
+if_17_then:
+    %v19 = load i64, ptr %v3
+    %v20 = add i64 0, 1
+    %v21 = add i64 %v19, %v20
+    store i64 %v21, ptr %v3
+    %v22 = add i64 0, 0
+    br label %if_17_merge
+if_17_else:
+    br label %if_17_merge
+if_17_merge:
     br label %for_5_step
 for_5_step:
-    %v31 = add i64 0, 1
-    %v32 = add i64 %v11, %v31
-    store i64 %v32, ptr %v7
-    %v33 = add i64 0, 0
+    %v29 = add i64 0, 1
+    %v30 = add i64 %v11, %v29
+    store i64 %v30, ptr %v7
+    %v31 = add i64 0, 0
     br label %for_5_header
 for_5_end:
-    %v36 = load i64, ptr %v3
-    ret i64 %v36
+    %v34 = load i64, ptr %v3
+    ret i64 %v34
 }
 
 define i64 @iter__sum(ptr %p0) {
@@ -2148,15 +2141,34 @@ if_8_merge:
     ret i64 %v50
 }
 
+define ptr @iter__sorted(ptr %p0, ptr %p1) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2.slot = getelementptr i64, ptr %v1, i64 0
+    %v2.i = load i64, ptr %v2.slot
+    %v2 = inttoptr i64 %v2.i to ptr
+    %v3 = call ptr @iter__sort_generic(ptr %v0, ptr %v2)
+    ret ptr %v3
+}
+
 define ptr @iter__sort_by(ptr %p0, ptr %p1) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = call ptr @iter__sort_generic(ptr %v0, ptr %v1)
+    ret ptr %v2
+}
+
+define ptr @iter__sort_generic(ptr %p0, ptr %p1) {
 entry:
     %v2 = alloca ptr, align 8
     %v5 = alloca ptr, align 8
     %v9 = alloca i64, align 8
     %v18 = alloca i64, align 8
     %v23 = alloca i64, align 8
-    %v60 = alloca ptr, align 8
-    %v65 = alloca i64, align 8
+    %v58 = alloca ptr, align 8
+    %v63 = alloca i64, align 8
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = getelementptr i8, ptr %p1, i64 0
     store ptr %v0, ptr %v2
@@ -2210,86 +2222,83 @@ cpln36:
     br label %cmrg36
 cmrg36:
     %v36 = phi i64 [ %v36.r1, %clam36 ], [ %v36.r2, %cpln36 ]
-    %v37 = add i64 0, 1
-    %v38.b = icmp eq i64 %v36, %v37
-    %v38 = zext i1 %v38.b to i64
-    %v39.cb = icmp ne i64 %v38, 0
-    br i1 %v39.cb, label %if_39_then, label %if_39_else
-if_39_then:
+    %v37.cb = icmp ne i64 %v36, 0
+    br i1 %v37.cb, label %if_37_then, label %if_37_else
+if_37_then:
     store i64 %v27, ptr %v18
-    %v41 = add i64 0, 0
-    br label %if_39_merge
-if_39_else:
-    br label %if_39_merge
-if_39_merge:
+    %v39 = add i64 0, 0
+    br label %if_37_merge
+if_37_else:
+    br label %if_37_merge
+if_37_merge:
     br label %for_20_step
 for_20_step:
-    %v48 = add i64 0, 1
-    %v49 = add i64 %v27, %v48
-    store i64 %v49, ptr %v23
-    %v50 = add i64 0, 0
+    %v46 = add i64 0, 1
+    %v47 = add i64 %v27, %v46
+    store i64 %v47, ptr %v23
+    %v48 = add i64 0, 0
     br label %for_20_header
 for_20_end:
-    %v53 = load ptr, ptr %v5
-    %v54 = load ptr, ptr %v2
-    %v55 = load i64, ptr %v18
-    %v56 = call i64 @orion_list_at(ptr %v54, i64 %v55)
-    %v57 = call ptr @orion_list_push_mut(ptr %v53, i64 %v56)
-    store ptr %v57, ptr %v5
-    %v58 = add i64 0, 0
-    %v59 = getelementptr i64, ptr @orion_empty_list, i64 0
-    store ptr %v59, ptr %v60
-    %v61 = add i64 0, 0
-    %v62 = add i64 0, 0
-    %v63 = load ptr, ptr %v2
-    %v64 = call i64 @orion_list_len(ptr %v63)
-    store i64 %v62, ptr %v65
-    %v66 = add i64 0, 0
-    br label %for_62_header
-for_62_header:
-    %v69 = load i64, ptr %v65
-    %v70.b = icmp slt i64 %v69, %v64
-    %v70 = zext i1 %v70.b to i64
-    %v71.cb = icmp ne i64 %v70, 0
-    br i1 %v71.cb, label %for_62_body, label %for_62_end
-for_62_body:
-    %v73 = load i64, ptr %v18
-    %v74.b = icmp ne i64 %v69, %v73
-    %v74 = zext i1 %v74.b to i64
-    %v75.cb = icmp ne i64 %v74, 0
-    br i1 %v75.cb, label %if_75_then, label %if_75_else
-if_75_then:
-    %v77 = load ptr, ptr %v60
-    %v78 = load ptr, ptr %v2
-    %v79 = call i64 @orion_list_at(ptr %v78, i64 %v69)
-    %v80 = call ptr @orion_list_push(ptr %v77, i64 %v79)
-    store ptr %v80, ptr %v60
-    %v81 = add i64 0, 0
-    br label %if_75_merge
-if_75_else:
-    br label %if_75_merge
-if_75_merge:
-    br label %for_62_step
-for_62_step:
-    %v88 = add i64 0, 1
-    %v89 = add i64 %v69, %v88
-    store i64 %v89, ptr %v65
-    %v90 = add i64 0, 0
-    br label %for_62_header
-for_62_end:
-    %v93 = load ptr, ptr %v60
-    store ptr %v93, ptr %v2
-    %v94 = add i64 0, 0
+    %v51 = load ptr, ptr %v5
+    %v52 = load ptr, ptr %v2
+    %v53 = load i64, ptr %v18
+    %v54 = call i64 @orion_list_at(ptr %v52, i64 %v53)
+    %v55 = call ptr @orion_list_push_mut(ptr %v51, i64 %v54)
+    store ptr %v55, ptr %v5
+    %v56 = add i64 0, 0
+    %v57 = getelementptr i64, ptr @orion_empty_list, i64 0
+    store ptr %v57, ptr %v58
+    %v59 = add i64 0, 0
+    %v60 = add i64 0, 0
+    %v61 = load ptr, ptr %v2
+    %v62 = call i64 @orion_list_len(ptr %v61)
+    store i64 %v60, ptr %v63
+    %v64 = add i64 0, 0
+    br label %for_60_header
+for_60_header:
+    %v67 = load i64, ptr %v63
+    %v68.b = icmp slt i64 %v67, %v62
+    %v68 = zext i1 %v68.b to i64
+    %v69.cb = icmp ne i64 %v68, 0
+    br i1 %v69.cb, label %for_60_body, label %for_60_end
+for_60_body:
+    %v71 = load i64, ptr %v18
+    %v72.b = icmp ne i64 %v67, %v71
+    %v72 = zext i1 %v72.b to i64
+    %v73.cb = icmp ne i64 %v72, 0
+    br i1 %v73.cb, label %if_73_then, label %if_73_else
+if_73_then:
+    %v75 = load ptr, ptr %v58
+    %v76 = load ptr, ptr %v2
+    %v77 = call i64 @orion_list_at(ptr %v76, i64 %v67)
+    %v78 = call ptr @orion_list_push(ptr %v75, i64 %v77)
+    store ptr %v78, ptr %v58
+    %v79 = add i64 0, 0
+    br label %if_73_merge
+if_73_else:
+    br label %if_73_merge
+if_73_merge:
+    br label %for_60_step
+for_60_step:
+    %v86 = add i64 0, 1
+    %v87 = add i64 %v67, %v86
+    store i64 %v87, ptr %v63
+    %v88 = add i64 0, 0
+    br label %for_60_header
+for_60_end:
+    %v91 = load ptr, ptr %v58
+    store ptr %v91, ptr %v2
+    %v92 = add i64 0, 0
     br label %for_7_step
 for_7_step:
-    %v97 = add i64 0, 1
-    %v98 = add i64 %v13, %v97
-    store i64 %v98, ptr %v9
-    %v99 = add i64 0, 0
+    %v95 = add i64 0, 1
+    %v96 = add i64 %v13, %v95
+    store i64 %v96, ptr %v9
+    %v97 = add i64 0, 0
     br label %for_7_header
 for_7_end:
-    %v102 = load ptr, ptr %v5
-    ret ptr %v102
+    %v100 = load ptr, ptr %v5
+    ret ptr %v100
 }
 
 define i64 @prog__is_long(ptr %p0) {
@@ -2346,7 +2355,7 @@ entry:
     %v8.fp = ptrtoint ptr @prog__is_long to i64
     call void @orion_list_set(ptr %v8, i64 0, i64 %v8.fp)
     call void @orion_list_set(ptr %v8, i64 1, i64 0)
-    %v9 = call ptr @iter__filter(ptr %v7, ptr %v8)
+    %v9 = call ptr @iter__keep(ptr %v7, ptr %v8)
     %v10 = add i64 0, 0
     %v11.i = call i64 @orion_list_at(ptr %v9, i64 %v10)
     %v11 = inttoptr i64 %v11.i to ptr
@@ -2355,7 +2364,7 @@ entry:
     %v13.fp = ptrtoint ptr @prog__is_long to i64
     call void @orion_list_set(ptr %v13, i64 0, i64 %v13.fp)
     call void @orion_list_set(ptr %v13, i64 1, i64 0)
-    %v14 = call ptr @iter__filter(ptr %v7, ptr %v13)
+    %v14 = call ptr @iter__keep(ptr %v7, ptr %v13)
     %v15 = add i64 0, 0
     %v16.i = call i64 @orion_list_at(ptr %v14, i64 %v15)
     %v16 = inttoptr i64 %v16.i to ptr

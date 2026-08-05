@@ -1,7 +1,7 @@
-# String interpolation now parses the full expression inside `{...}` —
+# String interpolation now parses the full expression inside `{...}` -
 # arithmetic and indexing, not just bare idents / calls / fields. Here
 # `{a + b}` must render "14" (2 chars), not fail as an unknown identifier.
-fn main() -> int:
+define main() -> int:
     a = 5
     b = 9
     xs = [3, 4]

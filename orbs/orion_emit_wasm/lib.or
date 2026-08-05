@@ -1,19 +1,19 @@
-# orion_emit_wasm — emit a WebAssembly module (.wasm binary).
+# orion_emit_wasm - emit a WebAssembly module (.wasm binary).
 #
 # Mirrors `orion_emit_pe` for the browser. Pure Orion produces a
 # bytes-on-disk .wasm whose exports a JS shell calls. No external
-# linker, no wasm-bindgen, no wasm-pack — Orion writes the bytes
+# linker, no wasm-bindgen, no wasm-pack - Orion writes the bytes
 # itself, JS imports them with `WebAssembly.instantiateStreaming`.
 #
 # Spec: https://webassembly.github.io/spec/core/binary/index.html
 #
 # Layout:
 #   "\0asm" + version 1 (8 bytes magic)
-#   Type   section  (id=1)  — function signatures
-#   Func   section  (id=3)  — fn indices into Types
-#   Memory section  (id=5)  — linear memory (1 page = 64 KiB)
-#   Export section  (id=7)  — what JS can call
-#   Code   section  (id=10) — fn bodies as bytecode
+#   Type   section  (id=1)  - function signatures
+#   Func   section  (id=3)  - fn indices into Types
+#   Memory section  (id=5)  - linear memory (1 page = 64 KiB)
+#   Export section  (id=7)  - what JS can call
+#   Code   section  (id=10) - fn bodies as bytecode
 #
 # Today's coverage: int → int functions with arithmetic,
 # locals, calls, return. Strings + memory ops + import tables land
@@ -23,29 +23,29 @@ use bytes
 
 # --- LEB128 encoders ---
 
-# Unsigned LEB128 — the variable-length integer wasm uses for sizes
+# Unsigned LEB128 - the variable-length integer wasm uses for sizes
 # and indices. Encodes one 7-bit chunk per byte, MSB = continuation.
-pub fn leb_u(value: int) -> [int]:
-    mut remaining = value
-    mut output = []
-    mut keep = true
+public define leb_u(value: int) -> [int]:
+    edit remaining = value
+    edit output = []
+    edit keep = true
     loop:
         if not keep:
             break
-        byte_chunk = remaining - (remaining / 128) * 128
-        remaining = remaining / 128
+        byte_chunk = remaining - (remaining // 128) * 128
+        remaining = remaining // 128
         if remaining == 0:
-            output = push(output, byte_chunk)
+            output = append(output, byte_chunk)
             keep = false
         else:
-            output = push(output, byte_chunk + 128)
+            output = append(output, byte_chunk + 128)
     output
 
-# Signed LEB128 — i32.const operand and friends.
-pub fn leb_s(value: int) -> [int]:
-    mut remaining = value
-    mut output = []
-    mut keep = true
+# Signed LEB128 - i32.const operand and friends.
+public define leb_s(value: int) -> [int]:
+    edit remaining = value
+    edit output = []
+    edit keep = true
     loop:
         if not keep:
             break
@@ -65,10 +65,10 @@ pub fn leb_s(value: int) -> [int]:
         done_positive = remaining == 0 and not sign_bit_set
         done_negative = remaining == -1 and sign_bit_set
         if done_positive or done_negative:
-            output = push(output, byte_chunk)
+            output = append(output, byte_chunk)
             keep = false
         else:
-            output = push(output, byte_chunk + 128)
+            output = append(output, byte_chunk + 128)
     output
 
 # --- low-level byte helpers ---
@@ -76,223 +76,224 @@ pub fn leb_s(value: int) -> [int]:
 # Concatenate a list of byte lists into one. The WASM encoder needs
 # this because sections are built piecewise then prefixed with their
 # total byte length.
-pub fn concat_all(parts: [int]) -> [int]:
-    mut output = []
+public define concat_all(parts: [int]) -> [int]:
+    edit output = []
     loop part_byte in parts:
-        output = push(output, part_byte)
+        output = append(output, part_byte)
     output
 
-# Encode a UTF-8 string with a LEB128 length prefix — the WASM "name"
+# Encode a UTF-8 string with a LEB128 length prefix - the WASM "name"
 # vector format for imports/exports.
-pub fn encode_name(name: Text) -> [int]:
+public define encode_name(name: text) -> [int]:
     name_bytes = bytes_from_text(name)
     name_length = bytes_length(name_bytes)
     length_prefix = leb_u(name_length)
-    mut output = []
+    edit output = []
     loop byte_value in length_prefix:
-        output = push(output, byte_value)
+        output = append(output, byte_value)
     loop byte_value in name_bytes:
-        output = push(output, byte_value)
+        output = append(output, byte_value)
     output
 
 # A section is: id (1 byte) + size (LEB128) + contents. The encoder
 # pre-builds the contents to know the size.
-pub fn wrap_section(section_id: int, contents: [int]) -> [int]:
+public define wrap_section(section_id: int, contents: [int]) -> [int]:
     content_length = list_length(contents)
     size_bytes = leb_u(content_length)
-    mut output = push([], section_id)
+    edit output = append([], section_id)
     loop size_byte in size_bytes:
-        output = push(output, size_byte)
+        output = append(output, size_byte)
     loop content_byte in contents:
-        output = push(output, content_byte)
+        output = append(output, content_byte)
     output
 
-fn list_length(items: [int]) -> int:
-    mut count = 0
+define list_length(items: [int]) -> int:
+    edit count = 0
     loop _item in items:
         count = count + 1
     count
 
 # --- WASM opcodes (subset we emit today) ---
 
-pub fn op_end() -> int: 11          # 0x0B end
-pub fn op_return() -> int: 15       # 0x0F return
-pub fn op_drop() -> int: 26         # 0x1A drop (discard the top stack value)
-pub fn op_unreachable() -> int: 0   # 0x00 unreachable (trap)
-pub fn op_call() -> int: 16         # 0x10 call funcidx
-pub fn op_call_indirect() -> int: 17 # 0x11 call_indirect (typeidx, tableidx)
-pub fn op_local_get() -> int: 32    # 0x20 local.get
-pub fn op_local_set() -> int: 33    # 0x21 local.set
-pub fn op_local_tee() -> int: 34    # 0x22 local.tee (set + leave on stack)
-pub fn op_i32_const() -> int: 65    # 0x41 i32.const
-pub fn op_i32_eqz() -> int: 69      # 0x45 i32.eqz
-pub fn op_i32_eq() -> int: 70       # 0x46 i32.eq
-pub fn op_i32_ne() -> int: 71       # 0x47 i32.ne
-pub fn op_i32_lt_s() -> int: 72     # 0x48 i32.lt_s
-pub fn op_i32_gt_s() -> int: 74     # 0x4A i32.gt_s
-pub fn op_i32_le_s() -> int: 76     # 0x4C i32.le_s
-pub fn op_i32_ge_s() -> int: 78     # 0x4E i32.ge_s
-pub fn op_i32_ge_u() -> int: 79     # 0x4F i32.ge_u (unsigned: catches idx<0 too)
-pub fn op_i32_add() -> int: 106     # 0x6A i32.add
-pub fn op_i32_sub() -> int: 107     # 0x6B i32.sub
-pub fn op_i32_mul() -> int: 108     # 0x6C i32.mul
-pub fn op_i32_div_s() -> int: 109   # 0x6D i32.div_s
-pub fn op_i32_rem_s() -> int: 111    # 0x6F i32.rem_s
-pub fn op_i32_and() -> int: 113      # 0x71 i32.and
-pub fn op_i32_or() -> int: 114       # 0x72 i32.or
-pub fn op_i32_xor() -> int: 115      # 0x73 i32.xor
-pub fn op_i32_shl() -> int: 116      # 0x74 i32.shl
-pub fn op_i32_shr_s() -> int: 117    # 0x75 i32.shr_s
-pub fn op_i32_shr_u() -> int: 118    # 0x76 i32.shr_u
+public define op_end() -> int: 11          # 0x0B end
+public define op_return() -> int: 15       # 0x0F return
+public define op_drop() -> int: 26         # 0x1A drop (discard the top stack value)
+public define op_unreachable() -> int: 0   # 0x00 unreachable (trap)
+public define op_call() -> int: 16         # 0x10 call funcidx
+public define op_call_indirect() -> int: 17 # 0x11 call_indirect (typeidx, tableidx)
+public define op_local_get() -> int: 32    # 0x20 local.get
+public define op_local_set() -> int: 33    # 0x21 local.set
+public define op_local_tee() -> int: 34    # 0x22 local.tee (set + leave on stack)
+public define op_i32_const() -> int: 65    # 0x41 i32.const
+public define op_i32_eqz() -> int: 69      # 0x45 i32.eqz
+public define op_i32_eq() -> int: 70       # 0x46 i32.eq
+public define op_i32_ne() -> int: 71       # 0x47 i32.ne
+public define op_i32_lt_s() -> int: 72     # 0x48 i32.lt_s
+public define op_i32_gt_s() -> int: 74     # 0x4A i32.gt_s
+public define op_i32_le_s() -> int: 76     # 0x4C i32.le_s
+public define op_i32_ge_s() -> int: 78     # 0x4E i32.ge_s
+public define op_i32_ge_u() -> int: 79     # 0x4F i32.ge_u (unsigned: catches idx<0 too)
+public define op_i32_add() -> int: 106     # 0x6A i32.add
+public define op_i32_sub() -> int: 107     # 0x6B i32.sub
+public define op_i32_mul() -> int: 108     # 0x6C i32.mul
+public define op_i32_div_s() -> int: 109   # 0x6D i32.div_s
+public define op_i32_rem_s() -> int: 111    # 0x6F i32.rem_s
+public define op_i32_and() -> int: 113      # 0x71 i32.and
+public define op_i32_or() -> int: 114       # 0x72 i32.or
+public define op_i32_xor() -> int: 115      # 0x73 i32.xor
+public define op_i32_shl() -> int: 116      # 0x74 i32.shl
+public define op_i32_shr_s() -> int: 117    # 0x75 i32.shr_s
+public define op_i32_shr_u() -> int: 118    # 0x76 i32.shr_u
 # Unsigned i32 ops + narrow sign-extension, for u8/u16/u32 and i8/i16.
-pub fn op_i32_div_u() -> int: 110    # 0x6E i32.div_u
-pub fn op_i32_rem_u() -> int: 112    # 0x70 i32.rem_u
-pub fn op_i32_lt_u() -> int: 73      # 0x49 i32.lt_u
-pub fn op_i32_gt_u() -> int: 75      # 0x4B i32.gt_u
-pub fn op_i32_le_u() -> int: 77      # 0x4D i32.le_u
-pub fn op_i32_extend8_s() -> int: 192   # 0xC0 i32.extend8_s
-pub fn op_i32_extend16_s() -> int: 193  # 0xC1 i32.extend16_s
+public define op_i32_div_u() -> int: 110    # 0x6E i32.div_u
+public define op_i32_rem_u() -> int: 112    # 0x70 i32.rem_u
+public define op_i32_lt_u() -> int: 73      # 0x49 i32.lt_u
+public define op_i32_gt_u() -> int: 75      # 0x4B i32.gt_u
+public define op_i32_le_u() -> int: 77      # 0x4D i32.le_u
+public define op_i32_extend8_s() -> int: 192   # 0xC0 i32.extend8_s
+public define op_i32_extend16_s() -> int: 193  # 0xC1 i32.extend16_s
 
 # Control flow.
-pub fn op_block() -> int: 2         # 0x02 block (then blocktype)
-pub fn op_loop() -> int: 3          # 0x03 loop
-pub fn op_if() -> int: 4            # 0x04 if (then blocktype)
-pub fn op_else() -> int: 5          # 0x05 else
-pub fn op_br() -> int: 12           # 0x0C br
-pub fn op_br_if() -> int: 13        # 0x0D br_if (branch when top of stack != 0)
+public define op_block() -> int: 2         # 0x02 block (then blocktype)
+public define op_loop() -> int: 3          # 0x03 loop
+public define op_if() -> int: 4            # 0x04 if (then blocktype)
+public define op_else() -> int: 5          # 0x05 else
+public define op_br() -> int: 12           # 0x0C br
+public define op_br_if() -> int: 13        # 0x0D br_if (branch when top of stack != 0)
 
-# Blocktype sentinel — "no result". Used after `if`/`block`/`loop`
+# Blocktype sentinel - "no result". Used after `if`/`block`/`loop`
 # when the body doesn't push anything to the stack.
-pub fn blocktype_void() -> int: 64  # 0x40
+public define blocktype_void() -> int: 64  # 0x40
 
-# Linear memory ops — the byte-level loads/stores wasm uses to read
+# Linear memory ops - the byte-level loads/stores wasm uses to read
 # and write the module's heap. Used to pass strings (and any other
 # composite data) between the wasm code and the JS host.
-pub fn op_i32_load() -> int: 40     # 0x28 i32.load
-pub fn op_i32_load8_u() -> int: 45  # 0x2D i32.load8_u
-pub fn op_i32_store() -> int: 54    # 0x36 i32.store
-pub fn op_i32_store8() -> int: 58   # 0x3A i32.store8
+public define op_i32_load() -> int: 40     # 0x28 i32.load
+public define op_i32_load8_u() -> int: 45  # 0x2D i32.load8_u
+public define op_i32_store() -> int: 54    # 0x36 i32.store
+public define op_i32_store8() -> int: 58   # 0x3A i32.store8
 
 # f64 ops. Values are real wasm f64 (not boxed): f64 locals/params/results,
 # and conversions to/from i32. A decimal literal compiles to num/denom via
 # convert (see compile_expr), so no IEEE754 constant encoding is needed.
-pub fn op_f64_load() -> int: 43     # 0x2B f64.load
-pub fn op_f64_store() -> int: 57    # 0x39 f64.store
-pub fn op_f64_eq() -> int: 97       # 0x61 f64.eq
-pub fn op_f64_ne() -> int: 98       # 0x62 f64.ne
-pub fn op_f64_lt() -> int: 99       # 0x63 f64.lt
-pub fn op_f64_gt() -> int: 100      # 0x64 f64.gt
-pub fn op_f64_le() -> int: 101      # 0x65 f64.le
-pub fn op_f64_ge() -> int: 102      # 0x66 f64.ge
-pub fn op_f64_add() -> int: 160     # 0xA0 f64.add
-pub fn op_f64_sub() -> int: 161     # 0xA1 f64.sub
-pub fn op_f64_mul() -> int: 162     # 0xA2 f64.mul
-pub fn op_f64_div() -> int: 163     # 0xA3 f64.div
-pub fn op_i32_trunc_f64_s() -> int: 170   # 0xAA i32.trunc_f64_s
-pub fn op_f64_convert_i32_s() -> int: 183 # 0xB7 f64.convert_i32_s
+public define op_f64_load() -> int: 43     # 0x2B f64.load
+public define op_f64_store() -> int: 57    # 0x39 f64.store
+public define op_f64_eq() -> int: 97       # 0x61 f64.eq
+public define op_f64_ne() -> int: 98       # 0x62 f64.ne
+public define op_f64_lt() -> int: 99       # 0x63 f64.lt
+public define op_f64_gt() -> int: 100      # 0x64 f64.gt
+public define op_f64_le() -> int: 101      # 0x65 f64.le
+public define op_f64_ge() -> int: 102      # 0x66 f64.ge
+public define op_f64_add() -> int: 160     # 0xA0 f64.add
+public define op_f64_sub() -> int: 161     # 0xA1 f64.sub
+public define op_f64_mul() -> int: 162     # 0xA2 f64.mul
+public define op_f64_div() -> int: 163     # 0xA3 f64.div
+public define op_f64_floor() -> int: 156    # 0x9C f64.floor
+public define op_i32_trunc_f64_s() -> int: 170   # 0xAA i32.trunc_f64_s
+public define op_f64_convert_i32_s() -> int: 183 # 0xB7 f64.convert_i32_s
 
 # f32 ops (a distinct 32-bit float type). A literal is built as f64 (num/denom)
 # then demoted, so no f32.const encoding is needed.
-pub fn op_f32_load() -> int: 42     # 0x2A f32.load
-pub fn op_f32_store() -> int: 56    # 0x38 f32.store
-pub fn op_f32_eq() -> int: 91       # 0x5B
-pub fn op_f32_ne() -> int: 92       # 0x5C
-pub fn op_f32_lt() -> int: 93       # 0x5D
-pub fn op_f32_gt() -> int: 94       # 0x5E
-pub fn op_f32_le() -> int: 95       # 0x5F
-pub fn op_f32_ge() -> int: 96       # 0x60
-pub fn op_f32_add() -> int: 146     # 0x92
-pub fn op_f32_sub() -> int: 147     # 0x93
-pub fn op_f32_mul() -> int: 148     # 0x94
-pub fn op_f32_div() -> int: 149     # 0x95
-pub fn op_i32_trunc_f32_s() -> int: 168   # 0xA8 i32.trunc_f32_s
-pub fn op_f32_convert_i32_s() -> int: 178 # 0xB2 f32.convert_i32_s
-pub fn op_f32_demote_f64() -> int: 182    # 0xB6 f32.demote_f64
-pub fn op_f64_promote_f32() -> int: 187   # 0xBB f64.promote_f32
+public define op_f32_load() -> int: 42     # 0x2A f32.load
+public define op_f32_store() -> int: 56    # 0x38 f32.store
+public define op_f32_eq() -> int: 91       # 0x5B
+public define op_f32_ne() -> int: 92       # 0x5C
+public define op_f32_lt() -> int: 93       # 0x5D
+public define op_f32_gt() -> int: 94       # 0x5E
+public define op_f32_le() -> int: 95       # 0x5F
+public define op_f32_ge() -> int: 96       # 0x60
+public define op_f32_add() -> int: 146     # 0x92
+public define op_f32_sub() -> int: 147     # 0x93
+public define op_f32_mul() -> int: 148     # 0x94
+public define op_f32_div() -> int: 149     # 0x95
+public define op_i32_trunc_f32_s() -> int: 168   # 0xA8 i32.trunc_f32_s
+public define op_f32_convert_i32_s() -> int: 178 # 0xB2 f32.convert_i32_s
+public define op_f32_demote_f64() -> int: 182    # 0xB6 f32.demote_f64
+public define op_f64_promote_f32() -> int: 187   # 0xBB f64.promote_f32
 
-pub fn emit_f32_load(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_f32_load())
-    grown = push(grown, 2)
+public define emit_f32_load(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_f32_load())
+    grown = append(grown, 2)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-pub fn emit_f32_store(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_f32_store())
-    grown = push(grown, 2)
+public define emit_f32_store(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_f32_store())
+    grown = append(grown, 2)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-# i64 ops — for the 64-bit `int` and the i64 sized type. Pointers stay i32
+# i64 ops - for the 64-bit `int` and the i64 sized type. Pointers stay i32
 # (wasm32 addresses); a value typed i64/u64 uses these, with wrap/extend at the
 # i32<->i64 boundaries.
-pub fn op_i64_const() -> int: 66    # 0x42 i64.const
-pub fn op_i64_load() -> int: 41     # 0x29 i64.load
-pub fn op_i64_store() -> int: 55    # 0x37 i64.store
-pub fn op_i64_eqz() -> int: 80      # 0x50 i64.eqz
-pub fn op_i64_eq() -> int: 81       # 0x51 i64.eq
-pub fn op_i64_ne() -> int: 82       # 0x52 i64.ne
-pub fn op_i64_lt_s() -> int: 83     # 0x53 i64.lt_s
-pub fn op_i64_lt_u() -> int: 84     # 0x54 i64.lt_u
-pub fn op_i64_gt_s() -> int: 85     # 0x55 i64.gt_s
-pub fn op_i64_gt_u() -> int: 86     # 0x56 i64.gt_u
-pub fn op_i64_le_s() -> int: 87     # 0x57 i64.le_s
-pub fn op_i64_ge_s() -> int: 89     # 0x59 i64.ge_s
-pub fn op_i64_ge_u() -> int: 90     # 0x5A i64.ge_u
-pub fn op_i64_add() -> int: 124     # 0x7C i64.add
-pub fn op_i64_sub() -> int: 125     # 0x7D i64.sub
-pub fn op_i64_mul() -> int: 126     # 0x7E i64.mul
-pub fn op_i64_div_s() -> int: 127   # 0x7F i64.div_s
-pub fn op_i64_div_u() -> int: 128   # 0x80 i64.div_u
-pub fn op_i64_rem_s() -> int: 129   # 0x81 i64.rem_s
-pub fn op_i64_and() -> int: 131     # 0x83 i64.and
-pub fn op_i64_or() -> int: 132      # 0x84 i64.or
-pub fn op_i64_xor() -> int: 133     # 0x85 i64.xor
-pub fn op_i64_shl() -> int: 134     # 0x86 i64.shl
-pub fn op_i64_shr_s() -> int: 135   # 0x87 i64.shr_s
-pub fn op_i64_shr_u() -> int: 136   # 0x88 i64.shr_u
-pub fn op_i32_wrap_i64() -> int: 167       # 0xA7 i32.wrap_i64 (i64 -> i32)
-pub fn op_i64_extend_i32_s() -> int: 172   # 0xAC i64.extend_i32_s
-pub fn op_i64_extend_i32_u() -> int: 173   # 0xAD i64.extend_i32_u
-pub fn op_i64_trunc_f64_s() -> int: 176    # 0xB0 i64.trunc_f64_s
-pub fn op_f64_convert_i64_s() -> int: 185  # 0xB9 f64.convert_i64_s
+public define op_i64_const() -> int: 66    # 0x42 i64.const
+public define op_i64_load() -> int: 41     # 0x29 i64.load
+public define op_i64_store() -> int: 55    # 0x37 i64.store
+public define op_i64_eqz() -> int: 80      # 0x50 i64.eqz
+public define op_i64_eq() -> int: 81       # 0x51 i64.eq
+public define op_i64_ne() -> int: 82       # 0x52 i64.ne
+public define op_i64_lt_s() -> int: 83     # 0x53 i64.lt_s
+public define op_i64_lt_u() -> int: 84     # 0x54 i64.lt_u
+public define op_i64_gt_s() -> int: 85     # 0x55 i64.gt_s
+public define op_i64_gt_u() -> int: 86     # 0x56 i64.gt_u
+public define op_i64_le_s() -> int: 87     # 0x57 i64.le_s
+public define op_i64_ge_s() -> int: 89     # 0x59 i64.ge_s
+public define op_i64_ge_u() -> int: 90     # 0x5A i64.ge_u
+public define op_i64_add() -> int: 124     # 0x7C i64.add
+public define op_i64_sub() -> int: 125     # 0x7D i64.sub
+public define op_i64_mul() -> int: 126     # 0x7E i64.mul
+public define op_i64_div_s() -> int: 127   # 0x7F i64.div_s
+public define op_i64_div_u() -> int: 128   # 0x80 i64.div_u
+public define op_i64_rem_s() -> int: 129   # 0x81 i64.rem_s
+public define op_i64_and() -> int: 131     # 0x83 i64.and
+public define op_i64_or() -> int: 132      # 0x84 i64.or
+public define op_i64_xor() -> int: 133     # 0x85 i64.xor
+public define op_i64_shl() -> int: 134     # 0x86 i64.shl
+public define op_i64_shr_s() -> int: 135   # 0x87 i64.shr_s
+public define op_i64_shr_u() -> int: 136   # 0x88 i64.shr_u
+public define op_i32_wrap_i64() -> int: 167       # 0xA7 i32.wrap_i64 (i64 -> i32)
+public define op_i64_extend_i32_s() -> int: 172   # 0xAC i64.extend_i32_s
+public define op_i64_extend_i32_u() -> int: 173   # 0xAD i64.extend_i32_u
+public define op_i64_trunc_f64_s() -> int: 176    # 0xB0 i64.trunc_f64_s
+public define op_f64_convert_i64_s() -> int: 185  # 0xB9 f64.convert_i64_s
 
 # i64 const/load/store emit helpers (memarg alignment 3 for the 8-byte access).
-pub fn emit_i64_const(fn_value: WFn, value: int) -> WFn:
+public define emit_i64_const(fn_value: WFn, value: int) -> WFn:
     immediate = leb_s(value)
-    mut grown = push(fn_value.body, op_i64_const())
+    edit grown = append(fn_value.body, op_i64_const())
     loop byte_value in immediate:
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-pub fn emit_i64_load(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_i64_load())
-    grown = push(grown, 3)
+public define emit_i64_load(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_i64_load())
+    grown = append(grown, 3)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-pub fn emit_i64_store(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_i64_store())
-    grown = push(grown, 3)
+public define emit_i64_store(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_i64_store())
+    grown = append(grown, 3)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # Type markers in function signatures / local decls.
-pub fn ty_i32() -> int: 127         # 0x7F
-pub fn ty_i64() -> int: 126         # 0x7E
-pub fn ty_f32() -> int: 125         # 0x7D
-pub fn ty_f64() -> int: 124         # 0x7C
+public define ty_i32() -> int: 127         # 0x7F
+public define ty_i64() -> int: 126         # 0x7E
+public define ty_f32() -> int: 125         # 0x7D
+public define ty_f64() -> int: 124         # 0x7C
 
 # --- module assembly ---
 
 # Build a minimal WASM module that exports one function `main`
 # returning a constant i32. Useful for sanity-testing the encoder
 # end-to-end without an AST in the loop.
-pub fn build_const_module(return_value: int) -> [int]:
-    # Type section: one type — () -> i32
+public define build_const_module(return_value: int) -> [int]:
+    # Type section: one type - () -> i32
     type_section = build_type_section()
     # Function section: one function, type index 0
     func_section = wrap_section(3, [1, 0])
@@ -303,65 +304,65 @@ pub fn build_const_module(return_value: int) -> [int]:
     # Code section: one function body
     code_section = build_code_section_const(return_value)
 
-    mut output = []
+    edit output = []
     # Magic: 0x00 'a' 's' 'm' + version 1
-    output = push(output, 0)
-    output = push(output, 97)
-    output = push(output, 115)
-    output = push(output, 109)
-    output = push(output, 1)
-    output = push(output, 0)
-    output = push(output, 0)
-    output = push(output, 0)
+    output = append(output, 0)
+    output = append(output, 97)
+    output = append(output, 115)
+    output = append(output, 109)
+    output = append(output, 1)
+    output = append(output, 0)
+    output = append(output, 0)
+    output = append(output, 0)
 
     loop section_byte in type_section:
-        output = push(output, section_byte)
+        output = append(output, section_byte)
     loop section_byte in func_section:
-        output = push(output, section_byte)
+        output = append(output, section_byte)
     loop section_byte in memory_section:
-        output = push(output, section_byte)
+        output = append(output, section_byte)
     loop section_byte in export_section:
-        output = push(output, section_byte)
+        output = append(output, section_byte)
     loop section_byte in code_section:
-        output = push(output, section_byte)
+        output = append(output, section_byte)
     output
 
-fn build_type_section() -> [int]:
+define build_type_section() -> [int]:
     # 1 type, form 0x60, 0 params, 1 result (i32)
     contents = [1, 96, 0, 1, ty_i32()]
     wrap_section(1, contents)
 
-fn build_export_section(name: Text) -> [int]:
+define build_export_section(name: text) -> [int]:
     name_bytes = encode_name(name)
     # 1 export, then the name vec, then kind=0 (func) + index=0
-    mut contents = [1]
+    edit contents = [1]
     loop byte_value in name_bytes:
-        contents = push(contents, byte_value)
-    contents = push(contents, 0)
-    contents = push(contents, 0)
+        contents = append(contents, byte_value)
+    contents = append(contents, 0)
+    contents = append(contents, 0)
     wrap_section(7, contents)
 
-fn build_code_section_const(return_value: int) -> [int]:
+define build_code_section_const(return_value: int) -> [int]:
     # 1 code entry. Function body = local count (0), then
     # i32.const + leb_s(value), then end.
     const_bytes = leb_s(return_value)
-    mut fn_body = [0]
-    fn_body = push(fn_body, op_i32_const())
+    edit fn_body = [0]
+    fn_body = append(fn_body, op_i32_const())
     loop byte_value in const_bytes:
-        fn_body = push(fn_body, byte_value)
-    fn_body = push(fn_body, op_end())
+        fn_body = append(fn_body, byte_value)
+    fn_body = append(fn_body, op_end())
 
     body_size = list_length(fn_body)
     size_prefix = leb_u(body_size)
-    mut wrapped = [1]
+    edit wrapped = [1]
     loop size_byte in size_prefix:
-        wrapped = push(wrapped, size_byte)
+        wrapped = append(wrapped, size_byte)
     loop body_byte in fn_body:
-        wrapped = push(wrapped, body_byte)
+        wrapped = append(wrapped, body_byte)
     wrap_section(10, wrapped)
 
 # ============================================================
-#  Higher-level builder API — assemble a module from data types
+#  Higher-level builder API - assemble a module from data types
 # ============================================================
 #
 # Instead of poking bytes by hand the user describes the module as
@@ -370,177 +371,177 @@ fn build_code_section_const(return_value: int) -> [int]:
 # description, lays out each section, and returns the full .wasm.
 
 # One function within a module.
-pub type WFn: name: Text, param_count: int, body: [int], local_count: int
+public type WFn: name: text, param_count: int, body: [int], local_count: int
 
 # One import from the JS host: `module.name`, taking N i32 args,
 # returning either i32 or nothing. The result_count flag is 0 for
-# void, 1 for i32 — same shape as fn types.
-pub type WImport: module_name: Text, fn_name: Text, param_count: int, result_count: int
+# void, 1 for i32 - same shape as fn types.
+public type WImport: module_name: text, fn_name: text, param_count: int, result_count: int
 
 # One static byte block placed in linear memory at startup. The data
-# section seeds the wasm heap with literal bytes — strings, tables,
-# baked vertex data — without the runtime having to compute them.
-pub type WDataSegment: offset: int, bytes: [int]
+# section seeds the wasm heap with literal bytes - strings, tables,
+# baked vertex data - without the runtime having to compute them.
+public type WDataSegment: offset: int, bytes: [int]
 
-# Whole module — imports + locally-defined functions + data segments.
+# Whole module - imports + locally-defined functions + data segments.
 # Imports get function indices 0..N before locally-defined fns start;
 # data segments populate linear memory at instantiate time.
-pub type WModule: imports: [WImport], functions: [WFn], data_segments: [WDataSegment]
+public type WModule: imports: [WImport], functions: [WFn], data_segments: [WDataSegment]
 
-pub fn new_module() -> WModule:
+public define new_module() -> WModule:
     WModule{imports: [], functions: [], data_segments: []}
 
 # Register a host import. JS will satisfy it via
 # `{ env: { canvas_fill_rect: (x,y,w,h,c) => ... } }` at instantiate
 # time.
-pub fn add_import(module: WModule, import_value: WImport) -> WModule:
-    WModule{imports: push(module.imports, import_value), functions: module.functions, data_segments: module.data_segments}
+public define add_import(module: WModule, import_value: WImport) -> WModule:
+    WModule{imports: append(module.imports, import_value), functions: module.functions, data_segments: module.data_segments}
 
-pub fn new_import(module_name: Text, fn_name: Text, param_count: int, result_count: int) -> WImport:
+public define new_import(module_name: text, fn_name: text, param_count: int, result_count: int) -> WImport:
     WImport{module_name: module_name, fn_name: fn_name, param_count: param_count, result_count: result_count}
 
-pub fn add_fn(module: WModule, fn_value: WFn) -> WModule:
-    WModule{imports: module.imports, functions: push(module.functions, fn_value), data_segments: module.data_segments}
+public define add_fn(module: WModule, fn_value: WFn) -> WModule:
+    WModule{imports: module.imports, functions: append(module.functions, fn_value), data_segments: module.data_segments}
 
 # Bake a string (or any byte sequence) into linear memory. Returns
-# the new module + the offset the bytes were placed at — callers can
+# the new module + the offset the bytes were placed at - callers can
 # use that offset as the pointer in `i32.load8_u` or hand it to a
 # host import expecting (ptr, len).
-pub fn add_data(module: WModule, offset: int, bytes_data: [int]) -> WModule:
+public define add_data(module: WModule, offset: int, bytes_data: [int]) -> WModule:
     new_seg = WDataSegment{offset: offset, bytes: bytes_data}
-    WModule{imports: module.imports, functions: module.functions, data_segments: push(module.data_segments, new_seg)}
+    WModule{imports: module.imports, functions: module.functions, data_segments: append(module.data_segments, new_seg)}
 
-pub fn add_string(module: WModule, offset: int, text: Text) -> WModule:
+public define add_string(module: WModule, offset: int, text: text) -> WModule:
     add_data(module, offset, bytes_from_text(text))
 
-pub fn new_fn(name: Text, param_count: int) -> WFn:
+public define new_fn(name: text, param_count: int) -> WFn:
     WFn{name: name, param_count: param_count, body: [], local_count: 0}
 
 # Register one more local (beyond params); emitted as an i32 in the code
 # section local declarations.
-pub fn add_local(fn_value: WFn) -> WFn:
+public define add_local(fn_value: WFn) -> WFn:
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: fn_value.body, local_count: fn_value.local_count + 1}
 
 # Emit one opcode-with-no-immediate into the function body. Returns a
 # fresh WFn so the builder stays pure (no mutation).
-pub fn emit_op(fn_value: WFn, opcode: int) -> WFn:
-    WFn{name: fn_value.name, param_count: fn_value.param_count, body: push(fn_value.body, opcode), local_count: fn_value.local_count}
+public define emit_op(fn_value: WFn, opcode: int) -> WFn:
+    WFn{name: fn_value.name, param_count: fn_value.param_count, body: append(fn_value.body, opcode), local_count: fn_value.local_count}
 
 # Append several bytes (used for opcode + immediate combos).
-pub fn emit_bytes(fn_value: WFn, more: [int]) -> WFn:
-    mut grown = fn_value.body
+public define emit_bytes(fn_value: WFn, more: [int]) -> WFn:
+    edit grown = fn_value.body
     loop byte_value in more:
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # Push an i32 constant.
-pub fn emit_const(fn_value: WFn, value: int) -> WFn:
+public define emit_const(fn_value: WFn, value: int) -> WFn:
     immediate = leb_s(value)
-    mut grown = push(fn_value.body, op_i32_const())
+    edit grown = append(fn_value.body, op_i32_const())
     loop byte_value in immediate:
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # local.get / local.set with LEB128 index.
-pub fn emit_local_get(fn_value: WFn, index: int) -> WFn:
+public define emit_local_get(fn_value: WFn, index: int) -> WFn:
     idx_bytes = leb_u(index)
-    mut grown = push(fn_value.body, op_local_get())
+    edit grown = append(fn_value.body, op_local_get())
     loop byte_value in idx_bytes:
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-pub fn emit_local_set(fn_value: WFn, index: int) -> WFn:
+public define emit_local_set(fn_value: WFn, index: int) -> WFn:
     idx_bytes = leb_u(index)
-    mut grown = push(fn_value.body, op_local_set())
+    edit grown = append(fn_value.body, op_local_set())
     loop byte_value in idx_bytes:
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-# local.tee — like set but leaves the value on the stack (so an
+# local.tee - like set but leaves the value on the stack (so an
 # allocation pointer can be stashed and reused in one instruction).
-pub fn emit_local_tee(fn_value: WFn, index: int) -> WFn:
+public define emit_local_tee(fn_value: WFn, index: int) -> WFn:
     idx_bytes = leb_u(index)
-    mut grown = push(fn_value.body, op_local_tee())
+    edit grown = append(fn_value.body, op_local_tee())
     loop byte_value in idx_bytes:
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # i32.load / i32.store with a memarg (alignment exponent + byte offset).
 # Alignment 2 is natural for a 4-byte i32; baking the offset in lets a
 # field access (ptr + 4 + i*4) fold the constant `+ 4` into the load.
-pub fn emit_load(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_i32_load())
-    grown = push(grown, 2)
+public define emit_load(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_i32_load())
+    grown = append(grown, 2)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-pub fn emit_store(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_i32_store())
-    grown = push(grown, 2)
+public define emit_store(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_i32_store())
+    grown = append(grown, 2)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-# i32.load8_u / i32.store8 — single byte, for text (UTF-8 byte payloads).
-pub fn emit_load8u(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_i32_load8_u())
-    grown = push(grown, 0)
+# i32.load8_u / i32.store8 - single byte, for text (UTF-8 byte payloads).
+public define emit_load8u(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_i32_load8_u())
+    grown = append(grown, 0)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-pub fn emit_store8(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_i32_store8())
-    grown = push(grown, 0)
+public define emit_store8(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_i32_store8())
+    grown = append(grown, 0)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # f64.load / f64.store (8-byte). Alignment hint 3; wasm still permits the
 # access when a field lands unaligned (e.g. an f64 after an i32).
-pub fn emit_f64_load(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_f64_load())
-    grown = push(grown, 3)
+public define emit_f64_load(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_f64_load())
+    grown = append(grown, 3)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
-pub fn emit_f64_store(fn_value: WFn, offset: int) -> WFn:
-    mut grown = push(fn_value.body, op_f64_store())
-    grown = push(grown, 3)
+public define emit_f64_store(fn_value: WFn, offset: int) -> WFn:
+    edit grown = append(fn_value.body, op_f64_store())
+    grown = append(grown, 3)
     loop byte_value in leb_u(offset):
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # Direct call to another function by index. The caller already
 # arranged the arguments on the stack.
-pub fn emit_call(fn_value: WFn, function_index: int) -> WFn:
+public define emit_call(fn_value: WFn, function_index: int) -> WFn:
     idx_bytes = leb_u(function_index)
-    mut grown = push(fn_value.body, op_call())
+    edit grown = append(fn_value.body, op_call())
     loop byte_value in idx_bytes:
-        grown = push(grown, byte_value)
+        grown = append(grown, byte_value)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # Indirect call through table 0: the callee's table index is on top of the
 # stack, below it the arguments. type_index names the signature to check.
-pub fn emit_call_indirect(fn_value: WFn, type_index: int) -> WFn:
-    mut grown = push(fn_value.body, op_call_indirect())
+public define emit_call_indirect(fn_value: WFn, type_index: int) -> WFn:
+    edit grown = append(fn_value.body, op_call_indirect())
     loop byte_value in leb_u(type_index):
-        grown = push(grown, byte_value)
-    grown = push(grown, 0)
+        grown = append(grown, byte_value)
+    grown = append(grown, 0)
     WFn{name: fn_value.name, param_count: fn_value.param_count, body: grown, local_count: fn_value.local_count}
 
 # Close out a function body with the `end` opcode (required by the
 # WASM grammar at function/block end).
-pub fn emit_end(fn_value: WFn) -> WFn:
+public define emit_end(fn_value: WFn) -> WFn:
     emit_op(fn_value, op_end())
 
 # ============================================================
 #  Encode a WModule to bytes
 # ============================================================
 
-pub fn encode_module(module: WModule) -> [int]:
+public define encode_module(module: WModule) -> [int]:
     # Layout: types ← imports ← funcs ← memory ← exports ← code ← data.
     # Memory is exported as "memory" so JS can read strings the wasm
     # writes (or that we bake in via data segments).
@@ -556,82 +557,82 @@ pub fn encode_module(module: WModule) -> [int]:
 
     # Section order per the wasm spec: type, import, func, table, memory,
     # export, element, code, data.
-    mut output = [0, 97, 115, 109, 1, 0, 0, 0]
-    loop byte_value in type_section: output = push(output, byte_value)
-    loop byte_value in import_section: output = push(output, byte_value)
-    loop byte_value in func_section: output = push(output, byte_value)
-    loop byte_value in table_section: output = push(output, byte_value)
-    loop byte_value in memory_section: output = push(output, byte_value)
-    loop byte_value in export_section: output = push(output, byte_value)
-    loop byte_value in element_section: output = push(output, byte_value)
-    loop byte_value in code_section: output = push(output, byte_value)
-    loop byte_value in data_section: output = push(output, byte_value)
+    edit output = [0, 97, 115, 109, 1, 0, 0, 0]
+    loop byte_value in type_section: output = append(output, byte_value)
+    loop byte_value in import_section: output = append(output, byte_value)
+    loop byte_value in func_section: output = append(output, byte_value)
+    loop byte_value in table_section: output = append(output, byte_value)
+    loop byte_value in memory_section: output = append(output, byte_value)
+    loop byte_value in export_section: output = append(output, byte_value)
+    loop byte_value in element_section: output = append(output, byte_value)
+    loop byte_value in code_section: output = append(output, byte_value)
+    loop byte_value in data_section: output = append(output, byte_value)
     output
 
-# Data section (id 11) — initialises linear memory with literal bytes
+# Data section (id 11) - initialises linear memory with literal bytes
 # at instantiate time. Each segment: memidx (0, the only memory), an
 # i32.const offset expression, then the byte vector.
-fn encode_data_section(module: WModule) -> [int]:
+define encode_data_section(module: WModule) -> [int]:
     seg_count = data_count(module)
     if seg_count == 0:
         []
     else:
-        mut contents = []
+        edit contents = []
         count_bytes = leb_u(seg_count)
         loop byte_value in count_bytes:
-            contents = push(contents, byte_value)
+            contents = append(contents, byte_value)
         loop segment in module.data_segments:
             # Active segment for memidx 0
-            contents = push(contents, 0)
+            contents = append(contents, 0)
             # Offset expression: i32.const <offset>, end
             offset_bytes = leb_s(segment.offset)
-            contents = push(contents, op_i32_const())
+            contents = append(contents, op_i32_const())
             loop byte_value in offset_bytes:
-                contents = push(contents, byte_value)
-            contents = push(contents, op_end())
+                contents = append(contents, byte_value)
+            contents = append(contents, op_end())
             # The byte payload
             payload_size = list_length(segment.bytes)
             size_bytes = leb_u(payload_size)
             loop byte_value in size_bytes:
-                contents = push(contents, byte_value)
+                contents = append(contents, byte_value)
             loop byte_value in segment.bytes:
-                contents = push(contents, byte_value)
+                contents = append(contents, byte_value)
         wrap_section(11, contents)
 
-fn data_count(module: WModule) -> int:
-    mut count = 0
+define data_count(module: WModule) -> int:
+    edit count = 0
     loop _segment in module.data_segments:
         count = count + 1
     count
 
-# Import section — id 2. Each entry is module name + fn name + kind
+# Import section - id 2. Each entry is module name + fn name + kind
 # (0x00 = func) + type index. The type vector already includes the
 # import signatures alongside the local function ones.
-fn encode_import_section(module: WModule) -> [int]:
+define encode_import_section(module: WModule) -> [int]:
     import_count = import_list_length(module)
     if import_count == 0:
         []
     else:
-        mut contents = []
+        edit contents = []
         count_bytes = leb_u(import_count)
         loop byte_value in count_bytes:
-            contents = push(contents, byte_value)
+            contents = append(contents, byte_value)
         loop import_value in module.imports:
             mod_bytes = encode_name(import_value.module_name)
             loop byte_value in mod_bytes:
-                contents = push(contents, byte_value)
+                contents = append(contents, byte_value)
             name_bytes = encode_name(import_value.fn_name)
             loop byte_value in name_bytes:
-                contents = push(contents, byte_value)
-            contents = push(contents, 0)
+                contents = append(contents, byte_value)
+            contents = append(contents, 0)
             type_index = type_index_for_import(module, import_value)
             idx_bytes = leb_u(type_index)
             loop byte_value in idx_bytes:
-                contents = push(contents, byte_value)
+                contents = append(contents, byte_value)
         wrap_section(2, contents)
 
-fn import_list_length(module: WModule) -> int:
-    mut count = 0
+define import_list_length(module: WModule) -> int:
+    edit count = 0
     loop _value in module.imports:
         count = count + 1
     count
@@ -641,9 +642,9 @@ fn import_list_length(module: WModule) -> int:
 # is recorded by the codegen in slots wsig:<name> (params) and wret:<name>
 # (result); absent slots fall back to all-i32, so pure-i32 modules encode
 # byte-for-byte as before.
-fn irep(n: int) -> Text:
-    mut s = ""
-    mut k = 0
+define irep(n: int) -> text:
+    edit s = ""
+    edit k = 0
     loop:
         if k >= n:
             break
@@ -651,61 +652,61 @@ fn irep(n: int) -> Text:
         k = k + 1
     s
 
-fn sig_text_for_import(import_value: WImport) -> Text:
-    mut params = irep(import_value.param_count)
+define sig_text_for_import(import_value: WImport) -> text:
+    edit params = irep(import_value.param_count)
     if slot_has("wsig:{import_value.fn_name}"):
         params = slot_get("wsig:{import_value.fn_name}")
-    mut result = ""
+    edit result = ""
     if import_value.result_count == 1:
         result = "i"
         if slot_has("wret:{import_value.fn_name}"):
             result = slot_get("wret:{import_value.fn_name}")
     "{params}#{result}"
 
-fn sig_text_for_fn(fn_value: WFn) -> Text:
-    mut params = irep(fn_value.param_count)
+define sig_text_for_fn(fn_value: WFn) -> text:
+    edit params = irep(fn_value.param_count)
     if slot_has("wsig:{fn_value.name}"):
         params = slot_get("wsig:{fn_value.name}")
-    mut result = "i"
+    edit result = "i"
     if slot_has("wret:{fn_value.name}"):
         result = slot_get("wret:{fn_value.name}")
     "{params}#{result}"
 
-fn contains_text(items: [Text], value: Text) -> bool:
-    mut found = false
+define contains_text(items: [text], value: text) -> truth:
+    edit found = false
     loop item in items:
         if item == value:
             found = true
     found
 
-fn index_of_text(items: [Text], value: Text) -> int:
-    mut at_index = 0
-    mut found = 0
+define index_of_text(items: [text], value: text) -> int:
+    edit at_index = 0
+    edit found = 0
     loop item in items:
         if item == value:
             found = at_index
         at_index = at_index + 1
     found
 
-fn collect_signatures(module: WModule) -> [Text]:
+define collect_signatures(module: WModule) -> [text]:
     # Type index 0 is reserved for the closure signature (i32)->i32, so
     # call_indirect through a function value can name it directly.
-    mut sigs = push([], "i#i")
+    edit sigs = append([], "i#i")
     loop import_value in module.imports:
         s = sig_text_for_import(import_value)
         if not contains_text(sigs, s):
-            sigs = push(sigs, s)
+            sigs = append(sigs, s)
     loop fn_value in module.functions:
         s = sig_text_for_fn(fn_value)
         if not contains_text(sigs, s):
-            sigs = push(sigs, s)
+            sigs = append(sigs, s)
     sigs
 
-fn type_index_for_import(module: WModule, import_value: WImport) -> int:
+define type_index_for_import(module: WModule, import_value: WImport) -> int:
     index_of_text(collect_signatures(module), sig_text_for_import(import_value))
 
 # 'f' (102) -> f64, everything else -> i32.
-fn wtype_char_to_byte(c: int) -> int:
+define wtype_char_to_byte(c: int) -> int:
     if c == 102:
         ty_f64()
     else if c == 103:
@@ -715,138 +716,138 @@ fn wtype_char_to_byte(c: int) -> int:
     else:
         ty_i32()
 
-# Type section — one entry per distinct signature across imports + fns.
-fn encode_type_section(module: WModule) -> [int]:
+# Type section - one entry per distinct signature across imports + fns.
+define encode_type_section(module: WModule) -> [int]:
     signatures = collect_signatures(module)
-    mut contents = []
+    edit contents = []
     loop byte_value in leb_u(list_length(signatures)):
-        contents = push(contents, byte_value)
+        contents = append(contents, byte_value)
     loop sig in signatures:
         bs = bytes_from_text(sig)
         n = len(bs)
-        mut hash_pos = 0
+        edit hash_pos = 0
         loop hi in 0..<n:
             if at(bs, hi) == 35:
                 hash_pos = hi
-        contents = push(contents, 96)
+        contents = append(contents, 96)
         loop byte_value in leb_u(hash_pos):
-            contents = push(contents, byte_value)
+            contents = append(contents, byte_value)
         loop pi in 0..<hash_pos:
-            contents = push(contents, wtype_char_to_byte(at(bs, pi)))
+            contents = append(contents, wtype_char_to_byte(at(bs, pi)))
         loop byte_value in leb_u(n - hash_pos - 1):
-            contents = push(contents, byte_value)
+            contents = append(contents, byte_value)
         loop ri in (hash_pos + 1)..<n:
-            contents = push(contents, wtype_char_to_byte(at(bs, ri)))
+            contents = append(contents, wtype_char_to_byte(at(bs, ri)))
     wrap_section(1, contents)
 
-# Function section — each fn's index into the type vector.
-fn encode_function_section(module: WModule) -> [int]:
+# Function section - each fn's index into the type vector.
+define encode_function_section(module: WModule) -> [int]:
     signatures = collect_signatures(module)
-    mut contents = []
+    edit contents = []
     loop byte_value in leb_u(function_count(module)):
-        contents = push(contents, byte_value)
+        contents = append(contents, byte_value)
     loop fn_value in module.functions:
         loop byte_value in leb_u(index_of_text(signatures, sig_text_for_fn(fn_value))):
-            contents = push(contents, byte_value)
+            contents = append(contents, byte_value)
     wrap_section(3, contents)
 
-fn function_count(module: WModule) -> int:
-    mut count = 0
+define function_count(module: WModule) -> int:
+    edit count = 0
     loop _fn_value in module.functions:
         count = count + 1
     count
 
-fn total_function_count(module: WModule) -> int:
+define total_function_count(module: WModule) -> int:
     import_list_length(module) + function_count(module)
 
-# Table section (id 4) — one funcref table holding every function at its own
+# Table section (id 4) - one funcref table holding every function at its own
 # index (an identity table), so a function value is just its index and
 # call_indirect through it lands on the right function.
-fn encode_table_section(module: WModule) -> [int]:
+define encode_table_section(module: WModule) -> [int]:
     n = total_function_count(module)
     if n == 0:
         []
     else:
-        mut contents = [1, 112, 0]
+        edit contents = [1, 112, 0]
         loop b in leb_u(n):
-            contents = push(contents, b)
+            contents = append(contents, b)
         wrap_section(4, contents)
 
-# Element section (id 9) — one active segment filling the table with funcidx i
+# Element section (id 9) - one active segment filling the table with funcidx i
 # at slot i, at offset 0.
-fn encode_element_section(module: WModule) -> [int]:
+define encode_element_section(module: WModule) -> [int]:
     n = total_function_count(module)
     if n == 0:
         []
     else:
-        mut contents = [1, 0, 65, 0, 11]
+        edit contents = [1, 0, 65, 0, 11]
         loop b in leb_u(n):
-            contents = push(contents, b)
-        mut i = 0
+            contents = append(contents, b)
+        edit i = 0
         loop:
             if i >= n:
                 break
             loop b in leb_u(i):
-                contents = push(contents, b)
+                contents = append(contents, b)
             i = i + 1
         wrap_section(9, contents)
 
-# Export section — local fns indexed AFTER imports. We also export
+# Export section - local fns indexed AFTER imports. We also export
 # the single memory under the name "memory" so JS can `new Uint8Array(
 # instance.exports.memory.buffer)` and read strings the wasm placed.
-fn encode_export_section(module: WModule) -> [int]:
+define encode_export_section(module: WModule) -> [int]:
     fn_count = function_count(module)
     import_offset = import_list_length(module)
     total_count = fn_count + 1
-    mut contents = []
+    edit contents = []
     count_bytes = leb_u(total_count)
     loop byte_value in count_bytes:
-        contents = push(contents, byte_value)
-    mut index = 0
+        contents = append(contents, byte_value)
+    edit index = 0
     loop fn_value in module.functions:
         name_bytes = encode_name(fn_value.name)
         loop byte_value in name_bytes:
-            contents = push(contents, byte_value)
-        contents = push(contents, 0)
+            contents = append(contents, byte_value)
+        contents = append(contents, 0)
         idx_bytes = leb_u(index + import_offset)
         loop byte_value in idx_bytes:
-            contents = push(contents, byte_value)
+            contents = append(contents, byte_value)
         index = index + 1
-    # Memory export — kind = 2 (memory), index 0 (only memory).
+    # Memory export - kind = 2 (memory), index 0 (only memory).
     mem_name = encode_name("memory")
     loop byte_value in mem_name:
-        contents = push(contents, byte_value)
-    contents = push(contents, 2)
-    contents = push(contents, 0)
+        contents = append(contents, byte_value)
+    contents = append(contents, 2)
+    contents = append(contents, 0)
     wrap_section(7, contents)
 
-# Code section — bundled function bodies.
+# Code section - bundled function bodies.
 # Local declaration bytes for a function body. `types` is one char per
 # declared local ('i'/'f') in index order, set by the codegen in wloc:<name>.
 # Consecutive same-type locals are run-length grouped, as wasm requires. When
 # the type string is missing or its length disagrees with local_count, fall
 # back to all-i32 so index validity is preserved.
-fn encode_locals_decl(types: Text, fallback_count: int) -> [int]:
+define encode_locals_decl(types: text, fallback_count: int) -> [int]:
     tb = bytes_from_text(types)
     tn = len(tb)
     if tn != fallback_count:
         if fallback_count == 0:
             [0]
         else:
-            mut out = [1]
+            edit out = [1]
             loop b in leb_u(fallback_count):
-                out = push(out, b)
-            out = push(out, ty_i32())
+                out = append(out, b)
+            out = append(out, ty_i32())
             out
     else:
-        mut counts = []
-        mut chars = []
-        mut i = 0
+        edit counts = []
+        edit chars = []
+        edit i = 0
         loop:
             if i >= tn:
                 break
             c = at(tb, i)
-            mut run = 1
+            edit run = 1
             loop:
                 if i + run >= tn:
                     break
@@ -854,37 +855,37 @@ fn encode_locals_decl(types: Text, fallback_count: int) -> [int]:
                     run = run + 1
                 else:
                     break
-            counts = push(counts, run)
-            chars = push(chars, c)
+            counts = append(counts, run)
+            chars = append(chars, c)
             i = i + run
         ngroups = list_length(counts)
-        mut out = []
+        edit out = []
         loop b in leb_u(ngroups):
-            out = push(out, b)
+            out = append(out, b)
         loop gi in 0..<ngroups:
             loop b in leb_u(at(counts, gi)):
-                out = push(out, b)
-            out = push(out, wtype_char_to_byte(at(chars, gi)))
+                out = append(out, b)
+            out = append(out, wtype_char_to_byte(at(chars, gi)))
         out
 
-fn encode_code_section(module: WModule) -> [int]:
+define encode_code_section(module: WModule) -> [int]:
     fn_count = function_count(module)
-    mut contents = []
+    edit contents = []
     count_bytes = leb_u(fn_count)
     loop byte_value in count_bytes:
-        contents = push(contents, byte_value)
+        contents = append(contents, byte_value)
     loop fn_value in module.functions:
         # Function body framing: local declarations, then body bytes.
-        mut local_types = ""
+        edit local_types = ""
         if slot_has("wloc:{fn_value.name}"):
             local_types = slot_get("wloc:{fn_value.name}")
-        mut body_with_locals = encode_locals_decl(local_types, fn_value.local_count)
+        edit body_with_locals = encode_locals_decl(local_types, fn_value.local_count)
         loop byte_value in fn_value.body:
-            body_with_locals = push(body_with_locals, byte_value)
+            body_with_locals = append(body_with_locals, byte_value)
         body_size = list_length(body_with_locals)
         size_bytes = leb_u(body_size)
         loop byte_value in size_bytes:
-            contents = push(contents, byte_value)
+            contents = append(contents, byte_value)
         loop byte_value in body_with_locals:
-            contents = push(contents, byte_value)
+            contents = append(contents, byte_value)
     wrap_section(10, contents)

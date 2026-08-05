@@ -1,17 +1,17 @@
 type Effect:
-    Spawn(Map)
-    SetResource(Text, int)
-    Relate(int, Text, int)
+    Spawn(table)
+    SetResource(text, int)
+    Relate(int, text, int)
     Nop
 
-fn apply(e: Effect) -> int:
-    match e:
+define apply(e: Effect) -> int:
+    choose e:
         Spawn(comps) -> get_int(comps, "hp")
         SetResource(key, value) -> len(key) + value
         Relate(a, kind, b) -> a + len(kind) + b
         Nop -> 7
 
-fn main() -> int:
+define main() -> int:
     s = apply(Spawn({"hp": 10}))
     r = apply(SetResource("score", 100))
     l = apply(Relate(3, "owns", 4))

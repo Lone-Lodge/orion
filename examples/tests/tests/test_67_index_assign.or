@@ -1,8 +1,8 @@
 # `xs[i] = v` element assignment (sugar for `xs = set(xs, i, v)`) and `[]`
 # reads for both lists (`xs[i]` -> at) and maps (`m[k]` -> get). Before,
 # `xs[i] = v` silently did nothing and `m[k]` failed to lower.
-fn main() -> int:
-    mut xs = [1, 2, 3]
+define main() -> int:
+    edit xs = [1, 2, 3]
     xs[0] = 10
     xs[2] = 30
     i = 1

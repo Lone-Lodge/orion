@@ -1,14 +1,14 @@
-# runtime.or — what the GENERATED code costs, per primitive.
+# runtime.or - what the GENERATED code costs, per primitive.
 #
 # tools/compile_bench.sh answers "did that change make compilation slower?".
 # This answers the other half: "did that change make the compiled program
-# slower?". Same shape — one machine-readable row per case, best-of-N and a
+# slower?". Same shape - one machine-readable row per case, best-of-N and a
 # baseline diff live in the script.
 #
 # Every case is sized to run ~100ms so a 1ms scheduling hiccup is noise, and
 # every loop feeds a guard value the exit code depends on, so no case can be
 # optimized away as dead.
-fn main() -> int:
+define main() -> int:
     words = ["alpha", "beta", "gamma", "delta", "epsilon"]
     small = {"alpha": 1, "beta": 2, "gamma": 3, "delta": 4, "epsilon": 5}
     a = "alpha"
@@ -19,34 +19,34 @@ fn main() -> int:
     # --- map_get: 5-entry map, key varies so the lookup cannot be hoisted ---
     map_reps = 10000000
     t0 = monotonic_ms()
-    mut m_acc = 0
+    edit m_acc = 0
     loop i in 0..<map_reps:
         k = at(words, i % 5)
         m_acc = m_acc + small[k]
     t1 = monotonic_ms()
 
     # --- list_at + set over a pre-sized buffer ---
-    mut buf = [0, 0, 0, 0, 0, 0, 0, 0]
+    edit buf = [0, 0, 0, 0, 0, 0, 0, 0]
     list_reps = 10000000
     t2 = monotonic_ms()
-    mut l_acc = 0
+    edit l_acc = 0
     loop i in 0..<list_reps:
         set(buf, i % 8, i)
         l_acc = l_acc + at(buf, i % 8)
     t3 = monotonic_ms()
 
-    # --- push_mut: the in-place accumulator ---
+    # --- append into a growing list (promoted in place) ---
     push_reps = 2000000
     t4 = monotonic_ms()
-    mut xs = [0]
+    edit xs = [0]
     loop i in 0..<push_reps:
-        xs = push_mut(xs, i)
+        xs = append(xs, i)
     t5 = monotonic_ms()
 
     # --- int -> text ---
     itt_reps = 2500000
     t6 = monotonic_ms()
-    mut i_acc = 0
+    edit i_acc = 0
     loop i in 0..<itt_reps:
         i_acc = i_acc + len(to_text(i))
     t7 = monotonic_ms()
@@ -54,7 +54,7 @@ fn main() -> int:
     # --- concat of two texts ---
     cat_reps = 2500000
     t8 = monotonic_ms()
-    mut c_acc = 0
+    edit c_acc = 0
     loop i in 0..<cat_reps:
         c_acc = c_acc + len(at(words, i % 5) + "-x")
     t9 = monotonic_ms()
@@ -62,7 +62,7 @@ fn main() -> int:
     # --- interpolation, the shape the compiler's own emitter writes ---
     interp_reps = 750000
     t10 = monotonic_ms()
-    mut s_acc = 0
+    edit s_acc = 0
     loop i in 0..<interp_reps:
         line = "  {a} = call i64 @orion_x(ptr {b}, i64 {c}, i64 {d})"
         s_acc = s_acc + len(line)
@@ -74,11 +74,11 @@ fn main() -> int:
     itt_ms = t7 - t6
     cat_ms = t9 - t8
     interp_ms = t11 - t10
-    print("BENCH map_get {map_ms} {map_reps}")
-    print("BENCH list_at {list_ms} {list_reps}")
-    print("BENCH push_mut {push_ms} {push_reps}")
-    print("BENCH int_to_text {itt_ms} {itt_reps}")
-    print("BENCH concat {cat_ms} {cat_reps}")
-    print("BENCH interp {interp_ms} {interp_reps}")
+    print_line("BENCH map_get {map_ms} {map_reps}")
+    print_line("BENCH list_at {list_ms} {list_reps}")
+    print_line("BENCH append {push_ms} {push_reps}")
+    print_line("BENCH int_to_text {itt_ms} {itt_reps}")
+    print_line("BENCH concat {cat_ms} {cat_reps}")
+    print_line("BENCH interp {interp_ms} {interp_reps}")
     guard = m_acc + l_acc + i_acc + c_acc + s_acc + len(xs)
     if guard == 0 then 1 else 0

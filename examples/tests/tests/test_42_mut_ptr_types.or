@@ -1,13 +1,13 @@
-fn main() -> int:
+define main() -> int:
     # mut variables reassigned with compatible ptr types
-    mut acc = ""
+    edit acc = ""
     acc = "hello"
     acc = acc + " world"
-    # Then a list (also ptr — should be allowed)
-    mut things = []
-    things = push(things, 21)
-    things = push(things, 21)
-    mut total = 0
+    # Then a list (also ptr - should be allowed)
+    edit things = []
+    things = append(things, 21)
+    things = append(things, 21)
+    edit total = 0
     loop x in things:
         total = total + x
     total

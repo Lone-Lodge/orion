@@ -1,9 +1,9 @@
-fn double(x: int) -> int:
+define double(x: int) -> int:
     x + x
 
-fn id<T>(x: T) -> T:
+define id<T>(x: T) -> T:
     x
 
-fn main() -> int:
+define main() -> int:
     a = id(21)
     double(a)

@@ -1,5 +1,5 @@
-fn add(a: int, b: int) -> int:
+define add(a: int, b: int) -> int:
     a + b
 
-fn main() -> int:
+define main() -> int:
     add(20, 22)

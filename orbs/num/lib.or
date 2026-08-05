@@ -1,37 +1,48 @@
-# num — the small integer helpers every program reaches for.
+# num - the small integer helpers every program reaches for.
 #
 #   abs(-3)            ->  3
 #   min(4, 9)          ->  4
 #   max(4, 9)          ->  9
 #   clamp(12, 0, 10)   ->  10
 #   sign(-5)           ->  -1
+#
+# Floats: the language already gives you f64 arithmetic and the math builtins
+# `sqrt sin cos tan exp log log2 floor ceil round atan2 pow` directly (no import
+# needed). This orb adds what those leave out: `pi`, `e` (real consts), the f* min/max/abs
+# helpers, and `parse_float` (the int-only `parse` above cannot read a decimal).
 
 # Absolute value.
-pub fn abs(x: int) -> int:
+public define abs(x: int) -> int:
+    example abs(0 - 5) is 5
     if x < 0 then 0 - x else x
 
 # The smaller of two values.
-pub fn min(a: int, b: int) -> int:
+public define min(a: int, b: int) -> int:
+    example min(3, 7) is 3
     if a < b then a else b
 
 # The larger of two values.
-pub fn max(a: int, b: int) -> int:
+public define max(a: int, b: int) -> int:
+    example max(3, 7) is 7
     if a > b then a else b
 
 # Constrain `x` to the range [lo, hi].
-pub fn clamp(x: int, lo: int, hi: int) -> int:
+public define clamp(x: int, lo: int, hi: int) -> int:
+    example clamp(15, 0, 10) is 10
     if x < lo then lo else (if x > hi then hi else x)
 
 # -1, 0, or 1 by the sign of `x`.
-pub fn sign(x: int) -> int:
+public define sign(x: int) -> int:
+    example sign(0 - 9) is 0 - 1
     if x > 0 then 1 else (if x < 0 then 0 - 1 else 0)
 
 # Greatest common divisor (Euclid). gcd(0, 0) is 0.
-pub fn gcd(a: int, b: int) -> int:
-    mut x = abs(a)
-    mut y = abs(b)
+public define gcd(a: int, b: int) -> int:
+    example gcd(12, 18) is 6
+    edit x = abs(a)
+    edit y = abs(b)
     loop:
-        if y == 0:
+        if y is 0:
             break
         t = y
         y = x % y
@@ -43,37 +54,128 @@ pub fn gcd(a: int, b: int) -> int:
 #   parse("42")   ->  42
 #   parse("-7")   ->  -7
 # Pairs with split: split("3,4,5", ",") then parse each piece.
-pub fn parse(t: Text) -> int:
+public define parse(t: text) -> int:
+    example parse("42") is 42
     b = bytes_from_text(t)
     total = bytes_length(b)
-    mut value = 0
-    mut start = 0
-    mut neg = 0
+    edit value = 0
+    edit start = 0
+    edit neg = 0
     if total > 0:
-        if byte_at(b, 0) == 45:
+        if byte_at(b, 0) is 45:
             neg = 1
             start = 1
-    loop i in start..<total:
+    loop i in start until total:
         d = byte_at(b, i)
         if d >= 48 and d <= 57:
             value = value * 10 + (d - 48)
-    if neg == 1 then 0 - value else value
+    if neg is 1 then 0 - value else value
 
 # Integer power (ipow): base^exp for exp >= 0. Negative exp yields 0.
 #   ipow(2, 10)  ->  1024
-pub fn ipow(base: int, exp: int) -> int:
-    mut result = 1
+public define ipow(base: int, exp: int) -> int:
+    example ipow(2, 10) is 1024
+    edit result = 1
     if exp >= 0:
-        loop _ in 0..<exp:
+        loop _ in 0 until exp:
             result = result * base
     else:
         result = 0
     result
 
 # 1 if `n` is even, else 0.
-pub fn is_even(n: int) -> int:
-    if n % 2 == 0 then 1 else 0
+public define is_even(n: int) -> truth:
+    example is_even(4)
+    n % 2 is 0
 
 # 1 if `n` is odd, else 0.
-pub fn is_odd(n: int) -> int:
-    if n % 2 == 0 then 0 else 1
+public define is_odd(n: int) -> truth:
+    example is_odd(7)
+    n % 2 is not 0
+
+# --- floats ---
+
+
+# Real constants - const crosses the orb boundary (a language limit that
+# died when programs became one concatenated compile; `pi` is a VALUE now).
+public const pi = 3.141592653589793
+public const e = 2.718281828459045
+
+# Absolute value of a float.
+public define fabs(x: float) -> float:
+    example fabs(0.0 - 2.5) is 2.5
+    if x < 0.0 then 0.0 - x else x
+
+# The smaller / larger of two floats.
+public define fmin(a: float, b: float) -> float:
+    example fmin(1.5, 2.5) is 1.5
+    if a < b then a else b
+
+public define fmax(a: float, b: float) -> float:
+    example fmax(1.5, 2.5) is 2.5
+    if a > b then a else b
+
+# Constrain a float to [lo, hi].
+public define fclamp(x: float, lo: float, hi: float) -> float:
+    example fclamp(5.0, 0.0, 1.0) is 1.0
+    if x < lo then lo else (if x > hi then hi else x)
+
+# Parse a float out of text: optional '-', integer part, optional '.fraction',
+# optional 'e'/'E' exponent (with optional sign). Non-numeric tails stop the
+# scan. parse_float("") is 0.0.
+#   parse_float("3.14")    ->  3.14
+#   parse_float("-2.5e3")  ->  -2500.0
+public define parse_float(t: text) -> float:
+    example parse_float("1.5") is 1.5
+    b = bytes_from_text(t)
+    n = bytes_length(b)
+    edit i = 0
+    edit neg = false
+    if n > 0 and byte_at(b, 0) is 45:
+        neg = true
+        i = 1
+    edit val = 0.0
+    loop:
+        if i >= n: break
+        d = byte_at(b, i)
+        if d < 48 or d > 57: break
+        val = val * 10.0 + ((d - 48) as float)
+        i = i + 1
+    if i < n and byte_at(b, i) is 46:              # '.'
+        i = i + 1
+        edit scale = 0.1
+        loop:
+            if i >= n: break
+            d = byte_at(b, i)
+            if d < 48 or d > 57: break
+            val = val + ((d - 48) as float) * scale
+            scale = scale * 0.1
+            i = i + 1
+    if i < n and (byte_at(b, i) is 101 or byte_at(b, i) is 69):   # 'e' / 'E'
+        i = i + 1
+        edit eneg = false
+        if i < n and byte_at(b, i) is 45:
+            eneg = true
+            i = i + 1
+        if i < n and byte_at(b, i) is 43:          # '+'
+            i = i + 1
+        edit exp = 0
+        loop:
+            if i >= n: break
+            d = byte_at(b, i)
+            if d < 48 or d > 57: break
+            exp = exp * 10 + (d - 48)
+            i = i + 1
+        factor = pow(10.0, exp as float)
+        val = if eneg then val / factor else val * factor
+    if neg then 0.0 - val else val
+
+external define fmt_float(x: float, decimals: int) -> text
+
+# `x` as text with a fixed number of decimals - the one formatting ask
+# plain to_text cannot answer.
+public define with_decimals(x: float, decimals: int) -> text:
+    example with_decimals(3.14159, 2) is "3.14"
+    example with_decimals(2.5, 0) is "2"
+    example with_decimals(1.0, 3) is "1.000"
+    fmt_float(x, decimals)

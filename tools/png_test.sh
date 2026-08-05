@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PNG loader regression (host_image_load). Self-contained: a 4x2 RGBA PNG
 # is embedded as bytes (red, green, blue, transparent | white x4), written
-# to a temp file, decoded, and every pixel checked — exercises the sfnt
+# to a temp file, decoded, and every pixel checked - exercises the sfnt
 # chunk walk, zlib/DEFLATE inflate, and RGBA extraction with alpha=0.
 # Pure C against the runtime; runs anywhere a C compiler is on PATH.
 set -e

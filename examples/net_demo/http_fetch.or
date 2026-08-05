@@ -1,0 +1,27 @@
+# http_fetch - the http orb live: GET a real page over TLS.
+#
+#   orbit run examples/net_demo/http_fetch.or
+#
+# Manual proof on purpose: the demo gate runs offline, and a network demo
+# in a gate is a flaky gate. Two targets, because corporate networks
+# DNS-filter selectively (a Starbreeze machine resolves sqlite.org but
+# not example.com) - one succeeding is the proof; the other's failure
+# prints curl's own reason.
+use http
+
+define try_one(url: text, marker: text) -> truth:
+    r = fetch(url)
+    if success(r) and contains(r.body, marker):
+        print_line("{url} -> status={r.status} bytes={len(r.body)}  OK")
+        return true
+    print_line("{url} -> status={r.status} {r.body}")
+    false
+
+define main() -> int:
+    a = try_one("https://example.com", "Example Domain")
+    b = try_one("https://sqlite.org/", "SQLite")
+    if a or b:
+        print_line("http orb: live fetch OK")
+        return 0
+    print_line("http orb: no target reachable (offline? proxy?)")
+    1

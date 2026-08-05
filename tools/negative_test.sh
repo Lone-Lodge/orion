@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# negative_test.sh — the things that must NOT compile.
+# negative_test.sh - the things that must NOT compile.
 #
 # The positive suite (tools/test.sh) can only prove properties that produce a
 # runnable binary, so every "this is a hard compile error" claim went unchecked:
@@ -15,9 +15,16 @@
 # Exit code is the number of failing cases.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The compiler recurses deep; Windows reserves stack in the exe (/STACK),
+# POSIX raises it here - without this, arm64 macOS segfaulted SILENTLY on
+# the deepest compiles (closure combos) while linux squeaked by on 8 MB.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
+esac
 ORION="$ROOT/dist/orion.exe"
 DIR="$ROOT/examples/tests/negative"
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 TMP="$(mktemp -d)"
 pass=0; fail=0
@@ -31,7 +38,10 @@ for f in "$DIR"/*.or; do
     # spin forever (an unterminated interpolation hole did exactly that), and a
     # hang in the compiler is worse than a bad message. A case that does not
     # finish in 30s is a failure.
-    out="$(timeout 30 "$ORION" "$f" "$TMP/out.ll" "$DIR/orbs" "$ROOT/orbs" 2>&1)"
+    # macOS ships no `timeout` (coreutils calls it gtimeout) - without this
+    # probe every fixture "failed" with `timeout: command not found`.
+    TO="$(command -v timeout || command -v gtimeout || true)"
+    out="$(${TO:+"$TO" 30} "$ORION" "$f" "$TMP/out.ll" "$DIR/orbs" "$ROOT/orbs" 2>&1)"
     code=$?
     if [ "$code" = "124" ]; then
         printf "  %-22s HUNG (30s timeout)\n" "$name"

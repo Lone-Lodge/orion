@@ -1,8 +1,8 @@
-fn main() -> int:
+define main() -> int:
     kind_val = 2
     # Match with int patterns + text branches in expression position.
     # Both bugs (match-as-expr + match-int-text) now fixed.
-    kind_text = match kind_val:
+    kind_text = choose kind_val:
         1 -> "one"
         2 -> "two"
         _ -> "other"

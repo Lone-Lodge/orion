@@ -237,6 +237,32 @@ pre code { background: none; padding: 0; }
 .hl-f { color: var(--tok-f); }
 .hl-x { color: var(--tok-x); text-decoration: line-through; }
 
+/* Library reference (reference.html): each orb's exported functions, one per
+ * row, signature then a one-line description. The blurb and the description
+ * are dim like a comment. No new colours, so the palette check still covers
+ * every pair; --dim sits on --bg here, lighter than --code-bg, so it clears
+ * the 7:1 the comment check already proves on the darker code background. */
+.orb-blurb {
+    color: var(--dim);
+    margin: -0.25rem 0 1.25rem;
+}
+.sub {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    margin: 1.25rem 0 0.6rem;
+}
+.fn { margin: 0 0 1rem; }
+.fn .sig {
+    display: inline-block;
+    padding: 0.15em 0.45em;
+}
+.fn p {
+    margin: 0.35rem 0 0;
+    color: var(--dim);
+}
+
 /* Copy button, added by a small script to every code block. Subtle by default
  * so it never competes with the code, terracotta on hover/focus. Kept visible
  * (not hover-only) so it works on touch and for keyboard users. */
@@ -277,3 +303,6 @@ footer {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* proven usage under a reference entry: the example lines the build runs */
+.fn pre.ex { margin: 0.35rem 0 0.2rem; padding: 0.4rem 0.6rem; font-size: 0.85em; opacity: 0.85; overflow-x: auto; }

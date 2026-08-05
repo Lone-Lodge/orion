@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     s1 = {"kind": "Int", "value": "42"}
     inner = {"items": [s1]}
     items = get_list(inner, "items")

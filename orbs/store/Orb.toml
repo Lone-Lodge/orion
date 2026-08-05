@@ -1,0 +1,3 @@
+name = "store"
+version = "0.1.0"
+description = "Program state as a database: flat records with stable ids - spawn/despawn/lookup, and loop over items() as the query"

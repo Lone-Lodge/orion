@@ -1,0 +1,5 @@
+# expect: `total` cannot change: it was bound as a stable value
+define main() -> int:
+    total = 40
+    total = total + 2
+    total

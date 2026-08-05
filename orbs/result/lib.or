@@ -1,53 +1,60 @@
-# result — Result<T,E>-style error handling for Orion.
+# result - Result<T>: a value, or an error message.
 #
-# Idiomatic usage:
-#   res = safe_div(10, 2)
-#   if is_ok(res):
-#       print_line("got {res.value}")
-#   else:
-#       print_line("error: {res.err}")
+# A native generic sum type. The point is that you cannot look at the value
+# without saying what happens in the error case: `match` is exhaustive, so the
+# compiler makes you follow up.
 #
-# Or with the helper unwrap_or:
-#   result = safe_div(10, 0)
-#   print_line(unwrap_or(result, 0 - 1))
+#   use result
 #
-# This is a CONVENTION orb — values are plain data structs, not sum types.
-# When orion-self gets true sum types with payloads, this orb can be replaced
-# with `enum Result: Ok(int), Err(Text)` for free.
+#   fn safe_div(a: int, b: int) -> Result<int>:
+#       if b is 0 then Result.Err("divide by zero") else Result.Ok(a / b)
+#
+#   match safe_div(10, 0):
+#       Ok(v)  -> print_line("got {v}")
+#       Err(m) -> print_line("error: {m}")
+#
+# Softer forms when you do not want to branch by hand:
+#   n = unwrap_or(safe_div(10, 0), 0 - 1)   # fallback value
+#   if let Ok(v) = safe_div(10, 2):         # only the happy path
+#       print_line("{v}")
+#
+# `?` propagates: `v = safe_div(a, b)?` returns the Err out of the enclosing
+# function and binds `v` to the Ok payload otherwise.
+#
+# There is deliberately no `unwrap`. Orion has no panic, so an `unwrap` here
+# could only lie and hand back a zero. Use `match`, `if let`, `?` or
+# `unwrap_or`.
 
-type Result: ok: int, value: int, err: Text
+public type Result<T>:
+    Ok(T)
+    Err(text)
 
-# Construct a success result.
-pub fn Ok(v: int) -> Result:
-    Result{ok: 1, value: v, err: ""}
+# The payload, or `default` if this is an Err.
+public define unwrap_or<T>(r: Result<T>, default: T) -> T:
+    example unwrap_or(Result.Ok(7), 0) is 7
+    example unwrap_or(Result.Err("x"), 9) is 9
+    choose r:
+        Ok(v) -> v
+        Err(m) -> default
 
-# Construct an error result.
-pub fn Err(msg: Text) -> Result:
-    Result{ok: 0, value: 0, err: msg}
+# 1 if this is an Ok, else 0.
+public define is_ok<T>(r: Result<T>) -> truth:
+    example is_ok(Result.Ok(5))
+    example not is_ok(Result.Err("no"))
+    choose r:
+        Ok(v) then true
+        Err(m) then false
 
-# Check if a result is successful.
-pub fn is_ok(r: Result) -> int:
-    r.ok
+# true if this is an Err.
+public define is_err<T>(r: Result<T>) -> truth:
+    example is_err(Result.Err("boom"))
+    choose r:
+        Ok(v) then false
+        Err(m) then true
 
-# Check if a result is an error.
-pub fn is_err(r: Result) -> int:
-    if r.ok == 1 then 0 else 1
-
-# Get value or panic-equivalent (returns 0 — convention).
-pub fn unwrap(r: Result) -> int:
-    r.value
-
-# Get value or fallback.
-pub fn unwrap_or(r: Result, default: int) -> int:
-    if r.ok == 1 then r.value else default
-
-# Get error message (empty if Ok).
-pub fn err_msg(r: Result) -> Text:
-    r.err
-
-# Map a successful value through a function; propagate errors unchanged.
-pub fn map_ok(r: Result, default_on_err: int) -> Result:
-    if r.ok == 1:
-        Ok(r.value * 1)
-    else:
-        r
+# The error message, or "" if this is an Ok.
+public define err_msg<T>(r: Result<T>) -> text:
+    example err_msg(Result.Err("boom")) is "boom"
+    choose r:
+        Ok(v) then ""
+        Err(m) then m

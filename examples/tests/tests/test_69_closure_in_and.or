@@ -1,0 +1,13 @@
+# A closure call inside a short-circuit `and` used to break SSA dominance: the
+# closure_call expands into emit-time blocks the phi predecessor tracking could
+# not see. Both the and-true and the and-short-circuit paths must work now.
+define int_eq(a: int, b: int) -> int:
+    if a == b then 1 else 0
+
+define both(f: fn(int, int) -> int, a: int, b: int, c: int) -> int:
+    if f(a, b) == 1 and f(b, c) == 0 then 1 else 0
+
+define main() -> int:
+    ok_true = if both(int_eq, 3, 3, 7) == 1 then 1 else 0     # f(3,3)=1 and f(3,7)=0 -> 1
+    ok_sc = if both(int_eq, 5, 6, 6) == 0 then 1 else 0       # f(5,6)=0 -> short-circuits -> 0
+    ok_true * 35 + ok_sc * 34                                 # 69

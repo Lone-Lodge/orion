@@ -8,11 +8,18 @@
 # after a spike, quiet cycles walk the cap back down to the region's floor
 # and the reported high-water retracts to the recent peak.
 #
-# Pure C against the runtime — no orbit build needed. Runs anywhere clang/gcc
+# Pure C against the runtime - no orbit build needed. Runs anywhere clang/gcc
 # is on PATH.
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The compiler recurses deep; Windows reserves stack in the exe (/STACK),
+# POSIX raises it here - without this, arm64 macOS segfaulted SILENTLY on
+# the deepest compiles (closure combos) while linux squeaked by on 8 MB.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
+esac
 RT="$ROOT/runtime/orion_rt.c"
 CC="${CC:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CC" ] || CC="$(command -v clang || command -v cc || echo cc)"
@@ -52,7 +59,7 @@ int main(void) {
 
     /* Sustained quiet: tiny allocation each cycle. Shrink is deliberately
      * patient (SHRINK_PATIENCE cycles per step), so this takes many
-     * cycles — that patience is what stops the thrash tested below. */
+     * cycles - that patience is what stops the thrash tested below. */
     int cycles = 0;
     for (; cycles < 8000; cycles++) {
         orion_alloc(256);
@@ -71,7 +78,7 @@ int main(void) {
         return 1;
     }
 
-    /* Thrash resistance — the fireplace bug: a game alternates a busy render
+    /* Thrash resistance - the fireplace bug: a game alternates a busy render
      * frame with an idle one. A cap that matches the busy working set must
      * stay PUT, not oscillate every frame. Warm to a working size, then
      * alternate busy(~400 KB)/idle(~0) and assert the cap never moves. */

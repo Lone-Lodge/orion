@@ -1,0 +1,289 @@
+# app - the thin shell a local desktop-web app stands on: serve a folder and
+# some routes on loopback, open the OS's app window at it, live until Ctrl+C.
+# The BLOCKS.md model: a route is a record with a function in it - the app
+# hands its behavior over as data, wiring visible at the call site.
+#
+#     routes = [route{method: "GET", path: "/api/list", handler: list_files}]
+#     srv = serve("ui", routes, 0)
+#     w = open_window("http://127.0.0.1:{local_port(srv)}/")
+#     run_until_interrupted(srv, routes, "ui")
+#
+# One task per connection (the httpd pattern); static files stream in binary
+# through send_raw, so images and fonts survive. HTTP/1.0, close per request:
+# boring, debuggable, plenty for loopback.
+use net
+use os
+use text
+use file (open_read, read_chunk, close_file)
+use async
+
+type request:
+    method: text
+    path: text
+    query: text
+    body: text
+
+type response:
+    status: int
+    mime: text
+    body: text
+
+type route:
+    method: text
+    path: text
+    handler: fn
+
+# The little answers most handlers want.
+public define page(html: text) -> response:
+    example page("<h1>hej</h1>").status is 200
+    response{status: 200, mime: "text/html; charset=utf-8", body: html}
+
+public define json_of(body: text) -> response:
+    example json_of("[]").status is 200
+    response{status: 200, mime: "application/json", body: body}
+
+public define not_found() -> response:
+    example not_found().status is 404
+    response{status: 404, mime: "text/plain", body: "not found"}
+
+# First line of an HTTP head -> request. Query strings stay in `path` for
+# the handler to split if it cares.
+public define parse_request(raw: text) -> request:
+    example parse_request("GET /x HTTP/1.1").path is "/x"
+    example parse_request("GET /x?a=1 HTTP/1.1").path is "/x"
+    example parse_request("GET /x?a=1 HTTP/1.1").query is "a=1"
+    example parse_request("").method is ""
+    first = at(lines(raw), 0)
+    parts = split(trim(first), " ")
+    if len(parts) < 2:
+        return request{method: "", path: "", query: "", body: ""}
+    target = at(parts, 1)
+    halves = split(target, "?")
+    q = if len(halves) > 1 then at(halves, 1) else ""
+    request{method: at(parts, 0), path: at(halves, 0), query: q, body: ""}
+
+define status_line(code: int) -> text:
+    choose:
+        code is 200 then "HTTP/1.0 200 OK"
+        code is 404 then "HTTP/1.0 404 Not Found"
+        else "HTTP/1.0 500 Internal Server Error"
+
+define head_of(r: response) -> text:
+    n = len(r.body)
+    "{status_line(r.status)}\r\nContent-Type: {r.mime}\r\nContent-Length: {n}\r\nConnection: close\r\n\r\n"
+
+# Content type from the filename - the handful a local app meets.
+public define mime_of(path: text) -> text:
+    example mime_of("a.png") is "image/png"
+    example mime_of("a.html") is "text/html; charset=utf-8"
+    choose:
+        ends_with(path, ".html") then "text/html; charset=utf-8"
+        ends_with(path, ".css") then "text/css"
+        ends_with(path, ".js") then "text/javascript"
+        ends_with(path, ".json") then "application/json"
+        ends_with(path, ".png") then "image/png"
+        ends_with(path, ".jpg") or ends_with(path, ".jpeg") then "image/jpeg"
+        ends_with(path, ".gif") then "image/gif"
+        ends_with(path, ".webp") then "image/webp"
+        ends_with(path, ".svg") then "image/svg+xml"
+        ends_with(path, ".ico") then "image/x-icon"
+        ends_with(path, ".woff2") then "font/woff2"
+        else "application/octet-stream"
+
+# The nibble value of a hex digit byte, or -1 if it is not one.
+define nibble(b: int) -> int:
+    choose:
+        b >= 48 and b <= 57 then b - 48
+        b >= 97 and b <= 102 then b - 87
+        b >= 65 and b <= 70 then b - 55
+        else -1
+
+# "%XX" byte triples back to the bytes they stand for. The browser sends every
+# path and query value this way, so the file "Skärmbild 1.png" arrives as
+# "Sk%C3%A4rmbild%201.png" and has to come back before it can be opened. A "%"
+# that is not followed by two hex digits stays literal. ("+" is NOT space here:
+# that rule belongs to query strings only - see query_of.)
+public define percent_decode(s: text) -> text:
+    example percent_decode("a%20b") is "a b"
+    example percent_decode("Sk%C3%A4rmbild") is "Skärmbild"
+    example percent_decode("100% sure") is "100% sure"
+    example percent_decode("a+b") is "a+b"
+    b = bytes_from_text(s)
+    n = bytes_length(b)
+    edit out = []
+    edit i = 0
+    loop:
+        if i >= n:
+            break
+        c = byte_at(b, i)
+        hi = if c is 37 and i + 2 < n then nibble(byte_at(b, i + 1)) else -1
+        lo = if hi >= 0 then nibble(byte_at(b, i + 2)) else -1
+        if lo >= 0:
+            out = append(out, hi * 16 + lo)
+            i = i + 3
+        else:
+            out = append(out, c)
+            i = i + 1
+    bytes_to_text(out)
+
+# ".." must never climb out of the served folder.
+public define safe_path(p: text) -> truth:
+    example safe_path("/bilder/a.png")
+    example not safe_path("/../secrets")
+    not contains(p, "..")
+
+# The typed bridge: a fn(request) -> response parameter carries its whole
+# signature, so the call through it keeps the response type.
+define call_handler(h: fn(request) -> response, req: request) -> response = h(req)
+
+# The seam: match `req` against the routes, else fall back to a static file
+# under `static_dir`. Pure dispatch - the serving loop below is its only
+# I/O-touching caller, which is what keeps THIS part example-testable.
+public define dispatch(req: request, routes: [route]) -> response:
+    # no example: calls through fn-typed handlers - proven by folio
+    edit found = not_found()
+    edit hit = false
+    loop r in routes:
+        if not hit and r.method is req.method and r.path is req.path:
+            found = call_handler(r.handler, req)
+            hit = true
+    found
+
+# Serve one accepted connection: read the head, dispatch, answer, close.
+define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files, clock:
+    deadline = monotonic_ms() + 5000
+    edit raw = ""
+    loop:
+        left = deadline - monotonic_ms()
+        if left <= 0:
+            break
+        if readable_within(conn, left):
+            chunk = recv(conn, 8192)
+            if timed_out(chunk):
+                break
+            raw = "{raw}{chunk}"
+            if contains(raw, "\r\n\r\n"):
+                break
+    req = parse_request(raw)
+    edit matched = false
+    loop r in routes:
+        if not matched and r.method is req.method and r.path is req.path:
+            matched = true
+    if matched:
+        resp = dispatch(req, routes)
+        sent1 = send(conn, head_of(resp))
+        sent2 = send_raw(conn, resp.body)
+    else:
+        serve_static(conn, req, static_dir)
+    closed = close(conn)
+
+# A static file, streamed in binary chunks so a large image never has to
+# fit one send.
+define serve_static(conn: int, req: request, static_dir: text) uses net, files:
+    rel = if req.path is "/" then "/index.html" else percent_decode(req.path)
+    if req.method is not "GET" or not safe_path(rel):
+        r404 = not_found()
+        s1 = send(conn, head_of(r404))
+        s2 = send(conn, r404.body)
+        return
+    full = "{static_dir}{rel}"
+    if not is_file(full):
+        r404 = not_found()
+        s1 = send(conn, head_of(r404))
+        s2 = send(conn, r404.body)
+        return
+    n = file_size(full)
+    s1 = send(conn, "HTTP/1.0 200 OK\r\nContent-Type: {mime_of(full)}\r\nContent-Length: {n}\r\nConnection: close\r\n\r\n")
+    h = open_read(full)
+    loop:
+        chunk = read_chunk(h, 262144)
+        if len(chunk) is 0:
+            break
+        sent = send_raw(conn, chunk)
+    fclosed = close_file(h)
+
+# Open a listener on 127.0.0.1. Returns the socket; ask local_port(srv) for
+# the port when 0 picked one.
+# no example: opens a socket - proven by folio
+public define serve(port: int) -> int uses net = listen(port)
+
+# Accept + serve until interrupted() (Ctrl+C). Connections serve one at a
+# time - honest and plenty on loopback for one user; the browser queues.
+# no example: runs a server loop - proven by folio
+public define run_until_interrupted(srv: int, routes: [route], static_dir: text) uses net, files, clock, console:
+    loop:
+        if interrupted():
+            break
+        conn = accept_within(srv, 250)
+        if ok(conn):
+            t = spawn_conn(conn, routes, static_dir)
+    closed = close(srv)
+    print_line("app: stopped cleanly")
+
+# One connection, handled to completion.
+define spawn_conn(conn: int, routes: [route], static_dir: text) -> int uses net, files, clock:
+    serve_conn(conn, routes, static_dir)
+    0
+
+# The OS's app window at `url`: Edge's --app mode - no address bar, no tabs,
+# just the app. Edge is launched by its well-known install path (CreateProcess
+# directly - routing through `cmd /c start` trips cmd's quote rules), with the
+# 32/64-bit locations both tried. Swappable for an embedded WebView2 later
+# without a caller changing.
+# no example: opens a window - proven by folio
+public define open_window(url: text) -> int uses net:
+    a = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+    b = "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
+    exe = if file_exists(a) then a else b
+    start_command(exe, ["--app={url}"])
+
+# The value of `key` in the request's query string, "" when absent. Decoded the
+# form-urlencoded way: "+" is a space, then the %XX triples.
+public define query_of(req: request, key: text) -> text:
+    example query_of(request{method: "GET", path: "/", query: "name=a.png&x=1", body: ""}, "name") is "a.png"
+    example query_of(request{method: "GET", path: "/", query: "", body: ""}, "name") is ""
+    example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png", body: ""}, "name") is "Skärm 1.png"
+    edit found = ""
+    loop pair in split(req.query, "&"):
+        kv = split(pair, "=")
+        if len(kv) is 2 and at(kv, 0) is key and found is "":
+            found = percent_decode(replace(at(kv, 1), "+", " "))
+    found
+
+# --- the window itself -------------------------------------------------
+# Everything below finds the window by a piece of its TITLE, which is how a
+# page reaches its own window: it names itself, then asks the server. All
+# answer true when that window was found. Windows-only today; elsewhere false.
+external define win_set_topmost(needle: text, on: int) -> int
+external define win_set_opacity(needle: text, percent: int) -> int
+external define win_set_frameless(needle: text, on: int, view_h: int) -> int
+external define win_move(needle: text, x: int, y: int) -> int
+external define win_command(needle: text, what: text) -> int
+
+# Keep the window above every other window, or let it back down.
+# no example: window state - proven by folio's pin feature
+public define window_on_top(title: text, on: truth) -> truth uses console = win_set_topmost(title, if on then 1 else 0) is 0
+
+# How solid the window is, 10..100. 100 is fully opaque and costs nothing.
+# no example: window state - proven by folio's opacity slider
+public define window_opacity(title: text, percent: int) -> truth uses console = win_set_opacity(title, percent) is 0
+
+# Take the frame off, so the page IS the window - the modern app look. The
+# browser paints its title strip inside the window, so this clips it away at
+# the window level: send `view_h`, the page's own viewport height in device
+# pixels (innerHeight * devicePixelRatio), and everything the browser draws
+# above it stops existing. The page must then draw its own bar and call
+# window_move/minimize/maximize/close from it, and re-ask on every resize -
+# the region is fixed to a size.
+# no example: window state - proven by folio's own top bar
+public define window_frameless(title: text, on: truth, view_h: int) -> truth uses console = win_set_frameless(title, if on then 1 else 0, view_h) is 0
+
+# Put the window's top-left corner at x,y in device pixels - a frameless
+# window's bar drags with this. The browser keeps the pointer to itself and
+# will not let us hand the drag to the OS move loop, so the page follows its
+# own pointer and says where the window should be.
+# no example: window state - proven by folio's own top bar
+public define window_move(title: text, x: int, y: int) -> truth uses console = win_move(title, x, y) is 0
+public define window_minimize(title: text) -> truth uses console = win_command(title, "min") is 0
+public define window_maximize(title: text) -> truth uses console = win_command(title, "max") is 0
+public define window_close(title: text) -> truth uses console = win_command(title, "close") is 0

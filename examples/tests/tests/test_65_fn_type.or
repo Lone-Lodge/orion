@@ -1,0 +1,17 @@
+# A `fn(...)` parameter carries a real arity now: correct higher-order calls
+# work, and the compiler checks the argument count (the wrong-count case is
+# examples/tests/negative/fn_arity.or).
+define inc(n: int) -> int:
+    n + 1
+define dbl(n: int) -> int:
+    n * 2
+define add(a: int, b: int) -> int:
+    a + b
+
+define apply(f: fn(int) -> int, x: int) -> int:
+    f(x)
+define apply2(f: fn(int, int) -> int, a: int, b: int) -> int:
+    f(a, b)
+
+define main() -> int:
+    apply(inc, 10) + apply(dbl, 20) + apply2(add, 3, 11)   # 11 + 40 + 14 = 65

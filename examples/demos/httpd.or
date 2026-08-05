@@ -1,0 +1,181 @@
+# httpd - a CONCURRENT HTTP/1.0 server in Orion, one task per connection.
+#
+# Written to dogfood the newest code in the language: sockets (`net`), the task
+# scheduler (`async`: spawn / sleep_task / run_all), the scope-owned resource
+# form, capability contracts (`uses net, console`), text parsing, and the
+# spoken comparisons. It serves a fixed number of requests and exits, so the
+# demo gate can run it.
+#
+#   orbit run examples/demos/httpd.or
+#
+# THE ONE IDEA: a socket call must never park the whole process. A task waits
+# with `readable_within`, which parks the TASK - the scheduler then waits for
+# every parked socket in one call and runs whoever is ready. `connect_within`
+# and `accept_within` are the same bargain for the other two blocking calls.
+# With plain blocking `recv`, one slow client stalls every other one; the demo
+# below proves it does not.
+use net
+use text
+use async
+
+# The first line of a request: `GET /path HTTP/1.1`.
+type request:
+    method: text
+    path: text
+
+define parse_request(raw: text) -> request:
+    first = at(lines(raw), 0)
+    parts = split(trim(first), " ")
+    if len(parts) < 2:
+        return request{method: "", path: ""}
+    request{method: at(parts, 0), path: at(parts, 1)}
+
+define status_line(code: int) -> text:
+    choose:
+        code is 200 then "HTTP/1.0 200 OK"
+        code is 404 then "HTTP/1.0 404 Not Found"
+        else "HTTP/1.0 500 Internal Server Error"
+
+define respond(code: int, body: text) -> text:
+    n = len(body)
+    "{status_line(code)}\r\nContent-Type: text/plain\r\nContent-Length: {n}\r\nConnection: close\r\n\r\n{body}"
+
+# The routing table is data, not a chain of ifs.
+define route(r: request) -> text:
+    choose:
+        r.path is "/" then respond(200, "orion httpd\n")
+        r.path is "/fast" then respond(200, "fast\n")
+        r.path is "/slow" then respond(200, "slow\n")
+        else respond(404, "no route for {r.path}\n")
+
+# Who finished when. The order IS the result of this demo, so it is recorded
+# rather than printed as it happens.
+define note(what: text) -> int:
+    prev = if slot_has("trace") then slot_get("trace") else ""
+    slot_set("trace", "{prev}{what} ")
+    0
+
+# Read until the blank line that ends an HTTP head, or until `deadline`.
+#
+# The task never calls `recv` on a quiet socket: `readable_within` parks it
+# until there is something there, and the scheduler waits for every parked
+# socket at once. Polling instead - `recv` with a 5 ms timeout, retried -
+# looks the same and costs (waiting tasks x 5 ms) per round; at 80
+# connections that was 400 ms of the process doing nothing per round.
+define read_head(sock: int, deadline: int) -> text uses net, clock:
+    edit raw = ""
+    loop:
+        left = deadline - monotonic_ms()
+        if left <= 0:
+            break
+        if readable_within(sock, left):
+            chunk = recv(sock, 4096)
+            # Readable but empty means the peer closed, not "nothing yet".
+            if timed_out(chunk):
+                break
+            raw = "{raw}{chunk}"
+            if contains(raw, "\r\n\r\n"):
+                break
+    raw
+
+# One connection, start to finish, on its own task and its own stack.
+define handle(conn: int) -> int uses net, clock:
+    # No recv timeout needed: `read_head` only reads a socket it was told is
+    # readable, so a read never blocks on a quiet peer.
+    raw = read_head(conn, monotonic_ms() + 2000)
+    r = parse_request(raw)
+    send(conn, route(r))
+    close(conn)
+    note("served{r.path}")
+    1
+
+# Accept `want` connections, handing each to its own task.
+#
+# A listener is a socket, so the accept loop waits the same way a read does:
+# park until somebody is there. Polling with a 2 ms `accept_within` also
+# works and reads almost the same, but it takes one turn of the scheduler per
+# connection - at 300 clients the backlog drained slower than the clients
+# gave up.
+define acceptor(listener: int) -> int uses net:
+    want = slot_get_int("want")
+    edit got = 0
+    loop:
+        if got >= want:
+            break
+        if not readable_within(listener, 1000):
+            break                      # a full second with nobody knocking
+        conn = accept_within(listener, 0)
+        if ok(conn):
+            # `spawn` is the one call that can refuse: the task table is
+            # finite. Dropping the connection silently is how a server ends
+            # up "mysteriously slow", so refuse it out loud instead.
+            task = spawn(handle, conn)
+            if not ok(task):
+                send(conn, respond(500, "server at capacity\n"))
+                close(conn)
+            got = got + 1
+    got
+
+# Connect from inside a task. `connect_within` is the point: plain `connect`
+# blocks the PROCESS, so a client that has to wait (the listen backlog is
+# full, the server has not accepted yet) freezes the acceptor it is waiting
+# for. Giving up after 200 ms and parking the task breaks that knot.
+define dial() -> int uses net, clock:
+    edit tries = 0
+    loop:
+        c = connect_within("127.0.0.1", 58480, 200)
+        if ok(c):
+            return c
+        tries = tries + 1
+        if tries >= 20:
+            return 0 - 1
+        sleep_task(5)
+    0 - 1
+
+# Connects first and asks last: sends a request head WITHOUT its blank line,
+# dawdles 60 ms, then finishes it. A one-client-at-a-time server answers this
+# one first and makes everybody wait for it.
+define slow_client(id: int) -> int uses net, clock:
+    c = dial()
+    if not ok(c):
+        return 0
+    send(c, "GET /slow HTTP/1.0\r\n")
+    sleep_task(60)
+    send(c, "\r\n")
+    reply = read_head(c, monotonic_ms() + 2000)
+    close(c)
+    note("client{id}")
+    if len(reply) > 0 then 1 else 0
+
+# Asks immediately and should be answered immediately.
+define fast_client(id: int) -> int uses net, clock:
+    c = dial()
+    if not ok(c):
+        return 0
+    send(c, "GET /fast HTTP/1.0\r\n\r\n")
+    reply = read_head(c, monotonic_ms() + 2000)
+    close(c)
+    note("client{id}")
+    if len(reply) > 0 then 1 else 0
+
+# The demo drives itself: the server AND its clients are tasks in one process.
+# `run_all` is the only thing main does - everything else is the scheduler.
+define main() uses net, console:
+    print_line("httpd on 127.0.0.1:58480 - 1 slow client, 2 fast ones")
+    listener = listen(58480)
+    if not ok(listener):
+        print_line("port busy")
+        return
+    defer close(listener)
+    slot_set("want", 3)
+    spawn(acceptor, listener)
+    spawn(slow_client, 1)
+    spawn(fast_client, 2)
+    spawn(fast_client, 3)
+    run_all()
+    trace = if slot_has("trace") then slot_get("trace") else ""
+    print_line("  order: {trace}")
+    if starts_with(trace, "served/fast"):
+        print_line("concurrent: the fast clients were answered while client 1 dawdled")
+    else:
+        print_line("SEQUENTIAL: the slow client held the server")

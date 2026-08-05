@@ -1,0 +1,19 @@
+# rand: deterministic-by-seed, distinct successive draws, non-negative, and
+# rand_range stays inside its half-open bounds.
+use rand
+
+define main() -> int:
+    srand(999)
+    a = rand()
+    b = rand()
+    srand(999)
+    c = rand()
+    ok_deterministic = if a == c then 1 else 0
+    ok_differ = if a != b then 1 else 0
+    ok_nonneg = if a >= 0 and b >= 0 then 1 else 0
+    edit ok_range = 1
+    loop i in 0..<300:
+        r = rand_range(5, 9)
+        if r < 5 or r > 8:
+            ok_range = 0
+    ok_deterministic * 20 + ok_differ * 20 + ok_nonneg * 11 + ok_range * 11   # 62

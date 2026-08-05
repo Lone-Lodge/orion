@@ -10,19 +10,19 @@
 # of ints are both i64 slots. This is only the compiler no longer forgetting
 # which one it holds.
 
-fn take<T>(xs: [T], n: int) -> [T]:
-    mut out = slice(xs, 0, 0)
+define take<T>(xs: [T], n: int) -> [T]:
+    edit out = slice(xs, 0, 0)
     loop i in 0..<n:
-        out = push(out, at(xs, i))
+        out = append(out, at(xs, i))
     out
 
-fn first_of<T>(xs: [T]) -> T:
+define first_of<T>(xs: [T]) -> T:
     at(xs, 0)
 
-fn sum_two(xs: [int]) -> int:
+define sum_two(xs: [int]) -> int:
     at(xs, 0) + at(xs, 1)
 
-fn main() -> int:
+define main() -> int:
     words = ["hi", "hello", "howdy"]
     kept = take(words, 2)
     a = len(at(kept, 0))     # 2   ("hi")     needs T = Text

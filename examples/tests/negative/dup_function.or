@@ -1,7 +1,7 @@
 # expect: is defined more than once in the same orb
-fn helper() -> int:
+define helper() -> int:
   1
-fn helper() -> int:
+define helper() -> int:
   2
-fn main() -> int:
+define main() -> int:
   helper()

@@ -1,4 +1,4 @@
-/* gdi_min.c — software renderer with the same og_* API as d3d12_min.c.
+/* gdi_min.c - software renderer with the same og_* API as d3d12_min.c.
  *
  * The potato backend: a CPU framebuffer blitted with StretchDIBits.
  * No GPU, no extra DLLs (user32/gdi32 only), ~instant init. Both
@@ -101,7 +101,7 @@ void sw_og_rect_a(long long x, long long y, long long w, long long h,
 }
 
 static void blit(void) {
-    /* hwnd 0 would make GetDC hand back the SCREEN dc — a headless
+    /* hwnd 0 would make GetDC hand back the SCREEN dc - a headless
      * harness must never paint the desktop. */
     if (!g_fb || !g_hwnd) return;
     BITMAPINFO bi = {0};
@@ -123,7 +123,7 @@ long long sw_og_present(void) {
 }
 
 /* sw_og_snapshot(path): dump the software framebuffer to a top-down 32-bit
- * BMP. Pure stdio — no windowing — so it works headless (hwnd 0) and on any
+ * BMP. Pure stdio - no windowing - so it works headless (hwnd 0) and on any
  * OS: this is the portable "render a frame to a file" primitive, the same
  * pixel buffer an e-ink panel would receive. g_fb is BGRX little-endian,
  * which is exactly BMP's byte order (B,G,R,X per pixel). Negative height =

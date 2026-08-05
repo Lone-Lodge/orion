@@ -1,0 +1,30 @@
+# The `result` orb is a native generic sum type, not a struct convention.
+# Covers: cross-orb generic enum, exhaustive match, `?` propagation, a Text
+# payload, and the generic-default `unwrap_or`.
+use result
+
+define safe_div(a: int, b: int) -> Result<int>:
+    if b == 0 then Result.Err("divide by zero") else Result.Ok(a // b)
+
+define chain(a: int, b: int) -> Result<int>:
+    v = safe_div(a, b)?          # returns the Err out of chain
+    Result.Ok(v + 1)
+
+define words() -> Result<text>:
+    Result.Ok("hi")
+
+define main() -> int:
+    edit total = 0
+    choose safe_div(10, 2):
+        Ok(v) -> total = total + v                       # 5
+        Err(m) -> total = total + len(m)
+    total = total + unwrap_or(safe_div(1, 0), 3)         # 8
+    total = total + is_err(safe_div(1, 0))               # 9
+    total = total + is_ok(safe_div(1, 1))                # 10
+    total = total + len(err_msg(safe_div(1, 0)))         # 24
+    if let Ok(v) = chain(10, 5):
+        total = total + v                                # 27
+    total = total + is_err(chain(1, 0))                  # 28
+    total = total + len(unwrap_or(words(), "xx"))        # 30
+    total = total + is_ok(words()) + is_ok(Result.Ok(9)) # 32
+    total

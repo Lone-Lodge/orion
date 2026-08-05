@@ -1,7 +1,7 @@
-/* net_min.c — minimal blocking TCP for the `net` orb.
+/* net_min.c - minimal blocking TCP for the `net` orb.
  *
  * Kept in its OWN translation unit (not orion_rt.c) so <winsock2.h> can be
- * included before anything pulls in <windows.h> — the two conflict if windows.h
+ * included before anything pulls in <windows.h> - the two conflict if windows.h
  * wins the race, which orion_rt.c would cause. On Windows ws2_32 is linked by
  * the #pragma below, so no build-script flag is needed; WSAStartup is lazy, so a
  * program that never opens a socket never touches Winsock.
@@ -38,7 +38,7 @@ static void net_init(void) {}
 static int net_close_raw(net_sock s) { return close(s); }
 #endif
 
-/* Runtime helpers defined in orion_rt.c — a headered text buffer of `len`
+/* Runtime helpers defined in orion_rt.c - a headered text buffer of `len`
  * bytes (returns the byte pointer), and the length stored just before it. */
 char *orion_text_alloc(long long len);
 long long orion_tlen_c(const char *p);
@@ -79,7 +79,7 @@ long long net_send(long long sock, const char *data) {
 }
 
 /* net_recv(sock, maxlen) -> Text of up to maxlen bytes; "" on close/error.
- * One blocking recv (not drained to maxlen) — a caller loops if it wants more. */
+ * One blocking recv (not drained to maxlen) - a caller loops if it wants more. */
 const char *net_recv(long long sock, long long maxlen) {
     if (maxlen <= 0) maxlen = 4096;
     char *buf = orion_text_alloc(maxlen);

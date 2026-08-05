@@ -1,9 +1,9 @@
-fn main() -> int:
-    mut xs = [10, 20]
-    xs = push(xs, 30)
-    xs = push(xs, 40)
-    xs = push(xs, 50)
-    mut sum = 0
+define main() -> int:
+    edit xs = [10, 20]
+    xs = append(xs, 30)
+    xs = append(xs, 40)
+    xs = append(xs, 50)
+    edit sum = 0
     loop x in xs:
         sum = sum + x
-    sum / 10
+    sum // 10

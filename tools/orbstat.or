@@ -1,0 +1,119 @@
+# orbstat - what does an orb actually expose, and how much of it is proven?
+#
+# A real tool written in the v2 surface, on purpose: it is the dogfood test
+# for `define`/`edit`/`truth`/`is`/`until`/`choose`/`collect`/`where`/`each`/
+# `keep`/`combine`/`append`/`uses`/`example`/named args/light lambdas.
+#
+#   orbit run tools/orbstat.or              # every orb under orbs/
+#   orbit run tools/orbstat.or text list    # only these
+#
+# Reports per orb: public defines, example assertions, capability contracts,
+# and whether the orb still speaks v1 idiom (== / != / 0..<n).
+use os
+use text
+use iter
+use list
+
+type orbstat:
+    name: text
+    publics: int
+    examples: int
+    contracts: int
+    old_idiom: int
+
+# One line of a source file counts toward at most one bucket.
+define classify(line: text) -> text:
+    t = trim(line)
+    choose:
+        starts_with(t, "#") then "comment"
+        starts_with(t, "public define ") then "public"
+        starts_with(t, "example ") then "example"
+        else "code"
+
+define has_contract(line: text) -> truth:
+    example has_contract("public define f() uses net:")
+    example not has_contract("public define f():")
+    contains(line, " uses ")
+
+# `==`, `!=` and `0..<n` are the retired spellings - this is the measure of
+# how much of an orb still reads like v1.
+define is_old_idiom(line: text) -> truth:
+    example is_old_idiom("if a == b:")
+    example is_old_idiom("loop i in 0..<n:")
+    example not is_old_idiom("if a is b:")
+    contains(line, " == ") or contains(line, " != ") or contains(line, "..<")
+
+define scan(name: text, src: text) -> orbstat:
+    lines_of = lines(src)
+    edit publics = 0
+    edit examples = 0
+    edit contracts = 0
+    edit old = 0
+    loop line in lines_of:
+        kind = classify(line)
+        if kind is "public":
+            publics = publics + 1
+            if has_contract(line):
+                contracts = contracts + 1
+        if kind is "example":
+            examples = examples + 1
+        if kind is not "comment" and is_old_idiom(line):
+            old = old + 1
+    orbstat{name: name, publics: publics, examples: examples, contracts: contracts, old_idiom: old}
+
+define pct(part: int, whole: int) -> int:
+    if whole is 0 then 100 else part * 100 // whole
+
+define report(s: orbstat) uses console:
+    cover = pct(s.examples, s.publics)
+    bar = repeat("#", cover // 10)
+    # NOTE: a string literal cannot appear INSIDE an interpolation hole
+    # (the inner quote ends the outer string), so each padded column is
+    # built into a local first. Worth knowing before you write a table.
+    sp = " "
+    name_col = pad_right(s.name, 16, sp)
+    pub_col = pad_left("{s.publics}", 4, sp)
+    ex_col = pad_left("{s.examples}", 4, sp)
+    use_col = pad_left("{s.contracts}", 4, sp)
+    cov_col = pad_left("{cover}", 4, sp)
+    print_line("{name_col}{pub_col}{ex_col}{use_col}{cov_col}%  {bar}")
+    if s.old_idiom > 0:
+        print_line("                 ^ {s.old_idiom} line(s) still v1 idiom")
+
+# An orb is "internal" when it is part of the compiler itself: covered by the
+# test suite and the fixpoint, not by user-facing examples.
+define is_internal(name: text) -> truth:
+    example is_internal("orion_parse")
+    example not is_internal("text")
+    starts_with(name, "orion_")
+
+define wanted(name: text, picks: list of text) -> truth:
+    if len(picks) is 0:
+        return not is_internal(name)
+    edit hit = false
+    loop p in picks:
+        if p is name:
+            hit = true
+    hit
+
+define main() uses files, console:
+    args = arguments()
+    picks = loop i in 1 until len(args): collect at(args, i)
+    names = list_dirs("orbs")
+    edit stats = []
+    loop name in names where name is not "" and wanted(name, picks):
+        src = read_file("orbs/{name}/lib.or")
+        if len(src) > 0:
+            stats = append(stats, scan(name, src))
+    print_line("orb              pub  example  uses  coverage")
+    print_line("--------------------------------------------------")
+    loop s in stats:
+        report(s)
+    total_pub = combine(each(stats, (s: orbstat): s.publics), 0, (a, b): a + b)
+    total_ex = combine(each(stats, (s: orbstat): s.examples), 0, (a, b): a + b)
+    total_old = combine(each(stats, (s: orbstat): s.old_idiom), 0, (a, b): a + b)
+    clean = keep(stats, (s: orbstat): s.old_idiom is 0)
+    print_line("--------------------------------------------------")
+    print_line("{len(stats)} orbs, {total_pub} public, {total_ex} examples ({pct(total_ex, total_pub)}%), {len(clean)}/{len(stats)} fully v2")
+    if total_old > 0:
+        print_line("{total_old} line(s) still speak v1 idiom")

@@ -6,6 +6,9 @@ declare i32 @puts(ptr)
 declare ptr @malloc(i64)
 declare ptr @orion_f64_literal_hex(ptr)
 declare i64 @orion_par_run(ptr, i64)
+declare i64 @orion_trace_enter(ptr)
+declare i64 @orion_trail_note_trap()
+declare i64 @orion_breakpoint(ptr)
 declare ptr @orion_alloc(i64)
 declare ptr @orion_par_madd(ptr, ptr, i64)
 declare i64 @orion_arena_init(i64)
@@ -829,6 +832,7 @@ entry:
   br i1 %at_oob, label %at_fail, label %at_ok
 at_fail:
   %_atp = call i32 (ptr, ...) @printf(ptr @.msg_oob, i64 %idx, i64 %at_len)
+  %_att = call i64 @orion_trail_note_trap()
   call void @exit(i32 70)
   unreachable
 at_ok:
@@ -870,6 +874,7 @@ entry:
   br i1 %rq, label %rfail, label %rok
 rfail:
   %_rp = call i32 (ptr, ...) @printf(ptr @.msg_require)
+  %_rt = call i64 @orion_trail_note_trap()
   call void @exit(i32 70)
   unreachable
 rok:
@@ -882,6 +887,7 @@ entry:
   br i1 %eq0, label %efail, label %eok
 efail:
   %_ep = call i32 (ptr, ...) @printf(ptr @.msg_ensure)
+  %_et = call i64 @orion_trail_note_trap()
   call void @exit(i32 70)
   unreachable
 eok:
@@ -1530,7 +1536,7 @@ for_7_header:
 for_7_body:
     %v16 = load ptr, ptr %v5
     %v17 = call i64 @orion_list_at(ptr %v0, i64 %v12)
-    %v18 = call ptr @orion_list_push(ptr %v16, i64 %v17)
+    %v18 = call ptr @orion_list_push_mut(ptr %v16, i64 %v17)
     store ptr %v18, ptr %v5
     %v19 = add i64 0, 0
     br label %for_7_step

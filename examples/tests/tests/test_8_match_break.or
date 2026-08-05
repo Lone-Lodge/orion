@@ -2,14 +2,14 @@
 # a diverging arm is detected and the match skips its value-store + fallthrough.
 type Opt<T>: Some(T) | None
 
-fn dec(n: int) -> Opt<int>:
+define dec(n: int) -> Opt<int>:
     if n > 0 then Opt.Some(n - 1) else Opt.None
 
-fn main() -> int:
-    mut count = 0
-    mut cur = 8
+define main() -> int:
+    edit count = 0
+    edit cur = 8
     loop:
-        match dec(cur):
+        choose dec(cur):
             Some(next) ->
                 cur = next
                 count = count + 1

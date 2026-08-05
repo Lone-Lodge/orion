@@ -1,5 +1,5 @@
 #!/bin/bash
-# demos_smoke — compile (and link) every examples/demos/*.or and report
+# demos_smoke - compile (and link) every examples/demos/*.or and report
 # pass/fail. Guards the demos against orb renames and compiler changes.
 #
 #   bash tools/demos_smoke.sh
@@ -9,13 +9,20 @@
 # include it.
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
+# The compiler recurses deep; Windows reserves stack in the exe (/STACK),
+# POSIX raises it here - without this, arm64 macOS segfaulted SILENTLY on
+# the deepest compiles (closure combos) while linux squeaked by on 8 MB.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
+esac
 ORION="$ROOT/dist/orion.exe"
 RT="$ROOT/runtime/orion_rt.c"
 TMP=$(mktemp -d)
 INCLUDE_NET=0
 [ "${1:-}" = "--all" ] && INCLUDE_NET=1
 
-[ -x "$ORION" ] || { echo "no dist/orion.exe — run tools/bootstrap_from_ll.sh first"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - run tools/bootstrap_from_ll.sh first"; exit 1; }
 
 # The compiler always emits a Windows triple; on POSIX retarget to the host.
 case "$(uname -s 2>/dev/null || echo Linux)" in

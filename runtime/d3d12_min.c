@@ -1,7 +1,7 @@
-/* d3d12_min.c — minimal D3D12 renderer for native Orion.
+/* d3d12_min.c - minimal D3D12 renderer for native Orion.
  *
  * Same philosophy as win32_min.c: one C file, raw OS API, no
- * middleware. Colored 2D rects only — exactly what cubsy's
+ * middleware. Colored 2D rects only - exactly what cubsy's
  * DisplayList needs. ~450 lines replaces lodge-orion's gpu.rs + wgpu
  * dependency chain.
  *
@@ -10,7 +10,7 @@
  *   og_rect(x,y,w,h,r,g,b)   append 6 verts (pixel coords, 0-255 col)
  *   og_present()             record ONE command list: barrier, clear,
  *                             draw all, barrier, execute, present,
- *                             fence-wait (full sync — correct first,
+ *                             fence-wait (full sync - correct first,
  *                             overlap later)
  *
  * All-i64 extern API (colors 0-255, coords in pixels).
@@ -28,7 +28,7 @@
 #include <string.h>
 
 #define FRAME_COUNT 2
-#define MAX_VERTS 65536           /* 10922 rects/frame — plenty for 2D */
+#define MAX_VERTS 65536           /* 10922 rects/frame - plenty for 2D */
 
 typedef struct { float x, y, r, g, b, a; } Vert;
 
@@ -98,7 +98,7 @@ extern long long orion_tlen_c(const char *p);
 static void tex_pipeline_init(void); /* defined below; called from init */
 static void tex_flush(UINT frame);   /* defined below; called from present */
 
-/* Shaders precompiled to DXBC at build time (fxc, see tools/shaders) —
+/* Shaders precompiled to DXBC at build time (fxc, see tools/shaders) -
  * no d3dcompiler DLL at runtime: fewer deps, faster cold start. */
 #include "vs_dxbc.h"
 #include "ps_dxbc.h"
@@ -191,7 +191,7 @@ long long dx_og_init(long long hwnd_i, long long width, long long height) {
     IDXGISwapChain1_QueryInterface(swap1, &IID_IDXGISwapChain3, (void **)&g_swap);
     IDXGISwapChain1_Release(swap1);
     /* Kill DXGI's built-in Alt+Enter: it flips to a stretched exclusive-
-     * fullscreen mode (blurry/pixelated — the backbuffer stays windowed-
+     * fullscreen mode (blurry/pixelated - the backbuffer stays windowed-
      * size and DXGI upscales). We handle Alt+Enter ourselves in the window
      * proc as borderless fullscreen, which goes through the normal resize
      * path (swap chain + layout re-derive at native res). */
@@ -300,7 +300,7 @@ long long dx_og_init(long long hwnd_i, long long width, long long height) {
     return 1;
 }
 
-/* Wait only for THIS slot's previous submission — with FRAME_COUNT
+/* Wait only for THIS slot's previous submission - with FRAME_COUNT
  * slots the CPU records frame N while the GPU draws frame N-1. This
  * is the overlap the v0.0 "full sync per present" left on the table
  * (it played at half vsync). */
@@ -325,7 +325,7 @@ void dx_og_begin(long long r, long long g, long long b) {
  * the shader stays a passthrough.
  * Verts build in a CACHED staging array, not the mapped upload heap:
  * the upload heap is write-combined memory where scattered 24-byte
- * stores cost ~330ns each — st53 measured it. One streaming memcpy
+ * stores cost ~330ns each - st53 measured it. One streaming memcpy
  * at present is what WC memory is good at. */
 void dx_og_rect(long long x, long long y, long long w, long long h,
               long long r, long long g, long long b) {
@@ -367,7 +367,7 @@ void dx_og_rect_a(long long x, long long y, long long w, long long h,
     g_nverts += 6;
 }
 
-/* Vertical gradient rect: top verts carry colour0, bottom verts colour1 —
+/* Vertical gradient rect: top verts carry colour0, bottom verts colour1 -
  * the rasterizer interpolates the fill for free. */
 void dx_og_vgrad(long long x, long long y, long long w, long long h,
               long long r0, long long g0, long long b0,
@@ -447,7 +447,7 @@ long long dx_og_present(void) {
 
     ID3D12CommandList *lists[] = {(ID3D12CommandList *)g_list};
     ID3D12CommandQueue_ExecuteCommandLists(g_queue, 1, lists);
-    /* 0x200 = DXGI_PRESENT_ALLOW_TEARING — required for uncapped
+    /* 0x200 = DXGI_PRESENT_ALLOW_TEARING - required for uncapped
      * present on flip-model when vsync is off. */
     IDXGISwapChain3_Present(g_swap, g_vsync ? 1 : 0,
                             (!g_vsync && g_tearing) ? 0x200 : 0);
@@ -461,7 +461,7 @@ long long dx_og_present(void) {
 
 /* D3DCompile, loaded dynamically so we add no link dependency and degrade
  * gracefully if the compiler DLL is absent. Types (ID3DBlob, D3D_SHADER_MACRO)
- * come from d3dcommon.h via d3d12.h — no d3dcompiler.h needed. */
+ * come from d3dcommon.h via d3d12.h - no d3dcompiler.h needed. */
 typedef HRESULT(WINAPI *PFN_D3DCOMPILE)(LPCVOID, SIZE_T, LPCSTR,
     const D3D_SHADER_MACRO *, ID3DInclude *, LPCSTR, LPCSTR, UINT, UINT,
     ID3DBlob **, ID3DBlob **);
@@ -729,13 +729,13 @@ long long dx_og_texture(const char *path) {
     int h = d[4] | d[5] << 8 | d[6] << 16 | d[7] << 24;
     int id = tex_upload_raw(d + 8, w, h);
     if (id >= 0) g_tex_path[id] = _strdup(path);
-    /* The pixels live on the GPU now — release the ~w*h*4 CPU copy. */
+    /* The pixels live on the GPU now - release the ~w*h*4 CPU copy. */
     host_image_free_cached(path);
     return id;
 }
 
 /* Cached glyph texture by int key (gid*K+size). Returns id or -1 if not yet
- * uploaded — the caller then rasterizes and calls dx_og_texture_mem. */
+ * uploaded - the caller then rasterizes and calls dx_og_texture_mem. */
 long long dx_og_glyph_id(long long key) {
     if (!g_tex_ok) return -1;
     for (int i = 0; i < g_tex_n; i++)
@@ -761,7 +761,7 @@ long long dx_og_texture_mem(long long key, long long w, long long h,
     return id;
 }
 
-/* Record one textured quad. src rect (sx,sy,sw,sh) in texels — 0 w/h means
+/* Record one textured quad. src rect (sx,sy,sw,sh) in texels - 0 w/h means
  * the whole texture (atlas otherwise). tint is 0xRRGGBBAA modulation.
  * blend: 0 = alpha, 1 = additive. Clipped to the active scissor. */
 void dx_og_sprite(long long id, long long dx, long long dy, long long dw,
@@ -878,6 +878,6 @@ long long dx_og_resize(long long w, long long h) {
 
 void dx_og_shutdown(void) {
     if (g_queue) fence_sync();
-    /* Deliberately no Release cascade — process exit reclaims
+    /* Deliberately no Release cascade - process exit reclaims
      * everything; a game calls this once. */
 }

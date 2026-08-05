@@ -1,9 +1,9 @@
-# expect: cut_comptime.or:6:23 — `comptime` was cut
+# expect: cut_comptime.or:6:27 - `comptime` was cut
 # `comptime` was accepted in exactly one position (`= comptime EXPR`) where it
 # was skipped and did nothing, while the docs listed "comptime constant folding"
 # under what works. `const NAME = expr` really is folded at its read sites, so
 # the keyword was a second way to say the same thing, minus the guarantee.
-fn version() -> Text = comptime "0.0.1"
+define version() -> text = comptime "0.0.1"
 
-fn main() -> int:
+define main() -> int:
     len(version())

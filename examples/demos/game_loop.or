@@ -1,4 +1,4 @@
-# Orion 2026 game demo — showcases the full language stack in one file.
+# Orion 2026 game demo - showcases the full language stack in one file.
 #
 # Features used:
 #   * sum types (enum Tile, Action, Outcome)
@@ -9,7 +9,7 @@
 #
 # The handlers in this file are the PRODUCTION versions. For tests you'd
 # write deterministic handlers (e.g. Random.roll returns fixed sequence)
-# and link those instead — the game code is unchanged.
+# and link those instead - the game code is unchanged.
 
 # ---- Sum types -------------------------------------------------------
 
@@ -23,7 +23,7 @@ effect Random:
     roll: fn(max: int) -> int
 
 effect Log:
-    msg: fn(text: Text) -> Text
+    msg: fn(text: text) -> text
 
 # ---- Handlers (production) ------------------------------------------
 # `handle Effect.op(...)` names the handler explicitly; `resume(v)` sends a
@@ -33,13 +33,13 @@ handle Random.roll(max: int) -> int:
     # Deterministic for the demo. Production would call OS random.
     resume(73)
 
-handle Log.msg(message: Text) -> Text:
+handle Log.msg(message: text) -> text:
     print_line(message)
     resume("ok")
 
 # ---- Game logic ------------------------------------------------------
 
-fn loot_value() -> int:
+define loot_value() -> int:
     perform Log.msg("rolling loot table")
     roll = perform Random.roll(100)
     if roll > 95:
@@ -53,7 +53,7 @@ fn loot_value() -> int:
             else:
                 0
 
-fn process_tile(tile_kind: int) -> int:
+define process_tile(tile_kind: int) -> int:
     if tile_kind == 0:
         return 0
     if tile_kind == 1:
@@ -68,7 +68,7 @@ fn process_tile(tile_kind: int) -> int:
         else:
             0
 
-fn main() -> int:
+define main() -> int:
     perform Log.msg("=== game starts ===")
 
     a = process_tile(0)   # Empty → 0

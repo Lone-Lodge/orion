@@ -1,0 +1,62 @@
+# scheduler — cooperative task abstraction on top of the async orb.
+#
+# This is the user-space layer. A `Task` is a deadline + a fn_id the
+# dispatcher knows how to invoke. The run loop sleeps until the
+# earliest deadline, fires all due tasks, repeats until empty.
+#
+# Real preemptive scheduling with non-blocking I/O needs:
+#   - libco (or Windows fibers) for stack switching
+#   - IOCP (Windows) / epoll (Linux) for fd readiness
+#   - a worker pool for parallel execution
+# All future work. What this orb gives you today is a clean
+# event-loop pattern that composes with the existing setjmp/longjmp
+# continuations + the async timer queue.
+
+type Task: deadline_ms: int, fn_id: int, payload: int
+
+public define task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
+    example task_fn_id(task_new(0, 5, 0)) is 5
+    Task{deadline_ms: monotonic_ms() + fire_in_ms, fn_id: fn_id, payload: payload}
+
+public define task_deadline(t: Task) -> int:
+    example task_deadline(task_new(0, 7, 3)) >= 0
+    t.deadline_ms
+
+public define task_fn_id(t: Task) -> int:
+    example task_fn_id(task_new(0, 7, 3)) is 7
+    t.fn_id
+
+public define task_payload(t: Task) -> int:
+    example task_payload(task_new(0, 7, 3)) is 3
+    t.payload
+
+# Is this task ready to run (deadline ≤ now)?
+public define task_due(t: Task) -> truth uses clock:
+    example task_due(task_new(0, 0, 0))
+    monotonic_ms() >= t.deadline_ms
+
+# Sleep until task fires. Returns immediately if already due.
+# no example: sleeps until a deadline — proven by test_44_async_sleep.or
+public define await_task(t: Task):
+    now = monotonic_ms()
+    remaining = t.deadline_ms - now
+    if remaining > 0:
+        sleep_ms(remaining)
+
+# Sleep until the earliest deadline in a list. Caller dispatches the
+# fired task(s) by inspecting `task_due` on each entry.
+# no example: sleeps until a deadline — proven by test_44_async_sleep.or
+# no example: sleeps until the earliest deadline — proven by test_44_async_sleep.or
+public define await_next(tasks: [Task]):
+    n = len(tasks)
+    if n is 0:
+        return
+    edit earliest = at(tasks, 0).deadline_ms
+    loop i in 1 until n:
+        d = at(tasks, i).deadline_ms
+        if d < earliest:
+            earliest = d
+    now = monotonic_ms()
+    remaining = earliest - now
+    if remaining > 0:
+        sleep_ms(remaining)

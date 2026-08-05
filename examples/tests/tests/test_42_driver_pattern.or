@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     # Mirror what orion_driver.or does, except hardcoded paths.
     if argc() < 1:
         99
@@ -6,7 +6,7 @@ fn main() -> int:
         # Write a small file, read it back, verify roundtrip.
         # Relative to the runner's cwd (examples/tests), NOT /tmp: a native exe
         # does not get the shell's /tmp mapping, so on Windows "/tmp/x" means
-        # C:\tmp\x — a directory that happens to exist on the author's machine
+        # C:\tmp\x - a directory that happens to exist on the author's machine
         # and does not on a clean one, where file_write then silently failed
         # and the test returned 77. dist/ is the runner's own scratch dir and
         # is always there by the time a test runs.

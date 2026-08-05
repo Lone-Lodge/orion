@@ -1,0 +1,4 @@
+# expect: `mut` was retired
+define main() -> int:
+    mut x = 5
+    x

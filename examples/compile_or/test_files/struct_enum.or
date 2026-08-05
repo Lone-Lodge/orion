@@ -5,16 +5,16 @@ type Color:
     Green
     Blue
 
-fn color_code(c: Color) -> int:
-    match c:
+define color_code(c: Color) -> int:
+    choose c:
         Red -> 0xff0000
         Green -> 0x00ff00
         Blue -> 0x0000ff
 
-fn dist_sq(p: Point) -> int:
+define dist_sq(p: Point) -> int:
     p.x * p.x + p.y * p.y
 
-fn main() -> int:
+define main() -> int:
     pt = Point{x: 3, y: 4}
     d = dist_sq(pt)
     c = color_code(Color.Green)

@@ -1,4 +1,4 @@
-# text — common text helpers callable via method-call syntax.
+# text - common text helpers callable via method-call syntax.
 #
 # Once you `use text`, you get:
 #   msg.is_empty()
@@ -11,101 +11,290 @@
 # All thanks to MethodCall desugar: `msg.starts_with("x")` lowers to
 # `starts_with(msg, "x")`.
 
-pub fn is_empty(t: Text) -> int:
-    if len(t) == 0 then 1 else 0
+public define is_empty(t: text) -> truth:
+    example is_empty("")
+    example not is_empty("x")
+    len(t) is 0
 
-pub fn byte_count(t: Text) -> int:
+public define byte_count(t: text) -> int:
+    example byte_count("åsa") is 4
     bytes_length(bytes_from_text(t))
 
-pub fn starts_with(t: Text, prefix: Text) -> int:
+public define starts_with(t: text, prefix: text) -> truth:
+    example starts_with("hello", "he")
     t_bytes = bytes_from_text(t)
     p_bytes = bytes_from_text(prefix)
     t_len = bytes_length(t_bytes)
     p_len = bytes_length(p_bytes)
-    mut result = 1
     if p_len > t_len:
-        result = 0
-    if p_len <= t_len:
-        loop ci in 0..<p_len:
-            tb = byte_at(t_bytes, ci)
-            pb = byte_at(p_bytes, ci)
-            if tb != pb:
-                result = 0
-    result
+        return false
+    loop ci in 0 until p_len:
+        if byte_at(t_bytes, ci) is not byte_at(p_bytes, ci):
+            return false
+    true
 
-pub fn ends_with(t: Text, suffix: Text) -> int:
+public define ends_with(t: text, suffix: text) -> truth:
+    example ends_with("hello", "lo")
     t_bytes = bytes_from_text(t)
     s_bytes = bytes_from_text(suffix)
     t_len = bytes_length(t_bytes)
     s_len = bytes_length(s_bytes)
-    mut result = 1
     if s_len > t_len:
-        result = 0
-    if s_len <= t_len:
-        offset = t_len - s_len
-        loop ci in 0..<s_len:
-            tb = byte_at(t_bytes, ci + offset)
-            sb = byte_at(s_bytes, ci)
-            if tb != sb:
-                result = 0
-    result
+        return false
+    offset = t_len - s_len
+    loop ci in 0 until s_len:
+        if byte_at(t_bytes, ci + offset) is not byte_at(s_bytes, ci):
+            return false
+    true
 
 # Repeat `t` `n` times. Returns "" if n <= 0.
-pub fn repeat(t: Text, n: int) -> Text:
-    mut result = ""
+public define repeat(t: text, n: int) -> text:
+    example repeat("ab", 3) is "ababab"
+    edit result = ""
     if n > 0:
-        loop _ in 0..<n:
+        loop _ in 0 until n:
             result = "{result}{t}"
     result
 
-# Reverse the bytes (ASCII-safe only).
-pub fn reverse(t: Text) -> Text:
+# Reverse by CHARACTER (UTF-8-aware): a multibyte sequence keeps its byte
+# order, so reversing Swedish never produces invalid UTF-8.
+public define reverse(t: text) -> text:
+    example reverse("abc") is "cba"
+    example reverse("åsa") is "aså"
     t_bytes = bytes_from_text(t)
     n = bytes_length(t_bytes)
-    mut out = bytes_zeros(0)
-    loop ci in 0..<n:
-        idx = n - 1 - ci
-        out = bytes_concat(out, bytes_slice(t_bytes, idx, idx + 1))
+    edit out = bytes_zeros(0)
+    edit ci = 0
+    loop:
+        if ci >= n:
+            break
+        # A character = its lead byte + any continuation bytes (0x80-0xBF).
+        edit cend = ci + 1
+        loop:
+            if cend >= n:
+                break
+            cb = byte_at(t_bytes, cend)
+            if cb >= 128 and cb < 192:
+                cend = cend + 1
+            else:
+                break
+        out = bytes_concat(bytes_slice(t_bytes, ci, cend), out)
+        ci = cend
     bytes_to_text(out)
 
-# Convert ASCII letters to upper case (in place, ASCII only).
-pub fn upper(t: Text) -> Text:
-    t_bytes = bytes_from_text(t)
-    n = bytes_length(t_bytes)
-    mut out = bytes_zeros(0)
-    loop ci in 0..<n:
-        b = byte_at(t_bytes, ci)
-        mut new_b = b
-        if b >= 97 and b <= 122:
-            new_b = b - 32
-        out = bytes_concat(out, [new_b])
+# ---- Unicode case ----------------------------------------------------
+#
+# `upper` and `lower` work on CODE POINTS, not bytes: decode UTF-8, map the
+# code point, encode it back. That is what lets one rule cover every script
+# instead of one byte hack per alphabet.
+#
+# Covered: ASCII, Latin-1 supplement, Latin Extended-A, Greek, Cyrillic.
+# Everything else passes through unchanged, so no text is ever corrupted -
+# a code point with no mapping is simply itself.
+#
+# Two honest limits, both inherent to SIMPLE (1:1) case mapping:
+#   - ß stays ß in `upper`. Its real uppercase is "SS", which is two code
+#     points; a 1:1 table cannot say that.
+#   - `upper("i")` is "I" everywhere, including Turkish text, where the
+#     locale-correct answer is "İ". Locale-tailored casing needs a locale,
+#     which Orion does not have. İ and ı themselves DO map (İ->i, ı->I), so
+#     Turkish text survives a round trip through the wrong direction.
+
+# How many bytes the UTF-8 sequence with this lead byte occupies.
+define cp_size(lead: int) -> int:
+    if lead < 0x80:
+        1
+    else if lead < 0xE0:
+        2
+    else if lead < 0xF0:
+        3
+    else:
+        4
+
+# Decode the code point starting at byte `i`. A truncated or ill-formed
+# sequence decodes as its lead byte, so decoding never fails.
+define cp_at(b: [int], i: int) -> int:
+    n = len(b)
+    lead = at(b, i)
+    size = cp_size(lead)
+    if i + size > n:
+        lead
+    else if size is 1:
+        lead
+    else if size is 2:
+        ((lead & 0x1F) << 6) | (at(b, i + 1) & 0x3F)
+    else if size is 3:
+        ((lead & 0x0F) << 12) | ((at(b, i + 1) & 0x3F) << 6) | (at(b, i + 2) & 0x3F)
+    else:
+        ((lead & 0x07) << 18) | ((at(b, i + 1) & 0x3F) << 12) | ((at(b, i + 2) & 0x3F) << 6) | (at(b, i + 3) & 0x3F)
+
+# Encode a code point back to UTF-8 bytes.
+define cp_bytes(cp: int) -> [int]:
+    if cp < 0x80:
+        [cp]
+    else if cp < 0x800:
+        [0xC0 | (cp >> 6), 0x80 | (cp & 0x3F)]
+    else if cp < 0x10000:
+        [0xE0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F)]
+    else:
+        [0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F)]
+
+# Latin Extended-A (0x100..0x17F) is upper/lower PAIRS, but the parity flips
+# twice: 0x100..0x137 and 0x14A..0x177 have the capital on even, 0x139..0x148
+# and 0x179..0x17E have it on odd. These two answer "is this the capital of
+# its pair" for the block.
+define latin_a_pair_even(cp: int) -> truth:
+    (cp >= 0x100 and cp <= 0x137) or (cp >= 0x14A and cp <= 0x177)
+
+define latin_a_pair_odd(cp: int) -> truth:
+    (cp >= 0x139 and cp <= 0x148) or (cp >= 0x179 and cp <= 0x17E)
+
+# Cyrillic beyond the main alphabet (0x460..0x52F) is the same pair scheme:
+# capital on even, except the 0x4C1..0x4CE run where it is on odd.
+define cyrillic_pair_even(cp: int) -> truth:
+    (cp >= 0x460 and cp <= 0x481) or (cp >= 0x48A and cp <= 0x4BF) or (cp >= 0x4D0 and cp <= 0x52F)
+
+define cyrillic_pair_odd(cp: int) -> truth:
+    cp >= 0x4C1 and cp <= 0x4CE
+
+# The capital of `cp`, or `cp` itself when it has none.
+define upper_cp(cp: int) -> int:
+    if cp >= 0x61 and cp <= 0x7A:
+        cp - 0x20
+    else if cp is 0xB5:
+        0x39C                                  # µ micro sign -> Greek capital Mu
+    else if cp >= 0xE0 and cp <= 0xFE and cp is not 0xF7:
+        cp - 0x20                              # à..þ, ÷ is not a letter
+    else if cp is 0xFF:
+        0x178                                  # ÿ -> Ÿ, which lives in Latin Ext-A
+    else if cp is 0x131:
+        0x49                                   # ı dotless i -> I
+    else if cp is 0x17F:
+        0x53                                   # ſ long s -> S
+    else if latin_a_pair_even(cp):
+        if cp % 2 is 1 then cp - 1 else cp
+    else if latin_a_pair_odd(cp):
+        if cp % 2 is 0 then cp - 1 else cp
+    else if cp is 0x3C2:
+        0x3A3                                  # ς final sigma -> Σ
+    else if cp >= 0x3B1 and cp <= 0x3C1:
+        cp - 0x20                              # α..ρ
+    else if cp >= 0x3C3 and cp <= 0x3CB:
+        cp - 0x20                              # σ..ϋ
+    else if cp is 0x3AC:
+        0x386                                  # ά
+    else if cp >= 0x3AD and cp <= 0x3AF:
+        cp - 0x25                              # έ ή ί
+    else if cp is 0x3CC:
+        0x38C                                  # ό
+    else if cp >= 0x3CD and cp <= 0x3CE:
+        cp - 0x3F                              # ύ ώ
+    else if cp >= 0x430 and cp <= 0x44F:
+        cp - 0x20                              # а..я
+    else if cp >= 0x450 and cp <= 0x45F:
+        cp - 0x50                              # ѐ..џ
+    else if cyrillic_pair_even(cp):
+        if cp % 2 is 1 then cp - 1 else cp
+    else if cyrillic_pair_odd(cp):
+        if cp % 2 is 0 then cp - 1 else cp
+    else:
+        cp
+
+# The small letter of `cp`, or `cp` itself when it has none.
+define lower_cp(cp: int) -> int:
+    if cp >= 0x41 and cp <= 0x5A:
+        cp + 0x20
+    else if cp >= 0xC0 and cp <= 0xDE and cp is not 0xD7:
+        cp + 0x20                              # À..Þ, × is not a letter
+    else if cp is 0x130:
+        0x69                                   # İ -> i (simple mapping)
+    else if cp is 0x178:
+        0xFF                                   # Ÿ -> ÿ
+    else if latin_a_pair_even(cp):
+        if cp % 2 is 0 then cp + 1 else cp
+    else if latin_a_pair_odd(cp):
+        if cp % 2 is 1 then cp + 1 else cp
+    else if cp is 0x386:
+        0x3AC
+    else if cp >= 0x388 and cp <= 0x38A:
+        cp + 0x25                              # Έ Ή Ί
+    else if cp is 0x38C:
+        0x3CC
+    else if cp >= 0x38E and cp <= 0x38F:
+        cp + 0x3F                              # Ύ Ώ
+    else if cp >= 0x391 and cp <= 0x3A1:
+        cp + 0x20                              # Α..Ρ
+    else if cp >= 0x3A3 and cp <= 0x3AB:
+        cp + 0x20                              # Σ..Ϋ
+    else if cp >= 0x410 and cp <= 0x42F:
+        cp + 0x20                              # А..Я
+    else if cp >= 0x400 and cp <= 0x40F:
+        cp + 0x50                              # Ѐ..Џ
+    else if cyrillic_pair_even(cp):
+        if cp % 2 is 0 then cp + 1 else cp
+    else if cyrillic_pair_odd(cp):
+        if cp % 2 is 1 then cp + 1 else cp
+    else:
+        cp
+
+# Walk `t` code point by code point and rebuild it through `mapper`.
+define map_case(t: text, mapper: fn) -> text:
+    b = bytes_from_text(t)
+    n = len(b)
+    edit out = bytes_zeros(0)
+    edit i = 0
+    loop:
+        if i >= n:
+            break
+        cp = cp_at(b, i)
+        out = bytes_concat(out, cp_bytes(mapper(cp)))
+        i = i + cp_size(at(b, i))
     bytes_to_text(out)
 
-# Convert ASCII letters to lower case.
-pub fn lower(t: Text) -> Text:
+# Upper-case, code point by code point.
+public define upper(t: text) -> text:
+    example upper("hej") is "HEJ"
+    example upper("åsa är glad") is "ÅSA ÄR GLAD"
+    example upper("ελληνικά") is "ΕΛΛΗΝΙΚΆ"
+    example upper("привет") is "ПРИВЕТ"
+    map_case(t, upper_cp)
+
+# Lower-case, code point by code point.
+public define lower(t: text) -> text:
+    example lower("HEJ") is "hej"
+    example lower("ÅSA ÄR GLAD") is "åsa är glad"
+    example lower("ΕΛΛΗΝΙΚΆ") is "ελληνικά"
+    example lower("ПРИВЕТ") is "привет"
+    map_case(t, lower_cp)
+
+# How many CHARACTERS (Unicode code points) the text holds - `len` counts
+# bytes, and "åsa" is 4 bytes but 3 characters. Counts every byte that is
+# not a UTF-8 continuation byte (0x80-0xBF).
+public define characters(t: text) -> int:
+    example characters("åsa") is 3
+    example characters("abc") is 3
     t_bytes = bytes_from_text(t)
     n = bytes_length(t_bytes)
-    mut out = bytes_zeros(0)
-    loop ci in 0..<n:
+    edit count = 0
+    loop ci in 0 until n:
         b = byte_at(t_bytes, ci)
-        mut new_b = b
-        if b >= 65 and b <= 90:
-            new_b = b + 32
-        out = bytes_concat(out, [new_b])
-    bytes_to_text(out)
+        if b < 128 or b >= 192:
+            count = count + 1
+    count
 
 # Remove leading and trailing ASCII whitespace (space, tab, newline, CR).
 #   trim("  hi  ")  ->  "hi"
-pub fn trim(t: Text) -> Text:
+public define trim(t: text) -> text:
+    example trim("  hi  ") is "hi"
     tb = bytes_from_text(t)
     n = bytes_length(tb)
-    mut lo = 0
-    mut hi = n
+    edit lo = 0
+    edit hi = n
     loop:
         if lo >= hi:
             break
         b = byte_at(tb, lo)
-        if b == 32 or b == 9 or b == 10 or b == 13:
+        if b is 32 or b is 9 or b is 10 or b is 13:
             lo = lo + 1
         else:
             break
@@ -113,7 +302,7 @@ pub fn trim(t: Text) -> Text:
         if hi <= lo:
             break
         b = byte_at(tb, hi - 1)
-        if b == 32 or b == 9 or b == 10 or b == 13:
+        if b is 32 or b is 9 or b is 10 or b is 13:
             hi = hi - 1
         else:
             break
@@ -121,10 +310,11 @@ pub fn trim(t: Text) -> Text:
 
 # Join a list of pieces with `sep` between them.
 #   join(["a", "b", "c"], "-")  ->  "a-b-c"
-pub fn join(parts: [Text], sep: Text) -> Text:
-    mut out = ""
+public define join(parts: [text], sep: text) -> text:
+    example join(["a", "b", "c"], "-") is "a-b-c"
+    edit out = ""
     n = len(parts)
-    loop i in 0..<n:
+    loop i in 0 until n:
         if i > 0:
             out = "{out}{sep}"
         out = "{out}{at(parts, i)}"
@@ -133,66 +323,71 @@ pub fn join(parts: [Text], sep: Text) -> Text:
 # Split `t` on every occurrence of `sep`, returning the pieces.
 #   split("a,b,c", ",")  ->  ["a", "b", "c"]
 # An empty `sep` yields the whole string as a single piece.
-pub fn split(t: Text, sep: Text) -> [Text]:
+public define split(t: text, sep: text) -> [text]:
+    example len(split("a,b,c", ",")) is 3
     tb = bytes_from_text(t)
     sb = bytes_from_text(sep)
     tlen = bytes_length(tb)
     slen = bytes_length(sb)
-    mut out = []
-    if slen == 0:
-        out = push(out, t)
+    edit out = []
+    if slen is 0:
+        out = append(out, t)
     else:
-        mut start = 0
-        mut i = 0
+        edit start = 0
+        edit i = 0
         loop:
             if i > tlen - slen:
                 break
-            mut matched = 1
-            loop j in 0..<slen:
-                if byte_at(tb, i + j) != byte_at(sb, j):
-                    matched = 0
-            if matched == 1:
-                out = push(out, bytes_to_text(bytes_slice(tb, start, i)))
+            edit matched = true
+            loop j in 0 until slen:
+                if byte_at(tb, i + j) is not byte_at(sb, j):
+                    matched = false
+            if matched:
+                out = append(out, bytes_to_text(bytes_slice(tb, start, i)))
                 i = i + slen
                 start = i
             else:
                 i = i + 1
-        out = push(out, bytes_to_text(bytes_slice(tb, start, tlen)))
+        out = append(out, bytes_to_text(bytes_slice(tb, start, tlen)))
     out
 
-# Replace every occurrence of `from` with `to` — split on `from`, rejoin
+# Replace every occurrence of `from` with `to` - split on `from`, rejoin
 # with `to`. An empty `from` returns `t` unchanged.
 #   replace("a,b,c", ",", "; ")  ->  "a; b; c"
-pub fn replace(t: Text, from: Text, to: Text) -> Text:
+public define replace(t: text, from: text, to: text) -> text:
+    example replace("a,b", ",", "; ") is "a; b"
     join(split(t, from), to)
 
 # First byte index of `sub` in `t`, or -1 if absent. Empty `sub` -> 0.
-pub fn index_of(t: Text, sub: Text) -> int:
+public define index_of(t: text, sub: text) -> int:
+    example index_of("hello", "ll") is 2
+    example index_of("hello", "zz") is 0 - 1
     tb = bytes_from_text(t)
     sb = bytes_from_text(sub)
     tlen = bytes_length(tb)
     slen = bytes_length(sb)
-    mut found = 0 - 1
-    if slen == 0:
+    edit found = 0 - 1
+    if slen is 0:
         found = 0
     else:
-        mut i = 0
+        edit i = 0
         loop:
             if i > tlen - slen or found >= 0:
                 break
-            mut matched = 1
-            loop j in 0..<slen:
-                if byte_at(tb, i + j) != byte_at(sb, j):
-                    matched = 0
-            if matched == 1:
+            edit matched = true
+            loop j in 0 until slen:
+                if byte_at(tb, i + j) is not byte_at(sb, j):
+                    matched = false
+            if matched:
                 found = i
             i = i + 1
     found
 
 # Pad `t` on the left with `pad` until it is at least `width` bytes wide.
-pub fn pad_left(t: Text, width: int, pad: Text) -> Text:
-    mut out = t
-    mut k = len(t)
+public define pad_left(t: text, width: int, pad: text) -> text:
+    example pad_left("7", 3, "0") is "007"
+    edit out = t
+    edit k = len(t)
     loop:
         if k >= width:
             break
@@ -201,9 +396,10 @@ pub fn pad_left(t: Text, width: int, pad: Text) -> Text:
     out
 
 # Pad `t` on the right with `pad` until it is at least `width` bytes wide.
-pub fn pad_right(t: Text, width: int, pad: Text) -> Text:
-    mut out = t
-    mut k = len(t)
+public define pad_right(t: text, width: int, pad: text) -> text:
+    example pad_right("7", 3, "0") is "700"
+    edit out = t
+    edit k = len(t)
     loop:
         if k >= width:
             break
@@ -212,5 +408,32 @@ pub fn pad_right(t: Text, width: int, pad: Text) -> Text:
     out
 
 # Split `t` into lines on '\n'.
-pub fn lines(t: Text) -> [Text]:
+public define lines(t: text) -> [text]:
+    # no example: the newline in the input cannot be written inline here
     split(t, "\n")
+
+# The integer written at the start of `t`: an optional `-`, then digits.
+# Stops at the first non-digit; no digits at all is 0. For CLI arguments
+# and simple protocols - not a validator.
+public define int_from_text(t: text) -> int:
+    example int_from_text("42") is 42
+    example int_from_text("-7") is 0 - 7
+    example int_from_text("12ab") is 12
+    example int_from_text("x") is 0
+    bs = bytes_from_text(t)
+    n = len(bs)
+    edit i = 0
+    edit neg = false
+    if n > 0 and at(bs, 0) is 45:
+        neg = true
+        i = 1
+    edit value = 0
+    edit done = false
+    loop k in i until n:
+        if not done:
+            c = at(bs, k)
+            if c >= 48 and c <= 57:
+                value = value * 10 + (c - 48)
+            else:
+                done = true
+    if neg then 0 - value else value

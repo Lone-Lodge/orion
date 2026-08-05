@@ -1,8 +1,8 @@
-# expect: trasigorb/lib.or:6:8 — unknown identifier `does_not_exist_here`
+# expect: trasigorb/lib.or:6:8 - unknown identifier `does_not_exist_here`
 # The program is ONE concatenated text by the time it is lowered, so a raw
 # token line points into that concatenation, not into any file on disk. An
 # error inside an orb must name the ORB's file and the orb's own line.
 use trasigorb
 
-fn main() -> int:
+define main() -> int:
     helper(1)

@@ -25,13 +25,13 @@ use delta
 # these are the only alpha names visible here.
 use alpha (alpha_label, alpha_run, shared_label)
 
-fn label() -> Text:
+define label() -> text:
     "program"
 
-fn run(n: int) -> int:
+define run(n: int) -> int:
     n - 1
 
-fn check_text(name: Text, expected: Text, actual: Text) -> int:
+define check_text(name: text, expected: text, actual: text) -> int:
     if actual == expected:
         print_line("    ok    {name}")
         0
@@ -39,7 +39,7 @@ fn check_text(name: Text, expected: Text, actual: Text) -> int:
         print_line("    FAIL  {name} -> expected `{expected}`, got `{actual}`")
         1
 
-fn check(name: Text, expected: int, actual: int) -> int:
+define check(name: text, expected: int, actual: int) -> int:
     if actual == expected:
         print_line("    ok    {name}")
         0
@@ -47,11 +47,11 @@ fn check(name: Text, expected: int, actual: int) -> int:
         print_line("    FAIL  {name} -> expected {expected}, got {actual}")
         1
 
-fn main() -> int:
+define main() -> int:
     print_line("")
     print_line("  gate: orb visibility (private functions are orb-local)")
     print_line("")
-    mut bad = 0
+    edit bad = 0
     bad = bad + check_text("alpha's pub reaches alpha's private label", "alpha", alpha_label())
     bad = bad + check_text("beta's pub reaches beta's private label", "beta", beta_label())
     bad = bad + check_text("the program's own private label is untouched", "program", label())

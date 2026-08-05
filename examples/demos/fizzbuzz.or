@@ -1,11 +1,11 @@
-# fizzbuzz — the canonical "can a newcomer write it?" program.
+# fizzbuzz - the canonical "can a newcomer write it?" program.
 # Build: orion.exe examples/demos/fizzbuzz.or out.ll orbs
 #
 # 1..20: multiples of 3 -> "Fizz", of 5 -> "Buzz", of both -> "FizzBuzz",
 # otherwise the number. Returns how many were "FizzBuzz" (exit code).
 
-fn line(n: int) -> Text:
-    mut s = ""
+define line(n: int) -> text:
+    edit s = ""
     if n % 3 == 0:
         s = "{s}Fizz"
     if n % 5 == 0:
@@ -14,8 +14,8 @@ fn line(n: int) -> Text:
         s = "{n}"
     s
 
-fn main() -> int:
-    mut both = 0
+define main() -> int:
+    edit both = 0
     loop n in 1..=20:
         print_line("{n}: {line(n)}")
         if n % 15 == 0:

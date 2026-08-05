@@ -1,4 +1,4 @@
-# json — parse and build JSON. Written for the language server, which speaks
+# json - parse and build JSON. Written for the language server, which speaks
 # JSON-RPC over a pipe, but there is nothing LSP-specific here.
 #
 # Values map onto Orion's own dynamic shapes: an object is a `Map`, an array is
@@ -15,50 +15,50 @@
 
 # --- scanning helpers ---
 
-fn jsn_ws(b: [int], start: int) -> int:
+define jsn_ws(b: [int], start: int) -> int:
     n = len(b)
-    mut i = start
+    edit i = start
     loop:
         if i >= n:
             break
         c = at(b, i)
         # space, tab, newline, carriage return
-        if c == 32 or c == 9 or c == 10 or c == 13:
+        if c is 32 or c is 9 or c is 10 or c is 13:
             i = i + 1
         else:
             break
     i
 
 # Index just past the string that starts at the opening quote `start`.
-fn jsn_str_end(b: [int], start: int) -> int:
+define jsn_str_end(b: [int], start: int) -> int:
     n = len(b)
-    mut i = start + 1
+    edit i = start + 1
     loop:
         if i >= n:
             break
         c = at(b, i)
-        if c == 92:
+        if c is 92:
             i = i + 2
         else:
-            if c == 34:
+            if c is 34:
                 i = i + 1
                 break
             i = i + 1
     i
 
-fn jsn_has_escape(b: [int], from: int, to: int) -> bool:
-    mut found = false
-    mut i = from
+define jsn_has_escape(b: [int], from: int, to: int) -> truth:
+    edit found = false
+    edit i = from
     loop:
         if i >= to:
             break
-        if at(b, i) == 92:
+        if at(b, i) is 92:
             found = true
             break
         i = i + 1
     found
 
-fn jsn_hex_val(c: int) -> int:
+define jsn_hex_val(c: int) -> int:
     if c >= 48 and c <= 57:
         c - 48
     else:
@@ -73,15 +73,15 @@ fn jsn_hex_val(c: int) -> int:
 # The bytes between the quotes, with escapes resolved. `\uXXXX` is encoded as
 # UTF-8 (the BMP range; a surrogate pair is passed through as replacement
 # bytes rather than silently truncating the document).
-fn jsn_unescape(b: [int], from: int, to: int) -> Text:
-    mut out = slice([0], 0, 0)
-    mut i = from
+define jsn_unescape(b: [int], from: int, to: int) -> text:
+    edit out = slice([0], 0, 0)
+    edit i = from
     loop:
         if i >= to:
             break
         c = at(b, i)
-        if c != 92:
-            out = push(out, c)
+        if c is not 92:
+            out = append(out, c)
             i = i + 1
         else:
             if i + 1 >= to:
@@ -89,84 +89,84 @@ fn jsn_unescape(b: [int], from: int, to: int) -> Text:
             else:
                 e = at(b, i + 1)
                 i = i + 2
-                if e == 110:
-                    out = push(out, 10)
-                if e == 114:
-                    out = push(out, 13)
-                if e == 116:
-                    out = push(out, 9)
-                if e == 98:
-                    out = push(out, 8)
-                if e == 102:
-                    out = push(out, 12)
-                if e == 34:
-                    out = push(out, 34)
-                if e == 92:
-                    out = push(out, 92)
-                if e == 47:
-                    out = push(out, 47)
-                if e == 117:
+                if e is 110:
+                    out = append(out, 10)
+                if e is 114:
+                    out = append(out, 13)
+                if e is 116:
+                    out = append(out, 9)
+                if e is 98:
+                    out = append(out, 8)
+                if e is 102:
+                    out = append(out, 12)
+                if e is 34:
+                    out = append(out, 34)
+                if e is 92:
+                    out = append(out, 92)
+                if e is 47:
+                    out = append(out, 47)
+                if e is 117:
                     if i + 3 < to:
                         cp = jsn_hex_val(at(b, i)) * 4096 + jsn_hex_val(at(b, i + 1)) * 256 + jsn_hex_val(at(b, i + 2)) * 16 + jsn_hex_val(at(b, i + 3))
                         i = i + 4
                         if cp < 128:
-                            out = push(out, cp)
+                            out = append(out, cp)
                         else:
                             if cp < 2048:
-                                out = push(out, 192 + cp / 64)
-                                out = push(out, 128 + cp - (cp / 64) * 64)
+                                out = append(out, 192 + cp // 64)
+                                out = append(out, 128 + cp - (cp // 64) * 64)
                             else:
-                                hi = cp / 4096
-                                mid = (cp - hi * 4096) / 64
+                                hi = cp // 4096
+                                mid = (cp - hi * 4096) // 64
                                 lo = cp - hi * 4096 - mid * 64
-                                out = push(out, 224 + hi)
-                                out = push(out, 128 + mid)
-                                out = push(out, 128 + lo)
+                                out = append(out, 224 + hi)
+                                out = append(out, 128 + mid)
+                                out = append(out, 128 + lo)
     bytes_to_text(out)
 
 # --- values ---
 # Every parser returns {"v": value, "i": index-just-past}. The caller knows
 # which shape it asked for and reads "v" with the matching typed getter.
 
-fn jsn_value(b: [int], start: int) -> Map:
+define jsn_value(b: [int], start: int) -> table:
     i = jsn_ws(b, start)
     n = len(b)
     if i >= n:
         {"v": 0, "i": i}
     else:
         c = at(b, i)
-        if c == 123:
+        if c is 123:
             jsn_object(b, i)
         else:
-            if c == 91:
+            if c is 91:
                 jsn_array(b, i)
             else:
-                if c == 34:
+                if c is 34:
                     e = jsn_str_end(b, i)
                     raw_from = i + 1
                     raw_to = e - 1
                     txt = if jsn_has_escape(b, raw_from, raw_to) then jsn_unescape(b, raw_from, raw_to) else bytes_to_text(bytes_slice(b, raw_from, raw_to))
                     {"v": txt, "i": e}
                 else:
-                    if c == 116:
+                    if c is 116:
                         {"v": 1, "i": i + 4}
                     else:
-                        if c == 102:
+                        if c is 102:
                             {"v": 0, "i": i + 5}
                         else:
-                            if c == 110:
+                            if c is 110:
                                 {"v": 0, "i": i + 4}
                             else:
                                 jsn_number(b, i)
 
-fn jsn_number(b: [int], start: int) -> Map:
+define jsn_number(b: [int], start: int) -> table:
     n = len(b)
-    mut i = start
-    mut neg = false
-    if at(b, i) == 45:
+    edit i = start
+    edit neg = false
+    if at(b, i) is 45:
         neg = true
         i = i + 1
-    mut v = 0
+    edit v = 0
     loop:
         if i >= n:
             break
@@ -183,124 +183,206 @@ fn jsn_number(b: [int], start: int) -> Map:
         if i >= n:
             break
         c2 = at(b, i)
-        if c2 == 46 or c2 == 101 or c2 == 69 or c2 == 43 or (c2 >= 48 and c2 <= 57):
+        if c2 is 46 or c2 is 101 or c2 is 69 or c2 is 43 or (c2 >= 48 and c2 <= 57):
             i = i + 1
         else:
-            if c2 == 45:
+            if c2 is 45:
                 i = i + 1
             else:
                 break
     {"v": if neg then 0 - v else v, "i": i}
 
-fn jsn_object(b: [int], start: int) -> Map:
+define jsn_object(b: [int], start: int) -> table:
     n = len(b)
-    mut out = {}
-    mut i = start + 1
+    edit out = {}
+    edit i = start + 1
     loop:
         i = jsn_ws(b, i)
         if i >= n:
             break
         c = at(b, i)
-        if c == 125:
+        if c is 125:
             i = i + 1
             break
-        if c == 44:
+        if c is 44:
             i = i + 1
             continue
-        if c != 34:
+        if c is not 34:
             i = i + 1
             continue
         key_end = jsn_str_end(b, i)
         key = bytes_to_text(bytes_slice(b, i + 1, key_end - 1))
         i = jsn_ws(b, key_end)
         if i < n:
-            if at(b, i) == 58:
+            if at(b, i) is 58:
                 i = i + 1
         vr = jsn_value(b, i)
         out = set(out, key, get(vr, "v"))
         i = get_int(vr, "i")
     {"v": out, "i": i}
 
-fn jsn_array(b: [int], start: int) -> Map:
+define jsn_array(b: [int], start: int) -> table:
     n = len(b)
-    mut items = []
-    mut i = start + 1
+    edit items = []
+    edit i = start + 1
     loop:
         i = jsn_ws(b, i)
         if i >= n:
             break
         c = at(b, i)
-        if c == 93:
+        if c is 93:
             i = i + 1
             break
-        if c == 44:
+        if c is 44:
             i = i + 1
             continue
         vr = jsn_value(b, i)
-        items = push(items, get(vr, "v"))
+        items = append(items, get(vr, "v"))
         i = get_int(vr, "i")
     {"v": items, "i": i}
 
 # --- public surface ---
 
-pub fn json_parse(src: Text) -> Map:
+public define json_parse(src: text) -> table:
+    example json_has(json_parse("\{\"k\": 1\}"), "k")
     b = bytes_from_text(src)
     r = jsn_value(b, 0)
     get_map(r, "v")
 
-pub fn json_obj(o: Map, key: Text) -> Map:
+public define json_obj(o: table, key: text) -> table:
+    example json_has(json_obj(json_parse("\{\"o\": \{\"k\": 1\}\}"), "o"), "k")
     if has(o, key) then get_map(o, key) else {}
 
-pub fn json_text(o: Map, key: Text) -> Text:
+public define json_text(o: table, key: text) -> text:
+    example json_text(json_parse("\{\"s\": \"hi\"\}"), "s") is "hi"
     if has(o, key) then get(o, key) else ""
 
-pub fn json_int(o: Map, key: Text) -> int:
+public define json_int(o: table, key: text) -> int:
+    example json_int(json_parse("\{\"n\": 7\}"), "n") is 7
     if has(o, key) then get_int(o, key) else 0
 
-pub fn json_list(o: Map, key: Text) -> [Map]:
+public define json_list(o: table, key: text) -> [table]:
+    example len(json_list(json_parse("\{\"xs\": [1, 2]\}"), "xs")) is 2
     if has(o, key) then get_list(o, key) else []
 
-pub fn json_has(o: Map, key: Text) -> bool:
+public define json_has(o: table, key: text) -> truth:
+    example json_has(json_parse("\{\"a\": 1\}"), "a")
     has(o, key)
 
 # Escape a Text for embedding in JSON output. Single pass; the byte list is
 # turned into text once at the end.
-pub fn json_escape(s: Text) -> Text:
+public define json_escape(s: text) -> text:
+    example json_escape("a\"b") is "a\\\"b"
     b = bytes_from_text(s)
     n = len(b)
-    mut out = slice([0], 0, 0)
-    loop i in 0..<n:
+    edit out = slice([0], 0, 0)
+    loop i in 0 until n:
         c = at(b, i)
-        if c == 34:
-            out = push(out, 92)
-            out = push(out, 34)
+        if c is 34:
+            out = append(out, 92)
+            out = append(out, 34)
         else:
-            if c == 92:
-                out = push(out, 92)
-                out = push(out, 92)
+            if c is 92:
+                out = append(out, 92)
+                out = append(out, 92)
             else:
-                if c == 10:
-                    out = push(out, 92)
-                    out = push(out, 110)
+                if c is 10:
+                    out = append(out, 92)
+                    out = append(out, 110)
                 else:
-                    if c == 13:
-                        out = push(out, 92)
-                        out = push(out, 114)
+                    if c is 13:
+                        out = append(out, 92)
+                        out = append(out, 114)
                     else:
-                        if c == 9:
-                            out = push(out, 92)
-                            out = push(out, 116)
+                        if c is 9:
+                            out = append(out, 92)
+                            out = append(out, 116)
                         else:
                             if c < 32:
                                 # Control byte: \u00XX
                                 hexd = "0123456789abcdef"
                                 hb = bytes_from_text(hexd)
-                                out = push(out, 92)
-                                out = push(out, 117)
-                                out = push(out, 48)
-                                out = push(out, 48)
-                                out = push(out, at(hb, c / 16))
-                                out = push(out, at(hb, c - (c / 16) * 16))
+                                out = append(out, 92)
+                                out = append(out, 117)
+                                out = append(out, 48)
+                                out = append(out, 48)
+                                out = append(out, at(hb, c // 16))
+                                out = append(out, at(hb, c - (c // 16) * 16))
                             else:
-                                out = push(out, c)
+                                out = append(out, c)
     bytes_to_text(out)
+
+# --- writing JSON ---
+#
+# `json_parse` reads INTO a dynamic Map. To WRITE JSON, build a typed `Json`
+# value with the `j*` constructors and hand it to `json_stringify`. The two
+# sides are deliberately separate: reading is dynamic, writing is a typed tree
+# that serializes without guessing any value's type.
+
+type Json:
+    JNull
+    JBool(int)                 # 0 = false, anything else = true
+    JInt(int)
+    JFloat(float)
+    JStr(text)
+    JArr([Json])
+    JObj([text], [Json])       # parallel keys and values
+
+public define jnull() -> Json:
+    example json_stringify(jnull()) is "null"
+    Json.JNull
+public define jbool(b: int) -> Json:
+    example json_stringify(jbool(1)) is "true"
+    Json.JBool(b)
+public define jint(n: int) -> Json:
+    example json_stringify(jint(0 - 5)) is "-5"
+    Json.JInt(n)
+public define jfloat(x: float) -> Json:
+    example json_stringify(jfloat(1.5)) is "1.5"
+    Json.JFloat(x)
+public define jstr(s: text) -> Json:
+    example json_stringify(jstr("hi")) is "\"hi\""
+    Json.JStr(s)
+public define jarr(items: [Json]) -> Json:
+    example json_stringify(jarr([])) is "[]"
+    Json.JArr(items)
+public define jobj(keys: [text], vals: [Json]) -> Json:
+    example json_stringify(jobj([], [])) is "\{\}"
+    Json.JObj(keys, vals)
+
+# Serialize a Json value to compact JSON text.
+public define json_stringify(j: Json) -> text:
+    example json_stringify(jint(42)) is "42"
+    example json_stringify(jarr([jint(1), jint(2)])) is "[1,2]"
+    choose j:
+        JNull -> "null"
+        JBool(b) -> if b is 0 then "false" else "true"
+        JInt(n) -> "{n}"
+        JFloat(x) -> "{x}"
+        JStr(s) -> jsn_quote(s)
+        JArr(items) -> jsn_arr_text(items)
+        JObj(keys, vals) -> jsn_obj_text(keys, vals)
+
+# A JSON string literal: escaped and wrapped in double quotes.
+define jsn_quote(s: text) -> text:
+    q = bytes_to_text([34])
+    "{q}{json_escape(s)}{q}"
+
+define jsn_arr_text(items: [Json]) -> text:
+    edit out = "["
+    loop i in 0 until len(items):
+        if i > 0:
+            out = "{out},"
+        out = "{out}{json_stringify(at(items, i))}"
+    "{out}]"
+
+define jsn_obj_text(keys: [text], vals: [Json]) -> text:
+    lb = bytes_to_text([123])          # { and } are interpolation delimiters,
+    rb = bytes_to_text([125])          # so the braces come in as bytes.
+    edit out = lb
+    n = len(keys)
+    loop i in 0 until n:
+        if i > 0:
+            out = "{out},"
+        out = "{out}{jsn_quote(at(keys, i))}:{json_stringify(at(vals, i))}"
+    "{out}{rb}"

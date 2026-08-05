@@ -7,21 +7,25 @@
 // the code background; body text and links stay AAA. tools/docs_check.sh
 // measures all of it. Comments stay the dim tone the guide already used.
 (function () {
-  // The keyword set orion_parse actually dispatches on (kept in sync with the
-  // grammar's #keywords + #logical + #modifiers).
+  // The v2 keyword set (the target surface the Field Guide shows; the VS Code
+  // grammar follows as the migration lands).
   const KEYWORDS = new Set([
-    'if', 'then', 'else', 'match', 'loop', 'break', 'continue', 'in', 'where',
-    'return', 'require', 'ensure', 'defer', 'use', 'pub', 'extern', 'fn', 'type',
-    'const', 'effect', 'handle', 'perform', 'resume', 'let', 'move', 'orb',
-    'not', 'and', 'or', 'deterministic', 'parallel', 'mut'
+    'if', 'then', 'else', 'choose', 'loop', 'break', 'continue', 'in', 'where',
+    'return', 'require', 'ensure', 'defer', 'use', 'public', 'external',
+    'define', 'type', 'effect', 'handle', 'perform', 'resume', 'let', 'orb',
+    'not', 'and', 'or', 'deterministic', 'parallel', 'edit', 'collect', 'is',
+    'try', 'given', 'to', 'until', 'of', 'compile_time'
   ]);
-  // Built-in type names (case-insensitive in the compiler), plus true/false.
+  // Built-in type names, plus the value words.
   const TYPES = new Set([
-    'int', 'text', 'bool', 'float', 'f64', 'map', 'list', 'unit'
+    'number', 'truth', 'text', 'table', 'list', 'maybe', 'result', 'byte'
   ]);
-  const CONSTS = new Set(['true', 'false']);
-  // Words the compiler retired: painted as an error, like the editor does.
-  const RETIRED = new Set(['data', 'enum', 'for', 'comptime', 'take', 'dyn', 'region', 'query', 'none']);
+  const CONSTS = new Set(['true', 'false', 'none']);
+  // Words the language retired: painted as an error, like the editor does.
+  const RETIRED = new Set([
+    'data', 'enum', 'for', 'comptime', 'take', 'dyn', 'region', 'query',
+    'fn', 'mut', 'pub', 'extern', 'match', 'yield', 'const', 'int', 'float', 'bool'
+  ]);
 
   const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const span = (cls, s) => '<span class="' + cls + '">' + esc(s) + '</span>';

@@ -1,5 +1,5 @@
 # THE STACK TEST: a cubsy-shaped main loop through the ori orb +
-# veil DisplayList — compiled natively, zero lodge-orion. Orb
+# veil DisplayList - compiled natively, zero lodge-orion. Orb
 # shadowing supplies native window/gpu.
 #
 #   orion test_files/atlas_native_demo.or out.ll \
@@ -12,7 +12,7 @@ use ori
 use veil_display
 use veil_geometry
 
-fn main() -> int:
+define main() -> int:
     app = ori_open(ori_defaults("Atlas NATIVE - click to paint, Esc quits", 800, 600))
     if app.running == 0:
         print_line("ori_open failed")
@@ -23,9 +23,9 @@ fn main() -> int:
         return 1
     print_line("atlas native stack up")
 
-    mut running = 1
-    mut blocks_x = []
-    mut blocks_y = []
+    edit running = 1
+    edit blocks_x = []
+    edit blocks_y = []
     loop:
         if running == 0:
             break
@@ -36,15 +36,15 @@ fn main() -> int:
         loop i in 0..<n_ev:
             ev = at(events, i)
             if ev.kind == "mouse_down":
-                blocks_x = push(blocks_x, to_int(ev.x))
-                blocks_y = push(blocks_y, to_int(ev.y))
+                blocks_x = append(blocks_x, to_int(ev.x))
+                blocks_y = append(blocks_y, to_int(ev.y))
             if ev.kind == "key_down":
                 if ev.key == 27:
                     running = 0
 
         # DrawRect's third arg is the `src` provenance int (a real game
         # threads its entity id); this demo has no entities, so 0 = no source.
-        mut display = empty_list()
+        edit display = empty_list()
         display = push_cmd(display, DrawRect(Rect{x: 40, y: 40, width: 720, height: 520}, "panel", 0))
         n_b = len(blocks_x)
         loop bi in 0..<n_b:

@@ -1,4 +1,4 @@
-fn main() -> int:
+define main() -> int:
     a = true
     b = false
     # true and not false = true and true = true

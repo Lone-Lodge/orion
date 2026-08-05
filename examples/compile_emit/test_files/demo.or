@@ -1,4 +1,4 @@
-# orion_ir — typed IR for orion-self.
+# orion_ir - typed IR for orion-self.
 #
 # Design:
 #   - SSA-form: each instruction PRODUCES exactly one value.
@@ -22,13 +22,13 @@
 # An IR instruction. All fields present; unused ones zero/empty.
 # - name: fn name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
-type Inst: op: Text, type_text: Text, value: int, lhs: int, rhs: int, name: Text, args: [int]
+type Inst: op: text, type_text: text, value: int, lhs: int, rhs: int, name: text, args: [int]
 
 # A function parameter.
-type Param: name: Text, type_text: Text
+type Param: name: text, type_text: text
 
 # A function: name, return type, params, and a list of instructions.
-type IRFn: name: Text, return_type: Text, params: [Param], instructions: [Inst]
+type IRFn: name: text, return_type: text, params: [Param], instructions: [Inst]
 
 # A module is a list of functions.
 type IRModule: functions: [IRFn]
@@ -38,79 +38,79 @@ type IRModule: functions: [IRFn]
 type PushResult: function: IRFn, id: int
 
 
-# --- Value types (Text constants) ---
+# --- Value types (text constants) ---
 
-pub fn ir_type_i64() -> Text: "i64"
-pub fn ir_type_ptr() -> Text: "ptr"
-pub fn ir_type_bool() -> Text: "bool"
-pub fn ir_type_void() -> Text: "void"
+public define ir_type_i64() -> text: "i64"
+public define ir_type_ptr() -> text: "ptr"
+public define ir_type_bool() -> text: "bool"
+public define ir_type_void() -> text: "void"
 
 
 # --- Instruction builders ---
 
-pub fn ir_iconst(value: int) -> Inst:
+public define ir_iconst(value: int) -> Inst:
     Inst{op: "iconst", type_text: "i64", value: value, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_iadd(lhs: int, rhs: int) -> Inst:
+public define ir_iadd(lhs: int, rhs: int) -> Inst:
     Inst{op: "iadd", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_isub(lhs: int, rhs: int) -> Inst:
+public define ir_isub(lhs: int, rhs: int) -> Inst:
     Inst{op: "isub", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_imul(lhs: int, rhs: int) -> Inst:
+public define ir_imul(lhs: int, rhs: int) -> Inst:
     Inst{op: "imul", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_idiv(lhs: int, rhs: int) -> Inst:
+public define ir_idiv(lhs: int, rhs: int) -> Inst:
     Inst{op: "idiv", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_imod(lhs: int, rhs: int) -> Inst:
+public define ir_imod(lhs: int, rhs: int) -> Inst:
     Inst{op: "imod", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical and/or: each operand is coerced to 0/1 (any nonzero → 1),
 # then bitwise AND/OR. Result is 0 or 1.
-pub fn ir_iand(lhs: int, rhs: int) -> Inst:
+public define ir_iand(lhs: int, rhs: int) -> Inst:
     Inst{op: "iand", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_ior(lhs: int, rhs: int) -> Inst:
+public define ir_ior(lhs: int, rhs: int) -> Inst:
     Inst{op: "ior", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical NOT: 0 → 1, non-zero → 0.
-pub fn ir_inot(value_id: int) -> Inst:
+public define ir_inot(value_id: int) -> Inst:
     Inst{op: "inot", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Comparison ops. Produce i64 with value 0 (false) or 1 (true).
-pub fn ir_icmp_eq(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_eq(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_eq", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_ne(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_ne(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_ne", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_lt(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_lt(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_lt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_le(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_le(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_le", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_gt(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_gt(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_gt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_icmp_ge(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_ge(lhs: int, rhs: int) -> Inst:
     Inst{op: "icmp_ge", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-pub fn ir_return(value_id: int) -> Inst:
+public define ir_return(value_id: int) -> Inst:
     Inst{op: "return", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_return_void() -> Inst:
+public define ir_return_void() -> Inst:
     Inst{op: "return", type_text: "void", value: 0 - 1, lhs: 0, rhs: 0, name: "", args: []}
 
 # Print an i64 value as decimal text + newline to stdout.
 # Produces a void value (the instruction has no SSA-id consumers).
-pub fn ir_print_int(value_id: int) -> Inst:
+public define ir_print_int(value_id: int) -> Inst:
     Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Select: result = if cond != 0 then then_id else else_id.
-# Branchless via cmov — works for any tree-shaped IR.
-pub fn ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
+# Branchless via cmov - works for any tree-shaped IR.
+public define ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
     Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
 
 
@@ -119,108 +119,108 @@ pub fn ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
 # Call user-defined function `fn_name` with arg-value-ids.
 # ret_type lets later passes (binop type-detection, phi, etc.) see the
 # call's actual return type without needing a module lookup.
-pub fn ir_call(fn_name: Text, arg_ids: [int], ret_type: Text) -> Inst:
+public define ir_call(fn_name: text, arg_ids: [int], ret_type: text) -> Inst:
     Inst{op: "call", type_text: ret_type, value: 0, lhs: 0, rhs: 0, name: fn_name, args: arg_ids}
 
 
 # Print a string literal followed by newline (uses libc puts).
 # name = the string text (raw, no escapes processed).
-pub fn ir_print_str(text: Text) -> Inst:
+public define ir_print_str(text: text) -> Inst:
     Inst{op: "print_str", type_text: "void", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
-# String literal as a value — produces a text-typed SSA value (ptr to global).
-pub fn ir_const_str(text: Text) -> Inst:
+# String literal as a value - produces a text-typed SSA value (ptr to global).
+public define ir_const_str(text: text) -> Inst:
     Inst{op: "const_str", type_text: "text", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
-# Concatenate two text SSA values — calls runtime helper.
-pub fn ir_text_concat(left_id: int, right_id: int) -> Inst:
+# Concatenate two text SSA values - calls runtime helper.
+public define ir_text_concat(left_id: int, right_id: int) -> Inst:
     Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
-# Convert an i64 to text — calls runtime helper.
-pub fn ir_int_to_text(value_id: int) -> Inst:
+# Convert an i64 to text - calls runtime helper.
+public define ir_int_to_text(value_id: int) -> Inst:
     Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Text equality / inequality / lexicographic compare via strcmp.
 # Result is i64 0/1.
-pub fn ir_text_cmp(op_name: Text, left_id: int, right_id: int) -> Inst:
+public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
     Inst{op: op_name, type_text: "i64", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
 # Length of a text string (calls libc strlen).
-pub fn ir_text_len(value_id: int) -> Inst:
+public define ir_text_len(value_id: int) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# slice(text, lo, hi) — substring from byte index lo (inclusive) to hi (exclusive).
+# slice(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
-pub fn ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
+public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
-# contains(text, sub) — returns i64 1 if sub appears anywhere in text, else 0.
-pub fn ir_text_contains(text_id: int, sub_id: int) -> Inst:
+# contains(text, sub) - returns i64 1 if sub appears anywhere in text, else 0.
+public define ir_text_contains(text_id: int, sub_id: int) -> Inst:
     Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
 
 
 # --- File I/O (libc fopen/fread/fwrite) ---
-pub fn ir_file_read(path_id: int) -> Inst:
+public define ir_file_read(path_id: int) -> Inst:
     Inst{op: "file_read", type_text: "text", value: path_id, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_file_write(path_id: int, content_id: int) -> Inst:
+public define ir_file_write(path_id: int, content_id: int) -> Inst:
     Inst{op: "file_write", type_text: "i64", value: path_id, lhs: content_id, rhs: 0, name: "", args: []}
 
 
 # CLI args. argc() → count, argv(i) → ith arg as Text.
-pub fn ir_argc() -> Inst:
+public define ir_argc() -> Inst:
     Inst{op: "argc", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_argv(idx_id: int) -> Inst:
+public define ir_argv(idx_id: int) -> Inst:
     Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # bytes_from_text(t) → [int] of byte values
-pub fn ir_bytes_from_text(text_id: int) -> Inst:
+public define ir_bytes_from_text(text_id: int) -> Inst:
     Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # bytes_to_text(list) → Text from list of byte values
-pub fn ir_bytes_to_text(list_id: int) -> Inst:
+public define ir_bytes_to_text(list_id: int) -> Inst:
     Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # bytes_slice(list, lo, hi) → new list with items [lo, hi)
-pub fn ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
+public define ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
 # bytes_concat(a, b) → new list with items of a followed by items of b
-pub fn ir_bytes_concat(a_id: int, b_id: int) -> Inst:
+public define ir_bytes_concat(a_id: int, b_id: int) -> Inst:
     Inst{op: "bytes_concat", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 
 # bytes_zeros(n) → list of n zeros
-pub fn ir_bytes_zeros(n_id: int) -> Inst:
+public define ir_bytes_zeros(n_id: int) -> Inst:
     Inst{op: "bytes_zeros", type_text: "list", value: n_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# Global state slots — key→ptr Map. slot_get's caller decides type by usage.
+# Global state slots - key→ptr Map. slot_get's caller decides type by usage.
 # In our orbs, slots store text values; ir_slot_get defaults to text type.
-pub fn ir_slot_get(key_id: int) -> Inst:
+public define ir_slot_get(key_id: int) -> Inst:
     Inst{op: "slot_get", type_text: "text", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
 
-pub fn ir_slot_set(key_id: int, val_id: int) -> Inst:
+public define ir_slot_set(key_id: int, val_id: int) -> Inst:
     Inst{op: "slot_set", type_text: "i64", value: key_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 
 # --- Lists (int-only for now) ---
 # A list is a ptr to a heap buffer laid out as [i64 length, i64 item0, ...].
-# LIMITATION: only int items work — text lists like ["a", "b"] fail at
+# LIMITATION: only int items work - text lists like ["a", "b"] fail at
 # compile because list_set takes i64, not ptr. Type-aware lists are a
 # future enhancement.
-pub fn ir_list_lit(item_ids: [int], elem_type: Text) -> Inst:
+public define ir_list_lit(item_ids: [int], elem_type: text) -> Inst:
     Inst{op: "list_lit", type_text: "list:{elem_type}", value: 0, lhs: 0, rhs: 0, name: "", args: item_ids}
 
-pub fn ir_list_at(list_id: int, index_id: int) -> Inst:
+public define ir_list_at(list_id: int, index_id: int) -> Inst:
     Inst{op: "list_at", type_text: "i64", value: list_id, lhs: index_id, rhs: 0, name: "", args: []}
 
-pub fn ir_list_len(list_id: int) -> Inst:
+public define ir_list_len(list_id: int) -> Inst:
     Inst{op: "list_len", type_text: "i64", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Push: copy all items + append val, return new list ptr.
-# Caller pattern: `xs = push(xs, val)`.
-pub fn ir_list_push(list_id: int, val_id: int) -> Inst:
+# Caller pattern: `xs = append(xs, val)`.
+public define ir_list_push(list_id: int, val_id: int) -> Inst:
     Inst{op: "list_push", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 
@@ -229,13 +229,13 @@ pub fn ir_list_push(list_id: int, val_id: int) -> Inst:
 #   [i64 length, i64 key0_ptr, i64 val0, i64 key1_ptr, i64 val1, ...]
 # Keys are text pointers stored as i64 (lossless on 64-bit).
 # args alternates: [key0_id, val0_id, key1_id, val1_id, ...].
-pub fn ir_map_lit(pair_ids: [int]) -> Inst:
+public define ir_map_lit(pair_ids: [int]) -> Inst:
     Inst{op: "map_lit", type_text: "map", value: 0, lhs: 0, rhs: 0, name: "", args: pair_ids}
 
-pub fn ir_map_get(map_id: int, key_id: int, value_type: Text) -> Inst:
+public define ir_map_get(map_id: int, key_id: int, value_type: text) -> Inst:
     Inst{op: "map_get", type_text: value_type, value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
-pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
+public define ir_map_has(map_id: int, key_id: int) -> Inst:
     Inst{op: "map_has", type_text: "i64", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
 
@@ -243,100 +243,100 @@ pub fn ir_map_has(map_id: int, key_id: int) -> Inst:
 # A struct value is a ptr to a heap buffer of i64 slots, one per field.
 # type_text encodes the struct name as "struct:Player".
 # Field args carry the SSA value ids in declared field order.
-pub fn ir_struct_cons(struct_name: Text, n_fields: int, value_ids: [int]) -> Inst:
+public define ir_struct_cons(struct_name: text, n_fields: int, value_ids: [int]) -> Inst:
     Inst{op: "struct_cons", type_text: "struct:{struct_name}", value: n_fields, lhs: 0, rhs: 0, name: struct_name, args: value_ids}
 
 # Load a field from a struct by index. field_type tells emit what type to load.
-pub fn ir_field_load(struct_id: int, field_index: int, field_type: Text) -> Inst:
+public define ir_field_load(struct_id: int, field_index: int, field_type: text) -> Inst:
     Inst{op: "field_load", type_text: field_type, value: struct_id, lhs: field_index, rhs: 0, name: "", args: []}
 
 # Print a dynamically-computed text value (calls puts on the ptr).
-pub fn ir_print_text(value_id: int) -> Inst:
+public define ir_print_text(value_id: int) -> Inst:
     Inst{op: "print_text", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # --- Memory ops (for mutable variables and loop counters) ---
 # alloca produces a slot for `stored_type` ("i64" or "text").
 # type_text records the STORED type; the SSA result itself is always ptr.
-pub fn ir_alloca(stored_type: Text) -> Inst:
+public define ir_alloca(stored_type: text) -> Inst:
     Inst{op: "alloca", type_text: stored_type, value: 0, lhs: 0, rhs: 0, name: "", args: []}
 
 # Load value of `loaded_type` from ptr SSA id.
-pub fn ir_load(ptr_id: int, loaded_type: Text) -> Inst:
+public define ir_load(ptr_id: int, loaded_type: text) -> Inst:
     Inst{op: "load", type_text: loaded_type, value: ptr_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Store value_id to ptr_id. Void. The stored type is inferred from value's type.
-pub fn ir_store(ptr_id: int, value_id: int) -> Inst:
+public define ir_store(ptr_id: int, value_id: int) -> Inst:
     Inst{op: "store", type_text: "void", value: ptr_id, lhs: value_id, rhs: 0, name: "", args: []}
 
 
 # --- Basic blocks (labels + branches + phi) ---
 # These let us emit real if/else with side-effects (recursion, calls)
-# and future loops. Label names are strings — we encode them in `name`.
+# and future loops. Label names are strings - we encode them in `name`.
 
 # Mark a basic-block boundary. name = "label_name".
-pub fn ir_label(label_name: Text) -> Inst:
+public define ir_label(label_name: text) -> Inst:
     Inst{op: "label", type_text: "void", value: 0, lhs: 0, rhs: 0, name: label_name, args: []}
 
 # Unconditional jump to label. name = "target".
-pub fn ir_br(target_label: Text) -> Inst:
+public define ir_br(target_label: text) -> Inst:
     Inst{op: "br", type_text: "void", value: 0, lhs: 0, rhs: 0, name: target_label, args: []}
 
 # Conditional jump. value = cond ssa-id (i64 0/1).
 # name = "then_label|else_label" (pipe-separated).
-pub fn ir_br_if(cond_id: int, then_label: Text, else_label: Text) -> Inst:
+public define ir_br_if(cond_id: int, then_label: text, else_label: text) -> Inst:
     Inst{op: "br_if", type_text: "void", value: cond_id, lhs: 0, rhs: 0, name: "{then_label}|{else_label}", args: []}
 
 # Phi node merging two predecessors.
 # lhs = then-value-id, rhs = else-value-id.
 # name = "then_label|else_label" (pipe-separated).
 # type_text is set at emit time from the operand types.
-pub fn ir_phi(then_val_id: int, then_label: Text, else_val_id: int, else_label: Text, phi_type: Text) -> Inst:
+public define ir_phi(then_val_id: int, then_label: text, else_val_id: int, else_label: text, phi_type: text) -> Inst:
     Inst{op: "phi", type_text: phi_type, value: 0, lhs: then_val_id, rhs: else_val_id, name: "{then_label}|{else_label}", args: []}
 
 
 # Reference a function parameter by index (0-based). type_text matches
 # the param's declared type ("i64" or "text").
-pub fn ir_param(param_index: int, param_type: Text) -> Inst:
+public define ir_param(param_index: int, param_type: text) -> Inst:
     Inst{op: "param", type_text: param_type, value: param_index, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # --- Function builders ---
 
-pub fn ir_fn_new(name: Text, return_type: Text) -> IRFn:
+public define ir_fn_new(name: text, return_type: text) -> IRFn:
     IRFn{name: name, return_type: return_type, params: [], instructions: []}
 
-pub fn ir_fn_add_param(fn_value: IRFn, param_name: Text, param_type: Text) -> IRFn:
+public define ir_fn_add_param(fn_value: IRFn, param_name: text, param_type: text) -> IRFn:
     new_param = Param{name: param_name, type_text: param_type}
-    new_params = push(fn_value.params, new_param)
+    new_params = append(fn_value.params, new_param)
     IRFn{name: fn_value.name, return_type: fn_value.return_type, params: new_params, instructions: fn_value.instructions}
 
-pub fn ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
+public define ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
     new_id = len(fn_value.instructions)
-    new_instructions = push(fn_value.instructions, inst)
+    new_instructions = append(fn_value.instructions, inst)
     new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: new_instructions}
     PushResult{function: new_fn, id: new_id}
 
 
 # --- Module builders ---
 
-pub fn ir_module_new() -> IRModule:
+public define ir_module_new() -> IRModule:
     IRModule{functions: []}
 
-pub fn ir_module_add_fn(module: IRModule, fn_value: IRFn) -> IRModule:
-    new_functions = push(module.functions, fn_value)
+public define ir_module_add_fn(module: IRModule, fn_value: IRFn) -> IRModule:
+    new_functions = append(module.functions, fn_value)
     IRModule{functions: new_functions}
 
 
 # --- Text dumper (Cranelift CLIF-style) ---
 
-pub fn ir_dump_value_ref(value_id: int) -> Text:
+public define ir_dump_value_ref(value_id: int) -> text:
     if value_id < 0:
         "void"
     else:
         "v{value_id}"
 
-pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
+public define ir_dump_instruction(inst: Inst, my_id: int) -> text:
     prefix = "{ir_dump_value_ref(my_id)} = "
     op = inst.op
     if op == "iconst":
@@ -349,8 +349,8 @@ pub fn ir_dump_instruction(inst: Inst, my_id: int) -> Text:
             rhs_ref = ir_dump_value_ref(inst.rhs)
             "{prefix}{op}.{inst.type_text} {lhs_ref}, {rhs_ref}"
 
-pub fn ir_dump_fn(fn_value: IRFn) -> Text:
-    mut text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
+public define ir_dump_fn(fn_value: IRFn) -> text:
+    edit text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = len(fn_value.instructions)
     loop idx in 0..<total:
         inst = at(fn_value.instructions, idx)
@@ -358,8 +358,8 @@ pub fn ir_dump_fn(fn_value: IRFn) -> Text:
         text = "{text}    {line}\n"
     text
 
-pub fn ir_dump_module(module: IRModule) -> Text:
-    mut text = "; orion_ir module dump\n"
+public define ir_dump_module(module: IRModule) -> text:
+    edit text = "; orion_ir module dump\n"
     total = len(module.functions)
     loop idx in 0..<total:
         fn_value = at(module.functions, idx)
@@ -370,7 +370,7 @@ pub fn ir_dump_module(module: IRModule) -> Text:
 
 use bytes
 
-# orion_emit_llvm — emit LLVM IR text from typed IR (orion_ir).
+# orion_emit_llvm - emit LLVM IR text from typed IR (orion_ir).
 #
 # Pipeline: orion_ir → orion_emit_llvm → .ll file → clang → .exe
 #
@@ -383,20 +383,20 @@ use bytes
 
 # --- Helpers ---
 
-fn value_ref(value_id: int) -> Text:
+define value_ref(value_id: int) -> text:
     "%v{value_id}"
 
 
 # Escape a string for use in LLVM IR `c"..."` constant.
 # Printable ASCII passes through; quote/backslash/non-printable use \NN hex.
-fn hex_digit(value: int) -> Text:
+define hex_digit(value: int) -> text:
     digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]
     at(digits, value)
 
-fn llvm_escape(text: Text) -> Text:
+define llvm_escape(text: text) -> text:
     bs = bytes_from_text(text)
     total = len(bs)
-    mut result = ""
+    edit result = ""
     loop index in 0..<total:
         b = at(bs, index)
         needs_escape = b == 34 or b == 92 or b < 32 or b > 126
@@ -414,9 +414,9 @@ fn llvm_escape(text: Text) -> Text:
 
 
 # Find the index of `target` in a list of strings. -1 if not found.
-fn string_list_index(strings: [Text], target: Text) -> int:
+define string_list_index(strings: [text], target: text) -> int:
     total = len(strings)
-    mut found = 0 - 1
+    edit found = 0 - 1
     loop index in 0..<total:
         if at(strings, index) == target and found == (0 - 1):
             found = index
@@ -425,9 +425,9 @@ fn string_list_index(strings: [Text], target: Text) -> int:
 
 # Walk the module to collect every distinct string literal used by
 # print_str or const_str instructions. Returned list is in first-seen order.
-fn collect_strings(module: IRModule) -> [Text]:
+define collect_strings(module: IRModule) -> [text]:
     n_fns = len(module.functions)
-    mut result = []
+    edit result = []
     loop fi in 0..<n_fns:
         fn_value = at(module.functions, fi)
         n_insts = len(fn_value.instructions)
@@ -437,30 +437,30 @@ fn collect_strings(module: IRModule) -> [Text]:
             if is_str_op:
                 existing = string_list_index(result, inst.name)
                 if existing < 0:
-                    result = push(result, inst.name)
+                    result = append(result, inst.name)
     result
 
 
 # Split a pipe-separated label list "a|b" into ["a", "b"].
-fn split_pipe(text: Text) -> [Text]:
+define split_pipe(text: text) -> [text]:
     bs = bytes_from_text(text)
     total = len(bs)
-    mut parts = []
-    mut current = ""
+    edit parts = []
+    edit current = ""
     loop index in 0..<total:
         ch = at(bs, index)
         if ch == 124:  # '|'
-            parts = push(parts, current)
+            parts = append(parts, current)
             current = ""
         else:
             single = bytes_to_text([ch])
             current = "{current}{single}"
-    parts = push(parts, current)
+    parts = append(parts, current)
     parts
 
 
-fn icmp_cc(op: Text) -> Text:
-    mut cc = "eq"
+define icmp_cc(op: text) -> text:
+    edit cc = "eq"
     if op == "icmp_ne":
         cc = "ne"
     if op == "icmp_lt":
@@ -477,9 +477,9 @@ fn icmp_cc(op: Text) -> Text:
 # --- Per-instruction emit ---
 
 # Look up a fn's return type in the module; defaults to "i64".
-fn find_fn_return_type(module: IRModule, fn_name: Text) -> Text:
+define find_fn_return_type(module: IRModule, fn_name: text) -> text:
     n = len(module.functions)
-    mut result = "i64"
+    edit result = "i64"
     loop index in 0..<n:
         f = at(module.functions, index)
         if f.name == fn_name:
@@ -489,7 +489,7 @@ fn find_fn_return_type(module: IRModule, fn_name: Text) -> Text:
 
 # Actual produced type of an SSA value. For call ops, look up the called
 # fn's return type (the call inst itself has a placeholder type).
-fn ssa_value_type(value_id: int, fn_value: IRFn, module: IRModule) -> Text:
+define ssa_value_type(value_id: int, fn_value: IRFn, module: IRModule) -> text:
     if value_id < 0:
         "i64"
     else:
@@ -500,7 +500,7 @@ fn ssa_value_type(value_id: int, fn_value: IRFn, module: IRModule) -> Text:
             inst.type_text
 
 
-pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn, module: IRModule) -> Text:
+public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value: IRFn, module: IRModule) -> text:
     op = inst.op
     is_icmp = op == "icmp_eq" or op == "icmp_ne" or op == "icmp_lt" or op == "icmp_le" or op == "icmp_gt" or op == "icmp_ge"
     is_logical = op == "iand" or op == "ior"
@@ -508,7 +508,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     # marker comment. Without the slot, downstream phi nodes or
     # consumers would reference undefined `%vN` and clang would reject
     # the whole module with a confusing error.
-    mut result = "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}"
+    edit result = "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}"
 
     if op == "iconst":
         result = "    {value_ref(my_id)} = add i64 0, {inst.value}"
@@ -523,7 +523,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
     if op == "call":
         n_args = len(inst.args)
-        mut arg_text = ""
+        edit arg_text = ""
         loop ai in 0..<n_args:
             arg_id = at(inst.args, ai)
             arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
@@ -540,7 +540,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         result = "    br label %{inst.name}"
 
     if op == "br_if":
-        # name = "then_lbl|else_lbl" — split on '|'.
+        # name = "then_lbl|else_lbl" - split on '|'.
         # Coerce cond from i64 to i1 first.
         labels = split_pipe(inst.name)
         then_lbl = at(labels, 0)
@@ -671,7 +671,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         result = "    {value_ref(my_id)} = call ptr @orion_slot_get(ptr {value_ref(inst.value)})"
 
     if op == "slot_set":
-        # val_id may be i64 or ptr — cast ptr→i64 for uniform storage.
+        # val_id may be i64 or ptr - cast ptr→i64 for uniform storage.
         val_inst = at(fn_value.instructions, inst.lhs)
         val_ty = llvm_type_of(val_inst.type_text)
         if val_ty == "ptr":
@@ -684,7 +684,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
     is_text_cmp = op == "text_eq" or op == "text_ne" or op == "text_lt" or op == "text_le" or op == "text_gt" or op == "text_ge"
     if is_text_cmp:
-        mut cc = "eq"
+        edit cc = "eq"
         if op == "text_ne":
             cc = "ne"
         if op == "text_lt":
@@ -709,7 +709,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
     if op == "list_lit":
         n = len(inst.args)
-        mut text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
+        edit text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
         loop ai in 0..<n:
             item_id = at(inst.args, ai)
             item_inst = at(fn_value.instructions, item_id)
@@ -754,7 +754,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
         # args alternates key/val: [k0, v0, k1, v1, ...]
         n_total = len(inst.args)
         n_pairs = n_total / 2
-        mut text = "    {value_ref(my_id)} = call ptr @orion_map_new(i64 {n_pairs})"
+        edit text = "    {value_ref(my_id)} = call ptr @orion_map_new(i64 {n_pairs})"
         loop pi in 0..<n_pairs:
             key_id = at(inst.args, pi * 2)
             val_id = at(inst.args, pi * 2 + 1)
@@ -787,7 +787,7 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
     if op == "struct_cons":
         n_fields = inst.value
         bytes_needed = n_fields * 8
-        mut text2 = "    {value_ref(my_id)} = call ptr @malloc(i64 {bytes_needed})"
+        edit text2 = "    {value_ref(my_id)} = call ptr @malloc(i64 {bytes_needed})"
         loop fi in 0..<n_fields:
             val_id = at(inst.args, fi)
             val_inst = at(fn_value.instructions, val_id)
@@ -846,14 +846,14 @@ pub fn emit_instruction(inst: Inst, my_id: int, strings: [Text], fn_value: IRFn,
 
 # --- Function and module ---
 
-fn llvm_type_of(orion_type: Text) -> Text:
-    mut is_struct = false
-    mut is_list_elem = false
+define llvm_type_of(orion_type: text) -> text:
+    edit is_struct = false
+    edit is_list_elem = false
     bs = bytes_from_text(orion_type)
     if len(bs) >= 7:
         if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
             is_struct = true
-    # `list:T` (parameterised list) — also a ptr at LLVM level.
+    # `list:T` (parameterised list) - also a ptr at LLVM level.
     if len(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
@@ -861,10 +861,10 @@ fn llvm_type_of(orion_type: Text) -> Text:
 
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).
-fn list_elem_type(list_type: Text) -> Text:
+define list_elem_type(list_type: text) -> text:
     bs = bytes_from_text(list_type)
     n = len(bs)
-    mut is_listed = false
+    edit is_listed = false
     if n >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_listed = true
@@ -872,16 +872,16 @@ fn list_elem_type(list_type: Text) -> Text:
         "i64"
     else:
         # Extract bytes 5..n
-        mut result = ""
+        edit result = ""
         loop index in 5..<n:
             single = bytes_to_text([at(bs, index)])
             result = "{result}{single}"
         result
 
 
-fn emit_param_list(params: [Param]) -> Text:
+define emit_param_list(params: [Param]) -> text:
     n = len(params)
-    mut result = ""
+    edit result = ""
     loop index in 0..<n:
         sep = if index == 0 then "" else ", "
         ty = llvm_type_of(at(params, index).type_text)
@@ -889,7 +889,7 @@ fn emit_param_list(params: [Param]) -> Text:
     result
 
 
-pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
+public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text:
     name = fn_value.name
     # Skip emission of compile-time aliases that exist only so lodge-orion
     # can interpret the source; orion-self dispatches their callers directly
@@ -902,7 +902,7 @@ pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
         param_list = emit_param_list(fn_value.params)
         is_user_main = name == "main"
         emit_name = if is_user_main then "orion_main" else name
-        mut text = "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n"
+        edit text = "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n"
         total = len(fn_value.instructions)
         loop index in 0..<total:
             inst = at(fn_value.instructions, index)
@@ -914,7 +914,7 @@ pub fn emit_fn(fn_value: IRFn, strings: [Text], module: IRModule) -> Text:
 
 # Emit the global for a single string literal.
 # Format: @.str_N = private unnamed_addr constant [LEN x i8] c"<bytes>\00"
-fn emit_string_global(text_value: Text, idx: int) -> Text:
+define emit_string_global(text_value: text, idx: int) -> text:
     bs = bytes_from_text(text_value)
     n = len(bs) + 1                          # +1 for null terminator
     escaped = llvm_escape(text_value)
@@ -923,8 +923,8 @@ fn emit_string_global(text_value: Text, idx: int) -> Text:
 
 # Runtime helpers in LLVM IR. Defined alongside user code so we can
 # stay clang-only without a separate runtime .c file.
-fn emit_runtime() -> Text:
-    mut text = ""
+define emit_runtime() -> text:
+    edit text = ""
     text = "{text}declare i32 @printf(ptr, ...)\n"
     text = "{text}declare i32 @puts(ptr)\n"
     text = "{text}declare ptr @malloc(i64)\n"
@@ -983,7 +983,7 @@ fn emit_runtime() -> Text:
     text = "{text}  %result = select i1 %is_null, i64 0, i64 1\n"
     text = "{text}  ret i64 %result\n"
     text = "{text}\}\n\n"
-    # bytes_from_text: Text → [int] (list of byte values).
+    # bytes_from_text: text → [int] (list of byte values).
     text = "{text}define ptr @orion_bytes_from_text(ptr %src) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %src_len = call i64 @strlen(ptr %src)\n"
@@ -1099,7 +1099,7 @@ fn emit_runtime() -> Text:
     text = "{text}after:\n"
     text = "{text}  ret ptr %dst\n"
     text = "{text}\}\n\n"
-    # Global slot store — single Map keyed by text. Init on first access.
+    # Global slot store - single Map keyed by text. Init on first access.
     text = "{text}@orion_slots = global ptr null\n\n"
     text = "{text}define ptr @orion_slot_get(ptr %key) \{\n"
     text = "{text}entry:\n"
@@ -1330,8 +1330,8 @@ fn emit_runtime() -> Text:
     text
 
 
-pub fn emit_module(module: IRModule) -> Text:
-    mut text = "; orion_emit_llvm output\n"
+public define emit_module(module: IRModule) -> text:
+    edit text = "; orion_emit_llvm output\n"
     text = "{text}{emit_runtime()}"
     # Emit one global per distinct string literal in the module.
     strings = collect_strings(module)
@@ -1344,7 +1344,7 @@ pub fn emit_module(module: IRModule) -> Text:
         fn_value = at(module.functions, index)
         text = "{text}{emit_fn(fn_value, strings, module)}\n"
     # Wrapper @main: stash argc/argv to globals so argc()/argv(i) can read
-    # them, then delegate to user's orion_main. We always emit this — if
+    # them, then delegate to user's orion_main. We always emit this - if
     # the user didn't define a main, clang will complain about undefined
     # orion_main, which is the correct error.
     text = "{text}@orion_argc = global i64 0\n"
@@ -1359,7 +1359,7 @@ pub fn emit_module(module: IRModule) -> Text:
     text = "{text}  ret i32 %ret32\n"
     text = "{text}\}\n"
     text
-fn main() -> int:
+define main() -> int:
     inst = ir_iconst(42)
     ret = ir_return(0)
     fn_value = IRFn{name: "main", return_type: "i64", params: [], instructions: [inst, ret]}

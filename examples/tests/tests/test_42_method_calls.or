@@ -1,7 +1,7 @@
-fn double_it(x: int) -> int:
+define double_it(x: int) -> int:
     x + x
 
-fn main() -> int:
+define main() -> int:
     # User fn via method-call syntax
     a = 21
     a_doubled = a.double_it()
@@ -14,8 +14,8 @@ fn main() -> int:
     has_lo = msg.contains("lo")
 
     # List push via method-call
-    items = [1, 2]
-    items = items.push(3)
+    edit items = [1, 2]
+    items = items.append(3)
     sum_items = at(items, 0) + at(items, 1) + at(items, 2)
 
     # 42 + 5 + 1 + 6 - 12 = 42

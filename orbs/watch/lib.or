@@ -1,0 +1,63 @@
+# watch - the mechanics of a file watcher: scan a tree, fingerprint it,
+# name what changed. Pure bookkeeping, so it is testable; the loop that
+# ACTS on a change (rerun a command, stop a stale run) lives in
+# tools/orbwatch.or.
+use os
+use text
+
+# Directories no watcher wants to look inside: build output and history.
+#   skip_dir("dist") -> true, skip_dir("src") -> false
+define skip_dir(name: text) -> truth:
+    name is "dist" or name is "build" or name is "target" or name is "node_modules" or name is ".git" or name is "_archive"
+
+# Source files worth watching: Orion code, the C runtime, the manifests.
+#   watched("main.or") / watched("orion_rt.c") -> true, watched("a.exe") -> false
+define watched(name: text) -> truth:
+    ends_with(name, ".or") or ends_with(name, ".c") or ends_with(name, ".toml")
+
+# Every watched file under `dir`, recursively, skipping build dirs.
+# no example: depends on the filesystem - proven by test_42_watch_core.or
+public define scan_tree(dir: text) -> [text] uses files:
+    edit acc = []
+    names = list_dir(dir)
+    loop n in names where n is not "" and watched(n):
+        acc = append(acc, path_join(dir, n))
+    subs = list_dirs(dir)
+    loop s in subs where s is not "" and not skip_dir(s):
+        inner = scan_tree(path_join(dir, s))
+        loop f in inner:
+            acc = append(acc, f)
+    acc
+
+# One line per watched file: "mtime:size path". Two snapshots compare as
+# one text; size is included so an edit inside the mtime resolution is
+# still seen when the length moves.
+# no example: depends on the filesystem - proven by test_42_watch_core.or
+public define snapshot(dir: text) -> text uses files:
+    edit out = ""
+    loop p in scan_tree(dir):
+        out = "{out}{modified_at(p)}:{file_size(p)} {p}\n"
+    out
+
+# The path behind the first line that differs between two snapshots.
+# "" when nothing changed; a set-level answer when a file came or went
+# (the caller reruns either way, so it needs a name only for the message).
+public define first_change(old: text, new: text) -> text:
+    example first_change("1:2 a\n", "1:2 a\n") is ""
+    example first_change("1:2 a\n", "9:9 a\n") is "a"
+    example first_change("1:2 a\n", "") is "(file added or removed)"
+    a = split(old, "\n")
+    b = split(new, "\n")
+    if len(a) is not len(b):
+        return "(file added or removed)"
+    loop i in 0 until len(a):
+        la = at(a, i)
+        lb = at(b, i)
+        if la is not lb:
+            line = if len(lb) > 0 then lb else la
+            sp = index_of(line, " ")
+            if sp < 0:
+                return line
+            lbs = bytes_from_text(line)
+            return bytes_to_text(bytes_slice(lbs, sp + 1, len(lbs)))
+    ""

@@ -1,0 +1,7 @@
+# expect: needs the `console` capability
+define sneaky(msg: text) uses files:
+    print_line(msg)
+
+define main() -> int:
+    sneaky("hi")
+    0

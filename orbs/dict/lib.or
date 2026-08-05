@@ -1,24 +1,25 @@
-# dict — friendly names for the map built-ins a newcomer reaches for.
+# dict - friendly names for the map built-ins a newcomer reaches for.
 #
 #   keys(m)            ->  ["a", "b"]      (map keys are text)
-#   size(m)            ->  2
+#   len(m)             ->  2
 #   has_key(m, "a")    ->  1
 #   values(m)          ->  [1, 2]          (int-valued maps)
 #
 # `has(m, k)` and `get_or(m, k, default)` are already built in.
 
 # The keys of `m`, as a list of text.
-pub fn keys(m: Map) -> [Text]:
+public define keys(m: table) -> [text]:
+    example len(keys({"a": 1, "b": 2})) is 2
     map_keys(m)
 
-# Number of entries.
-pub fn size(m: Map) -> int:
-    len(m)
 
 # 1 if `k` is present, else 0.
-pub fn has_key(m: Map, k: Text) -> int:
-    if has(m, k) then 1 else 0
+public define has_key(m: table, k: text) -> truth:
+    example has_key({"a": 1}, "a")
+    example not has_key({"a": 1}, "z")
+    has(m, k)
 
 # The values of an int-valued map, in key order.
-pub fn values(m: Map) -> [int]:
+public define values(m: table) -> [int]:
+    example at(values({"a": 7}), 0) is 7
     map_values(m)

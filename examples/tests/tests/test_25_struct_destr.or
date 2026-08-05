@@ -3,7 +3,7 @@
 # the temp carries the struct type so field access resolves.
 type Point: x: int, y: int
 
-fn main() -> int:
+define main() -> int:
     p = Point{x: 20, y: 5}
     Point{x, y} = p    # x == 20, y == 5
     x + y              # 25

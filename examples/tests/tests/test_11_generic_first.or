@@ -1,9 +1,9 @@
 # Operation-passing generics: `T` is a real type variable now. It lowers to
 # an opaque pointer-sized slot (i64) instead of being mistaken for a struct
 # type `struct:T`, so a generic function type-checks and passes values through.
-fn first<T>(xs: [T]) -> T:
+define first<T>(xs: [T]) -> T:
     at(xs, 0)
 
-fn main() -> int:
+define main() -> int:
     nums = [11, 22, 33]
     first(nums)   # 11

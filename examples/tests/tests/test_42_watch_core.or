@@ -1,0 +1,42 @@
+# The watcher's mechanics (orbs/watch): scan a tree, fingerprint it, name
+# what changed. Real files on a real filesystem - no child processes, so
+# this stays stable however loaded the parallel runner makes the machine.
+# The live loop built on these (stop a stale run, start a fresh one) is
+# tools/orbwatch.or, and the process side is proven by
+# test_42_proc_parallel.or.
+use os
+use watch
+
+define main() -> int:
+    mkdir_all("dist/.watch/sub")
+    mkdir_all("dist/.watch/build")
+    # A previous run may have left the "new file" step behind - start clean.
+    junk = remove_file("dist/.watch/c.or")
+    w1 = write_file("dist/.watch/a.or", "one")
+    w2 = write_file("dist/.watch/sub/b.or", "two")
+    w3 = write_file("dist/.watch/build/junk.or", "build output, must be skipped")
+    w4 = write_file("dist/.watch/notes.md", "not a watched suffix")
+
+    files = scan_tree("dist/.watch")
+    two_found = len(files) is 2
+
+    s1 = snapshot("dist/.watch")
+    same = first_change(s1, snapshot("dist/.watch")) is ""
+
+    # Longer content: the size moves, so the change is seen even inside
+    # the filesystem's mtime resolution.
+    w5 = write_file("dist/.watch/sub/b.or", "two, but noticeably longer")
+    s2 = snapshot("dist/.watch")
+    hit = first_change(s1, s2)
+    named = hit is "dist/.watch/sub/b.or"
+
+    w6 = write_file("dist/.watch/c.or", "a new file")
+    s3 = snapshot("dist/.watch")
+    grew = first_change(s2, s3) is "(file added or removed)"
+
+    print_line("files={len(files)} hit={hit}")
+    p1 = if two_found then 10 else 0
+    p2 = if same then 10 else 0
+    p3 = if named then 12 else 0
+    p4 = if grew then 10 else 0
+    p1 + p2 + p3 + p4

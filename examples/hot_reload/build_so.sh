@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build_so.sh <src.or> <out.so> — compile one Orion file to a shared library.
+# build_so.sh <src.or> <out.so> - compile one Orion file to a shared library.
 set -e
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ORION="$ROOT/dist/orion.exe"

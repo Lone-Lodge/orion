@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# docs_check.sh — compile every code sample in the Field Guide.
+# docs_check.sh - compile every code sample in the Field Guide.
 #
 # WHY: a documented feature that no longer exists is the same failure as a
 # stale seed. It reads fine, nobody runs it, and it is wrong for months.
@@ -15,22 +15,31 @@
 #   bash tools/docs_check.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The compiler recurses deep; Windows reserves stack in the exe (/STACK),
+# POSIX raises it here - without this, arm64 macOS segfaulted SILENTLY on
+# the deepest compiles (closure combos) while linux squeaked by on 8 MB.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
+esac
 ORION="$ROOT/dist/orion.exe"
 WORK="$ROOT/dist/.docscheck"
-PAGES="index.html sv.html"
+# One guide, one language for it. sv.html is archived; a second translation of
+# the same samples drifts by construction.
+PAGES="index.html"
 
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 rm -rf "$WORK"; mkdir -p "$WORK"
 
 # Pull the samples out of one page into $2/NN.or, one file per block.
 # The guide marks them `<code data-or>`; anything else (shell commands) is
 # skipped. Inline <span> markup for comments is stripped, then the four HTML
-# entities are turned back into the characters Orion actually uses — `&amp;`
+# entities are turned back into the characters Orion actually uses - `&amp;`
 # LAST, or an escaped `&amp;lt;` would decode twice.
 extract() {
     local page="$1" dir="$2"
     mkdir -p "$dir"
-    # The tags share a line with code — `<code data-or>type Player: ...` — so
+    # The tags share a line with code - `<code data-or>type Player: ...` - so
     # take the remainder of the opening line and the part before the closing
     # tag, rather than dropping both lines whole.
     awk -v dir="$dir" '
@@ -159,11 +168,35 @@ awk '
     }
 ' "$ROOT/docs/style.css" || fail=$((fail + 1))
 
+# --- library reference ----------------------------------------------------
+# docs/reference.html is generated from the orbs. A generated file that is
+# committed by hand goes stale the moment someone adds a `pub fn` and forgets
+# to regenerate - the same failure the samples above guard against. So build
+# it fresh and compare: if it differs, the committed page is out of date.
+echo
+if bash "$ROOT/tools/orb_reference.sh" --stdout > "$WORK/reference.html" 2> "$WORK/reflog.txt"; then
+    # Compare with line endings normalized: a CI checkout with autocrlf=true
+    # hands us a CRLF copy of the committed page and the freshly generated
+    # one is LF - same content, and that must not read as "stale".
+    tr -d '\r' < "$ROOT/docs/reference.html" > "$WORK/ref_committed.norm"
+    tr -d '\r' < "$WORK/reference.html" > "$WORK/ref_fresh.norm"
+    if diff -q "$WORK/ref_committed.norm" "$WORK/ref_fresh.norm" > /dev/null 2>&1; then
+        echo "  reference: up to date with orbs/"
+    else
+        echo "  reference: STALE - run bash tools/orb_reference.sh"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  reference: generator failed"
+    sed 's/^/    /' "$WORK/reflog.txt" | head -10
+    fail=$((fail + 1))
+fi
+
 echo
 if [ "$fail" = "0" ]; then
-    echo "  docs: $count sample(s) compile, translations agree, contrast is AAA"
+    echo "  docs: $count sample(s) compile, contrast is AAA, reference up to date"
     rm -rf "$WORK"
     exit 0
 fi
-echo "  docs: $fail problem(s) — samples left in $WORK"
+echo "  docs: $fail problem(s) - samples left in $WORK"
 exit 1

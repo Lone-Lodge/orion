@@ -1,0 +1,50 @@
+# The general-software floor: environment variables, OS entropy, clock time.
+# (interrupted() only ARMS here - proving the flag needs a keyboard; the arm
+# call must at least not disturb anything.)
+use os
+use rand
+use time
+use text
+
+define main() -> int:
+    # Every platform sets SOMETHING findable: PATH on POSIX and modern
+    # Windows shells; absent names answer "".
+    path_ok = env("PATH") is not "" or env("Path") is not ""
+    unset_ok = env("ORION_SURELY_NOT_SET_9Q4Z") is ""
+
+    # Entropy: right length, right range, and two draws that differ
+    # (32 identical bytes from real entropy is a broken source).
+    a = secure_bytes(32)
+    b = secure_bytes(32)
+    edit in_range = true
+    edit same = true
+    loop i in 0 until 32:
+        if at(a, i) < 0 or at(a, i) > 255:
+            in_range = false
+        if at(a, i) is not at(b, i):
+            same = false
+    tok = secure_token(16)
+    ent_ok = len(a) is 32 and in_range and not same and len(tok) is 32
+
+    # Clock time: epoch zero formats exactly, and now() is after 2020.
+    t_ok = utc_time(0, "%Y-%m-%d %H:%M:%S") is "1970-01-01 00:00:00"
+    now_ok = now_unix() > 1577836800
+    stamp_ok = len(timestamp()) is 19
+
+    armed = interrupted()
+    arm_ok = not armed
+
+    # fs completeness: write, copy, move, and cwd answers something.
+    w9 = write_file("dist/.floor_a.txt", "flytta mig")
+    cp = copy_file("dist/.floor_a.txt", "dist/.floor_b.txt")
+    junk9 = remove_file("dist/.floor_c.txt")
+    mv = move_path("dist/.floor_b.txt", "dist/.floor_c.txt")
+    fs_ok = cp is 0 and mv is 0 and read_file("dist/.floor_c.txt") is "flytta mig" and cwd() is not ""
+
+    p1 = if path_ok and unset_ok then 6 else 0
+    p2 = if ent_ok then 8 else 0
+    p3 = if t_ok and now_ok and stamp_ok then 8 else 0
+    p4 = if arm_ok then 6 else 0
+    p5 = if fs_ok then 14 else 0
+    print_line("env={path_ok} ent={ent_ok} time={t_ok} fs={fs_ok} tok={tok}")
+    p1 + p2 + p3 + p4 + p5

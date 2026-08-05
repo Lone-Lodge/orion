@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Orion compiler in Orion. LLVM backend. Pure Orion compiles pure Orion."
 
 # Members live in:
-#   orbs/        — compiler stages as reusable libraries
-#   examples/    — drivers + test suite
+#   orbs/        - compiler stages as reusable libraries
+#   examples/    - drivers + test suite
 #
 # Run the test suite:
 #   cd examples/tests

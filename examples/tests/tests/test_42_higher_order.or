@@ -1,9 +1,9 @@
-fn double(x: int) -> int:
+define double(x: int) -> int:
     x * 2
 
-# Higher-order fn — accepts another fn as a parameter (type: fn).
-fn apply_twice(f: fn, x: int) -> int:
+# Higher-order fn - accepts another fn as a parameter (type: fn).
+define apply_twice(f: fn, x: int) -> int:
     f(f(x))
 
-fn main() -> int:
+define main() -> int:
     apply_twice(double, 10) + 2

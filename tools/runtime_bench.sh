@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# runtime_bench.sh — measure what the GENERATED code costs, per primitive.
+# runtime_bench.sh - measure what the GENERATED code costs, per primitive.
 #
 # tools/compile_bench.sh gates compile time. This gates the other half: a
 # codegen change that makes the compiler faster and the compiled program
@@ -27,7 +27,7 @@ CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
 [ -x "$CLANG" ] || CLANG="$(command -v clang || echo clang)"
 UPDATE=0
 [ "${1:-}" = "--update" ] && UPDATE=1
-[ -x "$ORION" ] || { echo "no dist/orion.exe — bash tools/bootstrap.sh"; exit 1; }
+[ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 TMP="$ROOT/dist/.rtbench"
 mkdir -p "$TMP"
@@ -36,7 +36,8 @@ mkdir -p "$TMP"
 # Anything measured at -O0 would be measuring the wrong binary.
 echo "  building examples/bench/runtime.or (-O2)"
 "$ORION" "$SRC" "$TMP/runtime.ll" "$ROOT/orbs" >/dev/null || { echo "  compile FAILED"; exit 1; }
-[ -f "$TMP/orion_rt.o" ] || "$CLANG" -c -Os "$ROOT/runtime/orion_rt.c" -o "$TMP/orion_rt.o"
+# a cached object with no invalidation measured a STALE runtime - always fresh
+"$CLANG" -c -Os "$ROOT/runtime/orion_rt.c" -o "$TMP/orion_rt.o"
 "$CLANG" "$TMP/runtime.ll" "$TMP/orion_rt.o" -O2 -Wno-override-module -o "$TMP/runtime.exe" || {
     echo "  link FAILED"; exit 1; }
 
@@ -70,7 +71,7 @@ fi
 
 if [ ! -f "$BASELINE" ]; then
     echo
-    echo "  no baseline yet — record one: bash tools/runtime_bench.sh --update"
+    echo "  no baseline yet - record one: bash tools/runtime_bench.sh --update"
     exit 0
 fi
 

@@ -1,7 +1,7 @@
-/* orion_rt.c — runtime helpers for the native compiler.
+/* orion_rt.c - runtime helpers for the native compiler.
  *
  * Compiled alongside generated .ll files to provide:
- *   - __orion_perform_int / __orion_resume_int — one-shot continuations
+ *   - __orion_perform_int / __orion_resume_int - one-shot continuations
  *     for algebraic effects, backed by setjmp/longjmp.
  *
  * Single int parameter, single int return for the MVP. Generalize later
@@ -9,8 +9,17 @@
  */
 
 /* Portable C uses fopen/strcpy; MSVC's CRT flags them "deprecated" in
- * favour of non-portable _s variants. We stay portable — suppress. */
+ * favour of non-portable _s variants. We stay portable - suppress. */
 #define _CRT_SECURE_NO_WARNINGS 1
+
+/* Darwin hides the (deprecated but fully working) ucontext routines - the
+ * task scheduler's stack switching on POSIX - unless asked like this.
+ * Must precede every system include. _DARWIN_C_SOURCE keeps the rest of
+ * the BSD surface visible alongside the _XOPEN_SOURCE restriction. */
+#if defined(__APPLE__)
+#define _XOPEN_SOURCE 700
+#define _DARWIN_C_SOURCE 1
+#endif
 
 #include <setjmp.h>
 #include <stdarg.h>
@@ -20,6 +29,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#if !defined(_WIN32)
+#include <poll.h>       /* the scheduler waits on parked sockets with one poll */
+#endif
 
 /* ---- Console: color capability + VT enable --------------------------
  * ANSI styling is opt-in per stream state: orion_console_color()
@@ -68,7 +80,7 @@ void orion_print_raw(const char *s) { fputs(s, stdout); fflush(stdout); }
  * The compiler's parser is recursive descent: nested parens, unary runs,
  * calls and indented blocks each add a native stack frame. On adversarial
  * input (tens of thousands deep) that overran the linked stack and the
- * compiler died with a raw SIGSEGV / ACCESS VIOLATION and no diagnostic —
+ * compiler died with a raw SIGSEGV / ACCESS VIOLATION and no diagnostic -
  * exactly the failure the fuzzer exists to catch. The parser now bumps
  * this counter at each recursion chokepoint and refuses past a limit with
  * a located `ERROR` instead of crashing. Compilation is single-threaded,
@@ -83,7 +95,7 @@ long long psr_depth_drop(void) { if (psr_depth_level > 0) psr_depth_level -= 1; 
  * them: at a reset the region is empty by definition, so the backing
  * buffer can be swapped for a bigger one with zero live pointers.
  * Overflow mid-cycle chains onto a per-region list and is freed
- * (poisoned) at that same reset — spill is slow for one cycle, never
+ * (poisoned) at that same reset - spill is slow for one cycle, never
  * a leak, and the next reset has grown the buffer to fit. The engine
  * picks how much it needs; nobody hand-tunes byte counts. Grow-only:
  * caps converge to less than ~2.7x the real peak per workload. */
@@ -117,7 +129,7 @@ static void ovf_drain(orion_ovf **head, size_t *bytes) {
 
 /* Region-lifetime forensics. region_fit frees a region's old buffer when
  * it grows; a struct built in that region and read after the reset now
- * points into freed (or reused) memory — the classic "value outlived its
+ * points into freed (or reused) memory - the classic "value outlived its
  * region" bug that is otherwise a cryptic wild-pointer crash. Remember the
  * last few freed ranges (and the live region bounds) so the crash filter
  * can NAME the region a bad pointer belonged to and prescribe the fix. */
@@ -154,8 +166,8 @@ static const char *orion_region_of(uintptr_t a) {
  * double until it fits, so the next cycle bumps instead of spilling.
  *
  * SHRINK when the buffer DWARFS the region's recent working set and has
- * done so for a SUSTAINED stretch: halve one step. A transient spike — a
- * heavy render frame, a compaction — otherwise pins RSS at the
+ * done so for a SUSTAINED stretch: halve one step. A transient spike - a
+ * heavy render frame, a compaction - otherwise pins RSS at the
  * high-water for the whole session (the grow-only bug: fireplace idled
  * at 223 MB because one busy frame grew the arena to 54 MB and it never
  * came back).
@@ -189,7 +201,7 @@ static void region_fit(const char *name, unsigned char **base, size_t *cap,
         return;
     }
     if (!streak || *cap <= floor || need >= *cap / 4) {
-        if (streak) *streak = 0; /* healthy use — reset the patience clock */
+        if (streak) *streak = 0; /* healthy use - reset the patience clock */
         return;
     }
     if (++(*streak) < SHRINK_PATIENCE) return;
@@ -207,13 +219,13 @@ static void region_fit(const char *name, unsigned char **base, size_t *cap,
             name, (unsigned long long)(want / 1024u), c_off());
 }
 
-/* Thread-local allocation MODE — the foundation for running Orion systems on
+/* Thread-local allocation MODE - the foundation for running Orion systems on
  * worker threads. A worker's mode flags default to off/-1 (its own TLS copy),
  * so every allocation it makes falls straight through orion_alloc to malloc
  * (thread-safe) instead of bumping a region pointer shared with the main
  * thread. The bump regions themselves (arena/frame/pool buffers) stay
  * single-threaded: ONLY the main thread ever turns a mode on, so only it ever
- * touches those buffers. Single-threaded behaviour is byte-identical — the main
+ * touches those buffers. Single-threaded behaviour is byte-identical - the main
  * thread is just "thread 0" with the same defaults. Stats counters (alloc_total
  * etc.) may tear across threads; benign (profiling only, never memory safety). */
 #if defined(_WIN32) && defined(_MSC_VER) && !defined(__clang__)
@@ -266,11 +278,11 @@ long long orion_arena_active(void) { return arena_on; }
 
 /* ---- Frame region: allocations die at end of frame by DEFAULT -------
  * Three lifetimes, nothing else:
- *   epoch   — the bump arena above (render/dispatch), nests innermost
- *   frame   — this region: on for the whole game frame, reset at its
+ *   epoch   - the bump arena above (render/dispatch), nests innermost
+ *   frame   - this region: on for the whole game frame, reset at its
  *             end; the default for everything the frame allocates
- *   persist — orion_persist_on/off scopes route to malloc: the world,
- *             the log, caches — anything that must outlive the frame
+ *   persist - orion_persist_on/off scopes route to malloc: the world,
+ *             the log, caches - anything that must outlive the frame
  * A missed persist is not a slow leak: the reset POISONS the used
  * range, so a use-after-frame read crashes deterministically on the
  * next frame in every build. */
@@ -333,7 +345,7 @@ long long orion_persist_off(void) {
  * explicitly choosing a shorter lifetime). */
 
 /* Pools are DYNAMIC: every world allocates its own set via
- * orion_pool_alloc (atlas takes 4 per world — snapshot ring x2 +
+ * orion_pool_alloc (atlas takes 4 per world - snapshot ring x2 +
  * tick log x2), so region-as-world scales without shared lifetime
  * clocks. Same retirement proofs, per world. */
 #define POOL_START (128u * 1024u)
@@ -372,7 +384,7 @@ long long orion_pool_alloc(void) {
 
 /* Pool selection is a small STACK: a log/snapshot pool selected
  * inside a world-state scope must restore the OUTER pool on off,
- * not drop to persist — that drop was an invisible leak-by-scope. */
+ * not drop to persist - that drop was an invisible leak-by-scope. */
 static int pool_prev[8];
 static int pool_depth = 0;
 
@@ -397,7 +409,7 @@ long long orion_pool_used(long long i) {
     if (i < 0 || i >= pool_count) return 0;
     return (long long)pool_used[i];
 }
-/* True pressure: in-buffer bytes PLUS the overflow chain — a full
+/* True pressure: in-buffer bytes PLUS the overflow chain - a full
  * pool spills to malloc silently, and compaction thresholds must
  * see that, not a number frozen at capacity. */
 long long orion_pool_pressure(long long i) {
@@ -524,13 +536,13 @@ long long orion_pool_reset(long long i) {
     return 1;
 }
 
-/* ---- H1: texts carry identity — [hash:i64][len:i64][bytes..NUL],
+/* ---- H1: texts carry identity - [hash:i64][len:i64][bytes..NUL],
  * the POINTER aims at bytes so every strcmp/fprintf/extern keeps
  * working. len() is a load at p[-8]; hash at p[-16] is LAZY for
  * heap texts (0 = not yet computed) and BAKED for constants
  * (rodata is unwritable). Hash algo must be identical here and in
  * the emitter's compile-time baking: polynomial base 131, seed
- * 5381, mod 1e9+7 — no overflow in plain i64, no XOR needed. */
+ * 5381, mod 1e9+7 - no overflow in plain i64, no XOR needed. */
 #define OTX_MOD 1000000007LL
 
 void *orion_alloc(long long size);
@@ -559,7 +571,7 @@ char *orion_text_seal(char *p) {
 
 /* Force a FRESH copy of a text into the current allocation region (pool /
  * arena / persist). The compiler folds a bare "{t}" interpolation of a Text
- * value to the same pointer — correct for value semantics, but it defeats a
+ * value to the same pointer - correct for value semantics, but it defeats a
  * deep copy: the "copy" then shares the source's backing store. A snapshot
  * never noticed (its source outlives it), but COMPACTION resets the source
  * pool, so a shared text dangles. This primitive is the honest deep copy the
@@ -585,11 +597,11 @@ const char *orion_text_from_c(const char *s) {
 
 #include <time.h>
 /* Wall-clock strings for the OrionOS lock screen. Formatted in C (zero-pad;
- * Swedish ASCII day/month names — the glyph pipeline is byte-based) and boxed
+ * Swedish ASCII day/month names - the glyph pipeline is byte-based) and boxed
  * as Orion Text so a bundle can surface them as ctx bindings. localtime() is
  * the platform's local zone. Named atlas_* so a plain `extern fn` gets its
  * LLVM declare (orion_* names skip that path). */
-/* Box under persist so the Text is malloc-stable — a frame-region text would
+/* Box under persist so the Text is malloc-stable - a frame-region text would
  * dangle once the value flows through a queued astra:set and the region resets
  * before the drain (the crash this replaced). Only allocates when the string
  * changes (minute / day), reusing the stable pointer in between, so the persist
@@ -628,11 +640,11 @@ const char *atlas_date_text(void) {
     return box_stable(buf, last, sizeof last, &cached);
 }
 
-/* Wall-clock as plain INTS — surfaced as ctx bindings (like mouse_x/y) and
+/* Wall-clock as plain INTS - surfaced as ctx bindings (like mouse_x/y) and
  * copied into state by an every-1s rule, then rendered digit-by-digit
  * ("{h}:{mt}{mo}") so the minute zero-pads. Ints flow through a queued
  * astra:set BY VALUE, so unlike the text form (box_stable above) they never
- * dangle — this is the safe path for a live clock. */
+ * dangle - this is the safe path for a live clock. */
 long long atlas_clock_hour(void) {
     time_t t = time(NULL);
     return (long long)localtime(&t)->tm_hour;
@@ -661,7 +673,7 @@ long long orion_text_hash(const char *p) {
 
 /* Map keys are OWNED by the map: text keys copy on FIRST insert, so a
  * caller's transient key can never dangle inside a longer-lived map.
- * The copy allocates in the current scope — the same lifetime as the
+ * The copy allocates in the current scope - the same lifetime as the
  * spine growth the insert may do. Kills the shared-key-pointer bug
  * class (two poison-caught crashes in one day) at the language level. */
 void *orion_alloc(long long size);
@@ -673,7 +685,7 @@ const char *orion_key_copy(const char *key) {
 }
 
 /* Lifetime tripwire: a pointer that lies inside the arena buffer is
- * arena-born and dies at the next reset — storing it in a persistent
+ * arena-born and dies at the next reset - storing it in a persistent
  * structure is always a latent use-after-reset. Emitted slot-store
  * code calls this for every pointer value; costs two compares.
  * Fail fast: the store is already corrupt the moment this fires, and
@@ -704,13 +716,13 @@ void orion_arena_ptr_guard(const char *p, const char *key) {
  * pointer into the arena/frame region would dangle at the next reset,
  * so the store EVACUATES a deep copy to the malloc heap, typed by the
  * code the emitter derived statically at the callsite:
- *   0 opaque  (struct/fn/unknown — abort if in-region, can't copy)
+ *   0 opaque  (struct/fn/unknown - abort if in-region, can't copy)
  *   1 text    2 flat list    3 list of texts
  *   4 map     5 list of maps
  * Layouts mirror the emitted LLVM exactly: list = [cap][len][elems],
  * map handle = [entries][cap][len] with (key,val) i64 pairs. Map keys
  * copy when they point into a region (text keys born there); int keys
- * never alias region addresses in practice. Map VALUES are untyped —
+ * never alias region addresses in practice. Map VALUES are untyped -
  * an in-region value still aborts, but now with the reason. */
 static int oe_in_region(const void *p) {
     return (arena_base && (const unsigned char *)p >= arena_base &&
@@ -821,7 +833,7 @@ long long orion_arena_reset(void) {
 long long orion_arena_used(void) { return (long long)arena_used; }
 long long orion_arena_cap(void) { return (long long)arena_cap; }
 
-/* Process commit charge (what Task Manager calls private bytes) — the
+/* Process commit charge (what Task Manager calls private bytes) - the
  * number the engine's own report anchors on. K32GetProcessMemoryInfo
  * lives in kernel32 on Win7+, declared by hand to skip psapi. */
 #if defined(_WIN32)
@@ -851,7 +863,7 @@ long long orion_os_private_kb(void) {
 #else
 long long orion_os_private_kb(void) { return 0; }
 #endif
-/* Obstack-style partial rewind — callers save a watermark, evacuate
+/* Obstack-style partial rewind - callers save a watermark, evacuate
  * their result, and free everything above it in one move. */
 long long orion_arena_rewind(long long mark) {
     if (mark >= 0 && (size_t)mark <= arena_used) arena_used = (size_t)mark;
@@ -875,7 +887,7 @@ __attribute__((constructor)) static void orion_stdio_init(void) {
 
 /* Audio null backend: weak stubs COUNT instead of play. Linking
  * wasapi_min.c (orbit native does) overrides them with the real
- * mixer; headless gates link without it and assert the counters —
+ * mixer; headless gates link without it and assert the counters -
  * audio is testable because emission and playback are separate. */
 #if defined(__GNUC__) || defined(__clang__)
 static long long audio_null_plays = 0;
@@ -949,7 +961,7 @@ __attribute__((weak)) const char *orion_embedded_text(const char *path) {
     (void)path;
     return otx_empty.z;
 }
-/* Newline-joined paths of every embedded asset — lets ship builds
+/* Newline-joined paths of every embedded asset - lets ship builds
  * enumerate "directories" they no longer have. */
 __attribute__((weak)) const char *orion_embedded_list(void) {
     return otx_empty.z;
@@ -965,7 +977,7 @@ __attribute__((weak)) const char *orion_embedded_data(const char *path,
 #endif
 
 /* Counter rack for probe builds: temporary orb instrumentation taps
- * orion_ctr_add, gates read totals. Sixteen anonymous slots — the
+ * orion_ctr_add, gates read totals. Sixteen anonymous slots - the
  * probe defines what they mean, nothing here persists meaning. */
 static long long octr[16];
 void octr_add(long long i, long long n) {
@@ -974,7 +986,7 @@ void octr_add(long long i, long long n) {
 long long octr_get(long long i) { return (i >= 0 && i < 16) ? octr[i] : 0; }
 
 /* Allocation telemetry: total requested bytes, and the subset served
- * by malloc (arena misses + arena-off) — perf probes read both. */
+ * by malloc (arena misses + arena-off) - perf probes read both. */
 static long long alloc_total = 0;
 static long long alloc_malloc = 0;
 long long orion_alloc_total(void) { return alloc_total; }
@@ -982,18 +994,18 @@ long long orion_alloc_malloc_total(void) { return alloc_malloc; }
 
 long long orion_arena_high(void) { return (long long)arena_high; }
 
-/* Priority: epoch arena (innermost) > selected pool (beats persist —
+/* Priority: epoch arena (innermost) > selected pool (beats persist -
  * an explicit shorter lifetime) > persist scope (malloc) > frame
  * region (the frame default) > malloc (setup/tools).
  * Regions never fall through on overflow: the spill chains onto the
  * region's overflow list (same lifetime, freed at its reset) and the
- * reset grows the buffer — so overflow costs a slow cycle, not a
+ * reset grows the buffer - so overflow costs a slow cycle, not a
  * leak, and does not count as persist growth. */
 /* ---- Malloc-fallback ledger: WHO is dripping? ----
  * Orb code brackets suspicious regions with orion_ledger_tag(name);
  * every allocation that falls through to raw malloc credits the
  * innermost active tag. orion_ledger_dump prints the table. Zero
- * bookkeeping on region-served allocations — this watches only the
+ * bookkeeping on region-served allocations - this watches only the
  * immortal route. Tags nest like pools (small stack). */
 #define OL_MAX 32
 static char ol_names[OL_MAX][24];
@@ -1085,7 +1097,7 @@ void *orion_alloc(long long size) {
 /* Float-literal support for the compiler: parse a decimal literal with
  * strtod and return its IEEE-754 bit pattern as a 16-digit hex string
  * ("0x3FE0000000000000"). String-in/string-out so the COMPILER's own
- * source needs no double type — the previous-generation compiler can
+ * source needs no double type - the previous-generation compiler can
  * always build the next one (no bootstrap chicken-egg). */
 const char *orion_f64_literal_hex(const char *s) {
     union { double d; unsigned long long i; } u;
@@ -1097,7 +1109,7 @@ const char *orion_f64_literal_hex(const char *s) {
     return buf + 16;
 }
 
-/* Thread-local stack of one jmp_buf — only one perform pending at a time
+/* Thread-local stack of one jmp_buf - only one perform pending at a time
  * for the MVP. Nested perform/resume requires a real stack here. */
 static jmp_buf *current_k = NULL;
 static long long resume_value = 0;
@@ -1159,7 +1171,7 @@ void __orion_resume_int(long long value) {
     longjmp(*current_k, 1);
 }
 
-/* Text variants — same setjmp dance, but the value is a char*. We use a
+/* Text variants - same setjmp dance, but the value is a char*. We use a
  * separate global to avoid type confusion when both kinds of perform
  * are nested (rare but possible). */
 static char *resume_text_value = NULL;
@@ -1200,15 +1212,15 @@ void __orion_resume_text(char *value) {
     longjmp(*current_k, 1);
 }
 
-/* Timing primitives — backbone of the async runtime. Windows-only for now;
+/* Timing primitives - backbone of the async runtime. Windows-only for now;
  * port to POSIX (clock_gettime + nanosleep) is a few extra ifdefs. */
 /* ---- The WHY: cause breadcrumbs (PORTABLE) ----
- * The engine always knows which bundle/event/rule is executing — a crash
+ * The engine always knows which bundle/event/rule is executing - a crash
  * should say so. Dispatch layers drop crumbs (bounded copies into static
  * rings, zero alloc, ~20ns). Recording is zero-API, so it lives OUTSIDE the
  * platform guard: the emitter calls orion_crumb / orion_crumb_rule on every
- * platform (astra's `rule` construct does). Only the crash READER below —
- * which prints the trail newest-first — is Windows-specific for now. */
+ * platform (astra's `rule` construct does). Only the crash READER below -
+ * which prints the trail newest-first - is Windows-specific for now. */
 #define CRUMB_N 8
 static char crumb_bundle[CRUMB_N][40];
 static char crumb_event[CRUMB_N][24];
@@ -1245,14 +1257,89 @@ void orion_crumb_rule(const char *rule) {
  *
  * It lives ABOVE the _WIN32 block on purpose. There used to be three identical
  * copies of it, and the one the parallel system driver called was the copy
- * inside `#ifdef _WIN32` — so on Linux and Mac that call had no declaration
+ * inside `#ifdef _WIN32` - so on Linux and Mac that call had no declaration
  * and no definition, and the runtime did not compile at all. Nothing caught
  * it, because the only machine that ever built it was Windows. */
 static long long orion_rt_slot(void *p, long long i) {
     return ((long long *)p)[2 + i];
 }
 
+/* ---- debugger v1: the call trail + breakpoint --------------------------
+ * A `--trace` build (orbit debug) prefixes every user define with
+ * orion_trace_enter(name), a ring of the last 64 entered functions. It is
+ * printed newest-first wherever execution stops surprised: a crash, a
+ * require/index trap, or a breakpoint() the program placed itself. The
+ * names are string constants in the binary - storing the pointer is the
+ * whole cost of a hop, so a traced run stays fast enough to be usable. */
+#define ORION_TRAIL_N 64
+static const char *orion_trail_name[ORION_TRAIL_N];
+static long long orion_trail_seq = 0;
+
+long long orion_trace_enter(const char *name) {
+    orion_trail_name[(int)(orion_trail_seq % ORION_TRAIL_N)] = name;
+    orion_trail_seq++;
+    return 0;
+}
+
+/* Newest-first, to stderr. Quiet when the program was not built with
+ * --trace (an untraced binary never enters anything). */
+long long orion_trail_print(void) {
+    if (orion_trail_seq == 0) return 0;
+    long long n = orion_trail_seq < ORION_TRAIL_N ? orion_trail_seq : ORION_TRAIL_N;
+    fprintf(stderr, "[orion] last %lld call(s), newest first:\n", n);
+    for (long long k = 1; k <= n; k++) {
+        const char *nm = orion_trail_name[(int)((orion_trail_seq - k) % ORION_TRAIL_N)];
+        fprintf(stderr, "[orion]   %s\n", nm ? nm : "?");
+    }
+    return n;
+}
+
+/* The require/ensure/index traps call this before exit(70). */
+long long orion_trail_note_trap(void) {
+    fflush(stdout);
+    return orion_trail_print();
+}
+
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
+
+/* breakpoint() - stop here, on purpose. Prints where (the enclosing
+ * function) and the trail, then waits on stdin: Enter continues, q quits
+ * with 70. When stdin is not a terminal (a gate, a pipe) it reports and
+ * continues, so a forgotten breakpoint never hangs a script. */
+long long orion_breakpoint(const char *where) {
+    fflush(stdout);
+    fprintf(stderr, "[orion] breakpoint in `%s`\n", where);
+    orion_trail_print();
 #ifdef _WIN32
+    int interactive = _isatty(_fileno(stdin));
+#else
+    int interactive = isatty(0);
+#endif
+    if (!interactive) {
+        fprintf(stderr, "[orion]   (stdin is not a terminal - continuing)\n");
+        return 0;
+    }
+    for (;;) {
+        fprintf(stderr, "[orion]   Enter = continue, q = quit: ");
+        fflush(stderr);
+        int c = fgetc(stdin);
+        if (c == 'q') exit(70);
+        if (c == '\n' || c == EOF) return 0;
+        /* swallow the rest of the line, then ask again */
+        while (c != '\n' && c != EOF) c = fgetc(stdin);
+    }
+}
+#ifdef _WIN32
+/* winsock2 must precede windows.h (the classic ordering fix) - the tcp_*
+ * functions at the end of this file are the `net` orb's floor. FD_SETSIZE
+ * must precede winsock2.h too: the default 64 is smaller than the task table,
+ * and the scheduler selects over every socket a task is parked on. */
+#define FD_SETSIZE 1024
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
 #include <windows.h>
 
 /* Crash forensics: on an unhandled fault, print the exception code
@@ -1260,7 +1347,7 @@ static long long orion_rt_slot(void *p, long long i) {
  * orbit emits next to the exe) before dying. Fail fast, but say
  * where. The crumb trail recorded above prints newest-first. */
 
-/* The report goes to stderr AND crash.txt — a console window dies
+/* The report goes to stderr AND crash.txt - a console window dies
  * with the process, a file survives to be read (by the pilot or by
  * the recovery boot). */
 static FILE *crash_tee = NULL;
@@ -1301,7 +1388,7 @@ static void crash_print_crumbs(void) {
 /* Crashes symbolize THEMSELVES: the filter loads the link map that
  * orbit always emits next to the exe (<exe>.map) and resolves every
  * module-relative offset to `function +0x..` inline. No debugger,
- * no post-processing, no "look it up" — the crash line IS the
+ * no post-processing, no "look it up" - the crash line IS the
  * diagnosis. Falls back to raw offsets when the map is missing. */
 static char *crash_map_buf = NULL;
 static void crash_map_load(void) {
@@ -1328,13 +1415,13 @@ static void crash_map_load(void) {
 }
 /* Returns 1 when it resolved to a confident named symbol, 0 otherwise.
  * A match more than 8 KB past the nearest .map symbol is almost always the
- * WRONG function (the real one is absent from the map) — a confident-looking
+ * WRONG function (the real one is absent from the map) - a confident-looking
  * bogus name like "RtlUnwind+0x8630" is worse than nothing, so callers can
  * drop those frames and show only the real trace. */
 static int crash_sym(unsigned long long off, char *out, size_t cap) {
     snprintf(out, cap, "0x%llx", off);
     if (!crash_map_buf) return 0;
-    /* Map lines: " 0001:HHHHHHHH  name ..." — module offset is the
+    /* Map lines: " 0001:HHHHHHHH  name ..." - module offset is the
      * section address + 0x1000. Find the greatest base <= off. */
     unsigned long long best = 0;
     char best_name[192] = {0};
@@ -1399,7 +1486,7 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
     crash_map_load();
     crash_tee = fopen(orion_artifact("crash.txt", artbuf, sizeof artbuf), "w");
     /* Unbuffered: the filter itself may die (nested fault in dbghelp
-     * etc.) — every line must hit disk the moment it is written. */
+     * etc.) - every line must hit disk the moment it is written. */
     if (crash_tee)
         setvbuf(crash_tee, NULL, _IONBF, 0);
     crash_sym(at - base, sym, sizeof sym);
@@ -1407,6 +1494,7 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                orion_exc_name(info->ExceptionRecord->ExceptionCode),
                (unsigned long)info->ExceptionRecord->ExceptionCode, sym);
     crash_print_crumbs();
+    orion_trail_print();   /* the --trace call trail, when there is one */
     /* Backtrace: scan the crashed thread's stack for return addresses
      * inside our module, symbolized inline. No dbghelp, always works. */
     if (info->ContextRecord) {
@@ -1438,11 +1526,11 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
             }
         }
         if (printed == 0)
-            crash_line("[orion]   (no named frames — see crash.dmp)");
+            crash_line("[orion]   (no named frames - see crash.dmp)");
     }
     /* Access violations carry the faulting data address; a 0xdd..dd
      * byte pattern means a read through region memory poisoned at
-     * reset — a lifetime bug, not a wild pointer. Printed BEFORE the
+     * reset - a lifetime bug, not a wild pointer. Printed BEFORE the
      * minidump attempt: dbghelp can nested-fault and kill the filter,
      * and the diagnosis must never depend on it. */
     if (info->ExceptionRecord->ExceptionCode == 0xC0000005 &&
@@ -1453,11 +1541,11 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                      ((bad >> 16) & 0xffffffffULL) == 0xddddddddULL;
         const char *why;
         if (poison)
-            why = " — 0xDD poison: memory used after its arena was reset (lifetime bug)";
+            why = " - 0xDD poison: memory used after its arena was reset (lifetime bug)";
         else if (bad == 0xffffffffffffffffULL)
-            why = " — value is -1: an uninitialized field or a missing map key read as a pointer";
+            why = " - value is -1: an uninitialized field or a missing map key read as a pointer";
         else if (bad < 0x1000ULL)
-            why = " — near-null: an unset struct field or empty/missing value";
+            why = " - near-null: an unset struct field or empty/missing value";
         else
             why = "";
         crash_line("[orion]        %s address 0x%llx%s",
@@ -1466,19 +1554,19 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                    bad, why);
         /* Region-lifetime forensics. If the bad address lands in a region
          * buffer we freed at a resize, this is a value that outlived its
-         * region — name it and prescribe persist. Even when the address is
+         * region - name it and prescribe persist. Even when the address is
          * -1/near-null (the region buffer was freed AND reused, so the
          * dangling read returns garbage rather than the old range), a resize
-         * having happened at all is the tell — surface it so the next person
+         * having happened at all is the tell - surface it so the next person
          * doesn't spend hours: this was fireplace's Renderer-in-frame-region
          * crash exactly. */
         const char *region = orion_region_of((uintptr_t)bad);
         if (region)
             crash_line("[orion]        ^ points into the %s region's buffer, freed at a resize "
-                       "— LIFETIME BUG: this value outlived its region; build it under "
+                       "- LIFETIME BUG: this value outlived its region; build it under "
                        "orion_persist_on()", region);
         else if (orion_region_resized && (poison || bad == 0xffffffffffffffffULL || bad < 0x1000ULL))
-            crash_line("[orion]        ^ a region was resized (buffer freed) earlier this run — "
+            crash_line("[orion]        ^ a region was resized (buffer freed) earlier this run - "
                        "if a struct built in the arena/frame region is read after its reset it "
                        "dangles; build it under orion_persist_on() (see the 'region sized' line above)");
     }
@@ -1489,7 +1577,7 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
     }
     /* Self-service minidump: WER is unreliable on dev boxes, so the
      * filter writes crash.dmp next to the exe (dbghelp loaded
-     * dynamically — zero link cost for headless builds). Open with
+     * dynamically - zero link cost for headless builds). Open with
      * `lldb exe -c crash.dmp -o bt`. */
     {
         HMODULE dh = LoadLibraryA("dbghelp.dll");
@@ -1521,7 +1609,7 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                     CloseHandle(f);
                     if (ok)
                     fprintf(stderr,
-                            "%s[orion]        crash.dmp written — lldb "
+                            "%s[orion]        crash.dmp written - lldb "
                             "<exe> -c crash.dmp -o bt%s\n",
                             c_red(), c_off());
                 }
@@ -1538,7 +1626,7 @@ static void orion_crash_filter_install(void) {
 /* ---- Supervision: run a rule dispatch under a fault net (B6 step 2).
  * sup_guard5/7 call an Orion fn ref with the caller's own arguments; a
  * hardware fault inside does NOT kill the process. The vectored handler
- * writes the full crash report first (same trinity, same crash.txt —
+ * writes the full crash report first (same trinity, same crash.txt -
  * supervision never costs diagnosis), then steers the faulting thread
  * into a longjmp back here and the guard returns -1 so the engine can
  * quarantine the rule and rewind the world. The net exists only while
@@ -1560,7 +1648,7 @@ static LONG WINAPI orion_guard_vector(EXCEPTION_POINTERS *info) {
         return EXCEPTION_CONTINUE_SEARCH;
     guard_armed = 0; /* a fault inside the report must fall through */
     orion_crash_filter(info);
-    fprintf(stderr, "%s[orion] caught by supervisor — quarantine + rewind%s\n",
+    fprintf(stderr, "%s[orion] caught by supervisor - quarantine + rewind%s\n",
             c_red(), c_off());
     /* The longjmp must run OUTSIDE the exception dispatcher: point the
      * resumed context at guard_bounce. Rsp realigned as if just called
@@ -1572,7 +1660,7 @@ static LONG WINAPI orion_guard_vector(EXCEPTION_POINTERS *info) {
 }
 
 /* The fault may abandon region scopes mid-flight (arena on, pool or
- * ledger stack pushed, persist depth held) — snapshot on arm, restore
+ * ledger stack pushed, persist depth held) - snapshot on arm, restore
  * on catch, or every later allocation lands in the wrong lifetime. */
 typedef struct {
     int arena, pactive, pdepth, olc, old, persist;
@@ -1601,7 +1689,7 @@ static void guard_install(void) {
     if (!vh) vh = AddVectoredExceptionHandler(1, orion_guard_vector);
 }
 
-/* An Orion fn-ref arrives here as a CLOSURE list [fn_addr, flag] — the
+/* An Orion fn-ref arrives here as a CLOSURE list [fn_addr, flag] - the
  * compiler wraps every fn-ref value that way (flag 1 = a lambda that takes
  * its env as a leading arg, else a plain fn-ref). The old code cast this
  * list pointer straight to code and jumped into the list's own memory (the
@@ -1619,7 +1707,7 @@ long long sup_guard5(long long fn, long long a, long long b, long long c,
     /* Zero the SEH frame slot: longjmp becomes a plain register
      * restore instead of RtlUnwindEx through frames the fault left
      * in an unknown state. Nothing between arm and fault owns
-     * destructors — this runtime has none. */
+     * destructors - this runtime has none. */
     ((unsigned long long *)guard_jb)[0] = 0;
     guard_tid = GetCurrentThreadId();
     guard_armed = 1;
@@ -1665,7 +1753,7 @@ long long sup_guard7(long long fn, long long a, long long b, long long c,
     return r;
 }
 
-/* Which rule was executing when the guard tripped — the quarantine
+/* Which rule was executing when the guard tripped - the quarantine
  * key. Headered per H1 (every Text the runtime hands out carries
  * [hash][len]). */
 const char *sup_rule_name(void) {
@@ -1673,7 +1761,7 @@ const char *sup_rule_name(void) {
 }
 
 /* Newline-joined file names in `dir` (no paths, no subdirs). Empty
- * text when the directory is missing — callers fall back to the
+ * text when the directory is missing - callers fall back to the
  * embedded asset list in ship builds. */
 /* Non-blocking console line: returns a COMPLETE line once, else "".
  * Polled once per frame by the dev console. Interactive terminals
@@ -1755,7 +1843,7 @@ const char *orion_dir_subdirs(const char *dir) {
         len += n;
     } while (FindNextFileA(h, &fd));
     FindClose(h);
-    /* Evacuate into the scope allocator and free the growth buffer —
+    /* Evacuate into the scope allocator and free the growth buffer -
      * the raw malloc leaked one listing per call, forever (the soak
      * ledger billed script reloads ~16KB each for these). */
     {
@@ -1794,7 +1882,7 @@ const char *orion_dir_list(const char *dir) {
         return evac;
     }
 }
-/* Absolute path of the running executable — lets orbit find its own toolchain
+/* Absolute path of the running executable - lets orbit find its own toolchain
  * (orion.exe + runtime beside it) so projects never hard-code the engine path.
  * Placed here, after windows.h, so GetModuleFileNameA/DWORD are in scope. */
 const char *host_self_exe(void) {
@@ -1862,7 +1950,7 @@ long long atlas_monotonic_us(void) {
     QueryPerformanceCounter(&c);
     return (long long)(c.QuadPart * 1000000 / freq.QuadPart);
 }
-/* Best-effort mkdir (single dir) — games route saves under saves/. Named
+/* Best-effort mkdir (single dir) - games route saves under saves/. Named
  * atlas_* so the compiler auto-declares it for a plain `extern fn`. */
 long long atlas_mkdir(const char *path) {
     CreateDirectoryA(path, NULL);
@@ -1900,7 +1988,7 @@ long long atlas_monotonic_us(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
-/* Best-effort mkdir (single dir) — games route saves under saves/. Named
+/* Best-effort mkdir (single dir) - games route saves under saves/. Named
  * atlas_* so the compiler auto-declares it for a plain `extern fn`. */
 long long atlas_mkdir(const char *path) {
     mkdir(path, 0755);
@@ -1941,14 +2029,25 @@ const char *orion_dir_list(const char *dir) {
         return evac;
     }
 }
-/* Absolute path of the running executable (POSIX mirror). unistd.h for
- * readlink is included with the other POSIX headers. */
+/* Absolute path of the running executable (POSIX mirror). /proc/self/exe
+ * is Linux-only; Darwin answers via _NSGetExecutablePath (CI showed orbit
+ * on macOS falling back to a hard-coded engine path because this returned
+ * "" there). */
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 const char *host_self_exe(void) {
     char path[4096];
+#if defined(__APPLE__)
+    uint32_t cap = (uint32_t)sizeof path;
+    if (_NSGetExecutablePath(path, &cap) != 0) return otx_empty.z;
+    return orion_text_from_c(path);
+#else
     ssize_t n = readlink("/proc/self/exe", path, sizeof path - 1);
     if (n <= 0) return otx_empty.z;
     path[n] = 0;
     return orion_text_from_c(path);
+#endif
 }
 /* Subdirectories of `dir` (newline-separated, excludes . and ..). Lets orbit
  * scan a workspace for orbs regardless of folder layout. */
@@ -1983,7 +2082,7 @@ const char *host_subdirs(const char *dir) {
 }
 
 /* Same contract as the Windows one above it: newline-joined subdirectory
- * names, one level. It skips EVERY dot-entry, not just . and .. — the callers
+ * names, one level. It skips EVERY dot-entry, not just . and .. - the callers
  * are looking for project directories and have no use for .git or .vscode.
  *
  * This had no POSIX half at all, so the LSP referenced a symbol that only
@@ -2009,7 +2108,7 @@ const char *orion_dir_subdirs(const char *dir) {
         len += n;
     }
     closedir(d);
-    /* Evacuate into the scope allocator and free the growth buffer — the raw
+    /* Evacuate into the scope allocator and free the growth buffer - the raw
      * malloc would leak one listing per call, the way the Windows half used
      * to before the soak ledger caught it. */
     {
@@ -2023,7 +2122,7 @@ const char *orion_dir_subdirs(const char *dir) {
 /* POSIX half of the console poll. Same contract as the Windows one: never
  * blocks, returns an empty text until a whole line has arrived.
  *
- * REDIRECTED stdin only — an agent or a script driving a running program
+ * REDIRECTED stdin only - an agent or a script driving a running program
  * through a pipe, which is the case that matters and the case that can be
  * tested. On an interactive terminal this returns empty and does nothing,
  * deliberately: keystroke-at-a-time input needs raw termios, and a half-right
@@ -2073,7 +2172,7 @@ long long host_os(void) { return 2; }
 long long host_os(void) { return 1; }
 #endif
 
-/* PNG sprite loader (host_image_load) — see png_min.c */
+/* PNG sprite loader (host_image_load) - see png_min.c */
 #include "png_min.c"
 
 /* --- Parallel multiply-add: dst[i] += src[i]*k, split across CPU cores.
@@ -2156,7 +2255,7 @@ void *orion_par_madd(void *dstp, void *srcp, long long k) {
 
 /* --- Parallel SYSTEM runner: run a set of Orion system closures concurrently,
  * one per worker. A system is fn(World, dt)->int; World is a boxed struct, i.e.
- * a single pointer (data values are heap records — see struct_cons), so the ABI
+ * a single pointer (data values are heap records - see struct_cons), so the ABI
  * is just (ptr world, i64 dt). SAFE only for a footprint BATCH: the scheduler
  * guarantees the systems write DISJOINT columns and only READ shared world
  * state, so there are no data races and the result is bit-identical to running
@@ -2164,7 +2263,7 @@ void *orion_par_madd(void *dstp, void *srcp, long long k) {
  * malloc (the alloc mode flags are thread-local and default off on a worker),
  * so allocation is thread-safe too. Structural effects (spawn/despawn via
  * apply_effect, which mutate shared world state) are NOT permitted inside a
- * parallel system — those run on the main thread in their own batch.
+ * parallel system - those run on the main thread in their own batch.
  *
  * A closure is a list [fn_ptr, flag]; flag 1 = lambda taking its env first. */
 static long long orion_call_system(void *clos, void *world, long long dt) {
@@ -2281,7 +2380,7 @@ static void orion_run_pool_init(void) {
 }
 long long orion_par_run(void *closures, long long arg) {
     orion_run_pool_init();
-    /* List layout is [cap, len, data...] — slot 1, not slot 0. Reading cap
+    /* List layout is [cap, len, data...] - slot 1, not slot 0. Reading cap
      * here worked only for a literal list (cap == len); a pushed-into list
      * (what `loop parallel:` builds) grows cap past len, and the extra
      * iterations ran off the end into the bounds trap. */
@@ -2375,7 +2474,7 @@ long long orion_stderr_line(const char *s) {
  * was "future work". Until then a task could not SUSPEND: the effect machinery
  * is one-shot setjmp/longjmp, which can resume a continuation but cannot park
  * one and come back to it later. So `async` was timers and `scheduler` was a
- * deadline queue that ran each task to completion — cooperative in name only.
+ * deadline queue that ran each task to completion - cooperative in name only.
  *
  * This is the missing layer. Every task gets its own stack (a Windows fiber, or
  * a ucontext elsewhere), so `orion_task_yield()` parks mid-computation and the
@@ -2388,16 +2487,27 @@ long long orion_stderr_line(const char *s) {
  * task that does yield simply does not interleave. That is stated out loud
  * rather than pretending to suspend.
  */
-#define ORION_MAX_TASKS 256
+/* Slots, not stacks: a stack is created on spawn and released on finish, so
+ * this bounds how many tasks are LIVE at once, and the cost of a spare slot
+ * is one small struct. 256 was too tight for the obvious server shape (one
+ * task per connection, plus one per client in a self-driving test) - it ran
+ * out at 130 connections and spawn started returning -1. */
+#define ORION_MAX_TASKS 1024
 #define ORION_TASK_STACK (256 * 1024)
 
-/* 0 = free, 1 = ready, 2 = running, 3 = done, 4 = sleeping until `wake_ms` */
+/* 0 = free, 1 = ready, 2 = running, 3 = done, 4 = sleeping until `wake_ms`,
+ * 5 = parked until `wait_fd` is readable or `wake_ms` passes,
+ * 6 = parked until child process `wait_fd` (a proc-table id) exits or
+ *     `wake_ms` passes */
 typedef struct {
     void *stack_ctx;
     void *clos;
     long long arg;
     long long result;
     long long wake_ms;
+    long long wait_fd;
+    int wait_write;     /* 0 = waiting to read, 1 = waiting to write/connect */
+    int wait_ok;
     int state;
 } orion_task_slot;
 
@@ -2413,12 +2523,306 @@ static int orion_task_alloc(void *clos, long long arg) {
             orion_tasks[i].result = 0;
             orion_tasks[i].state = 1;
             orion_tasks[i].wake_ms = 0;
+            orion_tasks[i].wait_fd = -1;
+            orion_tasks[i].wait_write = 0;
+            orion_tasks[i].wait_ok = 0;
             orion_tasks[i].stack_ctx = NULL;
             orion_task_live++;
             return i;
         }
     }
     return -1;
+}
+
+/* ---- Waiting on a SOCKET without holding the scheduler ---------------------
+ * `sleep_task` fixed waiting on time. This fixes waiting on IO, which is the
+ * same bug one level down: without it, a task that wants to read has exactly
+ * one move - give `recv` a small timeout and try again - and every attempt
+ * parks the WHOLE process for that timeout. A round then costs
+ * (live tasks x timeout). Measured on the httpd demo: 80 connections at 5 ms
+ * per recv spent 400 ms per round doing nothing, and the 2-second client
+ * deadline expired before the server had accepted them all.
+ *
+ * State 5 is "parked until this fd is readable, or the deadline passes". The
+ * scheduler waits for all of them in ONE select/poll, so a round costs one
+ * wait no matter how many tasks are in it. */
+static long long orion_sched_io_soonest(void) {
+    long long now = __orion_monotonic_ms();
+    long long soonest = -1;
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 5) continue;
+        long long left = orion_tasks[i].wake_ms - now;
+        if (left < 0) left = 0;
+        if (soonest < 0 || left < soonest) soonest = left;
+    }
+    return soonest;
+}
+
+/* Wait up to `budget` ms for any parked socket. Tasks whose fd became
+ * readable wake with wait_ok = 1; tasks past their deadline wake with 0. */
+static void orion_sched_poll_io(long long budget) {
+    int idxs[ORION_MAX_TASKS];
+    int n = 0;
+    for (int i = 0; i < ORION_MAX_TASKS; i++)
+        if (orion_tasks[i].state == 5) idxs[n++] = i;
+    if (n == 0) return;
+    if (budget < 0) budget = 0;
+#ifdef _WIN32
+    fd_set rd, wr;
+    FD_ZERO(&rd);
+    FD_ZERO(&wr);
+    int highest = 0;
+    int watched = n < FD_SETSIZE ? n : FD_SETSIZE;
+    for (int k = 0; k < watched; k++) {
+        SOCKET s = (SOCKET)orion_tasks[idxs[k]].wait_fd;
+        if (orion_tasks[idxs[k]].wait_write) FD_SET(s, &wr); else FD_SET(s, &rd);
+        if ((int)s > highest) highest = (int)s;
+    }
+    struct timeval tv;
+    tv.tv_sec = (long)(budget / 1000);
+    tv.tv_usec = (long)((budget % 1000) * 1000);
+    select(highest + 1, &rd, &wr, NULL, &tv);
+    long long now = __orion_monotonic_ms();
+    for (int k = 0; k < n; k++) {
+        int i = idxs[k];
+        SOCKET s = (SOCKET)orion_tasks[i].wait_fd;
+        int ready = k < watched &&
+                    (orion_tasks[i].wait_write ? FD_ISSET(s, &wr) : FD_ISSET(s, &rd));
+        if (ready || orion_tasks[i].wake_ms <= now) {
+            orion_tasks[i].wait_ok = ready ? 1 : 0;
+            orion_tasks[i].state = 1;
+        }
+    }
+#else
+    struct pollfd *pf = (struct pollfd *)malloc(sizeof(struct pollfd) * (size_t)n);
+    if (!pf) return;
+    for (int k = 0; k < n; k++) {
+        pf[k].fd = (int)orion_tasks[idxs[k]].wait_fd;
+        pf[k].events = orion_tasks[idxs[k]].wait_write ? POLLOUT : POLLIN;
+        pf[k].revents = 0;
+    }
+    poll(pf, (nfds_t)n, (int)budget);
+    long long now = __orion_monotonic_ms();
+    for (int k = 0; k < n; k++) {
+        int i = idxs[k];
+        int ready = pf[k].revents != 0;
+        if (ready || orion_tasks[i].wake_ms <= now) {
+            orion_tasks[i].wait_ok = ready ? 1 : 0;
+            orion_tasks[i].state = 1;
+        }
+    }
+    free(pf);
+#endif
+}
+
+/* ---- Waiting on a CHILD PROCESS without holding the scheduler --------------
+ * `sock_wait_ready` fixed waiting on sockets; this is the same bargain for
+ * `run_command`, whose WaitForSingleObject/system() parks the WHOLE process.
+ * With it, one slow compile serializes every task - a "parallel" build runner
+ * gains nothing. Here a command is STARTED without waiting, and a task parks
+ * (state 6) until the child exits or a deadline passes. Children run OS-truly
+ * in parallel; the single-threaded scheduler only coordinates the waiting.
+ *
+ * A child process has no fd select() can watch alongside the sockets, so while
+ * one is parked on, the scheduler wakes every 10 ms and asks the OS (a 0 ms
+ * WaitForSingleObject / WNOHANG waitpid). Builds run for hundreds of ms; 10 ms
+ * of wake granularity is noise, and one shared poll interval keeps Windows and
+ * POSIX behaviour identical. */
+#define ORION_MAX_PROCS 256
+
+/* 0 = free, 1 = running, 2 = exited (code not yet taken) */
+typedef struct {
+    int state;
+    long long exit_code;
+#ifdef _WIN32
+    HANDLE handle;
+#else
+    long long pid;
+#endif
+} orion_proc_slot;
+
+static orion_proc_slot orion_procs[ORION_MAX_PROCS];
+
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#endif
+
+/* Start `cmd`; stdout+stderr go to `outfile` when given (truncated), else they
+ * are inherited. Returns a job id, or -1 (table full / spawn failed). */
+static long long orion_proc_spawn(const char *cmd, const char *outfile) {
+    int id = -1;
+    for (int i = 0; i < ORION_MAX_PROCS; i++)
+        if (orion_procs[i].state == 0) { id = i; break; }
+    if (id < 0) return -1;
+#ifdef _WIN32
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    char buf[32768];   /* CreateProcessA needs a mutable command buffer */
+    size_t n = 0;
+    while (cmd[n] && n < sizeof(buf) - 1) { buf[n] = cmd[n]; n++; }
+    buf[n] = 0;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    HANDLE out = INVALID_HANDLE_VALUE;
+    if (outfile && outfile[0]) {
+        SECURITY_ATTRIBUTES sa;
+        sa.nLength = sizeof(sa);
+        sa.lpSecurityDescriptor = NULL;
+        sa.bInheritHandle = TRUE;
+        out = CreateFileA(outfile, GENERIC_WRITE, FILE_SHARE_READ, &sa,
+                          CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (out == INVALID_HANDLE_VALUE) return -1;
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        si.hStdOutput = out;
+        si.hStdError = out;
+    }
+    BOOL ok = CreateProcessA(NULL, buf, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+    if (out != INVALID_HANDLE_VALUE) CloseHandle(out);
+    if (!ok) return -1;
+    CloseHandle(pi.hThread);
+    orion_procs[id].handle = pi.hProcess;
+#else
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+    if (pid == 0) {
+        if (outfile && outfile[0]) {
+            int fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd >= 0) { dup2(fd, 1); dup2(fd, 2); close(fd); }
+        }
+        execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+        _exit(127);
+    }
+    orion_procs[id].pid = (long long)pid;
+#endif
+    orion_procs[id].exit_code = -1;
+    orion_procs[id].state = 1;
+    return id;
+}
+
+/* Has job `id` exited? Non-blocking; reaps (and remembers the exit code) the
+ * first time it sees the exit. 1 = exited, 0 = still running / no such job. */
+static int orion_proc_poll(int id) {
+    if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state == 0) return 0;
+    if (orion_procs[id].state == 2) return 1;
+#ifdef _WIN32
+    if (WaitForSingleObject(orion_procs[id].handle, 0) != WAIT_OBJECT_0) return 0;
+    DWORD code = 0;
+    GetExitCodeProcess(orion_procs[id].handle, &code);
+    CloseHandle(orion_procs[id].handle);
+    orion_procs[id].exit_code = (long long)(int)code;
+#else
+    int st = 0;
+    pid_t r = waitpid((pid_t)orion_procs[id].pid, &st, WNOHANG);
+    if (r == 0) return 0;
+    orion_procs[id].exit_code = (r < 0) ? -1 : (WIFEXITED(st) ? WEXITSTATUS(st) : -1);
+#endif
+    orion_procs[id].state = 2;
+    return 1;
+}
+
+/* How many hardware threads the host has - what a build runner sizes its
+ * worker pool by. */
+long long host_cpus(void) {
+#ifdef _WIN32
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    long long n = (long long)si.dwNumberOfProcessors;
+    return n > 0 ? n : 1;
+#else
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+    return n > 0 ? (long long)n : 1;
+#endif
+}
+
+long long proc_start(const char *cmd) { return orion_proc_spawn(cmd, NULL); }
+long long proc_start_to_file(const char *cmd, const char *path) { return orion_proc_spawn(cmd, path); }
+
+/* Exit code of a finished job, freeing its slot - taken ONCE, like a task
+ * result. -1 while it still runs (or for an unknown id). */
+long long proc_result(long long id) {
+    if (id < 0 || id >= ORION_MAX_PROCS) return -1;
+    if (!orion_proc_poll((int)id)) return -1;
+    long long code = orion_procs[id].exit_code;
+    orion_procs[id].state = 0;
+    return code;
+}
+
+/* Kill a running job. Its exit code (taken via proc_result) becomes the
+ * kill status the OS reports, not the program's own. */
+long long proc_stop(long long id) {
+    if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state != 1) return 0;
+#ifdef _WIN32
+    TerminateProcess(orion_procs[id].handle, 137);
+#else
+    kill((pid_t)orion_procs[id].pid, SIGKILL);
+#endif
+    return 1;
+}
+
+/* Soonest deadline among tasks parked on a process, or -1 when none are. */
+static long long orion_sched_proc_soonest(void) {
+    long long now = __orion_monotonic_ms();
+    long long soonest = -1;
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 6) continue;
+        long long left = orion_tasks[i].wake_ms - now;
+        if (left < 0) left = 0;
+        if (soonest < 0 || left < soonest) soonest = left;
+    }
+    return soonest;
+}
+
+/* Wake tasks whose process exited (wait_ok = 1) or whose deadline passed. */
+static void orion_sched_poll_procs(void) {
+    long long now = __orion_monotonic_ms();
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 6) continue;
+        if (orion_proc_poll((int)orion_tasks[i].wait_fd)) {
+            orion_tasks[i].wait_ok = 1;
+            orion_tasks[i].state = 1;
+        } else if (orion_tasks[i].wake_ms <= now) {
+            orion_tasks[i].wait_ok = 0;
+            orion_tasks[i].state = 1;
+        }
+    }
+}
+
+/* Outside a task there is nobody else to run: slice-poll until exit/deadline. */
+static long long orion_proc_wait_blocking(long long id, long long ms) {
+    long long deadline = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    for (;;) {
+        if (orion_proc_poll((int)id)) return 1;
+        long long left = deadline - __orion_monotonic_ms();
+        if (left <= 0) return 0;
+        __orion_sleep_ms(left < 10 ? left : 10);
+    }
+}
+
+/* Outside a task there is nobody else to run, so this is an ordinary wait -
+ * which is what makes the same call correct in both places. */
+static long long orion_io_wait_blocking(long long fd, long long ms, int want_write) {
+#ifdef _WIN32
+    fd_set s;
+    FD_ZERO(&s);
+    FD_SET((SOCKET)fd, &s);
+    struct timeval tv;
+    tv.tv_sec = (long)(ms / 1000);
+    tv.tv_usec = (long)((ms % 1000) * 1000);
+    int r = want_write ? select((int)fd + 1, NULL, &s, NULL, &tv)
+                       : select((int)fd + 1, &s, NULL, NULL, &tv);
+    return r > 0 ? 1 : 0;
+#else
+    struct pollfd pf;
+    pf.fd = (int)fd;
+    pf.events = want_write ? POLLOUT : POLLIN;
+    pf.revents = 0;
+    return poll(&pf, 1, (int)ms) > 0 ? 1 : 0;
+#endif
 }
 
 #if defined(_WIN32)
@@ -2441,7 +2845,7 @@ static void __stdcall orion_task_entry(void *param) {
     orion_tasks[idx].state = 3;
     /* A fiber must never return. Park, and give control to whoever is owed it:
      * a handler waiting for this continuation's result, otherwise the
-     * scheduler. A REPLAY request jumps back to the captured perform point —
+     * scheduler. A REPLAY request jumps back to the captured perform point -
      * the stack has already been restored under us. */
     for (;;) {
         void *back = orion_ms_handler_of(idx);
@@ -2497,7 +2901,7 @@ static long long orion_sched_wake_due(void) {
  * A SLEEPING task does not hold the scheduler: when nothing is runnable but a
  * timer is pending, this sleeps ONCE for the shortest remaining wait and then
  * wakes whoever is due. That is what makes N tasks each waiting 100ms finish in
- * ~100ms instead of N*100ms — with plain `sleep_ms` inside a task, the whole
+ * ~100ms instead of N*100ms - with plain `sleep_ms` inside a task, the whole
  * scheduler was parked in the OS. */
 static long long orion_sched_drive(int until_idx) {
     long long switches = 0;
@@ -2517,8 +2921,18 @@ static long long orion_sched_drive(int until_idx) {
         }
         if (!ran) {
             long long wait = orion_sched_wake_due();
-            if (wait <= 0) break;      /* nothing runnable, no timers: stop */
-            __orion_sleep_ms(wait);
+            long long io = orion_sched_io_soonest();
+            long long pr = orion_sched_proc_soonest();
+            /* nothing runnable, no timers, nothing parked on: stop */
+            if (wait <= 0 && io < 0 && pr < 0) break;
+            long long budget = wait;
+            if (budget <= 0 || (io >= 0 && io < budget)) budget = io;
+            if (budget <= 0 || (pr >= 0 && pr < budget)) budget = pr;
+            /* a child process has no fd to select on - while one is
+             * watched, wake every 10 ms and ask the OS about it */
+            if (pr >= 0 && budget > 10) budget = 10;
+            if (io >= 0) orion_sched_poll_io(budget); else __orion_sleep_ms(budget);
+            if (pr >= 0) orion_sched_poll_procs();
         }
     }
     return switches;
@@ -2536,6 +2950,33 @@ long long orion_task_sleep(long long ms) {
     orion_tasks[me].state = 4;
     SwitchToFiber(orion_sched_fiber);
     return 1;
+}
+
+/* Park until `fd` is ready (readable, or writable when `want_write`), or `ms`
+ * passes. 1 = ready, 0 = timed out. */
+long long sock_wait_ready(long long fd, long long ms, long long want_write) {
+    int me = orion_task_current;
+    if (me < 0) return orion_io_wait_blocking(fd, ms, (int)want_write);
+    orion_tasks[me].wait_fd = fd;
+    orion_tasks[me].wait_write = want_write ? 1 : 0;
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].wait_ok = 0;
+    orion_tasks[me].state = 5;
+    SwitchToFiber(orion_sched_fiber);
+    return orion_tasks[me].wait_ok;
+}
+
+/* Park until job `id` exits, or `ms` passes. 1 = exited, 0 = timed out. */
+long long proc_wait_ready(long long id, long long ms) {
+    if (orion_proc_poll((int)id)) return 1;
+    int me = orion_task_current;
+    if (me < 0) return orion_proc_wait_blocking(id, ms);
+    orion_tasks[me].wait_fd = id;
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].wait_ok = 0;
+    orion_tasks[me].state = 6;
+    SwitchToFiber(orion_sched_fiber);
+    return orion_tasks[me].wait_ok;
 }
 
 static void orion_task_release(int idx) {
@@ -2619,8 +3060,11 @@ static long long orion_sched_drive(int until_idx) {
         }
         if (!ran) {
             long long wait = orion_sched_wake_due();
-            if (wait <= 0) break;
-            __orion_sleep_ms(wait);
+            long long io = orion_sched_io_soonest();
+            if (wait <= 0 && io < 0) break;
+            long long budget = wait;
+            if (budget <= 0 || (io >= 0 && io < budget)) budget = io;
+            if (io >= 0) orion_sched_poll_io(budget); else __orion_sleep_ms(budget);
         }
     }
     return switches;
@@ -2636,6 +3080,33 @@ long long orion_task_sleep(long long ms) {
     orion_tasks[me].state = 4;
     swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
     return 1;
+}
+
+/* Park until `fd` is ready (readable, or writable when `want_write`), or `ms`
+ * passes. 1 = ready, 0 = timed out. */
+long long sock_wait_ready(long long fd, long long ms, long long want_write) {
+    int me = orion_task_current;
+    if (me < 0) return orion_io_wait_blocking(fd, ms, (int)want_write);
+    orion_tasks[me].wait_fd = fd;
+    orion_tasks[me].wait_write = want_write ? 1 : 0;
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].wait_ok = 0;
+    orion_tasks[me].state = 5;
+    swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
+    return orion_tasks[me].wait_ok;
+}
+
+/* Park until job `id` exits, or `ms` passes. 1 = exited, 0 = timed out. */
+long long proc_wait_ready(long long id, long long ms) {
+    if (orion_proc_poll((int)id)) return 1;
+    int me = orion_task_current;
+    if (me < 0) return orion_proc_wait_blocking(id, ms);
+    orion_tasks[me].wait_fd = id;
+    orion_tasks[me].wake_ms = __orion_monotonic_ms() + (ms > 0 ? ms : 0);
+    orion_tasks[me].wait_ok = 0;
+    orion_tasks[me].state = 6;
+    swapcontext(&orion_task_ctx[me], &orion_sched_ctx);
+    return orion_tasks[me].wait_ok;
 }
 
 static void orion_task_release(int idx) {
@@ -2680,15 +3151,15 @@ long long orion_task_live_count(void) { return orion_task_live; }
  *
  * `resume(v)` in an ordinary `handle` block is a longjmp: control leaves for
  * the perform site and the handler's frame is GONE. So a handler can never do
- * anything after the continuation runs — not clean up, not inspect the result,
+ * anything after the continuation runs - not clean up, not inspect the result,
  * and certainly not resume a second time.
  *
  * Here the handler runs on ITS OWN FIBER, so it survives:
  *
- *   1. capture — snapshot the task's live stack from the perform point up to
+ *   1. capture - snapshot the task's live stack from the perform point up to
  *                its base, and setjmp;
- *   2. handle  — switch to a fresh fiber and run the handler there;
- *   3. resume  — hand control back to the task and RETURN ITS RESULT to the
+ *   2. handle  - switch to a fresh fiber and run the handler there;
+ *   3. resume  - hand control back to the task and RETURN ITS RESULT to the
  *                handler when the rest of the task finishes.
  *
  * `resume_with(v)` therefore returns a value, which one-shot `resume` cannot.
@@ -2697,7 +3168,7 @@ long long orion_task_live_count(void) { return orion_task_live; }
  * A SECOND resume is refused, loudly. Replaying would mean putting the task's
  * stack back as it was at the perform point, and that invalidates the context
  * the OS parked the fiber at: the switch then lands on a stack whose saved
- * frame no longer describes it. That was measured, not assumed — the first
+ * frame no longer describes it. That was measured, not assumed - the first
  * resume returns correctly, the second faulted at the switch. Getting past it
  * needs a context switcher of our own or per-resume stack copies with full
  * pointer relocation, and neither belongs in a half-built state.
@@ -2798,7 +3269,7 @@ long long orion_ms_resume(long long v) {
     orion_ms_slot *m = &orion_ms[idx];
     if (m->ran_once) {
         /* ONE resume per capture. A second one would have to put the task's
-         * stack back the way it was at the perform point — and restoring it
+         * stack back the way it was at the perform point - and restoring it
          * invalidates the very context the OS parked that fiber at, so the
          * switch lands on a stack whose saved frame no longer describes it.
          * (Measured, not assumed: the first resume works and returns the
@@ -2807,7 +3278,7 @@ long long orion_ms_resume(long long v) {
          * Doing better needs a context switcher of our own, or per-resume stack
          * COPIES with every frame pointer relocated. Neither is something to
          * half-build, so this says no instead of corrupting the process. */
-        fprintf(stderr, "orion: resume_with called twice for one `ask` — the continuation is one-shot (see orbs/async)\n");
+        fprintf(stderr, "orion: resume_with called twice for one `ask` - the continuation is one-shot (see orbs/async)\n");
         return -1;
     }
     m->resume_in = v;
@@ -2836,4 +3307,335 @@ long long orion_ms_replay_wanted(int idx) { return orion_ms[idx].replay ? 1 : 0;
 void orion_ms_do_replay(int idx) {
     orion_ms[idx].replay = 0;
     longjmp(orion_ms[idx].ctx, 1);
+}
+
+/* ---- TCP: the `net` orb's floor. ------------------------------------------
+ * Plain synchronous sockets, handles as i64. The ORB carries the `uses net`
+ * contracts; the scoped-resource story (a handler owning the socket's
+ * lifetime) is language-level sugar on top of these. POSIX half mirrors the
+ * Windows half; both return -1 for failure, and tcp_recv returns "" at EOF. */
+#ifdef _WIN32
+static int orion_net_up = 0;
+static void orion_net_init(void) {
+    if (!orion_net_up) { WSADATA w; WSAStartup(MAKEWORD(2, 2), &w); orion_net_up = 1; }
+}
+#define ORION_BADSOCK INVALID_SOCKET
+#define orion_closesock closesocket
+typedef SOCKET orion_sock_t;
+static void orion_sock_nonblock(orion_sock_t s, int on) {
+    u_long m = on ? 1 : 0;
+    ioctlsocket(s, FIONBIO, &m);
+}
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+static void orion_net_init(void) {}
+#define ORION_BADSOCK (-1)
+#define orion_closesock close
+typedef int orion_sock_t;
+static void orion_sock_nonblock(orion_sock_t s, int on) {
+    int f = fcntl(s, F_GETFL, 0);
+    if (f < 0) return;
+    fcntl(s, F_SETFL, on ? (f | O_NONBLOCK) : (f & ~O_NONBLOCK));
+}
+#endif
+
+long long tcp_listen(long long port) {
+    orion_net_init();
+    orion_sock_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == ORION_BADSOCK) return -1;
+    int yes = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    a.sin_port = htons((unsigned short)port);
+    if (bind(s, (struct sockaddr *)&a, sizeof(a)) != 0) { orion_closesock(s); return -1; }
+    /* Backlog 8 deadlocked a single-process demo the moment ten clients
+     * connected before the acceptor got a turn: the ninth connect() blocked,
+     * and a blocked connect holds the whole scheduler. 128 is what a server
+     * that means it asks for. */
+    if (listen(s, 128) != 0) { orion_closesock(s); return -1; }
+    return (long long)s;
+}
+
+long long tcp_accept(long long listener) {
+    orion_sock_t c = accept((orion_sock_t)listener, NULL, NULL);
+    if (c == ORION_BADSOCK) return -1;
+    return (long long)c;
+}
+
+long long tcp_connect(const char *host, long long port) {
+    orion_net_init();
+    orion_sock_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == ORION_BADSOCK) return -1;
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_port = htons((unsigned short)port);
+    inet_pton(AF_INET, host && host[0] ? host : "127.0.0.1", &a.sin_addr);
+    if (connect(s, (struct sockaddr *)&a, sizeof(a)) != 0) { orion_closesock(s); return -1; }
+    return (long long)s;
+}
+
+/* connect() with a deadline. `accept` and `recv` could already give up, but
+ * connect could not - and a blocking connect parks the whole PROCESS, so one
+ * task waiting on a full listen backlog froze every other task with it. This
+ * one goes non-blocking, waits for writability, and returns -1 on timeout so
+ * the caller can sleep_task and try again. The socket is put back into
+ * blocking mode on success, so everything downstream is unchanged. */
+long long tcp_connect_wait(const char *host, long long port, long long ms) {
+    if (ms <= 0) return tcp_connect(host, port);
+    orion_net_init();
+    orion_sock_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == ORION_BADSOCK) return -1;
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_port = htons((unsigned short)port);
+    inet_pton(AF_INET, host && host[0] ? host : "127.0.0.1", &a.sin_addr);
+    orion_sock_nonblock(s, 1);
+    if (connect(s, (struct sockaddr *)&a, sizeof(a)) == 0) {
+        orion_sock_nonblock(s, 0);
+        return (long long)s;
+    }
+#ifdef _WIN32
+    if (WSAGetLastError() != WSAEWOULDBLOCK) { orion_closesock(s); return -1; }
+#else
+    if (errno != EINPROGRESS) { orion_closesock(s); return -1; }
+#endif
+    /* Wait for writability THROUGH the scheduler: inside a task this parks
+     * only that task. Waiting here with a plain select is what turned 300
+     * clients into a twenty-minute serial queue. */
+    if (!sock_wait_ready((long long)s, ms, 1)) { orion_closesock(s); return -1; }
+    int err = 0;
+#ifdef _WIN32
+    int elen = (int)sizeof(err);
+#else
+    socklen_t elen = sizeof(err);
+#endif
+    if (getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&err, &elen) != 0 || err != 0) {
+        orion_closesock(s);
+        return -1;
+    }
+    orion_sock_nonblock(s, 0);
+    return (long long)s;
+}
+
+/* Binary-safe send: the length comes from the orion text HEADER, not
+ * strlen, so a JPEG's null bytes survive. What a file server sends with. */
+long long tcp_send_len(long long conn, const char *data) {
+    if (!data) return 0;
+    long long n = ((const long long *)data)[-1];
+    long long sent = 0;
+    while (sent < n) {
+        int r = send((orion_sock_t)conn, data + sent, (int)(n - sent), 0);
+        if (r <= 0) return -1;
+        sent += r;
+    }
+    return sent;
+}
+
+long long tcp_send(long long conn, const char *data) {
+    if (!data) return 0;
+    long long n = (long long)strlen(data);
+    long long sent = 0;
+    while (sent < n) {
+        int r = send((orion_sock_t)conn, data + sent, (int)(n - sent), 0);
+        if (r <= 0) return -1;
+        sent += r;
+    }
+    return sent;
+}
+
+const char *tcp_recv(long long conn, long long maxlen) {
+    if (maxlen <= 0) maxlen = 4096;
+    if (maxlen > 1 << 20) maxlen = 1 << 20;
+    char *buf = (char *)malloc((size_t)maxlen);
+    if (!buf) return orion_text_empty();
+    int r = recv((orion_sock_t)conn, buf, (int)maxlen, 0);
+    if (r <= 0) { free(buf); return orion_text_empty(); }
+    char *out = orion_text_alloc((long long)r);
+    memcpy(out, buf, (size_t)r);
+    out[r] = 0;
+    free(buf);
+    return out;
+}
+
+long long tcp_close(long long h) {
+    if (h >= 0) orion_closesock((orion_sock_t)h);
+    return 0;
+}
+
+/* ---- UDP: the datagram floor a game's netcode stands on --------------------
+ * Connectionless: one socket per side, no accept. A UDP socket is a socket -
+ * sock_wait_ready parks a task on it exactly like TCP. Datagrams carry TEXT
+ * like the tcp_* family; a binary protocol rides bytes/base64 on top. */
+
+/* udp_open(port) -> a bound UDP socket, or -1. Port 0 picks an ephemeral
+ * one (read it back with sock_local_port). */
+long long udp_open(long long port) {
+    orion_net_init();
+    orion_sock_t s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s == (orion_sock_t)-1) return -1;
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof a);
+    a.sin_family = AF_INET;
+    a.sin_addr.s_addr = htonl(INADDR_ANY);
+    a.sin_port = htons((unsigned short)port);
+    if (bind(s, (struct sockaddr *)&a, sizeof a) != 0) { orion_closesock(s); return -1; }
+    return (long long)s;
+}
+
+/* udp_send_to(sock, host, port, data) -> bytes sent, or -1. */
+long long udp_send_to(long long sock, const char *host, long long port, const char *data) {
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof a);
+    a.sin_family = AF_INET;
+    a.sin_port = htons((unsigned short)port);
+    if (inet_pton(AF_INET, host, &a.sin_addr) != 1) return -1;
+    size_t n = strlen(data);
+    return (long long)sendto((orion_sock_t)sock, data, (int)n, 0,
+                             (struct sockaddr *)&a, sizeof a);
+}
+
+/* One datagram as text ("" when nothing there). The sender's "ip:port" is
+ * readable right after via udp_last_sender - what a server keys clients by. */
+static char orion_udp_sender[64];
+const char *udp_recv_from(long long sock, long long maxlen) {
+    if (maxlen <= 0) maxlen = 4096;
+    if (maxlen > 1 << 16) maxlen = 1 << 16;
+    char *buf = (char *)malloc((size_t)maxlen);
+    if (!buf) return orion_text_empty();
+    struct sockaddr_in a;
+    socklen_t alen = sizeof a;
+    int r = recvfrom((orion_sock_t)sock, buf, (int)maxlen, 0,
+                     (struct sockaddr *)&a, &alen);
+    if (r <= 0) { free(buf); orion_udp_sender[0] = 0; return orion_text_empty(); }
+    char ip[46];
+    if (!inet_ntop(AF_INET, &a.sin_addr, ip, sizeof ip)) ip[0] = 0;
+    snprintf(orion_udp_sender, sizeof orion_udp_sender, "%s:%d", ip, (int)ntohs(a.sin_port));
+    char *out = orion_text_alloc((long long)r);
+    memcpy(out, buf, (size_t)r);
+    out[r] = 0;
+    free(buf);
+    return out;
+}
+
+const char *udp_last_sender(void) {
+    char *out = orion_text_alloc((long long)strlen(orion_udp_sender));
+    strcpy(out, orion_udp_sender);
+    return out;
+}
+
+/* The port a socket actually bound to - what listen(0)/udp_open(0) picked. */
+long long sock_local_port(long long sock) {
+    struct sockaddr_in a;
+    socklen_t len = sizeof a;
+    if (getsockname((orion_sock_t)sock, (struct sockaddr *)&a, &len) != 0) return -1;
+    return (long long)ntohs(a.sin_port);
+}
+
+/* ---- Streaming file IO -----------------------------------------------------
+ * Whole-file read/write cannot process anything larger than memory, and a
+ * socket reply had to fit one recv. These are the missing primitives: open a
+ * handle, move bytes a chunk at a time, close it. Handles are i64 (>= 0 is
+ * open, -1 is failure); a read at end-of-stream returns "" - the same
+ * convention tcp_recv uses, so both streams read the same way. */
+#define ORION_MAX_FILES 64
+static FILE *orion_files[ORION_MAX_FILES];
+
+/* mode: 0 read, 1 write (truncate), 2 append. */
+long long file_open(const char *path, long long mode) {
+    if (!path) return -1;
+    const char *m = (mode == 1) ? "wb" : (mode == 2) ? "ab" : "rb";
+    FILE *f = fopen(path, m);
+    if (!f) return -1;
+    for (int i = 0; i < ORION_MAX_FILES; i++) {
+        if (!orion_files[i]) { orion_files[i] = f; return (long long)i; }
+    }
+    fclose(f);
+    return -1;
+}
+
+const char *file_read_chunk(long long h, long long maxlen) {
+    if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h]) return orion_text_empty();
+    if (maxlen <= 0) maxlen = 4096;
+    if (maxlen > (1 << 22)) maxlen = 1 << 22;
+    char *buf = (char *)malloc((size_t)maxlen);
+    if (!buf) return orion_text_empty();
+    size_t n = fread(buf, 1, (size_t)maxlen, orion_files[h]);
+    if (n == 0) { free(buf); return orion_text_empty(); }
+    char *out = orion_text_alloc((long long)n);
+    memcpy(out, buf, n);
+    out[n] = 0;
+    free(buf);
+    return out;
+}
+
+long long file_write_chunk(long long h, const char *data) {
+    if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h] || !data) return -1;
+    size_t n = strlen(data);
+    size_t w = fwrite(data, 1, n, orion_files[h]);
+    return (long long)w;
+}
+
+long long file_close(long long h) {
+    if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h]) return -1;
+    fclose(orion_files[h]);
+    orion_files[h] = NULL;
+    return 0;
+}
+
+/* Bytes in a file without reading it - sizing a buffer, or just reporting. */
+long long file_bytes(const char *path) {
+    if (!path) return -1;
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    fseek(f, 0, SEEK_END);
+    long long n = (long long)ftell(f);
+    fclose(f);
+    return n;
+}
+
+/* Read/write deadline on a socket, in milliseconds (0 = block forever).
+ * Without it a server blocks in accept/recv until someone shows up, which is
+ * the reason "serve N requests and exit" was the only shape a demo could
+ * take. With it, accept returns -1 and recv returns "" when the deadline
+ * passes - the same two failure signals those calls already use. */
+long long tcp_set_timeout(long long sock, long long ms) {
+#ifdef _WIN32
+    DWORD tv = (DWORD)ms;
+    int r1 = setsockopt((orion_sock_t)sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
+    int r2 = setsockopt((orion_sock_t)sock, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof(tv));
+#else
+    struct timeval tv;
+    tv.tv_sec = (long)(ms / 1000);
+    tv.tv_usec = (long)((ms % 1000) * 1000);
+    int r1 = setsockopt((orion_sock_t)sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    int r2 = setsockopt((orion_sock_t)sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+#endif
+    return (r1 == 0 && r2 == 0) ? 0 : -1;
+}
+
+/* accept() with a deadline. SO_RCVTIMEO does NOT apply to accept on Windows,
+ * so waiting for a connection needs select(): block up to `ms`, then accept
+ * only if one is pending. -1 means "nobody came" (or the wait failed), the
+ * same signal a failed accept already gives. ms <= 0 blocks forever. */
+long long tcp_accept_wait(long long listener, long long ms) {
+    if (ms <= 0) return tcp_accept(listener);
+    fd_set rd;
+    FD_ZERO(&rd);
+    FD_SET((orion_sock_t)listener, &rd);
+    struct timeval tv;
+    tv.tv_sec = (long)(ms / 1000);
+    tv.tv_usec = (long)((ms % 1000) * 1000);
+    int r = select((int)listener + 1, &rd, NULL, NULL, &tv);
+    if (r <= 0) return -1;
+    return tcp_accept(listener);
 }

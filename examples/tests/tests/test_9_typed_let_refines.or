@@ -5,19 +5,19 @@
 # text element out of it therefore lowered `len` to a MAP length: no error, just
 # a wrong number. The annotation is how the programmer says what is in there.
 #
-# It only half worked: `mut ys: [Text] = …` was honoured (a mut read loads with
-# the slot's annotated type) while the immutable `ys: [Text] = …` parsed the
+# It only half worked: `mut ys: [text] = …` was honoured (a mut read loads with
+# the slot's annotated type) while the immutable `ys: [text] = …` parsed the
 # annotation and dropped it, which is the worse of the two - it looks like the
 # fix and is a no-op. Both forms now agree.
-fn text_len_of_first(m: Map) -> int:
-    ys: [Text] = get_list(m, "words")
+define text_len_of_first(m: table) -> int:
+    ys: [text] = get_list(m, "words")
     at(ys, 0).len()
 
-fn mut_form(m: Map) -> int:
-    mut ys: [Text] = get_list(m, "words")
+define mut_form(m: table) -> int:
+    edit ys: [text] = get_list(m, "words")
     len(at(ys, 1))
 
-fn main() -> int:
+define main() -> int:
     m = {"words": ["ab", "cdef"]}
     a = text_len_of_first(m)   # 2, not the map length
     b = mut_form(m)            # 4

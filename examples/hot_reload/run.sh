@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Demonstrate Orion-native hot reload: compile two versions of gameplay code to
 # shared libraries, then run an Orion host that loads v1, accumulates state,
-# and hot-swaps v2 in mid-run — state survives, behavior changes, no restart.
+# and hot-swaps v2 in mid-run - state survives, behavior changes, no restart.
 #
 #   bash examples/hot_reload/run.sh
 set -e
@@ -47,4 +47,4 @@ echo "==> running (watch state survive the swap):"
 rc=0
 ./reload || rc=$?
 rm -f _p.ll _p_host.ll _h.ll _h_host.ll orion_rt.o plugin_v1.so plugin_v2.so reload
-echo "==> done — final state $rc (1,2,3 then a hot swap to 13,23,33)"
+echo "==> done - final state $rc (1,2,3 then a hot swap to 13,23,33)"

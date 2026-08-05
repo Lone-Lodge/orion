@@ -1,21 +1,21 @@
 type Task: deadline_ms: int, fn_id: int, payload: int
 
-fn task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
+define task_new(fire_in_ms: int, fn_id: int, payload: int) -> Task:
     Task{deadline_ms: monotonic_ms() + fire_in_ms, fn_id: fn_id, payload: payload}
 
-fn task_due(t: Task) -> int:
+define task_due(t: Task) -> int:
     now = monotonic_ms()
     if t.deadline_ms <= now then 1 else 0
 
-# Hand-written dispatcher — fn_id 0 doubles payload, fn_id 1 negates.
-fn dispatch(t: Task) -> int:
+# Hand-written dispatcher - fn_id 0 doubles payload, fn_id 1 negates.
+define dispatch(t: Task) -> int:
     fid = t.fn_id
     if fid == 0:
         t.payload + t.payload
     else:
         0 - t.payload
 
-fn main() -> int:
+define main() -> int:
     a = task_new(10, 0, 21)
     b = task_new(25, 1, 50)
     sleep_ms(40)

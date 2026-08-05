@@ -2,19 +2,19 @@
 # payload's real (struct) type, so it can be matched on in turn.
 type Res:
     Ok(int)
-    Bad(Text)
+    Bad(text)
 
 type Opt:
     Some(Res)
     None
 
-fn unwrap(r: Res) -> int:
-    match r:
+define unwrap(r: Res) -> int:
+    choose r:
         Ok(n) -> n
         Bad(m) -> 0 - len(m)
 
-fn main() -> int:
+define main() -> int:
     v = Opt.Some(Res.Ok(42))
-    match v:
+    choose v:
         Some(r) -> unwrap(r)
         None -> 0

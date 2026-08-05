@@ -1,5 +1,5 @@
 # Multi-orb compiler entry. `use orion_driver` pulls the driver orb,
-# whose own uses pull lex/parse/ir/ast_to_ir/emit — the whole compiler
+# whose own uses pull lex/parse/ir/ast_to_ir/emit - the whole compiler
 # resolves from this one file:
 #
 #   cd orion-self
@@ -8,5 +8,5 @@
 
 use orion_driver
 
-fn main() -> int:
+define main() -> int:
     driver_main()

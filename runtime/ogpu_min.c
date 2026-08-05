@@ -1,4 +1,4 @@
-/* ogpu_min.c — renderer dispatch. Owns the public og_* names.
+/* ogpu_min.c - renderer dispatch. Owns the public og_* names.
  *
  * Both backends link into every exe; the choice happens at og_init:
  *   pref 0 (auto)  try d3d12, fall back to software
@@ -6,7 +6,7 @@
  *   pref 2 (gpu)   d3d12 wanted; still falls back if it can't init
  *
  * dx_* are weak no-op stubs here so harness builds that only link
- * gdi_min.c resolve — d3d12_min.c's strong symbols win when present.
+ * gdi_min.c resolve - d3d12_min.c's strong symbols win when present.
  */
 #include <stdio.h>
 

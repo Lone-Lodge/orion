@@ -1,5 +1,5 @@
-type Player: name: Text, hp: int, level: int
+type Player: name: text, hp: int, level: int
 
-fn main() -> int:
+define main() -> int:
     p = Player{name: "Hero", hp: 100, level: 5}
     p.hp + p.level

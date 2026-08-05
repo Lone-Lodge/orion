@@ -1,12 +1,12 @@
-fn is_empty(t: Text) -> int:
+define is_empty(t: text) -> int:
     if len(t) == 0 then 1 else 0
 
-fn starts_with(t: Text, prefix: Text) -> int:
+define starts_with(t: text, prefix: text) -> int:
     t_bytes = bytes_from_text(t)
     p_bytes = bytes_from_text(prefix)
     t_len = bytes_length(t_bytes)
     p_len = bytes_length(p_bytes)
-    mut result = 1
+    edit result = 1
     if p_len > t_len:
         result = 0
     if p_len <= t_len:
@@ -17,7 +17,7 @@ fn starts_with(t: Text, prefix: Text) -> int:
                 result = 0
     result
 
-fn main() -> int:
+define main() -> int:
     msg = "hello world"
     empty = ""
 

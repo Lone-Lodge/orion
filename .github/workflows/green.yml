@@ -1,4 +1,4 @@
-# green.yml — the suite the repo already had, run somewhere that is not the
+# green.yml - the suite the repo already had, run somewhere that is not the
 # author's laptop.
 #
 # The first job is the one that matters: it starts from a bare checkout with no
@@ -80,11 +80,38 @@ jobs:
           bash tools/build_lsp.sh
           bash tools/lsp_test.sh
 
+      # Every `example` line in every orb compiles and runs as a claim.
+      - name: stdlib examples run true
+        run: bash tools/example_check.sh
+
+      # get / lock / transitive / update, against local git repos (no network).
+      - name: package system
+        run: bash tools/package_test.sh
+
+      # call trail on trap, breakpoint() reporting, opt-in instrumentation.
+      - name: debugger
+        run: bash tools/debug_test.sh
+
+      # `link = "vendor/x.c"` in Orbit.toml - the door to the C ecosystem.
+      - name: vendored C links
+        run: bash tools/link_test.sh
+
+      # The sqlite orb over that door: create/insert/bind/query/error.
+      - name: sqlite
+        run: bash tools/sqlite_test.sh
+
       # A documented feature that no longer exists fails exactly like a stale
       # seed: it reads fine and nobody runs it. Every sample in the Field Guide
       # is a whole program, and this compiles all of them.
       - name: field guide samples compile
         run: bash tools/docs_check.sh
+
+      # The wasm backend is secondary and does not cover every feature, so this
+      # is a REGRESSION gate, not a 100% gate: the OK count must not drop and
+      # there must be no unexpected wrong-answer/crash (known gaps are allowlisted
+      # in wasm_conformance.js). Needs node, which the runners already have.
+      - name: wasm backend conformance
+        run: bash tools/wasm_conformance.sh
 
       # Everything above this line asks whether the compiler crashes, refuses
       # correctly, or runs fast. This asks whether a valid program still gives

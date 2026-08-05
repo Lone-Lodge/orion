@@ -11,10 +11,10 @@
 #   - Sum types + ? operator (existing)
 #   - Defer (existing)
 
-fn id<T>(value: T) -> T:
+define id<T>(value: T) -> T:
     value
 
-fn pair_first<A, B>(left: A, right: B) -> A:
+define pair_first<A, B>(left: A, right: B) -> A:
     left
 
 # NB: closures with captures (|x| body referencing outer vars) work in the
@@ -22,7 +22,7 @@ fn pair_first<A, B>(left: A, right: B) -> A:
 # interp run. See test_files/demo_all_features.or for the closure-flavour
 # demo when running through native.
 
-fn main() -> int:
+define main() -> int:
     t0 = monotonic_ms()
 
     # Generics: T pinned by HM at call site.
@@ -41,16 +41,16 @@ fn main() -> int:
     t1 = monotonic_ms()
     elapsed = t1 - t0
 
-    print("generics a:")
-    print(a)
-    print("generics b:")
-    print(b)
-    print("vec_dot:")
-    print(dot)
-    print("vec_add[0]:")
-    print(at(sum_vec, 0))
-    print("elapsed_ms:")
-    print(elapsed)
+    print_line("generics a:")
+    print_line(a)
+    print_line("generics b:")
+    print_line(b)
+    print_line("vec_dot:")
+    print_line(dot)
+    print_line("vec_add[0]:")
+    print_line(at(sum_vec, 0))
+    print_line("elapsed_ms:")
+    print_line(elapsed)
 
     # Sanity check: a (20) + b (22) = 42.
     a + b

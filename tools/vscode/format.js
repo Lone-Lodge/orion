@@ -1,14 +1,14 @@
-// Orion formatter — structure-preserving re-indentation.
+// Orion formatter - structure-preserving re-indentation.
 //
 // Orion uses the offside rule: blocks open with a trailing `:` and children
 // nest by indentation. There's no AST pretty-printer (yet), so this formatter
-// never reads a line's content — it re-derives nesting depth from each line's
+// never reads a line's content - it re-derives nesting depth from each line's
 // RELATIVE indentation and re-emits it at a canonical 4-space step. Strings,
 // `=` spacing, and `[ ]` payloads can't be broken because only leading and
 // trailing whitespace is touched. Blank-line runs collapse to one, leading
 // and trailing blanks are dropped, and a trailing newline is guaranteed.
 //
-// Same approach as Astra's formatter — see astra/editors/vscode/format.js for
+// Same approach as Astra's formatter - see astra/editors/vscode/format.js for
 // the original. Limitation: normalises a structurally-valid file; it does NOT
 // repair genuinely mis-nested code.
 

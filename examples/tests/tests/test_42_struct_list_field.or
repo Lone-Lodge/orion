@@ -1,7 +1,7 @@
-type Item: name: Text, value: int
+type Item: name: text, value: int
 type Bag: items: [Item]
 
-fn main() -> int:
+define main() -> int:
     a = Item{name: "alpha", value: 21}
     b = Item{name: "beta", value: 21}
     bag = Bag{items: [a, b]}

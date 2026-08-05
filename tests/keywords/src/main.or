@@ -16,12 +16,12 @@ deterministic fn step(x: int, vx: int, dt: int) -> int:
     x + vx * dt
 
 deterministic fn integrate(x: int, vx: int, ticks: int) -> int:
-    mut pos = x
+    edit pos = x
     loop i in 0..<ticks:
         pos = step(pos, vx, 1)
     pos
 
-fn main() -> int:
+define main() -> int:
     print_line("")
     print_line("  gate: deterministic keyword (compile-time certificate)")
     print_line("")

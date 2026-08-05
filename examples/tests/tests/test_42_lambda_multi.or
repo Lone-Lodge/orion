@@ -1,3 +1,3 @@
-fn main() -> int:
+define main() -> int:
     add = fn(a, b): a + b
     add(20, 22)
