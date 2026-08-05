@@ -165,6 +165,17 @@ define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files,
             if contains(raw, "\r\n\r\n"):
                 break
     req = parse_request(raw)
+    # The one path the shell answers itself: the page says goodbye when its
+    # window goes (navigator.sendBeacon on pagehide), and the loop below stops
+    # a moment later. A reload says goodbye too, so the moment is a grace
+    # period that any further request cancels - which a reload always sends.
+    if req.path is "/api/bye":
+        slot_set("app:bye", "{monotonic_ms()}")
+        gone = send(conn, head_of(json_of("\{\"bye\":true\}")))
+        gone2 = send(conn, "\{\"bye\":true\}")
+        closed_bye = close(conn)
+        return
+    slot_set("app:bye", "0")
     edit matched = false
     loop r in routes:
         if not matched and r.method is req.method and r.path is req.path:
@@ -211,12 +222,18 @@ public define serve(port: int) -> int uses net = listen(port)
 # time - honest and plenty on loopback for one user; the browser queues.
 # no example: runs a server loop - proven by folio
 public define run_until_interrupted(srv: int, routes: [route], static_dir: text) uses net, files, clock, console:
+    slot_set("app:bye", "0")
     loop:
         if interrupted():
             break
         conn = accept_within(srv, 250)
         if ok(conn):
             t = spawn_conn(conn, routes, static_dir)
+        # an app lives as long as its window: the page said goodbye and
+        # nothing came after it, so there is nobody left to serve
+        said = int_from_text(slot_get("app:bye"))
+        if said > 0 and monotonic_ms() - said > 2500:
+            break
     closed = close(srv)
     print_line("app: stopped cleanly")
 
@@ -249,6 +266,20 @@ public define query_of(req: request, key: text) -> text:
         if len(kv) is 2 and at(kv, 0) is key and found is "":
             found = percent_decode(replace(at(kv, 1), "+", " "))
     found
+
+# An app's own file, wherever the app was started from. Shipped, `ui/x.html`
+# sits beside the exe; in development the exe is down in `build/`, so one
+# level up is the same tree. The working directory is the last resort, which
+# is what `orbit run` from the project root gives.
+# no example: depends on where the binary sits - proven by folio
+public define asset(rel: text) -> text uses files:
+    home = path_parent(program_path())
+    beside = "{home}/{rel}"
+    above = "{home}/../{rel}"
+    choose:
+        is_file(beside) then beside
+        is_file(above) then above
+        else rel
 
 # --- the window itself -------------------------------------------------
 # Everything below finds the window by a piece of its TITLE, which is how a

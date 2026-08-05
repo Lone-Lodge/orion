@@ -196,6 +196,9 @@ const char *capture(const char *cmd) {
 #include <sys/wait.h>
 #include <unistd.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>   /* _NSGetExecutablePath - see exe_path */
+#endif
 
 /* system() returns a wait-encoded status, not the child's exit code - the
  * code lives in bits 8-15. Decode it so run_command() yields the real exit
@@ -422,6 +425,28 @@ const char *fs_cwd(void) {
     return orion_text_from_c(buf);
 }
 
+/* This program's own file, in full, "" on failure. argv[0] is whatever the
+ * caller typed and can be relative or a bare name, so a shipped app cannot
+ * use it to find the files that ship beside it - this can. */
+const char *exe_path(void) {
+    static char buf[4096];
+    buf[0] = 0;
+#ifdef _WIN32
+    if (!GetModuleFileNameA(NULL, buf, (DWORD)sizeof buf)) buf[0] = 0;
+#elif defined(__APPLE__)
+    {
+        unsigned int n = (unsigned int)sizeof buf;
+        if (_NSGetExecutablePath(buf, &n) != 0) buf[0] = 0;
+    }
+#else
+    {
+        ssize_t n = readlink("/proc/self/exe", buf, sizeof buf - 1);
+        buf[n > 0 ? n : 0] = 0;
+    }
+#endif
+    return orion_text_from_c(buf);
+}
+
 /* Format a float with a fixed number of decimals - the one formatting ask
  * to_text cannot answer. Decimals clamped to 0..17. */
 const char *fmt_float(double x, long long decimals) {
@@ -578,9 +603,14 @@ long long win_set_topmost(const char *needle, long long on) {
                     0, 0, 0, 0, 0x0001 | 0x0002 /* SWP_NOSIZE|SWP_NOMOVE */);
     return 0;
 }
-/* percent 100 takes the layered style back off, so a solid window pays
- * nothing for having once been faded - unless it is clicking through, which
- * is built on the same style bit. */
+/* How solid the window is. percent 100 takes the layered style back off, so a
+ * solid window pays nothing for having once been faded - unless it is
+ * clicking through, which is built on the same style bit.
+ *
+ * (Not here, and measured: a colour key - LWA_COLORKEY, one exact colour
+ * punched out of the window - does nothing to a browser window. Its pixels
+ * arrive through the compositor, where the per-pixel comparison never
+ * happens. A see-through background needs a window we own.) */
 long long win_set_opacity(const char *needle, long long percent) {
     void *h = win_by_title(needle);
     LONG_PTR ex;

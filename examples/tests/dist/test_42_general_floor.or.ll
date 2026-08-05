@@ -1903,6 +1903,14 @@ if_46_merge:
     ret ptr %v57
 }
 
+declare ptr @exe_path()
+
+define ptr @os__program_path() {
+entry:
+    %v0 = call ptr @exe_path()
+    ret ptr %v0
+}
+
 declare i64 @fs_remove_tree(ptr)
 
 define i64 @os__remove_tree(ptr %p0) {

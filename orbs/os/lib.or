@@ -176,6 +176,13 @@ public define path_parent(p: text) -> text:
     else:
         bytes_to_text(bytes_slice(bs, 0, last_sep))
 
+external define exe_path() -> text
+
+# This program's own file, in full. `arg(0)` is only what the caller typed,
+# so a shipped program that has to find the files beside it asks here.
+# no example: depends on where the binary sits - proven by folio's asset()
+public define program_path() -> text = exe_path()
+
 # ---- directory listing (newline-joined names from the runtime) ----
 # `list_dir` gives FILES only; `list_dirs` gives SUBDIRECTORIES. Reaching for
 # the wrong one is silent (an empty result), which is why both are named for

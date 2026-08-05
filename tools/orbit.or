@@ -109,6 +109,7 @@ define usage():
     eprint("  get                         " + c_dim("fetch [deps] git packages into orbs_pkg/, pinned by Orbit.lock"))
     eprint("  update [name]               " + c_dim("refetch package(s) at their ref's newest commit, move the lock"))
     eprint("  fmt                         " + c_dim("format the sources in place"))
+    eprint("  package                     " + c_dim("a shippable dist/<name>/ (exe + assets, no console) and a zip of it"))
     eprint("")
     eprint(c_bold("  projects and games"))
     eprint("  dev [dev|bench|off]         " + c_dim("build fresh + reference-check + launch (the one command)"))
@@ -331,6 +332,100 @@ define cmd_run():
 define cmd_debug():
     slot_set("orbit:trace", 1)
     cmd_run()
+
+# ---------- package ----------
+# `orbit package` - what you hand to someone else. Building gives you an exe
+# that only runs where it was built: its assets are found relative to the
+# working directory, and it opens a console window nobody asked for. This
+# gives you a folder that runs anywhere, and a zip of it:
+#
+#     dist/folio/folio.exe + dist/folio/ui/…   ->   dist/folio-0.1.0-win.zip
+#
+# The app declares what ships beside the exe in Orbit.toml:
+#
+#     [package]
+#     version = "0.1.0"
+#     assets  = "ui"          # space-separated, project-relative
+#
+# and reads those files through the app orb's `asset()`, which looks beside
+# the exe first. Nothing else changes between development and release.
+
+define copy_tree(src: text, dst: text):
+    mkdir_all(dst)
+    entries = list_dir(src)
+    loop index in 0..<len(entries):
+        entry = at(entries, index)
+        if len(entry) > 0:
+            file_copy_or_die(path_join(src, entry), path_join(dst, entry))
+    subs = split(host_subdirs(src), "\n")
+    loop sub_index in 0..<len(subs):
+        sub = at(subs, sub_index)
+        if len(sub) > 0:
+            copy_tree(src + "/" + sub, path_join(dst, sub))
+
+define file_copy_or_die(src: text, dst: text):
+    if copy_file(src, dst) != 0:
+        die("orbit: could not copy `" + src + "`")
+
+define os_tag() -> text:
+    if os_kind() == 0 then "win" else if os_kind() == 2 then "macos" else "linux"
+
+define cmd_package():
+    if not file_exists("Orbit.toml"):
+        die("orbit: no Orbit.toml here - `package` works on a project")
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "app")
+    version = nb_setting(lines, "version", "0.0.0")
+    assets = nb_setting(lines, "assets", "")
+    out = "dist/" + name
+    remove_tree(out)
+    mkdir_all(out)
+    # No console window for a shipped app - see cli_build.
+    slot_set("orbit:windowless", 1)
+    built = cli_build(resolve_path())
+    if built == "":
+        exit_with(1)
+    shipped = out + "/" + name + (if os_kind() == 0 then ".exe" else "")
+    file_copy_or_die(built, shipped)
+    # The console-less build must not linger in build/ pretending to be the
+    # one `orbit build` makes - running that from a terminal would print
+    # nothing and look broken.
+    remove_file(built)
+    parts = split(assets, " ")
+    loop a_index in 0..<len(parts):
+        asset_path = at(parts, a_index)
+        if len(asset_path) > 0:
+            if is_dir(asset_path):
+                copy_tree(asset_path, path_join(out, asset_path))
+            else if is_file(asset_path):
+                file_copy_or_die(asset_path, path_join(out, asset_path))
+            else:
+                die("orbit: no such asset `" + asset_path + "`")
+    print_line(c_bold(shipped) + " " + c_green("ok"))
+    # The archive is a convenience, not the deliverable: if the system has no
+    # tar the folder above is still what ships, so say so and stop there.
+    zipped = pack_archive(name, version)
+    if len(zipped) > 0:
+        print_line(c_bold(zipped) + " " + c_green("ok"))
+    else:
+        print_line(c_dim("(no archive - tar not available; ship the folder)"))
+
+define pack_archive(name: text, version: text) -> text:
+    stem = "dist/" + name + "-" + version + "-" + os_tag()
+    # Windows ships bsdtar, which writes a real zip from -a; elsewhere the
+    # native format is a tar.gz. Full path on Windows: a GNU tar earlier in
+    # PATH does not understand -a.
+    if os_kind() == 0:
+        zip_path = stem + ".zip"
+        remove_file(zip_path)
+        if run_command_quiet("C:/Windows/System32/tar.exe", ["-a", "-c", "-f", zip_path, "-C", "dist", name]) != 0:
+            return ""
+        return zip_path
+    tgz = stem + ".tar.gz"
+    remove_file(tgz)
+    if run_command_quiet("tar", ["-c", "-z", "-f", tgz, "-C", "dist", name]) != 0:
+        return ""
+    tgz
 
 define cmd_test():
     path = resolve_path()
@@ -1040,6 +1135,14 @@ define cli_build(path: text) -> text:
             xf = at(extras, x_index)
             if xf != "":
                 link_args = append(link_args, xf)
+    # `orbit package` links a shipped app without a console window. The entry
+    # point stays main() - /SUBSYSTEM:WINDOWS alone would send the linker
+    # looking for WinMain.
+    if slot_has("orbit:windowless") and slot_get_int("orbit:windowless") == 1 and os_kind() == 0:
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "/SUBSYSTEM:WINDOWS")
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "/ENTRY:mainCRTStartup")
     if os_kind() == 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/STACK:67108864")
@@ -1281,6 +1384,8 @@ public define main():
             cmd_get()
         else if command == "update":
             cmd_update()
+        else if command == "package":
+            cmd_package()
         else if command == "debug":
             cmd_debug()
         else:
