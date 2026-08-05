@@ -802,6 +802,27 @@ long long win_command(const char *needle, const char *what) {
     if (!strcmp(what, "close")) { wt_PostMessageW(h, 0x0010 /* WM_CLOSE */, 0, 0); return 0; }
     return -1;
 }
+/* Give the window a size and put it in the middle of its monitor's work area.
+ * A browser --app window opens at whatever size the profile last had; an
+ * installer wants one known shape, centered, and this is the only caller that
+ * can decide that (the page cannot resize its own OS window). */
+long long win_resize(const char *needle, long long w, long long h) {
+    void *h_ = win_by_title(needle);
+    MONITORINFO mi;
+    void *mon;
+    int x = 0, y = 0;
+    if (!h_) return -1;
+    if (wt_MonitorFromWindow && wt_GetMonitorInfoW) {
+        mi.cbSize = sizeof mi;
+        mon = wt_MonitorFromWindow(h_, 2 /* MONITOR_DEFAULTTONEAREST */);
+        if (mon && wt_GetMonitorInfoW(mon, &mi)) {
+            x = mi.rcWork.left + (int)(mi.rcWork.right - mi.rcWork.left - w) / 2;
+            y = mi.rcWork.top + (int)(mi.rcWork.bottom - mi.rcWork.top - h) / 2;
+        }
+    }
+    wt_SetWindowPos(h_, NULL, x, y, (int)w, (int)h, 0x0004 /* SWP_NOZORDER */);
+    return 0;
+}
 #else
 long long win_set_topmost(const char *needle, long long on) { (void)needle; (void)on; return -1; }
 long long win_set_opacity(const char *needle, long long percent) { (void)needle; (void)percent; return -1; }
@@ -810,6 +831,182 @@ long long win_set_click_through(const char *needle, long long on) { (void)needle
 long long win_click_through_on(const char *needle) { (void)needle; return -1; }
 long long win_move(const char *needle, long long x, long long y) { (void)needle; (void)x; (void)y; return -1; }
 long long win_command(const char *needle, const char *what) { (void)needle; (void)what; return -1; }
+long long win_resize(const char *needle, long long w, long long h) { (void)needle; (void)w; (void)h; return -1; }
+#endif
+
+/* ---- setup payload: an installer exe carries its app in its own tail ----
+ * A PE loader ignores whatever follows the image, so one file can be both a
+ * program and its own cargo. Layout, reading from the END of the file:
+ *
+ *   [stub exe][app zip][manifest text][ui html]
+ *   [zip_len u64][manifest_len u64][html_len u64]["ORBSETUP"]
+ *
+ * `orbit package` stitches with setup_stitch; the running setup.exe reads
+ * itself back with setup_section (manifest/html) and setup_extract (the zip).
+ * Lengths are little-endian, written a byte at a time - no struct games. */
+#define SETUP_MAGIC "ORBSETUP"
+
+static void setup_put_u64(FILE *f, unsigned long long v) {
+    for (int i = 0; i < 8; i++) fputc((int)((v >> (8 * i)) & 0xff), f);
+}
+static unsigned long long setup_get_u64(const unsigned char *p) {
+    unsigned long long v = 0;
+    for (int i = 7; i >= 0; i--) v = (v << 8) | p[i];
+    return v;
+}
+static long long setup_copy_into(FILE *out, const char *path) {
+    FILE *in = fopen(path, "rb");
+    char buf[65536];
+    size_t n;
+    long long total = 0;
+    if (!in) return -1;
+    while ((n = fread(buf, 1, sizeof buf, in)) > 0) {
+        if (fwrite(buf, 1, n, out) != n) { fclose(in); return -1; }
+        total += (long long)n;
+    }
+    fclose(in);
+    return total;
+}
+/* Stitch stub + zip + manifest + ui html into `out`. 0 ok, -1 not. */
+long long setup_stitch(const char *base, const char *zip, const char *manifest,
+                       const char *html, const char *out) {
+    FILE *f = fopen(out, "wb");
+    long long zip_len, html_len, manifest_len = (long long)strlen(manifest);
+    if (!f) return -1;
+    if (setup_copy_into(f, base) < 0) { fclose(f); return -1; }
+    zip_len = setup_copy_into(f, zip);
+    if (zip_len < 0) { fclose(f); return -1; }
+    if (manifest_len > 0 && fwrite(manifest, 1, (size_t)manifest_len, f) != (size_t)manifest_len) { fclose(f); return -1; }
+    html_len = setup_copy_into(f, html);
+    if (html_len < 0) { fclose(f); return -1; }
+    setup_put_u64(f, (unsigned long long)zip_len);
+    setup_put_u64(f, (unsigned long long)manifest_len);
+    setup_put_u64(f, (unsigned long long)html_len);
+    fwrite(SETUP_MAGIC, 1, 8, f);
+    return fclose(f) == 0 ? 0 : -1;
+}
+/* Open this very exe and find the payload. Returns the file (positioned
+ * nowhere in particular) or NULL; the three offsets/lengths come out through
+ * the pointers. */
+static FILE *setup_open_self(long long *zip_off, long long *zip_len,
+                             long long *man_off, long long *man_len,
+                             long long *html_off, long long *html_len) {
+    unsigned char tail[32];
+    const char *me = exe_path();
+    FILE *f;
+    long long end;
+    if (!me[0]) return NULL;
+    f = fopen(me, "rb");
+    if (!f) return NULL;
+    if (fseek(f, -32, SEEK_END) != 0 || fread(tail, 1, 32, f) != 32 ||
+        memcmp(tail + 24, SETUP_MAGIC, 8) != 0) { fclose(f); return NULL; }
+    end = ftell(f) - 32;
+    *zip_len = (long long)setup_get_u64(tail);
+    *man_len = (long long)setup_get_u64(tail + 8);
+    *html_len = (long long)setup_get_u64(tail + 16);
+    *html_off = end - *html_len;
+    *man_off = *html_off - *man_len;
+    *zip_off = *man_off - *zip_len;
+    if (*zip_off < 0) { fclose(f); return NULL; }
+    return f;
+}
+/* The manifest (which 0) or the ui page (which 1), "" when this exe carries
+ * no payload - which is how the stub knows it was run bare. */
+const char *setup_section(long long which) {
+    long long zo, zl, mo, ml, ho, hl, off, len;
+    FILE *f = setup_open_self(&zo, &zl, &mo, &ml, &ho, &hl);
+    char *buf;
+    const char *text;
+    if (!f) return orion_text_from_c("");
+    off = which == 0 ? mo : ho;
+    len = which == 0 ? ml : hl;
+    buf = (char *)malloc((size_t)len + 1);
+    if (!buf || fseek(f, (long)off, SEEK_SET) != 0 ||
+        fread(buf, 1, (size_t)len, f) != (size_t)len) {
+        free(buf); fclose(f); return orion_text_from_c("");
+    }
+    buf[len] = 0;
+    fclose(f);
+    text = orion_text_from_c(buf);
+    free(buf);
+    return text;
+}
+/* Write the app zip to `dest`. 0 ok, -1 when there is no payload. */
+long long setup_extract(const char *dest) {
+    long long zo, zl, mo, ml, ho, hl, left;
+    char buf[65536];
+    FILE *f = setup_open_self(&zo, &zl, &mo, &ml, &ho, &hl);
+    FILE *out;
+    if (!f) return -1;
+    out = fopen(dest, "wb");
+    if (!out || fseek(f, (long)zo, SEEK_SET) != 0) { if (out) fclose(out); fclose(f); return -1; }
+    left = zl;
+    while (left > 0) {
+        size_t want = left > (long long)sizeof buf ? sizeof buf : (size_t)left;
+        if (fread(buf, 1, want, f) != want || fwrite(buf, 1, want, out) != want) {
+            fclose(out); fclose(f); return -1;
+        }
+        left -= (long long)want;
+    }
+    fclose(f);
+    return fclose(out) == 0 ? 0 : -1;
+}
+
+/* ---- the per-user registry, just enough for Apps & features ----
+ * An installed app announces itself with a handful of values under
+ * HKCU\...\Uninstall\<name> - that is the whole listing. Per-user only
+ * (HKCU): no admin, no machine state, and uninstall is deleting the key.
+ * advapi32 loads dynamically for the same reason user32 does above. */
+#ifdef _WIN32
+static long long (__stdcall *rg_CreateKey)(void *, const char *, unsigned long, char *, unsigned long, unsigned long, void *, void **, unsigned long *);
+static long long (__stdcall *rg_SetValue)(void *, const char *, unsigned long, unsigned long, const unsigned char *, unsigned long);
+static long long (__stdcall *rg_CloseKey)(void *);
+static long long (__stdcall *rg_DeleteTree)(void *, const char *);
+#define RG_HKCU ((void *)(uintptr_t)0x80000001)
+static int rg_load(void) {
+    HMODULE a;
+    if (rg_CreateKey) return 1;
+    a = LoadLibraryA("advapi32.dll");
+    if (!a) return 0;
+    rg_CreateKey = (long long (__stdcall *)(void *, const char *, unsigned long, char *, unsigned long, unsigned long, void *, void **, unsigned long *))(void *)GetProcAddress(a, "RegCreateKeyExA");
+    rg_SetValue = (long long (__stdcall *)(void *, const char *, unsigned long, unsigned long, const unsigned char *, unsigned long))(void *)GetProcAddress(a, "RegSetValueExA");
+    rg_CloseKey = (long long (__stdcall *)(void *))(void *)GetProcAddress(a, "RegCloseKey");
+    rg_DeleteTree = (long long (__stdcall *)(void *, const char *))(void *)GetProcAddress(a, "RegDeleteTreeA");
+    return rg_CreateKey && rg_SetValue && rg_CloseKey && rg_DeleteTree;
+}
+static void *rg_open(const char *subkey) {
+    void *k = NULL;
+    if (!rg_load()) return NULL;
+    if (rg_CreateKey(RG_HKCU, subkey, 0, NULL, 0, 0x2 /* KEY_SET_VALUE */, NULL, &k, NULL) != 0) return NULL;
+    return k;
+}
+/* (The process code page is UTF-8 - runtime/orion.manifest - so the A calls
+ * store real UTF-8 names: "Skärmbild" survives.) */
+long long reg_user_set_text(const char *subkey, const char *name, const char *value) {
+    void *k = rg_open(subkey);
+    long long rc;
+    if (!k) return -1;
+    rc = rg_SetValue(k, name, 0, 1 /* REG_SZ */, (const unsigned char *)value, (unsigned long)strlen(value) + 1);
+    rg_CloseKey(k);
+    return rc == 0 ? 0 : -1;
+}
+long long reg_user_set_number(const char *subkey, const char *name, long long v) {
+    void *k = rg_open(subkey);
+    unsigned long dw = (unsigned long)v;
+    long long rc;
+    if (!k) return -1;
+    rc = rg_SetValue(k, name, 0, 4 /* REG_DWORD */, (const unsigned char *)&dw, 4);
+    rg_CloseKey(k);
+    return rc == 0 ? 0 : -1;
+}
+long long reg_user_delete(const char *subkey) {
+    if (!rg_load()) return -1;
+    return rg_DeleteTree(RG_HKCU, subkey) == 0 ? 0 : -1;
+}
+#else
+long long reg_user_set_text(const char *subkey, const char *name, const char *value) { (void)subkey; (void)name; (void)value; return -1; }
+long long reg_user_set_number(const char *subkey, const char *name, long long v) { (void)subkey; (void)name; (void)v; return -1; }
+long long reg_user_delete(const char *subkey) { (void)subkey; return -1; }
 #endif
 
 /* Exit the process with a code. */

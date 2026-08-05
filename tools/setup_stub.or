@@ -1,0 +1,171 @@
+# setup_stub.or - the installer behind every `orbit package` setup exe.
+#
+# The stub alone does nothing: `orbit package` sews the app's zip, a small
+# manifest (name/version/publisher/exe) and setup_ui.html onto the end of
+# this program's own exe (os orb: stitch_setup), and THAT file is what ships.
+# Run, it reads itself back and becomes the app's installer: one small
+# frameless window in the app's own look - the same Edge --app + local
+# server pattern folio uses - that installs per user, no admin:
+#
+#     %LOCALAPPDATA%\Programs\<name>\        the app, unpacked
+#     Start menu \ <name>.lnk                the shortcut
+#     HKCU ...\Uninstall\<name>              the Apps & features row
+#     <dir>\uninstall.exe                    this same exe, copied in
+#
+# Uninstall is the same window in reverse: uninstall.exe relaunches itself
+# from TEMP (a program cannot delete the folder it runs from), takes the
+# three things above away, and the person's own files are never touched.
+use app
+use net
+use os
+use text
+
+# The manifest is flat "key=value" lines - read one.
+define setting(manifest: text, key: text) -> text:
+    edit found = ""
+    loop line in split(manifest, "\n"):
+        kv = split(line, "=")
+        if len(kv) is 2 and at(kv, 0) is key and found is "":
+            found = at(kv, 1)
+    found
+
+# Where the app lives (or will), Windows-style for the registry and the
+# shortcut, forward-slashed for JSON and our own fs calls.
+define install_dir() -> text = slot_get("setup:dir")
+define win_dir() -> text = replace(install_dir(), "/", "\\")
+define registry_key() -> text = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + slot_get("setup:name")
+define shortcut_path() -> text = env("APPDATA") + "\\Microsoft\\Windows\\Start Menu\\Programs\\" + slot_get("setup:name") + ".lnk"
+
+define ui(req: request) -> response:
+    page(setup_page())
+
+define info(req: request) -> response:
+    name = slot_get("setup:name")
+    version = slot_get("setup:version")
+    publisher = slot_get("setup:publisher")
+    mode = slot_get("setup:mode")
+    dest = replace(install_dir(), "\\", "/")
+    json_of("\{\"name\":\"{name}\",\"version\":\"{version}\",\"publisher\":\"{publisher}\",\"mode\":\"{mode}\",\"dest\":\"{dest}\"\}")
+
+define ok_json() -> response = json_of("\{\"ok\":true\}")
+define err_json(msg: text) -> response = json_of("\{\"ok\":false,\"error\":\"{msg}\"\}")
+
+# Everything under the install dir, in kilobytes - the Apps & features size.
+define dir_size(dir: text) -> int uses files:
+    edit total = 0
+    loop f in list_dir(dir):
+        if f is not "":
+            total = total + file_size("{dir}/{f}")
+    loop sub in list_dirs(dir):
+        if sub is not "":
+            total = total + dir_size("{dir}/{sub}")
+    total
+
+# --- the three install steps + the one uninstall step -------------------
+# Each is its own request so the page can tick them off one by one; each
+# answers ok or a message a person can act on.
+
+define step_unpack() -> response uses files, net, console:
+    name = slot_get("setup:name")
+    root = env("LOCALAPPDATA") + "/Programs"
+    made = mkdir_all(root)
+    tmpzip = env("TEMP") + "/{name}-payload.zip"
+    gone = remove_file(tmpzip)
+    if unpack_setup(tmpzip) is not 0:
+        return err_json("den här exe:n bär ingen app - den är en bar stub")
+    rc = run_command_quiet("C:/Windows/System32/tar.exe", ["-x", "-f", tmpzip, "-C", root])
+    gone2 = remove_file(tmpzip)
+    if rc is not 0:
+        return err_json("kunde inte packa upp - stäng {name} om den är igång och försök igen")
+    # the uninstaller is this very exe, payload and all, copied in
+    copied = copy_file(program_path(), install_dir() + "/uninstall.exe")
+    ok_json()
+
+define step_shortcut() -> response uses files, net, console:
+    exe = win_dir() + "\\" + slot_get("setup:exe")
+    script = "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('" + shortcut_path() + "'); $s.TargetPath='" + exe + "'; $s.WorkingDirectory='" + win_dir() + "'; $s.Save()"
+    if run_command_quiet("powershell", ["-NoProfile", "-Command", script]) is not 0:
+        return err_json("kunde inte lägga genvägen i Start-menyn")
+    ok_json()
+
+define step_register() -> response uses files, net:
+    key = registry_key()
+    name = slot_get("setup:name")
+    wrote = registry_write_text(key, "DisplayName", name)
+    wrote2 = registry_write_text(key, "DisplayVersion", slot_get("setup:version"))
+    wrote3 = registry_write_text(key, "Publisher", slot_get("setup:publisher"))
+    wrote4 = registry_write_text(key, "InstallLocation", win_dir())
+    wrote5 = registry_write_text(key, "DisplayIcon", win_dir() + "\\" + slot_get("setup:exe"))
+    wrote6 = registry_write_text(key, "UninstallString", "\"" + win_dir() + "\\uninstall.exe\" --uninstall")
+    wrote7 = registry_write_number(key, "NoModify", 1)
+    wrote8 = registry_write_number(key, "NoRepair", 1)
+    wrote9 = registry_write_number(key, "EstimatedSize", dir_size(install_dir()) // 1024)
+    if wrote is not 0:
+        return err_json("kunde inte skriva registerposten")
+    ok_json()
+
+define step_remove() -> response uses files, net:
+    name = slot_get("setup:name")
+    if remove_tree(install_dir()) is not 0:
+        return err_json("stäng {name} först och försök igen")
+    gone = remove_file(replace(shortcut_path(), "\\", "/"))
+    cleared = registry_remove(registry_key())
+    ok_json()
+
+define step(req: request) -> response uses files, net, console:
+    what = query_of(req, "do")
+    choose:
+        what is "unpack" then step_unpack()
+        what is "shortcut" then step_shortcut()
+        what is "register" then step_register()
+        what is "remove" then step_remove()
+        else err_json("okänt steg")
+
+define launch(req: request) -> response uses files, net, console:
+    started = start_command(install_dir() + "/" + slot_get("setup:exe"), [])
+    ok_json()
+
+define do_window(title: text, what: text, v: int, t: int) -> truth:
+    choose:
+        what is "size" then window_size(title, v, t)
+        what is "frameless" then window_frameless(title, v is 1, t)
+        what is "moveto" then window_move(title, v, t)
+        what is "close" then window_close(title)
+        else false
+
+define window_api(req: request) -> response:
+    done = do_window(query_of(req, "title"), query_of(req, "do"), int_from_text(query_of(req, "v")), int_from_text(query_of(req, "t")))
+    if done then json_of("\{\"ok\":true\}") else json_of("\{\"ok\":false\}")
+
+define main() -> int:
+    manifest = setup_manifest()
+    if manifest is "":
+        print_line("setup_stub: bare - `orbit package` stitches an app onto this")
+        return 1
+    name = setting(manifest, "name")
+    slot_set("setup:name", name)
+    slot_set("setup:version", setting(manifest, "version"))
+    slot_set("setup:publisher", setting(manifest, "publisher"))
+    slot_set("setup:exe", setting(manifest, "exe"))
+    first = if arg_count() > 1 then arg(1) else ""
+    # uninstall.exe cannot delete the folder it runs from, so it hands the
+    # job to a copy of itself in TEMP and steps aside
+    if first is "--uninstall":
+        temp_copy = env("TEMP") + "/{name}-uninstall.exe"
+        gone = remove_file(temp_copy)
+        copied = copy_file(program_path(), temp_copy)
+        started = start_command(temp_copy, ["--uninstall-from", path_parent(program_path())])
+        return 0
+    if first is "--uninstall-from":
+        slot_set("setup:mode", "remove")
+        slot_set("setup:dir", arg(2))
+    else:
+        slot_set("setup:mode", "install")
+        slot_set("setup:dir", env("LOCALAPPDATA") + "/Programs/" + name)
+    routes = [route{method: "GET", path: "/", handler: ui}, route{method: "GET", path: "/api/info", handler: info}, route{method: "GET", path: "/api/step", handler: step}, route{method: "GET", path: "/api/launch", handler: launch}, route{method: "GET", path: "/api/window", handler: window_api}]
+    edit srv = serve(0)
+    if not ok(srv):
+        return 1
+    w = open_window("http://127.0.0.1:{local_port(srv)}/")
+    run_until_interrupted(srv, routes, "")
+    0

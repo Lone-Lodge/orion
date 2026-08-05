@@ -1,0 +1,231 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>setup</title>
+<style>
+  /* folio's palette: near-black surfaces, one indigo accent, hairline
+     borders, text stepping down in greys. The installer is the first thing
+     a person sees of an app - it wears the same clothes as the app. */
+  :root {
+    color-scheme: dark;
+    --bg:      #08090a;
+    --surface: #0e0f11;
+    --line:    rgba(255,255,255,.07);
+    --line-2:  rgba(255,255,255,.14);
+    --fg:      #f7f8f8;
+    --fg-2:    #8a8f98;
+    --fg-3:    #52565e;
+    --accent:  #5e6ad2;
+    --danger:  #e5484d;
+    --ease:    cubic-bezier(.4,0,.2,1);
+  }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 13px/1.5 ui-sans-serif, Inter, -apple-system, "Segoe UI", system-ui, sans-serif;
+    letter-spacing: -.01em; -webkit-font-smoothing: antialiased;
+    user-select: none; cursor: default;
+    display: flex; flex-direction: column;
+    opacity: 0; transition: opacity .25s var(--ease);
+  }
+  body.ready { opacity: 1; }
+
+  /* the bar IS the window chrome: empty drag surface + one close button */
+  #bar { height: 38px; flex: none; display: flex; align-items: center;
+         justify-content: flex-end; padding: 0 4px; }
+  #close { width: 30px; height: 30px; border: 0; background: transparent;
+           border-radius: 6px; color: var(--fg-3); font-size: 15px;
+           line-height: 1; transition: all .12s var(--ease); }
+  #close:hover { background: rgba(255,255,255,.06); color: var(--fg); }
+
+  main { flex: 1; display: flex; flex-direction: column; align-items: center;
+         justify-content: center; gap: 0; padding: 0 44px 46px; text-align: center; }
+
+  /* the mark: the app's initial on a raised tile, folio-style */
+  #mark { width: 64px; height: 64px; border-radius: 16px; margin-bottom: 20px;
+          background: linear-gradient(180deg, #17181b, #101114);
+          border: 1px solid var(--line-2);
+          box-shadow: 0 12px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 26px; font-weight: 600; color: var(--accent); }
+  h1 { font-size: 17px; font-weight: 590; letter-spacing: -.02em; }
+  #meta { margin-top: 3px; font-size: 12px; color: var(--fg-2); }
+  #hint { margin-top: 14px; font-size: 11.5px; color: var(--fg-3);
+          max-width: 30em; min-height: 2.8em; }
+
+  /* the steps, while they run: a quiet list that ticks itself off */
+  #steps { list-style: none; margin-top: 6px; text-align: left;
+           display: none; }
+  body.busy #steps { display: block; }
+  #steps li { display: flex; align-items: center; gap: 9px; padding: 3px 0;
+              font-size: 12.5px; color: var(--fg-3);
+              transition: color .18s var(--ease); }
+  #steps li.doing { color: var(--fg-2); }
+  #steps li.done { color: var(--fg-2); }
+  #steps .tick { width: 15px; height: 15px; flex: none; border-radius: 50%;
+                 border: 1px solid var(--line-2); position: relative;
+                 transition: all .18s var(--ease); }
+  #steps li.doing .tick { border-color: var(--accent);
+                          animation: pulse 1s infinite var(--ease); }
+  #steps li.done .tick { border-color: var(--accent); background: var(--accent); }
+  #steps li.done .tick::after { content: ""; position: absolute; inset: 4px 3px;
+    border: solid #fff; border-width: 0 0 1.5px 1.5px; transform: rotate(-45deg) translateY(-1px); }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(94,106,210,.18); } }
+
+  #error { margin-top: 12px; font-size: 12px; color: var(--danger);
+           max-width: 30em; display: none; }
+
+  #actions { margin-top: 22px; display: flex; gap: 8px; }
+  button.primary, button.ghost {
+    font: inherit; font-size: 13px; border-radius: 7px; padding: 7px 18px;
+    transition: all .13s var(--ease);
+  }
+  button.primary { border: 1px solid rgba(255,255,255,.12);
+    background: var(--accent); color: #fff; font-weight: 530; }
+  button.primary:hover { filter: brightness(1.12); }
+  button.primary:disabled { opacity: .45; filter: none; }
+  button.ghost { border: 1px solid transparent; background: transparent; color: var(--fg-2); }
+  button.ghost:hover { color: var(--fg); background: rgba(255,255,255,.05);
+                       border-color: var(--line); }
+</style>
+<div id="bar"><button id="close" title="Stäng">✕</button></div>
+<main>
+  <div id="mark">?</div>
+  <h1 id="name">…</h1>
+  <div id="meta"></div>
+  <div id="hint"></div>
+  <ul id="steps"></ul>
+  <div id="error"></div>
+  <div id="actions"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const win = (what, v, t) => fetch('/api/window?do=' + what +
+  '&v=' + (v === undefined ? 0 : v) +
+  '&t=' + (t === undefined ? Math.round(innerHeight * devicePixelRatio) : t) +
+  '&title=' + encodeURIComponent(document.title));
+
+/* the window: one known shape, centered, then frameless - the page draws its
+   own chrome. Retry until the window has taken our title (folio's pattern).
+   The frameless clip removes the browser's own strip from the window, so the
+   asked-for height adds that strip back (outerHeight - innerHeight): what
+   stays VISIBLE is exactly 380x500, no dead notch where the strip was. The
+   clip itself waits until the resize has landed - it measures innerHeight,
+   and a stale pre-resize value would clip the wrong amount. */
+async function dress() {
+  const d = devicePixelRatio;
+  for (let i = 0; i < 15; i++) {
+    const chrome = Math.max(0, outerHeight - innerHeight);
+    const r = await win('size', Math.round(380 * d), Math.round((500 + chrome) * d))
+      .then(x => x.json()).catch(() => ({}));
+    if (r.ok) break;
+    await new Promise(ok => setTimeout(ok, 300));
+  }
+  await new Promise(ok => setTimeout(ok, 250));
+  await win('frameless', 1).catch(() => {});
+  document.body.classList.add('ready');
+}
+let clipT = 0;
+addEventListener('resize', () => {
+  clearTimeout(clipT);
+  clipT = setTimeout(() => win('frameless', 1), 60);
+});
+addEventListener('pagehide', () => navigator.sendBeacon('/api/bye'));
+$('close').onclick = () => win('close');
+
+/* dragging the empty bar drags the window - the page follows its own pointer */
+let flying = false;
+$('bar').addEventListener('pointerdown', e => {
+  if (e.target.closest('button')) return;
+  const bar = $('bar'), d = devicePixelRatio;
+  const wx = screenX, wy = screenY, px = e.screenX, py = e.screenY;
+  bar.setPointerCapture(e.pointerId);
+  const move = ev => {
+    if (flying) return;
+    flying = true;
+    win('moveto', Math.round((wx + ev.screenX - px) * d),
+                  Math.round((wy + ev.screenY - py) * d)).finally(() => { flying = false; });
+  };
+  const up = () => { bar.removeEventListener('pointermove', move); bar.removeEventListener('pointerup', up); };
+  bar.addEventListener('pointermove', move);
+  bar.addEventListener('pointerup', up);
+});
+
+/* ---- the flow: ask who we are, offer the one action, tick the steps ---- */
+let info = null;
+
+const PLAN = {
+  install: [['unpack',   'Packar upp'],
+            ['shortcut', 'Genväg i Start-menyn'],
+            ['register', 'Appar och funktioner']],
+  remove:  [['remove',   'Tar bort appen, genvägen och registerposten']]
+};
+
+function actions(list) {
+  $('actions').replaceChildren(...list.map(([label, cls, fn]) => {
+    const b = document.createElement('button');
+    b.className = cls; b.textContent = label; b.onclick = fn;
+    return b;
+  }));
+}
+
+async function run(mode) {
+  const steps = PLAN[mode];
+  document.body.classList.add('busy');
+  $('error').style.display = 'none';
+  $('hint').textContent = '';
+  $('steps').replaceChildren(...steps.map(([, label]) => {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="tick"></span>' + label;
+    return li;
+  }));
+  actions([[mode === 'install' ? 'Installerar…' : 'Tar bort…', 'primary', () => {}]]);
+  document.querySelector('#actions .primary').disabled = true;
+  for (let i = 0; i < steps.length; i++) {
+    const li = $('steps').children[i];
+    li.classList.add('doing');
+    const r = await fetch('/api/step?do=' + steps[i][0]).then(x => x.json())
+      .catch(() => ({ ok: false, error: 'tappade kontakten med installern' }));
+    li.classList.remove('doing');
+    if (!r.ok) {
+      $('error').textContent = r.error || 'något gick fel';
+      $('error').style.display = 'block';
+      actions([['Försök igen', 'primary', () => run(mode)],
+               ['Avbryt', 'ghost', () => win('close')]]);
+      return;
+    }
+    li.classList.add('done');
+  }
+  done(mode);
+}
+
+function done(mode) {
+  if (mode === 'install') {
+    $('hint').textContent = info.name + ' finns nu i Start-menyn.';
+    actions([['Öppna ' + info.name, 'primary', async () => { await fetch('/api/launch'); win('close'); }],
+             ['Stäng', 'ghost', () => win('close')]]);
+  } else {
+    $('hint').textContent = 'Borta. Dina egna filer är kvar där de var.';
+    actions([['Stäng', 'primary', () => win('close')]]);
+  }
+}
+
+async function boot() {
+  info = await fetch('/api/info').then(x => x.json());
+  document.title = info.name + (info.mode === 'install' ? ' setup' : ' avinstallation');
+  $('mark').textContent = (info.name[0] || '?').toUpperCase();
+  $('name').textContent = info.mode === 'install' ? info.name : 'Avinstallera ' + info.name + '?';
+  $('meta').textContent = info.version + (info.publisher ? ' · ' + info.publisher : '');
+  if (info.mode === 'install') {
+    $('hint').textContent = 'Installeras för dig i ' + info.dest + '. Inget admin, inget annat rörs.';
+    actions([['Installera', 'primary', () => run('install')],
+             ['Avbryt', 'ghost', () => win('close')]]);
+  } else {
+    $('hint').textContent = 'Appen och genvägen tas bort. Dina egna filer rörs inte.';
+    actions([['Avinstallera', 'primary', () => run('remove')],
+             ['Avbryt', 'ghost', () => win('close')]]);
+  }
+  dress();
+}
+boot();
+</script>

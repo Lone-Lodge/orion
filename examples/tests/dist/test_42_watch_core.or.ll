@@ -2024,6 +2024,75 @@ entry:
     ret ptr %v0
 }
 
+declare i64 @setup_stitch(ptr, ptr, ptr, ptr, ptr)
+
+declare ptr @setup_section(i64)
+
+declare i64 @setup_extract(ptr)
+
+define i64 @os__stitch_setup(ptr %p0, ptr %p1, ptr %p2, ptr %p3, ptr %p4) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = getelementptr i8, ptr %p2, i64 0
+    %v3 = getelementptr i8, ptr %p3, i64 0
+    %v4 = getelementptr i8, ptr %p4, i64 0
+    %v5 = call i64 @setup_stitch(ptr %v0, ptr %v1, ptr %v2, ptr %v3, ptr %v4)
+    ret i64 %v5
+}
+
+define ptr @os__setup_manifest() {
+entry:
+    %v0 = add i64 0, 0
+    %v1 = call ptr @setup_section(i64 %v0)
+    ret ptr %v1
+}
+
+define ptr @os__setup_page() {
+entry:
+    %v0 = add i64 0, 1
+    %v1 = call ptr @setup_section(i64 %v0)
+    ret ptr %v1
+}
+
+define i64 @os__unpack_setup(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call i64 @setup_extract(ptr %v0)
+    ret i64 %v1
+}
+
+declare i64 @reg_user_set_text(ptr, ptr, ptr)
+
+declare i64 @reg_user_set_number(ptr, ptr, i64)
+
+declare i64 @reg_user_delete(ptr)
+
+define i64 @os__registry_write_text(ptr %p0, ptr %p1, ptr %p2) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = getelementptr i8, ptr %p2, i64 0
+    %v3 = call i64 @reg_user_set_text(ptr %v0, ptr %v1, ptr %v2)
+    ret i64 %v3
+}
+
+define i64 @os__registry_write_number(ptr %p0, ptr %p1, i64 %p2) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = add i64 0, %p2
+    %v3 = call i64 @reg_user_set_number(ptr %v0, ptr %v1, i64 %v2)
+    ret i64 %v3
+}
+
+define i64 @os__registry_remove(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call i64 @reg_user_delete(ptr %v0)
+    ret i64 %v1
+}
+
 define i64 @watch__skip_dir(ptr %p0) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0

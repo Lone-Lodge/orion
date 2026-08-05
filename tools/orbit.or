@@ -424,32 +424,63 @@ define cmd_package():
                 file_copy_or_die(asset_path, path_join(out, asset_path))
             else:
                 die("orbit: no such asset `" + asset_path + "`")
-    write_installer(name, out)
     print_line(c_bold(shipped) + " " + c_green("ok"))
     # The archive is a convenience, not the deliverable: if the system has no
     # tar the folder above is still what ships, so say so and stop there.
     zipped = pack_archive(name, version)
     if len(zipped) > 0:
         print_line(c_bold(zipped) + " " + c_green("ok"))
+        setup = build_setup(name, version, nb_setting(lines, "publisher", ""), res, zipped)
+        if len(setup) > 0:
+            print_line(c_bold(setup) + " " + c_green("ok"))
+        else:
+            print_line(c_dim("(no setup exe - the zip is still complete)"))
     else:
         print_line(c_dim("(no archive - tar not available; ship the folder)"))
 
-# An installed app is a folder somewhere permanent plus a shortcut in the
-# Start menu. That is all Windows means by "installed", so that is all this
-# does - and uninstall is deleting the folder, which the script says out loud.
-define write_installer(name: text, out: text):
+# The real installer: one setup exe a person double-clicks. tools/setup_stub.or
+# is compiled fresh with THIS app's icon, then the app zip + a manifest +
+# setup_ui.html are sewn onto the exe's tail (os orb: stitch_setup) - a single
+# file that is both installer and cargo. The stub installs per user (folder,
+# Start-menu shortcut, Apps & features row) and carries its own uninstall.
+define build_setup(name: text, version: text, publisher: text, res: text, zipped: text) -> text:
     if os_kind() != 0:
-        return
-    edit s = "@echo off\r\n"
-    s = s + "setlocal\r\n"
-    s = s + "set \"DEST=%LOCALAPPDATA%\\Programs\\" + name + "\"\r\n"
-    s = s + "echo Installing " + name + " to \"%DEST%\"\r\n"
-    s = s + "robocopy \"%~dp0.\" \"%DEST%\" /e /njh /njs /ndl /nc /ns /nfl >nul\r\n"
-    s = s + "del \"%DEST%\\install.cmd\" >nul 2>&1\r\n"
-    s = s + "powershell -NoProfile -Command \"$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Programs')+'\\" + name + ".lnk'); $s.TargetPath='%DEST%\\" + name + ".exe'; $s.WorkingDirectory='%DEST%'; $s.Save()\"\r\n"
-    s = s + "echo Done. " + name + " is in the Start menu. To uninstall, delete \"%DEST%\".\r\n"
-    s = s + "pause\r\n"
-    wrote = write_file(out + "/install.cmd", s)
+        return ""
+    root = path_parent(self_dist_dir())
+    stub_src = root + "/tools/setup_stub.or"
+    ui_html = root + "/tools/setup_ui.html"
+    if not file_exists(stub_src) or not file_exists(ui_html):
+        return ""
+    runtime = default_runtime()
+    ll = "build/setup_stub.ll"
+    stub_exe = "build/setup_stub.exe"
+    if run_command(default_compiler(), [stub_src, ll, default_orbs(), "--quiet"]) != 0:
+        return ""
+    # Same link line a packaged app gets: windowless, the app's icon, UTF-8.
+    edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2"]
+    if res != "":
+        link_args = append(link_args, res)
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "/SUBSYSTEM:WINDOWS")
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "/ENTRY:mainCRTStartup")
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "/STACK:67108864")
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "-MANIFEST:EMBED")
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "-MANIFESTINPUT:" + runtime + "/orion.manifest")
+    link_args = append(link_args, "-o")
+    link_args = append(link_args, stub_exe)
+    if run_command(nb_clang(), link_args) != 0:
+        return ""
+    remove_file(ll)
+    manifest = "name=" + name + "\nversion=" + version + "\npublisher=" + publisher + "\nexe=" + name + ".exe\n"
+    out = "dist/" + name + "-" + version + "-setup.exe"
+    remove_file(out)
+    if stitch_setup(stub_exe, zipped, manifest, ui_html, out) != 0:
+        return ""
+    out
 
 define pack_archive(name: text, version: text) -> text:
     stem = "dist/" + name + "-" + version + "-" + os_tag()

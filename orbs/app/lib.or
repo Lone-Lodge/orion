@@ -292,6 +292,7 @@ external define win_set_click_through(needle: text, on: int) -> int
 external define win_click_through_on(needle: text) -> int
 external define win_move(needle: text, x: int, y: int) -> int
 external define win_command(needle: text, what: text) -> int
+external define win_resize(needle: text, w: int, h: int) -> int
 
 # Keep the window above every other window, or let it back down.
 # no example: window state - proven by folio's pin feature
@@ -329,6 +330,13 @@ public define clicks_through(title: text) -> truth uses console = win_click_thro
 # own pointer and says where the window should be.
 # no example: window state - proven by folio's own top bar
 public define window_move(title: text, x: int, y: int) -> truth uses console = win_move(title, x, y) is 0
+# Give the window a size (device pixels) and center it on its monitor. The
+# one window verb that starts from the OUTSIDE: a browser app window opens at
+# whatever size its profile last had, and only the OS side can correct that -
+# an installer's first move.
+# no example: window state - proven by the setup stub
+public define window_size(title: text, w: int, h: int) -> truth uses console = win_resize(title, w, h) is 0
+
 public define window_minimize(title: text) -> truth uses console = win_command(title, "min") is 0
 public define window_maximize(title: text) -> truth uses console = win_command(title, "max") is 0
 public define window_close(title: text) -> truth uses console = win_command(title, "close") is 0

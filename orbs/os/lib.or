@@ -233,3 +233,42 @@ public define copy_file(from: text, to: text) -> int uses files = fs_copy_file(f
 # The current working directory, "" if the OS cannot say.
 # no example: depends on where the process runs - proven by test_42_general_floor.or
 public define cwd() -> text uses files = fs_cwd()
+
+# ---- shipping: the setup exe and the per-user registry ----
+# A setup exe made by `orbit package` is the installer stub with the app's
+# zip, a manifest and its ui page appended to the file itself - one file that
+# is both program and cargo. The stub reads itself back with the three calls
+# below; orbit sews with stitch_setup. tools/setup_stub.or is the one caller.
+external define setup_stitch(base: text, zip: text, manifest: text, html: text, out: text) -> int
+external define setup_section(which: int) -> text
+external define setup_extract(dest: text) -> int
+
+# Sew stub + app zip + manifest + ui html into one setup exe. 0 when written.
+# no example: writes an exe - proven by tools/setup_test.sh
+public define stitch_setup(base: text, zip: text, manifest: text, html: text, out: text) -> int uses files = setup_stitch(base, zip, manifest, html, out)
+
+# The manifest this exe carries ("" when it carries none - a bare stub).
+# no example: reads the running exe - proven by tools/setup_test.sh
+public define setup_manifest() -> text uses files = setup_section(0)
+
+# The ui page this exe carries ("" when none).
+# no example: reads the running exe - proven by tools/setup_test.sh
+public define setup_page() -> text uses files = setup_section(1)
+
+# Write the app zip this exe carries to `dest`. 0 when written, -1 when bare.
+# no example: reads the running exe - proven by tools/setup_test.sh
+public define unpack_setup(dest: text) -> int uses files = setup_extract(dest)
+
+# The per-user registry (HKCU), just enough for an app to announce itself in
+# Apps & features and take it back. No admin, no machine state - uninstall is
+# registry_remove of the same key. Windows-only; elsewhere every call is -1.
+external define reg_user_set_text(subkey: text, name: text, value: text) -> int
+external define reg_user_set_number(subkey: text, name: text, value: int) -> int
+external define reg_user_delete(subkey: text) -> int
+
+# no example: writes the user registry - proven by tools/setup_test.sh
+public define registry_write_text(key: text, name: text, value: text) -> int uses files = reg_user_set_text(key, name, value)
+# no example: writes the user registry - proven by tools/setup_test.sh
+public define registry_write_number(key: text, name: text, value: int) -> int uses files = reg_user_set_number(key, name, value)
+# no example: writes the user registry - proven by tools/setup_test.sh
+public define registry_remove(key: text) -> int uses files = reg_user_delete(key)
