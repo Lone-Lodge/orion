@@ -13,7 +13,7 @@ type Opt:
 define score(v: Opt) -> int:
     choose v:
         Some(Ok(n)) -> n
-        Some(Bad(m)) -> len(m)
+        Some(Bad(m)) -> length(m)
         None -> 100
 
 define main() -> int:

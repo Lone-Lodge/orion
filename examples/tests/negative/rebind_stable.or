@@ -1,4 +1,4 @@
-# expect: `total` cannot change: it was bound as a stable value
+# expect: `total` cannot change (bound stable)
 define main() -> int:
     total = 40
     total = total + 2

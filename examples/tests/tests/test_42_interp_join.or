@@ -46,7 +46,7 @@ define main() -> int:
     if h == "sum=3/2.":
         score = score + 1
 
-    if len(a) + len(c) == 5 + 5:
+    if length(a) + length(c) == 5 + 5:
         score = score + 1
 
     if score == 9 then 42 else score

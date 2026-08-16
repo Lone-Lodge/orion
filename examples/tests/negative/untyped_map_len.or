@@ -4,6 +4,6 @@
 # even if the element is a Text. The fix is to annotate the read.
 define word_len(m: table) -> int:
   ys = get_list(m, "words")
-  len(ys[0])
+  length(ys[0])
 define main() -> int:
   0

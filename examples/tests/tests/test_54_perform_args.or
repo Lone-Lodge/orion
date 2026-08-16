@@ -10,19 +10,19 @@
 # their source type and the runtime casts the handler to the matching arity
 # (0..4; more is a compile error). Mixed int/text parameters therefore work.
 effect Math:
-    add: fn(a: int, b: int) -> int
+    add: function(a: int, b: int) -> int
 
 effect Mix:
-    at: fn(name: text, n: int) -> int
+    at: function(name: text, n: int) -> int
 
 effect Log:
-    msg: fn(text: text) -> text
+    msg: function(text: text) -> text
 
 handle Math.add(a: int, b: int) -> int:
     resume(a + b)
 
 handle Mix.at(name: text, n: int) -> int:
-    resume(len(name) + n)
+    resume(length(name) + n)
 
 handle Log.msg(text: text) -> text:
     resume("ok")
@@ -30,5 +30,5 @@ handle Log.msg(text: text) -> text:
 define main() -> int:
     a = perform Math.add(40, 2)      # 42
     b = perform Mix.at("abc", 7)     # 3 + 7 = 10
-    c = len(perform Log.msg("hi"))   # 2, the single-arg path is unchanged
+    c = length(perform Log.msg("hi"))   # 2, the single-arg path is unchanged
     a + b + c                        # 42 + 10 + 2 == 54

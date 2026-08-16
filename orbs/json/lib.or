@@ -16,7 +16,7 @@
 # --- scanning helpers ---
 
 define jsn_ws(b: [int], start: int) -> int:
-    n = len(b)
+    n = length(b)
     edit i = start
     loop:
         if i >= n:
@@ -31,7 +31,7 @@ define jsn_ws(b: [int], start: int) -> int:
 
 # Index just past the string that starts at the opening quote `start`.
 define jsn_str_end(b: [int], start: int) -> int:
-    n = len(b)
+    n = length(b)
     edit i = start + 1
     loop:
         if i >= n:
@@ -74,7 +74,7 @@ define jsn_hex_val(c: int) -> int:
 # UTF-8 (the BMP range; a surrogate pair is passed through as replacement
 # bytes rather than silently truncating the document).
 define jsn_unescape(b: [int], from: int, to: int) -> text:
-    edit out = slice([0], 0, 0)
+    edit out = part([0], 0, 0)
     edit i = from
     loop:
         if i >= to:
@@ -122,7 +122,7 @@ define jsn_unescape(b: [int], from: int, to: int) -> text:
                                 out = append(out, 224 + hi)
                                 out = append(out, 128 + mid)
                                 out = append(out, 128 + lo)
-    bytes_to_text(out)
+    text_of(out)
 
 # --- values ---
 # Every parser returns {"v": value, "i": index-just-past}. The caller knows
@@ -130,7 +130,7 @@ define jsn_unescape(b: [int], from: int, to: int) -> text:
 
 define jsn_value(b: [int], start: int) -> table:
     i = jsn_ws(b, start)
-    n = len(b)
+    n = length(b)
     if i >= n:
         {"v": 0, "i": i}
     else:
@@ -145,7 +145,7 @@ define jsn_value(b: [int], start: int) -> table:
                     e = jsn_str_end(b, i)
                     raw_from = i + 1
                     raw_to = e - 1
-                    txt = if jsn_has_escape(b, raw_from, raw_to) then jsn_unescape(b, raw_from, raw_to) else bytes_to_text(bytes_slice(b, raw_from, raw_to))
+                    txt = if jsn_has_escape(b, raw_from, raw_to) then jsn_unescape(b, raw_from, raw_to) else text_of(bytes_part(b, raw_from, raw_to))
                     {"v": txt, "i": e}
                 else:
                     if c is 116:
@@ -160,7 +160,7 @@ define jsn_value(b: [int], start: int) -> table:
                                 jsn_number(b, i)
 
 define jsn_number(b: [int], start: int) -> table:
-    n = len(b)
+    n = length(b)
     edit i = start
     edit neg = false
     if at(b, i) is 45:
@@ -193,7 +193,7 @@ define jsn_number(b: [int], start: int) -> table:
     {"v": if neg then 0 - v else v, "i": i}
 
 define jsn_object(b: [int], start: int) -> table:
-    n = len(b)
+    n = length(b)
     edit out = {}
     edit i = start + 1
     loop:
@@ -211,7 +211,7 @@ define jsn_object(b: [int], start: int) -> table:
             i = i + 1
             continue
         key_end = jsn_str_end(b, i)
-        key = bytes_to_text(bytes_slice(b, i + 1, key_end - 1))
+        key = text_of(bytes_part(b, i + 1, key_end - 1))
         i = jsn_ws(b, key_end)
         if i < n:
             if at(b, i) is 58:
@@ -222,7 +222,7 @@ define jsn_object(b: [int], start: int) -> table:
     {"v": out, "i": i}
 
 define jsn_array(b: [int], start: int) -> table:
-    n = len(b)
+    n = length(b)
     edit items = []
     edit i = start + 1
     loop:
@@ -245,7 +245,7 @@ define jsn_array(b: [int], start: int) -> table:
 
 public define json_parse(src: text) -> table:
     example json_has(json_parse("\{\"k\": 1\}"), "k")
-    b = bytes_from_text(src)
+    b = bytes_of(src)
     r = jsn_value(b, 0)
     get_map(r, "v")
 
@@ -262,7 +262,7 @@ public define json_int(o: table, key: text) -> int:
     if has(o, key) then get_int(o, key) else 0
 
 public define json_list(o: table, key: text) -> [table]:
-    example len(json_list(json_parse("\{\"xs\": [1, 2]\}"), "xs")) is 2
+    example length(json_list(json_parse("\{\"xs\": [1, 2]\}"), "xs")) is 2
     if has(o, key) then get_list(o, key) else []
 
 public define json_has(o: table, key: text) -> truth:
@@ -273,9 +273,9 @@ public define json_has(o: table, key: text) -> truth:
 # turned into text once at the end.
 public define json_escape(s: text) -> text:
     example json_escape("a\"b") is "a\\\"b"
-    b = bytes_from_text(s)
-    n = len(b)
-    edit out = slice([0], 0, 0)
+    b = bytes_of(s)
+    n = length(b)
+    edit out = part([0], 0, 0)
     loop i in 0 until n:
         c = at(b, i)
         if c is 34:
@@ -301,7 +301,7 @@ public define json_escape(s: text) -> text:
                             if c < 32:
                                 # Control byte: \u00XX
                                 hexd = "0123456789abcdef"
-                                hb = bytes_from_text(hexd)
+                                hb = bytes_of(hexd)
                                 out = append(out, 92)
                                 out = append(out, 117)
                                 out = append(out, 48)
@@ -310,7 +310,7 @@ public define json_escape(s: text) -> text:
                                 out = append(out, at(hb, c - (c // 16) * 16))
                             else:
                                 out = append(out, c)
-    bytes_to_text(out)
+    text_of(out)
 
 # --- writing JSON ---
 #
@@ -365,22 +365,22 @@ public define json_stringify(j: Json) -> text:
 
 # A JSON string literal: escaped and wrapped in double quotes.
 define jsn_quote(s: text) -> text:
-    q = bytes_to_text([34])
+    q = text_of([34])
     "{q}{json_escape(s)}{q}"
 
 define jsn_arr_text(items: [Json]) -> text:
     edit out = "["
-    loop i in 0 until len(items):
+    loop i in 0 until length(items):
         if i > 0:
             out = "{out},"
         out = "{out}{json_stringify(at(items, i))}"
     "{out}]"
 
 define jsn_obj_text(keys: [text], vals: [Json]) -> text:
-    lb = bytes_to_text([123])          # { and } are interpolation delimiters,
-    rb = bytes_to_text([125])          # so the braces come in as bytes.
+    lb = text_of([123])          # { and } are interpolation delimiters,
+    rb = text_of([125])          # so the braces come in as bytes.
     edit out = lb
-    n = len(keys)
+    n = length(keys)
     loop i in 0 until n:
         if i > 0:
             out = "{out},"

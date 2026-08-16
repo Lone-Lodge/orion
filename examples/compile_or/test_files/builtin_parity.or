@@ -5,14 +5,14 @@ define main() -> int:
     m = set(m, "a", 10)
     print_line(get_int(m, "a"))
     print_line(get_int(m, "b"))
-    # len(map) vs len(list)
-    print_line(len(m))
+    # length(map) vs length(list)
+    print_line(length(m))
     # get_or
     print_line(get_or(m, "missing", 99))
     print_line(get_or(m, "b", 99))
     # map_keys / map_values
     ks = map_keys(m)
-    print_line(len(ks))
+    print_line(length(ks))
     print_line(at(ks, 0))
     vs = map_values(m)
     print_line(at(vs, 1))

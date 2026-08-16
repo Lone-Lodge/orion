@@ -59,14 +59,14 @@ public define size_of(path: text) -> int uses files = file_bytes(path)
 public define is_end(chunk: text) -> truth:
     example is_end("")
     example not is_end("x")
-    len(chunk) is 0
+    length(chunk) is 0
 
 # --- scope-owned forms: the handle you cannot forget to close ---
 # The orb owns the handle, runs your body with it, and closes on the way out
 # (including an early return - the close is a `defer`). -1 when the open
 # failed, so a caller can tell "could not open" from a body result.
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define with_read(path: text, body: fn) -> int uses files:
+public define with_read(path: text, body: function) -> int uses files:
     h = open_read(path)
     if not ok(h):
         return 0 - 1
@@ -74,7 +74,7 @@ public define with_read(path: text, body: fn) -> int uses files:
     body(h)
 
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define with_write(path: text, body: fn) -> int uses files:
+public define with_write(path: text, body: function) -> int uses files:
     h = open_write(path)
     if not ok(h):
         return 0 - 1
@@ -82,7 +82,7 @@ public define with_write(path: text, body: fn) -> int uses files:
     body(h)
 
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define with_append(path: text, body: fn) -> int uses files:
+public define with_append(path: text, body: function) -> int uses files:
     h = open_append(path)
     if not ok(h):
         return 0 - 1

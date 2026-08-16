@@ -10,7 +10,7 @@ define main() -> int:
     words = split("the cat sat on the mat and the cat ran", " ")
 
     edit counts = {}
-    loop i in 0..<len(words):
+    loop i in 0..<length(words):
         w = at(words, i)
         counts[w] = get_or(counts, w, 0) + 1
 

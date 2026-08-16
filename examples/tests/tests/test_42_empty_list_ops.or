@@ -1,8 +1,8 @@
 define main() -> int:
     edit xs = []
-    n_empty = len(xs)
+    n_empty = length(xs)
     xs = append(xs, 21)
     xs = append(xs, 21)
-    n_full = len(xs)
+    n_full = length(xs)
     # 21 + 21 + 0 + 0 = 42
     at(xs, 0) + at(xs, 1) + n_empty + (n_full - 2)

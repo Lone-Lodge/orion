@@ -6,8 +6,8 @@ define repeat(t: text, n: int) -> text:
     result
 
 define upper(t: text) -> text:
-    t_bytes = bytes_from_text(t)
-    n = bytes_length(t_bytes)
+    t_bytes = bytes_of(t)
+    n = bytes_count(t_bytes)
     edit out = bytes_zeros(0)
     loop ci in 0..<n:
         b = byte_at(t_bytes, ci)
@@ -15,12 +15,12 @@ define upper(t: text) -> text:
         if b >= 97 and b <= 122:
             new_b = b - 32
         out = bytes_concat(out, [new_b])
-    bytes_to_text(out)
+    text_of(out)
 
 define main() -> int:
     # repeat
     line = "-".repeat(7)
-    line_len = line.len()
+    line_len = line.length()
 
     # upper
     yelled = "hello".upper()

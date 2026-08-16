@@ -41,6 +41,7 @@
  * output (gates, logs) stays plain text. */
 #if defined(_WIN32)
 #include <io.h>
+#include <fcntl.h>
 __declspec(dllimport) void *__stdcall GetStdHandle(unsigned long which);
 __declspec(dllimport) int __stdcall GetConsoleMode(void *h, unsigned long *m);
 __declspec(dllimport) int __stdcall SetConsoleMode(void *h, unsigned long m);
@@ -946,6 +947,25 @@ __attribute__((weak)) long long orion_audio_debug_plays(void) {
     return audio_null_plays;
 }
 __attribute__((weak)) void orion_audio_shutdown(void) {}
+
+/* Mic null backend: a device that is always there and always silent.
+ * open() succeeds so the whole listen path RUNS on a build machine with
+ * no sound card; level() is 0 forever, so anything gated on "someone is
+ * talking" simply never fires instead of hanging. take_wav writes
+ * nothing and says so - callers already handle an empty take. */
+static long long mic_null_rate = 0;
+__attribute__((weak)) long long orion_mic_open(long long rate) {
+    mic_null_rate = rate;
+    return 1;
+}
+__attribute__((weak)) long long orion_mic_level(void) { return 0; }
+__attribute__((weak)) long long orion_mic_buffered(void) { return 0; }
+__attribute__((weak)) long long orion_mic_rate(void) { return mic_null_rate; }
+__attribute__((weak)) long long orion_mic_take_wav(const char *path) {
+    (void)path;
+    return 0;
+}
+__attribute__((weak)) void orion_mic_close(void) { mic_null_rate = 0; }
 #endif
 
 /* Embedded assets: a build step generates a strong scripts_embed.c
@@ -1494,7 +1514,10 @@ static LONG WINAPI orion_crash_filter(EXCEPTION_POINTERS *info) {
                orion_exc_name(info->ExceptionRecord->ExceptionCode),
                (unsigned long)info->ExceptionRecord->ExceptionCode, sym);
     crash_print_crumbs();
-    orion_trail_print();   /* the --trace call trail, when there is one */
+    /* The --trace call trail, when there is one. An untraced binary has
+     * nothing to show - say HOW to get it instead of showing nothing. */
+    if (orion_trail_print() == 0)
+        crash_line("[orion]   (no call trail in this build - rerun with `orbit debug` to see the last calls)");
     /* Backtrace: scan the crashed thread's stack for return addresses
      * inside our module, symbolized inline. No dbghelp, always works. */
     if (info->ContextRecord) {
@@ -1956,6 +1979,17 @@ long long atlas_mkdir(const char *path) {
     CreateDirectoryA(path, NULL);
     return 1;
 }
+/* Resident memory in KB - the number Task Manager shows. The engine's
+ * flat-memory gate asserts it stops growing over thousands of frames:
+ * a leak class that shipped once is a red gate forever after. Uses the
+ * same hand-declared K32 call as orion_os_private_kb above. */
+long long atlas_rss_kb(void) {
+    orion_pmc pmc;
+    pmc.cb = sizeof(pmc);
+    if (!K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return 0;
+    return (long long)(pmc.WorkingSetSize / 1024u);
+}
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
@@ -1988,6 +2022,8 @@ long long atlas_monotonic_us(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
+/* POSIX twin of atlas_rss_kb - 0 until the Linux track is verified. */
+long long atlas_rss_kb(void) { return 0; }
 /* Best-effort mkdir (single dir) - games route saves under saves/. Named
  * atlas_* so the compiler auto-declares it for a plain `extern fn`. */
 long long atlas_mkdir(const char *path) {
@@ -2452,7 +2488,21 @@ const char *orion_stdin_read(long long want) {
     return out;
 }
 
+/* Raw bytes to stdout, EXACTLY as given. On Windows a stream opened in
+ * text mode rewrites every \n into \r\n, so an LSP header written as
+ * "...\r\n\r\n" left the process as "...\r\r\n\r\r\n" and no client
+ * that searches for the four-byte separator could find it. The stream
+ * is switched to binary once, on first use, so this stays a property of
+ * THIS function rather than a flag someone has to remember to set. */
 long long orion_stdout_write(const char *s) {
+#ifdef _WIN32
+    static int binary_mode = 0;
+    if (!binary_mode) {
+        binary_mode = 1;
+        fflush(stdout);
+        _setmode(_fileno(stdout), _O_BINARY);
+    }
+#endif
     long long n = orion_tlen_c(s);
     if (n > 0) fwrite(s, 1, (size_t)n, stdout);
     fflush(stdout);
@@ -3580,8 +3630,11 @@ const char *file_read_chunk(long long h, long long maxlen) {
 
 long long file_write_chunk(long long h, const char *data) {
     if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h] || !data) return -1;
-    size_t n = strlen(data);
-    size_t w = fwrite(data, 1, n, orion_files[h]);
+    /* the text's OWN length, not strlen: a chunk read from a file or built
+       from bytes carries NULs (every PNG does by byte 9), and write must be
+       the mirror of read_chunk - byte-true both ways */
+    long long n = orion_tlen_c(data);
+    size_t w = fwrite(data, 1, (size_t)n, orion_files[h]);
     return (long long)w;
 }
 

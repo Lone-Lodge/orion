@@ -1,12 +1,12 @@
 # Trait sugar over operation-passing: `requires order` makes the capability
 # record an implicit trailing parameter. The caller hands it as a named arg,
 # the body reads operations off it. Dictionary-passing made visible.
-type order: less: fn
+type order: less: function
 
 define largest given item requires order (items: list of item) -> item:
     cmp = order.less
     edit best = at(items, 0)
-    loop i in 1..<len(items):
+    loop i in 1..<length(items):
         if cmp(at(items, i), best):
             best = at(items, i)
     best

@@ -1,162 +1,111 @@
 {
-  "fn": {
-    "prefix": "fn",
-    "body": [
-      "fn ${1:name}(${2:arg}: ${3:int}) -> ${4:int}:",
-      "\t${0:body}"
-    ],
-    "description": "A function with one argument and a body block."
-  },
-  "fn-expr": {
-    "prefix": "fne",
-    "body": [
-      "fn ${1:name}(${2:arg}: ${3:int}) -> ${4:int} = ${0:expr}"
-    ],
-    "description": "A single-expression function (tail-expression form)."
-  },
-  "pub-fn": {
-    "prefix": "pfn",
-    "body": [
-      "pub fn ${1:name}(${2:arg}: ${3:int}) -> ${4:int}:",
-      "\t${0:body}"
-    ],
-    "description": "A public function."
-  },
-  "extern-fn": {
-    "prefix": "efn",
-    "body": [
-      "pub extern fn ${1:name}(${2:arg}: ${3:Text}) -> ${4:Text}$0"
-    ],
-    "description": "An extern function declaration (impl is registered from Rust)."
-  },
-  "data": {
-    "prefix": "data",
-    "body": [
-      "data ${1:Name}:",
-      "\t${2:field}: ${3:int}$0"
-    ],
-    "description": "A data declaration (a typed record)."
-  },
-  "enum": {
-    "prefix": "enum",
-    "body": [
-      "enum ${1:Name}:",
-      "\t${2:Variant1}",
-      "\t${3:Variant2}$0"
-    ],
-    "description": "An enum with two variants."
-  },
-  "trait": {
-    "prefix": "trait",
-    "body": [
-      "trait ${1:Name}:",
-      "\tfn ${2:method}(self) -> ${3:int}$0"
-    ],
-    "description": "A trait declaration with one method."
-  },
-  "impl": {
-    "prefix": "impl",
-    "body": [
-      "impl ${1:Trait} for ${2:Type}:",
-      "\tfn ${3:method}(self) -> ${4:int}:",
-      "\t\t${0:body}"
-    ],
-    "description": "An impl block."
-  },
-  "system": {
-    "prefix": "system",
-    "body": [
-      "system ${1:name}(${2:dt}: f32):",
-      "\tfor ${3:e} with ${4:Position}:",
-      "\t\t${0:body}"
-    ],
-    "description": "A system that iterates entities with a component."
-  },
-  "for-in": {
-    "prefix": "for",
-    "body": [
-      "for ${1:i} in ${2:0}..<${3:n}:",
-      "\t${0:body}"
-    ],
-    "description": "A for-loop over an exclusive range."
-  },
-  "for-with": {
-    "prefix": "forw",
-    "body": [
-      "for ${1:e} with ${2:Position}:",
-      "\t${0:body}"
-    ],
-    "description": "A for-loop over entities carrying components."
-  },
-  "if-then-else": {
-    "prefix": "if",
-    "body": [
-      "if ${1:cond} then ${2:a} else ${3:b}$0"
-    ],
-    "description": "A conditional expression."
-  },
-  "if-block": {
-    "prefix": "ifb",
-    "body": [
-      "if ${1:cond}:",
-      "\t${2:body}",
-      "else:",
-      "\t${0:body}"
-    ],
-    "description": "A conditional statement with then/else blocks."
-  },
-  "loop": {
-    "prefix": "loop",
-    "body": [
-      "loop:",
-      "\tif ${1:stop_cond}:",
-      "\t\tbreak",
-      "\t${0:body}"
-    ],
-    "description": "An unbounded loop with an explicit break condition."
-  },
-  "mut": {
-    "prefix": "mut",
-    "body": [
-      "mut ${1:name} = ${0:value}"
-    ],
-    "description": "A mutable binding."
-  },
-  "use": {
-    "prefix": "use",
-    "body": [
-      "use ${0:module}"
-    ],
-    "description": "Import another orb or local module."
-  },
-  "match": {
-    "prefix": "match",
-    "body": [
-      "match ${1:value}:",
-      "\t${2:Variant1} -> ${3:expr}",
-      "\t${4:Variant2} -> ${0:expr}"
-    ],
-    "description": "A match expression."
-  },
-  "spawn": {
-    "prefix": "spawn",
-    "body": [
-      "spawn ${1:Position}{${2:x: 0.0, y: 0.0}}$0"
-    ],
-    "description": "Spawn an entity with one component."
-  },
-  "require": {
-    "prefix": "require",
-    "body": [
-      "require ${1:cond}$0"
-    ],
-    "description": "Precondition assertion."
-  },
-  "ensure": {
-    "prefix": "ensure",
-    "body": [
-      "ensure ${1:cond}$0"
-    ],
-    "description": "Postcondition assertion."
-  }
+	"define": {
+		"prefix": "def",
+		"body": [
+			"define ${1:name}(${2:value}: ${3:number}) -> ${4:number}:",
+			"\t${0:body}"
+		],
+		"description": "A function with a body block."
+	},
+	"define-expression": {
+		"prefix": "defe",
+		"body": [
+			"define ${1:name}(${2:value}: ${3:number}) -> ${4:number} = ${0:expression}"
+		],
+		"description": "A single-expression function."
+	},
+	"public-define": {
+		"prefix": "pdef",
+		"body": [
+			"public define ${1:name}(${2:value}: ${3:number}) -> ${4:number}:",
+			"\t${0:body}"
+		],
+		"description": "A public function - visible to users of this orb."
+	},
+	"external-define": {
+		"prefix": "edef",
+		"body": [
+			"external define ${1:name}(${2:value}: ${3:number}) -> ${4:number}"
+		],
+		"description": "An external function the linked C runtime provides."
+	},
+	"type-record": {
+		"prefix": "type",
+		"body": [
+			"public type ${1:Name}: ${2:field}: ${3:number}, ${4:other}: ${5:text}"
+		],
+		"description": "A record type (product)."
+	},
+	"type-choice": {
+		"prefix": "enum",
+		"body": [
+			"public type ${1:Name}:",
+			"\t${2:First}(${3:number})",
+			"\t${4:Second}"
+		],
+		"description": "A choice type (sum) - match with choose."
+	},
+	"choose": {
+		"prefix": "choose",
+		"body": [
+			"choose ${1:value}:",
+			"\t${2:First}(${3:payload}) -> ${4:result}",
+			"\t${5:Second} -> ${0:other}"
+		],
+		"description": "Pattern match over a choice type."
+	},
+	"loop-in": {
+		"prefix": "loopin",
+		"body": [
+			"loop ${1:item} in ${2:items}:",
+			"\t${0:body}"
+		],
+		"description": "Loop over a list's elements."
+	},
+	"loop-until": {
+		"prefix": "loopu",
+		"body": [
+			"loop ${1:index} in 0 until ${2:count}:",
+			"\t${0:body}"
+		],
+		"description": "Counted loop, end exclusive."
+	},
+	"test": {
+		"prefix": "test",
+		"body": [
+			"define test_${1:what}():",
+			"\trequire ${0:claim}"
+		],
+		"description": "A test - `orbit test` finds and runs every test_*."
+	},
+	"game": {
+		"prefix": "game",
+		"body": [
+			"use core",
+			"use ori_scene",
+			"use raster",
+			"use game",
+			"use num",
+			"",
+			"define ${1:name}_seeds() -> list of Entry:",
+			"\t[spawn(\"${2:thing}\", [field(\"x\", ${3:0})])]",
+			"",
+			"define ${1:name}_rules(world: World, intents: list of Intent) -> list of Entry:",
+			"\t[${0:entries}]",
+			"",
+			"define ${1:name}_view(world: World) -> Scene:",
+			"\tScene{camera: Camera{eye: v3(0.0, 0.0, 0.0), yaw: 0.0, pitch: 0.0, fov: 1.05}, triangles: [], sky: 0x14161A}",
+			"",
+			"define main():",
+			"\tfinal_tick = run_game(Game{title: \"${1:name}\", width: 640, height: 360, seeds: ${1:name}_seeds(), bindings: [], rules: ${1:name}_rules, view: ${1:name}_view})"
+		],
+		"description": "A whole game on the shell: seeds + rules + view."
+	},
+	"binding": {
+		"prefix": "bind",
+		"body": [
+			"bind(\"${1:w}\", \"${2:intent_name}\", ${3:1})"
+		],
+		"description": "A key binding - keys go by the name on their cap."
+	}
 }

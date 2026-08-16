@@ -2,7 +2,7 @@
 # A perform that passes fewer arguments than the handler declares used to
 # compile: the extra parameter read whatever was in the register.
 effect Math:
-    add: fn(a: int, b: int) -> int
+    add: function(a: int, b: int) -> int
 
 handle Math.add(a: int, b: int) -> int:
     resume(a + b)

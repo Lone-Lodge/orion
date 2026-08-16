@@ -1,7 +1,7 @@
 # slicing - the modern, KISS way to take a sub-range: method style.
 # Build: orion.exe examples/demos/slicing.or out.ll orbs
 #
-# `xs.slice(lo, hi)` is half-open [lo, hi) - like Python/JS. It's just the
+# `xs.part(lo, hi)` is half-open [lo, hi) - like Python/JS. It's just the
 # `slice` builtin reached through the `x.f(a)` -> `f(x, a)` method desugar,
 # so it needs no special syntax, chains left-to-right, and works on lists
 # AND text (substring). (`xs[lo..hi]` bracket-range sugar is deliberately
@@ -10,15 +10,15 @@
 define main() -> int:
     xs = [10, 20, 30, 40, 50, 60]
 
-    mid = xs.slice(1, 4)              # [20, 30, 40]
-    head = xs.slice(0, 2)            # [10, 20]
-    tail = xs.slice(4, len(xs))      # [50, 60]
+    mid = xs.part(1, 4)              # [20, 30, 40]
+    head = xs.part(0, 2)            # [10, 20]
+    tail = xs.part(4, length(xs))      # [50, 60]
 
     # Chains left-to-right like map/filter.
-    third = xs.slice(2, 5).slice(0, 1)   # [30]
+    third = xs.part(2, 5).part(0, 1)   # [30]
 
     # Works on text too - a substring.
-    word = "hello world".slice(0, 5)     # "hello"
+    word = "hello world".part(0, 5)     # "hello"
 
-    print_line("mid={at(mid,0)}..{at(mid,2)}  head0={at(head,0)}  tail1={at(tail,1)}  third={at(third,0)}  word_len={len(word)}")
-    len(mid) + len(head) + len(tail) + len(third) + len(word)   # 3+2+2+1+5 = 13
+    print_line("mid={at(mid,0)}..{at(mid,2)}  head0={at(head,0)}  tail1={at(tail,1)}  third={at(third,0)}  word_len={length(word)}")
+    length(mid) + length(head) + length(tail) + length(third) + length(word)   # 3+2+2+1+5 = 13

@@ -85,8 +85,8 @@ public define concat_all(parts: [int]) -> [int]:
 # Encode a UTF-8 string with a LEB128 length prefix - the WASM "name"
 # vector format for imports/exports.
 public define encode_name(name: text) -> [int]:
-    name_bytes = bytes_from_text(name)
-    name_length = bytes_length(name_bytes)
+    name_bytes = bytes_of(name)
+    name_length = bytes_count(name_bytes)
     length_prefix = leb_u(name_length)
     edit output = []
     loop byte_value in length_prefix:
@@ -189,6 +189,8 @@ public define op_f64_sub() -> int: 161     # 0xA1 f64.sub
 public define op_f64_mul() -> int: 162     # 0xA2 f64.mul
 public define op_f64_div() -> int: 163     # 0xA3 f64.div
 public define op_f64_floor() -> int: 156    # 0x9C f64.floor
+public define op_f64_trunc() -> int: 157    # 0x9D f64.trunc
+public define op_f64_neg() -> int: 154      # 0x9A f64.neg
 public define op_i32_trunc_f64_s() -> int: 170   # 0xAA i32.trunc_f64_s
 public define op_f64_convert_i32_s() -> int: 183 # 0xB7 f64.convert_i32_s
 
@@ -412,7 +414,7 @@ public define add_data(module: WModule, offset: int, bytes_data: [int]) -> WModu
     WModule{imports: module.imports, functions: module.functions, data_segments: append(module.data_segments, new_seg)}
 
 public define add_string(module: WModule, offset: int, text: text) -> WModule:
-    add_data(module, offset, bytes_from_text(text))
+    add_data(module, offset, bytes_of(text))
 
 public define new_fn(name: text, param_count: int) -> WFn:
     WFn{name: name, param_count: param_count, body: [], local_count: 0}
@@ -549,7 +551,15 @@ public define encode_module(module: WModule) -> [int]:
     import_section = encode_import_section(module)
     func_section = encode_function_section(module)
     table_section = encode_table_section(module)
-    memory_section = wrap_section(5, [1, 0, 1])
+    # 256 pages = 16 MiB. The allocator is a bump pointer that never
+    # frees and never grows memory, so one 64 KiB page starved any
+    # program that builds real amounts of text (memory access out of
+    # bounds). 16 MiB matches the native heap's generosity until the
+    # allocator learns memory.grow.
+    edit memory_body = [1, 0]
+    loop mb in leb_u(256):
+        memory_body = append(memory_body, mb)
+    memory_section = wrap_section(5, memory_body)
     export_section = encode_export_section(module)
     element_section = encode_element_section(module)
     code_section = encode_code_section(module)
@@ -689,9 +699,17 @@ define index_of_text(items: [text], value: text) -> int:
     found
 
 define collect_signatures(module: WModule) -> [text]:
-    # Type index 0 is reserved for the closure signature (i32)->i32, so
-    # call_indirect through a function value can name it directly.
+    # Indices 0..5 are reserved for the all-i32 indirect-call signatures
+    # of arity 1..6 (a function VALUE is called by arity: type index =
+    # argument count - 1), and index 6 for the zero-arg one. Everything
+    # a fn value carries is an i32 (pointers and whole numbers alike).
     edit sigs = append([], "i#i")
+    sigs = append(sigs, "ii#i")
+    sigs = append(sigs, "iii#i")
+    sigs = append(sigs, "iiii#i")
+    sigs = append(sigs, "iiiii#i")
+    sigs = append(sigs, "iiiiii#i")
+    sigs = append(sigs, "#i")
     loop import_value in module.imports:
         s = sig_text_for_import(import_value)
         if not contains_text(sigs, s):
@@ -723,8 +741,8 @@ define encode_type_section(module: WModule) -> [int]:
     loop byte_value in leb_u(list_length(signatures)):
         contents = append(contents, byte_value)
     loop sig in signatures:
-        bs = bytes_from_text(sig)
-        n = len(bs)
+        bs = bytes_of(sig)
+        n = length(bs)
         edit hash_pos = 0
         loop hi in 0..<n:
             if at(bs, hi) == 35:
@@ -828,8 +846,8 @@ define encode_export_section(module: WModule) -> [int]:
 # the type string is missing or its length disagrees with local_count, fall
 # back to all-i32 so index validity is preserved.
 define encode_locals_decl(types: text, fallback_count: int) -> [int]:
-    tb = bytes_from_text(types)
-    tn = len(tb)
+    tb = bytes_of(types)
+    tn = length(tb)
     if tn != fallback_count:
         if fallback_count == 0:
             [0]

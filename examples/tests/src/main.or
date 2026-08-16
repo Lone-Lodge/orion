@@ -26,8 +26,8 @@ external define orion_console_color() -> int
 
 
 define parse_expected(filename: text) -> int:
-    b = bytes_from_text(filename)
-    total = len(b)
+    b = bytes_of(filename)
+    total = length(b)
     edit start = 0
     if total >= 5:
         start = 5
@@ -72,10 +72,10 @@ define host_triple_of() -> text:
 define or_files() -> [text]:
     raw_files = list_dir("tests")
     edit files = []
-    loop raw_index in 0..<len(raw_files):
+    loop raw_index in 0..<length(raw_files):
         raw_name = at(raw_files, raw_index)
-        name_bytes = bytes_from_text(raw_name)
-        name_len = len(name_bytes)
+        name_bytes = bytes_of(raw_name)
+        name_len = length(name_bytes)
         edit is_or_file = false
         if name_len >= 3:
             tail_dot = at(name_bytes, name_len - 3)
@@ -100,7 +100,7 @@ define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) 
     # module, the resulting exe exits 0, and any test expecting 0 would
     # falsely pass.
     decls = get_list(ast, "decls")
-    if len(decls) == 0:
+    if length(decls) == 0:
         return 0
     # A type/lowering error makes the .ll unsound. compile_errors() is a
     # process-global counter, so compare the delta for THIS file.
@@ -125,13 +125,13 @@ define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) 
 # the task can park on. Records the outcome in the shared counters and
 # prints the row. Runs INSIDE a worker task.
 define finish_one(filename: text, clang_path: text) -> int:
-    esc = bytes_to_text([27])
+    esc = text_of([27])
     c_green = "{esc}[32m"
     c_red = "{esc}[31m"
     c_cyan = "{esc}[36m"
     c_dim = "{esc}[2m"
     c_off = "{esc}[0m"
-    cr = bytes_to_text([13])
+    cr = text_of([13])
 
     ll_path = "dist/{filename}.ll"
     exe_path = "dist/{filename}.exe"
@@ -201,7 +201,7 @@ define finish_one(filename: text, clang_path: text) -> int:
 # cooperative and single-threaded - two workers can never claim the same test.
 define worker(w: int) -> int:
     files = or_files()
-    total = len(files)
+    total = length(files)
     clang_path = host_clang()
     loop:
         i = slot_get_int("next")
@@ -229,16 +229,16 @@ define main() -> int:
     run_command(clang_path, ["-c", "-Os", "../../runtime/orion_cli.c", "-o", "dist/orion_cli.o"])
 
     files = or_files()
-    total_tests = len(files)
+    total_tests = length(files)
 
-    esc = bytes_to_text([27])
+    esc = text_of([27])
     c_green = "{esc}[32m"
     c_red = "{esc}[31m"
     c_cyan = "{esc}[36m"
     c_bold = "{esc}[1m"
     c_dim = "{esc}[2m"
     c_off = "{esc}[0m"
-    cr = bytes_to_text([13])
+    cr = text_of([13])
 
     print_line("")
     print_line("  {c_bold}{c_cyan}◆ Orion{c_off} {c_dim}test runner · LLVM backend · {total_tests} tests{c_off}")
@@ -277,7 +277,7 @@ define main() -> int:
     edit workers = []
     loop w in 0..<jobs:
         workers = append(workers, spawn(worker, w))
-    loop t in 0..<len(workers):
+    loop t in 0..<length(workers):
         junk = await(at(workers, t))
 
     if is_tty:

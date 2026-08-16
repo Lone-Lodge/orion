@@ -67,6 +67,12 @@ REQ_FILE="$TMP/requests"
     # Line 3 is `    p.x * p.y` - asking right after `p.` must give what belongs
     # to a Point (its fields, and the fns that take one first), not every name.
     msg "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"textDocument/completion\",\"params\":{\"textDocument\":{\"uri\":\"$URI\"},\"position\":{\"line\":3,\"character\":6}}}"
+    # Formatting: a second doc with a tab, trailing spaces and a double blank
+    # line - the format key must answer one whole-document edit that fixes all
+    # three. The clean doc above must answer no edits.
+    msg "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"file:///fmt-sample.or\",\"text\":\"define main() -> int:\\n\\tx = 1  \\n\\n\\n    x\\n\"}}}"
+    msg "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"textDocument/formatting\",\"params\":{\"textDocument\":{\"uri\":\"file:///fmt-sample.or\"}}}"
+    msg "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"textDocument/formatting\",\"params\":{\"textDocument\":{\"uri\":\"$URI\"}}}"
     msg "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"shutdown\",\"params\":{}}"
     msg "{\"jsonrpc\":\"2.0\",\"method\":\"exit\",\"params\":{}}"
 } > "$REQ_FILE"
@@ -104,6 +110,9 @@ check "completion: a keyword"           '"label":"loop","kind":14'
 # things you can actually write there.
 check "after a dot: the type's field"   '"label":"x","kind":5,"detail":"field: int"'
 check "after a dot: a fn taking it"     '"label":"area","kind":2,"detail":"Point.area() -> int"'
+check "format key announced"            '"documentFormattingProvider":true'
+check "formatting fixes the dirty doc"  '"newText":"define main() -> int:\n    x = 1\n\n    x\n"'
+check "formatting no-ops the clean doc" '"id":9,"result":[]'
 
 # A diagnostic must NOT be attributed to the temp file the server compiles, nor
 # leak the compiler's own orb paths into the document's diagnostics.

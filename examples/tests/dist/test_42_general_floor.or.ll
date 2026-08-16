@@ -79,6 +79,12 @@ declare i64 @orion_audio_bus_gain(i64, i64, i64)
 declare i64 @orion_audio_playing()
 declare i64 @orion_audio_debug_plays()
 declare void @orion_audio_shutdown()
+declare i64 @orion_mic_open(i64)
+declare i64 @orion_mic_level()
+declare i64 @orion_mic_buffered()
+declare i64 @orion_mic_rate()
+declare i64 @orion_mic_take_wav(ptr)
+declare void @orion_mic_close()
 declare void @orion_arena_ptr_guard(ptr, ptr)
 declare ptr @orion_slot_evac(ptr, ptr, i64)
 declare void @orion_crumb(ptr, ptr, i64)
@@ -1903,12 +1909,36 @@ if_46_merge:
     ret ptr %v57
 }
 
+declare ptr @exe_path()
+
+declare ptr @pick_folder(ptr)
+
+define ptr @os__choose_folder(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call ptr @pick_folder(ptr %v0)
+    ret ptr %v1
+}
+
+define ptr @os__program_path() {
+entry:
+    %v0 = call ptr @exe_path()
+    ret ptr %v0
+}
+
 declare i64 @fs_remove_tree(ptr)
 
 define i64 @os__remove_tree(ptr %p0) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = call i64 @fs_remove_tree(ptr %v0)
+    ret i64 %v1
+}
+
+define i64 @os__delete_file(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call i64 @remove_file(ptr %v0)
     ret i64 %v1
 }
 
@@ -1996,6 +2026,75 @@ define ptr @os__cwd() {
 entry:
     %v0 = call ptr @fs_cwd()
     ret ptr %v0
+}
+
+declare i64 @setup_stitch(ptr, ptr, ptr, ptr, ptr)
+
+declare ptr @setup_section(i64)
+
+declare i64 @setup_extract(ptr)
+
+define i64 @os__stitch_setup(ptr %p0, ptr %p1, ptr %p2, ptr %p3, ptr %p4) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = getelementptr i8, ptr %p2, i64 0
+    %v3 = getelementptr i8, ptr %p3, i64 0
+    %v4 = getelementptr i8, ptr %p4, i64 0
+    %v5 = call i64 @setup_stitch(ptr %v0, ptr %v1, ptr %v2, ptr %v3, ptr %v4)
+    ret i64 %v5
+}
+
+define ptr @os__setup_manifest() {
+entry:
+    %v0 = add i64 0, 0
+    %v1 = call ptr @setup_section(i64 %v0)
+    ret ptr %v1
+}
+
+define ptr @os__setup_page() {
+entry:
+    %v0 = add i64 0, 1
+    %v1 = call ptr @setup_section(i64 %v0)
+    ret ptr %v1
+}
+
+define i64 @os__unpack_setup(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call i64 @setup_extract(ptr %v0)
+    ret i64 %v1
+}
+
+declare i64 @reg_user_set_text(ptr, ptr, ptr)
+
+declare i64 @reg_user_set_number(ptr, ptr, i64)
+
+declare i64 @reg_user_delete(ptr)
+
+define i64 @os__registry_write_text(ptr %p0, ptr %p1, ptr %p2) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = getelementptr i8, ptr %p2, i64 0
+    %v3 = call i64 @reg_user_set_text(ptr %v0, ptr %v1, ptr %v2)
+    ret i64 %v3
+}
+
+define i64 @os__registry_write_number(ptr %p0, ptr %p1, i64 %p2) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = getelementptr i8, ptr %p1, i64 0
+    %v2 = add i64 0, %p2
+    %v3 = call i64 @reg_user_set_number(ptr %v0, ptr %v1, i64 %v2)
+    ret i64 %v3
+}
+
+define i64 @os__registry_remove(ptr %p0) {
+entry:
+    %v0 = getelementptr i8, ptr %p0, i64 0
+    %v1 = call i64 @reg_user_delete(ptr %v0)
+    ret i64 %v1
 }
 
 define i64 @rand__rand_state() {

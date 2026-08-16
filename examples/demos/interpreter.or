@@ -37,8 +37,8 @@ define is_alpha(b: int) -> int:
 # ---- Tokenizer -------------------------------------------------------
 
 define tokenize(src: text) -> [table]:
-    bs = bytes_from_text(src)
-    n = len(bs)
+    bs = bytes_of(src)
+    n = length(bs)
     edit toks = []
     edit i = 0
     loop:
@@ -70,7 +70,7 @@ define tokenize(src: text) -> [table]:
                             break
                         chars = append(chars, c)
                         i = i + 1
-                    toks = append(toks, tok_ident(bytes_to_text(chars)))
+                    toks = append(toks, tok_ident(text_of(chars)))
                 else:
                     kind = choose b:
                         '+' -> "plus"
@@ -107,7 +107,7 @@ define parse_term(toks: [table], pos: int, env: table) -> Parsed:
     edit val = left.val
     edit i = left.next
     loop:
-        if i >= len(toks):
+        if i >= length(toks):
             break
         k = get(at(toks, i), "kind")
         if k != "star" and k != "slash":
@@ -129,7 +129,7 @@ define parse_expr(toks: [table], pos: int, env: table) -> Parsed:
     edit val = left.val
     edit i = left.next
     loop:
-        if i >= len(toks):
+        if i >= length(toks):
             break
         k = get(at(toks, i), "kind")
         if k != "plus" and k != "minus":
@@ -142,7 +142,7 @@ define parse_expr(toks: [table], pos: int, env: table) -> Parsed:
 # ---- Main - run a little program, carrying the environment forward ---
 
 define is_assign(toks: [table]) -> int:
-    if len(toks) >= 2 and get(at(toks, 0), "kind") == "ident" and get(at(toks, 1), "kind") == "assign" then 1 else 0
+    if length(toks) >= 2 and get(at(toks, 0), "kind") == "ident" and get(at(toks, 1), "kind") == "assign" then 1 else 0
 
 define main() -> int:
     program = ["x = 3", "y = x * 2 + 1", "z = (x + y) * 2", "z - x"]

@@ -17,13 +17,13 @@ define add(a: int, b: int) -> int:
 
 # ---- Higher-order helpers ------------------------------------------
 
-define apply(f: fn, x: int) -> int:
+define apply(f: function, x: int) -> int:
     f(x)
 
-define compose_call(g: fn, h: fn, x: int) -> int:
+define compose_call(g: function, h: function, x: int) -> int:
     g(h(x))   # g(h(x))
 
-define twice(f: fn, x: int) -> int:
+define twice(f: function, x: int) -> int:
     f(f(x))
 
 # ---- Main - uses fns as first-class values --------------------------

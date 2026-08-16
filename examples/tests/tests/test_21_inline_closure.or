@@ -1,7 +1,7 @@
 # A capturing lambda passed DIRECTLY as a call argument (not bound first) -
 # lifted by the nested-lambda pass. k=7 captured; f(3) = 3 * 7 = 21.
-define apply(f: fn, x: int) -> int:
+define apply(f: function, x: int) -> int:
     f(x)
 define main() -> int:
     k = 7
-    apply(fn(n): n * k, 3)
+    apply(function(n): n * k, 3)

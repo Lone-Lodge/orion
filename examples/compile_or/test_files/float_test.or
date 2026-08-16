@@ -12,7 +12,7 @@ define main() -> int:
     print_line(mixed)
     scaled = scale(10.0, 2.5)
     print_line(scaled)
-    big = to_float(7)
+    big = to_real(7)
     print_line(big)
     edit acc = 0.0
     loop i in 0..<4:
@@ -20,4 +20,4 @@ define main() -> int:
     print_line(acc)
     if sum > 0.3 or sum < 0.3:
         print_line("0.1+0.2 != 0.3 exactly (IEEE-754 works)")
-    to_int(scaled)
+    to_whole(scaled)

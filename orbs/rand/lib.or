@@ -57,19 +57,19 @@ external define entropy_bytes(n: int) -> [int]
 
 # `n` unpredictable bytes (0..255 each) from the OS.
 public define secure_bytes(n: int) -> [int] uses random:
-    example len(secure_bytes(8)) is 8
+    example length(secure_bytes(8)) is 8
     entropy_bytes(n)
 
 # An unpredictable hex token of `n` bytes (2n characters), for session ids
 # and API keys.
 public define secure_token(n: int) -> text uses random:
-    example len(secure_token(8)) is 16
+    example length(secure_token(8)) is 16
     digits = "0123456789abcdef"
     bs = entropy_bytes(n)
     edit out = ""
-    loop i in 0 until len(bs):
+    loop i in 0 until length(bs):
         b = at(bs, i)
-        hi = slice(digits, b // 16, b // 16 + 1)
-        lo = slice(digits, b % 16, b % 16 + 1)
+        hi = part(digits, b // 16, b // 16 + 1)
+        lo = part(digits, b % 16, b % 16 + 1)
         out = "{out}{hi}{lo}"
     out

@@ -31,11 +31,11 @@ public define status_from_headers(header_dump: text) -> int:
     example status_from_headers("garbage") is 0
     rows = lines(header_dump)
     edit status = 0
-    loop i in 0 until len(rows):
+    loop i in 0 until length(rows):
         row = trim(at(rows, i))
         if starts_with(row, "HTTP/"):
             parts = split(row, " ")
-            if len(parts) >= 2:
+            if length(parts) >= 2:
                 status = int_from_text(at(parts, 1))
     status
 
@@ -45,7 +45,7 @@ define run_curl(args: [text], body_file: text) -> response:
     hdr_file = "{body_file}.hdr"
     log_file = "{body_file}.log"
     edit all_args = ["-sS", "--max-time", "60", "-L", "-o", body_file, "-D", hdr_file]
-    loop i in 0 until len(args):
+    loop i in 0 until length(args):
         all_args = append(all_args, at(args, i))
     job = start_command_to_file("curl", all_args, log_file)
     if job < 0:

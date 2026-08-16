@@ -88,7 +88,7 @@ define is_internal(name: text) -> truth:
     starts_with(name, "orion_")
 
 define wanted(name: text, picks: list of text) -> truth:
-    if len(picks) is 0:
+    if length(picks) is 0:
         return not is_internal(name)
     edit hit = false
     loop p in picks:
@@ -98,12 +98,12 @@ define wanted(name: text, picks: list of text) -> truth:
 
 define main() uses files, console:
     args = arguments()
-    picks = loop i in 1 until len(args): collect at(args, i)
+    picks = loop i in 1 until length(args): collect at(args, i)
     names = list_dirs("orbs")
     edit stats = []
     loop name in names where name is not "" and wanted(name, picks):
         src = read_file("orbs/{name}/lib.or")
-        if len(src) > 0:
+        if length(src) > 0:
             stats = append(stats, scan(name, src))
     print_line("orb              pub  example  uses  coverage")
     print_line("--------------------------------------------------")
@@ -114,6 +114,6 @@ define main() uses files, console:
     total_old = combine(each(stats, (s: orbstat): s.old_idiom), 0, (a, b): a + b)
     clean = keep(stats, (s: orbstat): s.old_idiom is 0)
     print_line("--------------------------------------------------")
-    print_line("{len(stats)} orbs, {total_pub} public, {total_ex} examples ({pct(total_ex, total_pub)}%), {len(clean)}/{len(stats)} fully v2")
+    print_line("{length(stats)} orbs, {total_pub} public, {total_ex} examples ({pct(total_ex, total_pub)}%), {length(clean)}/{length(stats)} fully v2")
     if total_old > 0:
         print_line("{total_old} line(s) still speak v1 idiom")

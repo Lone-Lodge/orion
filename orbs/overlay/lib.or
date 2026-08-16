@@ -1,0 +1,224 @@
+# overlay - the 2D compositor: an ori_display DisplayList drawn OVER a
+# rendered pixel frame. This is how a UI block's output (veil's, or
+# anyone's) lands on a game frame without either knowing the other -
+# the DisplayList is the whole contract.
+#
+# The list arrives in the producer's own units and `scale` maps them to
+# this frame's pixels (a field-space UI passes its px-per-unit; a
+# pixel-space HUD passes 1.0). Text goes through typeface's blitter -
+# the same crisp AA glyphs the rest of the frame speaks - and rounded
+# rects round for real. Icon, path, sprite and image commands arrive
+# when something needs them.
+use ori_display
+use ori_geometry
+use list
+use typeface
+use ori_scene
+
+# "#RRGGBB" (or "#RGB") to a whole color; anything else is 0.
+public define color_of(colour: text) -> int:
+    bytes = bytes_of(colour)
+    if bytes_count(bytes) is 0 or byte_at(bytes, 0) is not 35:
+        return 0
+    edit value = 0
+    edit digits = 0
+    edit sound = true
+    loop i in 1 until bytes_count(bytes):
+        d = byte_at(bytes, i)
+        edit hex = -1
+        if d is at least 48 and d is at most 57:
+            hex = d - 48
+        if d is at least 65 and d is at most 70:
+            hex = d - 55
+        if d is at least 97 and d is at most 102:
+            hex = d - 87
+        if hex is less than 0:
+            sound = false
+        else:
+            value = value * 16 + hex
+            digits = digits + 1
+    if not sound or (digits is not 3 and digits is not 6):
+        return 0
+    if digits is 3:
+        return (value // 256) * 17 * 65536 + ((value // 16) % 16) * 17 * 256 + (value % 16) * 17
+    value
+
+# The frame with the display list drawn over it. Each fill is reborn
+# through slice so its set() writes stay in place (the promotion law):
+# one frame-sized copy per drawn command buys O(1) pixel writes - a HUD
+# is a handful of commands, so the copies are nothing.
+# `texture_of` resolves an image NAME to pixels - the host owns its
+# assets (a declared game embeds them at build time), the compositor
+# only asks. A name it does not know answers with the 1x1 key texture
+# and nothing is drawn.
+public define draw_over(pixels: list of int, width: int, height: int, commands: list of DrawCmd, scale: number, types: Typeset, texture_of: function) -> list of int:
+    edit out = pixels
+    loop command in commands:
+        out = drawn(out, width, height, command, scale, types, texture_of)
+    out
+
+define drawn(pixels: list of int, width: int, height: int, command: DrawCmd, scale: number, types: Typeset, texture_of: function) -> list of int:
+    choose command:
+        DrawRect(rect, colour, tag) -> fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), 0)
+        DrawRoundRect(rect, colour, radius, tag) -> fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), to_whole(radius * scale + 0.5))
+        DrawText(point, content, colour, size, tag) -> fill_text(pixels, width, height, point, content, color_of(colour), size, scale, types)
+        DrawIcon(point, icon_name, size, tag) -> pixels
+        DrawPath(path_data, colour, tag) -> pixels
+        DrawSprite(point, image_path, sprite_scale, tag) -> pixels
+        DrawImage(point, image_path, image_wide, image_high, tint, blend, tag) -> blit_image(pixels, width, height, scaled(Rect{x: point.x, y: point.y, wide: (image_wide), high: (image_high)}, scale), texture_of(image_path))
+
+# An image into a box: each destination pixel samples the texture,
+# nearest when magnified (pixel art stays crisp) and 2x2 blended when
+# minified (a big picture in a small box glides). The magenta key is
+# transparent, so art keeps its shape over whatever is beneath.
+define blit_image(pixels: list of int, width: int, height: int, rect: Rect, texture: Texture) -> list of int:
+    key = 16711935
+    left = clamp_px(to_whole(rect.x), width)
+    top = clamp_px(to_whole(rect.y), height)
+    right = clamp_px(to_whole(rect.x + rect.wide), width)
+    bottom = clamp_px(to_whole(rect.y + rect.high), height)
+    if right is at most left or bottom is at most top or texture.width is less than 1:
+        return pixels
+    magnified = rect.wide is at least (texture.width) and rect.high is at least (texture.height)
+    edit out = part(pixels, 0, length(pixels))
+    loop y in top until bottom:
+        v = ((y) + 0.5 - rect.y) / rect.high * (texture.height) - 0.5
+        loop x in left until right:
+            u = ((x) + 0.5 - rect.x) / rect.wide * (texture.width) - 0.5
+            sampled = if magnified then texel_at(texture, to_whole(u + 0.5), to_whole(v + 0.5)) else texel_blend(texture, u, v)
+            if sampled is at least 0:
+                out = set(out, y * width + x, sampled)
+    out
+
+define texel_at(texture: Texture, u: int, v: int) -> int:
+    x = if u is less than 0 then 0 else if u is at least texture.width then texture.width - 1 else u
+    y = if v is less than 0 then 0 else if v is at least texture.height then texture.height - 1 else v
+    texel = at(texture.pixels, y * texture.width + x)
+    if texel is 16711935 then -1 else texel
+
+# Four texels blended by subpixel position; key texels carry no color
+# and no coverage, and under half coverage nothing is drawn.
+define texel_blend(texture: Texture, u: number, v: number) -> int:
+    u0 = floor_i(u)
+    v0 = floor_i(v)
+    fu = u - (u0)
+    fv = v - (v0)
+    edit red = 0.0
+    edit green = 0.0
+    edit blue = 0.0
+    edit coverage = 0.0
+    loop corner in 0 until 4:
+        cu = if corner % 2 is 0 then u0 else u0 + 1
+        cv = if corner // 2 is 0 then v0 else v0 + 1
+        weight = (if corner % 2 is 0 then 1.0 - fu else fu) * (if corner // 2 is 0 then 1.0 - fv else fv)
+        texel = texel_at(texture, cu, cv)
+        if texel is at least 0:
+            red = red + ((texel // 65536) % 256) * weight
+            green = green + ((texel // 256) % 256) * weight
+            blue = blue + (texel % 256) * weight
+            coverage = coverage + weight
+    if coverage is less than 0.5:
+        return -1
+    to_whole(red / coverage) * 65536 + to_whole(green / coverage) * 256 + to_whole(blue / coverage)
+
+define floor_i(value: number) -> int:
+    truncated = to_whole(value)
+    if value is less than (truncated) then truncated - 1 else truncated
+
+define scaled(rect: Rect, scale: number) -> Rect:
+    Rect{x: rect.x * scale, y: rect.y * scale, wide: rect.wide * scale, high: rect.high * scale}
+
+# Reborn via slice: the set() loop stays in place (see draw_over).
+# radius > 0 insets the corners along a quarter circle.
+define fill_round_rect(pixels: list of int, width: int, height: int, rect: Rect, color: int, radius: int) -> list of int:
+    edit out = part(pixels, 0, length(pixels))
+    left = clamp_px(to_whole(rect.x), width)
+    top = clamp_px(to_whole(rect.y), height)
+    right = clamp_px(to_whole(rect.x + rect.wide), width)
+    bottom = clamp_px(to_whole(rect.y + rect.high), height)
+    edit rad = radius
+    if rad * 2 is more than right - left:
+        rad = (right - left) // 2
+    if rad * 2 is more than bottom - top:
+        rad = (bottom - top) // 2
+    loop y in top until bottom:
+        edit inset = 0
+        if rad is more than 0:
+            edit edge_row = -1
+            if y - top is less than rad:
+                edge_row = y - top
+            if bottom - 1 - y is less than rad:
+                edge_row = bottom - 1 - y
+            if edge_row is at least 0:
+                # Quarter circle: this row keeps the chord's half-width.
+                dy = rad - 1 - edge_row
+                inset = rad - isqrt(rad * rad - dy * dy)
+        loop x in (left + inset) until (right - inset):
+            out = set(out, y * width + x, color)
+    out
+
+define isqrt(value: int) -> int:
+    edit root = 0
+    loop candidate in 0 until value + 1:
+        if candidate * candidate is at most value:
+            root = candidate
+    root
+
+# Text through typeface's blitter: the command's point and size arrive
+# in list units and scale to this frame's pixels. Body face - a HUD
+# speaks the body voice; titles are the game's own words.
+define fill_text(pixels: list of int, width: int, height: int, point: Point, content: text, color: int, size: int, scale: number, types: Typeset) -> list of int:
+    em_px = to_whole(size * scale + 0.5)
+    if em_px is at most 0 or content is "":
+        return pixels
+    blit_line(pixels, width, height, point.x * scale, point.y * scale, content, false, em_px, color, types)
+
+define clamp_px(value: int, limit: int) -> int:
+    if value is less than 0 then 0 else if value is more than limit then limit else value
+
+define blank_texture(name: text) -> Texture:
+    Texture{width: 1, height: 1, pixels: [16711935]}
+
+# ----- Tests (`orbit test` runs these) -----
+
+define test_rect_lands_and_clips():
+    types = cold_typeset()
+    blank = blank_texture
+    frame = draw_over(filled(100, 1), 10, 10, [DrawRect(Rect{x: 2, y: 2, wide: 3, high: 2}, "#FF0000", 0)], 1.0, types, blank)
+    require at(frame, 2 * 10 + 2) is 16711680
+    require at(frame, 3 * 10 + 4) is 16711680
+    require at(frame, 0) is 1
+    clipped = draw_over(filled(100, 1), 10, 10, [DrawRect(Rect{x: 8, y: 8, wide: 9, high: 9}, "#00FF00", 0)], 1.0, types, blank)
+    require at(clipped, 9 * 10 + 9) is 65280
+
+# A rect in list units lands scaled: 2..5 at scale 2 covers 4..10.
+define test_scale_maps_units_to_pixels():
+    types = cold_typeset()
+    blank = blank_texture
+    frame = draw_over(filled(400, 1), 20, 20, [DrawRect(Rect{x: 2, y: 2, wide: 3, high: 2}, "#FF0000", 0)], 2.0, types, blank)
+    require at(frame, 4 * 20 + 4) is 16711680
+    require at(frame, 7 * 20 + 9) is 16711680
+    require at(frame, 3 * 20 + 3) is 1
+
+define test_round_rect_insets_corners():
+    types = cold_typeset()
+    blank = blank_texture
+    frame = draw_over(filled(400, 1), 20, 20, [DrawRoundRect(Rect{x: 2, y: 2, wide: 12, high: 12}, "#00FF00", 4, 0)], 1.0, types, blank)
+    # The extreme corner pixel stays background; the middle fills.
+    require at(frame, 2 * 20 + 2) is 1
+    require at(frame, 8 * 20 + 8) is 65280
+
+define test_text_draws_typeface_pixels():
+    types = cold_typeset()
+    blank = blank_texture
+    frame = draw_over(filled(1600, 0), 40, 40, [DrawText(Point{x: 2, y: 2}, "1", "#FFFFFF", 20, 0)], 1.0, types, blank)
+    edit lit = 0
+    loop value in frame:
+        if value is more than 0:
+            lit = lit + 1
+    require lit is more than 10
+
+define test_color_of_parses():
+    require color_of("#E8956A") is 15242602
+    require color_of("#fff") is 16777215
+    require color_of("nonsense") is 0

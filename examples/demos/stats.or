@@ -14,10 +14,10 @@ define main() -> int:
 
     # Parse each piece into an int.
     edit xs = []
-    loop i in 0..<len(raw):
+    loop i in 0..<length(raw):
         xs = append(xs, parse(at(raw, i)))
 
-    n = len(xs)
+    n = length(xs)
     total = sum(xs)
     lo = min_of(xs)
     hi = max_of(xs)

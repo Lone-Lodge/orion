@@ -1,0 +1,3 @@
+name = "window"
+version = "0.0.1"
+description = "App-first window block: Win32 window + software framebuffer present for a pixel frame"

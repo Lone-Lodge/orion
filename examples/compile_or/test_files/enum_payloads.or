@@ -7,8 +7,8 @@ type Effect:
 define apply(e: Effect) -> int:
     choose e:
         Spawn(comps) -> get_int(comps, "hp")
-        SetResource(key, value) -> len(key) + value
-        Relate(a, kind, b) -> a + len(kind) + b
+        SetResource(key, value) -> length(key) + value
+        Relate(a, kind, b) -> a + length(kind) + b
         Nop -> 7
 
 define main() -> int:

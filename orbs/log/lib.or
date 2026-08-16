@@ -33,7 +33,7 @@ public external define orion_persist_text(s: text) -> text
 # Local styling fragments (a shared con orb is the day-two refactor).
 define lsty(code: text, s: text) -> text:
     if orion_console_color() is 1:
-        e = bytes_to_text(append([], 27))
+        e = text_of(append([], 27))
         "{e}[{code}m{s}{e}[0m"
     else:
         s

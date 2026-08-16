@@ -31,7 +31,16 @@ type response:
 type route:
     method: text
     path: text
-    handler: fn
+    handler: function
+
+# The route record spelled short: on_get("/api/list", list_chapters).
+# (Not `get`/`post` - `get` is the builtin table read, and a define wearing
+# a builtin's name is a compile error.)
+public define on_get(path: text, handler: function(request) -> response) -> route:
+    route{method: "GET", path: path, handler: handler}
+
+public define on_post(path: text, handler: function(request) -> response) -> route:
+    route{method: "POST", path: path, handler: handler}
 
 # The little answers most handlers want.
 public define page(html: text) -> response:
@@ -41,6 +50,14 @@ public define page(html: text) -> response:
 public define json_of(body: text) -> response:
     example json_of("[]").status is 200
     response{status: 200, mime: "application/json", body: body}
+
+# Plain text, and the reason it is its own answer: app_bar() appends the bar
+# script to every text/html the routes serve, so prose sent back through
+# page() comes home with a <script> tag stuck to its last line. Text that is
+# not a page says so - then nothing is injected into it.
+public define text_response(body: text) -> response:
+    example text_response("kapitel 1").mime is "text/plain; charset=utf-8"
+    response{status: 200, mime: "text/plain; charset=utf-8", body: body}
 
 public define not_found() -> response:
     example not_found().status is 404
@@ -55,11 +72,11 @@ public define parse_request(raw: text) -> request:
     example parse_request("").method is ""
     first = at(lines(raw), 0)
     parts = split(trim(first), " ")
-    if len(parts) < 2:
+    if length(parts) < 2:
         return request{method: "", path: "", query: "", body: ""}
     target = at(parts, 1)
     halves = split(target, "?")
-    q = if len(halves) > 1 then at(halves, 1) else ""
+    q = if length(halves) > 1 then at(halves, 1) else ""
     request{method: at(parts, 0), path: at(halves, 0), query: q, body: ""}
 
 define status_line(code: int) -> text:
@@ -68,9 +85,11 @@ define status_line(code: int) -> text:
         code is 404 then "HTTP/1.0 404 Not Found"
         else "HTTP/1.0 500 Internal Server Error"
 
+# no-cache överallt: appen bor på loopback och utvecklas i sekundtakt -
+# en cachad shell.js mot en ny server är ett spöke ingen ska behöva jaga.
 define head_of(r: response) -> text:
-    n = len(r.body)
-    "{status_line(r.status)}\r\nContent-Type: {r.mime}\r\nContent-Length: {n}\r\nConnection: close\r\n\r\n"
+    n = length(r.body)
+    "{status_line(r.status)}\r\nContent-Type: {r.mime}\r\nContent-Length: {n}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n"
 
 # Content type from the filename - the handful a local app meets.
 public define mime_of(path: text) -> text:
@@ -108,8 +127,8 @@ public define percent_decode(s: text) -> text:
     example percent_decode("Sk%C3%A4rmbild") is "Skärmbild"
     example percent_decode("100% sure") is "100% sure"
     example percent_decode("a+b") is "a+b"
-    b = bytes_from_text(s)
-    n = bytes_length(b)
+    b = bytes_of(s)
+    n = bytes_count(b)
     edit out = []
     edit i = 0
     loop:
@@ -124,7 +143,7 @@ public define percent_decode(s: text) -> text:
         else:
             out = append(out, c)
             i = i + 1
-    bytes_to_text(out)
+    text_of(out)
 
 # ".." must never climb out of the served folder.
 public define safe_path(p: text) -> truth:
@@ -132,9 +151,9 @@ public define safe_path(p: text) -> truth:
     example not safe_path("/../secrets")
     not contains(p, "..")
 
-# The typed bridge: a fn(request) -> response parameter carries its whole
+# The typed bridge: a function(request) -> response parameter carries its whole
 # signature, so the call through it keeps the response type.
-define call_handler(h: fn(request) -> response, req: request) -> response = h(req)
+define call_handler(h: function(request) -> response, req: request) -> response = h(req)
 
 # The seam: match `req` against the routes, else fall back to a static file
 # under `static_dir`. Pure dispatch - the serving loop below is its only
@@ -149,7 +168,19 @@ public define dispatch(req: request, routes: [route]) -> response:
             hit = true
     found
 
-# Serve one accepted connection: read the head, dispatch, answer, close.
+# The declared body length, 0 when none - what a POST promises to send.
+# no example: private - proven by folio's paste path (byte-true PNG upload)
+define header_length(head: text) -> int:
+    edit n = 0
+    loop line in lines(head):
+        kv = split(line, ":")
+        if length(kv) > 1 and (at(kv, 0) is "Content-Length" or at(kv, 0) is "content-length"):
+            n = int_from_text(trim(at(kv, 1)))
+    n
+
+# Serve one accepted connection: read the head, then as much body as the
+# head promised (bodies are TEXT - a page sends binary as base64), dispatch,
+# answer, close.
 define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files, clock:
     deadline = monotonic_ms() + 5000
     edit raw = ""
@@ -164,13 +195,51 @@ define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files,
             raw = "{raw}{chunk}"
             if contains(raw, "\r\n\r\n"):
                 break
-    req = parse_request(raw)
+    halves = split(raw, "\r\n\r\n")
+    head = at(halves, 0)
+    edit body = if length(halves) > 1 then at(halves, 1) else ""
+    want = header_length(head)
+    loop:
+        if length(body) >= want:
+            break
+        left2 = deadline - monotonic_ms()
+        if left2 <= 0:
+            break
+        if readable_within(conn, left2):
+            more = recv(conn, 65536)
+            if timed_out(more):
+                break
+            body = "{body}{more}"
+    first = parse_request(head)
+    req = request{method: first.method, path: first.path, query: first.query, body: body}
+    # The one path the shell answers itself: the page says goodbye when its
+    # window goes (navigator.sendBeacon on pagehide), and the loop below stops
+    # a moment later. A reload says goodbye too, so the moment is a grace
+    # period that any further request cancels - which a reload always sends.
+    if req.path is "/api/bye":
+        slot_set("app:bye", "{monotonic_ms()}")
+        gone = send(conn, head_of(json_of("\{\"bye\":true\}")))
+        gone2 = send(conn, "\{\"bye\":true\}")
+        closed_bye = close(conn)
+        return
+    slot_set("app:bye", "0")
+    # The orb's own asset: the standard bar (see app_bar above).
+    if req.path is "/orb/bar.js":
+        jsr = response{status: 200, mime: "text/javascript", body: bar_js()}
+        js1 = send(conn, head_of(jsr))
+        js2 = send_raw(conn, jsr.body)
+        js_closed = close(conn)
+        return
     edit matched = false
     loop r in routes:
         if not matched and r.method is req.method and r.path is req.path:
             matched = true
     if matched:
-        resp = dispatch(req, routes)
+        edit resp = dispatch(req, routes)
+        # app_bar(): every routed html page gets the bar appended. Injection
+        # happens HERE, not in the page, so the page stays plain html.
+        if bar_enabled() and starts_with(resp.mime, "text/html"):
+            resp = response{status: resp.status, mime: resp.mime, body: "{resp.body}<script src=\"/orb/bar.js\"></script>"}
         sent1 = send(conn, head_of(resp))
         sent2 = send_raw(conn, resp.body)
     else:
@@ -193,30 +262,78 @@ define serve_static(conn: int, req: request, static_dir: text) uses net, files:
         s2 = send(conn, r404.body)
         return
     n = file_size(full)
-    s1 = send(conn, "HTTP/1.0 200 OK\r\nContent-Type: {mime_of(full)}\r\nContent-Length: {n}\r\nConnection: close\r\n\r\n")
+    # app_bar(): a static html page gets the bar too, so an app needs no
+    # route at all for "/" - ui/index.html serves itself, bar included.
+    tag = if bar_enabled() and starts_with(mime_of(full), "text/html") then "<script src=\"/orb/bar.js\"></script>" else ""
+    total = n + length(bytes_of(tag))
+    s1 = send(conn, "HTTP/1.0 200 OK\r\nContent-Type: {mime_of(full)}\r\nContent-Length: {total}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n")
     h = open_read(full)
     loop:
         chunk = read_chunk(h, 262144)
-        if len(chunk) is 0:
+        if length(chunk) is 0:
             break
         sent = send_raw(conn, chunk)
     fclosed = close_file(h)
+    if tag is not "":
+        s_tag = send(conn, tag)
 
 # Open a listener on 127.0.0.1. Returns the socket; ask local_port(srv) for
 # the port when 0 picked one.
 # no example: opens a socket - proven by folio
 public define serve(port: int) -> int uses net = listen(port)
 
+# The whole serve-and-run dance as ONE call, so main() stays wiring:
+#
+#     app_run("scribe", 7374, 1240, 860, routes, ui_dir)
+#
+# The port is a preference, not a demand: taken when free, else any port
+# (the browser keys a page's stored data by origin, so a stable port is what
+# makes settings survive a restart - but a second instance still starts).
+# Returns the exit code for main to return.
+# The convention version: assets in ui/ (served as the site, index.html at
+# "/"), a 1240x860 window. Name the app, pick its port, list its routes:
+#
+#     app_start("scribe", 7374, [on_get("/api/list", list_chapters)])
+#
+public define app_start(title: text, port: int, routes: [route]) -> int uses net, files, clock, console:
+    app_run(title, port, 1240, 860, routes, path_parent(asset("ui/index.html")))
+
+public define app_run(title: text, port: int, w: int, h: int, routes: [route], static_dir: text) -> int uses net, files, clock, console:
+    edit srv = serve(port)
+    if not ok(srv):
+        srv = serve(0)
+    if not ok(srv):
+        print_line("{title}: could not open a port")
+        return 1
+    got = local_port(srv)
+    print_line("{title} at http://127.0.0.1:{got}/  (Ctrl+C stops)")
+    win = open_app_window("http://127.0.0.1:{got}/", title, w, h)
+    # The bar's server side rides along by itself - /api/window is part of
+    # the shell, not something every app should have to list. An app's own
+    # route on the same path wins: dispatch takes the first match.
+    all_routes = append(routes, route{method: "GET", path: "/api/window", handler: window_api})
+    run_until_interrupted(srv, all_routes, static_dir)
+    0
+
 # Accept + serve until interrupted() (Ctrl+C). Connections serve one at a
 # time - honest and plenty on loopback for one user; the browser queues.
 # no example: runs a server loop - proven by folio
 public define run_until_interrupted(srv: int, routes: [route], static_dir: text) uses net, files, clock, console:
+    slot_set("app:bye", "0")
     loop:
         if interrupted():
             break
         conn = accept_within(srv, 250)
         if ok(conn):
             t = spawn_conn(conn, routes, static_dir)
+        # an app lives as long as its window: the page said goodbye and
+        # nothing came after it, so there is nobody left to serve
+        said = int_from_text(slot_get("app:bye"))
+        if said > 0 and monotonic_ms() - said > 2500:
+            break
+        # our own window closing says it even more plainly
+        if own_window_gone() is 1:
+            break
     closed = close(srv)
     print_line("app: stopped cleanly")
 
@@ -228,14 +345,31 @@ define spawn_conn(conn: int, routes: [route], static_dir: text) -> int uses net,
 # The OS's app window at `url`: Edge's --app mode - no address bar, no tabs,
 # just the app. Edge is launched by its well-known install path (CreateProcess
 # directly - routing through `cmd /c start` trips cmd's quote rules), with the
-# 32/64-bit locations both tried. Swappable for an embedded WebView2 later
-# without a caller changing.
+# 32/64-bit locations both tried. The borrowed window carries Edge's own strip,
+# which frameless can only clip into a see-through band - open_app_window is
+# the real thing when the WebView2 pieces are on the machine.
 # no example: opens a window - proven by folio
 public define open_window(url: text) -> int uses net:
     a = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
     b = "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
     exe = if file_exists(a) then a else b
     start_command(exe, ["--app={url}"])
+
+external define own_window_open(url: text, title: text, w: int, h: int) -> int
+external define own_window_gone() -> int
+
+# OUR window with the OS webview inside - the Tauri model. No browser strip,
+# nothing to clip: the page fills the window from its first pixel, the OS
+# title follows document.title (so every title-needle verb below keeps
+# working), and closing the window ends the serve loop. Where the WebView2
+# pieces are missing it falls back to the borrowed Edge window, so a caller
+# needs no plan B. One own window per program.
+# no example: opens a window - proven by folio
+public define open_app_window(url: text, title: text, w: int, h: int) -> int uses net:
+    # #own-window är markören som säger åt bar.js att detta fönster är
+    # appens eget - bara där ritas fönsterkromen.
+    marked = "{url}#own-window"
+    if own_window_open(marked, title, w, h) is 0 then 1 else open_window(marked)
 
 # The value of `key` in the request's query string, "" when absent. Decoded the
 # form-urlencoded way: "+" is a space, then the %XX triples.
@@ -246,9 +380,23 @@ public define query_of(req: request, key: text) -> text:
     edit found = ""
     loop pair in split(req.query, "&"):
         kv = split(pair, "=")
-        if len(kv) is 2 and at(kv, 0) is key and found is "":
+        if length(kv) is 2 and at(kv, 0) is key and found is "":
             found = percent_decode(replace(at(kv, 1), "+", " "))
     found
+
+# An app's own file, wherever the app was started from. Shipped, `ui/x.html`
+# sits beside the exe; in development the exe is down in `build/`, so one
+# level up is the same tree. The working directory is the last resort, which
+# is what `orbit run` from the project root gives.
+# no example: depends on where the binary sits - proven by folio
+public define asset(rel: text) -> text uses files:
+    home = path_parent(program_path())
+    beside = "{home}/{rel}"
+    above = "{home}/../{rel}"
+    choose:
+        is_file(beside) then beside
+        is_file(above) then above
+        else rel
 
 # --- the window itself -------------------------------------------------
 # Everything below finds the window by a piece of its TITLE, which is how a
@@ -257,8 +405,12 @@ public define query_of(req: request, key: text) -> text:
 external define win_set_topmost(needle: text, on: int) -> int
 external define win_set_opacity(needle: text, percent: int) -> int
 external define win_set_frameless(needle: text, on: int, view_h: int) -> int
+external define win_set_click_through(needle: text, on: int) -> int
+external define win_click_through_on(needle: text) -> int
 external define win_move(needle: text, x: int, y: int) -> int
 external define win_command(needle: text, what: text) -> int
+external define win_resize(needle: text, w: int, h: int) -> int
+external define win_ghost(needle: text, rects: text) -> int
 
 # Keep the window above every other window, or let it back down.
 # no example: window state - proven by folio's pin feature
@@ -278,12 +430,199 @@ public define window_opacity(title: text, percent: int) -> truth uses console = 
 # no example: window state - proven by folio's own top bar
 public define window_frameless(title: text, on: truth, view_h: int) -> truth uses console = win_set_frameless(title, if on then 1 else 0, view_h) is 0
 
+# Let the mouse fall through the window to whatever is under it: a reference
+# board you can paint and click straight through. The keyboard still arrives,
+# so alt-tab back and the page's own keys are the way out - without that, a
+# window that takes no clicks could not be turned off from inside.
+# no example: window state - proven by folio's click-through
+public define window_click_through(title: text, on: truth) -> truth uses console = win_set_click_through(title, if on then 1 else 0) >= 0
+
+# Whether it is clicking through right now - the page asks while it is on,
+# since the way out does not go through the page.
+# no example: window state - proven by folio's click-through
+public define clicks_through(title: text) -> truth uses console = win_click_through_on(title) is 1
+
 # Put the window's top-left corner at x,y in device pixels - a frameless
 # window's bar drags with this. The browser keeps the pointer to itself and
 # will not let us hand the drag to the OS move loop, so the page follows its
 # own pointer and says where the window should be.
 # no example: window state - proven by folio's own top bar
 public define window_move(title: text, x: int, y: int) -> truth uses console = win_move(title, x, y) is 0
+# Give the window a size (device pixels) and center it on its monitor. The
+# one window verb that starts from the OUTSIDE: a browser app window opens at
+# whatever size its profile last had, and only the OS side can correct that -
+# an installer's first move.
+# no example: window state - proven by the setup stub
+public define window_size(title: text, w: int, h: int) -> truth uses console = win_resize(title, w, h) is 0
+
+# Ghost mode, own windows only: the page hands over the rectangles that stay
+# INTERACTIVE ("x,y,w,h;..." in device pixels, client coords) - everything
+# else is a hole: invisible where the page painted nothing, and clicks fall
+# through to the work underneath. "" turns it off. False on the borrowed
+# Edge window, where holes are impossible - the caller falls back to
+# translucent click-through.
+# no example: window state - proven by folio's ghost mode
+public define window_ghost(title: text, rects: text) -> truth uses console = win_ghost(title, rects) is 0
+
 public define window_minimize(title: text) -> truth uses console = win_command(title, "min") is 0
+# Gone from screen, taskbar and alt-tab, still running - what a summoned
+# window does when it is dismissed. window_show brings it back AND gives it
+# the keyboard, which a plain show does not: Windows hands the foreground to
+# a process that just had input, and a program that summons itself had none.
+public define window_hide(title: text) -> truth uses console = win_command(title, "hide") is 0
+public define window_show(title: text) -> truth uses console = win_command(title, "show") is 0
+
+external define win_hotkey(needle: text, mods: int, key: int) -> int
+external define win_hotkey_taken() -> int
+external define win_hotkey_held() -> int
+external define win_set_toolwindow(needle: text, on: int) -> int
+external define shell_open(path: text) -> int
+external define icon_base64(path: text, size: int) -> text
+
+# Programmets ikon som råa BGRA-pixlar, base64-kodade, `size` x `size`.
+# Shellet får avgöra vilken ikon en genväg har - den kan peka på målets, på
+# en egen, på en mapps. Base64 och inte bytes: en returnerad sträng kopieras
+# ut vid sin NUL, och pixlar är fulla av dem. "" när det inte finns någon.
+public define icon_pixels(path: text, size: int) -> text uses files = icon_base64(path, size)
+
+# Ur aktivitetsfältet, ur alt-tab, ur fönsterlistan. Ett fönster som ropas
+# fram ska finnas när det kallas på och inte annars - det ska inte gå att
+# snubbla in i det. Slår igenom först efter en göm-och-visa.
+public define window_toolwindow(title: text, on: truth) -> truth uses console = win_set_toolwindow(title, if on then 1 else 0) is 0
+
+# A key that reaches this window from anywhere in the OS, even with another
+# program in front. `mods` is alt 1 | ctrl 2 | shift 4 | win 8, `key` a
+# virtual key code (space is 32). The window raises ITSELF when it fires -
+# only the window's own message handler is allowed the foreground - so the
+# program learns about it afterwards, by asking.
+public define window_hotkey(title: text, mods: int, key: int) -> truth uses console = win_hotkey(title, mods, key) is 0
+# True once per press. Ask on your own schedule; the answer is never repeated.
+public define hotkey_taken() -> truth uses console = win_hotkey_taken() is 1
+# Är tangenten vår just nu? Registreringen misslyckas tyst när någon annan
+# håller kombinationen, och då är "inget händer" omöjligt att skilja från en
+# bugg någon annanstans. Fråga i stället för att gissa.
+public define hotkey_held() -> truth uses console = win_hotkey_held() is 1
+# Open what the shell would open: a shortcut, a folder, a document, a URL.
+# run_command cannot start a .lnk, and the start menu is nothing but those.
+public define open_with_shell(path: text) -> truth uses console = shell_open(path) is 0
 public define window_maximize(title: text) -> truth uses console = win_command(title, "max") is 0
 public define window_close(title: text) -> truth uses console = win_command(title, "close") is 0
+
+# --- the standard bar --------------------------------------------------
+# Tauri-style configuration, one call in main():
+#
+#     app_bar()
+#
+# and every html page the routes serve gets the orb's window bar injected:
+# frameless window, a transparent strip that blurs in on hover, drag to move,
+# double-click to maximize, min/max/close. The page needs NOTHING - no html,
+# no css, no js - but keeps control: colors follow --bar-ink/--bar-bg/--bar-btn
+# if the page defines them, and app buttons can be appended into #bar-tools.
+# An app with its own bar (folio) simply does not call this.
+# The server side of the seam is still the /api/window route.
+public define app_bar():
+    slot_set("app:bar", "1")
+
+define bar_enabled() -> truth:
+    slot_has("app:bar") and slot_get("app:bar") is "1"
+
+# The bar itself. Lives here as text so a packaged exe carries it with no
+# asset file to ship; served at /orb/bar.js, injected after the page's html.
+define bar_js() -> text:
+    edit js = "(() => \{\n"
+    js = js + "// Bara i fönstret APPEN öppnade (markerat #own-window av open_app_window):\n"
+    js = js + "// i en vanlig browserflik vore baren dubbel krom, och fönsterverben\n"
+    js = js + "// (som söker på TITELN) skulle kunna klippa fel fönster.\n"
+    js = js + "if (location.hash !== '#own-window') return;\n"
+    js = js + "if (document.getElementById('bar')) return;\n"
+    js = js + "const css = '#bar\{position:fixed;top:0;left:var(--bar-left,0);right:0;height:36px;display:flex;align-items:center;gap:10px;padding:0 6px 0 14px;z-index:2147483647;color:var(--bar-ink,inherit);opacity:0;transition:opacity .18s;user-select:none;-webkit-user-select:none\}' +\n"
+    js = js + "'#bar:hover\{opacity:1;background:var(--bar-bg,rgba(0,0,0,.28));backdrop-filter:blur(16px)\}' +\n"
+    js = js + "'#bar .bar-title\{font:12px/1 system-ui,sans-serif;letter-spacing:.4px;opacity:.65\}' +\n"
+    js = js + "'#bar-tools\{display:flex;align-items:center;gap:6px;margin-left:auto\}' +\n"
+    js = js + "'#bar button\{all:unset;width:36px;height:26px;display:grid;place-items:center;border-radius:6px;font:13px/1 system-ui,sans-serif;opacity:.75\}' +\n"
+    js = js + "'#bar button:hover\{background:var(--bar-btn,rgba(255,255,255,.14));opacity:1\}' +\n"
+    js = js + "'#bar button svg\{display:block\}' +\n"
+    js = js + "'#bar #bar-pin.on\{background:var(--bar-btn,rgba(255,255,255,.14));color:var(--bar-accent,inherit);opacity:1\}' +\n"
+    js = js + "'#bar #bar-close:hover\{background:#e81123;color:#fff\}';\n"
+    js = js + "const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);\n"
+    js = js + "const bar = document.createElement('div'); bar.id = 'bar';\n"
+    js = js + "const ic = d => '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" width=\"15\" height=\"15\">' + d + '</svg>';\n"
+    js = js + "bar.innerHTML = '<span class=bar-title></span><span id=bar-tools></span><button id=bar-pin title=\"alltid överst\"></button><button id=bar-min></button><button id=bar-max></button><button id=bar-close></button>';\n"
+    js = js + "bar.querySelector('#bar-pin').innerHTML = ic('<path d=\"M5 3h14\"/><path d=\"m18 13-6-6-6 6\"/><path d=\"M12 7v14\"/>');\n"
+    js = js + "bar.querySelector('#bar-min').innerHTML = ic('<path d=\"M5 12h14\"/>');\n"
+    js = js + "bar.querySelector('#bar-max').innerHTML = ic('<rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/>');\n"
+    js = js + "bar.querySelector('#bar-close').innerHTML = ic('<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>');\n"
+    js = js + "document.body.appendChild(bar);\n"
+    js = js + "bar.querySelector('.bar-title').textContent = document.title;\n"
+    js = js + "const win = (what, v) => fetch('/api/window?do=' + what + (v === undefined ? '' : '&v=' + v) + '&t=' + Math.round(innerHeight * devicePixelRatio) + '&title=' + encodeURIComponent(document.title));\n"
+    js = js + "const reclip = async () => \{\n"
+    js = js + "for (let i = 0; i < 15; i++) \{\n"
+    js = js + "const ok = await win('frameless', 1).then(r => r.json()).then(j => j.ok).catch(() => false);\n"
+    js = js + "if (ok) return;\n"
+    js = js + "await new Promise(d => setTimeout(d, 300));\n"
+    js = js + "\}\n"
+    js = js + "\};\n"
+    js = js + "reclip();\n"
+    js = js + "addEventListener('resize', () => \{ win('frameless', 1); \});\n"
+    js = js + "addEventListener('pagehide', () => navigator.sendBeacon('/api/bye'));\n"
+    js = js + "let pinned = false;\n"
+    js = js + "const pin = document.getElementById('bar-pin');\n"
+    js = js + "pin.onclick = () => \{ pinned = !pinned; win('top', pinned ? 1 : 0); pin.classList.toggle('on', pinned); \};\n"
+    js = js + "document.getElementById('bar-min').onclick = () => win('min');\n"
+    js = js + "document.getElementById('bar-max').onclick = () => win('max');\n"
+    js = js + "document.getElementById('bar-close').onclick = () => win('close');\n"
+    js = js + "bar.addEventListener('dblclick', e => \{ if (!e.target.closest('button')) win('max'); \});\n"
+    js = js + "let flying = false;\n"
+    js = js + "bar.addEventListener('pointerdown', e => \{\n"
+    js = js + "if (e.target.closest('button')) return;\n"
+    js = js + "const d = devicePixelRatio, wx = screenX, wy = screenY, px = e.screenX, py = e.screenY;\n"
+    js = js + "bar.setPointerCapture(e.pointerId);\n"
+    js = js + "const move = ev => \{\n"
+    js = js + "if (flying) return;\n"
+    js = js + "flying = true;\n"
+    js = js + "fetch('/api/window?do=moveto&v=' + Math.round((wx + ev.screenX - px) * d) + '&t=' + Math.round((wy + ev.screenY - py) * d) + '&title=' + encodeURIComponent(document.title)).finally(() => flying = false);\n"
+    js = js + "\};\n"
+    js = js + "const up = () => \{ bar.removeEventListener('pointermove', move); bar.removeEventListener('pointerup', up); \};\n"
+    js = js + "bar.addEventListener('pointermove', move);\n"
+    js = js + "bar.addEventListener('pointerup', up);\n"
+    js = js + "\});\n"
+    js = js + "\})();\n"
+    js
+
+# The one seam between a page and its own window, ready to put in a route
+# list: /api/window?do=<verb>&title=<the page's own title>. `v` is the value
+# the verb takes (on/off, percent, x), `t` the second one (y, or the page's
+# viewport height for the frameless clip). Extracted from folio the day
+# scribe became its second consumer.
+#
+#     route{method: "GET", path: "/api/window", handler: window_api}
+define do_window(title: text, what: text, v: int, t: int) -> truth:
+    choose:
+        what is "top" then window_on_top(title, v is 1)
+        what is "frameless" then window_frameless(title, v is 1, t)
+        what is "opacity" then window_opacity(title, v)
+        what is "through" then window_click_through(title, v is 1)
+        what is "moveto" then window_move(title, v, t)
+        what is "min" then window_minimize(title)
+        what is "hide" then window_hide(title)
+        what is "show" then window_show(title)
+        what is "hotkey" then window_hotkey(title, v, t)
+        what is "tool" then window_toolwindow(title, v is 1)
+        what is "max" then window_maximize(title)
+        what is "close" then window_close(title)
+        else false
+
+public define window_api(req: request) -> response:
+    title = query_of(req, "title")
+    what = query_of(req, "do")
+    v = int_from_text(query_of(req, "v"))
+    t = int_from_text(query_of(req, "t"))
+    if what is "ghost":
+        # the rects that stay interactive; "" ends the mode
+        return if window_ghost(title, query_of(req, "r")) then json_of("\{\"ok\":true\}") else json_of("\{\"ok\":false\}")
+    if what is "state":
+        # the one question the page cannot answer itself: while the window is
+        # clicking through, it is the keyboard that turns it off, not the page
+        return if clicks_through(title) then json_of("\{\"through\":true\}") else json_of("\{\"through\":false\}")
+    done = do_window(title, what, v, t)
+    if done then json_of("\{\"ok\":true\}") else json_of("\{\"ok\":false\}")

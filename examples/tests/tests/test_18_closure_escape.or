@@ -1,10 +1,10 @@
 # Escaping closure: a capturing lambda passed to another fn keeps its
 # captures (env-struct closure = [fn_ptr, flag, caps...]). a=10, b=3,
 # g(5) = 10 + 3 + 5 = 18. (Before real closures this silently miscompiled.)
-define apply(f: fn, x: int) -> int:
+define apply(f: function, x: int) -> int:
     f(x)
 define main() -> int:
     a = 10
     b = 3
-    g = fn(n): a + b + n
+    g = function(n): a + b + n
     apply(g, 5)

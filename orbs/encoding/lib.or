@@ -21,20 +21,20 @@ define hex_val(c: int) -> int:
 public define hex_encode(data: [int]) -> text:
     example hex_encode([255, 16]) is "ff10"
     example hex_encode([]) is ""
-    hex = bytes_from_text("0123456789abcdef")
+    hex = bytes_of("0123456789abcdef")
     edit out = []
-    loop i in 0 until len(data):
+    loop i in 0 until length(data):
         b = at(data, i)
         out = append(out, at(hex, (b >> 4) & 15))
         out = append(out, at(hex, b & 15))
-    bytes_to_text(out)
+    text_of(out)
 
 # hex text -> bytes. Non-hex characters are skipped; a trailing half-byte is
 # dropped.
 public define hex_decode(s: text) -> [int]:
     example at(hex_decode("ff10"), 0) is 255
-    b = bytes_from_text(s)
-    n = bytes_length(b)
+    b = bytes_of(s)
+    n = bytes_count(b)
     edit out = []
     edit hi = 0 - 1
     loop i in 0 until n:
@@ -61,8 +61,8 @@ define b64_val(c: int) -> int:
 public define base64_encode(data: [int]) -> text:
     example base64_encode([77, 97, 110]) is "TWFu"
     example base64_encode([]) is ""
-    alpha = bytes_from_text("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
-    n = len(data)
+    alpha = bytes_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+    n = length(data)
     edit out = []
     edit i = 0
     loop:
@@ -77,13 +77,13 @@ public define base64_encode(data: [int]) -> text:
         out = append(out, if has1 then at(alpha, ((b1 << 2) | (b2 >> 6)) & 63) else 61)   # '='
         out = append(out, if has2 then at(alpha, b2 & 63) else 61)
         i = i + 3
-    bytes_to_text(out)
+    text_of(out)
 
 # base64 text -> bytes. Padding, newlines and stray characters are ignored.
 public define base64_decode(s: text) -> [int]:
     example at(base64_decode("TWFu"), 0) is 77
-    b = bytes_from_text(s)
-    n = bytes_length(b)
+    b = bytes_of(s)
+    n = bytes_count(b)
     edit out = []
     edit acc = 0
     edit bits = 0

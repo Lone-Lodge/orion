@@ -11,7 +11,7 @@ type Opt:
 define unwrap(r: Res) -> int:
     choose r:
         Ok(n) -> n
-        Bad(m) -> 0 - len(m)
+        Bad(m) -> 0 - length(m)
 
 define main() -> int:
     v = Opt.Some(Res.Ok(42))

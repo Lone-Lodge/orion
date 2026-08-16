@@ -1,8 +1,8 @@
 {
 	"name": "orion",
 	"displayName": "Orion",
-	"description": "Orion language support — LSP (hover, go-to-definition, outline, diagnostics), syntax highlighting, snippets, and orbit CLI commands for build/run/test.",
-	"version": "0.1.0",
+	"description": "Orion and Astra language support - LSP (hover, go-to-definition, outline, diagnostics), syntax highlighting, snippets, orbit CLI commands, and the declared-game actions: probe, kin window, and reading a sketch in another tongue.",
+	"version": "0.3.0",
 	"publisher": "lonelodge",
 	"private": true,
 	"engines": {
@@ -13,12 +13,33 @@
 	],
 	"activationEvents": [
 		"onLanguage:orion",
+		"onLanguage:astra",
 		"onStartupFinished",
 		"workspaceContains:**/*.or",
+		"workspaceContains:**/*.astra",
 		"workspaceContains:Orbit.toml"
 	],
 	"main": "./extension.js",
 	"contributes": {
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "orion",
+					"title": "Orion",
+					"icon": "./icons/orion-dark.svg"
+				}
+			]
+		},
+		"views": {
+			"orion": [
+				{
+					"type": "webview",
+					"id": "orionActions",
+					"name": "Orbit",
+					"icon": "./icons/orion-dark.svg"
+				}
+			]
+		},
 		"languages": [
 			{
 				"id": "orion",
@@ -35,6 +56,21 @@
 					"light": "./icons/orion-light.svg",
 					"dark": "./icons/orion-dark.svg"
 				}
+			},
+			{
+				"id": "astra",
+				"aliases": [
+					"Astra",
+					"astra"
+				],
+				"extensions": [
+					".astra"
+				],
+				"configuration": "./astra-language-configuration.json",
+				"icon": {
+					"light": "./icons/orion-light.svg",
+					"dark": "./icons/orion-dark.svg"
+				}
 			}
 		],
 		"grammars": [
@@ -42,15 +78,34 @@
 				"language": "orion",
 				"scopeName": "source.orion",
 				"path": "./syntaxes/orion.tmLanguage.json"
+			},
+			{
+				"language": "astra",
+				"scopeName": "source.astra",
+				"path": "./syntaxes/astra.tmLanguage.json"
 			}
 		],
 		"snippets": [
 			{
 				"language": "orion",
 				"path": "./snippets/orion.code-snippets"
+			},
+			{
+				"language": "astra",
+				"path": "./snippets/astra.code-snippets"
 			}
 		],
 		"commands": [
+			{
+				"command": "orion.play",
+				"title": "Orion: play (run on the chosen target)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.playTarget",
+				"title": "Orion: choose play target (native / web / editor)",
+				"category": "Orion"
+			},
 			{
 				"command": "orion.build",
 				"title": "Orion: build project (orbit build)",
@@ -90,6 +145,51 @@
 				"command": "orion.restartServer",
 				"title": "Orion: restart language server",
 				"category": "Orion"
+			},
+			{
+				"command": "orion.debug",
+				"title": "Orion: debug project with call trail (orbit debug)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.shot",
+				"title": "Orion: headless one-frame render (orbit shot)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.dev",
+				"title": "Orion: build fresh + launch (orbit dev)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.package",
+				"title": "Orion: shippable dist + installer (orbit package)",
+				"category": "Orion"
+			},
+			{
+				"command": "orion.gates",
+				"title": "Orion: run the project's gates (tools/gates.sh)",
+				"category": "Orion"
+			},
+			{
+				"command": "astra.probe",
+				"title": "Astra: probe the sketch (probe.sh)",
+				"category": "Astra"
+			},
+			{
+				"command": "astra.kin",
+				"title": "Astra: run as a kin window (game_kin.sh)",
+				"category": "Astra"
+			},
+			{
+				"command": "astra.tongue",
+				"title": "Astra: write this project's sketches in another tongue",
+				"category": "Astra"
+			},
+			{
+				"command": "astra.canonicalize",
+				"title": "Astra: put every sketch back in canonical English",
+				"category": "Astra"
 			}
 		],
 		"keybindings": [
@@ -119,7 +219,30 @@
 					"type": "string",
 					"default": "orbit",
 					"description": "Command to invoke the orbit CLI. Defaults to `orbit` on PATH; set to an absolute path if your binary lives elsewhere."
+				},
+				"astra.tongue": {
+					"type": "string",
+					"enum": [
+						"en",
+						"sv"
+					],
+					"enumDescriptions": [
+						"Canonical English - what the corpus, the compiler and every shared example speak",
+						"Svenska - the same sketches, written in Swedish"
+					],
+					"default": "en",
+					"description": "The tongue this project's .astra sketches are written in. Changing it turns every sketch, and a sketch that arrives in the other tongue joins on open. Canonical English is what belongs in a commit."
 				}
+			}
+		},
+		"configurationDefaults": {
+			"[orion]": {
+				"editor.rulers": [
+					100
+				],
+				"editor.wordWrap": "off",
+				"editor.formatOnSave": true,
+				"editor.defaultFormatter": "lonelodge.orion"
 			}
 		}
 	},

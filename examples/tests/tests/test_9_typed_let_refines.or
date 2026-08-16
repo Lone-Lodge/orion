@@ -11,11 +11,11 @@
 # fix and is a no-op. Both forms now agree.
 define text_len_of_first(m: table) -> int:
     ys: [text] = get_list(m, "words")
-    at(ys, 0).len()
+    at(ys, 0).length()
 
 define mut_form(m: table) -> int:
     edit ys: [text] = get_list(m, "words")
-    len(at(ys, 1))
+    length(at(ys, 1))
 
 define main() -> int:
     m = {"words": ["ab", "cdef"]}

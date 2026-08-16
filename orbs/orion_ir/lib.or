@@ -12,7 +12,7 @@
 # --- Typed data structures ---
 
 # An IR instruction. All fields present; unused ones zero/empty.
-# - name: fn name for call ops (else "")
+# - name: function name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
 type Inst: op: text, type_text: text, value: int, lhs: int, rhs: int, name: text, args: [int]
 
@@ -71,13 +71,7 @@ public external define orion_arena_reset() -> int
 public external define orion_arena_used() -> int
 
 public define compile_error(msg: text):
-    # otir_where stashes a source-line + caret frame for located errors; print
-    # it under the message and consume it so the next error starts clean.
-    if slot_has("err:frame") and slot_get("err:frame") != "":
-        print_line(msg + slot_get("err:frame"))
-        slot_set("err:frame", "")
-    else:
-        print_line(msg)
+    print_line(msg)
     orion_err_bump()
 
 public define compile_errors() -> int:
@@ -242,12 +236,12 @@ public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
 public define ir_text_len(value_id: int) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# slice(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
+# part(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
 public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
-# slice(list, lo, hi) - half-open, clamped; type_text carries the
+# part(list, lo, hi) - half-open, clamped; type_text carries the
 # source list type so element typing survives the slice.
 public define ir_list_slice(list_id: int, lo_id: int, hi_id: int, list_type: text) -> Inst:
     Inst{op: "list_slice", type_text: list_type, value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
@@ -280,15 +274,15 @@ public define ir_argv(idx_id: int) -> Inst:
     Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
-# bytes_from_text(t) → [int] of byte values
+# bytes_of(t) → [int] of byte values
 public define ir_bytes_from_text(text_id: int) -> Inst:
     Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# bytes_to_text(list) → Text from list of byte values
+# text_of(list) → Text from list of byte values
 public define ir_bytes_to_text(list_id: int) -> Inst:
     Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# bytes_slice(list, lo, hi) → new list with items [lo, hi)
+# bytes_part(list, lo, hi) → new list with items [lo, hi)
 public define ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
@@ -510,7 +504,7 @@ public define ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
     # pr.function, dropping the old IRFn, so no live alias sees the
     # mutation.
     edit insts = fn_value.instructions
-    new_id = len(insts)
+    new_id = length(insts)
     insts = __push_inplace(insts, inst)
     new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
     PushResult{function: new_fn, id: new_id}
@@ -590,7 +584,7 @@ public define ir_make_closure(fn_name: text, cap_ids: [int], is_lambda: int) -> 
 
 
 # Call a closure value: load its fn-ptr, and dispatch on the is_lambda flag -
-# a lambda is invoked as fn(env, args...), a plain fn-ref as fn(args...).
+# a lambda is invoked as function(env, args...), a plain fn-ref as function(args...).
 public define ir_closure_call(closure_id: int, arg_ids: [int], ret_type: text) -> Inst:
     Inst{op: "closure_call", type_text: ret_type, value: closure_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
 
@@ -604,7 +598,7 @@ public define ir_int_to_ptr(src_id: int, type_text: text) -> Inst:
 
 public define ir_dump_fn(fn_value: IRFn) -> text:
     edit text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
-    total = len(fn_value.instructions)
+    total = length(fn_value.instructions)
     loop idx in 0..<total:
         inst = at(fn_value.instructions, idx)
         line = ir_dump_instruction(inst, idx)
@@ -613,7 +607,7 @@ public define ir_dump_fn(fn_value: IRFn) -> text:
 
 public define ir_dump_module(module: IRModule) -> text:
     edit text = "; orion_ir module dump\n"
-    total = len(module.functions)
+    total = length(module.functions)
     loop idx in 0..<total:
         fn_value = at(module.functions, idx)
         text = "{text}{ir_dump_fn(fn_value)}\n"

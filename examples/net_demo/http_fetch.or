@@ -12,7 +12,7 @@ use http
 define try_one(url: text, marker: text) -> truth:
     r = fetch(url)
     if success(r) and contains(r.body, marker):
-        print_line("{url} -> status={r.status} bytes={len(r.body)}  OK")
+        print_line("{url} -> status={r.status} bytes={length(r.body)}  OK")
         return true
     print_line("{url} -> status={r.status} {r.body}")
     false

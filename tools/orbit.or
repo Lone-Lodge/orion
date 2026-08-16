@@ -2,6 +2,7 @@
 # with orion_cli.c + orion_rt.c. No lodge-orion, no interpreter.
 use os
 use text
+use orion_fmt
 
 # build/run/test are pure Orion (see cli_build below): they compile with
 # orion.exe + clang and run the native exe. No Rust interpreter left.
@@ -16,31 +17,31 @@ external define host_subdirs(dir: text) -> text
 # self-path is unavailable (or a toml can still override explicitly).
 define self_dist_dir() -> text:
     exe = host_self_exe()
-    if len(exe) == 0 then "" else path_parent(exe)
+    if length(exe) == 0 then "" else path_parent(exe)
 
 define default_compiler() -> text:
     d = self_dist_dir()
-    if len(d) > 0 and file_exists(d + "/orion.exe") then d + "/orion.exe"
+    if length(d) > 0 and file_exists(d + "/orion.exe") then d + "/orion.exe"
     else "../orion/dist/orion.exe"
 
 define default_runtime() -> text:
     d = self_dist_dir()
-    if len(d) > 0 and is_dir(path_parent(d) + "/runtime") then path_parent(d) + "/runtime"
+    if length(d) > 0 and is_dir(path_parent(d) + "/runtime") then path_parent(d) + "/runtime"
     else "../orion/runtime"
 
 define default_orbs() -> text:
     d = self_dist_dir()
-    if len(d) > 0 and is_dir(path_parent(d) + "/orbs") then path_parent(d) + "/orbs"
+    if length(d) > 0 and is_dir(path_parent(d) + "/orbs") then path_parent(d) + "/orbs"
     else "../orion/orbs"
 
 # `dir/hello.or` -> `dir/hello`. Keeps the directory, so building a file that
 # is not in the working directory puts the exe beside its source rather than
 # underfoot.
 define path_drop_or(p: text) -> text:
-    bs = bytes_from_text(p)
-    n = len(bs)
+    bs = bytes_of(p)
+    n = length(bs)
     if n > 3 and at(bs, n - 3) == 46 and at(bs, n - 2) == 111 and at(bs, n - 1) == 114:
-        bytes_to_text(bytes_slice(bs, 0, n - 3))
+        text_of(bytes_part(bs, 0, n - 3))
     else:
         p
 
@@ -48,7 +49,7 @@ define path_drop_or(p: text) -> text:
 
 define sty(code: text, s: text) -> text:
     if orion_console_color() == 1:
-        e = bytes_to_text(append([], 27))
+        e = text_of(append([], 27))
         "{e}[{code}m{s}{e}[0m"
     else:
         s
@@ -109,6 +110,8 @@ define usage():
     eprint("  get                         " + c_dim("fetch [deps] git packages into orbs_pkg/, pinned by Orbit.lock"))
     eprint("  update [name]               " + c_dim("refetch package(s) at their ref's newest commit, move the lock"))
     eprint("  fmt                         " + c_dim("format the sources in place"))
+    eprint("  package                     " + c_dim("a shippable dist/<name>/ (exe + assets, no console) and a zip of it"))
+  eprint("  setup <name> <ver> <zip>    " + c_dim("a setup exe from any zip; [path-subdir] joins the user PATH"))
     eprint("")
     eprint(c_bold("  projects and games"))
     eprint("  dev [dev|bench|off]         " + c_dim("build fresh + reference-check + launch (the one command)"))
@@ -132,7 +135,7 @@ define die(message: text):
 # ---------- list helpers (the builtin `contains` is text-only) ----------
 
 define list_contains(haystack: [text], needle: text) -> truth:
-    total = len(haystack)
+    total = length(haystack)
     edit found = false
     loop index in 0..<total:
         if at(haystack, index) == needle:
@@ -150,9 +153,9 @@ define scan_template_dirs(dir: text, depth: int, acc: [text]) -> [text]:
         return acc
     subs = split(host_subdirs(dir), "\n")
     edit out = acc
-    loop i in 0..<len(subs):
+    loop i in 0..<length(subs):
         name = at(subs, i)
-        if len(name) > 0 and not scan_noise(name):
+        if length(name) > 0 and not scan_noise(name):
             child = dir + "/" + name
             if name == "templates":
                 if not list_contains(out, child):
@@ -163,10 +166,10 @@ define scan_template_dirs(dir: text, depth: int, acc: [text]) -> [text]:
 
 define find_template(kind: text) -> text:
     root = find_workspace_root()
-    if len(root) == 0:
+    if length(root) == 0:
         return ""
     dirs = scan_template_dirs(root, 0, [])
-    loop i in 0..<len(dirs):
+    loop i in 0..<length(dirs):
         candidate = at(dirs, i) + "/" + kind
         if is_dir(candidate):
             return candidate
@@ -181,7 +184,7 @@ define copy_template(src_dir: text, dst_dir: text, name: text, packages: text):
     # Files: list_dir. Directories: host_subdirs - the same split
     # scan_orb_dirs relies on, since list_dir does not report subdirs.
     entries = list_dir(src_dir)
-    entry_count = len(entries)
+    entry_count = length(entries)
     loop index in 0..<entry_count:
         entry = at(entries, index)
         src = path_join(src_dir, entry)
@@ -189,10 +192,10 @@ define copy_template(src_dir: text, dst_dir: text, name: text, packages: text):
         if not is_dir(src):
             copy_template_file(src, dst, name, packages)
     subs = split(host_subdirs(src_dir), "\n")
-    sub_count = len(subs)
+    sub_count = length(subs)
     loop sub_index in 0..<sub_count:
         sub = at(subs, sub_index)
-        if len(sub) > 0:
+        if length(sub) > 0:
             copy_template(src_dir + "/" + sub, path_join(dst_dir, replace(sub, "__NAME__", name)), name, packages)
 
 define copy_template_file(src: text, dst: text, name: text, packages: text):
@@ -204,7 +207,7 @@ define copy_template_file(src: text, dst: text, name: text, packages: text):
 # workspace root, so `packages` resolves wherever the project is made.
 define packages_path() -> text:
     root = find_workspace_root()
-    if len(root) == 0:
+    if length(root) == 0:
         return "../atlas/packages"
     # root is ".", "./..", "./../.." … and the project sits one level
     # deeper than the cwd, so prepend one more hop. Trim the leading "./"
@@ -247,7 +250,7 @@ define cmd_new_orb(name: text):
     mkdir_all(name + "/src")
     toml_body = "[package]\nname = \"" + name + "\"\nversion = \"0.0.1\"\n\n[orbs]\n"
     write_file(name + "/Orbit.toml", toml_body)
-    main_body = "fn add(left: int, right: int) -> int = left + right\n\n# `orbit test` runs functions named test_*.\nfn test_add():\n    require add(2, 3) == 5\n"
+    main_body = "define add(left: int, right: int) -> int = left + right\n\n# `orbit test` runs every function named test_*.\ndefine test_add():\n    require add(2, 3) == 5\n"
     write_file(name + "/src/main.or", main_body)
     print_line("created `" + name + "`")
     print_line("  " + name + "/Orbit.toml")
@@ -315,6 +318,13 @@ define cmd_build():
 define cmd_run():
     # `orbit run [file.or] [fn] [args...]` - file defaults to src/main.or,
     # fn defaults to main. Bare `orbit run` in a project dir Just Works.
+    # A just-closed app can hold its exe locked for a beat while the window
+    # finishes dying, and the rerun you type immediately after then fails at
+    # the link with permission denied - free the exe first, like `orbit dev`.
+    if file_exists("Orbit.toml"):
+        proj = nb_setting(nb_lines(read_file("Orbit.toml")), "name", "")
+        if proj != "":
+            kill_running(proj + "_cli")
     second = first_param()
     has_path = ends_with(second, ".or")
     path = if has_path then second else "src/main.or"
@@ -332,79 +342,238 @@ define cmd_debug():
     slot_set("orbit:trace", 1)
     cmd_run()
 
+# ---------- package ----------
+# `orbit package` - what you hand to someone else. Building gives you an exe
+# that only runs where it was built: its assets are found relative to the
+# working directory, and it opens a console window nobody asked for. This
+# gives you a folder that runs anywhere, and a zip of it:
+#
+#     dist/folio/folio.exe + dist/folio/ui/…   ->   dist/folio-0.1.0-win.zip
+#
+# The app declares what ships beside the exe in Orbit.toml:
+#
+#     [package]
+#     version = "0.1.0"
+#     assets  = "ui"          # space-separated, project-relative
+#
+# and reads those files through the app orb's `asset()`, which looks beside
+# the exe first. Nothing else changes between development and release.
+
+define copy_tree(src: text, dst: text):
+    mkdir_all(dst)
+    entries = list_dir(src)
+    loop index in 0..<length(entries):
+        entry = at(entries, index)
+        if length(entry) > 0:
+            file_copy_or_die(path_join(src, entry), path_join(dst, entry))
+    subs = split(host_subdirs(src), "\n")
+    loop sub_index in 0..<length(subs):
+        sub = at(subs, sub_index)
+        if length(sub) > 0:
+            copy_tree(src + "/" + sub, path_join(dst, sub))
+
+define file_copy_or_die(src: text, dst: text):
+    if copy_file(src, dst) != 0:
+        die("orbit: could not copy `" + src + "`")
+
+define os_tag() -> text:
+    if os_kind() == 0 then "win" else if os_kind() == 2 then "macos" else "linux"
+
+# `icon = "assets/app.ico"` becomes a linked resource. llvm-rc ships beside
+# clang, so if we can compile the program we can compile this.
+define build_icon(icon: text) -> text:
+    if icon == "" or os_kind() != 0:
+        return ""
+    if not file_exists(icon):
+        die("orbit: no such icon `" + icon + "`")
+    rc_path = "build/icon.rc"
+    res_path = "build/icon.res"
+    write_file(rc_path, "1 ICON \"" + replace(icon, "\\", "/") + "\"\n")
+    rc_tool = path_parent(nb_clang()) + "/llvm-rc.exe"
+    if not file_exists(rc_tool):
+        print_line(c_dim("(no llvm-rc beside clang - the exe keeps the default icon)"))
+        return ""
+    if run_command_quiet(rc_tool, ["/fo", res_path, rc_path]) != 0:
+        print_line(c_dim("(llvm-rc could not compile the icon - keeping the default)"))
+        return ""
+    res_path
+
+# Only a project that depends on the `app` orb can open a webview - a
+# native game ships without the loader dll.
+define webview_project() -> truth:
+    if not file_exists("Orbit.toml"):
+        return false
+    lines = nb_lines(read_file("Orbit.toml"))
+    edit found = false
+    loop w_index in 0..<length(lines):
+        line = trim(at(lines, w_index))
+        if starts_with(line, "app ") or starts_with(line, "app="):
+            found = true
+    found
+
+define cmd_package():
+    if not file_exists("Orbit.toml"):
+        die("orbit: no Orbit.toml here - `package` works on a project")
+    lines = nb_lines(read_file("Orbit.toml"))
+    name = nb_setting(lines, "name", "app")
+    version = nb_setting(lines, "version", "0.0.0")
+    assets = nb_setting(lines, "assets", "")
+    out = "dist/" + name
+    remove_tree(out)
+    mkdir_all(out)
+    mkdir_all("build")
+    res = build_icon(nb_setting(lines, "icon", ""))
+    if res != "":
+        slot_set("orbit:res", res)
+    # No console window for a shipped app - see cli_build.
+    slot_set("orbit:windowless", 1)
+    built = cli_build(resolve_path())
+    if built == "":
+        exit_with(1)
+    shipped = out + "/" + name + (if os_kind() == 0 then ".exe" else "")
+    file_copy_or_die(built, shipped)
+    # The console-less build must not linger in build/ pretending to be the
+    # one `orbit build` makes - running that from a terminal would print
+    # nothing and look broken.
+    remove_file(built)
+    parts = split(assets, " ")
+    loop a_index in 0..<length(parts):
+        asset_path = at(parts, a_index)
+        if length(asset_path) > 0:
+            if is_dir(asset_path):
+                copy_tree(asset_path, path_join(out, asset_path))
+            else if is_file(asset_path):
+                file_copy_or_die(asset_path, path_join(out, asset_path))
+            else:
+                die("orbit: no such asset `" + asset_path + "`")
+    # The webview loader ships beside the exe: open_app_window looks for it
+    # there first, and falls back to the borrowed Edge window without it.
+    # A project that never opens a webview ships clean.
+    loader = default_runtime() + "/WebView2Loader.dll"
+    if os_kind() == 0 and file_exists(loader) and webview_project():
+        loader_copied = copy_file(loader, path_join(out, "WebView2Loader.dll"))
+    print_line(c_bold(shipped) + " " + c_green("ok"))
+    # The archive is a convenience, not the deliverable: if the system has no
+    # tar the folder above is still what ships, so say so and stop there.
+    zipped = pack_archive(name, version)
+    if length(zipped) > 0:
+        print_line(c_bold(zipped) + " " + c_green("ok"))
+        setup = build_setup(name, version, nb_setting(lines, "publisher", ""), res, zipped, "", "")
+        if length(setup) > 0:
+            print_line(c_bold(setup) + " " + c_green("ok"))
+        else:
+            print_line(c_dim("(no setup exe - the zip is still complete)"))
+    else:
+        print_line(c_dim("(no archive - tar not available; ship the folder)"))
+
+# The real installer: one setup exe a person double-clicks. tools/setup_stub.or
+# is compiled fresh with THIS app's icon, then the app zip + a manifest +
+# setup_ui.html are sewn onto the exe's tail (os orb: stitch_setup) - a single
+# file that is both installer and cargo. The stub installs per user (folder,
+# Start-menu shortcut, Apps & features row) and carries its own uninstall.
+define build_setup(name: text, version: text, publisher: text, res: text, zipped: text, path_sub: text, exe_rel: text) -> text:
+    if os_kind() != 0:
+        return ""
+    root = path_parent(self_dist_dir())
+    stub_src = root + "/tools/setup_stub.or"
+    ui_html = root + "/tools/setup_ui.html"
+    if not file_exists(stub_src) or not file_exists(ui_html):
+        return ""
+    runtime = default_runtime()
+    ll = "build/setup_stub.ll"
+    stub_exe = "build/setup_stub.exe"
+    if run_command(default_compiler(), [stub_src, ll, default_orbs(), "--quiet"]) != 0:
+        return ""
+    # Same link line a packaged app gets: windowless, the app's icon, UTF-8.
+    edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2"]
+    if res != "":
+        link_args = append(link_args, res)
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "/SUBSYSTEM:WINDOWS")
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "/ENTRY:mainCRTStartup")
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "/STACK:67108864")
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "-MANIFEST:EMBED")
+    link_args = append(link_args, "-Xlinker")
+    link_args = append(link_args, "-MANIFESTINPUT:" + runtime + "/orion.manifest")
+    link_args = append(link_args, "-o")
+    link_args = append(link_args, stub_exe)
+    if run_command(nb_clang(), link_args) != 0:
+        return ""
+    remove_file(ll)
+    exe_line = if exe_rel == "" then name + ".exe" else exe_rel
+    edit manifest = "name=" + name + "\nversion=" + version + "\npublisher=" + publisher + "\nexe=" + exe_line + "\n"
+    # `path=` asks the stub to put <install-dir>/<path_sub> on the user
+    # PATH (and take it off again at uninstall) - a CLI toolchain's whole
+    # reason to have an installer.
+    if path_sub != "":
+        manifest = manifest + "path=" + path_sub + "\n"
+    out = "dist/" + name + "-" + version + "-setup.exe"
+    remove_file(out)
+    if stitch_setup(stub_exe, zipped, manifest, ui_html, out) != 0:
+        return ""
+    out
+
+# `orbit setup <name> <version> <zip> [path-subdir] [exe-rel]` - build a
+# setup exe from ANY zip whose top level is a <name>/ folder. path-subdir
+# (install-dir-relative) goes onto the user PATH at install and off at
+# uninstall; exe-rel names the exe for the Start-menu shortcut (defaults
+# to <name>.exe). This is how the orion toolchain itself ships
+# (tools/package_toolchain.sh) - the same stub every app installer uses.
+define cmd_setup():
+    name = first_param()
+    version = second_param()
+    zip_path = if arg_count() < 5 then "" else arg(4)
+    path_sub = if arg_count() < 6 then "" else arg(5)
+    exe_rel = if arg_count() < 7 then "" else arg(6)
+    if name == "" or version == "" or zip_path == "":
+        die("usage: orbit setup <name> <version> <zip> [path-subdir] [exe-rel]")
+    if not file_exists(zip_path):
+        die("orbit setup: no such zip `" + zip_path + "`")
+    mkdir_all("build")
+    mkdir_all("dist")
+    setup = build_setup(name, version, "", "", zip_path, path_sub, exe_rel)
+    if length(setup) > 0:
+        print_line(c_bold(setup) + " " + c_green("ok"))
+    else:
+        die("orbit setup: could not build the setup exe")
+
+define pack_archive(name: text, version: text) -> text:
+    stem = "dist/" + name + "-" + version + "-" + os_tag()
+    # Windows ships bsdtar, which writes a real zip from -a; elsewhere the
+    # native format is a tar.gz. Full path on Windows: a GNU tar earlier in
+    # PATH does not understand -a.
+    if os_kind() == 0:
+        zip_path = stem + ".zip"
+        remove_file(zip_path)
+        if run_command_quiet("C:/Windows/System32/tar.exe", ["-a", "-c", "-f", zip_path, "-C", "dist", name]) != 0:
+            return ""
+        return zip_path
+    tgz = stem + ".tar.gz"
+    remove_file(tgz)
+    if run_command_quiet("tar", ["-c", "-z", "-f", tgz, "-C", "dist", name]) != 0:
+        return ""
+    tgz
+
 define cmd_test():
     path = resolve_path()
-    failures = __os_orbit_test(path)
+    failures = __os_orbit_test_keeping(path, first_param() == "--keep")
     if failures > 0:
         exit_with(1)
 
 # ---------- fmt ----------
 #
-# Conservative whitespace formatter - doesn't need a real parser.
-# Operations: tabs → 4 spaces, trailing whitespace stripped, runs of
-# blank lines collapsed to one, file ends with exactly one newline.
-# A "real" formatter that rewrites expressions / re-indents blocks
-# needs the lexer + parser (step 3-4 of self-hosting).
-
-define fmt_expand_tabs(line_text: text) -> text:
-    if contains(line_text, "\t"):
-        replace(line_text, "\t", "    ")
-    else:
-        line_text
-
-define fmt_trim_trailing(line_text: text) -> text:
-    bytes = bytes_from_text(line_text)
-    byte_count = bytes_length(bytes)
-    edit end_index = byte_count
-    loop:
-        if end_index <= 0:
-            break
-        last_byte = byte_at(bytes, end_index - 1)
-        if last_byte == 32 or last_byte == 9:
-            end_index -= 1
-        else:
-            break
-    if end_index == byte_count:
-        line_text
-    else:
-        bytes_to_text(bytes_slice(bytes, 0, end_index))
-
-# Split on "\n" (without LF), normalize each line, then rejoin.
-define fmt_normalize(text: text) -> text:
-    raw_lines = split(text, "\n")
-    line_count = len(raw_lines)
-    edit normalized_lines = []
-    loop index in 0..<line_count:
-        raw_line = at(raw_lines, index)
-        without_tabs = fmt_expand_tabs(raw_line)
-        stripped = fmt_trim_trailing(without_tabs)
-        normalized_lines = append(normalized_lines, stripped)
-    # Collapse 2+ consecutive blank lines.
-    collapsed = []
-    edit output_lines = collapsed
-    edit last_was_blank = false
-    loop index in 0..<line_count:
-        current_line = at(normalized_lines, index)
-        is_blank = current_line == ""
-        keep = not (is_blank and last_was_blank)
-        if keep:
-            output_lines = append(output_lines, current_line)
-        last_was_blank = is_blank
-    # Drop the trailing blank line so join + "\n" produces one final LF.
-    final_count = len(output_lines)
-    if final_count > 0 and at(output_lines, final_count - 1) == "":
-        edit trimmed = []
-        loop index in 0..<(final_count - 1):
-            trimmed = append(trimmed, at(output_lines, index))
-        output_lines = trimmed
-    join(output_lines, "\n") + "\n"
+# The whitespace formatter itself lives in the orion_fmt orb since the
+# language server became its second consumer (the editor's format key).
 
 # Walk a directory recursively and format every .or file we find.
 # Flat structure dodges the nested-if-in-for parser bug (see
 # orion_nesting_bug memory).
 define fmt_walk(directory: text):
     entries = list_dir(directory)
-    entry_count = len(entries)
+    entry_count = length(entries)
     loop index in 0..<entry_count:
         entry_name = at(entries, index)
         full_path = path_join(directory, entry_name)
@@ -456,10 +625,10 @@ define nb_lines(text: text) -> [text]:
 
 define nb_quoted(line: text) -> text:
     pieces = split(line, "\"")
-    if len(pieces) >= 2 then at(pieces, 1) else ""
+    if length(pieces) >= 2 then at(pieces, 1) else ""
 
 define nb_setting(lines: [text], key: text, fallback: text) -> text:
-    total = len(lines)
+    total = length(lines)
     edit found = fallback
     edit taken = false
     loop index in 0..<total:
@@ -474,7 +643,7 @@ define nb_setting(lines: [text], key: text, fallback: text) -> text:
 # to its own orb becomes relative to the project root as we descend. `base`
 # "" means the current project (paths already root-relative).
 define nb_dep_dirs(lines: [text], base: text) -> [text]:
-    total = len(lines)
+    total = length(lines)
     edit out = []
     loop index in 0..<total:
         line = at(lines, index)
@@ -515,8 +684,8 @@ define dep_key(line: text) -> text:
 # "url@ref" -> [url, ref]. The separator is the LAST `@` after the last
 # `/`, so ssh remotes (git@host:...) keep their `@`.
 define spec_split_ref(spec: text) -> [text]:
-    bs = bytes_from_text(spec)
-    n = len(bs)
+    bs = bytes_of(spec)
+    n = length(bs)
     edit last_slash = 0 - 1
     edit cut = 0 - 1
     loop i in 0..<n:
@@ -527,11 +696,11 @@ define spec_split_ref(spec: text) -> [text]:
             cut = j
     if cut < 0:
         return [spec, ""]
-    [bytes_to_text(bytes_slice(bs, 0, cut)), bytes_to_text(bytes_slice(bs, cut + 1, n))]
+    [text_of(bytes_part(bs, 0, cut)), text_of(bytes_part(bs, cut + 1, n))]
 
 # Every git dep in a toml, one "name|url|ref" row each.
 define nb_git_deps(lines: [text]) -> [text]:
-    total = len(lines)
+    total = length(lines)
     edit out = []
     loop index in 0..<total:
         line = at(lines, index)
@@ -546,7 +715,7 @@ define lock_rows() -> [text]:
         return []
     all_lines = nb_lines(read_file("Orbit.lock"))
     edit out = []
-    loop i in 0..<len(all_lines):
+    loop i in 0..<length(all_lines):
         line = trim(at(all_lines, i))
         if line != "" and not starts_with(line, "#"):
             out = append(out, line)
@@ -556,9 +725,9 @@ define lock_rows() -> [text]:
 define lock_commit(name: text) -> text:
     rows = lock_rows()
     edit found = ""
-    loop i in 0..<len(rows):
+    loop i in 0..<length(rows):
         parts = split(at(rows, i), " ")
-        if len(parts) >= 2 and at(parts, 0) == name:
+        if length(parts) >= 2 and at(parts, 0) == name:
             found = at(parts, 1)
     found
 
@@ -593,14 +762,14 @@ define pkg_fetch(name: text, url: text, ref: text) -> text:
     pkg_head(dir)
 
 define short_commit(commit: text) -> text:
-    bs = bytes_from_text(commit)
-    if len(bs) > 9 then bytes_to_text(bytes_slice(bs, 0, 9)) else commit
+    bs = bytes_of(commit)
+    if length(bs) > 9 then text_of(bytes_part(bs, 0, 9)) else commit
 
 define cmd_get():
     if not file_exists("Orbit.toml"):
         die("orbit: no Orbit.toml in this directory")
     edit queue = nb_git_deps(nb_lines(read_file("Orbit.toml")))
-    if len(queue) == 0:
+    if length(queue) == 0:
         print_line("orbit: no git deps in Orbit.toml")
         return
     edit seen = []
@@ -609,7 +778,7 @@ define cmd_get():
     edit failures = 0
     edit idx = 0
     loop:
-        if idx >= len(queue):
+        if idx >= length(queue):
             break
         parts = split(at(queue, idx), "|")
         idx = idx + 1
@@ -629,7 +798,7 @@ define cmd_get():
                 sub_toml = "orbs_pkg/" + name + "/Orbit.toml"
                 if file_exists(sub_toml):
                     more = nb_git_deps(nb_lines(read_file(sub_toml)))
-                    loop m_index in 0..<len(more):
+                    loop m_index in 0..<length(more):
                         queue = append(queue, at(more, m_index))
     write_file("Orbit.lock", join(lock_out, "\n") + "\n")
     if failures > 0:
@@ -644,7 +813,7 @@ define cmd_update():
     rows = lock_rows()
     edit kept = ["# orbit lock - the exact commit of every fetched package."]
     kept = append(kept, "# `orbit get` reproduces these; `orbit update [name]` moves them.")
-    loop i in 0..<len(rows):
+    loop i in 0..<length(rows):
         parts = split(at(rows, i), " ")
         name = at(parts, 0)
         if target == "" or name == target:
@@ -665,7 +834,7 @@ define nb_expand_orb(orb_dir: text, acc: [text]) -> [text]:
         toml = orb_dir + "/Orbit.toml"
         if file_exists(toml):
             deps = nb_dep_dirs(nb_lines(read_file(toml)), orb_dir)
-            dep_total = len(deps)
+            dep_total = length(deps)
             loop d_index in 0..<dep_total:
                 out = nb_expand_orb(at(deps, d_index), out)
         out
@@ -704,9 +873,9 @@ define scan_orb_dirs(dir: text, depth: int, acc: [text]) -> [text]:
         return acc
     subs = split(host_subdirs(dir), "\n")
     edit out = acc
-    loop i in 0..<len(subs):
+    loop i in 0..<length(subs):
         name = at(subs, i)
-        if len(name) > 0 and not scan_noise(name):
+        if length(name) > 0 and not scan_noise(name):
             child = dir + "/" + name
             if name == "orbs" or name == "orbs_native":
                 if not list_contains(out, child):
@@ -717,18 +886,18 @@ define scan_orb_dirs(dir: text, depth: int, acc: [text]) -> [text]:
 
 define nb_orb_dirs(lines: [text]) -> [text]:
     direct = nb_dep_dirs(lines, "")
-    direct_total = len(direct)
+    direct_total = length(direct)
     edit all_orbs = []
     loop i in 0..<direct_total:
         all_orbs = nb_expand_orb(at(direct, i), all_orbs)
     edit parents = []
-    orb_total = len(all_orbs)
+    orb_total = length(all_orbs)
     loop j in 0..<orb_total:
         parent = path_parent(at(all_orbs, j))
         if not list_contains(parents, parent):
             parents = append(parents, parent)
     edit dirs = []
-    parent_total = len(parents)
+    parent_total = length(parents)
     loop p_index in 0..<parent_total:
         parent = at(parents, p_index)
         native_sibling = path_parent(parent) + "/orbs_native"
@@ -741,16 +910,16 @@ define nb_orb_dirs(lines: [text]) -> [text]:
     # regardless of where the project or the orbs live. Explicit path: deps
     # above still win; this only ADDS search dirs.
     root = find_workspace_root()
-    if len(root) > 0:
+    if length(root) > 0:
         scanned = scan_orb_dirs(root, 0, [])
         # Native backends win name clashes (a game wants orbs_native/atlas_render,
         # not the wgpu orbs/atlas_render), so add every orbs_native search dir
         # BEFORE the plain orbs ones - mirroring the path-based order above.
-        loop n_index in 0..<len(scanned):
+        loop n_index in 0..<length(scanned):
             nd = at(scanned, n_index)
             if contains(nd, "orbs_native") and not list_contains(dirs, nd):
                 dirs = append(dirs, nd)
-        loop s_index in 0..<len(scanned):
+        loop s_index in 0..<length(scanned):
             sd = at(scanned, s_index)
             if not contains(sd, "orbs_native") and not list_contains(dirs, sd):
                 dirs = append(dirs, sd)
@@ -775,7 +944,7 @@ define nb_add_astra(joined: text, dir: text) -> text:
     edit out = joined
     if is_dir(dir):
         files = list_dir(dir)
-        total = len(files)
+        total = length(files)
         loop index in 0..<total:
             file = at(files, index)
             if ends_with(file, ".astra"):
@@ -784,7 +953,7 @@ define nb_add_astra(joined: text, dir: text) -> text:
 
 define nb_split_spaces(joined: text) -> [text]:
     pieces = split(joined, " ")
-    total = len(pieces)
+    total = length(pieces)
     edit out = []
     loop index in 0..<total:
         piece = at(pieces, index)
@@ -797,7 +966,7 @@ define nb_ship_files(name: text) -> text:
     joined = nb_add_astra(joined, "scripts")
     if is_dir("features"):
         subs = list_dir("features")
-        sub_total = len(subs)
+        sub_total = length(subs)
         loop s_index in 0..<sub_total:
             sub = at(subs, s_index)
             if is_dir("features/" + sub):
@@ -806,12 +975,12 @@ define nb_ship_files(name: text) -> text:
     pkgs = nb_setting(game_lines, "packages", "")
     if pkgs != "":
         roots = nb_split_spaces(pkgs)
-        root_total = len(roots)
+        root_total = length(roots)
         loop r_index in 0..<root_total:
             joined = nb_add_astra(joined, at(roots, r_index))
     if is_dir("sounds"):
         wavs = list_dir("sounds")
-        wav_total = len(wavs)
+        wav_total = length(wavs)
         loop w_index in 0..<wav_total:
             wav = at(wavs, w_index)
             if ends_with(wav, ".wav"):
@@ -826,7 +995,7 @@ define entry_path(name: text) -> text:
     if file_exists("src/main.or"):
         "src/main.or"
     else:
-        q = bytes_to_text(append([], 34))
+        q = text_of(append([], 34))
         src = "use atlas_project\n\nfn main() -> int:\n    project_run(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")\n"
         mkdir_all("target")
         write_file("target/main_gen.or", src)
@@ -873,7 +1042,7 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     entry = if entry_override == "" then entry_path(name) else entry_override
     edit compile_args = [entry, ll]
     dirs = nb_orb_dirs(lines)
-    dir_total = len(dirs)
+    dir_total = length(dirs)
     loop d_index in 0..<dir_total:
         compile_args = append(compile_args, at(dirs, d_index))
     if run_command(compiler, compile_args) != 0:
@@ -884,11 +1053,22 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     # once those *_min.c land - no cross-compile flag, you build on-target.
     target = os_kind()
     cfiles = platform_c_files(runtime, target)
-    if len(cfiles) == 0:
+    if length(cfiles) == 0:
         die("orbit: no GUI backend for " + target_name(target) + " yet - build on Windows, or add runtime/*_min.c backends for " + target_name(target) + " (see BUILD.md)")
     edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/net_min.c"]
-    loop cf_index in 0..<len(cfiles):
+    loop cf_index in 0..<length(cfiles):
         link_args = append(link_args, at(cfiles, cf_index))
+    # The package's `link = "..."` rides here too - the same key
+    # cli_build honors, so an app orb's runtime needs (say
+    # runtime/orion_cli.c for serve + own_window) name themselves in
+    # the toml instead of failing at the linker.
+    extra_link = nb_setting(lines, "link", "")
+    if extra_link != "":
+        extras = split(extra_link, " ")
+        loop x_index in 0..<length(extras):
+            xf = at(extras, x_index)
+            if xf != "":
+                link_args = append(link_args, xf)
     if variant == "ship":
         embed_rc = run_command("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", runtime + "/tools/embed_assets.ps1", "-Out", "build/scripts_embed.c", "-Files", nb_ship_files(name)])
         if embed_rc != 0:
@@ -1005,7 +1185,7 @@ define cli_build(path: text) -> text:
     if not file_exists(compiler):
         die("orbit: compiler not found at `" + compiler + "` - set [native] compiler in Orbit.toml")
     edit compile_args = [path, ll]
-    dir_total = len(dirs)
+    dir_total = length(dirs)
     loop d_index in 0..<dir_total:
         compile_args = append(compile_args, at(dirs, d_index))
     # Running one file should show the PROGRAM's output, not three lines about
@@ -1036,10 +1216,22 @@ define cli_build(path: text) -> text:
     edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module"]
     if extra_link != "":
         extras = split(extra_link, " ")
-        loop x_index in 0..<len(extras):
+        loop x_index in 0..<length(extras):
             xf = at(extras, x_index)
             if xf != "":
                 link_args = append(link_args, xf)
+    # `orbit package` gives the exe its icon: a compiled resource, linked in
+    # like any other object.
+    if slot_has("orbit:res") and os_kind() == 0:
+        link_args = append(link_args, slot_get("orbit:res"))
+    # `orbit package` links a shipped app without a console window. The entry
+    # point stays main() - /SUBSYSTEM:WINDOWS alone would send the linker
+    # looking for WinMain.
+    if slot_has("orbit:windowless") and slot_get_int("orbit:windowless") == 1 and os_kind() == 0:
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "/SUBSYSTEM:WINDOWS")
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "/ENTRY:mainCRTStartup")
     if os_kind() == 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/STACK:67108864")
@@ -1053,6 +1245,13 @@ define cli_build(path: text) -> text:
     if run_command(nb_clang(), link_args) != 0:
         return ""
     remove_file(ll)
+    # A project build gets the webview loader beside its exe, so a dev run's
+    # open_app_window finds it the same way a shipped one does. Projects
+    # that never open a webview stay clean.
+    if not standalone and os_kind() == 0 and webview_project():
+        loader = runtime + "/WebView2Loader.dll"
+        if file_exists(loader):
+            loader_beside = copy_file(loader, "build/WebView2Loader.dll")
     exe
 
 # Returns the PROGRAM's exit code, not a pass/fail. Every Orion main returns an
@@ -1066,11 +1265,156 @@ define __os_orbit_run(path: text, fname: text, args: [text]) -> int:
         return 1
     run_command(exe, args)
 
+# `orbit test` discovers every `define test_*` in the entry file AND in
+# each path-orb's lib.or (tests live with the code they test), and runs
+# them all, fail-fast per target: a generated build/__tests_<tag>.or
+# carries the target's source with any `main` renamed aside and a main
+# calling each test appended. A project with no test functions anywhere
+# falls back to the old behavior (the program itself is the test).
+# Zero-arg tests only - a test that needs input is a program, not a test.
 define __os_orbit_test(path: text) -> int:
-    exe = cli_build(path)
-    if exe == "":
-        return 1
-    run_command(exe, [])
+    __os_orbit_test_keeping(path, false)
+
+# `orbit test --keep` leaves each generated driver on disk. The wasm
+# gate compiles ONE of them as its second platform, and it used to read
+# whatever stale copy an older run had left behind - a green light for a
+# file nobody wrote that day.
+define __os_orbit_test_keeping(path: text, keep: truth) -> int:
+    edit targets = [path]
+    orb_files = ot_orb_libs()
+    loop i in 0..<length(orb_files):
+        targets = append(targets, at(orb_files, i))
+    edit total = 0
+    edit failed = 0
+    loop i in 0..<length(targets):
+        f = at(targets, i)
+        if file_exists(f):
+            src = read_file(f)
+            names = ot_test_names(src)
+            if length(names) > 0:
+                total = total + length(names)
+                mkdir_all("build")
+                # The driver lives BESIDE the source it copies: `embed`
+                # paths are relative to the file they are written in, so
+                # the copy must sit where the original sits. Deleted
+                # after the run either way.
+                driver = ot_dirname(f) + "__tests_" + ot_target_tag(f) + ".or"
+                write_file(driver, ot_driver(src, names))
+                print_line(c_dim(f))
+                exe = cli_build(driver)
+                if exe == "" or run_command(exe, []) != 0:
+                    failed = failed + 1
+                if not keep:
+                    remove_file(driver)
+    if total == 0:
+        exe2 = cli_build(path)
+        if exe2 == "":
+            return 1
+        return run_command(exe2, [])
+    failed
+
+# lib.or of every orb that belongs to THIS project: explicit
+# `name = "path:<dir>"` deps in Orbit.toml, plus every orb under the
+# project's own orbs/ directory. Shared orbs elsewhere (the stdlib) are
+# other projects' responsibility - their tests run in their repos.
+define ot_orb_libs() -> [text]:
+    edit out = []
+    if file_exists("Orbit.toml"):
+        lines = nb_lines(read_file("Orbit.toml"))
+        loop i in 0..<length(lines):
+            parts = split(at(lines, i), "\"path:")
+            if length(parts) == 2:
+                rest = split(at(parts, 1), "\"")
+                if length(rest) >= 1 and at(rest, 0) != "":
+                    out = append(out, at(rest, 0) + "/lib.or")
+    if is_dir("orbs"):
+        subs = split(host_subdirs("orbs"), "\n")
+        loop i in 0..<length(subs):
+            e = at(subs, i)
+            if e != "" and not list_contains(out, "orbs/" + e + "/lib.or"):
+                out = append(out, "orbs/" + e + "/lib.or")
+    out
+
+# The directory of a path, trailing slash kept ("" for a bare name).
+define ot_dirname(f: text) -> text:
+    norm = replace(f, "\\", "/")
+    segs = split(norm, "/")
+    if length(segs) < 2:
+        return ""
+    edit out = ""
+    loop i in 0..<(length(segs) - 1):
+        out = out + at(segs, i) + "/"
+    out
+
+# A file-name-safe tag for a target: the last directory segment, or the
+# file stem for the entry ("src/main.or" -> "main").
+define ot_target_tag(f: text) -> text:
+    segs = split(replace(f, "\\", "/"), "/")
+    if length(segs) >= 2 and at(segs, length(segs) - 1) == "lib.or":
+        at(segs, length(segs) - 2)
+    else:
+        at(split(at(segs, length(segs) - 1), "."), 0)
+
+define ot_after(s: text, n: int) -> text:
+    bs = bytes_of(s)
+    text_of(bytes_part(bs, n, length(bs)))
+
+# The test name on a definition line, or "" when the line is not a
+# zero-arg test function. (`fn` is the lambda/type keyword, not a
+# definition - only `define test_*` is a test.)
+define ot_line_name(line: text) -> text:
+    edit r = line
+    if starts_with(r, "public "):
+        r = ot_after(r, 7)
+    edit off = 0
+    if starts_with(r, "define test_"):
+        off = 7
+    if off == 0:
+        return ""
+    bs = bytes_of(r)
+    n = length(bs)
+    edit p = off
+    loop:
+        if p >= n:
+            break
+        if byte_at(bs, p) == '(':
+            break
+        p = p + 1
+    if p + 1 >= n:
+        return ""
+    if byte_at(bs, p + 1) != ')':
+        return ""
+    text_of(bytes_part(bs, off, p))
+
+define ot_test_names(src: text) -> [text]:
+    edit out = []
+    lines = nb_lines(src)
+    loop i in 0..<length(lines):
+        nm = ot_line_name(at(lines, i))
+        if nm != "":
+            out = append(out, nm)
+    out
+
+define ot_driver(src: text, names: [text]) -> text:
+    lines = nb_lines(src)
+    edit out = ""
+    loop i in 0..<length(lines):
+        line = at(lines, i)
+        edit kept = line
+        if starts_with(line, "define main("):
+            kept = "define __app_main" + ot_after(line, 11)
+        out = out + kept + "\n"
+    out = out + "\n# generated by `orbit test` - runs every test_* in the entry file\n"
+    out = out + "define main():\n"
+    loop i in 0..<length(names):
+        nm = at(names, i)
+        # The name goes out BEFORE the test runs, the verdict after -
+        # so a failed `require` aborts mid-line and the line itself
+        # says which test died: `test_x ... orion: requirement failed`.
+        out = out + "    print(\"" + nm + " ... \")\n"
+        out = out + "    " + nm + "()\n"
+        out = out + "    print_line(\"ok\")\n"
+    out + "    print_line(\"{length(names)} test(s) passed\")\n"
 
 # The stdlib orb names - every orb under the project's declared orb dirs.
 # Used only by `orbit add` to validate `<orb>`.
@@ -1079,10 +1423,10 @@ define __os_orbit_stdlib_orbs() -> [text]:
     if file_exists("Orbit.toml"):
         lines = nb_lines(read_file("Orbit.toml"))
         dirs = nb_orb_dirs(lines)
-        dir_total = len(dirs)
+        dir_total = length(dirs)
         loop i in 0..<dir_total:
             entries = list_dir(at(dirs, i))
-            ent_total = len(entries)
+            ent_total = length(entries)
             loop j in 0..<ent_total:
                 nm = at(entries, j)
                 if nm != "":
@@ -1098,11 +1442,12 @@ define cmd_native():
 # Free a locked exe - a running instance blocks the relink. Best-effort:
 # nothing running is not an error, so the result is ignored. Windows kills
 # by image name, POSIX by command match.
+# Quiet on purpose: "no such process" is the NORMAL case, not news.
 define kill_running(name: text):
     if os_kind() == 0:
-        run_command("taskkill", ["/F", "/IM", name + ".exe"])
+        killed_w = run_command_quiet("taskkill", ["/F", "/IM", name + ".exe"])
     else:
-        run_command("pkill", ["-f", name])
+        killed_p = run_command_quiet("pkill", ["-f", name])
 
 # orbit dev [mode] - THE build-and-run loop for a windowed app, one command
 # on any host (no _gpu dance, no PowerShell): free the locked exe, build
@@ -1158,7 +1503,7 @@ define cmd_memfacts():
         die("orbit memfacts: compiler not found at `" + compiler + "`")
     edit args = [resolve_path(), "memfacts"]
     dirs = nb_orb_dirs(lines)
-    loop i in 0..<len(dirs):
+    loop i in 0..<length(dirs):
         args = append(args, at(dirs, i))
     exit_with(run_command(compiler, args))
 
@@ -1166,7 +1511,7 @@ define cmd_facts():
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
     filter = first_param()
-    q = bytes_to_text(append([], 34))
+    q = text_of(append([], 34))
     src = "use atlas_project\n\nfn main() -> int:\n    project_facts(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + filter + q + ")\n"
     mkdir_all("target")
     write_file("target/facts_gen.or", src)
@@ -1180,7 +1525,7 @@ define cmd_facts():
 define synth_analysis(fn_name: text, gen: text, arg: text):
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
-    q = bytes_to_text(append([], 34))
+    q = text_of(append([], 34))
     call = if arg == "" then fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")" else fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + arg + q + ")"
     src = "use atlas_project\n\nfn main() -> int:\n    " + call + "\n"
     mkdir_all("target")
@@ -1222,7 +1567,7 @@ define cmd_try():
     name = nb_setting(lines, "name", "game")
     ticks = nb_int(first_param(), 8000)
     seed = nb_int(second_param(), 42)
-    q = bytes_to_text(append([], 34))
+    q = text_of(append([], 34))
     src = "use atlas_project\n\nfn main() -> int:\n    project_try(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
     mkdir_all("target")
     write_file("target/try_gen.or", src)
@@ -1239,7 +1584,7 @@ define cmd_soak():
     s_param = second_param()
     ticks = nb_int(t_param, 20000)
     seed = nb_int(s_param, 42)
-    q = bytes_to_text(append([], 34))
+    q = text_of(append([], 34))
     src = "use atlas_project\n\nfn main() -> int:\n    project_soak(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
     mkdir_all("target")
     write_file("target/soak_gen.or", src)
@@ -1281,6 +1626,10 @@ public define main():
             cmd_get()
         else if command == "update":
             cmd_update()
+        else if command == "package":
+            cmd_package()
+        else if command == "setup":
+            cmd_setup()
         else if command == "debug":
             cmd_debug()
         else:

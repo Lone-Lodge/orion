@@ -7,6 +7,32 @@ Notable changes to Orion. The format follows
 ## [Unreleased]
 
 ### Added
+- **A whisper orb - and now Orion understands what it hears.** The
+  vendored whisper.cpp 1.9.2 (CPU only, 5 MB of source under
+  vendor/whisper/) behind four calls: hear_open / hear / hear_any /
+  hear_error. Audio arrives as a wav path, which is exactly what
+  mic_take_wav writes, so the two orbs hand off with nothing in between.
+  tools/whisper_build.sh compiles the library once into dist/ and caches
+  it against the vendored sources - and it builds with AVX2, which is the
+  whole ballgame: scalar ggml took 33 s on a four second clip, the SIMD
+  build takes 2.2 s. Models are not vendored (half a gigabyte), so
+  tools/whisper_test.sh skips without one and otherwise proves a real
+  Swedish sentence comes back through the orb.
+- **A mic orb - Orion can hear.** `wasapi_min.c` could make sound and never
+  take any in; now capture runs on its own client and thread into a ring
+  that keeps the last 30 seconds and drops the oldest, because a listener
+  wants what was just said. The device keeps its own rate and channels and
+  the ring downmixes to mono and decimates to whatever you asked for on the
+  way in - `mic_open(16000)` is what a speech recogniser wants. mic_level()
+  answers "is anyone talking" without touching a sample; mic_take_wav()
+  drains to mono PCM16, a FILE and not a `[int]` because marshalling a
+  minute of audio through a list is the exact shape that bit the vec
+  codegen - and orion_audio_load reads wav, so a gate can play back what it
+  recorded. It is a baseline orb, not a game seam: a mic is a platform
+  capability like the filesystem. Headless builds link the weak null
+  backend and run the whole listen path silently, so tools/mic_test.sh
+  gates the binding chain everywhere and skips only the WASAPI phase when
+  the runner has no capture device.
 - **A sqlite orb** - a real SQL database in one file, no server. db_open /
   db_run / db_run_with (bound `?` params - the injection-safe path, proven
   by a hostile string in the gate) / db_rows / columns / db_one / db_error /

@@ -18,4 +18,4 @@ define main() -> int:
     doubled = loop x in xs: x * 2          # [2, 4, 6, 8]
     big = loop x in xs:                    # [3, 4]
         if x > 2: collect x
-    at(doubled, 0) + at(doubled, 3) + len(big)   # 2 + 8 + 2 = 12
+    at(doubled, 0) + at(doubled, 3) + length(big)   # 2 + 8 + 2 = 12

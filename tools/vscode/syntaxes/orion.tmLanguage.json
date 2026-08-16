@@ -1,231 +1,374 @@
 {
-  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "Orion",
-  "scopeName": "source.orion",
-  "comment": "Grammar for the SELF-HOSTED language: the keyword set is the one orion/orbs/orion_parse/lib.or actually dispatches on. The previous version was generated from the deleted Rust crate's token enum and highlighted words the language no longer has (data, enum, for, take, dyn, region, query, none) while missing the ones it does (type, effect, handle, perform, resume, const, defer, deterministic). Retired spellings are painted as invalid so a stale file shows the problem in the editor instead of at compile time.",
-  "patterns": [
-    { "include": "#comments" },
-    { "include": "#strings" },
-    { "include": "#chars" },
-    { "include": "#retired" },
-    { "include": "#fn-declaration" },
-    { "include": "#extern-declaration" },
-    { "include": "#type-declaration" },
-    { "include": "#effect-declaration" },
-    { "include": "#handle-declaration" },
-    { "include": "#const-declaration" },
-    { "include": "#use-declaration" },
-    { "include": "#mut-binding" },
-    { "include": "#loop-var" },
-    { "include": "#param-name" },
-    { "include": "#local-binding" },
-    { "include": "#keywords" },
-    { "include": "#modifiers" },
-    { "include": "#types" },
-    { "include": "#booleans" },
-    { "include": "#logical" },
-    { "include": "#numbers-hex" },
-    { "include": "#numbers-oct" },
-    { "include": "#numbers-bin" },
-    { "include": "#numbers-float" },
-    { "include": "#numbers-int" },
-    { "include": "#variant" },
-    { "include": "#property" },
-    { "include": "#fn-call" },
-    { "include": "#operators" },
-    { "include": "#bare-identifier" }
-  ],
-  "repository": {
-    "comments": {
-      "match": "#.*$",
-      "name": "comment.line.number-sign.orion"
-    },
-    "strings": {
-      "comment": "Double-quoted, with `{expr}` interpolation holes painted as embedded code.",
-      "name": "string.quoted.double.orion",
-      "begin": "\"",
-      "end": "\"",
-      "patterns": [
-        {
-          "name": "meta.embedded.line.orion",
-          "begin": "\\{",
-          "end": "\\}",
-          "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.orion" } },
-          "endCaptures": { "0": { "name": "punctuation.section.embedded.end.orion" } },
-          "patterns": [{ "include": "$self" }]
-        },
-        { "match": "\\\\.", "name": "constant.character.escape.orion" }
-      ]
-    },
-    "chars": {
-      "comment": "Character literals are BYTE VALUES ('+' is 43, an int), escapes included.",
-      "match": "'(\\\\.|[^'])'",
-      "name": "constant.character.orion"
-    },
-    "retired": {
-      "comment": "Spellings the compiler rejects with a message naming the replacement: for -> loop, data/enum -> type, comptime -> const. Painted invalid so the editor says it first.",
-      "match": "^\\s*(?:pub\\s+)?(data|enum)\\s+(?=[A-Za-z_])|^\\s*(for)\\s*(?=[A-Za-z_:])|\\b(comptime)\\b",
-      "name": "invalid.deprecated.orion"
-    },
-    "fn-declaration": {
-      "match": "\\b(pub\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "storage.modifier.orion" },
-        "2": { "name": "keyword.declaration.function.orion" },
-        "3": { "name": "entity.name.function.orion" }
-      }
-    },
-    "extern-declaration": {
-      "match": "\\b(pub\\s+)?(extern)\\s+(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "storage.modifier.orion" },
-        "2": { "name": "keyword.declaration.extern.orion" },
-        "3": { "name": "keyword.declaration.function.orion" },
-        "4": { "name": "entity.name.function.orion" }
-      }
-    },
-    "type-declaration": {
-      "comment": "`type Name`, with an optional generic list. ONE keyword for products, sums and aliases.",
-      "match": "\\b(pub\\s+)?(type)\\s+([A-Za-z_][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "storage.modifier.orion" },
-        "2": { "name": "keyword.declaration.type.orion" },
-        "3": { "name": "entity.name.type.orion" }
-      }
-    },
-    "effect-declaration": {
-      "match": "\\b(effect)\\s+([A-Za-z_][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "keyword.declaration.effect.orion" },
-        "2": { "name": "entity.name.type.effect.orion" }
-      }
-    },
-    "handle-declaration": {
-      "comment": "`handle Effect.op(...)` — the operation's implementation.",
-      "match": "\\b(handle)\\s+([A-Za-z_][A-Za-z0-9_]*)\\.([A-Za-z_][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "keyword.declaration.effect.orion" },
-        "2": { "name": "entity.name.type.effect.orion" },
-        "3": { "name": "entity.name.function.orion" }
-      }
-    },
-    "const-declaration": {
-      "match": "\\b(const)\\s+([A-Za-z_][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "keyword.declaration.const.orion" },
-        "2": { "name": "variable.other.constant.orion" }
-      }
-    },
-    "use-declaration": {
-      "match": "\\b(use)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
-      "captures": {
-        "1": { "name": "keyword.control.import.orion" },
-        "2": { "name": "entity.name.namespace.orion" }
-      }
-    },
-    "mut-binding": {
-      "match": "\\b(mut)\\s+([A-Za-z_][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "storage.modifier.mut.orion" },
-        "2": { "name": "variable.other.declaration.orion" }
-      }
-    },
-    "loop-var": {
-      "comment": "`loop v in …`, `loop i, v in …`, `loop parallel v in …`, `loop let P(x) = e:`.",
-      "match": "\\b(loop)(?:\\s+(parallel))?\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*,\\s*([A-Za-z_][A-Za-z0-9_]*))?\\s+(in)\\b",
-      "captures": {
-        "1": { "name": "keyword.control.loop.orion" },
-        "2": { "name": "storage.modifier.parallel.orion" },
-        "3": { "name": "variable.parameter.loop.orion" },
-        "4": { "name": "variable.parameter.loop.orion" },
-        "5": { "name": "keyword.control.orion" }
-      }
-    },
-    "param-name": {
-      "comment": "`name: Type` in a parameter list or an inline product declaration.",
-      "match": "([(,]\\s*(?:mut\\s+|move\\s+)?)([A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*(?=[A-Za-z_\\[(])",
-      "captures": {
-        "1": { "name": "punctuation.separator.orion" },
-        "2": { "name": "variable.parameter.orion" }
-      }
-    },
-    "local-binding": {
-      "comment": "An identifier at the start of an indented line followed by `=`, `+=`, `-=`, `*=`, `/=`, or a type annotation. Excludes `==`.",
-      "match": "^(\\s+)([A-Za-z_][A-Za-z0-9_]*)(?=\\s*(?:[+\\-*/]=|:\\s*[A-Za-z_\\[(][A-Za-z0-9_\\[\\]<>, ]*\\s*=|=(?!=)))",
-      "captures": {
-        "2": { "name": "variable.other.orion" }
-      }
-    },
-    "keywords": {
-      "comment": "What orion_parse actually dispatches on. `where` is included: it only appears in a loop-collect filter, never as a bare identifier in practice.",
-      "match": "\\b(if|then|else|match|loop|break|continue|in|where|return|require|ensure|defer|use|pub|extern|fn|type|const|effect|handle|perform|resume|let|move|orb)\\b",
-      "name": "keyword.control.orion"
-    },
-    "modifiers": {
-      "comment": "`deterministic` is an ENFORCED purity certificate (the fn may not reach io/time/platform/audio); `parallel` turns a loop into one OS thread per iteration.",
-      "match": "\\b(deterministic|parallel)\\b",
-      "name": "storage.modifier.orion"
-    },
-    "types": {
-      "comment": "Built-in type names are case-insensitive in the compiler (`text` == `Text`).",
-      "match": "\\b([Ii]nt|[Tt]ext|[Bb]ool|[Ff]loat|f64|[Mm]ap|[Ll]ist|Unit)\\b",
-      "name": "support.type.orion"
-    },
-    "booleans": {
-      "match": "\\b(true|false)\\b",
-      "name": "constant.language.orion"
-    },
-    "logical": {
-      "match": "\\b(not|and|or)\\b",
-      "name": "keyword.operator.logical.orion"
-    },
-    "numbers-hex": {
-      "match": "\\b0[xX][0-9a-fA-F][0-9a-fA-F_]*\\b",
-      "name": "constant.numeric.hex.orion"
-    },
-    "numbers-oct": {
-      "match": "\\b0[oO][0-7][0-7_]*\\b",
-      "name": "constant.numeric.oct.orion"
-    },
-    "numbers-bin": {
-      "match": "\\b0[bB][01][01_]*\\b",
-      "name": "constant.numeric.bin.orion"
-    },
-    "numbers-float": {
-      "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?\\b|\\b[0-9][0-9_]*[eE][+-]?[0-9]+\\b",
-      "name": "constant.numeric.float.orion"
-    },
-    "numbers-int": {
-      "match": "\\b[0-9][0-9_]*\\b",
-      "name": "constant.numeric.integer.orion"
-    },
-    "variant": {
-      "comment": "`Enum.Variant` and a bare Capitalised name in a match arm: both are one value for a payload-free sum.",
-      "match": "\\b([A-Z][A-Za-z0-9_]*)\\.([A-Z][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "entity.name.type.orion" },
-        "2": { "name": "variable.other.enummember.orion" }
-      }
-    },
-    "property": {
-      "match": "\\.([A-Za-z_][A-Za-z0-9_]*)",
-      "captures": {
-        "1": { "name": "variable.other.property.orion" }
-      }
-    },
-    "fn-call": {
-      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\()",
-      "captures": {
-        "1": { "name": "entity.name.function.call.orion" }
-      }
-    },
-    "operators": {
-      "match": "==|!=|<=|>=|<<|>>|->|\\.\\.<|\\.\\.=|\\.\\.|\\+=|-=|\\*=|/=|[+\\-*/%=<>&|^~?]",
-      "name": "keyword.operator.orion"
-    },
-    "bare-identifier": {
-      "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
-      "name": "variable.other.use.orion"
-    }
-  }
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Orion",
+	"scopeName": "source.orion",
+	"comment": "Grammar for the SELF-HOSTED language: the keyword set is the one orion/orbs/orion_parse/lib.or actually dispatches on. The previous version was generated from the deleted Rust crate's token enum and highlighted words the language no longer has (data, enum, for, take, dyn, region, query, none) while missing the ones it does (type, effect, handle, perform, resume, const, defer, deterministic). Retired spellings are painted as invalid so a stale file shows the problem in the editor instead of at compile time.",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#chars"
+		},
+		{
+			"include": "#retired"
+		},
+		{
+			"include": "#fn-declaration"
+		},
+		{
+			"include": "#type-declaration"
+		},
+		{
+			"include": "#effect-declaration"
+		},
+		{
+			"include": "#handle-declaration"
+		},
+		{
+			"include": "#const-declaration"
+		},
+		{
+			"include": "#use-declaration"
+		},
+		{
+			"include": "#mut-binding"
+		},
+		{
+			"include": "#loop-var"
+		},
+		{
+			"include": "#param-name"
+		},
+		{
+			"include": "#local-binding"
+		},
+		{
+			"include": "#word-compare"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#modifiers"
+		},
+		{
+			"include": "#types"
+		},
+		{
+			"include": "#booleans"
+		},
+		{
+			"include": "#logical"
+		},
+		{
+			"include": "#numbers-hex"
+		},
+		{
+			"include": "#numbers-oct"
+		},
+		{
+			"include": "#numbers-bin"
+		},
+		{
+			"include": "#numbers-float"
+		},
+		{
+			"include": "#numbers-int"
+		},
+		{
+			"include": "#variant"
+		},
+		{
+			"include": "#property"
+		},
+		{
+			"include": "#fn-call"
+		},
+		{
+			"include": "#operators"
+		},
+		{
+			"include": "#user-type"
+		},
+		{
+			"include": "#bare-identifier"
+		}
+	],
+	"repository": {
+		"comments": {
+			"match": "#.*$",
+			"name": "comment.line.number-sign.orion"
+		},
+		"strings": {
+			"comment": "Double-quoted, with `{expr}` interpolation holes painted as embedded code.",
+			"name": "string.quoted.double.orion",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "meta.embedded.line.orion",
+					"begin": "\\{",
+					"end": "\\}",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.section.embedded.begin.orion"
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.section.embedded.end.orion"
+						}
+					},
+					"patterns": [
+						{
+							"include": "$self"
+						}
+					]
+				},
+				{
+					"match": "\\\\.",
+					"name": "constant.character.escape.orion"
+				}
+			]
+		},
+		"chars": {
+			"comment": "Character literals are BYTE VALUES ('+' is 43, an int), escapes included.",
+			"match": "'(\\\\.|[^'])'",
+			"name": "constant.character.orion"
+		},
+		"retired": {
+			"comment": "v1 spellings the compiler rejects: fn->define, pub->public, mut->edit, match->choose, data/enum->type, for->loop, comptime->const. Painted invalid so the editor says it first.",
+			"match": "^\\s*(?:pub\\s+)?(data|enum)\\s+(?=[A-Za-z_])|^\\s*(for|fn|pub|mut|match)\\s+(?=[A-Za-z_(:])|\\b(comptime)\\b",
+			"name": "invalid.deprecated.orion"
+		},
+		"fn-declaration": {
+			"match": "\\b(public\\s+)?(external\\s+)?(define)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "storage.modifier.orion"
+				},
+				"2": {
+					"name": "keyword.declaration.extern.orion"
+				},
+				"3": {
+					"name": "keyword.declaration.function.orion"
+				},
+				"4": {
+					"name": "entity.name.function.orion"
+				}
+			}
+		},
+		"type-declaration": {
+			"comment": "`type Name` - ONE keyword for products, sums and aliases.",
+			"match": "\\b(public\\s+)?(type)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "storage.modifier.orion"
+				},
+				"2": {
+					"name": "keyword.declaration.type.orion"
+				},
+				"3": {
+					"name": "entity.name.type.orion"
+				}
+			}
+		},
+		"effect-declaration": {
+			"match": "\\b(effect)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.effect.orion"
+				},
+				"2": {
+					"name": "entity.name.type.effect.orion"
+				}
+			}
+		},
+		"handle-declaration": {
+			"comment": "`handle Effect.op(...)` — the operation's implementation.",
+			"match": "\\b(handle)\\s+([A-Za-z_][A-Za-z0-9_]*)\\.([A-Za-z_][A-Za-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.effect.orion"
+				},
+				"2": {
+					"name": "entity.name.type.effect.orion"
+				},
+				"3": {
+					"name": "entity.name.function.orion"
+				}
+			}
+		},
+		"const-declaration": {
+			"match": "\\b(public\\s+)?(const)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "storage.modifier.orion"
+				},
+				"2": {
+					"name": "keyword.declaration.const.orion"
+				},
+				"3": {
+					"name": "variable.other.constant.orion"
+				}
+			}
+		},
+		"use-declaration": {
+			"match": "\\b(use)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
+			"captures": {
+				"1": {
+					"name": "keyword.control.import.orion"
+				},
+				"2": {
+					"name": "entity.name.namespace.orion"
+				}
+			}
+		},
+		"mut-binding": {
+			"match": "\\b(edit)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "storage.modifier.mut.orion"
+				},
+				"2": {
+					"name": "variable.other.declaration.orion"
+				}
+			}
+		},
+		"loop-var": {
+			"comment": "`loop v in …`, `loop i, v in …`, `loop parallel v in …`, `loop let P(x) = e:`.",
+			"match": "\\b(loop)(?:\\s+(parallel))?\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*,\\s*([A-Za-z_][A-Za-z0-9_]*))?\\s+(in)\\b",
+			"captures": {
+				"1": {
+					"name": "keyword.control.loop.orion"
+				},
+				"2": {
+					"name": "storage.modifier.parallel.orion"
+				},
+				"3": {
+					"name": "variable.parameter.loop.orion"
+				},
+				"4": {
+					"name": "variable.parameter.loop.orion"
+				},
+				"5": {
+					"name": "keyword.control.orion"
+				}
+			}
+		},
+		"param-name": {
+			"comment": "`name: Type` in a parameter list or an inline product declaration.",
+			"match": "([(,]\\s*(?:mut\\s+|move\\s+)?)([A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*(?=[A-Za-z_\\[(])",
+			"captures": {
+				"1": {
+					"name": "punctuation.separator.orion"
+				},
+				"2": {
+					"name": "variable.parameter.orion"
+				}
+			}
+		},
+		"local-binding": {
+			"comment": "An identifier at the start of an indented line followed by `=`, `+=`, `-=`, `*=`, `/=`, or a type annotation. Excludes `==`.",
+			"match": "^(\\s+)([A-Za-z_][A-Za-z0-9_]*)(?=\\s*(?:[+\\-*/]=|:\\s*[A-Za-z_\\[(][A-Za-z0-9_\\[\\]<>, ]*\\s*=|=(?!=)))",
+			"captures": {
+				"2": {
+					"name": "variable.other.orion"
+				}
+			}
+		},
+		"keywords": {
+			"comment": "The v2 words orion_parse dispatches on.  is not here - it is a live TYPE word (Game{rules: function}).",
+			"match": "\\b(if|then|else|choose|loop|break|continue|in|where|until|to|of|return|require|ensure|example|defer|use|public|external|define|type|const|effect|handle|perform|resume|let|move|orb|edit)\\b",
+			"name": "keyword.control.orion"
+		},
+		"modifiers": {
+			"comment": "`deterministic` is an ENFORCED purity certificate (the fn may not reach io/time/platform/audio); `parallel` turns a loop into one OS thread per iteration.",
+			"match": "\\b(deterministic|parallel)\\b",
+			"name": "storage.modifier.orion"
+		},
+		"types": {
+			"comment": "Built-in type names, the v2 lowercase words. Small words are the language's, Capitalized names are the user's - both get the type color.",
+			"match": "\b(number|truth|text|table|list|int|function|fn|f64|Unit)\b",
+			"name": "support.type.orion"
+		},
+		"booleans": {
+			"match": "\\b(true|false)\\b",
+			"name": "constant.language.orion"
+		},
+		"logical": {
+			"match": "\\b(not|and|or)\\b",
+			"name": "keyword.operator.logical.orion"
+		},
+		"numbers-hex": {
+			"match": "\\b0[xX][0-9a-fA-F][0-9a-fA-F_]*\\b",
+			"name": "constant.numeric.hex.orion"
+		},
+		"numbers-oct": {
+			"match": "\\b0[oO][0-7][0-7_]*\\b",
+			"name": "constant.numeric.oct.orion"
+		},
+		"numbers-bin": {
+			"match": "\\b0[bB][01][01_]*\\b",
+			"name": "constant.numeric.bin.orion"
+		},
+		"numbers-float": {
+			"match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?\\b|\\b[0-9][0-9_]*[eE][+-]?[0-9]+\\b",
+			"name": "constant.numeric.float.orion"
+		},
+		"numbers-int": {
+			"match": "\\b[0-9][0-9_]*\\b",
+			"name": "constant.numeric.integer.orion"
+		},
+		"variant": {
+			"comment": "`Enum.Variant` and a bare Capitalised name in a match arm: both are one value for a payload-free sum.",
+			"match": "\\b([A-Z][A-Za-z0-9_]*)\\.([A-Z][A-Za-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "entity.name.type.orion"
+				},
+				"2": {
+					"name": "variable.other.enummember.orion"
+				}
+			}
+		},
+		"property": {
+			"match": "\\.([A-Za-z_][A-Za-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "variable.other.property.orion"
+				}
+			}
+		},
+		"fn-call": {
+			"match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\()",
+			"captures": {
+				"1": {
+					"name": "entity.name.function.call.orion"
+				}
+			}
+		},
+		"operators": {
+			"match": "==|!=|<=|>=|<<|>>|->|\\.\\.<|\\.\\.=|\\.\\.|\\+=|-=|\\*=|/=|[+\\-*/%=<>&|^~?]",
+			"name": "keyword.operator.orion"
+		},
+		"bare-identifier": {
+			"match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
+			"name": "variable.other.use.orion"
+		},
+		"user-type": {
+			"comment": "User-defined types are Capitalized (World, Intent, Entry) - colored as types everywhere they appear. Must sit before bare-identifier.",
+			"match": "\\b[A-Z][A-Za-z0-9_]*\\b",
+			"name": "entity.name.type.orion"
+		},
+		"word-compare": {
+			"comment": "The comparison words. Longest first: ordered alternation.",
+			"match": "\\b(is\\s+at\\s+least|is\\s+at\\s+most|is\\s+less\\s+than|is\\s+more\\s+than|is\\s+not|is)\\b",
+			"name": "keyword.operator.comparison.orion"
+		}
+	}
 }

@@ -1,9 +1,9 @@
 define main() -> int:
-    bs = bytes_from_text("hello world")
-    head = bytes_slice(bs, 0, 5)
-    tail = bytes_slice(bs, 6, 11)
-    joined = bytes_concat(head, bytes_concat(bytes_from_text(" "), tail))
-    out = bytes_to_text(joined)
+    bs = bytes_of("hello world")
+    head = bytes_part(bs, 0, 5)
+    tail = bytes_part(bs, 6, 11)
+    joined = bytes_concat(head, bytes_concat(bytes_of(" "), tail))
+    out = text_of(joined)
     # "hello world" - 11 chars, but our test compares len
-    n = len(out)
+    n = length(out)
     n + 31

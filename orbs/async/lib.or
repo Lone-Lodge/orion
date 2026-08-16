@@ -26,7 +26,7 @@
 # A task is awaited ONCE (awaiting it again gives 0 - its stack is gone).
 # Where the platform has no stack switching, spawn runs the closure right away
 # and yield_now() does nothing: a non-yielding task still gives the same answer.
-external define orion_task_spawn(f: fn, arg: int) -> int
+external define orion_task_spawn(f: function, arg: int) -> int
 external define orion_task_await(id: int) -> int
 external define orion_task_yield() -> int
 external define orion_task_run_all() -> int
@@ -35,7 +35,7 @@ external define orion_task_live_count() -> int
 
 # Start a task. Returns its id, or -1 if the task table is full (1024).
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define spawn(f: fn, arg: int) -> int = orion_task_spawn(f, arg)
+public define spawn(f: function, arg: int) -> int = orion_task_spawn(f, arg)
 
 # Run the scheduler until this task finishes, then take its result.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
@@ -99,14 +99,14 @@ public define sleep_task(ms: int) -> int = orion_task_sleep(ms)
 #
 # Windows only for now (fibers). `resumable_ok()` answers whether it is real
 # here; elsewhere `ask` returns -1 rather than pretending.
-external define orion_ms_perform(f: fn, arg: int) -> int
+external define orion_ms_perform(f: function, arg: int) -> int
 external define orion_ms_resume(v: int) -> int
 external define orion_ms_supported() -> int
 
 # Inside a task: hand control to `handler`, which may resume this point once and
 # then keep working. Returns the handler's value, or the resumed value.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define ask(handler: fn, arg: int) -> int = orion_ms_perform(handler, arg)
+public define ask(handler: function, arg: int) -> int = orion_ms_perform(handler, arg)
 
 # Inside such a handler: run the rest of the task with `v`, and get its result.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or

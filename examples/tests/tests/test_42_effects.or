@@ -3,10 +3,10 @@
 # as an expression, and `resume(v)` comes back to the perform site with v.
 # Both the int and the text continuation are exercised.
 effect Random:
-    roll: fn(max: int) -> int
+    roll: function(max: int) -> int
 
 effect Log:
-    msg: fn(text: text) -> text
+    msg: function(text: text) -> text
 
 handle Random.roll(max: int) -> int:
     resume(max // 5)
@@ -17,4 +17,4 @@ handle Log.msg(message: text) -> text:
 define main() -> int:
     r = perform Random.roll(100)     # 20
     s = perform Log.msg("hello")     # "ok"
-    r + len(s) * 11                  # 20 + 2*11 == 42
+    r + length(s) * 11                  # 20 + 2*11 == 42

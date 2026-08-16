@@ -1,6 +1,6 @@
 define main() -> int:
     nums = [10, 20, 30, 40, 50]
     edit total = 0
-    loop i in 0..<len(nums):
+    loop i in 0..<length(nums):
         total = total + at(nums, i)
     total

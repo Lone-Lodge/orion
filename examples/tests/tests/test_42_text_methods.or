@@ -1,11 +1,11 @@
 define is_empty(t: text) -> int:
-    if len(t) == 0 then 1 else 0
+    if length(t) == 0 then 1 else 0
 
 define starts_with(t: text, prefix: text) -> int:
-    t_bytes = bytes_from_text(t)
-    p_bytes = bytes_from_text(prefix)
-    t_len = bytes_length(t_bytes)
-    p_len = bytes_length(p_bytes)
+    t_bytes = bytes_of(t)
+    p_bytes = bytes_of(prefix)
+    t_len = bytes_count(t_bytes)
+    p_len = bytes_count(p_bytes)
     edit result = 1
     if p_len > t_len:
         result = 0

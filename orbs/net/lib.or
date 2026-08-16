@@ -63,7 +63,7 @@ public define accept(server: int) -> int uses net = tcp_accept(server)
 #   answer = with_connection("127.0.0.1", 8080, (c): send(c, "hi"))
 # The body gets the socket and returns a number; -1 means the connect failed.
 # no example: needs a live peer - proven by examples/demos/httpd.or
-public define with_connection(host: text, port: int, body: fn) -> int uses net:
+public define with_connection(host: text, port: int, body: function) -> int uses net:
     c = connect(host, port)
     if not ok(c):
         return 0 - 1
@@ -73,7 +73,7 @@ public define with_connection(host: text, port: int, body: fn) -> int uses net:
 # The same for a listening socket: serve, hand the listener to the body, and
 # close it however the body leaves.
 # no example: binds a port - proven by test_42_net_scoped.or
-public define with_listener(port: int, body: fn) -> int uses net:
+public define with_listener(port: int, body: function) -> int uses net:
     s = listen(port)
     if not ok(s):
         return 0 - 1
@@ -118,7 +118,7 @@ public define readable_within(sock: int, ms: int) -> truth uses net:
 public define timed_out(chunk: text) -> truth:
     example timed_out("")
     example not timed_out("data")
-    len(chunk) is 0
+    length(chunk) is 0
 
 # Did the call succeed? Reads better than comparing to -1 at every site.
 public define ok(handle: int) -> truth:

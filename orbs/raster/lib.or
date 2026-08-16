@@ -1,0 +1,628 @@
+# raster - the first render block behind the ORI 3D seam (ori_scene).
+# Pure software: world-space triangles in, flat-shaded pixels out, plus a
+# BMP encoder so a frame can become a file anywhere (that is the whole
+# `orbit shot` story). No window, no GPU - a block that draws is a block
+# that can be replaced by one that draws faster.
+#
+# Pipeline: view transform (translate, yaw, pitch) -> cheap near-plane
+# cull -> perspective projection -> z-buffered edge-function fill with
+# one fixed light. Every step the simplest version that makes a correct,
+# legible picture.
+
+use ori_scene
+use ori_geometry
+use num
+use list
+use glyphs
+
+# ----- the field: the game's own coordinate grid -----
+#
+# A declared game draws everything on ONE plane: x right, y DOWN, origin
+# top-left, the size the sketch declared. These three numbers are the
+# whole field-to-screen map - the lens, the plane's z, and the world
+# half-height the field's height is stretched to fill. Nothing outside
+# this section may hardcode them, because field_scale (field -> world)
+# and field_of_pixel (screen -> field) must stay exact inverses: the one
+# turns a click into a place, the other put the thing there.
+#
+# Decoration sits a tenth in front of or behind the plane (game_plane +
+# 0.1 for a bar, - 0.1 for the backdrop); entities live ON it.
+
+public const game_fov = 1.05
+public const game_plane = -3.0
+const field_half_high = 1.736
+
+# World units per field unit.
+public define field_scale(field_h: number) -> number:
+    field_half_high / (field_h / 2.0)
+
+# Where a screen pixel lands on the field. Outside the field is a real
+# answer (negative, or past field_w/field_h) - the letterbox is a place
+# too, and a hit test says no all by itself.
+public define field_of_pixel(pixel_x: int, pixel_y: int, width: int, height: int, field_w: number, field_h: number) -> Point:
+    pixels_per_unit = (1.0 / tan(game_fov / 2.0)) * (1.0 / (0.0 - game_plane)) * ((height) / 2.0)
+    scale = field_scale(field_h)
+    world_x = ((pixel_x) + 0.5 - (width) / 2.0) / pixels_per_unit
+    world_y = ((height) / 2.0 - ((pixel_y) + 0.5)) / pixels_per_unit
+    Point{x: world_x / scale + field_w / 2.0, y: field_h / 2.0 - world_y / scale}
+
+# ----- vectors (a, b = the two operands; x, y, z = coordinates) -----
+
+define sub(a: V3, b: V3) -> V3:
+    v3(a.x - b.x, a.y - b.y, a.z - b.z)
+
+define cross(a: V3, b: V3) -> V3:
+    v3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
+
+define dot(a: V3, b: V3) -> number:
+    a.x * b.x + a.y * b.y + a.z * b.z
+
+define norm(a: V3) -> V3:
+    length = sqrt(dot(a, a))
+    if length is less than 0.000001 then v3(0.0, 0.0, 0.0) else v3(a.x / length, a.y / length, a.z / length)
+
+define rot_y(point: V3, angle: number) -> V3:
+    v3(point.x * cos(angle) + point.z * sin(angle), point.y, point.z * cos(angle) - point.x * sin(angle))
+
+define rot_x(point: V3, angle: number) -> V3:
+    v3(point.x, point.y * cos(angle) - point.z * sin(angle), point.z * cos(angle) + point.y * sin(angle))
+
+# ----- mesh building -----
+
+# Two triangles from four corners, wound a-b-c / a-c-d.
+public define quad(a: V3, b: V3, c: V3, d: V3, color: int) -> list of Tri:
+    [Tri{a: a, b: b, c: c, color: color}, Tri{a: a, b: c, c: d, color: color}]
+
+public define add_triangles(triangles: list of Tri, more: list of Tri) -> list of Tri:
+    edit joined = triangles
+    loop triangle in more:
+        joined = push(joined, triangle)
+    joined
+
+# FIELD-SPACE text: each lit pixel of the shared 5x7 font becomes one
+# quad, so a label renders identically on every shell at any resolution
+# (the same trick the stat bars use). left_x/top_y in field units,
+# cell = one glyph pixel in field units (a character is 5x7 cells with
+# a 1-cell gap), field_w/field_h = the game's declared field.
+public define text_triangles(content: text, left_x: number, top_y: number, cell: number, depth: number, color: int, field_w: number, field_h: number) -> list of Tri:
+    scale = field_scale(field_h)
+    half_w = field_w / 2.0
+    half_h = field_h / 2.0
+    half_cell = cell / 2.0 * scale
+    letters = bytes_of(content)
+    edit marks = []
+    loop index in 0 until bytes_count(letters):
+        rows = glyph_rows(byte_at(letters, index))
+        pen = left_x + index * cell * 6.0
+        loop row in 0 until 7:
+            bits = at(rows, row)
+            loop column in 0 until 5:
+                if (bits // column_bit(4 - column)) % 2 is 1:
+                    center_x = pen + column * cell + cell / 2.0
+                    center_y = top_y + row * cell + cell / 2.0
+                    x = (center_x - half_w) * scale
+                    y = (half_h - center_y) * scale
+                    marks = add_triangles(marks, quad(v3(x - half_cell, y - half_cell, depth), v3(x + half_cell, y - half_cell, depth), v3(x + half_cell, y + half_cell, depth), v3(x - half_cell, y + half_cell, depth), color))
+    marks
+
+define column_bit(power: int) -> int:
+    edit value = 1
+    loop index in 0 until power:
+        value = value * 2
+    value
+
+# ----- instances -> world-space triangles -----
+
+public define expand(instance: Instance, mesh: list of Tri) -> list of Tri:
+    edit placed = []
+    loop triangle in mesh:
+        color = if instance.tint is 0 then triangle.color else instance.tint
+        placed = push(placed, Tri{a: place(triangle.a, instance), b: place(triangle.b, instance), c: place(triangle.c, instance), color: color})
+    placed
+
+define place(point: V3, instance: Instance) -> V3:
+    scaled = rot_y(v3(point.x * instance.scale, point.y * instance.scale, point.z * instance.scale), instance.yaw)
+    v3(scaled.x + instance.at.x, scaled.y + instance.at.y, scaled.z + instance.at.z)
+
+# ----- camera and projection -----
+
+define to_view(point: V3, camera: Camera) -> V3:
+    rot_x(rot_y(sub(point, camera.eye), -camera.yaw), -camera.pitch)
+
+# Screen position: x, y in pixels, z kept for the depth test.
+define project(point: V3, camera: Camera, width: int, height: int) -> V3:
+    focal = 1.0 / tan(camera.fov / 2.0)
+    inverse_depth = 1.0 / -point.z
+    half_height = (height) / 2.0
+    v3((width) / 2.0 + point.x * focal * inverse_depth * half_height, half_height - point.y * focal * inverse_depth * half_height, point.z)
+
+# ----- shading -----
+
+define shade(color: int, surface_normal: V3) -> int:
+    light = norm(v3(0.45, 0.8, 0.35))
+    facing = dot(surface_normal, light)
+    strength = 0.35 + (if facing is more than 0.0 then facing else 0.0) * 0.65
+    red = to_whole(((color // 65536) % 256) * strength)
+    green = to_whole(((color // 256) % 256) * strength)
+    blue = to_whole((color % 256) * strength)
+    red * 65536 + green * 256 + blue
+
+# ----- the frame -----
+
+# A sprite pixel this color is not drawn - the artist's transparency.
+const transparent_key = 16711935
+
+# World-space triangles and camera-facing sprites to a top-down
+# row-major 0xRRGGBB pixel list, depth-tested per pixel (a z-buffer) so
+# draw order never matters. Triangles are lit; sprites are authored art
+# and sample their texture untouched, skipping the transparent key.
+#
+# The whole fill lives in THIS function on purpose, breaking the 20-line
+# law with cause: the two buffers must never cross a call boundary,
+# because in-place promotion of set()/push() only holds while a list is
+# provably unique (born here, one call per statement) - threaded through
+# helpers it degrades to copy-on-write, and a 230k-element frame copied
+# per pixel write is a render measured in minutes instead of
+# milliseconds. Measured, not assumed.
+public define render(camera: Camera, triangles: list of Tri, sprites: list of Sprite, width: int, height: int, sky: int) -> list of int:
+    pixel_count = width * height
+    edit pixels = filled(pixel_count, sky)
+    edit depths = filled_number(pixel_count, 1000000.0)
+    loop sprite in sprites:
+        view_center = to_view(sprite.at, camera)
+        if view_center.z is less than -0.1 and sprite.wide is more than 0.0 and sprite.high is more than 0.0:
+            texture = sprite.texture
+            screen_center = project(view_center, camera, width, height)
+            pixels_per_unit = (1.0 / tan(camera.fov / 2.0)) * (1.0 / -view_center.z) * ((height) / 2.0)
+            half_wide = sprite.wide / 2.0 * pixels_per_unit
+            half_high = sprite.high / 2.0 * pixels_per_unit
+            left_edge = screen_center.x - half_wide
+            top_edge = screen_center.y - half_high
+            left = clamp(to_whole(left_edge), 0, width - 1)
+            right = clamp(to_whole(screen_center.x + half_wide) + 1, 0, width - 1)
+            top = clamp(to_whole(top_edge), 0, height - 1)
+            bottom = clamp(to_whole(screen_center.y + half_high) + 1, 0, height - 1)
+            depth = -view_center.z
+            # Sampling follows the direction of scaling. MINIFIED (sprite
+            # smaller than its texture): bilinear - four texels blend by
+            # subpixel position, so motion glides instead of shimmering.
+            # MAGNIFIED (pixel art blown up): nearest - each texel stays a
+            # crisp square; bilinear here would just smear every edge.
+            # The transparent key carries no color either way - a key
+            # sample is simply not drawn.
+            magnified = half_wide * 2.0 is at least (texture.width) and half_high * 2.0 is at least (texture.height)
+            loop y in top until (bottom + 1):
+                sample_v = ((y) + 0.5 - top_edge) / (half_high * 2.0) * (texture.height) - 0.5
+                v_low = clamp(floor_int(sample_v), 0, texture.height - 1)
+                v_high = clamp(v_low + 1, 0, texture.height - 1)
+                v_mix = clamp_mix(sample_v - v_low)
+                loop x in left until (right + 1):
+                    sample_u = ((x) + 0.5 - left_edge) / (half_wide * 2.0) * (texture.width) - 0.5
+                    u_low = clamp(floor_int(sample_u), 0, texture.width - 1)
+                    u_high = clamp(u_low + 1, 0, texture.width - 1)
+                    u_mix = clamp_mix(sample_u - u_low)
+                    blended = if magnified then nearest_texel(texture, sample_u, sample_v) else blend_texels(texture, u_low, u_high, v_low, v_high, u_mix, v_mix)
+                    if blended is at least 0 and depth is less than at(depths, y * width + x):
+                        depths = set(depths, y * width + x, depth)
+                        pixels = set(pixels, y * width + x, blended)
+    loop triangle in triangles:
+        view_a = to_view(triangle.a, camera)
+        view_b = to_view(triangle.b, camera)
+        view_c = to_view(triangle.c, camera)
+        if view_a.z is less than -0.1 and view_b.z is less than -0.1 and view_c.z is less than -0.1:
+            color = shade(triangle.color, norm(cross(sub(view_b, view_a), sub(view_c, view_a))))
+            screen_a = project(view_a, camera, width, height)
+            screen_b = project(view_b, camera, width, height)
+            screen_c = project(view_c, camera, width, height)
+            left = clamp(to_whole(min3(screen_a.x, screen_b.x, screen_c.x)), 0, width - 1)
+            right = clamp(to_whole(max3(screen_a.x, screen_b.x, screen_c.x)) + 1, 0, width - 1)
+            top = clamp(to_whole(min3(screen_a.y, screen_b.y, screen_c.y)), 0, height - 1)
+            bottom = clamp(to_whole(max3(screen_a.y, screen_b.y, screen_c.y)) + 1, 0, height - 1)
+            area = edge(screen_a.x, screen_a.y, screen_b.x, screen_b.y, screen_c.x, screen_c.y)
+            if area is more than 0.001 or area is less than -0.001:
+                loop y in top until (bottom + 1):
+                    sample_y = (y) + 0.5
+                    loop x in left until (right + 1):
+                        sample_x = (x) + 0.5
+                        weight_a = edge(screen_b.x, screen_b.y, screen_c.x, screen_c.y, sample_x, sample_y) / area
+                        weight_b = edge(screen_c.x, screen_c.y, screen_a.x, screen_a.y, sample_x, sample_y) / area
+                        weight_c = edge(screen_a.x, screen_a.y, screen_b.x, screen_b.y, sample_x, sample_y) / area
+                        inside = (weight_a is at least 0.0 and weight_b is at least 0.0 and weight_c is at least 0.0) or (weight_a is at most 0.0 and weight_b is at most 0.0 and weight_c is at most 0.0)
+                        if inside:
+                            depth = -(weight_a * screen_a.z + weight_b * screen_b.z + weight_c * screen_c.z)
+                            if depth is less than at(depths, y * width + x):
+                                depths = set(depths, y * width + x, depth)
+                                pixels = set(pixels, y * width + x, color)
+    pixels
+
+define floor_int(value: number) -> int:
+    truncated = to_whole(value)
+    if value is less than truncated then truncated - 1 else truncated
+
+define clamp_mix(mix: number) -> number:
+    if mix is less than 0.0 then 0.0 else if mix is more than 1.0 then 1.0 else mix
+
+# The magnification sample: the one nearest texel, square and crisp.
+define nearest_texel(texture: Texture, sample_u: number, sample_v: number) -> int:
+    u = clamp(floor_int(sample_u + 0.5), 0, texture.width - 1)
+    v = clamp(floor_int(sample_v + 0.5), 0, texture.height - 1)
+    texel = at(texture.pixels, v * texture.width + u)
+    if texel is transparent_key then -1 else texel
+
+# The four-texel blend, key-aware: transparent texels contribute no
+# color and no coverage; under half coverage the sample is not drawn
+# (returned as -1, an impossible color).
+define blend_texels(texture: Texture, u_low: int, u_high: int, v_low: int, v_high: int, u_mix: number, v_mix: number) -> int:
+    edit red = 0.0
+    edit green = 0.0
+    edit blue = 0.0
+    edit coverage = 0.0
+    loop corner in 0 until 4:
+        u = if corner % 2 is 0 then u_low else u_high
+        v = if corner // 2 is 0 then v_low else v_high
+        weight_u = if corner % 2 is 0 then 1.0 - u_mix else u_mix
+        weight_v = if corner // 2 is 0 then 1.0 - v_mix else v_mix
+        weight = weight_u * weight_v
+        texel = at(texture.pixels, v * texture.width + u)
+        if texel is not transparent_key:
+            red = red + ((texel // 65536) % 256) * weight
+            green = green + ((texel // 256) % 256) * weight
+            blue = blue + (texel % 256) * weight
+            coverage = coverage + weight
+    if coverage is less than 0.5:
+        return -1
+    to_whole(red / coverage) * 65536 + to_whole(green / coverage) * 256 + to_whole(blue / coverage)
+
+# Twice the signed area of triangle (a, b, sample) - the sign says which
+# side of edge a->b the sample lies on.
+define edge(ax: number, ay: number, bx: number, by: number, sample_x: number, sample_y: number) -> number:
+    (bx - ax) * (sample_y - ay) - (by - ay) * (sample_x - ax)
+
+define min3(a: number, b: number, c: number) -> number:
+    smaller = if a is less than b then a else b
+    if c is less than smaller then c else smaller
+
+define max3(a: number, b: number, c: number) -> number:
+    bigger = if a is more than b then a else b
+    if c is more than bigger then c else bigger
+
+# ----- BMP encoding (24-bit, bottom-up) -----
+# Header and body are separate lists the caller writes as two chunks:
+# the body must be BORN in its own function ([] then single pushes in
+# statement position) for in-place promotion to hold - seeded from
+# another function's return it degrades to copy-per-push, which at
+# ~700k bytes is minutes of copying and an arena crash.
+
+public define bmp_header(width: int, height: int) -> list of int:
+    padding = (4 - (width * 3) % 4) % 4
+    file_size = 54 + (width * 3 + padding) * height
+    edit bytes = [66, 77]
+    bytes = u32(bytes, file_size)
+    bytes = u32(bytes, 0)
+    bytes = u32(bytes, 54)
+    bytes = u32(bytes, 40)
+    bytes = u32(bytes, width)
+    bytes = u32(bytes, height)
+    bytes = push(bytes, 1)
+    bytes = push(bytes, 0)
+    bytes = push(bytes, 24)
+    bytes = push(bytes, 0)
+    bytes = u32(bytes, 0)
+    bytes = u32(bytes, file_size - 54)
+    bytes = u32(bytes, 2835)
+    bytes = u32(bytes, 2835)
+    bytes = u32(bytes, 0)
+    u32(bytes, 0)
+
+public define bmp_body(pixels: list of int, width: int, height: int) -> list of int:
+    padding = (4 - (width * 3) % 4) % 4
+    edit bytes = []
+    edit y = height - 1
+    loop:
+        if y is less than 0:
+            break
+        loop x in 0 until width:
+            pixel = at(pixels, y * width + x)
+            bytes = push(bytes, pixel % 256)
+            bytes = push(bytes, (pixel // 256) % 256)
+            bytes = push(bytes, (pixel // 65536) % 256)
+        loop pad_index in 0 until padding:
+            bytes = push(bytes, 0)
+        y = y - 1
+    bytes
+
+# ----- PNG -----
+#
+# A frame anyone can LOOK at: a browser, a pull request, a person, an
+# agent reading its own test evidence. BMP is what a Windows window
+# hands back; PNG is what everything else opens.
+#
+# The DEFLATE stream is stored blocks - legal, exact and about thirty
+# lines, where a real compressor is a project. A test frame is written
+# once and read by eye, so the bytes it costs buy nothing back. If a
+# frame ever needs to be small, that is the day to write the encoder,
+# not before.
+
+define be32(bytes: list of int, value: int) -> list of int:
+    edit grown = bytes
+    grown = push(grown, (value // 16777216) % 256)
+    grown = push(grown, (value // 65536) % 256)
+    grown = push(grown, (value // 256) % 256)
+    push(grown, value % 256)
+
+# CRC32 in two 16-bit HALVES. Not for elegance: a literal above 2^31 is
+# an i64 to the wasm backend, an i64 leaking out of an int function is a
+# compile error, and CRC needs a LOGICAL shift right that a signed
+# divide does not give. Halves keep every value under 65536, where both
+# problems stop existing.
+type Crc: hi: int, lo: int
+
+define crc_start() -> Crc:
+    Crc{hi: 65535, lo: 65535}
+
+define crc_byte(crc: Crc, value: int) -> Crc:
+    edit hi = crc.hi
+    edit lo = crc.lo ^ value
+    loop bit in 0 until 8:
+        carried = lo % 2
+        lo = lo // 2 + (hi % 2) * 32768
+        hi = hi // 2
+        if carried is 1:
+            hi = hi ^ 60856
+            lo = lo ^ 33568
+    Crc{hi: hi, lo: lo}
+
+define crc_done(crc: Crc) -> Crc:
+    Crc{hi: crc.hi ^ 65535, lo: crc.lo ^ 65535}
+
+# zlib around stored DEFLATE blocks, each at most 65535 bytes.
+define zlib_stored(raw: list of int) -> list of int:
+    edit out = [120, 1]
+    total = length(raw)
+    edit start = 0
+    loop:
+        if start is at least total:
+            break
+        span = if total - start is more than 65535 then 65535 else total - start
+        last = if start + span is at least total then 1 else 0
+        out = push(out, last)
+        out = push(out, span % 256)
+        out = push(out, span // 256)
+        out = push(out, (65535 - span) % 256)
+        out = push(out, (65535 - span) // 256)
+        loop index in start until start + span:
+            out = push(out, at(raw, index))
+        start = start + span
+    # adler32 of the uncompressed bytes, big-endian, closes the stream.
+    # Emitted as four bytes rather than one number: b * 65536 + a can
+    # pass 2^31, and that is an i64 to the wasm backend.
+    edit a = 1
+    edit b = 0
+    loop value in raw:
+        a = (a + value) % 65521
+        b = (b + a) % 65521
+    out = push(out, b // 256)
+    out = push(out, b % 256)
+    out = push(out, a // 256)
+    push(out, a % 256)
+
+# 0xRRGGBB rows, top-down, to a complete PNG file.
+#
+# The whole file is assembled in THIS function, like render's frame and
+# for the same reason: in-place push only holds while a list is provably
+# unique, and a 220 KB byte list handed to a chunk-writing helper copies
+# itself once per byte. That is not slow, it is a segfault - measured,
+# not assumed.
+public define png_bytes(pixels: list of int, width: int, height: int) -> list of int:
+    edit raw = []
+    loop y in 0 until height:
+        raw = push(raw, 0)
+        loop x in 0 until width:
+            pixel = at(pixels, y * width + x)
+            raw = push(raw, (pixel // 65536) % 256)
+            raw = push(raw, (pixel // 256) % 256)
+            raw = push(raw, pixel % 256)
+    stream = zlib_stored(raw)
+    edit header = be32([], width)
+    header = be32(header, height)
+    header = push(header, 8)
+    header = push(header, 2)
+    header = push(header, 0)
+    header = push(header, 0)
+    header = push(header, 0)
+    ihdr_crc = crc_of_chunk("IHDR", header)
+    stream_length = length(stream)
+    edit running = crc_start()
+    loop code in bytes_of("IDAT"):
+        running = crc_byte(running, code)
+    loop index in 0 until stream_length:
+        running = crc_byte(running, at(stream, index))
+    idat_crc = crc_done(running)
+    iend_crc = crc_of_chunk("IEND", [])
+    edit out = [137, 80, 78, 71, 13, 10, 26, 10]
+    out = push(out, 0)
+    out = push(out, 0)
+    out = push(out, 0)
+    out = push(out, 13)
+    loop code in bytes_of("IHDR"):
+        out = push(out, code)
+    loop value in header:
+        out = push(out, value)
+    out = push(out, ihdr_crc.hi // 256)
+    out = push(out, ihdr_crc.hi % 256)
+    out = push(out, ihdr_crc.lo // 256)
+    out = push(out, ihdr_crc.lo % 256)
+    out = push(out, (stream_length // 16777216) % 256)
+    out = push(out, (stream_length // 65536) % 256)
+    out = push(out, (stream_length // 256) % 256)
+    out = push(out, stream_length % 256)
+    loop code in bytes_of("IDAT"):
+        out = push(out, code)
+    loop index in 0 until stream_length:
+        out = push(out, at(stream, index))
+    out = push(out, idat_crc.hi // 256)
+    out = push(out, idat_crc.hi % 256)
+    out = push(out, idat_crc.lo // 256)
+    out = push(out, idat_crc.lo % 256)
+    out = push(out, 0)
+    out = push(out, 0)
+    out = push(out, 0)
+    out = push(out, 0)
+    loop code in bytes_of("IEND"):
+        out = push(out, code)
+    out = push(out, iend_crc.hi // 256)
+    out = push(out, iend_crc.hi % 256)
+    out = push(out, iend_crc.lo // 256)
+    push(out, iend_crc.lo % 256)
+
+# Read back what png_bytes wrote: stored blocks, filter 0, 8-bit RGB,
+# one IDAT at the fixed offset the encoder emits. NOT a general PNG
+# reader - it decodes our own goldens (probe's `match`) and nothing
+# else, which is exactly as much PNG as the engine needs. The caller
+# passes the size it expects; the IHDR is its own to check.
+public define png_pixels(bytes: list of int, width: int, height: int) -> list of int:
+    # magic 8 + IHDR 25 + IDAT length/type 8 + zlib header 2 = the first
+    # stored-block header lives at 43.
+    edit raw = []
+    edit cursor = 43
+    loop:
+        last = at(bytes, cursor)
+        span = at(bytes, cursor + 1) + at(bytes, cursor + 2) * 256
+        loop index in cursor + 5 until cursor + 5 + span:
+            raw = push(raw, at(bytes, index))
+        cursor = cursor + 5 + span
+        if last is 1:
+            break
+    edit pixels = []
+    loop y in 0 until height:
+        row_start = y * (width * 3 + 1) + 1
+        loop x in 0 until width:
+            base = row_start + x * 3
+            pixels = push(pixels, at(raw, base) * 65536 + at(raw, base + 1) * 256 + at(raw, base + 2))
+    pixels
+
+define test_png_roundtrips_through_its_own_reader():
+    source = [16711680, 65280, 255, 8421504, 16777215, 0]
+    decoded = png_pixels(png_bytes(source, 3, 2), 3, 2)
+    require length(decoded) is 6
+    loop index in 0 until 6:
+        require at(decoded, index) is at(source, index)
+
+# CRC32 over a chunk's type and its (small) data.
+define crc_of_chunk(kind: text, data: list of int) -> Crc:
+    edit crc = crc_start()
+    loop code in bytes_of(kind):
+        crc = crc_byte(crc, code)
+    loop value in data:
+        crc = crc_byte(crc, value)
+    crc_done(crc)
+
+define test_png_is_a_png():
+    # A 2x1 red/green image: magic, one IHDR of 13 bytes, and the last
+    # four bytes of the file are IEND's CRC.
+    bytes = png_bytes([16711680, 65280], 2, 1)
+    require at(bytes, 0) is 137
+    require at(bytes, 1) is 80
+    require at(bytes, 12) is 73
+    require at(bytes, 13) is 72
+    require at(bytes, 14) is 68
+    require at(bytes, 15) is 82
+    require at(bytes, 19) is 2
+    require at(bytes, 23) is 1
+    require at(bytes, 24) is 8
+    require at(bytes, 25) is 2
+    require length(bytes) is more than 40
+    # IEND's CRC is a fixed, published number: 0xAE426082. If the CRC
+    # halves are wrong, THIS is what says so - a viewer would just shrug.
+    total = length(bytes)
+    require at(bytes, total - 4) is 174
+    require at(bytes, total - 3) is 66
+    require at(bytes, total - 2) is 96
+    require at(bytes, total - 1) is 130
+
+define u32(bytes: list of int, value: int) -> list of int:
+    edit grown = bytes
+    grown = push(grown, value % 256)
+    grown = push(grown, (value // 256) % 256)
+    grown = push(grown, (value // 65536) % 256)
+    push(grown, (value // 16777216) % 256)
+
+# ----- Tests (`orbit test` runs these) -----
+
+define test_bmp_sizes():
+    require length(bmp_header(640, 360)) is 54
+    require length(bmp_body([0, 0, 0, 0], 2, 2)) is 16
+
+define test_expand_places_and_tints():
+    mesh = [Tri{a: v3(0.0, 0.0, 0.0), b: v3(1.0, 0.0, 0.0), c: v3(0.0, 1.0, 0.0), color: 5}]
+    placed = expand(Instance{mesh: 0, at: v3(2.0, 0.0, 0.0), yaw: 0.0, scale: 2.0, tint: 9}, mesh)
+    require length(placed) is 1
+    require at(placed, 0).color is 9
+    require at(placed, 0).b.x is more than 3.9
+
+define test_text_becomes_field_quads():
+    # "1" lights 10 font pixels -> 20 triangles; drawn at the field's
+    # center it must land colored pixels near the screen's center.
+    marks = text_triangles("1", 3000.0, 1600.0, 80.0, -3.0, 16777215, 6400.0, 3600.0)
+    require length(marks) is 20
+    camera = Camera{eye: v3(0.0, 0.0, 0.0), yaw: 0.0, pitch: 0.0, fov: 1.05}
+    pixels = render(camera, marks, [], 320, 180, 3)
+    edit lit = 0
+    loop value in pixels:
+        if value is not 3:
+            lit = lit + 1
+    require lit is more than 100
+
+define test_a_click_finds_what_was_drawn():
+    # The inverse proved against the RENDERER, not against itself: place
+    # a 800x600 patch at field (2000, 1200) exactly the way a declared
+    # view does, render it, and read every lit pixel back through
+    # field_of_pixel. Each one must land inside the patch.
+    scale = field_scale(3600.0)
+    center_x = (2000.0 - 3200.0) * scale
+    center_y = (1800.0 - 1200.0) * scale
+    half_wide = 400.0 * scale
+    half_high = 300.0 * scale
+    depth = game_plane
+    patch = quad(v3(center_x - half_wide, center_y - half_high, depth), v3(center_x + half_wide, center_y - half_high, depth), v3(center_x + half_wide, center_y + half_high, depth), v3(center_x - half_wide, center_y + half_high, depth), 16711680)
+    camera = Camera{eye: v3(0.0, 0.0, 0.0), yaw: 0.0, pitch: 0.0, fov: game_fov}
+    pixels = render(camera, patch, [], 320, 180, 3)
+    edit hits = 0
+    loop index in 0 until length(pixels):
+        if at(pixels, index) is not 3:
+            hits = hits + 1
+            point = field_of_pixel(index % 320, index // 320, 320, 180, 6400.0, 3600.0)
+            require point.x is more than 1575.0
+            require point.x is less than 2425.0
+            require point.y is more than 875.0
+            require point.y is less than 1525.0
+    require hits is more than 400
+    middle = field_of_pixel(160, 90, 320, 180, 6400.0, 3600.0)
+    require middle.x is more than 3175.0
+    require middle.x is less than 3225.0
+    require middle.y is more than 1775.0
+    require middle.y is less than 1825.0
+
+define test_render_smoke():
+    triangle = Tri{a: v3(-1.0, -1.0, -3.0), b: v3(1.0, -1.0, -3.0), c: v3(0.0, 1.0, -3.0), color: 16711680}
+    camera = Camera{eye: v3(0.0, 0.0, 0.0), yaw: 0.0, pitch: 0.0, fov: 1.05}
+    pixels = render(camera, [triangle], [], 16, 16, 3)
+    require length(pixels) is 256
+    require at(pixels, 0) is 3
+    require at(pixels, 8 * 16 + 8) is not 3
+
+# A 2x2 texture centered on screen: its texels land untouched, the
+# transparent key does not, and a nearer triangle wins the z-test.
+define test_sprites_sample_and_respect_depth():
+    camera = Camera{eye: v3(0.0, 0.0, 0.0), yaw: 0.0, pitch: 0.0, fov: 1.05}
+    texture = Texture{width: 2, height: 2, pixels: [111, 222, 16711935, 444]}
+    sprite = Sprite{at: v3(0.0, 0.0, -3.0), wide: 2.0, high: 2.0, texture: texture}
+    pixels = render(camera, [], [sprite], 16, 16, 3)
+    require at(pixels, 4 * 16 + 4) is 111
+    require at(pixels, 4 * 16 + 11) is 222
+    require at(pixels, 11 * 16 + 4) is 3
+    require at(pixels, 11 * 16 + 11) is 444
+    near_triangle = Tri{a: v3(-2.0, -2.0, -1.5), b: v3(2.0, -2.0, -1.5), c: v3(0.0, 2.0, -1.5), color: 16711680}
+    covered = render(camera, [near_triangle], [sprite], 16, 16, 3)
+    require at(covered, 8 * 16 + 8) is not 444
+    require at(covered, 8 * 16 + 8) is not 111

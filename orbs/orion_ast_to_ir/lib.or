@@ -38,37 +38,10 @@ define scope_add_enum_decl(scope: Scope, enum_name: text, variant_csv: text) -> 
 # on an already-bundled text), so a diagnostic never becomes worse than before.
 # Slot-stored text must outlive the transient allocation it was built in.
 external define orion_persist_text(s: text) -> text
-# 1 when the console can show colour (a TTY), 0 when piped or redirected.
-external define orion_console_color() -> int
 
-define otir_spaces(n: int) -> text:
-    edit s = ""
-    loop i in 0..<n:
-        s = s + " "
-    s
-
-# The text of 1-based bundle line `n` from the collected source, "" if absent.
-define otir_src_line(src: text, n: int) -> text:
-    b = bytes_from_text(src)
-    total = len(b)
-    edit cur = 1
-    edit start = 0
-    edit i = 0
-    edit result = ""
-    loop:
-        if i >= total:
-            if cur == n:
-                result = bytes_to_text(bytes_slice(b, start, total))
-            break
-        if at(b, i) == 10:
-            if cur == n:
-                result = bytes_to_text(bytes_slice(b, start, i))
-                break
-            cur = cur + 1
-            start = i + 1
-        i = i + 1
-    result
-
+# One error is ONE line in the log: path:line:col plus the message. The
+# source-line + caret frame this used to stash made every error three lines,
+# and the editor already points at the spot - the log does not have to.
 define otir_where(line: int, col: int) -> text:
     total = if slot_has("src:map:n") then slot_get_int("src:map:n") else 0
     edit best_at = 0
@@ -78,19 +51,6 @@ define otir_where(line: int, col: int) -> text:
         if chunk_at <= line and chunk_at > best_at:
             best_at = chunk_at
             best_path = slot_get("src:map:{i}:path")
-    # Stash a source-line + caret frame for compile_error to print under the
-    # message. The gutter shows the local line; the caret sits at `col` (0-based)
-    # past the gutter width. Cleared by compile_error once consumed.
-    src = if slot_has("src:full") then slot_get("src:full") else ""
-    if src != "":
-        src_line = otir_src_line(src, line)
-        if src_line != "":
-            gutter = " {line - best_at} | "
-            gw = len(bytes_from_text(gutter))
-            esc = bytes_to_text([27])
-            caret = if orion_console_color() == 1 then "{esc}[31m^{esc}[0m" else "^"
-            frame = "\n{gutter}{src_line}\n{otir_spaces(gw + col)}{caret}"
-            slot_set("err:frame", orion_persist_text(frame))
     if best_path == "":
         "line {line}:{col}"
     else:
@@ -99,8 +59,8 @@ define otir_where(line: int, col: int) -> text:
 # True if the name contains '$' - synthetic "Enum$Variant" payload
 # entries in the enum tables, never real enums.
 define contains_dollar(name: text) -> truth:
-    bs = bytes_from_text(name)
-    n = len(bs)
+    bs = bytes_of(name)
+    n = length(bs)
     edit found = false
     loop i in 0..<n:
         if at(bs, i) == 36:
@@ -109,8 +69,8 @@ define contains_dollar(name: text) -> truth:
 
 # Count fields in a "name:type|name:type" data spec (pipes + 1).
 define count_spec_fields(spec: text) -> int:
-    bs = bytes_from_text(spec)
-    n = len(bs)
+    bs = bytes_of(spec)
+    n = length(bs)
     if n == 0:
         return 0
     edit pipes = 0
@@ -124,7 +84,7 @@ define count_spec_fields(spec: text) -> int:
 # (or unknown variant).
 define scope_lookup_variant_payloads(scope: Scope, enum_name: text, variant: text) -> text:
     key = "{enum_name}${variant}"
-    total = len(scope.en_names)
+    total = length(scope.en_names)
     edit result = ""
     loop index in 0..<total:
         if at(scope.en_names, index) == key:
@@ -133,7 +93,7 @@ define scope_lookup_variant_payloads(scope: Scope, enum_name: text, variant: tex
 
 # The comma-joined variant names of an enum (stored under the bare enum key).
 define enum_variant_csv(scope: Scope, enum_name: text) -> text:
-    total = len(scope.en_names)
+    total = length(scope.en_names)
     edit result = ""
     loop index in 0..<total:
         if at(scope.en_names, index) == enum_name:
@@ -148,8 +108,8 @@ define enum_variant_csv(scope: Scope, enum_name: text) -> text:
 define enum_has_payloads(scope: Scope, enum_name: text) -> truth:
     variant_names = split_csv(enum_variant_csv(scope, enum_name))
     edit found = false
-    loop vi in 0..<len(variant_names):
-        if len(scope_lookup_variant_payloads(scope, enum_name, at(variant_names, vi))) > 0:
+    loop vi in 0..<length(variant_names):
+        if length(scope_lookup_variant_payloads(scope, enum_name, at(variant_names, vi))) > 0:
             found = true
     found
 
@@ -157,26 +117,26 @@ define enum_has_payloads(scope: Scope, enum_name: text) -> truth:
 # "struct:" IR prefix (enums lower to structs), so strip it before an
 # enum-table lookup keyed by the plain enum name.
 define strip_struct_prefix(t: text) -> text:
-    b = bytes_from_text(t)
-    n = len(b)
+    b = bytes_of(t)
+    n = length(b)
     edit is_s = false
     if n >= 7:
         if at(b, 0) == 115 and at(b, 1) == 116 and at(b, 2) == 114 and at(b, 3) == 117 and at(b, 4) == 99 and at(b, 5) == 116 and at(b, 6) == 58:
             is_s = true
     if is_s:
-        bytes_to_text(bytes_slice(b, 7, n))
+        text_of(bytes_part(b, 7, n))
     else:
         t
 
 # The tag-0 (first-declared) variant of an enum, or "" if `enum_name` names
 # no known enum. Used to type the `?` operator's unwrapped success payload.
 define enum_first_variant(scope: Scope, enum_name: text) -> text:
-    total = len(scope.en_names)
+    total = length(scope.en_names)
     edit result = ""
     loop index in 0..<total:
         if at(scope.en_names, index) == enum_name and not contains_dollar(enum_name):
             names = split_csv(at(scope.en_variants, index))
-            if len(names) > 0 and result == "":
+            if length(names) > 0 and result == "":
                 result = at(names, 0)
     result
 
@@ -185,16 +145,16 @@ define enum_first_variant(scope: Scope, enum_name: text) -> text:
 # "@Variant:n1,n2", so `bindings` stays a flat [text] like every other arm
 # spec here. These three read that encoding back.
 define is_nested_binding(enc: text) -> truth:
-    b = bytes_from_text(enc)
+    b = bytes_of(enc)
     edit nested = false
-    if len(b) > 0:
+    if length(b) > 0:
         if at(b, 0) == 64:  # '@'
             nested = true
     nested
 
 define nested_binding_variant(enc: text) -> text:
-    b = bytes_from_text(enc)
-    n = len(b)
+    b = bytes_of(enc)
+    n = length(b)
     edit out = ""
     edit done = false
     loop i in 1..<n:
@@ -202,19 +162,19 @@ define nested_binding_variant(enc: text) -> text:
         if c == 58:  # ':'
             done = true
         if not done:
-            piece = bytes_to_text([c])
+            piece = text_of([c])
             out = "{out}{piece}"
     out
 
 define nested_binding_names(enc: text) -> [text]:
-    b = bytes_from_text(enc)
-    n = len(b)
+    b = bytes_of(enc)
+    n = length(b)
     edit rest = ""
     edit past = false
     loop i in 1..<n:
         c = at(b, i)
         if past:
-            piece = bytes_to_text([c])
+            piece = text_of([c])
             rest = "{rest}{piece}"
         if c == 58:  # ':'
             past = true
@@ -222,8 +182,8 @@ define nested_binding_names(enc: text) -> [text]:
 
 # Split a comma csv into parts (payload type lists are tiny).
 define split_csv(csv: text) -> [text]:
-    bs = bytes_from_text(csv)
-    n = len(bs)
+    bs = bytes_of(csv)
+    n = length(bs)
     edit parts = []
     edit current = ""
     if n == 0:
@@ -234,20 +194,20 @@ define split_csv(csv: text) -> [text]:
             parts = append(parts, current)
             current = ""
         else:
-            single = bytes_to_text(bytes_slice(bs, i, i + 1))
+            single = text_of(bytes_part(bs, i, i + 1))
             current = "{current}{single}"
     parts = append(parts, current)
     parts
 
 # Find the index of a variant in an enum. -1 if not enum or no match.
 define scope_lookup_enum_variant(scope: Scope, enum_name: text, variant: text) -> int:
-    total = len(scope.en_names)
+    total = length(scope.en_names)
     edit result = 0 - 1
     loop index in 0..<total:
         if at(scope.en_names, index) == enum_name:
             csv = at(scope.en_variants, index)
-            csv_bytes = bytes_from_text(csv)
-            n = len(csv_bytes)
+            csv_bytes = bytes_of(csv)
+            n = length(csv_bytes)
             edit current = ""
             edit found_at = 0 - 1
             edit idx_count = 0
@@ -259,7 +219,7 @@ define scope_lookup_enum_variant(scope: Scope, enum_name: text, variant: text) -
                     current = ""
                     idx_count = idx_count + 1
                 else:
-                    single = bytes_to_text([b])
+                    single = text_of([b])
                     current = "{current}{single}"
             if current == variant and found_at == (0 - 1):
                 found_at = idx_count
@@ -275,7 +235,7 @@ define scope_add_data_decl(scope: Scope, struct_name: text, spec: text) -> Scope
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: new_names, ds_specs: new_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
 define scope_lookup_data_spec(scope: Scope, struct_name: text) -> text:
-    total = len(scope.ds_names)
+    total = length(scope.ds_names)
     edit result = ""
     loop index in 0..<total:
         if at(scope.ds_names, index) == struct_name:
@@ -291,12 +251,12 @@ define scope_lookup_data_spec(scope: Scope, struct_name: text) -> text:
 # Replace ':' with '_' so a type string like "list:i64" is a clean part of a
 # synthesized struct name ("list_i64").
 define tuple_sanitize(t: text) -> text:
-    b = bytes_from_text(t)
-    n = len(b)
+    b = bytes_of(t)
+    n = length(b)
     edit out = ""
     loop i in 0..<n:
         c = at(b, i)
-        piece = if c == 58 then "_" else bytes_to_text([c])
+        piece = if c == 58 then "_" else text_of([c])
         out = "{out}{piece}"
     out
 
@@ -305,7 +265,7 @@ define tuple_sanitize(t: text) -> text:
 # and field access resolve `._0`/`._1` with the right per-slot type. The literal
 # and the `(A, B)` type produce identical names, so they interoperate.
 define otir_tuple_register(elem_types: [text]) -> text:
-    n = len(elem_types)
+    n = length(elem_types)
     edit name = "__Tup{n}"
     loop ni in 0..<n:
         name = "{name}_{tuple_sanitize(at(elem_types, ni))}"
@@ -333,8 +293,8 @@ define int_to_text_helper(value: int) -> text:
         if value < 0 then "-{chars}" else chars
 
 define parse_data_spec(spec: text) -> [text]:
-    bs = bytes_from_text(spec)
-    total = len(bs)
+    bs = bytes_of(spec)
+    total = length(bs)
     edit parts = []
     edit current = ""
     loop index in 0..<total:
@@ -343,9 +303,9 @@ define parse_data_spec(spec: text) -> [text]:
             parts = append(parts, current)
             current = ""
         else:
-            single = bytes_to_text([b])
+            single = text_of([b])
             current = "{current}{single}"
-    if len(bytes_from_text(current)) > 0:
+    if length(bytes_of(current)) > 0:
         parts = append(parts, current)
     parts
 
@@ -353,13 +313,13 @@ define parse_data_spec(spec: text) -> [text]:
 # Given parsed parts ["name:type", ...] find the index of field_name.
 # Returns -1 if not found.
 define find_field_index(parts: [text], field_name: text) -> int:
-    n = len(parts)
+    n = length(parts)
     edit result = 0 - 1
     loop index in 0..<n:
         part = at(parts, index)
         # Split on ':' to get name
-        bs = bytes_from_text(part)
-        bs_n = len(bs)
+        bs = bytes_of(part)
+        bs_n = length(bs)
         edit name_buf = ""
         edit found_colon = 0
         loop ci in 0..<bs_n:
@@ -368,7 +328,7 @@ define find_field_index(parts: [text], field_name: text) -> int:
                 if b == 58:  # ':'
                     found_colon = 1
                 else:
-                    single = bytes_to_text([b])
+                    single = text_of([b])
                     name_buf = "{name_buf}{single}"
         if name_buf == field_name and result == (0 - 1):
             result = index
@@ -377,19 +337,19 @@ define find_field_index(parts: [text], field_name: text) -> int:
 
 # Given parsed parts and an index, return the type after ':'.
 define field_type_at(parts: [text], idx: int) -> text:
-    n = len(parts)
+    n = length(parts)
     if idx < 0 or idx >= n:
         "i64"
     else:
         part = at(parts, idx)
-        bs = bytes_from_text(part)
-        bs_n = len(bs)
+        bs = bytes_of(part)
+        bs_n = length(bs)
         edit type_buf = ""
         edit found_colon = 0
         loop ci in 0..<bs_n:
             b = at(bs, ci)
             if found_colon == 1:
-                single = bytes_to_text([b])
+                single = text_of([b])
                 type_buf = "{type_buf}{single}"
             else:
                 if b == 58:
@@ -402,7 +362,7 @@ define scope_add_fn_sig(scope: Scope, fn_name: text, ret_type: text) -> Scope:
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
 define scope_lookup_fn_ret(scope: Scope, fn_name: text) -> text:
-    total = len(scope.fn_sig_names)
+    total = length(scope.fn_sig_names)
     edit result = ""
     loop index in 0..<total:
         if at(scope.fn_sig_names, index) == fn_name:
@@ -417,9 +377,37 @@ define scope_lookup_fn_ret_loc(scope: Scope, fn_name: text, node: table) -> text
     if found == "":
         line = if has(node, "line") then get_int(node, "line") else 0
         col = if has(node, "col") then get_int(node, "col") else 0
+        # An orb exports this name but no `use` brings it in: that is the
+        # whole story, told once, with a location (otir_resolve stashed the
+        # candidates instead of printing its own locationless line).
+        nv = if slot_has("otir:notvis:{fn_name}") then slot_get("otir:notvis:{fn_name}") else ""
+        if nv != "":
+            compile_error("orion: ERROR at {otir_where(line, col)} - `{fn_name}` needs a `use`; it is exported by{nv}")
+            slot_set("otir:notvis:{fn_name}", "")
+            return "i64"
         # The retired stdlib spellings each name their replacement - a reader
         # coming from v1 gets the new word, not a shrug.
         edit ufn_hint = ""
+        # 2026-08-13: the surface says the whole word. The parser maps the
+        # spoken name to the one this file knows (psr_spoken_builtin), so
+        # these OLD spellings arrive here unmapped - and each names its
+        # replacement rather than shrugging.
+        if fn_name == "len":
+            ufn_hint = " (retired; the word is `length` now)"
+        if fn_name == "slice":
+            ufn_hint = " (retired; a piece of a list is `part`)"
+        if fn_name == "to_int":
+            ufn_hint = " (retired; `to_whole` - the numbers are `number`, not int)"
+        if fn_name == "to_float":
+            ufn_hint = " (retired; `to_real`)"
+        if fn_name == "bytes_from_text":
+            ufn_hint = " (retired; `bytes_of`)"
+        if fn_name == "bytes_to_text":
+            ufn_hint = " (retired; `text_of`)"
+        if fn_name == "bytes_length":
+            ufn_hint = " (retired; `bytes_count`)"
+        if fn_name == "bytes_slice":
+            ufn_hint = " (retired; `bytes_part`)"
         if fn_name == "push":
             ufn_hint = " (retired; append to a list with `append`)"
         if fn_name == "push_mut":
@@ -474,15 +462,15 @@ define scope_push_loop(scope: Scope, header_lbl: text, end_lbl: text) -> Scope:
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: new_headers, loop_ends: new_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
 define scope_top_loop_header(scope: Scope) -> text:
-    n = len(scope.loop_headers)
+    n = length(scope.loop_headers)
     if n == 0 then "" else at(scope.loop_headers, n - 1)
 
 define scope_top_loop_end(scope: Scope) -> text:
-    n = len(scope.loop_ends)
+    n = length(scope.loop_ends)
     if n == 0 then "" else at(scope.loop_ends, n - 1)
 
 define scope_lookup(scope: Scope, name: text) -> int:
-    total = len(scope.names)
+    total = length(scope.names)
     edit result = 0 - 1
     loop index in 0..<total:
         from_end = total - 1 - index
@@ -492,7 +480,7 @@ define scope_lookup(scope: Scope, name: text) -> int:
     result
 
 define scope_is_mut(scope: Scope, name: text) -> int:
-    total = len(scope.names)
+    total = length(scope.names)
     edit result = 0
     loop index in 0..<total:
         from_end = total - 1 - index
@@ -519,7 +507,7 @@ define scope_is_linear(scope: Scope, name: text) -> int:
 # We use this to avoid emitting redundant branches (which LLVM rejects).
 define last_op(fn_value: IRFn) -> text:
     insts = fn_value.instructions
-    n = len(insts)
+    n = length(insts)
     if n == 0 then "" else at(insts, n - 1).op
 
 define is_block_terminated(fn_value: IRFn) -> int:
@@ -543,8 +531,8 @@ type ConvResult: function: IRFn, scope: Scope, id: int
 # Convert a text-encoded int literal to int.
 # Use bytes (text[i] returns whole string - Orion bug as of 2026-06).
 define parse_int(text: text) -> int:
-    byte_list = bytes_from_text(text)
-    total = len(byte_list)
+    byte_list = bytes_of(text)
+    total = length(byte_list)
     edit value = 0
     edit start = 0
     edit is_neg = false
@@ -560,7 +548,6 @@ define parse_int(text: text) -> int:
         if b >= 48 and b <= 57:
             value = value * 10 + (b - 48)
     if is_neg then 0 - value else value
-
 
 # Walk an expression node, append IR instructions to the function,
 # return the SSA id of the result.
@@ -632,7 +619,7 @@ define ast_binary_to_ir(fn2: IRFn, scope: Scope, op: text, left_id: int, right_i
 
 define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     stmts = get_list(node, "stmts")
-    total_stmts = len(stmts)
+    total_stmts = length(stmts)
     edit current_fn = fn_value
     # Own copy: bindings here append in place (see scope_bind), so the block
     # must not mutate the caller's buffer - its locals would leak into the
@@ -644,7 +631,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     # not just let/mut). current_scope only grows here - block-scoped sub-
     # statements revert to it - so the prefix [0, nm_prev_len) never shifts.
     edit nm_seen = build_name_index(current_scope.names)
-    edit nm_prev_len = len(current_scope.names)
+    edit nm_prev_len = length(current_scope.names)
     edit last_id = 0 - 1
     # Collect deferred expressions in source order. They run in LIFO order
     # at end of block (and before any return). For now defer is block-scope
@@ -777,7 +764,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     if nm_hit != 0 and not has(stmt, "ia"):
                         rbl = if has(stmt, "line") then get_int(stmt, "line") else 0
                         rbc = if has(stmt, "col") then get_int(stmt, "col") else 0
-                        compile_error("orion: ERROR at {otir_where(rbl, rbc)} - `{name}` cannot change: it was bound as a stable value. Choose one: declare it changeable where it is born (`edit {name} = ...`), or give this new value a new name")
+                        compile_error("orion: ERROR at {otir_where(rbl, rbc)} - `{name}` cannot change (bound stable); `edit {name} = ...` where it is born, or a new name here")
                     # `x: T = e` - the ANNOTATION decides the type. It used to be
                     # parsed and dropped here, so `ys: [text] = get_list(m, k)`
                     # looked like it fixed the element type and did nothing (the
@@ -842,7 +829,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             current_fn = er.function
             current_scope = er.scope
             # Emit deferred exprs in LIFO order BEFORE the return.
-            n_defers = len(defer_exprs)
+            n_defers = length(defer_exprs)
             loop di in 0..<n_defers:
                 # Reverse: emit defer_exprs[n_defers - 1 - di]
                 rev_idx = n_defers - 1 - di
@@ -887,7 +874,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             compile_error("orion: ERROR at {otir_where(line, col)} - unhandled statement kind `{stmt_kind}` (skipping)")
         # Keep the name index in sync: fold in whatever this statement appended
         # to current_scope (let/mut, destructure, anything). O(1) amortized.
-        nm_now = len(current_scope.names)
+        nm_now = length(current_scope.names)
         loop nk in nm_prev_len..<nm_now:
             nm_seen = set(nm_seen, at(current_scope.names, nk), nk + 1)
         nm_prev_len = nm_now
@@ -895,7 +882,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     # block already terminated via return (in which case defers ran before
     # the return).
     if is_block_terminated(current_fn) == 0:
-        n_end_defers = len(defer_exprs)
+        n_end_defers = length(defer_exprs)
         loop di in 0..<n_end_defers:
             rev_idx = n_end_defers - 1 - di
             def_expr = at(defer_exprs, rev_idx)
@@ -908,7 +895,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 # `loop:` - infinite loop with `break`/`continue` for exit.
 define ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     body_node = get(node, "body")
-    n = len(fn_value.instructions)
+    n = length(fn_value.instructions)
     header_lbl = "loop_{n}_header"
     end_lbl = "loop_{n}_end"
 
@@ -922,7 +909,7 @@ define ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     pr_header = ir_fn_push(pr_br_in.function, ir_label(header_lbl))
     # 3) Walk body inside loop scope.
     body_r = ast_expr_to_ir(pr_header.function, body_scope, body_node)
-    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
+    check_branch_shadows(length(body_scope.names), body_r.scope, "loop body", node)
     # 4) If body didn't terminate (no break/continue at end), loop back.
     edit fn_after_body = body_r.function
     if is_block_terminated(fn_after_body) == 0:
@@ -940,7 +927,7 @@ define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult
     iter_node = get(node, "iter")
     body_node = get(node, "body")
 
-    n = len(fn_value.instructions)
+    n = length(fn_value.instructions)
     header_lbl = "fin_{n}_header"
     body_lbl = "fin_{n}_body"
     step_lbl = "fin_{n}_step"
@@ -965,7 +952,7 @@ define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult
         fin_who = if get(iter_node, "kind") == "Ident" then "`{get(iter_node, "name")}`" else "that value"
         fin_line = if has(iter_node, "line") then get_int(iter_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
         fin_col = if has(iter_node, "col") then get_int(iter_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
-        compile_error("orion: ERROR at {otir_where(fin_line, fin_col)} - cannot loop over {fin_who}: it is `{friendly_type(fin_iter_type)}`, and `loop ... in` walks a list. For text, walk its bytes: `loop b in bytes_from_text(s)`. For a map, `use dict` and walk `keys(m)`. If it is an unannotated parameter, add a type (e.g. `xs: [int]`) - untyped params default to `int`.")
+        compile_error("orion: ERROR at {otir_where(fin_line, fin_col)} - cannot loop over {fin_who}: it is `{friendly_type(fin_iter_type)}`, and `loop ... in` walks a list (text: `bytes_of(s)`; map: `keys(m)`; untyped params default to `int` - annotate)")
 
     pr_len = ir_fn_push(iter_r.function, ir_list_len(list_id))
     len_id = pr_len.id
@@ -999,7 +986,7 @@ define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult
         body_scope = scope_bind(body_scope, index_var_name, cur_id)
     body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
     body_r = ast_expr_to_ir(pr_at.function, body_scope, body_node)
-    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
+    check_branch_shadows(length(body_scope.names), body_r.scope, "loop body", node)
 
     # Fall through from body into step block.
     edit fn_after_body = body_r.function
@@ -1025,14 +1012,14 @@ define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvRes
     high_node = get(node, "high")
     body_node = get(node, "body")
 
-    n = len(fn_value.instructions)
+    n = length(fn_value.instructions)
     header_lbl = "for_{n}_header"
     body_lbl = "for_{n}_body"
     step_lbl = "for_{n}_step"
     end_lbl = "for_{n}_end"
 
-    low_r = ast_expr_to_ir(fn_value, scope, low_node)
-    high_r = ast_expr_to_ir(low_r.function, low_r.scope, high_node)
+    low_r = demote_number_index(ast_expr_to_ir(fn_value, scope, low_node))
+    high_r = demote_number_index(ast_expr_to_ir(low_r.function, low_r.scope, high_node))
     pr_alloca = ir_fn_push(high_r.function, ir_alloca("i64"))
     counter_ptr_id = pr_alloca.id
     pr_init_store = ir_fn_push(pr_alloca.function, ir_store(counter_ptr_id, low_r.id))
@@ -1053,7 +1040,7 @@ define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvRes
     edit body_scope = scope_bind(high_r.scope, var_name, cur_id)
     body_scope = scope_push_loop(body_scope, step_lbl, end_lbl)
     body_r = ast_expr_to_ir(pr_body_lbl.function, body_scope, body_node)
-    check_branch_shadows(len(body_scope.names), body_r.scope, "loop body", node)
+    check_branch_shadows(length(body_scope.names), body_r.scope, "loop body", node)
 
     # Fall through from body into step block.
     edit fn_after_body = body_r.function
@@ -1133,7 +1120,7 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if bare_enum == "" and fn_ret != "":
             # A bare fn name used as a value becomes a plain-fn closure
             # [fn_ptr, 0] - flag 0 so closure_call invokes it without an env.
-            no_caps = slice([0], 0, 0)
+            no_caps = part([0], 0, 0)
             pr_fnref = ir_fn_push(fn_value, ir_make_closure(fn_name_res, no_caps, 0))
             result = ConvResult{function: pr_fnref.function, scope: scope, id: pr_fnref.id}
         if bare_enum == "" and fn_ret == "":
@@ -1141,6 +1128,12 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # captured as a single ident. Emit a sentinel iconst(0).
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
+            # Same merged not-visible story as unknown functions: one located
+            # line naming the orbs, not two errors for one missing `use`.
+            nv_id = if slot_has("otir:notvis:{name}") then slot_get("otir:notvis:{name}") else ""
+            if nv_id != "":
+                compile_error("orion: ERROR at {otir_where(line, col)} - `{name}` needs a `use`; it is exported by{nv_id}")
+                slot_set("otir:notvis:{name}", "")
             # `for` no longer starts a loop, so it reaches here as a bare name.
             # Say what happened instead of "unknown identifier `for`".
             if name == "for":
@@ -1150,7 +1143,7 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # The v1 spellings are RETIRED (corpus migrated 2026-08-02). Each
             # names its replacement instead of dying as an unknown identifier.
             if name == "fn":
-                compile_error("orion: ERROR at {otir_where(line, col)} - `fn` no longer declares a function; write `define name(...)`. (The anonymous form `fn(x): body` still works.)")
+                compile_error("orion: ERROR at {otir_where(line, col)} - `fn` no longer declares a function; write `define name(...)`. (The anonymous form `function(x): body` still works.)")
             if name == "mut":
                 compile_error("orion: ERROR at {otir_where(line, col)} - `mut` was retired; a changeable binding is `edit x = 0`")
             if name == "pub":
@@ -1161,7 +1154,7 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 compile_error("orion: ERROR at {otir_where(line, col)} - `match` was retired; the branching keyword is `choose` (`choose x:` with `pattern then value` arms)")
             if name == "yield":
                 compile_error("orion: ERROR at {otir_where(line, col)} - `yield` was retired; collect out of a loop with `collect` (`loop x in xs: collect x * 2`)")
-            if name != "for" and name != "where" and name != "mut" and name != "pub" and name != "extern" and name != "match" and name != "yield" and name != "fn":
+            if nv_id == "" and name != "for" and name != "where" and name != "mut" and name != "pub" and name != "extern" and name != "match" and name != "yield" and name != "fn":
                 compile_error("orion: ERROR at {otir_where(line, col)} - unknown identifier `{name}` (interpolation may need a temp var)")
             pr = ir_fn_push(fn_value, ir_iconst(0))
             result = ConvResult{function: pr.function, scope: scope, id: pr.id}
@@ -1174,6 +1167,28 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         pr = ir_fn_push(fn_value, ir_load(found_id, loaded_type))
         result = ConvResult{function: pr.function, scope: scope, id: pr.id}
     result
+
+# The `number` boundary, index side: a whole number where the runtime
+# wants an integer index or bound is demoted exactly (fptosi; whole
+# values below 2^53 are unchanged).
+# Coerce a value to a list's element class - promotion or exact
+# demotion; an unknown element class leaves the value alone.
+define coerce_to_elem(prior: ConvResult, elem_class: text) -> ConvResult:
+    value_type = get_value_type(prior.function, prior.id)
+    if elem_class == "f64" and (value_type == "i64" or is_sized_int_name(value_type)):
+        pr_pe = ir_fn_push(prior.function, ir_sitofp(prior.id))
+        return ConvResult{function: pr_pe.function, scope: prior.scope, id: pr_pe.id}
+    if (elem_class == "i64" or is_sized_int_name(elem_class)) and value_type == "f64":
+        pr_de = ir_fn_push(prior.function, ir_fptosi(prior.id))
+        return ConvResult{function: pr_de.function, scope: prior.scope, id: pr_de.id}
+    prior
+
+define demote_number_index(prior: ConvResult) -> ConvResult:
+    if get_value_type(prior.function, prior.id) == "f64":
+        pr_dm = ir_fn_push(prior.function, ir_fptosi(prior.id))
+        ConvResult{function: pr_dm.function, scope: prior.scope, id: pr_dm.id}
+    else:
+        prior
 
 # Float binop lowering: promote any i64 operand via sitofp, then
 # fadd/fsub/fmul/fdiv for arithmetic or fcmp+zext for comparisons.
@@ -1219,6 +1234,10 @@ define ast_float_binop_to_ir(fn_in: IRFn, scope: Scope, op: text, left_id: int, 
         fd_pr = ir_fn_push(current_fn, ir_fbin("fdiv", l_id, r_id))
         fl_pr = ir_fn_push(fd_pr.function, ir_fmath1("floor", fd_pr.id))
         return ConvResult{function: fl_pr.function, scope: scope, id: fl_pr.id}
+    # `%` on floats: IEEE remainder (frem) - exact by definition, so
+    # `number` code keeps its modulo and its determinism.
+    if op == "%":
+        fop = "frem"
     if fop == "":
         compile_error("orion: ERROR - operator `{op}` not supported for f64 operands")
         fop = "fadd"
@@ -1261,7 +1280,7 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # exponentially on left-associative `a or b or c…` chains.
         or_left_r = ast_expr_to_ir(fn_value, scope, get(node, "left"))
         or_fn = or_left_r.function
-        or_n = len(or_fn.instructions)
+        or_n = length(or_fn.instructions)
         or_tmp = "__or_tmp_{or_n}"
         or_scope = scope_bind(or_left_r.scope, or_tmp, or_left_r.id)
         or_ref = {"kind": "Ident", "name": or_tmp}
@@ -1334,7 +1353,7 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 # O(distance from last label to end), amortized O(1) in practice.
 define current_block(fn_value: IRFn) -> text:
     insts = fn_value.instructions
-    total = len(insts)
+    total = length(insts)
     edit found = "entry"
     edit done = 0
     loop index in 0..<total:
@@ -1368,7 +1387,7 @@ define current_block(fn_value: IRFn) -> text:
 #    ERROR: under block scoping the assignment cannot escape, so
 #    the author's intent silently dies - demand `mut` instead.
 define scope_truncate(s: Scope, keep: int) -> Scope:
-    Scope{names: slice(s.names, 0, keep), ids: slice(s.ids, 0, keep), mut_flags: slice(s.mut_flags, 0, keep), loop_headers: s.loop_headers, loop_ends: s.loop_ends, fn_sig_names: s.fn_sig_names, fn_sig_rets: s.fn_sig_rets, ds_names: s.ds_names, ds_specs: s.ds_specs, en_names: s.en_names, en_variants: s.en_variants}
+    Scope{names: part(s.names, 0, keep), ids: part(s.ids, 0, keep), mut_flags: part(s.mut_flags, 0, keep), loop_headers: s.loop_headers, loop_ends: s.loop_ends, fn_sig_names: s.fn_sig_names, fn_sig_rets: s.fn_sig_rets, ds_names: s.ds_names, ds_specs: s.ds_specs, en_names: s.en_names, en_variants: s.en_variants}
 
 # A private copy of the var-binding lists. Since scope_bind now appends IN
 # PLACE (push_mut, so N locals is O(N) not O(N^2)), a block must NOT share its
@@ -1377,7 +1396,7 @@ define scope_truncate(s: Scope, keep: int) -> Scope:
 # its own copy, so it may grow freely without touching the caller; the copy is
 # once per block (O(AST)), not once per binding.
 define scope_copy(s: Scope) -> Scope:
-    scope_truncate(s, len(s.names))
+    scope_truncate(s, length(s.names))
 
 # name -> (index + 1) of its MOST RECENT binding in `names` (0 / absent means
 # not bound). Lets the block statement loop answer "is this name already bound,
@@ -1386,13 +1405,13 @@ define scope_copy(s: Scope) -> Scope:
 # Last write wins, so a shadowed name resolves to its newest slot.
 define build_name_index(names: [text]) -> table:
     edit idx = {}
-    n = len(names)
+    n = length(names)
     loop i in 0..<n:
         idx = set(idx, at(names, i), i + 1)
     idx
 
 define check_branch_shadows(before: int, s: Scope, where_txt: text, node: table):
-    total = len(s.names)
+    total = length(s.names)
     loop i in before..<total:
         nm = at(s.names, i)
         if at(s.mut_flags, i) == 0:
@@ -1420,7 +1439,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     cond_r = ast_expr_to_ir(fn_value, scope, cond_node)
 
     # Unique label names, keyed on the post-condition inst position.
-    n = len(cond_r.function.instructions)
+    n = length(cond_r.function.instructions)
     then_lbl = "if_{n}_then"
     else_lbl = "if_{n}_else"
     merge_lbl = "if_{n}_merge"
@@ -1430,7 +1449,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     fn_after_br = pr_br.function
 
     # 3) label then; evaluate A.
-    scope_before = len(cond_r.scope.names)
+    scope_before = length(cond_r.scope.names)
     pr_then_lbl = ir_fn_push(fn_after_br, ir_label(then_lbl))
     then_r = ast_expr_to_ir(pr_then_lbl.function, cond_r.scope, then_node)
     check_branch_shadows(scope_before, then_r.scope, "branch", node)
@@ -1479,6 +1498,20 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # []` (runtime-correct, pervasive) would false-positive. All ptr
             # values share LLVM storage, so leave them lenient.
             type_mismatch = then_ll != else_ll and then_type != "void" and else_type != "void"
+            # The `number` boundary, branch side: one whole-number branch
+            # and one number branch unify by promoting the whole one -
+            # re-lower this if from the untouched entry state with that
+            # branch wrapped in to_float (IRFn is a value, so the
+            # half-built attempt simply drops).
+            then_is_whole = then_type == "i64" or is_sized_int_name(then_type)
+            else_is_whole = else_type == "i64" or is_sized_int_name(else_type)
+            if type_mismatch and ((then_type == "f64" and else_is_whole) or (else_type == "f64" and then_is_whole)):
+                wrap_then = else_type == "f64"
+                then_node0 = get_map(node, "then")
+                else_node0 = get_map(node, "else")
+                wrapped_then = if wrap_then then {"kind": "Call", "callee": "to_real", "args": [then_node0]} else then_node0
+                wrapped_else = if wrap_then then else_node0 else {"kind": "Call", "callee": "to_real", "args": [else_node0]}
+                return ast_if_to_ir(fn_value, scope, set(set(node, "then", wrapped_then), "else", wrapped_else))
             if type_mismatch:
                 line = if has(node, "line") then get_int(node, "line") else 0
                 col = if has(node, "col") then get_int(node, "col") else 0
@@ -1532,7 +1565,7 @@ define coerce_f64(r: ConvResult) -> ConvResult:
         ConvResult{function: pr.function, scope: r.scope, id: pr.id}
 
 define text_list_has(xs: [text], needle: text) -> truth:
-    n = len(xs)
+    n = length(xs)
     edit found = false
     loop i in 0..<n:
         if at(xs, i) == needle:
@@ -1542,14 +1575,14 @@ define text_list_has(xs: [text], needle: text) -> truth:
 # Payload slot count for a variant: "" = 0, else csv entries.
 define variant_payload_count(scope: Scope, enum_name: text, variant: text) -> int:
     csv = scope_lookup_variant_payloads(scope, enum_name, variant)
-    if csv == "" then 0 else len(split_csv(csv))
+    if csv == "" then 0 else length(split_csv(csv))
 
 define find_variant_enum(scope: Scope, callee: text) -> text:
     # Bare variant names share one global namespace natively - two enums
     # exporting the same variant resolve differently interp vs native
     # (caught live: atlas Effect::Spawn vs astra Tok::Spawn), so ambiguity
     # is a hard error rather than a silent first-hit.
-    n_enums = len(scope.en_names)
+    n_enums = length(scope.en_names)
     edit found_enum = ""
     edit second_enum = ""
     loop ei in 0..<n_enums:
@@ -1603,7 +1636,7 @@ define otir_bind_tyvars(decl: table) -> int:
     # The capability contract being compiled: call sites check against it.
     # Empty = no clause = inferred (unchecked) - a DECLARED clause is held to.
     gens = if has(decl, "generics") then get_list(decl, "generics") else []
-    loop gi in 0..<len(gens):
+    loop gi in 0..<length(gens):
         slot_set(otir_k1("tv", at(gens, gi)), g)
     g
 
@@ -1622,7 +1655,7 @@ define otir_scope(orb: text) -> text:
 # is valid immediately after ast_program_to_ir returns.
 public define deterministic_fn_names() -> [text]:
     n = slot_int_or_zero(otir_k1("detn", "count"))
-    edit out = slice([""], 0, 0)
+    edit out = part([""], 0, 0)
     loop i in 0..<n:
         out = append(out, slot_get(otir_k1("deto", "{i}")))
     out
@@ -1713,7 +1746,10 @@ define otir_resolve(name: text) -> text:
     if hits > 1:
         compile_error("orion: ERROR - `{name}` is exported by more than one orb you import ({listed} ) - say which: `use <orb> ({name})`")
         return name
-    compile_error("orion: ERROR - `{name}` is not visible here; it is exported by{listed} - add `use` for the one you mean")
+    # Not visible from here. Do not print yet: the CALLER knows line/col, and
+    # the located consumer (unknown fn / unknown ident) prints ONE merged
+    # error instead of this locationless line plus its own.
+    slot_set("otir:notvis:{name}", orion_persist_text(listed))
     name
 
 # How many arguments a BUILTIN needs before it starts indexing them. -1 means
@@ -1723,10 +1759,21 @@ define otir_resolve(name: text) -> text:
 # read `args[0]` and tripped the compiler's own runtime guard:
 # "list index 1 out of range (len 1)" - an internal trap where a diagnostic
 # belongs. A fuzzer found it in the second run.
+# The names ast_call_to_ir dispatches as BUILTINS (the `is_x = callee == ...`
+# flags below) - a call to one of these never reaches a user define, so
+# defining a function with one of these names is a compile error at the
+# define. MUST stay in sync with the dispatch flags; a name listed here but
+# not dispatched only over-rejects loudly, the reverse crashes silently.
+define is_builtin_name(n: text) -> truth:
+    a = n == "length" or n == "at" or n == "get" or n == "get_int" or n == "get_map" or n == "get_list" or n == "get_text_list" or n == "get_int_list" or n == "get_or" or n == "has" or n == "set" or n == "part" or n == "contains" or n == "push" or n == "append" or n == "__push_inplace" or n == "map_keys" or n == "map_values" or n == "map_remove"
+    b = n == "print" or n == "print_line" or n == "print_raw" or n == "to_text" or n == "to_whole" or n == "to_real" or n == "pow" or n == "atan2" or n == "resume" or n == "call_ptr" or n == "breakpoint" or n == "argc" or n == "argv" or n == "struct_field_int" or n == "struct_field_text" or n == "__interp_join"
+    c = n == "bytes_of" or n == "text_of" or n == "bytes_count" or n == "bytes_part" or n == "bytes_concat" or n == "bytes_zeros" or n == "byte_at" or n == "slot_get" or n == "slot_set" or n == "slot_has" or n == "slot_get_int" or n == "file_read" or n == "file_write" or n == "time_now_ms" or n == "monotonic_ms" or n == "sleep_ms" or n == "par_run" or n == "par_madd" or n == "vec_add" or n == "vec_sub" or n == "vec_mul" or n == "vec_dot" or n == "vec_madd" or n == "vec_addi"
+    a or b or c
+
 define builtin_min_args(callee: text) -> int:
-    one = callee == "len" or callee == "print_line" or callee == "print" or callee == "print_raw" or callee == "to_text" or callee == "to_int" or callee == "to_float" or callee == "bytes_from_text" or callee == "bytes_to_text" or callee == "bytes_zeros" or callee == "bytes_length" or callee == "map_keys" or callee == "map_values" or callee == "slot_get" or callee == "slot_has" or callee == "slot_get_int" or callee == "file_read" or callee == "argv" or callee == "resume" or callee == "parse_int"
+    one = callee == "length" or callee == "print_line" or callee == "print" or callee == "print_raw" or callee == "to_text" or callee == "to_whole" or callee == "to_real" or callee == "bytes_of" or callee == "text_of" or callee == "bytes_zeros" or callee == "bytes_count" or callee == "map_keys" or callee == "map_values" or callee == "slot_get" or callee == "slot_has" or callee == "slot_get_int" or callee == "file_read" or callee == "argv" or callee == "resume" or callee == "parse_int"
     two = callee == "at" or callee == "get" or callee == "get_int" or callee == "get_map" or callee == "get_list" or callee == "get_text_list" or callee == "get_int_list" or callee == "has" or callee == "push" or callee == "append" or callee == "__push_inplace" or callee == "contains" or callee == "map_remove" or callee == "byte_at" or callee == "bytes_concat" or callee == "slot_set" or callee == "file_write" or callee == "call_ptr" or callee == "par_run" or callee == "vec_add" or callee == "vec_sub" or callee == "vec_mul" or callee == "vec_dot"
-    three = callee == "set" or callee == "slice" or callee == "get_or" or callee == "bytes_slice" or callee == "vec_madd" or callee == "vec_addi"
+    three = callee == "set" or callee == "part" or callee == "get_or" or callee == "bytes_part" or callee == "vec_madd" or callee == "vec_addi"
     if three:
         3
     else:
@@ -1741,29 +1788,29 @@ define builtin_min_args(callee: text) -> int:
 define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     callee = get(node, "callee")
     # The orb-local name is used ONLY where a global function is meant. A LOCAL
-    # binding still shadows: `double = fn(x): x * 2` must call the closure in
+    # binding still shadows: `double = function(x): x * 2` must call the closure in
     # scope even if the orb also has a private `double`, so the local lookup
     # below keeps the raw name.
     callee_g = otir_resolve(callee)
     edit args = get_list(node, "args")
     # Builtin arity, checked BEFORE anything indexes the argument list.
     bmin = builtin_min_args(callee)
-    if bmin > 0 and len(args) < bmin:
+    if bmin > 0 and length(args) < bmin:
         ba_line = if has(node, "line") then get_int(node, "line") else 0
         ba_col = if has(node, "col") then get_int(node, "col") else 0
-        compile_error("orion: ERROR at {otir_where(ba_line, ba_col)} - `{callee}` takes {bmin} argument(s), got {len(args)}")
+        compile_error("orion: ERROR at {otir_where(ba_line, ba_col)} - `{callee}` takes {bmin} argument(s), got {length(args)}")
         pr_bad = ir_fn_push(fn_value, ir_iconst(0))
         return ConvResult{function: pr_bad.function, scope: scope, id: pr_bad.id}
     # Named-argument reorder + default fill: `f(y: 3, x: 5)` → positional
     # order via the `otir:param:<fn>:<name>` slots; any slot the call never
     # fills takes its parameter's recorded default (`otir:pdefault:<fn>:<i>`).
     edit na_has = 0
-    loop na_i in 0..<len(args):
+    loop na_i in 0..<length(args):
         if get(at(args, na_i), "kind") == "NamedArg":
             na_has = 1
-    na_want = if slot_has("otir:arity:" + callee_g) then slot_get_int("otir:arity:" + callee_g) else len(args)
-    if na_has == 1 or (na_want > len(args) and slot_has("otir:pdefault:{callee_g}:{len(args)}")):
-        na_total = if na_want > len(args) then na_want else len(args)
+    na_want = if slot_has("otir:arity:" + callee_g) then slot_get_int("otir:arity:" + callee_g) else length(args)
+    if na_has == 1 or (na_want > length(args) and slot_has("otir:pdefault:{callee_g}:{length(args)}")):
+        na_total = if na_want > length(args) then na_want else length(args)
         na_seed = []
         edit na_pos = na_seed
         edit na_filled = []
@@ -1771,7 +1818,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             na_pos = append(na_pos, {"kind": "Int", "value": "0"})
             na_filled = append(na_filled, 0)
         edit na_next = 0
-        loop na_k in 0..<len(args):
+        loop na_k in 0..<length(args):
             na_a = at(args, na_k)
             if get(na_a, "kind") == "NamedArg":
                 na_slot = slot_get_int("otir:param:" + callee_g + ":" + get(na_a, "name"))
@@ -1798,7 +1845,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # emit garbage in the missing slot (the interp checker caught
         # it; now both do).
         vc_want = variant_payload_count(scope, vc_enum, callee)
-        vc_got = len(args)
+        vc_got = length(args)
         if vc_got != vc_want:
             vc_line = if has(node, "line") then get_int(node, "line") else 0
             vc_col = if has(node, "col") then get_int(node, "col") else 0
@@ -1818,7 +1865,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         edit ij_scope = scope
         ij_seed: [int] = []
         edit ij_ids = ij_seed
-        loop ij_i in 0..<len(args):
+        loop ij_i in 0..<length(args):
             ij_r = ast_expr_to_ir(ij_fn, ij_scope, at(args, ij_i))
             ij_fn = ij_r.function
             ij_scope = ij_r.scope
@@ -1852,8 +1899,8 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_print_line = callee == "print_line"
     is_print_raw = callee == "print" or callee == "print_raw"
     is_to_text = callee == "to_text"
-    is_to_float = callee == "to_float"
-    is_to_int = callee == "to_int"
+    is_to_float = callee == "to_real"
+    is_to_int = callee == "to_whole"
     is_resume = callee == "resume"
     is_call_ptr = callee == "call_ptr"
     fmath_name = math_libm_name(callee)
@@ -1928,7 +1975,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 pr = ir_fn_push(arg_r.function, ir_int_to_text(arg_r.id))
                 result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     is_at = callee == "at"
-    is_len = callee == "len"
+    is_len = callee == "length"
     is_get = callee == "get"
     is_has = callee == "has"
     is_push = callee == "push" or callee == "append"
@@ -1940,7 +1987,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_map_keys = callee == "map_keys"
     is_map_values = callee == "map_values"
     is_get_or = callee == "get_or"
-    is_slice = callee == "slice"
+    is_slice = callee == "part"
     is_vec_add = callee == "vec_add"
     is_vec_addi = callee == "vec_addi"
     is_vec_madd = callee == "vec_madd"
@@ -1958,14 +2005,14 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_file_write = callee == "file_write"
     is_argc = callee == "argc"
     is_argv = callee == "argv"
-    is_b_from_t = callee == "bytes_from_text"
-    is_b_to_t = callee == "bytes_to_text"
-    is_b_slice = callee == "bytes_slice"
+    is_b_from_t = callee == "bytes_of"
+    is_b_to_t = callee == "text_of"
+    is_b_slice = callee == "bytes_part"
     is_b_concat = callee == "bytes_concat"
     is_b_zeros = callee == "bytes_zeros"
     # byte_at/bytes_length alias to list_at/list_len (bytes are lists internally).
     is_byte_at = callee == "byte_at"
-    is_b_length = callee == "bytes_length"
+    is_b_length = callee == "bytes_count"
     is_slot_get = callee == "slot_get"
     is_slot_set = callee == "slot_set"
     is_slot_has = callee == "slot_has"
@@ -1985,7 +2032,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         list_node = at(args, 0)
         idx_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
-        idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
+        idx_r = demote_number_index(ast_expr_to_ir(list_r.function, list_r.scope, idx_node))
         # Closure env read: `at(__env, const)` inside a synth lambda. The env
         # list is i64, so a text/list/map capture is stored ptr-as-int - read
         # it as i64, then re-type per the code recorded at make_closure.
@@ -2013,8 +2060,8 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         arg_node = at(args, 0)
         arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
         arg_type = get_value_type(arg_r.function, arg_r.id)
-        # len(text) → strlen; len(map) → handle slot 2 (NOT list_len -
-        # a map handle's slot 1 is capacity); len(list) → list_len.
+        # length(text) → strlen; length(map) → handle slot 2 (NOT list_len -
+        # a map handle's slot 1 is capacity); length(list) → list_len.
         # Untyped args are an ERROR: static dispatch would silently pick
         # the wrong length (strlen on a list header etc).
         if arg_type == "text":
@@ -2026,12 +2073,12 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 # map length here is the documented silent-wrong-answer (it would
                 # read a Text's bytes as a map header). Refuse and point at the fix
                 # - annotating the read. A genuine `Map` (`m: table`, `size(m)`) is
-                # typed `map`, not `dyn`, so `len(m)` still works.
+                # typed `map`, not `dyn`, so `length(m)` still works.
                 if arg_type == "dyn":
                     dyn_who = if get(arg_node, "kind") == "Ident" then "`" + get(arg_node, "name") + "`" else "this value"
                     dyn_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
                     dyn_col = if has(arg_node, "col") then get_int(arg_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
-                    compile_error("orion: ERROR at {otir_where(dyn_line, dyn_col)} - len({dyn_who}) reads from an untyped map (`get_list` with no annotation), so its element type is unknown - this would take a MAP length even if the value is a Text. Annotate the read: `ys: [text] = get_list(m, k)` (or `[int]` / `[table]`)")
+                    compile_error("orion: ERROR at {otir_where(dyn_line, dyn_col)} - length({dyn_who}) reads from an untyped map (`get_list` with no annotation), so its element type is unknown - this would take a MAP length even if the value is a Text. Annotate the read: `ys: [text] = get_list(m, k)` (or `[int]` / `[table]`)")
                     pr = ir_fn_push(arg_r.function, ir_map_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
                 else:
@@ -2045,15 +2092,15 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     # `len` needs to know if the value is text or a list (strlen
                     # vs a header read). An `int`-typed arg usually means an
                     # unannotated parameter: untyped params default to `int`, so
-                    # `fn f(s): len(s)` treats `s` as int. Name it and point at
+                    # `fn f(s): length(s)` treats `s` as int. Name it and point at
                     # the fix - annotate the param - instead of a cryptic message.
                     len_who = if get(arg_node, "kind") == "Ident" then "`" + get(arg_node, "name") + "`" else "this value"
                     # Point at the argument (an Ident carries its line/col; the
-                    # bare `len(...)` call node does not). A fuzzer flagged this
+                    # bare `length(...)` call node does not). A fuzzer flagged this
                     # message as UNLOCATED - every diagnostic must name a place.
                     len_line = if has(arg_node, "line") then get_int(arg_node, "line") else (if has(node, "line") then get_int(node, "line") else 0)
                     len_col = if has(arg_node, "col") then get_int(arg_node, "col") else (if has(node, "col") then get_int(node, "col") else 0)
-                    compile_error("orion: ERROR at {otir_where(len_line, len_col)} - len({len_who}) but {len_who} is `{friendly_type(arg_type)}`, not text or a list. If it is an unannotated parameter, add a type (e.g. `s: text` or `s: [int]`) - untyped params default to `int`.")
+                    compile_error("orion: ERROR at {otir_where(len_line, len_col)} - length({len_who}) but {len_who} is `{friendly_type(arg_type)}`, not text or a list. If it is an unannotated parameter, add a type (e.g. `s: text` or `s: [int]`) - untyped params default to `int`.")
                     pr = ir_fn_push(arg_r.function, ir_list_len(arg_r.id))
                     result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_get:
@@ -2080,13 +2127,13 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # or the key is text; list when the target types as a list or the
         # key is an int index. Mirrors lodge-orion's dynamic dispatch.
         sc_tgt = ast_expr_to_ir(fn_value, scope, at(args, 0))
-        sc_key = ast_expr_to_ir(sc_tgt.function, sc_tgt.scope, at(args, 1))
+        sc_key = demote_number_index(ast_expr_to_ir(sc_tgt.function, sc_tgt.scope, at(args, 1)))
         sc_val = ast_expr_to_ir(sc_key.function, sc_key.scope, at(args, 2))
         sc_tgt_type = get_value_type(sc_val.function, sc_tgt.id)
         sc_key_type = get_value_type(sc_val.function, sc_key.id)
-        sc_tgt_bs = bytes_from_text(sc_tgt_type)
+        sc_tgt_bs = bytes_of(sc_tgt_type)
         edit sc_is_list = false
-        if len(sc_tgt_bs) >= 4:
+        if length(sc_tgt_bs) >= 4:
             if at(sc_tgt_bs, 0) == 108 and at(sc_tgt_bs, 1) == 105 and at(sc_tgt_bs, 2) == 115 and at(sc_tgt_bs, 3) == 116:
                 sc_is_list = true
         edit sc_is_map = is_map_type(sc_tgt_type)
@@ -2119,7 +2166,10 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         list_node = at(args, 0)
         val_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
-        val_r = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
+        val_pre = ast_expr_to_ir(list_r.function, list_r.scope, val_node)
+        # The `number` boundary, element side: coerce a pushed value to
+        # the list's known element class, both directions, exactly.
+        val_r = coerce_to_elem(val_pre, extract_list_elem(get_value_type(val_pre.function, list_r.id)))
         # Carry the pushed element's type onto the result ("list:T"), so a
         # `x = append(x, v)` self-rebind can back-patch an empty list's slot.
         push_val_type = get_value_type(val_r.function, val_r.id)
@@ -2232,9 +2282,9 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         lo_node = at(args, 1)
         hi_node = at(args, 2)
         text_r = ast_expr_to_ir(fn_value, scope, text_node)
-        lo_r = ast_expr_to_ir(text_r.function, text_r.scope, lo_node)
-        hi_r = ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node)
-        # Interp slice() is list-only; text keeps the old lowering for
+        lo_r = demote_number_index(ast_expr_to_ir(text_r.function, text_r.scope, lo_node))
+        hi_r = demote_number_index(ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node))
+        # Interp part() is list-only; text keeps the old lowering for
         # any text-typed arg.
         sl_type = get_value_type(hi_r.function, text_r.id)
         if sl_type == "text":
@@ -2305,7 +2355,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         list_node = at(args, 0)
         idx_node = at(args, 1)
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
-        idx_r = ast_expr_to_ir(list_r.function, list_r.scope, idx_node)
+        idx_r = demote_number_index(ast_expr_to_ir(list_r.function, list_r.scope, idx_node))
         pr = ir_fn_push(idx_r.function, ir_list_at(list_r.id, idx_r.id))
         result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
     if is_b_length:
@@ -2383,7 +2433,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # indirect call. Otherwise treat it as a global fn name (direct call).
         bound_id = scope_lookup(scope, callee)
         is_local_callee = bound_id >= 0
-        total_args = len(args)
+        total_args = length(args)
         edit current_fn = fn_value
         edit current_scope = scope
         edit arg_ids = []
@@ -2400,11 +2450,28 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # map/fn/generic params stay wildcards; an arg whose static type is
             # unreliable (slot_get/map get, traced through phis) is skipped so the
             # dynamic-storage idiom never false-positives.
+            edit arg_id_final = arg_r.id
             if not is_local_callee:
                 pt_key_ca = "otir:paramtype:" + callee_g + ":{arg_index}"
                 if slot_has(pt_key_ca):
                     decl_pt_ca = slot_get(pt_key_ca)
                     arg_ty_ca = get_value_type(current_fn, arg_r.id)
+                    # The `number` boundary: an integer argument where the
+                    # parameter is declared f64 is PROMOTED (sitofp) - the
+                    # same rule arithmetic already applies. One number
+                    # surface, exact for every whole value below 2^53.
+                    # Without this the callee read raw int bits as a double
+                    # and answered garbage, silently.
+                    if decl_pt_ca == "f64" and (arg_ty_ca == "i64" or is_sized_int_name(arg_ty_ca)):
+                        pr_ca = ir_fn_push(current_fn, ir_sitofp(arg_r.id))
+                        current_fn = pr_ca.function
+                        arg_id_final = pr_ca.id
+                    # ...and the demotion twin: a number where the parameter
+                    # is an integer slot truncates exactly for whole values.
+                    if arg_ty_ca == "f64" and (decl_pt_ca == "i64" or is_sized_int_name(decl_pt_ca)):
+                        de_ca = ir_fn_push(current_fn, ir_fptosi(arg_r.id))
+                        current_fn = de_ca.function
+                        arg_id_final = de_ca.id
                     decl_ck_ca = concrete_ptr_kind(decl_pt_ca)
                     arg_ck_ca = concrete_ptr_kind(arg_ty_ca)
                     if decl_ck_ca != "" and arg_ck_ca != "" and decl_ck_ca != arg_ck_ca and (not is_unreliable_ptr(current_fn, arg_r.id)):
@@ -2419,9 +2486,9 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     # args is unreachable until dynamic getters carry honest types
                     # (the step-3 erasure work) - the concrete-kind check above is
                     # the safe ceiling for the guard pattern.
-            arg_ids = append(arg_ids, arg_r.id)
+            arg_ids = append(arg_ids, arg_id_final)
         if is_local_callee:
-            # If the callee is a `fn(...)`-typed param of THIS fn (matched by
+            # If the callee is a `function(...)`-typed param of THIS fn (matched by
             # name + generation stamp), its declared arity is known - so a call
             # with the wrong argument count is a compile error, not a silently
             # ignored extra arg. Params without a spelled-out fn signature (a
@@ -2432,8 +2499,8 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 want_arity = slot_get_int("otir:fnparam_arity:" + callee)
                 hoc_line = if has(node, "line") then get_int(node, "line") else 0
                 hoc_col = if has(node, "col") then get_int(node, "col") else 0
-                if len(arg_ids) != want_arity:
-                    compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} - `{callee}` expects {want_arity} argument(s) but got {len(arg_ids)}")
+                if length(arg_ids) != want_arity:
+                    compile_error("orion: ERROR at {otir_where(hoc_line, hoc_col)} - `{callee}` expects {want_arity} argument(s) but got {length(arg_ids)}")
                 # Propagate the declared return type, normalized to its STORAGE
                 # CLASS so the closure call's ABI always matches how the value is
                 # actually returned. There are exactly three classes: a pointer
@@ -2450,7 +2517,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 # is declared is a real error. i64/fn/generic wildcards and
                 # unreliable-typed args are skipped, so erased values never
                 # false-positive.
-                loop hac_i in 0..<len(arg_ids):
+                loop hac_i in 0..<length(arg_ids):
                     hac_key = "otir:fnparam_pt:" + callee + ":{hac_i}"
                     if slot_has(hac_key):
                         hac_decl = concrete_ptr_kind(slot_get(hac_key))
@@ -2469,8 +2536,8 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # a signature is erased to `list:i64` in the body, but at the call
             # site the argument says what T is, so the result no longer loses
             # its element type (`at(keep(words, p), 0)` is a text again).
-            edit call_arg_types = slice([""], 0, 0)
-            loop cat_i in 0..<len(arg_ids):
+            edit call_arg_types = part([""], 0, 0)
+            loop cat_i in 0..<length(arg_ids):
                 call_arg_types = append(call_arg_types, get_value_type(current_fn, at(arg_ids, cat_i)))
             call_ret_type = otir_call_ret_generic(callee_g, call_arg_types, erased_ret_type)
             # Capabilities compose UPWARD: a declared caller must cover
@@ -2497,7 +2564,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             arity_key = "otir:arity:" + callee_g
             if slot_has(arity_key):
                 want = slot_get_int(arity_key)
-                got = len(arg_ids)
+                got = length(arg_ids)
                 if got != want:
                     a_line = if has(node, "line") then get_int(node, "line") else 0
                     a_col = if has(node, "col") then get_int(node, "col") else 0
@@ -2566,13 +2633,27 @@ define ast_str_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 
 define ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     items = get_list(node, "items")
-    n_items = len(items)
+    n_items = length(items)
     edit current_fn = fn_value
     edit current_scope = scope
     edit item_ids = []
+    edit first_elem_class = ""
     loop index in 0..<n_items:
         item_node = at(items, index)
-        item_r = ast_expr_to_ir(current_fn, current_scope, item_node)
+        item_pre = ast_expr_to_ir(current_fn, current_scope, item_node)
+        # A literal's element class is set by its first item; later
+        # number/whole items coerce to it ([1, 2.5] is a number list).
+        edit item_r = item_pre
+        if index == 0:
+            first_elem_class = get_value_type(item_pre.function, item_pre.id)
+            first_scan = items
+            loop probe_node in first_scan:
+                if get(probe_node, "kind") == "Float":
+                    first_elem_class = "f64"
+        else:
+            item_r = coerce_to_elem(item_pre, first_elem_class)
+        if index == 0 and first_elem_class == "f64":
+            item_r = coerce_to_elem(item_pre, "f64")
         current_fn = item_r.function
         current_scope = item_r.scope
         item_ids = append(item_ids, item_r.id)
@@ -2622,8 +2703,8 @@ define otir_lower_nested_pat(fn_value: IRFn, scope: Scope, enc: text, inner_id: 
     if v_idx < 0:
         compile_error("orion: ERROR - nested pattern `{sub_variant}(…)` - `{sub_variant}` is not a variant of `{inner_enum}`")
     sub_want = variant_payload_count(scope, inner_enum, sub_variant)
-    if len(sub_names) != sub_want:
-        compile_error("orion: ERROR - nested pattern `{sub_variant}` binds {len(sub_names)} value(s) but the variant carries {sub_want}")
+    if length(sub_names) != sub_want:
+        compile_error("orion: ERROR - nested pattern `{sub_variant}` binds {length(sub_names)} value(s) but the variant carries {sub_want}")
     pr_tag = ir_fn_push(current_fn, ir_field_load(inner_id, 0, "i64"))
     current_fn = pr_tag.function
     pr_pat = ir_fn_push(current_fn, ir_iconst(v_idx))
@@ -2635,8 +2716,8 @@ define otir_lower_nested_pat(fn_value: IRFn, scope: Scope, enc: text, inner_id: 
     pr_lbl = ir_fn_push(current_fn, ir_label(cont_lbl))
     current_fn = pr_lbl.function
     sub_types = split_csv(scope_lookup_variant_payloads(scope, inner_enum, sub_variant))
-    n_sub_types = len(sub_types)
-    loop si in 0..<len(sub_names):
+    n_sub_types = length(sub_types)
+    loop si in 0..<length(sub_names):
         st = if si < n_sub_types then at(sub_types, si) else "i64"
         pr_slot = ir_fn_push(current_fn, ir_field_load(inner_id, 1 + si, st))
         current_fn = pr_slot.function
@@ -2649,7 +2730,7 @@ define otir_lower_nested_pat(fn_value: IRFn, scope: Scope, enc: text, inner_id: 
 define arm_has_nested(arm: table) -> truth:
     binds = if has(arm, "bindings") then get_list(arm, "bindings") else []
     edit nested = false
-    loop bi in 0..<len(binds):
+    loop bi in 0..<length(binds):
         if is_nested_binding(at(binds, bi)):
             nested = true
     nested
@@ -2662,7 +2743,7 @@ define otir_arm_nested_sub(arm: table) -> text:
     binds = if has(arm, "bindings") then get_list(arm, "bindings") else []
     edit sub = ""
     edit count = 0
-    loop bi in 0..<len(binds):
+    loop bi in 0..<length(binds):
         if is_nested_binding(at(binds, bi)):
             count = count + 1
             sub = nested_binding_variant(at(binds, bi))
@@ -2672,7 +2753,7 @@ define otir_arm_nested_sub(arm: table) -> text:
 define csv_has(csv: text, name: text) -> truth:
     parts = split_csv(csv)
     edit found = false
-    loop i in 0..<len(parts):
+    loop i in 0..<length(parts):
         if at(parts, i) == name:
             found = true
     found
@@ -2684,13 +2765,13 @@ define csv_has(csv: text, name: text) -> truth:
 define otir_subs_cover(scope: Scope, en: text, variant: text, subs_seen: text) -> truth:
     payloads = split_csv(scope_lookup_variant_payloads(scope, en, variant))
     edit covers = false
-    if len(payloads) == 1:
+    if length(payloads) == 1:
         inner_enum = strip_struct_prefix(at(payloads, 0))
         inner_csv = enum_variant_csv(scope, inner_enum)
         inner_names = split_csv(inner_csv)
-        if len(inner_names) > 0:
+        if length(inner_names) > 0:
             edit all_seen = true
-            loop ii in 0..<len(inner_names):
+            loop ii in 0..<length(inner_names):
                 if not csv_has(subs_seen, at(inner_names, ii)):
                     all_seen = false
             covers = all_seen
@@ -2703,11 +2784,11 @@ define otir_subs_cover(scope: Scope, en: text, variant: text, subs_seen: text) -
 define otir_covered_variants(scope: Scope, arms: [table], en: text) -> int:
     v_names = split_csv(enum_variant_csv(scope, en))
     edit covered = 0
-    loop vi in 0..<len(v_names):
+    loop vi in 0..<length(v_names):
         vn = at(v_names, vi)
         edit full = false
         edit subs_seen = ""
-        loop ai in 0..<len(arms):
+        loop ai in 0..<length(arms):
             arm = at(arms, ai)
             arm_hits = get(arm, "pat_kind") == "ident" and get(arm, "pattern") == vn and not has(arm, "guard")
             if arm_hits and arm_has_nested(arm):
@@ -2727,8 +2808,8 @@ define otir_covered_variants(scope: Scope, arms: [table], en: text) -> int:
 define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     scrutinee_node = get(node, "scrutinee")
     arms = get_list(node, "arms")
-    n_arms = len(arms)
-    n = len(fn_value.instructions)
+    n_arms = length(arms)
+    n = length(fn_value.instructions)
     end_lbl = "match_{n}_end"
 
     scrut_r = ast_expr_to_ir(fn_value, scope, scrutinee_node)
@@ -2741,7 +2822,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     # execute for real (running a side-effecting first arm twice). After probing
     # we truncate back to this baseline, discarding every leaked emission. The
     # probe reads only the resulting TYPE, never its instructions.
-    probe_base = len(scrut_r.function.instructions)
+    probe_base = length(scrut_r.function.instructions)
 
     # Result slot type: probe the WILDCARD arm's body by lowering it
     # against a scratch copy of the fn - IRFn is a value, discarding
@@ -2778,7 +2859,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # can type its payload binds like Phase 2b does.
             edit fa_enum = ""
             if first_pk == "ident" and first_pat != "_":
-                n_enums_p = len(scope.en_names)
+                n_enums_p = length(scope.en_names)
                 loop ei in 0..<n_enums_p:
                     en_name_p = at(scope.en_names, ei)
                     if not contains_dollar(en_name_p):
@@ -2786,20 +2867,20 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                             fa_enum = en_name_p
             # A tuple pattern binds fields 0..n from the scrutinee's tuple spec.
             # Typing them from the spec (not an i64 dummy) is what lets a body
-            # like `(n, s) -> n + len(s)` probe at all: with the dummy, `len(s)`
+            # like `(n, s) -> n + length(s)` probe at all: with the dummy, `length(s)`
             # saw an int and aborted the whole compile from inside the probe.
-            fa_is_tuple = first_pk == "tuple" and len(first_binds) > 0
+            fa_is_tuple = first_pk == "tuple" and length(first_binds) > 0
             if fa_is_tuple:
                 tup_parts_p = parse_data_spec(scope_lookup_data_spec(scope, strip_struct_prefix(scrut_type)))
-                loop tbi in 0..<len(first_binds):
+                loop tbi in 0..<length(first_binds):
                     tt_p = field_type_at(tup_parts_p, tbi)
                     pr_tf = ir_fn_push(probe_fn, ir_field_load(scrut_id, tbi, tt_p))
                     probe_fn = pr_tf.function
                     probe_scope = scope_bind(probe_scope, at(first_binds, tbi), pr_tf.id)
-            if fa_enum != "" and len(first_binds) > 0 and not fa_is_tuple:
+            if fa_enum != "" and length(first_binds) > 0 and not fa_is_tuple:
                 payload_types_p = split_csv(scope_lookup_variant_payloads(scope, fa_enum, first_pat))
-                n_pt_p = len(payload_types_p)
-                loop bpi in 0..<len(first_binds):
+                n_pt_p = length(payload_types_p)
+                loop bpi in 0..<length(first_binds):
                     bt_p = if bpi < n_pt_p then at(payload_types_p, bpi) else "i64"
                     pr_pl = ir_fn_push(probe_fn, ir_field_load(scrut_id, 1 + bpi, bt_p))
                     probe_fn = pr_pl.function
@@ -2815,7 +2896,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             if fa_enum == "" and not fa_is_tuple:
                 pr_dummy = ir_fn_push(probe_fn, ir_iconst(0))
                 probe_fn = pr_dummy.function
-                loop bpi in 0..<len(first_binds):
+                loop bpi in 0..<length(first_binds):
                     probe_scope = scope_bind(probe_scope, at(first_binds, bpi), pr_dummy.id)
             fa_r = ast_expr_to_ir(probe_fn, probe_scope, get(first_arm, "body"))
             if fa_r.id >= 0:
@@ -2824,7 +2905,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     # back to the pre-probe baseline. `slice` allocates a fresh list, so the
     # subsequent in-place pushes for the real arm bodies start clean and their
     # value-ids line up exactly as if no probe had run.
-    clean_fn = IRFn{name: scrut_r.function.name, return_type: scrut_r.function.return_type, params: scrut_r.function.params, instructions: slice(scrut_r.function.instructions, 0, probe_base)}
+    clean_fn = IRFn{name: scrut_r.function.name, return_type: scrut_r.function.return_type, params: scrut_r.function.params, instructions: part(scrut_r.function.instructions, 0, probe_base)}
     pr_alloca = ir_fn_push(clean_fn, ir_alloca(result_type))
     result_ptr_id = pr_alloca.id
     edit current_fn = pr_alloca.function
@@ -2844,7 +2925,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if chk_pk == "ident" and chk_pv == "_" and not chk_guarded:
             has_wildcard = true
         if chk_pk == "ident" and chk_pv != "_" and not chk_guarded:
-            n_enums_chk = len(scope.en_names)
+            n_enums_chk = length(scope.en_names)
             edit chk_is_variant = false
             loop ei in 0..<n_enums_chk:
                 en_name_chk = at(scope.en_names, ei)
@@ -2858,14 +2939,14 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 has_wildcard = true
     if not has_wildcard and matched_enum != "":
         # Look up total variants for this enum (CSV - comma count + 1).
-        en_total = len(scope.en_names)
+        en_total = length(scope.en_names)
         edit total_variants = 0
         loop ei2 in 0..<en_total:
             if at(scope.en_names, ei2) == matched_enum:
                 csv = at(scope.en_variants, ei2)
-                csv_bytes = bytes_from_text(csv)
+                csv_bytes = bytes_of(csv)
                 total_variants = 1
-                csv_len = len(csv_bytes)
+                csv_len = length(csv_bytes)
                 loop ci in 0..<csv_len:
                     if at(csv_bytes, ci) == 44:
                         total_variants = total_variants + 1
@@ -2905,7 +2986,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         edit variant_enum = ""
         if (not is_wildcard) and pat_kind == "ident":
             # Try every enum looking for this variant name.
-            n_enums = len(scope.en_names)
+            n_enums = length(scope.en_names)
             loop ei in 0..<n_enums:
                 en_name = at(scope.en_names, ei)
                 if not contains_dollar(en_name):
@@ -2976,9 +3057,9 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # (field index 1+i) RETYPED to the variant's declared payload
         # type at that position, so `Spawn(comps) -> do_spawn(s, comps)`
         # types comps as map, `Relate(a, kind, b)` gets i64/text/i64.
-        arm_start_names = len(current_scope.names)
+        arm_start_names = length(current_scope.names)
         edit body_scope = current_scope
-        n_arm_bindings = len(bindings)
+        n_arm_bindings = length(bindings)
         if do_variant_pat:
             arm_want = variant_payload_count(scope, variant_enum, pat_value)
             if n_arm_bindings != arm_want:
@@ -2986,7 +3067,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         if do_variant_pat and n_arm_bindings > 0:
             payload_csv = scope_lookup_variant_payloads(scope, variant_enum, pat_value)
             payload_types = split_csv(payload_csv)
-            n_payload_types = len(payload_types)
+            n_payload_types = length(payload_types)
             loop abi in 0..<n_arm_bindings:
                 bind_name = at(bindings, abi)
                 bind_type = if abi < n_payload_types then at(payload_types, abi) else "i64"
@@ -3028,7 +3109,7 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             current_fn = pr_glbl.function
 
         # Phase 3: body - emit for both wildcard and pattern arms.
-        arm_before = len(body_scope.names)
+        arm_before = length(body_scope.names)
         body_r = ast_expr_to_ir(current_fn, body_scope, body_node)
         check_branch_shadows(arm_before, body_r.scope, "match arm", node)
         current_fn = body_r.function
@@ -3083,11 +3164,11 @@ define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 # `_0` as int and `_1` as text (unlike the old homogeneous list lowering).
 define ast_tuple_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     items = get_list(node, "items")
-    n_items = len(items)
+    n_items = length(items)
     edit current_fn = fn_value
     edit current_scope = scope
     edit item_ids = []
-    elem_types = slice([""], 0, 0)
+    elem_types = part([""], 0, 0)
     edit elem_type_list = elem_types
     loop ti in 0..<n_items:
         it_r = ast_expr_to_ir(current_fn, current_scope, at(items, ti))
@@ -3108,8 +3189,8 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         col = if has(node, "col") then get_int(node, "col") else 0
         compile_error("orion: ERROR at {otir_where(line, col)} - unknown data type `{struct_name}`")
     parts = parse_data_spec(spec)
-    n_fields_decl = len(parts)
-    n_provided = len(fields)
+    n_fields_decl = length(parts)
+    n_provided = length(fields)
     # Build value_ids in declared field order.
     edit current_fn = fn_value
     edit current_scope = scope
@@ -3119,17 +3200,17 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         # The field's IR type (the spec stores ast_type_to_ir output, so this is
         # "struct:X"/"text"/"list:T"/"i64" - ready for concrete_ptr_kind).
         decl_field_type = field_type_at(parts, di)
-        decl_bs = bytes_from_text(decl_part)
+        decl_bs = bytes_of(decl_part)
         edit decl_name = ""
         edit found_colon = 0
-        decl_bs_n = len(decl_bs)
+        decl_bs_n = length(decl_bs)
         loop ci in 0..<decl_bs_n:
             b = at(decl_bs, ci)
             if found_colon == 0:
                 if b == 58:
                     found_colon = 1
                 else:
-                    single = bytes_to_text([b])
+                    single = text_of([b])
                     decl_name = "{decl_name}{single}"
         # Search provided fields for decl_name.
         edit matched_id = 0 - 1
@@ -3146,6 +3227,16 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                 # is declared is a type error. map/fn/generic fields = wildcard;
                 # an unreliable value (slot_get/map-get) is skipped.
                 fld_val_ty = get_value_type(current_fn, matched_id)
+                # The `number` boundary, field side: a whole-number value
+                # into an f64-declared field is promoted like an argument.
+                if decl_field_type == "f64" and (fld_val_ty == "i64" or is_sized_int_name(fld_val_ty)):
+                    pr_fp = ir_fn_push(current_fn, ir_sitofp(matched_id))
+                    current_fn = pr_fp.function
+                    matched_id = pr_fp.id
+                if fld_val_ty == "f64" and (decl_field_type == "i64" or is_sized_int_name(decl_field_type)):
+                    de_fp = ir_fn_push(current_fn, ir_fptosi(matched_id))
+                    current_fn = de_fp.function
+                    matched_id = de_fp.id
                 fld_decl_k = concrete_ptr_kind(decl_field_type)
                 fld_val_k = concrete_ptr_kind(fld_val_ty)
                 if fld_decl_k != "" and fld_val_k != "" and fld_decl_k != fld_val_k and (not is_unreliable_ptr(current_fn, matched_id)):
@@ -3211,13 +3302,13 @@ define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         obj_r = ast_expr_to_ir(fn_value, scope, obj_node)
         obj_type = get_value_type(obj_r.function, obj_r.id)
         edit struct_name = ""
-        obj_bytes = bytes_from_text(obj_type)
-        n = len(obj_bytes)
+        obj_bytes = bytes_of(obj_type)
+        n = length(obj_bytes)
         edit past_colon = 0
         loop ci in 0..<n:
             b = at(obj_bytes, ci)
             if past_colon == 1:
-                single = bytes_to_text([b])
+                single = text_of([b])
                 struct_name = "{struct_name}{single}"
             else:
                 if b == 58:
@@ -3237,7 +3328,7 @@ define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 
 define ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     pairs = get_list(node, "pairs")
-    n_pairs = len(pairs)
+    n_pairs = length(pairs)
     edit current_fn = fn_value
     edit current_scope = scope
     edit pair_ids = []
@@ -3400,8 +3491,8 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         mc_fn_name = otir_resolve(get(node, "fn"))
         edit mc_fn = fn_value
         edit mc_scope = scope
-        edit mc_cap_ids = slice([0], 0, 0)
-        loop mci in 0..<len(mc_caps):
+        edit mc_cap_ids = part([0], 0, 0)
+        loop mci in 0..<length(mc_caps):
             mc_cap_r = ast_expr_to_ir(mc_fn, mc_scope, at(mc_caps, mci))
             mc_fn = mc_cap_r.function
             mc_scope = mc_cap_r.scope
@@ -3465,7 +3556,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
             # a downstream match arm complained. Point at the construction.
             # (The bare-variant path in ast_call_to_ir checks the same way.)
             ec_want = variant_payload_count(scope, enum_name, method)
-            ec_got = len(m_args)
+            ec_got = length(m_args)
             if ec_got != ec_want:
                 ec_line = if has(node, "line") then get_int(node, "line") else 0
                 ec_col = if has(node, "col") then get_int(node, "col") else 0
@@ -3488,7 +3579,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                 n_slots = count_spec_fields(spec) - 1
                 zero_int = {"kind": "Int", "value": "0"}
                 edit cons_fields = [{"name": "tag", "value": {"kind": "Int", "value": int_to_text_helper(variant_idx)}}]
-                n_cargs = len(m_args)
+                n_cargs = length(m_args)
                 loop pfi in 0..<n_slots:
                     pf_val = if pfi < n_cargs then at(m_args, pfi) else zero_int
                     cons_fields = append(cons_fields, {"name": "p{pfi}", "value": pf_val})
@@ -3515,7 +3606,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                             edit cf_fn = pr_fld.function
                             edit cf_scope = scope
                             edit cf_args = []
-                            loop cfi in 0..<len(m_args):
+                            loop cfi in 0..<length(m_args):
                                 a_r = ast_expr_to_ir(cf_fn, cf_scope, at(m_args, cfi))
                                 cf_fn = a_r.function
                                 cf_scope = a_r.scope
@@ -3525,7 +3616,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                             did_field_call = true
             if not did_field_call:
                 edit new_args_list = [receiver]
-                n_m_args = len(m_args)
+                n_m_args = length(m_args)
                 loop ami in 0..<n_m_args:
                     new_args_list = append(new_args_list, at(m_args, ami))
                 line = if has(node, "line") then get_int(node, "line") else 0
@@ -3552,7 +3643,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         pr_ne = ir_fn_push(cur_fn, ir_icmp_ne(pr_tag.id, pr_zero.id))
         cur_fn = pr_ne.function
         # Branch to return-tmp block or continue
-        n_q = len(cur_fn.instructions)
+        n_q = length(cur_fn.instructions)
         ret_lbl = "q_{n_q}_ret"
         cont_lbl = "q_{n_q}_cont"
         pr_br = ir_fn_push(cur_fn, ir_br_if(pr_ne.id, ret_lbl, cont_lbl))
@@ -3574,7 +3665,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         q_ok_variant = enum_first_variant(scope, q_enum)
         if q_ok_variant != "":
             q_payloads = split_csv(scope_lookup_variant_payloads(scope, q_enum, q_ok_variant))
-            if len(q_payloads) > 0:
+            if length(q_payloads) > 0:
                 q_payload_type = at(q_payloads, 0)
         pr_val = ir_fn_push(cur_fn, ir_field_load(tmp_id, 1, q_payload_type))
         result = ConvResult{function: pr_val.function, scope: inner_r.scope, id: pr_val.id}
@@ -3587,14 +3678,14 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         op_name = get(node, "op")
         handler_name = "__handler_{effect_name}_{op_name}"
         perf_args = get_list(node, "args")
-        n_pa = len(perf_args)
+        n_pa = length(perf_args)
         edit cur_fn = fn_value
         edit cur_scope = scope
         # EVERY argument is lowered and passed. This used to keep the first and
         # evaluate-then-drop the rest, so `perform Math.add(40, 2)` handed the
         # handler one argument and read register garbage for the other: it
         # returned 248 instead of 42, with no error.
-        edit perf_arg_ids = slice([0], 0, 0)
+        edit perf_arg_ids = part([0], 0, 0)
         loop pi in 0..<n_pa:
             arg_node = at(perf_args, pi)
             arg_r = ast_expr_to_ir(cur_fn, cur_scope, arg_node)
@@ -3649,7 +3740,7 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
             # The hint has to fit the token. Naming the pipe and the lambda for
             # every unexpected byte (a stray `:`, say) is noise that sends the
             # reader looking in the wrong place.
-            hint = if found == "|" then " (Orion has one lambda form, `fn(x): body`, and no pipe operator)" else (if found == ":" then " (a match arm is `Pattern -> value`; `:` opens a block after `if`/`loop`/`fn`)" else "")
+            hint = if found == "|" then " (Orion has one lambda form, `function(x): body`, and no pipe operator)" else (if found == ":" then " (a match arm is `Pattern -> value`; `:` opens a block after `if`/`loop`/`fn`)" else "")
             compile_error("orion: ERROR at {otir_where(line, col)} - `{found}` is not valid here, an expression was expected{hint}")
         if kind != "Error":
             compile_error("orion: ERROR at {otir_where(line, col)} - unhandled AST node kind `{kind}` (emit iconst 0 as fallback)")
@@ -3687,16 +3778,16 @@ define is_list_type(type_text: text) -> truth:
     if type_text == "list":
         true
     else:
-        bs = bytes_from_text(type_text)
-        n = len(bs)
+        bs = bytes_of(type_text)
+        n = length(bs)
         if n >= 5:
             at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58
         else:
             false
 
 define extract_list_elem(type_text: text) -> text:
-    bs = bytes_from_text(type_text)
-    n = len(bs)
+    bs = bytes_of(type_text)
+    n = length(bs)
     edit is_param = false
     if n >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
@@ -3706,13 +3797,13 @@ define extract_list_elem(type_text: text) -> text:
     else:
         edit result = ""
         loop ci in 5..<n:
-            single = bytes_to_text([at(bs, ci)])
+            single = text_of([at(bs, ci)])
             result = "{result}{single}"
         result
 
 # ---- generic call-site instantiation (types only) ---------------------
 #
-# Generics are ERASED: inside `fn filter<T>(xs: [T], pred: fn) -> [T]` the type
+# Generics are ERASED: inside `fn filter<T>(xs: [T], pred: function) -> [T]` the type
 # var lowers to an i64 slot, and the declared return `[T]` lowers with it. So a
 # call site got `list:i64` back and every element read out of the result was an
 # int: `at(keep(words, p), 0)` produced an int where the text was, and `len`
@@ -3742,15 +3833,15 @@ define type_src_text(type_node: table) -> text:
 # Index of `name` in the type-var list, or -1.
 define tv_slot(gens: [text], name: text) -> int:
     edit found = 0 - 1
-    loop i in 0..<len(gens):
+    loop i in 0..<length(gens):
         if at(gens, i) == name:
             found = i
     found
 
 # "[X]" -> "X"; anything else -> "".
 define strip_brackets(s: text) -> text:
-    bs = bytes_from_text(s)
-    n = len(bs)
+    bs = bytes_of(s)
+    n = length(bs)
     edit wrapped = false
     if n >= 3:
         if at(bs, 0) == 91 and at(bs, n - 1) == 93:
@@ -3760,7 +3851,7 @@ define strip_brackets(s: text) -> text:
     else:
         edit inner = ""
         loop ci in 1..<(n - 1):
-            inner = inner + bytes_to_text([at(bs, ci)])
+            inner = inner + text_of([at(bs, ci)])
         inner
 
 # Match one declared source type against one actual IR type, binding type vars.
@@ -3817,10 +3908,10 @@ define otir_call_ret_generic(fn_name: text, arg_types: [text], erased_ret: text)
     edit out = erased_ret
     if slot_has(gen_key) and slot_has(ret_key):
         gens = split_csv(slot_get(gen_key))
-        edit binds = slice([""], 0, 0)
-        loop gi in 0..<len(gens):
+        edit binds = part([""], 0, 0)
+        loop gi in 0..<length(gens):
             binds = append(binds, "")
-        loop ai in 0..<len(arg_types):
+        loop ai in 0..<length(arg_types):
             p_key = "otir:psrc:" + fn_name + ":{ai}"
             if slot_has(p_key):
                 binds = tv_unify(slot_get(p_key), at(arg_types, ai), gens, binds)
@@ -3843,8 +3934,8 @@ define concrete_ptr_kind(t: text) -> text:
     else if is_list_type(t):
         "list"
     else:
-        bs = bytes_from_text(t)
-        n = len(bs)
+        bs = bytes_of(t)
+        n = length(bs)
         edit is_struct = false
         if n >= 7:
             if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
@@ -3864,9 +3955,9 @@ define otir_ret_storage(t: text) -> text:
     if t == "f64":
         "f64"
     else:
-        bs = bytes_from_text(t)
+        bs = bytes_of(t)
         edit is_struct = false
-        if len(bs) >= 7:
+        if length(bs) >= 7:
             if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
                 is_struct = true
         is_ptr = t == "text" or t == "list" or t == "map" or t == "dyn" or t == "ptr" or t == "fn" or is_struct or is_list_type(t) or is_map_type(t)
@@ -3905,8 +3996,8 @@ define is_map_type(type_text: text) -> truth:
     if type_text == "map" or type_text == "dyn":
         true
     else:
-        bs = bytes_from_text(type_text)
-        n = len(bs)
+        bs = bytes_of(type_text)
+        n = length(bs)
         if n >= 4:
             at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58
         else:
@@ -3915,8 +4006,8 @@ define is_map_type(type_text: text) -> truth:
 # The value type from a `map:<T>` type_text. Bare `map` (or non-map) yields
 # `text` - the historic default for untyped maps.
 define extract_map_val(type_text: text) -> text:
-    bs = bytes_from_text(type_text)
-    n = len(bs)
+    bs = bytes_of(type_text)
+    n = length(bs)
     edit is_param = false
     if n >= 4:
         if at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58:
@@ -3926,7 +4017,7 @@ define extract_map_val(type_text: text) -> text:
     else:
         edit result = ""
         loop ci in 4..<n:
-            single = bytes_to_text([at(bs, ci)])
+            single = text_of([at(bs, ci)])
             result = "{result}{single}"
         result
 
@@ -3937,8 +4028,8 @@ define extract_map_val(type_text: text) -> text:
 # compiler's business, and printing it in a diagnostic shows the reader a name
 # that appears nowhere in their file.
 define friendly_fn_name(n: text) -> text:
-    b = bytes_from_text(n)
-    total = len(b)
+    b = bytes_of(n)
+    total = length(b)
     edit cut = 0
     loop i in 0..<total:
         if i + 1 < total:
@@ -3947,7 +4038,7 @@ define friendly_fn_name(n: text) -> text:
     if cut == 0:
         n
     else:
-        bytes_to_text(bytes_slice(b, cut, total))
+        text_of(bytes_part(b, cut, total))
 
 define friendly_type(t: text) -> text:
     if t == "i64":
@@ -3962,8 +4053,8 @@ define friendly_type(t: text) -> text:
         "map"
     else:
         # struct:Foo -> Foo; text / fn / ptr pass through unchanged.
-        fb = bytes_from_text(t)
-        fn2 = len(fb)
+        fb = bytes_of(t)
+        fn2 = length(fb)
         edit is_struct = false
         if fn2 >= 7:
             if at(fb, 0) == 115 and at(fb, 1) == 116 and at(fb, 2) == 114 and at(fb, 3) == 117 and at(fb, 4) == 99 and at(fb, 5) == 116 and at(fb, 6) == 58:
@@ -3976,7 +4067,7 @@ define friendly_type(t: text) -> text:
                 # bootstrap (the interpolation splitter mis-tokenizes the `[`
                 # and `)`), which stalls the whole self-host chain.
                 one = [at(fb, fi)]
-                r = "{r}{bytes_to_text(one)}"
+                r = "{r}{text_of(one)}"
             r
         else:
             t
@@ -3989,7 +4080,7 @@ define ast_type_to_ir(type_node: table) -> text:
     # key is a null ptr natively, and strcmp(null) segfaults.
     if kind == "Range":
         return "i64"
-    # `fn(T) -> R` - a spelled-out function type. Erases to the same "fn"
+    # `function(T) -> R` - a spelled-out function type. Erases to the same "fn"
     # ptr as a bare `fn`; the signature lives in the AST for typeck only.
     if kind == "FnType":
         return "fn"
@@ -3997,9 +4088,9 @@ define ast_type_to_ir(type_node: table) -> text:
     # literal, so `(int, text)` and `(1, "hi")` share a representation.
     if kind == "TupleType":
         tt_elems = get_list(type_node, "elems")
-        tt_types = slice([""], 0, 0)
+        tt_types = part([""], 0, 0)
         edit tt_type_list = tt_types
-        loop tti in 0..<len(tt_elems):
+        loop tti in 0..<length(tt_elems):
             tt_type_list = append(tt_type_list, ast_type_to_ir(at(tt_elems, tti)))
         return "struct:{otir_tuple_register(tt_type_list)}"
     if not has(type_node, "name"):
@@ -4033,7 +4124,7 @@ define ast_type_to_ir(type_node: table) -> text:
                 # IR already understood `map:T` and `get` already read it; there
                 # was just no way to SAY it in source.
                 m_args = if has(type_node, "args") then get_list(type_node, "args") else []
-                if len(m_args) == 1:
+                if length(m_args) == 1:
                     "map:{ast_type_to_ir(at(m_args, 0))}"
                 else:
                     "map"
@@ -4057,9 +4148,9 @@ define ast_type_to_ir(type_node: table) -> text:
                         # Capitalised names (Inst, Item, IRFn, …) are presumed
                         # to be data-struct types. Snake-case / lowercase names
                         # (int, bool, void) get the i64 default.
-                        name_bs = bytes_from_text(name)
+                        name_bs = bytes_of(name)
                         edit starts_cap = false
-                        if len(name_bs) > 0:
+                        if length(name_bs) > 0:
                             first = at(name_bs, 0)
                             if first >= 65 and first <= 90:
                                 starts_cap = true
@@ -4077,9 +4168,9 @@ define ast_type_to_ir_with_scope(type_node: table, scope: Scope) -> text:
         return "fn"
     if kind == "TupleType":
         tt_elems = get_list(type_node, "elems")
-        tt_types = slice([""], 0, 0)
+        tt_types = part([""], 0, 0)
         edit tt_type_list = tt_types
-        loop tti in 0..<len(tt_elems):
+        loop tti in 0..<length(tt_elems):
             tt_type_list = append(tt_type_list, ast_type_to_ir_with_scope(at(tt_elems, tti), scope))
         return "struct:{otir_tuple_register(tt_type_list)}"
     if not has(type_node, "name"):
@@ -4117,7 +4208,7 @@ define ast_type_to_ir_with_scope(type_node: table, scope: Scope) -> text:
             if name == "map" or name == "table":
                 # `Map<T>` -> `map:T`, the value type. See ast_type_to_ir.
                 ms_args = if has(type_node, "args") then get_list(type_node, "args") else []
-                if len(ms_args) == 1:
+                if length(ms_args) == 1:
                     "map:{ast_type_to_ir_with_scope(at(ms_args, 0), scope)}"
                 else:
                     "map"
@@ -4134,7 +4225,7 @@ define ast_type_to_ir_with_scope(type_node: table, scope: Scope) -> text:
                         "f64"
                     else:
                         ds_names = scope.ds_names
-                        n_structs = len(ds_names)
+                        n_structs = length(ds_names)
                         edit is_struct = false
                         loop si in 0..<n_structs:
                             if at(ds_names, si) == name:
@@ -4160,13 +4251,13 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
     tv_gen = slot_int_or_zero("otir:tvgen") + 1
     slot_set("otir:tvgen", tv_gen)
     fn_generics = if has(ast_fn, "generics") then get_list(ast_fn, "generics") else []
-    loop gi in 0..<len(fn_generics):
+    loop gi in 0..<length(fn_generics):
         slot_set(otir_k1("tv", at(fn_generics, gi)), tv_gen)
     ret_type_node = get(ast_fn, "ret")
     ret_type = ast_type_to_ir_with_scope(ret_type_node, initial_scope)
     edit fn_value = ir_fn_new(name, ret_type)
     params = get_list(ast_fn, "params")
-    n_params = len(params)
+    n_params = length(params)
     edit scope = initial_scope
     loop index in 0..<n_params:
         param = at(params, index)
@@ -4177,19 +4268,19 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
         pr = ir_fn_push(fn_value, ir_param(index, param_type))
         fn_value = pr.function
         scope = scope_bind(scope, param_name, pr.id)
-        # A `f: fn(A, B) -> R` param carries a real signature the checker can
+        # A `f: function(A, B) -> R` param carries a real signature the checker can
         # hold on to. The IR type erases to "fn", so record the arity here,
         # stamped with this fn's generation (see tv_gen above) so a same-named
         # param in another fn never matches. The call site (`f(args)`, the
         # is_local_callee path) reads it to reject a wrong argument count.
         if has(param, "type") and get(param_type_node, "kind") == "FnType":
-            slot_set("otir:fnparam_arity:" + param_name, len(get_list(param_type_node, "params")))
+            slot_set("otir:fnparam_arity:" + param_name, length(get_list(param_type_node, "params")))
             slot_set("otir:fnparam_gen:" + param_name, tv_gen)
             # Each declared parameter type, for the call-site argument-shape
             # check (below). Stored as the erased IR type; the check only reads
             # its concrete pointer kind, so a type var stays a wildcard.
             fpt_list = get_list(param_type_node, "params")
-            loop fpt_i in 0..<len(fpt_list):
+            loop fpt_i in 0..<length(fpt_list):
                 slot_set("otir:fnparam_pt:" + param_name + ":{fpt_i}", ast_type_to_ir_with_scope(at(fpt_list, fpt_i), initial_scope))
             # Declared return type, for the call-site return-type propagation.
             slot_set("otir:fnparam_ret:" + param_name, ast_type_to_ir_with_scope(get_map(param_type_node, "ret"), initial_scope))
@@ -4208,7 +4299,7 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
     # emits `ret 0` - a silently wrong program. Make it loud instead. Externs
     # are a separate ExternFn node and never reach here; short-form `= expr`
     # fns carry a one-statement block, so neither is affected.
-    if get(body, "kind") == "Block" and len(get_list(body, "stmts")) == 0:
+    if get(body, "kind") == "Block" and length(get_list(body, "stmts")) == 0:
         compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} - function `{friendly_fn_name(name)}` has an empty body (add a body, or check for a keyword used as a variable name)")
     body_result = ast_expr_to_ir(fn_value, scope, body)
     # Return-type guard: the tail expression's storage shape (i64 vs pointer)
@@ -4241,7 +4332,19 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
         body_unreliable = is_unreliable_ptr(body_result.function, body_result.id)
         if (not rt_exempt) and (not body_unreliable) and decl_kind != "" and body_kind != "" and decl_kind != body_kind:
             compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} - function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body returns `{friendly_type(rt_body)}` (a {body_kind} where a {decl_kind} was declared)")
-        ret_result = ir_fn_push(body_result.function, ir_return(body_result.id))
+        # The `number` boundary, return side: a whole-number tail in a
+        # function declared f64 is promoted, mirroring the argument rule.
+        edit tail_id = body_result.id
+        edit tail_fn = body_result.function
+        if ret_type == "f64" and (rt_body == "i64" or is_sized_int_name(rt_body)):
+            pr_rt = ir_fn_push(tail_fn, ir_sitofp(tail_id))
+            tail_fn = pr_rt.function
+            tail_id = pr_rt.id
+        if rt_body == "f64" and (ret_type == "i64" or is_sized_int_name(ret_type)):
+            de_rt = ir_fn_push(tail_fn, ir_fptosi(tail_id))
+            tail_fn = de_rt.function
+            tail_id = de_rt.id
+        ret_result = ir_fn_push(tail_fn, ir_return(tail_id))
         ret_result.function
     else:
         body_result.function
@@ -4266,8 +4369,8 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
 # own. Nothing is left for the lowering to special-case.
 
 define defer_concat(a: [table], b: [table]) -> [table]:
-    edit out = slice(a, 0, len(a))
-    loop i in 0..<len(b):
+    edit out = part(a, 0, length(a))
+    loop i in 0..<length(b):
         out = append(out, at(b, i))
     out
 
@@ -4275,7 +4378,7 @@ define defer_concat(a: [table], b: [table]) -> [table]:
 # first, which is what LIFO means for a defer.
 define defer_append_reverse(out: [table], items: [table]) -> [table]:
     edit acc = out
-    n = len(items)
+    n = length(items)
     loop i in 0..<n:
         acc = append(acc, {"kind": "ExprStmt", "expr": at(items, n - 1 - i)})
     acc
@@ -4300,8 +4403,8 @@ define defer_rewrite_stmt(s: table, visible: [table]) -> table:
         out = set(out, "body", defer_rewrite_block(get(s, "body"), visible))
     if kind == "Match":
         arms = get_list(s, "arms")
-        edit new_arms = slice(arms, 0, 0)
-        loop ai in 0..<len(arms):
+        edit new_arms = part(arms, 0, 0)
+        loop ai in 0..<length(arms):
             arm = at(arms, ai)
             body = get_map(arm, "body")
             new_body = if get(body, "kind") == "Block" then defer_rewrite_block(body, visible) else body
@@ -4341,10 +4444,10 @@ define defer_is_tail_value(k: text) -> truth:
 # them: the defers have to run whichever way the condition went.
 define defer_prepend(block: table, defers: [table]) -> table:
     stmts = get_list(block, "stmts")
-    edit out = slice(stmts, 0, 0)
-    loop i in 0..<len(defers):
+    edit out = part(stmts, 0, 0)
+    loop i in 0..<length(defers):
         out = append(out, {"kind": "Defer", "expr": at(defers, i)})
-    loop j in 0..<len(stmts):
+    loop j in 0..<length(stmts):
         out = append(out, at(stmts, j))
     set(block, "stmts", out)
 
@@ -4359,9 +4462,9 @@ define defer_tail_ifblock(s: table, defers: [table], inherited: [table]) -> tabl
 
 define defer_rewrite_block(block: table, inherited: [table]) -> table:
     stmts = get_list(block, "stmts")
-    n = len(stmts)
-    edit mine = slice(stmts, 0, 0)
-    edit out = slice(stmts, 0, 0)
+    n = length(stmts)
+    edit mine = part(stmts, 0, 0)
+    edit out = part(stmts, 0, 0)
     loop i in 0..<n:
         s = at(stmts, i)
         k = get(s, "kind")
@@ -4374,7 +4477,7 @@ define defer_rewrite_block(block: table, inherited: [table]) -> table:
             # saved value is returned. `defer close(f)` before `return read(f)`
             # must not close the handle the return expression is about to read -
             # splicing the defers ahead of the return did exactly that.
-            if k == "Return" and len(visible) > 0:
+            if k == "Return" and length(visible) > 0:
                 tmp = defer_tmp_name()
                 out = append(out, {"kind": "LetOrAssign", "name": tmp, "value": get_map(s, "expr")})
                 out = defer_append_reverse(out, visible)
@@ -4383,9 +4486,9 @@ define defer_rewrite_block(block: table, inherited: [table]) -> table:
                 # The last expression of a block IS its value, so the same
                 # save-then-run applies at the block end: appending the defers
                 # after it would make a deferred call the block's value.
-                if k == "IfBlock" and is_last and len(mine) > 0:
+                if k == "IfBlock" and is_last and length(mine) > 0:
                     out = append(out, defer_tail_ifblock(s, mine, inherited))
-                else if defer_is_tail_value(k) and is_last and len(mine) > 0:
+                else if defer_is_tail_value(k) and is_last and length(mine) > 0:
                     tmp2 = defer_tmp_name()
                     # An ExprStmt wraps its expression; a tail `match` IS the
                     # value-producing node.
@@ -4401,7 +4504,7 @@ define defer_rewrite_block(block: table, inherited: [table]) -> table:
     # `already` must also cover the IfBlock branch above, which pushed the
     # defers down into the branches. Appending them again here would run them
     # twice and make the second copy the block's value.
-    already = (defer_is_tail_value(tail_kind) or tail_kind == "IfBlock") and len(mine) > 0
+    already = (defer_is_tail_value(tail_kind) or tail_kind == "IfBlock") and length(mine) > 0
     defer_out = if already then out else defer_append_reverse(out, mine)
     set(block, "stmts", defer_out)
 
@@ -4410,7 +4513,7 @@ define defer_rewrite_block(block: table, inherited: [table]) -> table:
 define defer_block_has(block: table) -> truth:
     stmts = get_list(block, "stmts")
     edit found = false
-    loop i in 0..<len(stmts):
+    loop i in 0..<length(stmts):
         s = at(stmts, i)
         k = get(s, "kind")
         if k == "Defer":
@@ -4475,21 +4578,21 @@ define dfv_defloc(s: table) -> table:
 # also stamped by the rewrite on what it covers), `d*` is the nearest enclosing
 # defer (what the error points at).
 define dfv_key(s: table, vis: [table]) -> table:
-    d = at(vis, len(vis) - 1)
+    d = at(vis, length(vis) - 1)
     {"mline": dfv_stmt_line(s), "mcol": dfv_stmt_col(s), "dline": get_int(d, "l"), "dcol": get_int(d, "c")}
 
 # ---- oracle: positions that must be covered, from the ORIGINAL body ----
 
 define dfv_need(block: table) -> [table]:
     seed = get_list(block, "stmts")
-    dfv_need_block(seed, slice(seed, 0, 0), slice(seed, 0, 0), true)
+    dfv_need_block(seed, part(seed, 0, 0), part(seed, 0, 0), true)
 
 # stmts: block body. inh: defers inherited from enclosing blocks. acc0: needs so
 # far. blk_tail: true when this block's last statement is the function's value.
 define dfv_need_block(stmts: [table], inh: [table], acc0: [table], blk_tail: truth) -> [table]:
     edit acc = acc0
-    edit vis = slice(inh, 0, len(inh))
-    n = len(stmts)
+    edit vis = part(inh, 0, length(inh))
+    n = length(stmts)
     loop i in 0..<n:
         s = at(stmts, i)
         k = get(s, "kind")
@@ -4497,7 +4600,7 @@ define dfv_need_block(stmts: [table], inh: [table], acc0: [table], blk_tail: tru
         if k == "Defer":
             vis = append(vis, dfv_defloc(s))
         else if k == "Return":
-            if len(vis) > 0:
+            if length(vis) > 0:
                 acc = append(acc, dfv_key(s, vis))
         else if k == "IfBlock":
             acc = dfv_need_block(get_list(get_map(s, "then"), "stmts"), vis, acc, tail_here)
@@ -4505,15 +4608,15 @@ define dfv_need_block(stmts: [table], inh: [table], acc0: [table], blk_tail: tru
         else if k == "Loop" or k == "ForRange" or k == "ForIn":
             acc = dfv_need_block(get_list(get_map(s, "body"), "stmts"), vis, acc, false)
         else if k == "Match":
-            if tail_here and len(vis) > 0:
+            if tail_here and length(vis) > 0:
                 acc = append(acc, dfv_key(s, vis))
             arms = get_list(s, "arms")
-            loop ai in 0..<len(arms):
+            loop ai in 0..<length(arms):
                 b = get_map(at(arms, ai), "body")
                 if get(b, "kind") == "Block":
                     acc = dfv_need_block(get_list(b, "stmts"), vis, acc, false)
         else if k == "ExprStmt":
-            if tail_here and len(vis) > 0:
+            if tail_here and length(vis) > 0:
                 acc = append(acc, dfv_key(s, vis))
     acc
 
@@ -4533,11 +4636,11 @@ define dfv_need_else(els: table, vis: [table], acc0: [table], tail_here: truth) 
 
 define dfv_covered(block: table) -> [table]:
     seed = get_list(block, "stmts")
-    dfv_cov_block(seed, slice(seed, 0, 0))
+    dfv_cov_block(seed, part(seed, 0, 0))
 
 define dfv_cov_block(stmts: [table], acc0: [table]) -> [table]:
     edit acc = acc0
-    loop i in 0..<len(stmts):
+    loop i in 0..<length(stmts):
         s = at(stmts, i)
         if has(s, "defer_covered"):
             acc = append(acc, {"mline": dfv_line(s), "mcol": dfv_col(s)})
@@ -4558,7 +4661,7 @@ define dfv_cov_nested(s: table, acc0: [table]) -> [table]:
         acc = dfv_cov_block(get_list(get_map(s, "body"), "stmts"), acc)
     else if k == "Match":
         arms = get_list(s, "arms")
-        loop ai in 0..<len(arms):
+        loop ai in 0..<length(arms):
             b = get_map(at(arms, ai), "body")
             if get(b, "kind") == "Block":
                 acc = dfv_cov_block(get_list(b, "stmts"), acc)
@@ -4568,14 +4671,14 @@ define dfv_cov_nested(s: table, acc0: [table]) -> [table]:
 
 define dfv_has(xs: [table], ml: int, mc: int) -> truth:
     edit f = false
-    loop i in 0..<len(xs):
+    loop i in 0..<length(xs):
         x = at(xs, i)
         if get_int(x, "mline") == ml and get_int(x, "mcol") == mc:
             f = true
     f
 
 define dfv_report(needs: [table], covered: [table]):
-    loop i in 0..<len(needs):
+    loop i in 0..<length(needs):
         nd = at(needs, i)
         ml = get_int(nd, "mline")
         mc = get_int(nd, "mcol")
@@ -4599,7 +4702,7 @@ define dfv_report(needs: [table], covered: [table]):
 
 define subst_find(names: [text], target: text) -> int:
     edit found = 0 - 1
-    n = len(names)
+    n = length(names)
     loop i in 0..<n:
         if at(names, i) == target:
             found = i
@@ -4607,16 +4710,16 @@ define subst_find(names: [text], target: text) -> int:
 
 # Rewrite a list of expression nodes (call args, list items, ...).
 define subst_list(items: [table], names: [text], exprs: [table]) -> [table]:
-    edit out = slice(items, 0, 0)
-    n = len(items)
+    edit out = part(items, 0, 0)
+    n = length(items)
     loop i in 0..<n:
         out = append(out, subst_expr(at(items, i), names, exprs))
     out
 
 # Rewrite the `value` field of each entry (MapLit pairs, StructCons fields).
 define subst_pairs(pairs: [table], names: [text], exprs: [table]) -> [table]:
-    edit out = slice(pairs, 0, 0)
-    n = len(pairs)
+    edit out = part(pairs, 0, 0)
+    n = length(pairs)
     loop i in 0..<n:
         p = at(pairs, i)
         out = append(out, set(p, "value", subst_expr(get(p, "value"), names, exprs)))
@@ -4624,8 +4727,8 @@ define subst_pairs(pairs: [table], names: [text], exprs: [table]) -> [table]:
 
 # Rewrite the `body` expression of each match arm.
 define subst_arms(arms: [table], names: [text], exprs: [table]) -> [table]:
-    edit out = slice(arms, 0, 0)
-    n = len(arms)
+    edit out = part(arms, 0, 0)
+    n = length(arms)
     loop i in 0..<n:
         a = at(arms, i)
         out = append(out, set(a, "body", subst_expr(get(a, "body"), names, exprs)))
@@ -4735,8 +4838,8 @@ define subst_stmt(s: table, names: [text], exprs: [table]) -> table:
 # Rewrite every statement in a Block.
 define subst_block(block: table, names: [text], exprs: [table]) -> table:
     stmts = get_list(block, "stmts")
-    n = len(stmts)
-    edit out = slice(stmts, 0, 0)
+    n = length(stmts)
+    edit out = part(stmts, 0, 0)
     loop i in 0..<n:
         out = append(out, subst_stmt(at(stmts, i), names, exprs))
     set(block, "stmts", out)
@@ -4751,7 +4854,7 @@ define subst_block(block: table, names: [text], exprs: [table]) -> table:
 define bound_in_block(block: table, acc: [text]) -> [text]:
     stmts = get_list(block, "stmts")
     edit out = acc
-    loop i in 0..<len(stmts):
+    loop i in 0..<length(stmts):
         s = at(stmts, i)
         kind = get(s, "kind")
         if kind == "MutLet" or kind == "LetOrAssign":
@@ -4774,7 +4877,7 @@ define bound_in_block(block: table, acc: [text]) -> [text]:
                 out = bound_in_block({"kind": "Block", "stmts": [els]}, out)
         if kind == "Match":
             arms = get_list(s, "arms")
-            loop ai in 0..<len(arms):
+            loop ai in 0..<length(arms):
                 arm_body = get_map(at(arms, ai), "body")
                 if get(arm_body, "kind") == "Block":
                     out = bound_in_block(arm_body, out)
@@ -4784,15 +4887,15 @@ define bound_in_block(block: table, acc: [text]) -> [text]:
 
 
 # ---- nested lambda lift (lambda in a call-arg / expression position) -----
-# The main lift handles `name = fn(...)` and bare/returned lambdas. This lifts
-# a lambda that sits deeper - e.g. `apply(fn(n): n+1, x)` - into the same
+# The main lift handles `name = function(...)` and bare/returned lambdas. This lifts
+# a lambda that sits deeper - e.g. `apply(function(n): n+1, x)` - into the same
 # closure form. It's additive (own `__nlambda` prefix + slot counter, so it
 # never collides with the main lift's `__lambda`), and only walks the node
 # kinds a call-arg lambda actually reaches.
 
 define nlam_names_has(names: [text], name: text) -> truth:
     edit found = false
-    loop i in 0..<len(names):
+    loop i in 0..<length(names):
         if at(names, i) == name:
             found = true
     found
@@ -4807,11 +4910,11 @@ define nlam_expr_caps(node: table, bound: [text], caps: [text]) -> [text]:
     edit worklist = init_work
     edit out = caps
     loop:
-        w_n = len(worklist)
+        w_n = length(worklist)
         if w_n == 0:
             break
         cur = at(worklist, w_n - 1)
-        worklist = slice(worklist, 0, w_n - 1)
+        worklist = part(worklist, 0, w_n - 1)
         ck = get(cur, "kind")
         if ck == "Ident":
             cn = get(cur, "name")
@@ -4824,7 +4927,7 @@ define nlam_expr_caps(node: table, bound: [text], caps: [text]) -> [text]:
             worklist = append(worklist, get(cur, "operand"))
         if ck == "Call":
             call_args = get_list(cur, "args")
-            loop cai in 0..<len(call_args):
+            loop cai in 0..<length(call_args):
                 worklist = append(worklist, at(call_args, cai))
         if ck == "If":
             worklist = append(worklist, get(cur, "cond"))
@@ -4840,19 +4943,19 @@ define nlam_expr_caps(node: table, bound: [text], caps: [text]) -> [text]:
         if ck == "MethodCall":
             worklist = append(worklist, get(cur, "receiver"))
             mc_args = get_list(cur, "args")
-            loop mci in 0..<len(mc_args):
+            loop mci in 0..<length(mc_args):
                 worklist = append(worklist, at(mc_args, mci))
         if ck == "ListLit" or ck == "Tuple":
             l_items = get_list(cur, "items")
-            loop li in 0..<len(l_items):
+            loop li in 0..<length(l_items):
                 worklist = append(worklist, at(l_items, li))
         if ck == "MapLit":
             m_pairs = get_list(cur, "pairs")
-            loop mpi in 0..<len(m_pairs):
+            loop mpi in 0..<length(m_pairs):
                 worklist = append(worklist, get(at(m_pairs, mpi), "value"))
         if ck == "StructCons":
             s_fields = get_list(cur, "fields")
-            loop sfi in 0..<len(s_fields):
+            loop sfi in 0..<length(s_fields):
                 worklist = append(worklist, get(at(s_fields, sfi), "value"))
         if ck == "Question":
             worklist = append(worklist, get(cur, "inner"))
@@ -4862,11 +4965,11 @@ define nlam_expr_caps(node: table, bound: [text], caps: [text]) -> [text]:
         if ck == "Match":
             worklist = append(worklist, get(cur, "scrutinee"))
             ms_arms = get_list(cur, "arms")
-            loop mai in 0..<len(ms_arms):
+            loop mai in 0..<length(ms_arms):
                 m_arm = at(ms_arms, mai)
                 edit arm_bound = bound
                 arm_binds = if has(m_arm, "bindings") then get_list(m_arm, "bindings") else []
-                loop abi in 0..<len(arm_binds):
+                loop abi in 0..<length(arm_binds):
                     arm_bound = append(arm_bound, at(arm_binds, abi))
                 out = nlam_expr_caps(get(m_arm, "body"), arm_bound, out)
     out
@@ -4882,7 +4985,7 @@ define nlam_block_caps(block: table, bound: [text], caps: [text]) -> table:
     stmts = get_list(block, "stmts")
     edit b = bound
     edit c = caps
-    loop si in 0..<len(stmts):
+    loop si in 0..<length(stmts):
         st = at(stmts, si)
         sk = get(st, "kind")
         if sk == "MutLet" or sk == "LetOrAssign":
@@ -4922,10 +5025,10 @@ define nlam_block_caps(block: table, bound: [text], caps: [text]) -> table:
 
 
 define nlam_capture_scan(lam_body: table, lam_params: [text]) -> [text]:
-    edit bound = slice([""], 0, 0)
-    loop bp in 0..<len(lam_params):
+    edit bound = part([""], 0, 0)
+    loop bp in 0..<length(lam_params):
         bound = append(bound, at(lam_params, bp))
-    empty_caps = slice([""], 0, 0)
+    empty_caps = part([""], 0, 0)
     edit caps = empty_caps
     if get(lam_body, "kind") == "Block":
         blk_r = nlam_block_caps(lam_body, bound, empty_caps)
@@ -4938,11 +5041,11 @@ define nlam_capture_scan(lam_body: table, lam_params: [text]) -> [text]:
 # Synthesize a __nlambda_N fn for `lam`; return {closure: MakeClosure, decl: Fn}.
 define nlam_synth(lam: table) -> table:
     lam_params = get_list(lam, "params")
-    n_lp = len(lam_params)
+    n_lp = length(lam_params)
     lam_body = get(lam, "body")
     caps = nlam_capture_scan(lam_body, lam_params)
-    n_caps = len(caps)
-    edit typed_params = slice([lam], 0, 0)
+    n_caps = length(caps)
+    edit typed_params = part([lam], 0, 0)
     typed_params = append(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
     loop pi in 0..<n_lp:
         edit p_ty = {"kind": "Named", "name": "int"}
@@ -4952,7 +5055,7 @@ define nlam_synth(lam: table) -> table:
     ctr = slot_get_int("otir:nlam_ctr")
     slot_set("otir:nlam_ctr", ctr + 1)
     synth_name = "__nlambda_{ctr}"
-    edit synth_stmts = slice([lam_body], 0, 0)
+    edit synth_stmts = part([lam_body], 0, 0)
     loop ci in 0..<n_caps:
         cap_slot = 2 + ci
         at_call = {"kind": "Call", "callee": "at", "args": [{"kind": "Ident", "name": "__env"}, {"kind": "Int", "value": "{cap_slot}"}]}
@@ -4963,7 +5066,7 @@ define nlam_synth(lam: table) -> table:
     # complaint about `__nlambda_3` is unreadable without it, and printed
     # `at line 0:0`.
     synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": {"kind": "Named", "name": "int"}, "body": synth_body, "line": if has(lam, "line") then get_int(lam, "line") else 0, "col": if has(lam, "col") then get_int(lam, "col") else 0}
-    edit cap_nodes = slice([lam], 0, 0)
+    edit cap_nodes = part([lam], 0, 0)
     loop cj in 0..<n_caps:
         # The capture reference at the CLOSURE-CONSTRUCTION site. Without a
         # position, an error about a free variable inside a lambda (an
@@ -4976,7 +5079,7 @@ define nlam_synth(lam: table) -> table:
 # Lift lambdas inside an expression; return {node: rewritten, synths: [Fn]}.
 define nlam_lift(node: table) -> table:
     kind = get(node, "kind")
-    edit synths = slice([node], 0, 0)
+    edit synths = part([node], 0, 0)
     if kind == "Lambda":
         s = nlam_synth(node)
         synths = append(synths, get(s, "decl"))
@@ -4984,12 +5087,12 @@ define nlam_lift(node: table) -> table:
     edit out = node
     if kind == "Call":
         args = get_list(node, "args")
-        edit new_args = slice(args, 0, 0)
-        loop i in 0..<len(args):
+        edit new_args = part(args, 0, 0)
+        loop i in 0..<length(args):
             ar = nlam_lift(at(args, i))
             new_args = append(new_args, get(ar, "node"))
             ars = get_list(ar, "synths")
-            loop j in 0..<len(ars):
+            loop j in 0..<length(ars):
                 synths = append(synths, at(ars, j))
         out = set(out, "args", new_args)
     if kind == "Binary":
@@ -4997,36 +5100,36 @@ define nlam_lift(node: table) -> table:
         rr = nlam_lift(get(node, "right"))
         out = set(out, "left", get(lr, "node"))
         out = set(out, "right", get(rr, "node"))
-        loop j in 0..<len(get_list(lr, "synths")):
+        loop j in 0..<length(get_list(lr, "synths")):
             synths = append(synths, at(get_list(lr, "synths"), j))
-        loop j in 0..<len(get_list(rr, "synths")):
+        loop j in 0..<length(get_list(rr, "synths")):
             synths = append(synths, at(get_list(rr, "synths"), j))
     # `not any(xs, (x): ...)` - a lambda under a unary operator.
     if kind == "Unary":
         ur = nlam_lift(get(node, "operand"))
         out = set(out, "operand", get(ur, "node"))
         ursyn = get_list(ur, "synths")
-        loop uj in 0..<len(ursyn):
+        loop uj in 0..<length(ursyn):
             synths = append(synths, at(ursyn, uj))
     # A lambda can sit in a struct-construction FIELD (`order{less: (a, b): a > b}`)
     # or behind a named argument - both were invisible to the lift and died in
     # lowering as "unhandled AST node kind Lambda".
     if kind == "StructCons":
         scf = get_list(node, "fields")
-        edit new_scf = slice(scf, 0, 0)
-        loop sci in 0..<len(scf):
+        edit new_scf = part(scf, 0, 0)
+        loop sci in 0..<length(scf):
             scp = at(scf, sci)
             scv = nlam_lift(get_map(scp, "value"))
             new_scf = append(new_scf, set(scp, "value", get(scv, "node")))
             scs = get_list(scv, "synths")
-            loop scj in 0..<len(scs):
+            loop scj in 0..<length(scs):
                 synths = append(synths, at(scs, scj))
         out = set(out, "fields", new_scf)
     if kind == "NamedArg":
         nav = nlam_lift(get_map(node, "value"))
         out = set(out, "value", get(nav, "node"))
         navs = get_list(nav, "synths")
-        loop naj in 0..<len(navs):
+        loop naj in 0..<length(navs):
             synths = append(synths, at(navs, naj))
     {"node": out, "synths": synths}
 
@@ -5034,7 +5137,7 @@ define nlam_lift(node: table) -> table:
 define nlam_lift_stmt(stmt: table) -> table:
     kind = get(stmt, "kind")
     edit out = stmt
-    edit synths = slice([stmt], 0, 0)
+    edit synths = part([stmt], 0, 0)
     edit fld = ""
     if kind == "MutLet" or kind == "LetOrAssign":
         fld = "value"
@@ -5045,7 +5148,7 @@ define nlam_lift_stmt(stmt: table) -> table:
         out = set(out, fld, get(r, "node"))
         synths = get_list(r, "synths")
     # Recurse into nested block bodies so a lambda inside a for/loop/if body
-    # (e.g. `for i in ...: g = fn(n): n + i`) is lifted too.
+    # (e.g. `for i in ...: g = function(n): n + i`) is lifted too.
     if kind == "Loop" or kind == "ForRange" or kind == "ForIn":
         br = nlam_lift_block(get(stmt, "body"))
         out = set(out, "body", get(br, "block"))
@@ -5055,7 +5158,7 @@ define nlam_lift_stmt(stmt: table) -> table:
             itr = nlam_lift(get(stmt, "iter"))
             out = set(out, "iter", get(itr, "node"))
             itsyn = get_list(itr, "synths")
-            loop itj in 0..<len(itsyn):
+            loop itj in 0..<length(itsyn):
                 lpsyn = append(lpsyn, at(itsyn, itj))
         if kind == "ForRange":
             lor = nlam_lift(get(stmt, "low"))
@@ -5063,10 +5166,10 @@ define nlam_lift_stmt(stmt: table) -> table:
             out = set(out, "low", get(lor, "node"))
             out = set(out, "high", get(hir, "node"))
             losyn = get_list(lor, "synths")
-            loop loj in 0..<len(losyn):
+            loop loj in 0..<length(losyn):
                 lpsyn = append(lpsyn, at(losyn, loj))
             hisyn = get_list(hir, "synths")
-            loop hij in 0..<len(hisyn):
+            loop hij in 0..<length(hisyn):
                 lpsyn = append(lpsyn, at(hisyn, hij))
         synths = lpsyn
     if kind == "IfBlock":
@@ -5078,20 +5181,20 @@ define nlam_lift_stmt(stmt: table) -> table:
         out = set(out, "then", get(tr, "block"))
         edit ifsyn = get_list(cnd, "synths")
         trsyn = get_list(tr, "synths")
-        loop trj in 0..<len(trsyn):
+        loop trj in 0..<length(trsyn):
             ifsyn = append(ifsyn, at(trsyn, trj))
         els = get(stmt, "else")
         if get(els, "kind") == "Block":
             er = nlam_lift_block(els)
             out = set(out, "else", get(er, "block"))
             ersyn = get_list(er, "synths")
-            loop ej in 0..<len(ersyn):
+            loop ej in 0..<length(ersyn):
                 ifsyn = append(ifsyn, at(ersyn, ej))
         if get(els, "kind") == "IfBlock":
             er2 = nlam_lift_stmt(els)
             out = set(out, "else", get(er2, "stmt"))
             ersyn2 = get_list(er2, "synths")
-            loop ej2 in 0..<len(ersyn2):
+            loop ej2 in 0..<length(ersyn2):
                 ifsyn = append(ifsyn, at(ersyn2, ej2))
         synths = ifsyn
     {"stmt": out, "synths": synths}
@@ -5099,13 +5202,13 @@ define nlam_lift_stmt(stmt: table) -> table:
 # Lift lambdas in every statement of a block. Returns {block, synths}.
 define nlam_lift_block(block: table) -> table:
     stmts = get_list(block, "stmts")
-    edit out_stmts = slice(stmts, 0, 0)
-    edit synths = slice([block], 0, 0)
-    loop i in 0..<len(stmts):
+    edit out_stmts = part(stmts, 0, 0)
+    edit synths = part([block], 0, 0)
+    loop i in 0..<length(stmts):
         r = nlam_lift_stmt(at(stmts, i))
         out_stmts = append(out_stmts, get(r, "stmt"))
         rs = get_list(r, "synths")
-        loop j in 0..<len(rs):
+        loop j in 0..<length(rs):
             synths = append(synths, at(rs, j))
     {"block": set(block, "stmts", out_stmts), "synths": synths}
 
@@ -5117,7 +5220,7 @@ define nlam_has(node: table) -> truth:
         found = true
     if kind == "Call":
         args = get_list(node, "args")
-        loop i in 0..<len(args):
+        loop i in 0..<length(args):
             if nlam_has(at(args, i)):
                 found = true
     if kind == "Binary":
@@ -5130,7 +5233,7 @@ define nlam_has(node: table) -> truth:
             found = true
     if kind == "StructCons":
         scf = get_list(node, "fields")
-        loop i in 0..<len(scf):
+        loop i in 0..<length(scf):
             if nlam_has(get_map(at(scf, i), "value")):
                 found = true
     if kind == "NamedArg":
@@ -5174,7 +5277,7 @@ define nlam_stmt_has(stmt: table) -> truth:
 define nlam_block_has(block: table) -> truth:
     stmts = get_list(block, "stmts")
     edit found = false
-    loop i in 0..<len(stmts):
+    loop i in 0..<length(stmts):
         if nlam_stmt_has(at(stmts, i)):
             found = true
     found
@@ -5184,7 +5287,10 @@ define upp_is_ident(node: table, name: text) -> truth:
     get(node, "kind") == "Ident" and get(node, "name") == name
 
 define upp_is_reader(callee: text) -> truth:
-    callee == "len" or callee == "at" or callee == "get" or callee == "get_int" or callee == "get_map" or callee == "get_list" or callee == "get_text_list" or callee == "get_int_list" or callee == "has" or callee == "contains" or callee == "byte_at" or callee == "bytes_length"
+    # slice belongs here: it reads its list and allocates a NEW one (value
+    # semantics, no views) - the way to hand ONE cell of a promoted
+    # accumulator to another function without losing the promotion.
+    callee == "length" or callee == "at" or callee == "get" or callee == "get_int" or callee == "get_map" or callee == "get_list" or callee == "get_text_list" or callee == "get_int_list" or callee == "has" or callee == "contains" or callee == "byte_at" or callee == "bytes_count" or callee == "part"
 
 define upp_fresh(val: table, name: text) -> truth:
     k = get(val, "kind")
@@ -5194,16 +5300,16 @@ define upp_fresh(val: table, name: text) -> truth:
         callee = get(val, "callee")
         if callee == "push" or callee == "append":
             true
-        else if callee == "slice":
-            # `slice(xs, a, b)` always allocates a NEW list (value semantics,
+        else if callee == "part":
+            # `part(xs, a, b)` always allocates a NEW list (value semantics,
             # no views), so the result is unaliased whatever xs is. This is
             # the compiler's own dominant accumulator idiom
-            # (`edit out = slice(stmts, 0, 0)`) - without it, none of those
+            # (`edit out = part(stmts, 0, 0)`) - without it, none of those
             # loops promoted and the self-compile went quadratic.
             true
         else if callee == "__push_inplace":
             args = get_list(val, "args")
-            len(args) > 0 and upp_is_ident(at(args, 0), name)
+            length(args) > 0 and upp_is_ident(at(args, 0), name)
         else:
             false
     else:
@@ -5211,19 +5317,19 @@ define upp_fresh(val: table, name: text) -> truth:
 
 define upp_bad_list(items: [table], name: text) -> int:
     edit bad = 0
-    loop i in 0..<len(items):
+    loop i in 0..<length(items):
         bad = bad + upp_bad_expr(at(items, i), name)
     bad
 
 define upp_bad_pairs(pairs: [table], name: text) -> int:
     edit bad = 0
-    loop i in 0..<len(pairs):
+    loop i in 0..<length(pairs):
         bad = bad + upp_bad_expr(get_map(at(pairs, i), "value"), name)
     bad
 
 define upp_bad_arms(arms: [table], name: text) -> int:
     edit bad = 0
-    loop i in 0..<len(arms):
+    loop i in 0..<length(arms):
         a = at(arms, i)
         if has(a, "guard"):
             bad = bad + upp_bad_expr(get_map(a, "guard"), name)
@@ -5243,7 +5349,7 @@ define upp_bad_expr(node: table, name: text) -> int:
     else if kind == "Call":
         callee = get(node, "callee")
         args = get_list(node, "args")
-        na = len(args)
+        na = length(args)
         safe0 = (callee == "push" or callee == "append" or callee == "__push_inplace" or upp_is_reader(callee)) and na > 0 and upp_is_ident(at(args, 0), name)
         start = if safe0 then 1 else 0
         edit bad = 0
@@ -5257,7 +5363,7 @@ define upp_bad_expr(node: table, name: text) -> int:
     else if kind == "MethodCall":
         edit bad = upp_bad_expr(get_map(node, "receiver"), name)
         args = get_list(node, "args")
-        loop i in 0..<len(args):
+        loop i in 0..<length(args):
             bad = bad + upp_bad_expr(at(args, i), name)
         bad
     else if kind == "Perform":
@@ -5331,14 +5437,14 @@ define upp_bad_stmt(s: table, name: text) -> int:
 define upp_bad_block(block: table, name: text) -> int:
     stmts = get_list(block, "stmts")
     edit bad = 0
-    loop i in 0..<len(stmts):
+    loop i in 0..<length(stmts):
         bad = bad + upp_bad_stmt(at(stmts, i), name)
     bad
 
 define upp_mut_names(block: table, acc0: [text]) -> [text]:
     stmts = get_list(block, "stmts")
     edit acc = acc0
-    loop i in 0..<len(stmts):
+    loop i in 0..<length(stmts):
         s = at(stmts, i)
         k = get(s, "kind")
         if k == "MutLet":
@@ -5356,7 +5462,7 @@ define upp_mut_names(block: table, acc0: [text]) -> [text]:
                 acc = upp_mut_names_stmt(els, acc)
         else if k == "Match":
             arms = get_list(s, "arms")
-            loop ai in 0..<len(arms):
+            loop ai in 0..<length(arms):
                 b = get_map(at(arms, ai), "body")
                 if get(b, "kind") == "Block":
                     acc = upp_mut_names(b, acc)
@@ -5373,7 +5479,7 @@ define upp_mut_names_stmt(s: table, acc0: [text]) -> [text]:
 
 define upp_contains_name(names: [text], name: text) -> truth:
     edit f = false
-    loop i in 0..<len(names):
+    loop i in 0..<length(names):
         if at(names, i) == name:
             f = true
     f
@@ -5383,7 +5489,7 @@ define upp_is_self_push(value: table, name: text) -> truth:
         false
     else:
         args = get_list(value, "args")
-        (get(value, "callee") == "push" or get(value, "callee") == "append") and len(args) > 0 and upp_is_ident(at(args, 0), name)
+        (get(value, "callee") == "push" or get(value, "callee") == "append") and length(args) > 0 and upp_is_ident(at(args, 0), name)
 
 define upp_promote_stmt(s: table, uniq: [text]) -> table:
     kind = get(s, "kind")
@@ -5406,8 +5512,8 @@ define upp_promote_stmt(s: table, uniq: [text]) -> table:
             out = set(out, "else", upp_promote_stmt(els, uniq))
     else if kind == "Match":
         arms = get_list(s, "arms")
-        edit new_arms = slice(arms, 0, 0)
-        loop ai in 0..<len(arms):
+        edit new_arms = part(arms, 0, 0)
+        loop ai in 0..<length(arms):
             a = at(arms, ai)
             b = get_map(a, "body")
             nb = if get(b, "kind") == "Block" then upp_promote_block(b, uniq) else b
@@ -5417,8 +5523,8 @@ define upp_promote_stmt(s: table, uniq: [text]) -> table:
 
 define upp_promote_block(block: table, uniq: [text]) -> table:
     stmts = get_list(block, "stmts")
-    edit out = slice(stmts, 0, 0)
-    loop i in 0..<len(stmts):
+    edit out = part(stmts, 0, 0)
+    loop i in 0..<length(stmts):
         out = append(out, upp_promote_stmt(at(stmts, i), uniq))
     set(block, "stmts", out)
 
@@ -5440,7 +5546,7 @@ define upp_stmt_has_self_push(s: table, name: text) -> truth:
     else if kind == "Match":
         arms = get_list(s, "arms")
         edit found = false
-        loop ai in 0..<len(arms):
+        loop ai in 0..<length(arms):
             b = get_map(at(arms, ai), "body")
             if get(b, "kind") == "Block":
                 found = found or upp_block_has_self_push(b, name)
@@ -5451,7 +5557,7 @@ define upp_stmt_has_self_push(s: table, name: text) -> truth:
 define upp_block_has_self_push(block: table, name: text) -> truth:
     stmts = get_list(block, "stmts")
     edit found = false
-    loop i in 0..<len(stmts):
+    loop i in 0..<length(stmts):
         found = found or upp_stmt_has_self_push(at(stmts, i), name)
     found
 
@@ -5467,7 +5573,7 @@ define upp_block_has_self_push(block: table, name: text) -> truth:
 #     ListV(acc)                      <- escape AFTER the pushes: fine
 define upp_safe_ordered(body: table, name: text) -> truth:
     stmts = get_list(body, "stmts")
-    n = len(stmts)
+    n = length(stmts)
     edit last_push = 0 - 1
     loop i in 0..<n:
         if upp_stmt_has_self_push(at(stmts, i), name):
@@ -5484,13 +5590,13 @@ define upp_safe_ordered(body: table, name: text) -> truth:
 
 # Per-function: keep the mut locals proven unique, rewrite their self-pushes.
 define upp_promote_fn(body: table) -> table:
-    cands = upp_mut_names(body, slice([""], 0, 0))
-    edit uniq = slice([""], 0, 0)
-    loop i in 0..<len(cands):
+    cands = upp_mut_names(body, part([""], 0, 0))
+    edit uniq = part([""], 0, 0)
+    loop i in 0..<length(cands):
         nm = at(cands, i)
         if (not upp_contains_name(uniq, nm)) and upp_safe_ordered(body, nm):
             uniq = append(uniq, nm)
-    if len(uniq) == 0:
+    if length(uniq) == 0:
         body
     else:
         upp_promote_block(body, uniq)
@@ -5520,7 +5626,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
     # questions a single ordered walk cannot answer: "who exports this?" (any
     # orb, including ones parsed later) and "did I import them?".
     pre_decls = get_list(program, "decls")
-    pre_n = len(pre_decls)
+    pre_n = length(pre_decls)
     edit orb_pre = ""
     loop pi in 0..<pre_n:
         pd = at(pre_decls, pi)
@@ -5541,11 +5647,11 @@ public define ast_program_to_ir(program: table) -> IRModule:
             if (if has(pd, "reexport") then get_int(pd, "reexport") else 0) == 1:
                 slot_set(otir_k2("reex", orb_pre, target), 1)
             only_list = get_list(pd, "only")
-            if len(only_list) > 0:
+            if length(only_list) > 0:
                 # A list is a LIMIT, not a hint: from this orb you see these
                 # names and nothing else.
                 slot_set(otir_k2("onlyn", orb_pre, target), 1)
-            loop oi in 0..<len(only_list):
+            loop oi in 0..<length(only_list):
                 slot_set(otir_k3("only", orb_pre, target, at(only_list, oi)), 1)
         if pk == "Fn":
             if (if has(pd, "pub") then get_int(pd, "pub") else 1) == 1:
@@ -5563,8 +5669,8 @@ public define ast_program_to_ir(program: table) -> IRModule:
     # duplicate-symbol error. Externs are declarations, not definitions, so
     # re-declaring them across orbs stays legal and is not checked here.
     dup_decls = get_list(program, "decls")
-    dup_n = len(dup_decls)
-    edit seen_fn_names = slice([""], 0, 0)
+    dup_n = length(dup_decls)
+    edit seen_fn_names = part([""], 0, 0)
     edit orb_dup = ""
     loop ddi in 0..<dup_n:
         dd = at(dup_decls, ddi)
@@ -5583,7 +5689,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             dnm_raw = get(dd, "name")
             dnm = otir_mangle(orb_dup, dnm_raw, if has(dd, "pub") then get_int(dd, "pub") else 1)
             edit dup_already = false
-            loop dsj in 0..<len(seen_fn_names):
+            loop dsj in 0..<length(seen_fn_names):
                 if at(seen_fn_names, dsj) == dnm:
                     dup_already = true
             if dup_already:
@@ -5599,10 +5705,10 @@ public define ast_program_to_ir(program: table) -> IRModule:
     # reference another const (the substitution is single-pass). Const-free
     # programs are untouched.
     cn_src = get_list(program, "decls")
-    cn_total = len(cn_src)
-    const_names = slice([""], 0, 0)
+    cn_total = length(cn_src)
+    const_names = part([""], 0, 0)
     edit const_name_list = const_names
-    const_exprs = slice([{"kind": "Int", "value": "0"}], 0, 0)
+    const_exprs = part([{"kind": "Int", "value": "0"}], 0, 0)
     edit const_expr_list = const_exprs
     loop cni in 0..<cn_total:
         cnd = at(cn_src, cni)
@@ -5610,8 +5716,8 @@ public define ast_program_to_ir(program: table) -> IRModule:
             const_name_list = append(const_name_list, get(cnd, "name"))
             const_expr_list = append(const_expr_list, get(cnd, "value"))
     edit program_const = program
-    if len(const_name_list) > 0:
-        edit cn_out = slice(cn_src, 0, 0)
+    if length(const_name_list) > 0:
+        edit cn_out = part(cn_src, 0, 0)
         loop cnj in 0..<cn_total:
             edit cnd2 = at(cn_src, cnj)
             cnk = get(cnd2, "kind")
@@ -5625,16 +5731,16 @@ public define ast_program_to_ir(program: table) -> IRModule:
                     # overwritten by it. See bound_in_block.
                     edit cn_bound = []
                     cn_params = get_list(cnd2, "params")
-                    loop cpi in 0..<len(cn_params):
+                    loop cpi in 0..<length(cn_params):
                         cn_bound = append(cn_bound, get(at(cn_params, cpi), "name"))
                     cn_bound = bound_in_block(get(cnd2, "body"), cn_bound)
-                    edit cn_keep_names = slice(const_name_list, 0, 0)
-                    edit cn_keep_exprs = slice(const_expr_list, 0, 0)
-                    loop cn_ni in 0..<len(const_name_list):
+                    edit cn_keep_names = part(const_name_list, 0, 0)
+                    edit cn_keep_exprs = part(const_expr_list, 0, 0)
+                    loop cn_ni in 0..<length(const_name_list):
                         if subst_find(cn_bound, at(const_name_list, cn_ni)) < 0:
                             cn_keep_names = append(cn_keep_names, at(const_name_list, cn_ni))
                             cn_keep_exprs = append(cn_keep_exprs, at(const_expr_list, cn_ni))
-                    if len(cn_keep_names) > 0:
+                    if length(cn_keep_names) > 0:
                         cnd2 = set(cnd2, "body", subst_block(get(cnd2, "body"), cn_keep_names, cn_keep_exprs))
                 cn_out = append(cn_out, cnd2)
         program_const = set(program, "decls", cn_out)
@@ -5651,14 +5757,14 @@ public define ast_program_to_ir(program: table) -> IRModule:
     # statements. Gated by a prescan, so a program without `defer` is untouched.
     edit defer_decls = get_list(program_const, "decls")
     edit any_defer = false
-    loop dfi in 0..<len(defer_decls):
+    loop dfi in 0..<length(defer_decls):
         dfd = at(defer_decls, dfi)
         if get(dfd, "kind") == "Fn":
             if defer_block_has(get(dfd, "body")):
                 any_defer = true
     if any_defer:
-        edit df_out = slice(defer_decls, 0, 0)
-        loop dfj in 0..<len(defer_decls):
+        edit df_out = part(defer_decls, 0, 0)
+        loop dfj in 0..<length(defer_decls):
             edit dfd2 = at(defer_decls, dfj)
             if get(dfd2, "kind") == "Fn":
                 orig_body = get_map(dfd2, "body")
@@ -5666,7 +5772,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                 # defer; coverage over the rewritten body; a need with no cover
                 # is a `defer` the rewrite lost on some return path.
                 needs = dfv_need(orig_body)
-                no_defers = slice([{}], 0, 0)
+                no_defers = part([{}], 0, 0)
                 new_body = defer_rewrite_block(orig_body, no_defers)
                 dfv_report(needs, dfv_covered(new_body))
                 dfd2 = set(dfd2, "body", new_body)
@@ -5679,8 +5785,8 @@ public define ast_program_to_ir(program: table) -> IRModule:
     # the quadratic copy. Runs BEFORE lambda lift so a capturing lambda is still
     # a Lambda node (which blocks promotion). See upp_promote_fn.
     upp_decls = get_list(program_const, "decls")
-    edit upp_out = slice(upp_decls, 0, 0)
-    loop upi in 0..<len(upp_decls):
+    edit upp_out = part(upp_decls, 0, 0)
+    loop upi in 0..<length(upp_decls):
         edit upd = at(upp_decls, upi)
         if get(upd, "kind") == "Fn":
             upd = set(upd, "body", upp_promote_fn(get_map(upd, "body")))
@@ -5693,7 +5799,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
     # leaves decls unmodified (avoids if/else type-mismatch on empty-list
     # initialization, which broke the bundle build before).
     raw_decls = get_list(program_const, "decls")
-    raw_total = len(raw_decls)
+    raw_total = length(raw_decls)
     edit has_any_lambda = false
     loop sc_idx in 0..<raw_total:
         sc_decl = at(raw_decls, sc_idx)
@@ -5701,7 +5807,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             sc_body = get(sc_decl, "body")
             if get(sc_body, "kind") == "Block":
                 sc_stmts = get_list(sc_body, "stmts")
-                sc_n = len(sc_stmts)
+                sc_n = length(sc_stmts)
                 loop sc_s in 0..<sc_n:
                     sc_stmt = at(sc_stmts, sc_s)
                     sc_kind = get(sc_stmt, "kind")
@@ -5724,7 +5830,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             cs_body = get(cs_decl, "body")
             if get(cs_body, "kind") == "Block":
                 cs_stmts = get_list(cs_body, "stmts")
-                cs_n = len(cs_stmts)
+                cs_n = length(cs_stmts)
                 loop cs_s in 0..<cs_n:
                     cs_stmt = at(cs_stmts, cs_s)
                     cs_kind = get(cs_stmt, "kind")
@@ -5741,7 +5847,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                                 if get(cs_left, "kind") == "Ident":
                                     cs_l_name = get(cs_left, "name")
                                     edit found_in_params = false
-                                    nlp_x = len(cs_lp)
+                                    nlp_x = length(cs_lp)
                                     loop ix in 0..<nlp_x:
                                         if at(cs_lp, ix) == cs_l_name:
                                             found_in_params = true
@@ -5754,11 +5860,11 @@ public define ast_program_to_ir(program: table) -> IRModule:
         seed = at(raw_decls, 0)
         init_decls = [seed]
         edit working_decls = init_decls
-        working_decls = bytes_slice(working_decls, 0, 0)
+        working_decls = bytes_part(working_decls, 0, 0)
         edit lambda_counter = 0
         init_synth = [seed]
         edit synth_decls = init_synth
-        synth_decls = bytes_slice(synth_decls, 0, 0)
+        synth_decls = bytes_part(synth_decls, 0, 0)
         # Stmts seed - we need a typed empty list of stmts. Use the seed
         # decl's body stmts if it's a Block fn; otherwise we still need
         # some Stmt-typed list. Synthesize using a dummy.
@@ -5776,12 +5882,12 @@ public define ast_program_to_ir(program: table) -> IRModule:
                 body_kind = get(fn_body, "kind")
                 if body_kind == "Block":
                     old_stmts = get_list(fn_body, "stmts")
-                    n_stmts = len(old_stmts)
+                    n_stmts = length(old_stmts)
                     init_stmts = old_stmts
                     edit new_stmts = init_stmts
-                    new_stmts = slice(new_stmts, 0, 0)
-                    edit binding_names = slice([""], 0, 0)
-                    edit binding_caps = slice([""], 0, 0)
+                    new_stmts = part(new_stmts, 0, 0)
+                    edit binding_names = part([""], 0, 0)
+                    edit binding_caps = part([""], 0, 0)
                     loop s_idx in 0..<n_stmts:
                         stmt = at(old_stmts, s_idx)
                         stmt_kind = get(stmt, "kind")
@@ -5790,7 +5896,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                             if get(get(stmt, "value"), "kind") == "Lambda":
                                 is_let_lambda = true
                         # A bare/returned lambda - the last expr of a fn body or
-                        # an explicit `return fn(...)` - lifts the same way; we
+                        # an explicit `return function(...)` - lifts the same way; we
                         # place the resulting closure back in expr position.
                         edit is_expr_lambda = false
                         if stmt_kind == "ExprStmt" or stmt_kind == "Return":
@@ -5803,21 +5909,21 @@ public define ast_program_to_ir(program: table) -> IRModule:
                             lam_line = if has(lam, "line") then get_int(lam, "line") else 0
                             lam_col = if has(lam, "col") then get_int(lam, "col") else 0
                             lam_params = get_list(lam, "params")
-                            n_lp = len(lam_params)
+                            n_lp = length(lam_params)
                             lam_body = get(lam, "body")
                             # Worklist-based capture scan: visit expressions
                             # iteratively, recurse into Binary/Call/Unary/If.
                             # Ident nodes not in lam_params become captures.
                             init_work = [lam_body]
                             edit worklist = init_work
-                            edit caps = slice([""], 0, 0)
-                            edit seen_caps = slice([""], 0, 0)
+                            edit caps = part([""], 0, 0)
+                            edit seen_caps = part([""], 0, 0)
                             loop:
-                                w_n = len(worklist)
+                                w_n = length(worklist)
                                 if w_n == 0:
                                     break
                                 cur = at(worklist, w_n - 1)
-                                worklist = slice(worklist, 0, w_n - 1)
+                                worklist = part(worklist, 0, w_n - 1)
                                 ck = get(cur, "kind")
                                 if ck == "Ident":
                                     cn = get(cur, "name")
@@ -5826,7 +5932,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                                         if at(lam_params, lp_w) == cn:
                                             is_param = true
                                     edit already = false
-                                    n_seen = len(seen_caps)
+                                    n_seen = length(seen_caps)
                                     loop sc in 0..<n_seen:
                                         if at(seen_caps, sc) == cn:
                                             already = true
@@ -5844,20 +5950,20 @@ public define ast_program_to_ir(program: table) -> IRModule:
                                     worklist = append(worklist, get(cur, "operand"))
                                 if ck == "Call":
                                     call_args = get_list(cur, "args")
-                                    n_ca = len(call_args)
+                                    n_ca = length(call_args)
                                     loop cai in 0..<n_ca:
                                         worklist = append(worklist, at(call_args, cai))
                                 if ck == "If":
                                     worklist = append(worklist, get(cur, "cond"))
                                     worklist = append(worklist, get(cur, "then"))
                                     worklist = append(worklist, get(cur, "else"))
-                            n_caps = len(caps)
+                            n_caps = length(caps)
                             # __lambda_N(__env, params): the captures live in the
                             # closure list __env; a prologue binds each by name so
                             # the body is unchanged. env is the leading param.
                             init_typed = get_list(decl, "params")
                             edit typed_params = init_typed
-                            typed_params = slice(typed_params, 0, 0)
+                            typed_params = part(typed_params, 0, 0)
                             typed_params = append(typed_params, {"name": "__env", "type": {"kind": "List", "elem": {"kind": "Named", "name": "int"}}})
                             loop pi in 0..<n_lp:
                                 p_name = at(lam_params, pi)
@@ -5869,7 +5975,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                             lambda_counter = lambda_counter + 1
                             # Prologue: cap_i = at(__env, 2 + i)  (slots 0/1 are
                             # the fn-ptr and the is_lambda flag).
-                            edit synth_stmts = slice([lam_body], 0, 0)
+                            edit synth_stmts = part([lam_body], 0, 0)
                             loop ci in 0..<n_caps:
                                 cap_name = at(caps, ci)
                                 cap_slot = 2 + ci
@@ -5882,7 +5988,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                             bind_name = get(stmt, "name")
                             binding_names = append(binding_names, bind_name)
                             # The binding value builds the closure: [ptr, 1, caps].
-                            edit cap_nodes = slice([lam_body], 0, 0)
+                            edit cap_nodes = part([lam_body], 0, 0)
                             loop cj in 0..<n_caps:
                                 # The capture reference at the CLOSURE-CONSTRUCTION
                                 # site. Without a position, an error about a free
@@ -5895,14 +6001,14 @@ public define ast_program_to_ir(program: table) -> IRModule:
                                 new_stmts = append(new_stmts, {"kind": stmt_kind, "expr": new_value})
                         if not is_lambda_stmt:
                             # Non-lambda statement: lift any lambda nested in its
-                            # expression (e.g. `apply(fn(n): n+1, x)`) into a
+                            # expression (e.g. `apply(function(n): n+1, x)`) into a
                             # closure + synth decls, then pass it through. Calls
                             # to a closure binding resolve to closure_call at
                             # lowering, so no cap rewrite / escape restriction.
                             nl = nlam_lift_stmt(stmt)
                             new_stmts = append(new_stmts, get(nl, "stmt"))
                             nl_synths = get_list(nl, "synths")
-                            loop nsi in 0..<len(nl_synths):
+                            loop nsi in 0..<length(nl_synths):
                                 synth_decls = append(synth_decls, set(at(nl_synths, nsi), "orb", orb_lam))
                     new_body = {"kind": "Block", "stmts": new_stmts}
                     # SET the changed fields on the ORIGINAL decl. Rebuilding it
@@ -5923,11 +6029,11 @@ public define ast_program_to_ir(program: table) -> IRModule:
                     working_decls = append(working_decls, decl)
             if get(decl, "kind") != "Fn":
                 working_decls = append(working_decls, decl)
-        n_synth = len(synth_decls)
+        n_synth = length(synth_decls)
         loop sy_i in 0..<n_synth:
             working_decls = append(working_decls, at(synth_decls, sy_i))
         decls = working_decls
-    total = len(decls)
+    total = length(decls)
     # Pass 1a: collect Data decls and Enum decls first. Pass 1b uses them so
     # fn ret types like `-> Inst` correctly become "struct:Inst" not "i64",
     # and `EnumName.Variant` expressions resolve to variant indices.
@@ -5939,7 +6045,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             # Bind generic type vars so `T` in a field type lowers to i64.
             otir_bind_tyvars(decl)
             data_fields = get_list(decl, "fields")
-            n_df = len(data_fields)
+            n_df = length(data_fields)
             edit spec = ""
             loop fi in 0..<n_df:
                 fld = at(data_fields, fi)
@@ -5967,7 +6073,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             # Bind generic type vars so `T` in a variant payload lowers to i64.
             otir_bind_tyvars(decl)
             variants = get_list(decl, "variants")
-            n_vars = len(variants)
+            n_vars = length(variants)
             edit csv = ""
             edit max_payloads = 0
             loop vi in 0..<n_vars:
@@ -5979,7 +6085,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                 # "Enum$Variant" entry in the enum tables (comma csv of
                 # IR types). Match-arm bindings retype loads with these.
                 v_payloads = get_list(v, "payload")
-                n_pl = len(v_payloads)
+                n_pl = length(v_payloads)
                 if n_pl > max_payloads:
                     max_payloads = n_pl
                 edit pl_csv = ""
@@ -6043,13 +6149,21 @@ public define ast_program_to_ir(program: table) -> IRModule:
                 dcl_line = if has(decl, "line") then get_int(decl, "line") else 0
                 dcl_col = if has(decl, "col") then get_int(decl, "col") else 0
                 compile_error("orion: ERROR at {otir_where(dcl_line, dcl_col)} - duplicate function `{fn_raw}` (defined twice in the same orb - two orbs may now each have their own)")
+            # A define wearing a BUILTIN's name can never be called: the call
+            # site lowers builtins by name first, so `get("/x", f)` built a
+            # table read out of a route call and crashed at runtime. Say it
+            # here, at the define, instead.
+            if is_builtin_name(fn_raw):
+                bi_line = if has(decl, "line") then get_int(decl, "line") else 0
+                bi_col = if has(decl, "col") then get_int(decl, "col") else 0
+                compile_error("orion: ERROR at {otir_where(bi_line, bi_col)} - `{fn_raw}` is a builtin; a define cannot take its name - calls would go to the builtin, not here")
             fn_seen = append(fn_seen, fn_name)
             ret_type = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, fn_name, ret_type)
             # Arity registry (compiler slots): a call with the wrong
             # argument count silently shifts every parameter - caught
             # here instead of as a runtime pointer crash.
-            slot_set("otir:arity:" + fn_name, len(get_list(decl, "params")))
+            slot_set("otir:arity:" + fn_name, length(get_list(decl, "params")))
             # Capability contract registry: `otir:uses:<fn>` -> csv. A caller
             # with its own declared clause must cover everything its callee
             # declares - capabilities compose upward through signatures.
@@ -6059,7 +6173,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             # Parameter-position registry: `otir:param:<fn>:<name>` -> index,
             # so a named argument `f(x = 5)` can be reordered to its slot.
             fn_params_list = get_list(decl, "params")
-            loop fp_i in 0..<len(fn_params_list):
+            loop fp_i in 0..<length(fn_params_list):
                 fp = at(fn_params_list, fp_i)
                 slot_set("otir:param:" + fn_name + ":" + get(fp, "name"), fp_i)
                 # Default-value registry: the param's default EXPRESSION (an
@@ -6094,7 +6208,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             ext_name = get(decl, "name")
             ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, ext_name, ext_ret)
-            slot_set("otir:arity:" + ext_name, len(get_list(decl, "params")))
+            slot_set("otir:arity:" + ext_name, length(get_list(decl, "params")))
 
     # Pass 2: build each fn's body with the signature scope available.
     # ExternFn becomes a body-less IRFn (params + ret, zero instructions);
@@ -6131,7 +6245,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
             ext_ret2 = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             edit ext_fn = ir_fn_new(get(decl, "name"), ext_ret2)
             ext_params = get_list(decl, "params")
-            n_ext_params = len(ext_params)
+            n_ext_params = length(ext_params)
             loop epi in 0..<n_ext_params:
                 ep = at(ext_params, epi)
                 ep_type = ast_type_to_ir_with_scope(get(ep, "type"), sig_scope)

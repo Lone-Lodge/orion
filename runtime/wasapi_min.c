@@ -528,4 +528,254 @@ void orion_audio_shutdown(void) {
     IAudioClient_Stop(oa_client);
     oa_ok = 0;
 }
+
+/* ---- capture: the mic half.
+ *
+ * Own client, own thread, own ring - the render side above is a mixer
+ * with a deadline and capture has nothing to say to it. Shared mode
+ * hands us the DEVICE's rate and channel count, so the ring downmixes
+ * to mono and decimates to whatever rate the caller asked for on the
+ * way in: a voice pipeline wants 16 kHz mono, a mic is usually 48 kHz
+ * stereo. Nearest-sample, no filter - speech recognisers are robust to
+ * the aliasing and a proper resampler is a DSP project of its own.
+ *
+ * The ring holds the last OM_RING_SECONDS and overwrites the OLDEST
+ * when it fills. Something listening for a wake word always wants what
+ * was just said, never the history it already missed.
+ */
+
+DEFINE_GUID(OA_IID_IAudioCaptureClient, 0xC8ADBD64, 0xE71E, 0x48A0, 0xA4,
+            0xDE, 0x18, 0x5C, 0x39, 0x5C, 0xD3, 0x17);
+
+#define OM_RING_SECONDS 30
+
+static IAudioClient *om_client;
+static IAudioCaptureClient *om_capture;
+static HANDLE om_event, om_thread;
+static CRITICAL_SECTION om_cs;
+static volatile int om_running;
+static int om_ok;
+static int om_dev_rate = 48000;
+static int om_dev_channels = 2;
+static int om_dev_f32 = 1;
+static int om_out_rate = 16000;
+static float *om_ring;
+static long long om_ring_cap;   /* in frames */
+static long long om_ring_len;
+static long long om_ring_head;  /* index of the oldest frame */
+static double om_phase;         /* decimation accumulator */
+static float om_level;
+
+static void om_push(float v) {
+    om_ring[(om_ring_head + om_ring_len) % om_ring_cap] = v;
+    if (om_ring_len == om_ring_cap)
+        om_ring_head = (om_ring_head + 1) % om_ring_cap;
+    else
+        om_ring_len++;
+}
+
+static DWORD WINAPI om_thread_main(LPVOID arg) {
+    (void)arg;
+    double ratio = (double)om_out_rate / (double)om_dev_rate;
+    while (om_running) {
+        if (WaitForSingleObject(om_event, 200) != WAIT_OBJECT_0) continue;
+        UINT32 packet = 0;
+        while (SUCCEEDED(IAudioCaptureClient_GetNextPacketSize(om_capture,
+                                                              &packet)) &&
+               packet > 0) {
+            BYTE *data;
+            UINT32 frames;
+            DWORD flags;
+            if (FAILED(IAudioCaptureClient_GetBuffer(om_capture, &data, &frames,
+                                                     &flags, NULL, NULL)))
+                break;
+            int silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0;
+            double sumsq = 0.0;
+            long long pushed = 0;
+            EnterCriticalSection(&om_cs);
+            for (UINT32 i = 0; i < frames; i++) {
+                float mono = 0.0f;
+                if (!silent) {
+                    if (om_dev_f32) {
+                        const float *f = (const float *)data;
+                        for (int c = 0; c < om_dev_channels; c++)
+                            mono += f[i * om_dev_channels + c];
+                    } else {
+                        const short *s = (const short *)data;
+                        for (int c = 0; c < om_dev_channels; c++)
+                            mono += s[i * om_dev_channels + c] / 32768.0f;
+                    }
+                    mono /= (float)om_dev_channels;
+                }
+                om_phase += ratio;
+                while (om_phase >= 1.0) {
+                    om_push(mono);
+                    om_phase -= 1.0;
+                    sumsq += mono * mono;
+                    pushed++;
+                }
+            }
+            if (pushed > 0) om_level = (float)sqrt(sumsq / (double)pushed);
+            LeaveCriticalSection(&om_cs);
+            IAudioCaptureClient_ReleaseBuffer(om_capture, frames);
+        }
+    }
+    return 0;
+}
+
+long long orion_mic_open(long long rate) {
+    if (om_ok) return 1;
+    if (rate < 4000 || rate > 192000) rate = 16000;
+    om_out_rate = (int)rate;
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    IMMDeviceEnumerator *devenum = NULL;
+    IMMDevice *dev = NULL;
+    WAVEFORMATEX *fmt = NULL;
+    if (FAILED(CoCreateInstance(&OA_CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL,
+                                &OA_IID_IMMDeviceEnumerator,
+                                (void **)&devenum)))
+        return 0;
+    if (FAILED(IMMDeviceEnumerator_GetDefaultAudioEndpoint(devenum, eCapture,
+                                                           eConsole, &dev))) {
+        IMMDeviceEnumerator_Release(devenum);
+        return 0;
+    }
+    if (FAILED(IMMDevice_Activate(dev, &OA_IID_IAudioClient, CLSCTX_ALL, NULL,
+                                  (void **)&om_client))) {
+        IMMDevice_Release(dev);
+        IMMDeviceEnumerator_Release(devenum);
+        return 0;
+    }
+    IAudioClient_GetMixFormat(om_client, &fmt);
+    om_dev_rate = (int)fmt->nSamplesPerSec;
+    om_dev_channels = fmt->nChannels < 1 ? 1 : fmt->nChannels;
+    om_dev_f32 = 1;
+    if (fmt->wFormatTag == WAVE_FORMAT_PCM ||
+        (fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
+         ((WAVEFORMATEXTENSIBLE *)fmt)->SubFormat.Data1 == 1))
+        om_dev_f32 = 0;
+    /* Take the device's own format unchanged - we downmix ourselves, and
+     * asking shared mode to convert is how Initialize starts failing. */
+    if (FAILED(IAudioClient_Initialize(om_client, AUDCLNT_SHAREMODE_SHARED,
+                                       AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                                       2000000, 0, fmt, NULL))) {
+        CoTaskMemFree(fmt);
+        IMMDevice_Release(dev);
+        IMMDeviceEnumerator_Release(devenum);
+        return 0;
+    }
+    CoTaskMemFree(fmt);
+    IMMDevice_Release(dev);
+    IMMDeviceEnumerator_Release(devenum);
+    om_ring_cap = (long long)om_out_rate * OM_RING_SECONDS;
+    om_ring = (float *)calloc((size_t)om_ring_cap, sizeof(float));
+    if (!om_ring) return 0;
+    om_ring_len = 0;
+    om_ring_head = 0;
+    om_phase = 0.0;
+    om_level = 0.0f;
+    om_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+    IAudioClient_SetEventHandle(om_client, om_event);
+    if (FAILED(IAudioClient_GetService(om_client, &OA_IID_IAudioCaptureClient,
+                                       (void **)&om_capture))) {
+        free(om_ring);
+        om_ring = NULL;
+        return 0;
+    }
+    InitializeCriticalSection(&om_cs);
+    om_running = 1;
+    om_thread = CreateThread(NULL, 0, om_thread_main, NULL, 0, NULL);
+    IAudioClient_Start(om_client);
+    om_ok = 1;
+    return 1;
+}
+
+long long orion_mic_level(void) {
+    if (!om_ok) return 0;
+    return (long long)(om_level * 1000.0f);
+}
+
+long long orion_mic_buffered(void) {
+    if (!om_ok) return 0;
+    EnterCriticalSection(&om_cs);
+    long long n = om_ring_len;
+    LeaveCriticalSection(&om_cs);
+    return n;
+}
+
+long long orion_mic_rate(void) { return om_ok ? om_out_rate : 0; }
+
+static void om_w32(unsigned char *p, unsigned long v) {
+    p[0] = (unsigned char)(v & 255);
+    p[1] = (unsigned char)((v >> 8) & 255);
+    p[2] = (unsigned char)((v >> 16) & 255);
+    p[3] = (unsigned char)((v >> 24) & 255);
+}
+
+static void om_w16(unsigned char *p, unsigned v) {
+    p[0] = (unsigned char)(v & 255);
+    p[1] = (unsigned char)((v >> 8) & 255);
+}
+
+/* Drains the ring into a mono PCM16 WAV. A file and not a buffer on
+ * purpose: Orion carries binary as [int], and marshalling a minute of
+ * audio through a list is both slow and the exact shape that bit the
+ * vec codegen. Everything downstream reads WAV anyway - orion_audio_load
+ * included, which is what makes a record-then-play test possible. */
+long long orion_mic_take_wav(const char *path) {
+    if (!om_ok || !path) return 0;
+    EnterCriticalSection(&om_cs);
+    long long n = om_ring_len;
+    float *pcm = n > 0 ? (float *)malloc((size_t)n * sizeof(float)) : NULL;
+    if (pcm)
+        for (long long i = 0; i < n; i++)
+            pcm[i] = om_ring[(om_ring_head + i) % om_ring_cap];
+    om_ring_len = 0;
+    om_ring_head = 0;
+    LeaveCriticalSection(&om_cs);
+    if (!pcm) return 0;
+
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        free(pcm);
+        return 0;
+    }
+    unsigned char h[44];
+    unsigned long bytes = (unsigned long)(n * 2);
+    memcpy(h, "RIFF", 4);
+    om_w32(h + 4, 36 + bytes);
+    memcpy(h + 8, "WAVEfmt ", 8);
+    om_w32(h + 16, 16);
+    om_w16(h + 20, 1);                      /* PCM */
+    om_w16(h + 22, 1);                      /* mono */
+    om_w32(h + 24, (unsigned long)om_out_rate);
+    om_w32(h + 28, (unsigned long)om_out_rate * 2);
+    om_w16(h + 32, 2);
+    om_w16(h + 34, 16);
+    memcpy(h + 36, "data", 4);
+    om_w32(h + 40, bytes);
+    fwrite(h, 1, 44, f);
+    for (long long i = 0; i < n; i++) {
+        float x = pcm[i];
+        if (x > 1.0f) x = 1.0f;
+        if (x < -1.0f) x = -1.0f;
+        short s = (short)(x * 32767.0f);
+        unsigned char b[2];
+        om_w16(b, (unsigned)(unsigned short)s);
+        fwrite(b, 1, 2, f);
+    }
+    fclose(f);
+    free(pcm);
+    return n;
+}
+
+void orion_mic_close(void) {
+    if (!om_ok) return;
+    om_running = 0;
+    WaitForSingleObject(om_thread, 500);
+    IAudioClient_Stop(om_client);
+    free(om_ring);
+    om_ring = NULL;
+    om_ok = 0;
+}
 #endif

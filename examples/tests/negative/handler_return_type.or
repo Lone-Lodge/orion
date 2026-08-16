@@ -1,6 +1,6 @@
 # expect: is declared to return `text` but its body returns `int`
 effect Log:
-  msg: fn(text) -> int
+  msg: function(text) -> int
 handle Log.msg(s: text) -> text:
   42
 define main() -> int:

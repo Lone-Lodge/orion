@@ -43,19 +43,19 @@ define main() -> int:
     args = arguments()
     edit i = 1
     edit rounds = 0
-    if len(args) > i + 1 and at(args, i) is "--rounds":
+    if length(args) > i + 1 and at(args, i) is "--rounds":
         rounds = int_from_text(at(args, i + 1))
         i = i + 2
-    if len(args) < i + 2:
+    if length(args) < i + 2:
         return usage()
     root = at(args, i)
     cmd = at(args, i + 1)
     edit cmd_args = []
-    loop k in i + 2 until len(args):
+    loop k in i + 2 until length(args):
         cmd_args = append(cmd_args, at(args, k))
 
     edit snap = snapshot(root)
-    n_files = len(scan_tree(root))
+    n_files = length(scan_tree(root))
     print_line("orbwatch: watching {n_files} files under {root}")
     edit job = start_command(cmd, cmd_args)
     edit quiet = 0

@@ -32,12 +32,12 @@ define main() -> int:
         if ori_should_quit(app):
             break
         events = ori_pump(app)
-        n_ev = len(events)
+        n_ev = length(events)
         loop i in 0..<n_ev:
             ev = at(events, i)
             if ev.kind == "mouse_down":
-                blocks_x = append(blocks_x, to_int(ev.x))
-                blocks_y = append(blocks_y, to_int(ev.y))
+                blocks_x = append(blocks_x, to_whole(ev.x))
+                blocks_y = append(blocks_y, to_whole(ev.y))
             if ev.kind == "key_down":
                 if ev.key == 27:
                     running = 0
@@ -46,7 +46,7 @@ define main() -> int:
         # threads its entity id); this demo has no entities, so 0 = no source.
         edit display = empty_list()
         display = push_cmd(display, DrawRect(Rect{x: 40, y: 40, width: 720, height: 520}, "panel", 0))
-        n_b = len(blocks_x)
+        n_b = length(blocks_x)
         loop bi in 0..<n_b:
             bx = (at(blocks_x, bi) / 40) * 40
             by = (at(blocks_y, bi) / 40) * 40

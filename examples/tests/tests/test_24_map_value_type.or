@@ -10,11 +10,11 @@
 # Nothing changes at runtime (every value is a 64-bit word). This is the
 # annotation finally reaching the reader.
 define greeting_len(m: table<text>) -> int:
-    len(get(m, "greeting"))                  # a text, so text length
+    length(get(m, "greeting"))                  # a text, so text length
 
 define second_word_len(m: table<[text]>) -> int:
     ws = get_list(m, "words")                # list:text, from the map's type
-    len(at(ws, 1))
+    length(at(ws, 1))
 
 define total(m: table<int>) -> int:
     get_int(m, "a") + get_int(m, "b")
@@ -26,6 +26,6 @@ define main() -> int:
     # An UNTYPED map keeps the old default (a list of maps), which is what the
     # compiler's own AST walking relies on - this is additive, not a change.
     plain = {"nodes": [{"kind": "Leaf"}]}
-    d = len(get_list(plain, "nodes"))                     # 1
+    d = length(get_list(plain, "nodes"))                     # 1
     print_line("a={a} b={b} c={c} d={d}")
     a + b + c + d                                         # 5 + 4 + 14 + 1 == 24

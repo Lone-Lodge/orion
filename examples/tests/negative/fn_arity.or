@@ -1,9 +1,9 @@
 # expect: expects 1 argument
-# A `fn(int) -> int` param called with two arguments is a compile error now,
+# A `function(int) -> int` param called with two arguments is a compile error now,
 # not a silently ignored extra arg.
 define inc(n: int) -> int:
     n + 1
-define apply(f: fn(int) -> int, x: int) -> int:
+define apply(f: function(int) -> int, x: int) -> int:
     f(x, 99)
 define main() -> int:
     apply(inc, 41)

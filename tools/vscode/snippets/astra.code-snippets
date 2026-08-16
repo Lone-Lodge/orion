@@ -1,0 +1,48 @@
+{
+	"game": {
+		"prefix": "game",
+		"body": [
+			"game ${1:name}:",
+			"    field ${2:6400} x ${3:3600}",
+			"",
+			"    ball:",
+			"        position center",
+			"        size ${4:120}",
+			"        velocity ${5:47}, ${6:31}",
+			"",
+			"    paddle:",
+			"        size 120, 900",
+			"        speed 70",
+			"",
+			"    paddle left:",
+			"        position 350, center",
+			"        input w s",
+			"",
+			"    paddle right:",
+			"        mirror left",
+			"        input up down",
+			"",
+			"    rule ball hits left or right",
+			"",
+			"    rule ball leaves left:",
+			"        score right",
+			"",
+			"    rule ball leaves right:",
+			"        score left",
+			"",
+			"view:",
+			"    background #151515",
+			"    draw left color #E8956A",
+			"    draw right color #A96844",
+			"    draw ball color #F2B285",
+			"    score left",
+			"    score right"
+		],
+		"description": "A whole declared game - every line a decision"
+	},
+	"rule": {
+		"prefix": "rule",
+		"body": ["rule ${1:ball} ${2|hits,leaves|} ${3:target}:", "    ${4:bounce y}"],
+		"description": "A rule: hits or leaves, action in the body"
+	}
+}

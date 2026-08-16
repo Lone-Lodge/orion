@@ -1,0 +1,3 @@
+name = "orion_fmt"
+version = "0.1.0"
+description = "Conservative whitespace formatter shared by orbit fmt and the language server"

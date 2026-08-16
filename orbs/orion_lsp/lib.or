@@ -23,6 +23,7 @@ use json
 use text
 use os
 use num
+use orion_fmt
 
 external define orion_stdin_line() -> text
 external define orion_stdin_read(n: int) -> text
@@ -54,15 +55,15 @@ define lsp_read_message() -> text:
         orion_stdin_read(content_len)
 
 define slice_from(t: text, from: int) -> text:
-    b = bytes_from_text(t)
-    n = len(b)
+    b = bytes_of(t)
+    n = length(b)
     if from >= n:
         ""
     else:
-        bytes_to_text(bytes_slice(b, from, n))
+        text_of(bytes_part(b, from, n))
 
 define lsp_send(body: text) -> int:
-    n = len(body)
+    n = length(body)
     orion_stdout_write("Content-Length: {n}\r\n\r\n{body}")
 
 define lsp_respond(id: int, result_json: text) -> int:
@@ -93,12 +94,12 @@ public define uri_to_path(uri: text) -> text:
     # absolute path into a relative one, and the server then wrote its check
     # file somewhere that did not exist and reported no diagnostics at all.
     after_scheme = if starts_with(uri, "file://") then slice_from(uri, 7) else uri
-    ab = bytes_from_text(after_scheme)
-    drive_form = len(ab) >= 3 and at(ab, 0) == 47 and (at(ab, 2) == 58 or (len(ab) >= 5 and at(ab, 2) == 37))
+    ab = bytes_of(after_scheme)
+    drive_form = length(ab) >= 3 and at(ab, 0) == 47 and (at(ab, 2) == 58 or (length(ab) >= 5 and at(ab, 2) == 37))
     stripped = if drive_form then slice_from(after_scheme, 1) else after_scheme
-    b = bytes_from_text(stripped)
-    n = len(b)
-    edit out = slice([0], 0, 0)
+    b = bytes_of(stripped)
+    n = length(b)
+    edit out = part([0], 0, 0)
     edit i = 0
     loop:
         if i >= n:
@@ -110,11 +111,11 @@ public define uri_to_path(uri: text) -> text:
         else:
             out = append(out, c)
             i = i + 1
-    bytes_to_text(out)
+    text_of(out)
 
 define dirname_of(path: text) -> text:
-    b = bytes_from_text(path)
-    n = len(b)
+    b = bytes_of(path)
+    n = length(b)
     edit cut = 0 - 1
     loop i in 0..<n:
         c = at(b, i)
@@ -123,7 +124,7 @@ define dirname_of(path: text) -> text:
     if cut < 0:
         "."
     else:
-        bytes_to_text(bytes_slice(b, 0, cut))
+        text_of(bytes_part(b, 0, cut))
 
 # ---- document store ----
 # Slots are the process-global store the compiler itself uses. Text handed to
@@ -147,6 +148,17 @@ define lsp_compiler() -> text:
 define lsp_orbs() -> text:
     if slot_has("lsp:orbs") then slot_get("lsp:orbs") else ""
 
+# The configured orb roots - ";"-separated so paths may hold spaces.
+# Every lookup (diagnostics, definitions, completion) walks them all:
+# one root sees only the stdlib and calls the project's own orbs
+# unknown, which painted false errors over green builds.
+define lsp_orb_roots() -> list of text:
+    edit roots = []
+    loop root in split(lsp_orbs(), ";"):
+        if root != "":
+            roots = push(roots, root)
+    roots
+
 define diag_json_of(line_no: int, col: int, msg: text) -> text:
     zero_line = if line_no > 0 then line_no - 1 else 0
     "\{\"range\":\{\"start\":\{\"line\":{zero_line},\"character\":{col}\},\"end\":\{\"line\":{zero_line},\"character\":{col + 1}\}\},\"severity\":1,\"source\":\"orion\",\"message\":\"{json_escape(msg)}\"\}"
@@ -165,10 +177,10 @@ define diag_parse(raw: text, want_file: text) -> table:
         if sep < 0:
             {"line": 0, "col": 0, "msg": ""}
         else:
-            loc = bytes_to_text(bytes_slice(bytes_from_text(after), 0, sep))
+            loc = text_of(bytes_part(bytes_of(after), 0, sep))
             msg = slice_from(after, sep + 3)
             parts = split(loc, ":")
-            np = len(parts)
+            np = length(parts)
             if np < 2:
                 {"line": 0, "col": 0, "msg": ""}
             else:
@@ -176,7 +188,7 @@ define diag_parse(raw: text, want_file: text) -> table:
                 # COLUMN are always the last two fields, never fields 1 and 2.
                 col_txt = at(parts, np - 1)
                 line_txt = at(parts, np - 2)
-                file_txt = join(slice(parts, 0, np - 2), ":")
+                file_txt = join(part(parts, 0, np - 2), ":")
                 same = ends_with(file_txt, want_file)
                 if same:
                     {"line": parse(line_txt), "col": parse(col_txt), "msg": msg}
@@ -187,6 +199,13 @@ define lsp_publish(uri: text, diags: text):
     lsp_notify("textDocument/publishDiagnostics", "\{\"uri\":\"{json_escape(uri)}\",\"diagnostics\":[{diags}]\}")
 
 public define lsp_diagnose(uri: text):
+    # A sketch is checked by the astra compiler, not this one - handing
+    # it to orion would paint a screen of errors about a language the
+    # file is not written in. Until the sketch checker is wired in here,
+    # a sketch simply gets no diagnostics (the build still refuses).
+    if is_astra(uri):
+        lsp_publish(uri, "")
+        return
     path = uri_to_path(uri)
     body = doc_get(uri)
     dir = dirname_of(path)
@@ -194,14 +213,16 @@ public define lsp_diagnose(uri: text):
     tmp = "{dir}/{check_name}"
     out_ll = "{dir}/.orion-lsp-check.ll"
     write_file(tmp, body)
-    args = if lsp_orbs() == "" then [tmp, out_ll] else [tmp, out_ll, lsp_orbs()]
+    edit args = [tmp, out_ll]
+    loop root in lsp_orb_roots():
+        args = push(args, root)
     out = capture_stdout(lsp_compiler(), args)
     remove_file(tmp)
     remove_file(out_ll)
     rows = lines(out)
     edit diags = ""
     edit count = 0
-    loop ri in 0..<len(rows):
+    loop ri in 0..<length(rows):
         row = at(rows, ri)
         if index_of(row, " ERROR at ") >= 0:
             d = diag_parse(row, check_name)
@@ -243,25 +264,91 @@ define sym_of_line(row: text) -> table:
     else:
         rest = slice_from(body, skip)
         edit name = ""
-        rb = bytes_from_text(rest)
+        rb = bytes_of(rest)
         edit i = 0
         loop:
-            if i >= len(rb):
+            if i >= length(rb):
                 break
             c = at(rb, i)
             ok = (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 95 or c == 46
             if not ok:
                 break
             i = i + 1
-        name = bytes_to_text(bytes_slice(rb, 0, i))
+        name = text_of(bytes_part(rb, 0, i))
         {"name": name, "kind": kind}
+
+# ---- astra ----
+#
+# A sketch declares things too, in its own words, and the words a
+# designer reaches for are exactly the ones worth jumping to: a stat, a
+# companion, an entity. Without this, `hunger` in `bar hunger` is just a
+# word and you have to scroll to find out what it means.
+#
+# A sketch is ONE file, so there is nothing to search but the document.
+
+public define is_astra(uri: text) -> truth:
+    ends_with(uri, ".astra")
+
+define first_word_after(row: text, skip: int) -> text:
+    rest = slice_from(trim(row), skip)
+    b = bytes_of(rest)
+    edit i = 0
+    loop:
+        if i >= length(b):
+            break
+        c = at(b, i)
+        if (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 95:
+            i = i + 1
+        else:
+            break
+    text_of(bytes_part(b, 0, i))
+
+define astra_sym_of_line(row: text) -> table:
+    t = trim(row)
+    if starts_with(t, "stat "):
+        # `stat hunger 3 of 10` - LSP Field.
+        {"name": first_word_after(t, 5), "kind": 8}
+    else if starts_with(t, "companion "):
+        {"name": first_word_after(t, 10), "kind": 23}
+    else if starts_with(t, "game "):
+        {"name": first_word_after(t, 5), "kind": 2}
+    else if t == "view:":
+        # A section header, not a name.
+        {"name": "", "kind": 0}
+    else if ends_with(t, ":") and not contains(t, " ") and not starts_with(t, "#"):
+        # `room:` - an entity block. `paddle left:` names the instance.
+        {"name": first_word_after(t, 0), "kind": 23}
+    else if ends_with(t, ":") and starts_with(t, "action ") is false and starts_with(t, "rule ") is false and count_spaces(t) == 1:
+        {"name": first_word_after(t, len_of_first_word(t) + 1), "kind": 23}
+    else:
+        {"name": "", "kind": 0}
+
+define count_spaces(t: text) -> int:
+    b = bytes_of(t)
+    edit n = 0
+    loop i in 0..<length(b):
+        if at(b, i) == 32:
+            n = n + 1
+    n
+
+define len_of_first_word(t: text) -> int:
+    b = bytes_of(t)
+    edit i = 0
+    loop:
+        if i >= length(b) or at(b, i) == 32:
+            break
+        i = i + 1
+    i
+
+define sym_of_row(row: text, astra: truth) -> table:
+    if astra then astra_sym_of_line(row) else sym_of_line(row)
 
 public define lsp_symbols_json(uri: text) -> text:
     rows = lines(doc_get(uri))
     edit out = ""
     edit count = 0
-    loop ri in 0..<len(rows):
-        s = sym_of_line(at(rows, ri))
+    loop ri in 0..<length(rows):
+        s = sym_of_row(at(rows, ri), is_astra(uri))
         nm = get(s, "name")
         if nm != "":
             k = get_int(s, "kind")
@@ -277,12 +364,12 @@ define is_word_byte(c: int) -> truth:
 
 public define word_at(uri: text, line_no: int, character: int) -> text:
     rows = lines(doc_get(uri))
-    if line_no >= len(rows):
+    if line_no >= length(rows):
         ""
     else:
         row = at(rows, line_no)
-        b = bytes_from_text(row)
-        n = len(b)
+        b = bytes_of(row)
+        n = length(b)
         if n == 0 or character > n:
             ""
         else:
@@ -302,38 +389,39 @@ public define word_at(uri: text, line_no: int, character: int) -> text:
                     hi = hi + 1
                 else:
                     break
-            bytes_to_text(bytes_slice(b, lo, hi))
+            text_of(bytes_part(b, lo, hi))
 
 # Line index of `NAME`'s declaration in `body`, or -1.
-define decl_line_in(body: text, name: text) -> int:
+define decl_line_in(body: text, name: text, astra: truth) -> int:
     rows = lines(body)
     edit found = 0 - 1
-    loop ri in 0..<len(rows):
+    loop ri in 0..<length(rows):
         if found < 0:
-            s = sym_of_line(at(rows, ri))
+            s = sym_of_row(at(rows, ri), astra)
             if get(s, "name") == name:
                 found = ri
     found
 
 # Search the open document, then every other open document, then each orb's
-# lib.or under the configured orbs root.
+# lib.or under the configured orbs root. A sketch is one file: there is
+# nowhere else for its own words to live.
 define find_decl(uri: text, name: text) -> table:
-    here = decl_line_in(doc_get(uri), name)
+    here = decl_line_in(doc_get(uri), name, is_astra(uri))
     if here >= 0:
         {"uri": uri, "line": here}
+    else if is_astra(uri):
+        {"uri": "", "line": 0 - 1}
     else:
         edit r_uri = ""
         edit r_line = 0 - 1
-        root = lsp_orbs()
-        if root != "":
+        loop root in lsp_orb_roots():
             names = split(orion_dir_subdirs(root), "\n")
-            loop ni in 0..<len(names):
-                orb = at(names, ni)
+            loop orb in names:
                 if r_line < 0 and orb != "":
                     cand = "{root}/{orb}/lib.or"
                     src = file_read(cand)
                     if src != "":
-                        ln = decl_line_in(src, name)
+                        ln = decl_line_in(src, name, false)
                         if ln >= 0:
                             r_line = ln
                             r_uri = "file:///{cand}"
@@ -364,13 +452,28 @@ public define lsp_hover_json(uri: text, line_no: int, character: int) -> text:
         else:
             src = if get(d, "uri") == uri then doc_get(uri) else file_read(uri_to_path(get(d, "uri")))
             rows = lines(src)
-            decl = if dl < len(rows) then trim(at(rows, dl)) else name
-            "\{\"contents\":\{\"kind\":\"markdown\",\"value\":\"```orion\\n{json_escape(decl)}\\n```\"\}\}"
+            decl = if dl < length(rows) then trim(at(rows, dl)) else name
+            fence = if is_astra(uri) then "astra" else "orion"
+            "\{\"contents\":\{\"kind\":\"markdown\",\"value\":\"```{fence}\\n{json_escape(decl)}\\n```\"\}\}"
+
+# ---- formatting ----
+#
+# The editor's format key. Same normalization as `orbit fmt` (the orion_fmt
+# orb shared by both): the answer is ONE whole-document edit, or no edits at
+# all when the text is already clean - the client applies it atomically, so
+# cursor and undo behave.
+define lsp_formatting_json(uri: text) -> text:
+    src = doc_get(uri)
+    formatted = fmt_normalize(src)
+    if formatted == src:
+        return "[]"
+    end_line = length(lines(src))
+    "[\{\"range\":\{\"start\":\{\"line\":0,\"character\":0\},\"end\":\{\"line\":{end_line},\"character\":0\}\},\"newText\":\"{json_escape(formatted)}\"\}]"
 
 # ---- capabilities + dispatch ----
 
 define caps_json() -> text:
-    "\{\"capabilities\":\{\"textDocumentSync\":1,\"documentSymbolProvider\":true,\"definitionProvider\":true,\"hoverProvider\":true,\"completionProvider\":\{\}\},\"serverInfo\":\{\"name\":\"orion-lsp\",\"version\":\"1.0.0\"\}\}"
+    "\{\"capabilities\":\{\"textDocumentSync\":1,\"documentSymbolProvider\":true,\"definitionProvider\":true,\"hoverProvider\":true,\"completionProvider\":\{\},\"documentFormattingProvider\":true\},\"serverInfo\":\{\"name\":\"orion-lsp\",\"version\":\"1.0.0\"\}\}"
 
 # ---- completion ----
 #
@@ -401,8 +504,8 @@ define compl_from_source(src: text, origin: text, seen: text, out: text) -> tabl
     rows = lines(src)
     edit acc = out
     edit mark = seen
-    loop ri in 0..<len(rows):
-        s = sym_of_line(at(rows, ri))
+    loop ri in 0..<length(rows):
+        s = sym_of_row(at(rows, ri), origin == "this sketch")
         nm = get(s, "name")
         if nm != "":
             key = "|{nm}|"
@@ -431,7 +534,9 @@ define sym_rows(uri: text) -> [text]:
     dir = dirname_of(path)
     tmp = "{dir}/.orion-lsp-syms.or"
     write_file(tmp, doc_get(uri))
-    args = if lsp_orbs() == "" then [tmp, "symbols"] else [tmp, "symbols", lsp_orbs()]
+    edit args = [tmp, "symbols"]
+    loop root in lsp_orb_roots():
+        args = push(args, root)
     out = capture_stdout(lsp_compiler(), args)
     remove_file(tmp)
     lines(out)
@@ -439,12 +544,12 @@ define sym_rows(uri: text) -> [text]:
 # The word immediately before a trailing `.` on this line, or "".
 public define receiver_before_dot(uri: text, line_no: int, character: int) -> text:
     rows = lines(doc_get(uri))
-    if line_no >= len(rows):
+    if line_no >= length(rows):
         ""
     else:
         row = at(rows, line_no)
-        b = bytes_from_text(row)
-        n = len(b)
+        b = bytes_of(row)
+        n = length(b)
         cut = if character > n then n else character
         if cut < 1:
             ""
@@ -460,7 +565,7 @@ public define receiver_before_dot(uri: text, line_no: int, character: int) -> te
                         lo = lo - 1
                     else:
                         break
-                bytes_to_text(bytes_slice(b, lo, cut - 1))
+                text_of(bytes_part(b, lo, cut - 1))
 
 # Declared type of `name` as seen from `line_no`: a parameter of the enclosing
 # function, a `name: Type =` binding, or `name = Type{…}`.
@@ -469,7 +574,7 @@ public define type_of_local(uri: text, name: text, line_no: int) -> text:
     edit found = ""
     # Walk UP from the cursor: the nearest binding wins, and the enclosing `fn`
     # line ends the search (its parameter list is the last place to look).
-    edit i = if line_no >= len(rows) then len(rows) - 1 else line_no
+    edit i = if line_no >= length(rows) then length(rows) - 1 else line_no
     loop:
         if i < 0 or found != "":
             break
@@ -478,33 +583,33 @@ public define type_of_local(uri: text, name: text, line_no: int) -> text:
         # `name: Type = …`
         pat_ann = "{name}: "
         if starts_with(t, pat_ann) and index_of(t, " = ") > 0:
-            rest = slice_from(t, len(pat_ann))
+            rest = slice_from(t, length(pat_ann))
             eq = index_of(rest, " = ")
-            found = trim(bytes_to_text(bytes_slice(bytes_from_text(rest), 0, eq)))
+            found = trim(text_of(bytes_part(bytes_of(rest), 0, eq)))
         # `name = Type{…}`
         pat_cons = "{name} = "
         if found == "" and starts_with(t, pat_cons):
-            rhs = slice_from(t, len(pat_cons))
+            rhs = slice_from(t, length(pat_cons))
             brace = index_of(rhs, "\{")
             if brace > 0:
-                found = trim(bytes_to_text(bytes_slice(bytes_from_text(rhs), 0, brace)))
+                found = trim(text_of(bytes_part(bytes_of(rhs), 0, brace)))
         # A parameter of the enclosing fn: `define f(name: Type, …)` (v1 `fn` too)
         if found == "" and starts_with(t, "fn ") or starts_with(t, "pub fn ") or starts_with(t, "define ") or starts_with(t, "public define "):
             marker = "{name}: "
             at_p = index_of(t, marker)
             if at_p > 0:
-                after = slice_from(t, at_p + len(marker))
-                ab = bytes_from_text(after)
+                after = slice_from(t, at_p + length(marker))
+                ab = bytes_of(after)
                 edit e = 0
                 loop:
-                    if e >= len(ab):
+                    if e >= length(ab):
                         break
                     c = at(ab, e)
                     stop = c == 44 or c == 41 or c == 32
                     if stop:
                         break
                     e = e + 1
-                found = bytes_to_text(bytes_slice(ab, 0, e))
+                found = text_of(bytes_part(ab, 0, e))
             break
         i = i - 1
     found
@@ -512,19 +617,19 @@ public define type_of_local(uri: text, name: text, line_no: int) -> text:
 # Fields of `type_name` + every fn whose FIRST parameter is that type.
 define members_of(rows: [text], type_name: text) -> text:
     edit acc = ""
-    loop ri in 0..<len(rows):
+    loop ri in 0..<length(rows):
         row = at(rows, ri)
         parts = split(row, "|")
-        if len(parts) >= 3:
+        if length(parts) >= 3:
             head = at(parts, 0)
             if starts_with(head, "TYPE "):
                 if slice_from(head, 5) == type_name:
                     fields = split(at(parts, 1), ",")
-                    loop fi in 0..<len(fields):
+                    loop fi in 0..<length(fields):
                         f = at(fields, fi)
                         colon = index_of(f, ":")
                         if colon > 0:
-                            fname = bytes_to_text(bytes_slice(bytes_from_text(f), 0, colon))
+                            fname = text_of(bytes_part(bytes_of(f), 0, colon))
                             fty = slice_from(f, colon + 1)
                             sep = if acc == "" then "" else ","
                             acc = acc + sep + compl_item(fname, 5, "field: {fty}")
@@ -534,7 +639,7 @@ define members_of(rows: [text], type_name: text) -> text:
                 if first_colon > 0:
                     rest = slice_from(ps, first_colon + 1)
                     comma = index_of(rest, ",")
-                    p1ty = if comma > 0 then bytes_to_text(bytes_slice(bytes_from_text(rest), 0, comma)) else rest
+                    p1ty = if comma > 0 then text_of(bytes_part(bytes_of(rest), 0, comma)) else rest
                     if p1ty == type_name:
                         fname2 = slice_from(head, 3)
                         sep2 = if acc == "" then "" else ","
@@ -542,6 +647,17 @@ define members_of(rows: [text], type_name: text) -> text:
     acc
 
 public define lsp_completion_json(uri: text, line_no: int, character: int) -> text:
+    # A sketch is not orion: its own declared names plus the words the
+    # astra compiler actually holds. Offering `define` and `handle` here
+    # would describe a language the file is not written in.
+    if is_astra(uri):
+        ra = compl_from_source(doc_get(uri), "this sketch", "", "")
+        edit sacc = get(ra, "out")
+        awords = ["game", "field", "view", "companion", "starts", "unlocked", "stat", "of", "rule", "every", "seconds", "ticks", "action", "click", "position", "size", "center", "input", "speed", "velocity", "clamp", "free", "mirror", "along", "hits", "leaves", "bounce", "destroy", "reset", "score", "background", "draw", "asset", "color", "bar", "label", "at", "when", "is", "less", "more", "than", "up", "down"]
+        loop ai in 0..<length(awords):
+            sep3 = if sacc == "" then "" else ","
+            sacc = sacc + sep3 + compl_item(at(awords, ai), 14, "astra")
+        return "\{\"isIncomplete\":false,\"items\":[{sacc}]\}"
     # After `x.` the answer is exact, so give THAT and nothing else: the fields
     # of x's type plus the functions that take it first. Returning the whole
     # program's names here would bury the four that apply.
@@ -556,11 +672,9 @@ public define lsp_completion_json(uri: text, line_no: int, character: int) -> te
     r1 = compl_from_source(doc_get(uri), "this file", "", "")
     edit acc = get(r1, "out")
     edit seen = get(r1, "seen")
-    root = lsp_orbs()
-    if root != "":
+    loop root in lsp_orb_roots():
         names = split(orion_dir_subdirs(root), "\n")
-        loop ni in 0..<len(names):
-            orb = at(names, ni)
+        loop orb in names:
             if orb != "":
                 src = file_read("{root}/{orb}/lib.or")
                 if src != "":
@@ -570,7 +684,7 @@ public define lsp_completion_json(uri: text, line_no: int, character: int) -> te
     # Keywords last: short, always valid, and they should not push declarations
     # out of the top of the list.
     kws = ["define", "public", "type", "edit", "if", "then", "else", "choose", "loop", "parallel", "break", "continue", "return", "require", "ensure", "defer", "collect", "effect", "handle", "perform", "resume", "use", "external", "deterministic", "and", "or", "not", "in", "where", "is", "to", "until", "try", "given", "true", "false", "none"]
-    loop ki in 0..<len(kws):
+    loop ki in 0..<length(kws):
         kw = at(kws, ki)
         sep2 = if acc == "" then "" else ","
         acc = acc + sep2 + compl_item(kw, 14, "keyword")
@@ -601,8 +715,8 @@ define handle(msg: text) -> int:
         lsp_diagnose(uri)
     if method == "textDocument/didChange":
         changes = json_list(params, "contentChanges")
-        if len(changes) > 0:
-            last = at(changes, len(changes) - 1)
+        if length(changes) > 0:
+            last = at(changes, length(changes) - 1)
             doc_set(uri, json_text(last, "text"))
             lsp_diagnose(uri)
     if method == "textDocument/didSave":
@@ -622,6 +736,8 @@ define handle(msg: text) -> int:
     if method == "textDocument/completion":
         pos3 = json_obj(params, "position")
         lsp_respond(id, lsp_completion_json(uri, json_int(pos3, "line"), json_int(pos3, "character")))
+    if method == "textDocument/formatting":
+        lsp_respond(id, lsp_formatting_json(uri))
     done
 
 public define lsp_serve() -> int:

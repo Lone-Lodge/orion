@@ -1,0 +1,3 @@
+name = "overlay"
+version = "0.0.1"
+description = "Draws an ori_display DisplayList onto a pixel frame - rects and bitmap text; the HUD half of a frame, any backend's pixels"

@@ -2,7 +2,7 @@
 # field with its real type (heterogeneous: n is int, s is text).
 define describe(p: (int, text)) -> int:
     choose p:
-        (n, s) -> n + len(s)
+        (n, s) -> n + length(s)
 
 define main() -> int:
     describe((37, "abcde"))    # 37 + 5 == 42

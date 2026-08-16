@@ -13,17 +13,17 @@ define main() -> int:
     m = {"words": ["ab", "cdef"], "nums": [7, 8, 9]}
 
     w = get_text_list(m, "words")
-    first_len = len(at(w, 0))        # 2 - a text, so text length
-    second_len = len(at(w, 1))       # 4
+    first_len = length(at(w, 0))        # 2 - a text, so text length
+    second_len = length(at(w, 1))       # 4
 
     n = get_int_list(m, "nums")
     third = at(n, 2)                 # 9 - an int stays an int
 
     # The annotation route still works, and agrees.
     ann: [text] = get_list(m, "words")
-    ann_len = len(at(ann, 1))        # 4
+    ann_len = length(at(ann, 1))        # 4
 
     # A missing key is an empty list, not a crash.
-    missing = len(get_text_list(m, "nope"))
+    missing = length(get_text_list(m, "nope"))
 
     first_len + second_len + third + ann_len - missing   # 2 + 4 + 9 + 4 - 0 == 19

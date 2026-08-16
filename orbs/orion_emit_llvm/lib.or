@@ -17,33 +17,31 @@ define value_ref(value_id: int) -> text:
 
 # Escape a string for use in LLVM IR `c"..."` constant.
 # Printable ASCII passes through; quote/backslash/non-printable use \NN hex.
-define hex_digit(value: int) -> text:
-    digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]
-    at(digits, value)
+# ASCII code of hex digit `value` (0-15): '0'-'9' then 'A'-'F'.
+define hex_code(value: int) -> int:
+    if value < 10 then 48 + value else 55 + value
 
 define llvm_escape(text: text) -> text:
-    bs = bytes_from_text(text)
-    total = len(bs)
-    edit result = ""
+    # Built as a byte list, one text at the end: per-byte text concat is
+    # quadratic, and `embed` runs whole asset files through here.
+    bs = bytes_of(text)
+    total = length(bs)
+    edit out = []
     loop index in 0..<total:
         b = at(bs, index)
         needs_escape = b == 34 or b == 92 or b < 32 or b > 126
         if needs_escape:
-            hi = hex_digit(b // 16)
-            lo = hex_digit(b % 16)
-            # NOTE: lodge-orion interprets `\\{` as a single literal `{`,
-            # eating the backslash. Use a stringified byte to dodge that.
-            backslash = bytes_to_text([92])
-            result = "{result}{backslash}{hi}{lo}"
+            out = append(out, 92)
+            out = append(out, hex_code(b // 16))
+            out = append(out, hex_code(b % 16))
         else:
-            single = bytes_to_text([b])
-            result = "{result}{single}"
-    result
+            out = append(out, b)
+    text_of(out)
 
 
 # Find the index of `target` in a list of strings. -1 if not found.
 define string_list_index(strings: [text], target: text) -> int:
-    total = len(strings)
+    total = length(strings)
     edit found = 0 - 1
     loop index in 0..<total:
         if at(strings, index) == target and found == (0 - 1):
@@ -56,8 +54,8 @@ define string_list_index(strings: [text], target: text) -> int:
 # libc functions clang links against). Used to skip re-declaring these
 # as user externs.
 define is_runtime_symbol(name: text) -> truth:
-    bs = bytes_from_text(name)
-    n = len(bs)
+    bs = bytes_of(name)
+    n = length(bs)
     # orion_* prefix
     starts_orion = n >= 6 and at(bs, 0) == 111 and at(bs, 1) == 114 and at(bs, 2) == 105 and at(bs, 3) == 111 and at(bs, 4) == 110 and at(bs, 5) == 95
     # __orion_* prefix
@@ -67,7 +65,7 @@ define is_runtime_symbol(name: text) -> truth:
 
 # True if `name` is defined by a user-level fn in the module.
 define is_module_defined(module: IRModule, name: text) -> truth:
-    n_fns = len(module.functions)
+    n_fns = length(module.functions)
     edit found = false
     loop fi in 0..<n_fns:
         f = at(module.functions, fi)
@@ -80,12 +78,12 @@ define is_module_defined(module: IRModule, name: text) -> truth:
 # with the caller's arg types. Signatures default to i64 return since
 # ast_to_ir already types unknown-fn returns as i64.
 define collect_extern_calls(module: IRModule) -> [text]:
-    n_fns = len(module.functions)
+    n_fns = length(module.functions)
     edit names = []
     edit declares = []
     loop fi in 0..<n_fns:
         fn_value = at(module.functions, fi)
-        n_insts = len(fn_value.instructions)
+        n_insts = length(fn_value.instructions)
         loop ii in 0..<n_insts:
             inst = at(fn_value.instructions, ii)
             if inst.op == "call":
@@ -94,7 +92,7 @@ define collect_extern_calls(module: IRModule) -> [text]:
                     if not is_module_defined(module, name):
                         if string_list_index(names, name) < 0:
                             names = append(names, name)
-                            n_args = len(inst.args)
+                            n_args = length(inst.args)
                             edit sig = ""
                             loop ai in 0..<n_args:
                                 arg_id = at(inst.args, ai)
@@ -108,11 +106,11 @@ define collect_extern_calls(module: IRModule) -> [text]:
 # Walk the module to collect every distinct string literal used by
 # print_str or const_str instructions. Returned list is in first-seen order.
 define collect_strings(module: IRModule) -> [text]:
-    n_fns = len(module.functions)
+    n_fns = length(module.functions)
     edit result = []
     loop fi in 0..<n_fns:
         fn_value = at(module.functions, fi)
-        n_insts = len(fn_value.instructions)
+        n_insts = length(fn_value.instructions)
         loop ii in 0..<n_insts:
             inst = at(fn_value.instructions, ii)
             is_str_op = inst.op == "print_str" or inst.op == "const_str"
@@ -125,8 +123,8 @@ define collect_strings(module: IRModule) -> [text]:
 
 # Split a pipe-separated label list "a|b" into ["a", "b"].
 define split_pipe(text: text) -> [text]:
-    bs = bytes_from_text(text)
-    total = len(bs)
+    bs = bytes_of(text)
+    total = length(bs)
     edit parts = []
     edit current = ""
     loop index in 0..<total:
@@ -135,7 +133,7 @@ define split_pipe(text: text) -> [text]:
             parts = append(parts, current)
             current = ""
         else:
-            single = bytes_to_text([ch])
+            single = text_of([ch])
             current = "{current}{single}"
     parts = append(parts, current)
     parts
@@ -160,7 +158,7 @@ define icmp_cc(op: text) -> text:
 
 # Look up a fn's return type in the module; defaults to "i64".
 define find_fn_return_type(module: IRModule, fn_name: text) -> text:
-    n = len(module.functions)
+    n = length(module.functions)
     edit result = "i64"
     # Built-in runtime fns we provide in emit_runtime - return types are
     # known statically, no AST entry exists for them.
@@ -219,7 +217,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                 result = "    {value_ref(my_id)} = add i64 0, %p{inst.value}"
 
     if op == "call":
-        n_args = len(inst.args)
+        n_args = length(inst.args)
         edit arg_text = ""
         loop ai in 0..<n_args:
             arg_id = at(inst.args, ai)
@@ -244,7 +242,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         # zero. The runtime casts the handler to the matching arity. The
         # resulting SSA value holds the handler's return, or the resumed value
         # if it called `resume`.
-        pf_n = len(inst.args)
+        pf_n = length(inst.args)
         edit pf_pre = ""
         edit pf_slots = ""
         loop pfi in 0..<4:
@@ -271,7 +269,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
 
     if op == "indirect_call":
         # Indirect call: callee SSA value is in inst.value; args same as call.
-        n_args = len(inst.args)
+        n_args = length(inst.args)
         edit arg_text = ""
         loop ai in 0..<n_args:
             arg_id = at(inst.args, ai)
@@ -287,7 +285,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
 
     if op == "make_closure":
         # Build [fn_ptr_as_int, is_lambda_flag, cap0, cap1, ...] as a list.
-        n_caps = len(inst.args)
+        n_caps = length(inst.args)
         total = 2 + n_caps
         edit mc = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {total})"
         mc = "{mc}\n    %v{my_id}.fp = ptrtoint ptr @{inst.name} to i64"
@@ -305,8 +303,8 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = mc
 
     if op == "closure_call":
-        # Load fn-ptr + flag; a lambda is called fn(env, args), a plain fn-ref
-        # fn(args). env is the closure list itself.
+        # Load fn-ptr + flag; a lambda is called function(env, args), a plain fn-ref
+        # function(args). env is the closure list itself.
         # The closure operand must be a ptr to the closure list. It usually is
         # (a lambda local, a struct field), but a fn-ref reaching us as an i64 -
         # a `Fn`-typed parameter, or an element read from a list of fn-refs -
@@ -319,7 +317,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             clos_pre = "    %v{my_id}.clp = inttoptr i64 {clos_raw} to ptr\n"
             clos = "%v{my_id}.clp"
         cc_ret = llvm_type_of(inst.type_text)
-        n_ca = len(inst.args)
+        n_ca = length(inst.args)
         edit cc_args = ""
         loop cai in 0..<n_ca:
             ca_id = at(inst.args, cai)
@@ -375,7 +373,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         hex_bits = orion_f64_literal_hex(inst.name)
         result = "    {value_ref(my_id)} = fadd double {hex_bits}, 0x0000000000000000"
 
-    if op == "fadd" or op == "fsub" or op == "fmul" or op == "fdiv":
+    if op == "fadd" or op == "fsub" or op == "fmul" or op == "fdiv" or op == "frem":
         result = "    {value_ref(my_id)} = {op} double {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
 
     if op == "fcmp":
@@ -644,7 +642,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = "{l1}\n{l2}"
 
     if op == "list_lit":
-        n = len(inst.args)
+        n = length(inst.args)
         # `[]` interns to one shared constant: cap 0 forces every push -
         # plain, push_mut, and the retired implicit rewrite is gone -
         # down the grow/copy path, and bounds-checked list_set rejects
@@ -783,7 +781,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
 
     if op == "map_lit":
         # args alternates key/val: [k0, v0, k1, v1, ...]
-        n_total = len(inst.args)
+        n_total = length(inst.args)
         n_pairs = n_total // 2
         edit text = "    {value_ref(my_id)} = call ptr @orion_map_new(i64 {n_pairs})"
         loop pi in 0..<n_pairs:
@@ -906,7 +904,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         ty = llvm_type_of(inst.type_text)
         if ty == "ptr":
             # A MISSING key reads back as 0, and turning that into a pointer
-            # handed the program a null: `len(get_list(m, "nope"))` crashed with
+            # handed the program a null: `length(get_list(m, "nope"))` crashed with
             # an access violation at address 0x8 instead of answering 0. Both
             # empty singletons already exist in the module, so substitute the one
             # this read's type calls for. Two instructions, no runtime change.
@@ -1098,17 +1096,17 @@ define evac_code(orion_type: text) -> int:
 define llvm_type_of(orion_type: text) -> text:
     edit is_struct = false
     edit is_list_elem = false
-    bs = bytes_from_text(orion_type)
-    if len(bs) >= 7:
+    bs = bytes_of(orion_type)
+    if length(bs) >= 7:
         if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
             is_struct = true
     # `list:T` (parameterised list) - also a ptr at LLVM level.
-    if len(bs) >= 5:
+    if length(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
     # `map:T` (value-typed map) - a map handle, also a ptr.
     edit is_map_elem = false
-    if len(bs) >= 4:
+    if length(bs) >= 4:
         if at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58:
             is_map_elem = true
     if orion_type == "f64":
@@ -1119,8 +1117,8 @@ define llvm_type_of(orion_type: text) -> text:
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).
 define list_elem_type(list_type: text) -> text:
-    bs = bytes_from_text(list_type)
-    n = len(bs)
+    bs = bytes_of(list_type)
+    n = length(bs)
     edit is_listed = false
     if n >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
@@ -1131,13 +1129,13 @@ define list_elem_type(list_type: text) -> text:
         # Extract bytes 5..n
         edit result = ""
         loop index in 5..<n:
-            single = bytes_to_text([at(bs, index)])
+            single = text_of([at(bs, index)])
             result = "{result}{single}"
         result
 
 
 define emit_param_list(params: [Param]) -> text:
-    n = len(params)
+    n = length(params)
     edit result = ""
     loop index in 0..<n:
         sep = if index == 0 then "" else ", "
@@ -1147,7 +1145,7 @@ define emit_param_list(params: [Param]) -> text:
 
 # Types only (no %pN names) - for `declare` lines.
 define emit_param_types(params: [Param]) -> text:
-    n = len(params)
+    n = length(params)
     edit result = ""
     loop index in 0..<n:
         sep = if index == 0 then "" else ", "
@@ -1174,7 +1172,7 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
         # over a multi-thousand-instruction function body.
         edit chunks = []
         chunks = append(chunks, "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n")
-        total = len(fn_value.instructions)
+        total = length(fn_value.instructions)
         # HOIST allocas to the entry block. `alloca` reserves a stack slot for
         # the whole function ONLY when it sits in the entry block - LLVM reuses
         # that slot across the function. An alloca left inside a loop body
@@ -1205,8 +1203,8 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
 # polynomial base 131 seed 5381 mod 1e9+7, identical to the
 # runtime's orion_text_hash, remapped 0 -> 1.
 define emit_string_global(text_value: text, idx: int) -> text:
-    bs = bytes_from_text(text_value)
-    blen = len(bs)
+    bs = bytes_of(text_value)
+    blen = length(bs)
     n = blen + 17
     escaped = llvm_escape(text_value)
     h = bake_hash(bs)
@@ -1214,7 +1212,7 @@ define emit_string_global(text_value: text, idx: int) -> text:
     "@.str_{idx} = private unnamed_addr constant [{n} x i8] c\"{header}{escaped}\\00\", align 8"
 
 define bake_hash(bs: [int]) -> int:
-    n = len(bs)
+    n = length(bs)
     edit h = 5381
     loop i in 0..<n:
         h = (h * 131 + at(bs, i)) - ((h * 131 + at(bs, i)) // 1000000007) * 1000000007
@@ -1342,6 +1340,12 @@ define emit_runtime() -> text:
     text = "{text}declare i64 @orion_audio_playing()\n"
     text = "{text}declare i64 @orion_audio_debug_plays()\n"
     text = "{text}declare void @orion_audio_shutdown()\n"
+    text = "{text}declare i64 @orion_mic_open(i64)\n"
+    text = "{text}declare i64 @orion_mic_level()\n"
+    text = "{text}declare i64 @orion_mic_buffered()\n"
+    text = "{text}declare i64 @orion_mic_rate()\n"
+    text = "{text}declare i64 @orion_mic_take_wav(ptr)\n"
+    text = "{text}declare void @orion_mic_close()\n"
     text = "{text}declare void @orion_arena_ptr_guard(ptr, ptr)\n"
     text = "{text}declare ptr @orion_slot_evac(ptr, ptr, i64)\n"
     text = "{text}declare void @orion_crumb(ptr, ptr, i64)\n"
@@ -1567,7 +1571,7 @@ define emit_runtime() -> text:
     text = "{text}fin:\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
-    # slice(text, lo, hi): copy bytes [lo, hi) into a new null-terminated buffer.
+    # part(text, lo, hi): copy bytes [lo, hi) into a new null-terminated buffer.
     # Clamps lo/hi to [0, strlen] for safety.
     text = "{text}declare ptr @memcpy(ptr, ptr, i64)\n\n"
     text = "{text}define ptr @orion_text_slice(ptr %src, i64 %lo, i64 %hi) \{\n"
@@ -1654,7 +1658,7 @@ define emit_runtime() -> text:
     text = "{text}after:\n"
     text = "{text}  ret ptr %list\n"
     text = "{text}\}\n\n"
-    # bytes_slice(list, lo, hi) → new list with items [lo, hi).
+    # bytes_part(list, lo, hi) → new list with items [lo, hi).
     text = "{text}define ptr @orion_bytes_slice(ptr %src, i64 %lo, i64 %hi) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %src_len = call i64 @orion_list_len(ptr %src)\n"
@@ -2210,7 +2214,7 @@ define emit_runtime() -> text:
     text = "{text}eok:\n"
     text = "{text}  ret i64 %c\n"
     text = "{text}\}\n\n"
-    # slice(list, lo, hi) - half-open [lo, hi), bounds clamped like the interp.
+    # part(list, lo, hi) - half-open [lo, hi), bounds clamped like the interp.
     text = "{text}define ptr @orion_list_slice(ptr %list, i64 %lo, i64 %hi) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %n = call i64 @orion_list_len(ptr %list)\n"
@@ -2722,9 +2726,9 @@ define emit_runtime() -> text:
 define emit_uses_print_raw(module: IRModule) -> truth:
     edit found = false
     fns = module.functions
-    loop fi in 0..<len(fns):
+    loop fi in 0..<length(fns):
         insts = at(fns, fi).instructions
-        loop ii in 0..<len(insts):
+        loop ii in 0..<length(insts):
             if at(insts, ii).op == "print_raw":
                 found = true
     found
@@ -2741,19 +2745,19 @@ public define emit_module(module: IRModule) -> text:
     # `name` isn't a user fn and isn't a runtime helper already declared
     # above. Without these declares clang rejects the .ll before linking.
     externs = collect_extern_calls(module)
-    n_ext = len(externs)
+    n_ext = length(externs)
     loop xi in 0..<n_ext:
         chunks = append(chunks, at(externs, xi))
         chunks = append(chunks, "\n")
     chunks = append(chunks, "\n")
     # Emit one global per distinct string literal in the module.
     strings = collect_strings(module)
-    n_strings = len(strings)
+    n_strings = length(strings)
     loop index in 0..<n_strings:
         chunks = append(chunks, emit_string_global(at(strings, index), index))
         chunks = append(chunks, "\n")
     chunks = append(chunks, "\n")
-    total = len(module.functions)
+    total = length(module.functions)
     loop index in 0..<total:
         fn_value = at(module.functions, index)
         # Body-less fn = extern declaration → typed declare; the symbol
@@ -2761,7 +2765,7 @@ public define emit_module(module: IRModule) -> text:
         # even the declare: emit_runtime DEFINES those and LLVM rejects
         # declare+define of one name in a module. Guard-if style, not
         # if/else - lodge-orion's dangling-else binds else to the inner if.
-        is_extern_decl = len(fn_value.instructions) == 0
+        is_extern_decl = length(fn_value.instructions) == 0
         if is_extern_decl:
             if not is_runtime_symbol(fn_value.name):
                 ret_ll = llvm_type_of(fn_value.return_type)

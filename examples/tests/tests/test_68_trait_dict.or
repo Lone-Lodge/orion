@@ -2,7 +2,7 @@
 # instance is a struct value you pass by hand, and `o.method(args)` calls the
 # fn-typed field (not a UFCS global). No implicit resolution: you can see which
 # dictionary is passed. Here two Ord instances drive one `minimum`.
-type Ord: lt: fn(int, int) -> int, eq: fn(int, int) -> int
+type Ord: lt: function(int, int) -> int, eq: function(int, int) -> int
 
 define int_lt(a: int, b: int) -> int:
     if a < b then 1 else 0
@@ -13,7 +13,7 @@ define desc_lt(a: int, b: int) -> int:
 
 define minimum(o: Ord, xs: [int]) -> int:
     edit best = at(xs, 0)
-    loop i in 1..<len(xs):
+    loop i in 1..<length(xs):
         if o.lt(at(xs, i), best) == 1:
             best = at(xs, i)
     best

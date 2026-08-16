@@ -36,7 +36,7 @@ define main() -> int:
     csv = "fruit, qty, price\napple, 15, 30\nbanana, 20, 10\ncherry, 7, 100"
 
     grid = parse_grid(csv)
-    ncols = len(at(grid, 0))
+    ncols = length(at(grid, 0))
     widths = column_widths(grid, ncols)
 
     # Print every row with each cell padded to its column width.
@@ -56,7 +56,7 @@ define main() -> int:
 
     # Total the `qty` column (index 1), skipping the header row.
     edit total = 0
-    loop di in 1..<len(grid):
+    loop di in 1..<length(grid):
         total = total + parse(at(at(grid, di), 1))
     print_line("")
     print_line("total qty = {total}")

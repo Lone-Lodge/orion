@@ -1,0 +1,3 @@
+name = "glyphs"
+version = "0.0.1"
+description = "The 5x7 bitmap font every text-drawing block shares"

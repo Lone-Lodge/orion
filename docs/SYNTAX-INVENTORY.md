@@ -8,7 +8,7 @@ Den next-gen-form vi bestämt. KISS, läsbart för en människa (verb, inte kryp
 
 ```
 public define update(edit items: list of number):
-    loop i in 0 until len(items):
+    loop i in 0 until length(items):
         if items[i] is not 0:
             items[i] = items[i] * 2
 
@@ -16,7 +16,7 @@ define alive(hp: number) -> truth:
     hp > 0
 
 define first given item (items: list of item) -> maybe item:
-    if len(items) > 0 then some(items[0]) else none
+    if length(items) > 0 then some(items[0]) else none
 
 define load(path: text) -> result text:
     read_file(path)
@@ -144,3 +144,25 @@ perform clock.now()
 ---
 
 Referens genererad ur parser + compiler, inte docs. Strukturell riktning (effekter som ryggrad, determinism, lazy iterators, docs-som-tester): `../NEXTGEN-PLAN.md`.
+
+## Ord som bytt namn (2026-08-13)
+
+Ytan säger hela ordet. Båda stavningarna parsas idag - parsern
+översätter den talade formen till den backends känner
+(`psr_spoken_builtin` / `psr_spoken_type` i `orbs/orion_parse`), så en
+framtida omdöpning kostar en rad där plus en mekanisk omskrivning.
+
+| förr | nu | varför |
+|---|---|---|
+| `len` | `length` | förkortning |
+| `fn` | `function` | förkortning (typordet, `Game{rules: function}`) |
+| `slice` | `part` | "en del av listan", inte CPU-tänk |
+| `to_int` | `to_whole` | `int` finns inte i ytan; talen heter `number` |
+| `to_float` | `to_real` | samma, och `/` kallas redan riktig division |
+| `bytes_from_text` | `bytes_of` | familjen blev symmetrisk |
+| `bytes_to_text` | `text_of` | |
+| `bytes_length` | `bytes_count` | `byte_count` var upptaget av text-orben |
+| `bytes_slice` | `bytes_part` | följer `part` |
+
+`app`-orbens `text_of(body) -> response` heter nu `text_response` - den
+byggde ett svar, inte en text, och namnet behövdes.

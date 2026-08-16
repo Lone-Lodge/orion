@@ -1,9 +1,9 @@
-# Spelled-out function type in a type annotation: `f: fn(int) -> int`.
+# Spelled-out function type in a type annotation: `f: function(int) -> int`.
 # Before, only a bare `fn` could type a higher-order param; now the full
 # signature parses (and erases to the same "fn" ptr at lowering).
-define apply2(f: fn(int) -> int, x: int) -> int:
+define apply2(f: function(int) -> int, x: int) -> int:
     f(f(x))
 
 define main() -> int:
-    inc = fn(n): n + 1
+    inc = function(n): n + 1
     apply2(inc, 3)   # 3 -> 4 -> 5 == 5

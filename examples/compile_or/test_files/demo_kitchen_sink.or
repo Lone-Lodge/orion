@@ -4,7 +4,7 @@
 #   orbit.exe run demo_kitchen_sink.or main
 #
 # Demonstrates:
-#   - Generics: fn id<T>, fn pair_first<A, B>  (HM substitution)
+#   - Generics: function id<T>, fn pair_first<A, B>  (HM substitution)
 #   - Closures with captures: |x| body that references outer vars
 #   - SIMD: vec_add / vec_dot on int lists
 #   - Async timing: monotonic_ms / sleep_ms

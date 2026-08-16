@@ -25,9 +25,9 @@ define main() -> int:
         edit draws = []
         loop r in 0..<100:
             draws = append(draws, r * 7)
-        msg = "frame {i} draws {len(draws)} score {i}"
+        msg = "frame {i} draws {length(draws)} score {i}"
         m = {"x": i, "y": i * 2, "label": msg}
-        consumed = get_int(m, "x") + len(msg)
+        consumed = get_int(m, "x") + length(msg)
         used = orion_arena_used()
         if used > peak:
             peak = used

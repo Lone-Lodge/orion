@@ -14,14 +14,14 @@ define main() -> int:
     fields = split(replace(trim(raw), " ", ""), ",")   # ["40","75",...]
 
     # num: parse each field to an int (via iter's map + a closure).
-    scores = each(fields, fn(s: text): parse(s))         # [40,75,88,12,95,60]
+    scores = each(fields, function(s: text): parse(s))         # [40,75,88,12,95,60]
 
     # list + num: aggregate.
     total  = sum(scores)                                # 370
     top    = max_of(scores)                             # 95
     bottom = min_of(scores)                             # 12
     mean   = avg(scores)                                # 61
-    passed = count(scores, fn(n): if n >= 60 then 1 else 0)  # 4 (iter closure)
+    passed = count(scores, function(n): if n >= 60 then 1 else 0)  # 4 (iter closure)
 
-    print_line("n={len(scores)} total={total} top={top} low={bottom} mean={mean} passed={passed}")
+    print_line("n={length(scores)} total={total} top={top} low={bottom} mean={mean} passed={passed}")
     total                                               # 370 -> exit 114

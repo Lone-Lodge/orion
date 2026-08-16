@@ -1,0 +1,104 @@
+# ori_scene - the ORI 3D seam. One frame of "what is where", nothing
+# about how it gets drawn: the engine emits a SceneFrame, a render block
+# turns it into pixels. Sibling of ori_display (the 2D UI overlay).
+#
+# v1 keeps the contract as small as honesty allows: a mesh is a triangle
+# list the render block holds, an instance places one by id. Materials,
+# lights and cameras-with-projection-choices arrive when a game needs
+# them - the seam is the type, not the feature list.
+
+use list
+
+public type V3: x: number, y: number, z: number
+
+# One triangle of a mesh, in model space. color is 0xRRGGBB.
+public type Tri: a: V3, b: V3, c: V3, color: int
+
+# Where the viewer stands: eye position, yaw around Y (radians, 0 looks
+# toward -Z), pitch around X, and vertical field of view in radians.
+public type Camera: eye: V3, yaw: number, pitch: number, fov: number
+
+# One placed mesh: which mesh (an index the render block resolves),
+# where, turned how much around Y, scaled uniformly, tinted (0 keeps
+# the mesh's own triangle colors).
+public type Instance: mesh: int, at: V3, yaw: number, scale: number, tint: int
+
+public type SceneFrame: camera: Camera, instances: list of Instance
+
+# Pixels an artist made: 0xRRGGBB rows, top-down. Magenta (0xFF00FF) is
+# the transparent key - a sprite pixel that color is simply not drawn.
+public type Texture: width: int, height: int, pixels: list of int
+
+# One textured, camera-facing rectangle: center in world space, size in
+# world units (wide/high - numbers, unlike the whole-pixel width/height
+# of a Texture). The 2D asset workhorse; textured MESHES arrive with the
+# 3D render block.
+public type Sprite: at: V3, wide: number, high: number, texture: Texture
+
+public define v3(x: number, y: number, z: number) -> V3:
+    V3{x: x, y: y, z: z}
+
+# A 24-bit BMP (the pixel-art interchange format every paint program
+# writes) decoded to a Texture. Made for `embed`: assets stay FILES,
+# the binary carries their bytes, this reads them at the seam.
+#
+#     texture: texture_from_bmp(embed "../../assets/dragon.bmp")
+#
+# Handles bottom-up (positive height) and top-down (negative) rows and
+# the 4-byte row padding. Anything that is not a 24-bit BMP is LOUD:
+# a 1x1 magenta texture, impossible to miss on screen.
+public define texture_from_bmp(blob: text) -> Texture:
+    bad = Texture{width: 1, height: 1, pixels: [16711935]}
+    data = bytes_of(blob)
+    if length(data) is less than 54:
+        return bad
+    if at(data, 0) is not 66 or at(data, 1) is not 77:
+        return bad
+    bits = at(data, 28) + at(data, 29) * 256
+    if bits is not 24:
+        return bad
+    pixel_start = read_u32(data, 10)
+    width = read_u32(data, 18)
+    # Negative height = top-down rows. Read the magnitude byte-wise
+    # (two's complement inverted) so it works under wasm's 32-bit words.
+    top_down = at(data, 25) is at least 128
+    height = if top_down then (255 - at(data, 22)) + (255 - at(data, 23)) * 256 + (255 - at(data, 24)) * 65536 + (255 - at(data, 25)) * 16777216 + 1 else read_u32(data, 22)
+    row_bytes = ((width * 3 + 3) // 4) * 4
+    # Preallocated + set() in place: growing by append would copy per
+    # pixel under the wasm backend (no in-place promotion there).
+    edit pixels = filled(width * height, 0)
+    loop row in 0 until height:
+        source_row = if top_down then row else height - 1 - row
+        base = pixel_start + source_row * row_bytes
+        loop column in 0 until width:
+            blue = at(data, base + column * 3)
+            green = at(data, base + column * 3 + 1)
+            red = at(data, base + column * 3 + 2)
+            pixels = set(pixels, row * width + column, red * 65536 + green * 256 + blue)
+    Texture{width: width, height: height, pixels: pixels}
+
+define read_u32(data: list of int, offset: int) -> int:
+    at(data, offset) + at(data, offset + 1) * 256 + at(data, offset + 2) * 65536 + at(data, offset + 3) * 16777216
+
+# ----- Tests (`orbit test` runs these) -----
+
+define test_bmp_decodes():
+    # A 2x2 24-bit bottom-up BMP built by hand: green blue / red magenta
+    # (top-down reading), rows padded 6 -> 8 bytes.
+    edit bytes = [66, 77, 70, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0, 40, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 1, 0, 24, 0]
+    loop zero_index in 0 until 24:
+        bytes = push(bytes, 0)
+    loop pixel_byte in [0, 0, 255, 255, 0, 255, 0, 0, 0, 255, 0, 255, 0, 0, 0, 0]:
+        bytes = push(bytes, pixel_byte)
+    texture = texture_from_bmp(text_of(bytes))
+    require texture.width is 2
+    require texture.height is 2
+    require at(texture.pixels, 0) is 65280
+    require at(texture.pixels, 1) is 255
+    require at(texture.pixels, 2) is 16711680
+    require at(texture.pixels, 3) is 16711935
+
+define test_bmp_refuses_junk():
+    junk = texture_from_bmp("not a bmp at all, far too short anyway")
+    require junk.width is 1
+    require at(junk.pixels, 0) is 16711935

@@ -33,17 +33,17 @@ define spaces(count: int) -> text:
 
 
 define padr(text: text, width: int) -> text:
-    cur = len(bytes_from_text(text))
+    cur = length(bytes_of(text))
     if cur >= width then text else "{text}{spaces(width - cur)}"
 
 
 define padl(text: text, width: int) -> text:
-    cur = len(bytes_from_text(text))
+    cur = length(bytes_of(text))
     if cur >= width then text else "{spaces(width - cur)}{text}"
 
 
 define ms_text(seconds: f64) -> text:
-    ms_int = to_int(seconds * 1000.0)
+    ms_int = to_whole(seconds * 1000.0)
     "{padl(int_to_text(ms_int), 4)} ms"
 
 
@@ -60,8 +60,8 @@ public define compile_file(input: text, output: text):
     print_line("")
 
     src = read_file(input)
-    src_bytes = bytes_from_text(src)
-    src_len = len(src_bytes)
+    src_bytes = bytes_of(src)
+    src_len = length(src_bytes)
     label = padr("source", 12)
     info = int_to_text(src_len) + " bytes"
     print_line("    {label}{info}")
@@ -69,28 +69,28 @@ public define compile_file(input: text, output: text):
     t_lex = now()
     tokens = self_lex(src)
     d_lex = elapsed(t_lex)
-    report_row("lex", int_to_text(len(tokens)) + " tokens", d_lex)
+    report_row("lex", int_to_text(length(tokens)) + " tokens", d_lex)
 
     t_parse = now()
     ast = self_parse(tokens)
     d_parse = elapsed(t_parse)
     decls = get(ast, "decls")
-    report_row("parse", int_to_text(len(decls)) + " fn", d_parse)
+    report_row("parse", int_to_text(length(decls)) + " fn", d_parse)
 
     t_ir = now()
     module = ast_program_to_ir(ast)
     d_ir = elapsed(t_ir)
-    n_fns = len(module.functions)
+    n_fns = length(module.functions)
     edit total_insts = 0
     loop fi in 0..<n_fns:
         f = at(module.functions, fi)
-        total_insts = total_insts + len(f.instructions)
+        total_insts = total_insts + length(f.instructions)
     report_row("ir", int_to_text(n_fns) + " fns, " + int_to_text(total_insts) + " insts", d_ir)
 
     t_em = now()
     llvm_text = emit_module(module)
     d_em = elapsed(t_em)
-    report_row("emit ll", int_to_text(len(bytes_from_text(llvm_text))) + " bytes", d_em)
+    report_row("emit ll", int_to_text(length(bytes_of(llvm_text))) + " bytes", d_em)
 
     # Write .ll to disk.
     mkdir_all("dist")

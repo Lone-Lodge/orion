@@ -22,4 +22,4 @@ define main() -> int:
     grid = loop r in [1, 2]:
         row = loop c in [10, 20]: r * c            # inner map, its own accumulator
         collect sum(row)                             # [30, 60]         -> 90
-    sum(doubled) + sum(big) + sum(pairs) + sum(inline_y) + sum(grid) + len(big)
+    sum(doubled) + sum(big) + sum(pairs) + sum(inline_y) + sum(grid) + length(big)

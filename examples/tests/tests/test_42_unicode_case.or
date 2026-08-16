@@ -14,5 +14,5 @@ define main() -> int:
     # Latin Extended-A, where capital and small alternate by parity.
     d = if upper("čeština") is "ČEŠTINA" and lower("ČEŠTINA") is "čeština" then 6 else 0
     # Unmapped scripts pass through untouched; characters() still counts points.
-    e = if upper("日本語 ok") is "日本語 OK" and characters("åsa") is 3 and len("åsa") is 4 then 4 else 0
+    e = if upper("日本語 ok") is "日本語 OK" and characters("åsa") is 3 and length("åsa") is 4 then 4 else 0
     a + b + c + d + e

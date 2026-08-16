@@ -23,5 +23,5 @@ define main() -> int:
     if let Some(v) = twice(2):
         total = total + v                               # 63
     total = total + is_none(twice(0))                   # 64
-    total = total + len(unwrap_or(name(1), "z"))        # 67
+    total = total + length(unwrap_or(name(1), "z"))        # 67
     total

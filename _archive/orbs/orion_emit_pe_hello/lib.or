@@ -58,8 +58,8 @@ fn ph_u64(offset: int, low_u32: int, high_u32: int):
     ph_u32(offset + 4, high_u32)
 
 fn ph_string(offset: int, text: Text):
-    payload = bytes_from_text(text)
-    count = bytes_length(payload)
+    payload = bytes_of(text)
+    count = bytes_count(payload)
     for index in 0..<count:
         ph_u8(offset + index, byte_at(payload, index))
 
@@ -229,4 +229,4 @@ pub fn ph_run():
     mkdir_all("build")
     write_file_bytes("build/hello.exe", pe_bytes)
     print("wrote build/hello.exe")
-    print(len(pe_bytes))
+    print(length(pe_bytes))

@@ -26,7 +26,7 @@ type request:
 define parse_request(raw: text) -> request:
     first = at(lines(raw), 0)
     parts = split(trim(first), " ")
-    if len(parts) < 2:
+    if length(parts) < 2:
         return request{method: "", path: ""}
     request{method: at(parts, 0), path: at(parts, 1)}
 
@@ -37,7 +37,7 @@ define status_line(code: int) -> text:
         else "HTTP/1.0 500 Internal Server Error"
 
 define respond(code: int, body: text) -> text:
-    n = len(body)
+    n = length(body)
     "{status_line(code)}\r\nContent-Type: text/plain\r\nContent-Length: {n}\r\nConnection: close\r\n\r\n{body}"
 
 # The routing table is data, not a chain of ifs.
@@ -145,7 +145,7 @@ define slow_client(id: int) -> int uses net, clock:
     reply = read_head(c, monotonic_ms() + 2000)
     close(c)
     note("client{id}")
-    if len(reply) > 0 then 1 else 0
+    if length(reply) > 0 then 1 else 0
 
 # Asks immediately and should be answered immediately.
 define fast_client(id: int) -> int uses net, clock:
@@ -156,7 +156,7 @@ define fast_client(id: int) -> int uses net, clock:
     reply = read_head(c, monotonic_ms() + 2000)
     close(c)
     note("client{id}")
-    if len(reply) > 0 then 1 else 0
+    if length(reply) > 0 then 1 else 0
 
 # The demo drives itself: the server AND its clients are tasks in one process.
 # `run_all` is the only thing main does - everything else is the scheduler.

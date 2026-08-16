@@ -1,0 +1,62 @@
+# orion_fmt - the conservative whitespace formatter, shared by `orbit fmt`
+# and the language server's textDocument/formatting (the editor's format key).
+# Operations: tabs -> 4 spaces, trailing whitespace stripped, runs of blank
+# lines collapsed to one, file ends with exactly one newline. A "real"
+# formatter that rewrites expressions / re-indents blocks needs the lexer +
+# parser (step 3-4 of self-hosting).
+use text
+
+define fmt_expand_tabs(line_text: text) -> text:
+    if index_of(line_text, "\t") >= 0:
+        replace(line_text, "\t", "    ")
+    else:
+        line_text
+
+define fmt_trim_trailing(line_text: text) -> text:
+    bytes = bytes_of(line_text)
+    byte_count = bytes_count(bytes)
+    edit end_index = byte_count
+    loop:
+        if end_index <= 0:
+            break
+        last_byte = byte_at(bytes, end_index - 1)
+        if last_byte == 32 or last_byte == 9:
+            end_index -= 1
+        else:
+            break
+    if end_index == byte_count:
+        line_text
+    else:
+        text_of(bytes_part(bytes, 0, end_index))
+
+# Split on "\n" (without LF), normalize each line, then rejoin.
+public define fmt_normalize(source: text) -> text:
+    example fmt_normalize("a \n\n\nb\n") is "a\n\nb\n"
+    example fmt_normalize("\tx") is "    x\n"
+    raw_lines = split(source, "\n")
+    line_count = length(raw_lines)
+    edit normalized_lines = []
+    loop index in 0..<line_count:
+        raw_line = at(raw_lines, index)
+        without_tabs = fmt_expand_tabs(raw_line)
+        stripped = fmt_trim_trailing(without_tabs)
+        normalized_lines = append(normalized_lines, stripped)
+    # Collapse 2+ consecutive blank lines.
+    collapsed = []
+    edit output_lines = collapsed
+    edit last_was_blank = false
+    loop index in 0..<line_count:
+        current_line = at(normalized_lines, index)
+        is_blank = current_line == ""
+        keep = not (is_blank and last_was_blank)
+        if keep:
+            output_lines = append(output_lines, current_line)
+        last_was_blank = is_blank
+    # Drop the trailing blank line so join + "\n" produces one final LF.
+    final_count = length(output_lines)
+    if final_count > 0 and at(output_lines, final_count - 1) == "":
+        edit trimmed = []
+        loop index in 0..<(final_count - 1):
+            trimmed = append(trimmed, at(output_lines, index))
+        output_lines = trimmed
+    join(output_lines, "\n") + "\n"

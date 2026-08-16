@@ -8,7 +8,7 @@ define sleep_until(deadline_ms: int):
         sleep_ms(remaining)
 
 define count_due(timers: [int]) -> int:
-    n = len(timers)
+    n = length(timers)
     now = monotonic_ms()
     edit count = 0
     loop i in 0..<n:

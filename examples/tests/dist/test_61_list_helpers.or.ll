@@ -79,6 +79,12 @@ declare i64 @orion_audio_bus_gain(i64, i64, i64)
 declare i64 @orion_audio_playing()
 declare i64 @orion_audio_debug_plays()
 declare void @orion_audio_shutdown()
+declare i64 @orion_mic_open(i64)
+declare i64 @orion_mic_level()
+declare i64 @orion_mic_buffered()
+declare i64 @orion_mic_rate()
+declare i64 @orion_mic_take_wav(ptr)
+declare void @orion_mic_close()
 declare void @orion_arena_ptr_guard(ptr, ptr)
 declare ptr @orion_slot_evac(ptr, ptr, i64)
 declare void @orion_crumb(ptr, ptr, i64)
@@ -2108,6 +2114,79 @@ for_5_step:
 for_5_end:
     %v33 = load ptr, ptr %v3
     ret ptr %v33
+}
+
+define ptr @list__filled(i64 %p0, i64 %p1) {
+entry:
+    %v3 = alloca ptr, align 8
+    %v6 = alloca i64, align 8
+    %v0 = add i64 0, %p0
+    %v1 = add i64 0, %p1
+    %v2 = getelementptr i64, ptr @orion_empty_list, i64 0
+    store ptr %v2, ptr %v3
+    %v4 = add i64 0, 0
+    %v5 = add i64 0, 0
+    store i64 %v5, ptr %v6
+    %v7 = add i64 0, 0
+    br label %for_5_header
+for_5_header:
+    %v10 = load i64, ptr %v6
+    %v11.b = icmp slt i64 %v10, %v0
+    %v11 = zext i1 %v11.b to i64
+    %v12.cb = icmp ne i64 %v11, 0
+    br i1 %v12.cb, label %for_5_body, label %for_5_end
+for_5_body:
+    %v14 = load ptr, ptr %v3
+    %v15 = call ptr @orion_list_push_mut(ptr %v14, i64 %v1)
+    store ptr %v15, ptr %v3
+    %v16 = add i64 0, 0
+    br label %for_5_step
+for_5_step:
+    %v19 = add i64 0, 1
+    %v20 = add i64 %v10, %v19
+    store i64 %v20, ptr %v6
+    %v21 = add i64 0, 0
+    br label %for_5_header
+for_5_end:
+    %v24 = load ptr, ptr %v3
+    ret ptr %v24
+}
+
+define ptr @list__filled_number(i64 %p0, double %p1) {
+entry:
+    %v3 = alloca ptr, align 8
+    %v6 = alloca i64, align 8
+    %v0 = add i64 0, %p0
+    %v1 = fadd double %p1, 0x0000000000000000
+    %v2 = getelementptr i64, ptr @orion_empty_list, i64 0
+    store ptr %v2, ptr %v3
+    %v4 = add i64 0, 0
+    %v5 = add i64 0, 0
+    store i64 %v5, ptr %v6
+    %v7 = add i64 0, 0
+    br label %for_5_header
+for_5_header:
+    %v10 = load i64, ptr %v6
+    %v11.b = icmp slt i64 %v10, %v0
+    %v11 = zext i1 %v11.b to i64
+    %v12.cb = icmp ne i64 %v11, 0
+    br i1 %v12.cb, label %for_5_body, label %for_5_end
+for_5_body:
+    %v14 = load ptr, ptr %v3
+    %v15.pf = bitcast double %v1 to i64
+    %v15 = call ptr @orion_list_push_mut(ptr %v14, i64 %v15.pf)
+    store ptr %v15, ptr %v3
+    %v16 = add i64 0, 0
+    br label %for_5_step
+for_5_step:
+    %v19 = add i64 0, 1
+    %v20 = add i64 %v10, %v19
+    store i64 %v20, ptr %v6
+    %v21 = add i64 0, 0
+    br label %for_5_header
+for_5_end:
+    %v24 = load ptr, ptr %v3
+    ret ptr %v24
 }
 
 define i64 @orion_main() {

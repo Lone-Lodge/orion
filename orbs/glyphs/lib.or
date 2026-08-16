@@ -1,0 +1,60 @@
+# glyphs - THE 5x7 bitmap font, one place (the one-of-each law).
+# overlay draws it into pixel frames, raster turns it into field-space
+# triangles; both read the same rows.
+#
+# One glyph is seven 5-bit rows, top down (bit 16 = leftmost column).
+# Uppercase letters, digits and the few marks a HUD line uses; unknown
+# characters come back as a solid block so a missing glyph is SEEN,
+# not skipped. Lowercase maps onto uppercase.
+
+public define glyph_rows(code: int) -> list of int:
+    letter = if code is at least 97 and code is at most 122 then code - 32 else code
+    choose letter:
+        48 -> [14, 17, 19, 21, 25, 17, 14]
+        49 -> [4, 12, 4, 4, 4, 4, 14]
+        50 -> [14, 17, 1, 2, 4, 8, 31]
+        51 -> [14, 17, 1, 6, 1, 17, 14]
+        52 -> [2, 6, 10, 18, 31, 2, 2]
+        53 -> [31, 16, 30, 1, 1, 17, 14]
+        54 -> [6, 8, 16, 30, 17, 17, 14]
+        55 -> [31, 1, 2, 4, 8, 8, 8]
+        56 -> [14, 17, 17, 14, 17, 17, 14]
+        57 -> [14, 17, 17, 15, 1, 2, 12]
+        65 -> [14, 17, 17, 31, 17, 17, 17]
+        66 -> [30, 17, 17, 30, 17, 17, 30]
+        67 -> [14, 17, 16, 16, 16, 17, 14]
+        68 -> [30, 17, 17, 17, 17, 17, 30]
+        69 -> [31, 16, 16, 30, 16, 16, 31]
+        70 -> [31, 16, 16, 30, 16, 16, 16]
+        71 -> [14, 17, 16, 23, 17, 17, 15]
+        72 -> [17, 17, 17, 31, 17, 17, 17]
+        73 -> [14, 4, 4, 4, 4, 4, 14]
+        74 -> [7, 2, 2, 2, 2, 18, 12]
+        75 -> [17, 18, 20, 24, 20, 18, 17]
+        76 -> [16, 16, 16, 16, 16, 16, 31]
+        77 -> [17, 27, 21, 21, 17, 17, 17]
+        78 -> [17, 25, 21, 19, 17, 17, 17]
+        79 -> [14, 17, 17, 17, 17, 17, 14]
+        80 -> [30, 17, 17, 30, 16, 16, 16]
+        81 -> [14, 17, 17, 17, 21, 18, 13]
+        82 -> [30, 17, 17, 30, 20, 18, 17]
+        83 -> [15, 16, 16, 14, 1, 1, 30]
+        84 -> [31, 4, 4, 4, 4, 4, 4]
+        85 -> [17, 17, 17, 17, 17, 17, 14]
+        86 -> [17, 17, 17, 17, 17, 10, 4]
+        87 -> [17, 17, 17, 21, 21, 27, 17]
+        88 -> [17, 10, 4, 4, 4, 10, 17]
+        89 -> [17, 17, 10, 4, 4, 4, 4]
+        90 -> [31, 1, 2, 4, 8, 16, 31]
+        32 -> [0, 0, 0, 0, 0, 0, 0]
+        45 -> [0, 0, 0, 14, 0, 0, 0]
+        46 -> [0, 0, 0, 0, 0, 12, 12]
+        58 -> [0, 12, 12, 0, 12, 12, 0]
+        _ -> [31, 31, 31, 31, 31, 31, 31]
+
+define test_glyphs_answer():
+    require length(glyph_rows(65)) is 7
+    require at(glyph_rows(65), 3) is 31
+    require at(glyph_rows(97), 3) is 31
+    require at(glyph_rows(32), 0) is 0
+    require at(glyph_rows(1000), 0) is 31

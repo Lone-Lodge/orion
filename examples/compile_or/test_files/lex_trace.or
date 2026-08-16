@@ -4,6 +4,6 @@ use orion_parse
 define main():
     src = "data Point: x: int, y: int\n"
     tokens = self_lex(src)
-    print_line("tokens: {len(tokens)}")
+    print_line("tokens: {length(tokens)}")
     ast = self_parse(tokens)
     print_line("done")

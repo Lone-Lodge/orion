@@ -13,7 +13,7 @@
 # ordinary one for a word used where no such name is bound.
 
 effect Log:
-    msg: fn(text: text) -> text
+    msg: function(text: text) -> text
 
 handle Log.msg(text: text) -> text:
 

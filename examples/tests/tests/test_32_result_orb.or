@@ -17,14 +17,14 @@ define main() -> int:
     edit total = 0
     choose safe_div(10, 2):
         Ok(v) -> total = total + v                       # 5
-        Err(m) -> total = total + len(m)
+        Err(m) -> total = total + length(m)
     total = total + unwrap_or(safe_div(1, 0), 3)         # 8
     total = total + is_err(safe_div(1, 0))               # 9
     total = total + is_ok(safe_div(1, 1))                # 10
-    total = total + len(err_msg(safe_div(1, 0)))         # 24
+    total = total + length(err_msg(safe_div(1, 0)))         # 24
     if let Ok(v) = chain(10, 5):
         total = total + v                                # 27
     total = total + is_err(chain(1, 0))                  # 28
-    total = total + len(unwrap_or(words(), "xx"))        # 30
+    total = total + length(unwrap_or(words(), "xx"))        # 30
     total = total + is_ok(words()) + is_ok(Result.Ok(9)) # 32
     total

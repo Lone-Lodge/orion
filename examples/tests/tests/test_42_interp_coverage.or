@@ -3,8 +3,8 @@
 # Categories tested:
 #   - Simple ident:           {name}
 #   - Field access:           {obj.field}
-#   - Fn call w/ ident arg:   {fn(arg)}
-#   - Fn call w/ field arg:   {fn(obj.field)}  ← was a bug
+#   - Fn call w/ ident arg:   {function(arg)}
+#   - Fn call w/ field arg:   {function(obj.field)}  ← was a bug
 #   - Multiple in one string
 
 type Obj: field: int, name: text

@@ -50,7 +50,7 @@ public define modified_at(p: text) -> int uses files = file_mtime(p)
 define os_quote(a: text) -> text = "\"{a}\""
 
 define os_join(acc: text, args: [text], i: int) -> text:
-    if i >= len(args):
+    if i >= length(args):
         acc
     else:
         os_join("{acc} {os_quote(at(args, i))}", args, i + 1)
@@ -164,8 +164,8 @@ public define path_join(a: text, b: text) -> text:
 public define path_parent(p: text) -> text:
     example path_parent("a/b/c.or") is "a/b"
     example path_parent("solo") is "."
-    bs = bytes_from_text(p)
-    n = len(bs)
+    bs = bytes_of(p)
+    n = length(bs)
     edit last_sep = 0 - 1
     loop i in 0 until n:
         c = at(bs, i)
@@ -174,7 +174,20 @@ public define path_parent(p: text) -> text:
     if last_sep < 0:
         "."
     else:
-        bytes_to_text(bytes_slice(bs, 0, last_sep))
+        text_of(bytes_part(bs, 0, last_sep))
+
+external define exe_path() -> text
+external define pick_folder(title: text) -> text
+
+# Ask which folder, and get its path back ("" if they said no). A program
+# started from a shortcut has no arguments to read; this is how it asks.
+# no example: opens a dialog - proven by folio started without a folder
+public define choose_folder(prompt: text) -> text uses files = pick_folder(prompt)
+
+# This program's own file, in full. `arg(0)` is only what the caller typed,
+# so a shipped program that has to find the files beside it asks here.
+# no example: depends on where the binary sits - proven by folio's asset()
+public define program_path() -> text = exe_path()
 
 # ---- directory listing (newline-joined names from the runtime) ----
 # `list_dir` gives FILES only; `list_dirs` gives SUBDIRECTORIES. Reaching for
@@ -189,6 +202,11 @@ external define fs_remove_tree(path: text) -> int
 # marks its object files read-only).
 # no example: deletes from disk - proven by tools/package_test.sh
 public define remove_tree(p: text) -> int uses files = fs_remove_tree(p)
+
+# Delete ONE file. 0 when it is gone. (remove_tree is the recursive big
+# brother; this one refuses to be pointed at a directory by construction.)
+# no example: deletes from disk - proven by dots' tree context menu
+public define delete_file(p: text) -> int uses files = remove_file(p)
 # no example: depends on the filesystem - proven by tools/orbstat.or
 public define list_dir(dir: text) -> [text] uses files = split(orion_dir_list(dir), "\n")
 # no example: depends on the filesystem - proven by tools/orbstat.or
@@ -220,3 +238,42 @@ public define copy_file(from: text, to: text) -> int uses files = fs_copy_file(f
 # The current working directory, "" if the OS cannot say.
 # no example: depends on where the process runs - proven by test_42_general_floor.or
 public define cwd() -> text uses files = fs_cwd()
+
+# ---- shipping: the setup exe and the per-user registry ----
+# A setup exe made by `orbit package` is the installer stub with the app's
+# zip, a manifest and its ui page appended to the file itself - one file that
+# is both program and cargo. The stub reads itself back with the three calls
+# below; orbit sews with stitch_setup. tools/setup_stub.or is the one caller.
+external define setup_stitch(base: text, zip: text, manifest: text, html: text, out: text) -> int
+external define setup_section(which: int) -> text
+external define setup_extract(dest: text) -> int
+
+# Sew stub + app zip + manifest + ui html into one setup exe. 0 when written.
+# no example: writes an exe - proven by tools/setup_test.sh
+public define stitch_setup(base: text, zip: text, manifest: text, html: text, out: text) -> int uses files = setup_stitch(base, zip, manifest, html, out)
+
+# The manifest this exe carries ("" when it carries none - a bare stub).
+# no example: reads the running exe - proven by tools/setup_test.sh
+public define setup_manifest() -> text uses files = setup_section(0)
+
+# The ui page this exe carries ("" when none).
+# no example: reads the running exe - proven by tools/setup_test.sh
+public define setup_page() -> text uses files = setup_section(1)
+
+# Write the app zip this exe carries to `dest`. 0 when written, -1 when bare.
+# no example: reads the running exe - proven by tools/setup_test.sh
+public define unpack_setup(dest: text) -> int uses files = setup_extract(dest)
+
+# The per-user registry (HKCU), just enough for an app to announce itself in
+# Apps & features and take it back. No admin, no machine state - uninstall is
+# registry_remove of the same key. Windows-only; elsewhere every call is -1.
+external define reg_user_set_text(subkey: text, name: text, value: text) -> int
+external define reg_user_set_number(subkey: text, name: text, value: int) -> int
+external define reg_user_delete(subkey: text) -> int
+
+# no example: writes the user registry - proven by tools/setup_test.sh
+public define registry_write_text(key: text, name: text, value: text) -> int uses files = reg_user_set_text(key, name, value)
+# no example: writes the user registry - proven by tools/setup_test.sh
+public define registry_write_number(key: text, name: text, value: int) -> int uses files = reg_user_set_number(key, name, value)
+# no example: writes the user registry - proven by tools/setup_test.sh
+public define registry_remove(key: text) -> int uses files = reg_user_delete(key)

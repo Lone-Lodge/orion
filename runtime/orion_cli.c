@@ -196,6 +196,9 @@ const char *capture(const char *cmd) {
 #include <sys/wait.h>
 #include <unistd.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>   /* _NSGetExecutablePath - see exe_path */
+#endif
 
 /* system() returns a wait-encoded status, not the child's exit code - the
  * code lives in bits 8-15. Decode it so run_command() yields the real exit
@@ -422,6 +425,80 @@ const char *fs_cwd(void) {
     return orion_text_from_c(buf);
 }
 
+/* Ask the person which folder, and answer with its path ("" if they said no).
+ * A program started from a Start-menu shortcut has no arguments to read, so
+ * this is how it finds out what to work on. Windows-only today; elsewhere ""
+ * and the caller falls back to an argument. */
+#ifdef _WIN32
+typedef struct {                       /* BROWSEINFOW, without shlobj.h */
+    void *hwndOwner;
+    const void *pidlRoot;
+    wchar_t *pszDisplayName;
+    const wchar_t *lpszTitle;
+    unsigned int ulFlags;
+    void *lpfn;
+    LPARAM lParam;
+    int iImage;
+} pf_browseinfo;
+const char *pick_folder(const char *title) {
+    static char out[4096];
+    wchar_t wtitle[256], wpath[4096];
+    pf_browseinfo bi;
+    void *pidl;
+    void *(__stdcall *SHBrowse)(pf_browseinfo *);
+    int (__stdcall *SHGetPath)(const void *, wchar_t *);
+    void (__stdcall *CoFree)(void *);
+    HMODULE shell = LoadLibraryA("shell32.dll"), ole = LoadLibraryA("ole32.dll");
+    out[0] = 0;
+    if (!shell || !ole) return orion_text_from_c(out);
+    SHBrowse = (void *(__stdcall *)(pf_browseinfo *))(void *)GetProcAddress(shell, "SHBrowseForFolderW");
+    SHGetPath = (int (__stdcall *)(const void *, wchar_t *))(void *)GetProcAddress(shell, "SHGetPathFromIDListW");
+    CoFree = (void (__stdcall *)(void *))(void *)GetProcAddress(ole, "CoTaskMemFree");
+    if (!SHBrowse || !SHGetPath || !CoFree) return orion_text_from_c(out);
+    { /* the dialog is COM; a GUI app that never called this would get nothing */
+        HRESULT (__stdcall *CoInit)(void *, unsigned long) =
+            (HRESULT (__stdcall *)(void *, unsigned long))(void *)GetProcAddress(ole, "CoInitializeEx");
+        if (CoInit) CoInit(NULL, 0x2 /* APARTMENTTHREADED */);
+    }
+    wtitle[0] = 0;
+    MultiByteToWideChar(CP_UTF8, 0, title, -1, wtitle, 256);
+    memset(&bi, 0, sizeof bi);
+    bi.lpszTitle = wtitle;
+    bi.ulFlags = 0x0001 /* RETURNONLYFSDIRS */ | 0x0040 /* NEWDIALOGSTYLE */;
+    pidl = SHBrowse(&bi);
+    if (!pidl) return orion_text_from_c(out);
+    wpath[0] = 0;
+    if (SHGetPath(pidl, wpath))
+        WideCharToMultiByte(CP_UTF8, 0, wpath, -1, out, sizeof out, NULL, NULL);
+    CoFree(pidl);
+    return orion_text_from_c(out);
+}
+#else
+const char *pick_folder(const char *title) { (void)title; return orion_text_from_c(""); }
+#endif
+
+/* This program's own file, in full, "" on failure. argv[0] is whatever the
+ * caller typed and can be relative or a bare name, so a shipped app cannot
+ * use it to find the files that ship beside it - this can. */
+const char *exe_path(void) {
+    static char buf[4096];
+    buf[0] = 0;
+#ifdef _WIN32
+    if (!GetModuleFileNameA(NULL, buf, (DWORD)sizeof buf)) buf[0] = 0;
+#elif defined(__APPLE__)
+    {
+        unsigned int n = (unsigned int)sizeof buf;
+        if (_NSGetExecutablePath(buf, &n) != 0) buf[0] = 0;
+    }
+#else
+    {
+        ssize_t n = readlink("/proc/self/exe", buf, sizeof buf - 1);
+        buf[n > 0 ? n : 0] = 0;
+    }
+#endif
+    return orion_text_from_c(buf);
+}
+
 /* Format a float with a fixed number of decimals - the one formatting ask
  * to_text cannot answer. Decimals clamped to 0..17. */
 const char *fmt_float(double x, long long decimals) {
@@ -520,17 +597,43 @@ static int (__stdcall *wt_GetMonitorInfoW)(void *, MONITORINFO *);
 static int (__stdcall *wt_GetClientRect)(void *, RECT *);
 static int (__stdcall *wt_ClientToScreen)(void *, POINT *);
 static void *(__stdcall *wt_CreateRoundRectRgn)(int, int, int, int, int, int);
+/* Raising a window is not just showing it: Windows refuses the foreground to a
+ * process that did not just receive input, so a summoned palette would only
+ * flash in the taskbar. Borrowing the current foreground thread's input queue
+ * for the length of the call is the documented way to ask honestly. */
+static void *(__stdcall *wt_GetForegroundWindow)(void);
+static int (__stdcall *wt_SetForegroundWindow)(void *);
+static unsigned long (__stdcall *wt_GetWindowThreadProcessId)(void *, unsigned long *);
+static int (__stdcall *wt_AttachThreadInput)(unsigned long, unsigned long, int);
 static wchar_t win_needle[256];
 static void *win_found;
+/* Normally only visible windows count (a hidden one cannot be the app's).
+ * "show" is the exception: the window it is looking for is hidden by
+ * definition, which is why it asked. */
+static int win_any;
 static int __stdcall win_find_scan(void *h, LONG_PTR unused) {
     wchar_t title[512];
+    RECT r;
     (void)unused;
-    if (!wt_IsWindowVisible(h)) return 1;
+    if (!win_any && !wt_IsWindowVisible(h)) return 1;
+    /* a window on its way out keeps its title for a moment while its rect
+       collapses to nothing - it must not shadow the live one */
+    if (wt_GetWindowRect && wt_GetWindowRect(h, &r) && r.right <= r.left) return 1;
     title[0] = 0;
     wt_GetWindowTextW(h, title, 512);
     if (title[0] && wcsstr(title, win_needle)) { win_found = h; return 0; }
     return 1;
 }
+/* The app's OWN window when one exists - the needle search below is a
+ * SUBSTRING match over every top-level window, so "dots" also matches
+ * "dots - Visual Studio Code" and friends. When the runtime opened its own
+ * window it must never guess: the verbs go straight to that hwnd. The
+ * needle path remains for the borrowed-Edge fallback. */
+static HWND ow_hwnd;
+static volatile LONG ow_ready;
+static volatile LONG ow_abandoned;
+static void *win_target(const char *needle);
+
 /* The window itself, or NULL. Loads user32 on the first call. */
 static void *win_by_title(const char *needle) {
     if (!wt_EnumWindows) {
@@ -555,6 +658,10 @@ static void *win_by_title(const char *needle) {
         wt_ClientToScreen = (int (__stdcall *)(void *, POINT *))(void *)GetProcAddress(u, "ClientToScreen");
         wt_MonitorFromWindow = (void *(__stdcall *)(void *, unsigned long))(void *)GetProcAddress(u, "MonitorFromWindow");
         wt_GetMonitorInfoW = (int (__stdcall *)(void *, MONITORINFO *))(void *)GetProcAddress(u, "GetMonitorInfoW");
+        wt_GetForegroundWindow = (void *(__stdcall *)(void))(void *)GetProcAddress(u, "GetForegroundWindow");
+        wt_SetForegroundWindow = (int (__stdcall *)(void *))(void *)GetProcAddress(u, "SetForegroundWindow");
+        wt_GetWindowThreadProcessId = (unsigned long (__stdcall *)(void *, unsigned long *))(void *)GetProcAddress(u, "GetWindowThreadProcessId");
+        wt_AttachThreadInput = (int (__stdcall *)(unsigned long, unsigned long, int))(void *)GetProcAddress(u, "AttachThreadInput");
         {   /* the rounded region itself is gdi32's */
             HMODULE gdi = LoadLibraryA("gdi32.dll");
             if (gdi) wt_CreateRoundRectRgn = (void *(__stdcall *)(int, int, int, int, int, int))(void *)GetProcAddress(gdi, "CreateRoundRectRgn");
@@ -567,29 +674,81 @@ static void *win_by_title(const char *needle) {
     wt_EnumWindows(win_find_scan, 0);
     return win_found;
 }
+static void *win_target(const char *needle) {
+    /* the search also lazy-loads the wt_* verb pointers - run it always,
+     * then prefer our own window over whatever the needle matched. Only a
+     * FULLY up own window counts: a half-born one (webview still coming,
+     * or an abandoned attempt) must not swallow verbs meant for the
+     * borrowed-Edge fallback. */
+    void *found = win_by_title(needle);
+    if (ow_hwnd && ow_ready == 1) return ow_hwnd;
+    return found;
+}
 long long win_set_topmost(const char *needle, long long on) {
-    void *h = win_by_title(needle);
+    void *h = win_target(needle);
     if (!h) return -1;
     wt_SetWindowPos(h, (void *)(intptr_t)(on ? -1 : -2) /* HWND_TOPMOST : HWND_NOTOPMOST */,
                     0, 0, 0, 0, 0x0001 | 0x0002 /* SWP_NOSIZE|SWP_NOMOVE */);
     return 0;
 }
-/* percent 100 takes the layered style back off, so a solid window pays
- * nothing for having once been faded. */
+/* How solid the window is. percent 100 takes the layered style back off, so a
+ * solid window pays nothing for having once been faded - unless it is
+ * clicking through, which is built on the same style bit.
+ *
+ * (Not here, and measured: a colour key - LWA_COLORKEY, one exact colour
+ * punched out of the window - does nothing to a browser window. Its pixels
+ * arrive through the compositor, where the per-pixel comparison never
+ * happens. A see-through background needs a window we own.) */
 long long win_set_opacity(const char *needle, long long percent) {
-    void *h = win_by_title(needle);
+    void *h = win_target(needle);
     LONG_PTR ex;
     if (!h || !wt_GetWindowLongPtr || !wt_SetWindowLongPtr || !wt_SetLayeredWindowAttributes) return -1;
     if (percent < 10) percent = 10;
     if (percent > 100) percent = 100;
     ex = wt_GetWindowLongPtr(h, -20 /* GWL_EXSTYLE */);
     if (percent >= 100) {
-        wt_SetWindowLongPtr(h, -20, ex & ~(LONG_PTR)0x00080000 /* WS_EX_LAYERED */);
+        if (ex & 0x00000020 /* WS_EX_TRANSPARENT */)
+            wt_SetLayeredWindowAttributes(h, 0, 255, 0x2 /* LWA_ALPHA */);
+        else
+            wt_SetWindowLongPtr(h, -20, ex & ~(LONG_PTR)0x00080000 /* WS_EX_LAYERED */);
         return 0;
     }
     wt_SetWindowLongPtr(h, -20, ex | 0x00080000);
     wt_SetLayeredWindowAttributes(h, 0, (unsigned char)(percent * 255 / 100), 0x2 /* LWA_ALPHA */);
     return 0;
+}
+/* Let the mouse fall straight through the window to whatever is under it -
+ * the reference-board trick: the board floats over the work and you paint,
+ * click and drag as if it were not there. The KEYBOARD still arrives, which
+ * is the way back: alt-tab to the window and the page's own key handler can
+ * turn this off. (WS_EX_TRANSPARENT only takes the window out of mouse hit
+ * testing; it needs WS_EX_LAYERED beside it to hold for a composited
+ * window, and win_set_opacity knows not to strip that bit while this is on.)
+ * 1 = clicking through, 0 = solid, -1 = no such window. */
+static void ow_through_hotkey(void *h, int on);   /* defined with the own-window block */
+static int ow_is_own_window(void *h);
+static long long ow_ghost_query(void *h);
+long long win_set_click_through(const char *needle, long long on) {
+    void *h = win_target(needle);
+    LONG_PTR ex;
+    if (!h || !wt_GetWindowLongPtr || !wt_SetWindowLongPtr) return -1;
+    ex = wt_GetWindowLongPtr(h, -20 /* GWL_EXSTYLE */);
+    if (on) ex |= 0x00080000 | 0x00000020;   /* WS_EX_LAYERED|WS_EX_TRANSPARENT */
+    else ex &= ~(LONG_PTR)0x00000020;
+    wt_SetWindowLongPtr(h, -20, ex);
+    /* a window the mouse cannot reach needs a way back the keyboard owns
+       from ANYWHERE - our own window arms ctrl+alt+c while this is on */
+    ow_through_hotkey(h, on ? 1 : 0);
+    return on ? 1 : 0;
+}
+/* Whether it is clicking through right now (1/0), or -1 for no such window.
+ * An own window in ghost mode answers yes even while the cursor is over an
+ * interactive island - the MODE is on, which is what the page asks about. */
+long long win_click_through_on(const char *needle) {
+    void *h = win_target(needle);
+    if (!h || !wt_GetWindowLongPtr) return -1;
+    if (ow_is_own_window(h) && ow_ghost_query(h)) return 1;
+    return (wt_GetWindowLongPtr(h, -20) & 0x00000020) ? 1 : 0;
 }
 /* Take the frame off, so the page IS the window and can draw its own bar.
  *
@@ -619,12 +778,18 @@ static void win_pseudo_max(void *h, int clip) {
                     mi.rcWork.right - mi.rcWork.left,
                     mi.rcWork.bottom - mi.rcWork.top + clip, 0x0004 /* SWP_NOZORDER */);
 }
+static int ow_is_own_window(void *h);   /* defined with the own-window block below */
+static void ow_set_visible(void *h, int on);   /* likewise */
+static void ow_take_foreground(void *h);
 long long win_set_frameless(const char *needle, long long on, long long view_h) {
-    void *h = win_by_title(needle);
+    void *h = win_target(needle);
     RECT r, c;
     POINT o;
     int strip;
     void *rgn;
+    /* our own webview window has no browser strip: nothing to clip, and a
+       GDI region would cost it DWM's rounded corners and shadow */
+    if (h && ow_is_own_window(h)) return 0;
     if (!h || !wt_SetWindowRgn || !wt_GetWindowRect || !wt_CreateRoundRectRgn) return -1;
     if (!wt_GetClientRect || !wt_ClientToScreen) return -1;
     if (!on) {
@@ -657,7 +822,7 @@ long long win_set_frameless(const char *needle, long long on, long long view_h) 
  * the OS move loop for it (neither WM_NCLBUTTONDOWN nor SC_MOVE - measured),
  * so the page follows its own pointer and says where to be. */
 long long win_move(const char *needle, long long x, long long y) {
-    void *h = win_by_title(needle);
+    void *h = win_target(needle);
     if (!h) return -1;
     wt_SetWindowPos(h, NULL, (int)x, (int)y, 0, 0,
                     0x0001 | 0x0004 /* SWP_NOSIZE|SWP_NOZORDER */);
@@ -665,9 +830,29 @@ long long win_move(const char *needle, long long x, long long y) {
 }
 /* The rest of what a frameless window's own bar needs: the three buttons. */
 long long win_command(const char *needle, const char *what) {
-    void *h = win_by_title(needle);
+    void *h;
+    if (!strcmp(what, "show")) win_any = 1;
+    h = win_target(needle);
+    win_any = 0;
     if (!h || !wt_ShowWindow || !wt_PostMessageW) return -1;
     if (!strcmp(what, "min")) { wt_ShowWindow(h, 6 /* SW_MINIMIZE */); return 0; }
+    if (!strcmp(what, "hide")) {
+        ow_set_visible(h, 0);
+        wt_ShowWindow(h, 0 /* SW_HIDE */);
+        return 0;
+    }
+    if (!strcmp(what, "show")) {
+        wt_ShowWindow(h, 5 /* SW_SHOW */);
+        /* z-order is part of showing. Set once at startup it does not survive
+           the window still settling in; asserted on every summon it always
+           does - and a summoned window that comes up behind something is the
+           same as one that did not come up. */
+        wt_SetWindowPos(h, (void *)(intptr_t)-1 /* HWND_TOPMOST */, 0, 0, 0, 0,
+                        0x0001 | 0x0002 /* SWP_NOSIZE|SWP_NOMOVE */);
+        ow_set_visible(h, 1);
+        ow_take_foreground(h);
+        return 0;
+    }
     if (!strcmp(what, "max")) {
         if (!win_clip) {          /* framed: the OS knows how to do this */
             wt_ShowWindow(h, wt_IsZoomed && wt_IsZoomed(h) ? 9 /* SW_RESTORE */ : 3 /* SW_MAXIMIZE */);
@@ -688,12 +873,1068 @@ long long win_command(const char *needle, const char *what) {
     if (!strcmp(what, "close")) { wt_PostMessageW(h, 0x0010 /* WM_CLOSE */, 0, 0); return 0; }
     return -1;
 }
+/* ---- a program's icon, as pixels -------------------------------------
+ * The start menu is shortcuts, and a shortcut's icon is whatever the shell
+ * decides it is (the target's, an overridden one, a folder's) - so ask the
+ * shell rather than reading the file. What comes back is an HICON, which is
+ * a pair of bitmaps; drawing it into a 32-bit top-down DIB is what turns it
+ * into pixels we can hand out.
+ *
+ * Base64 and not the bytes: a returned string is copied out at its NUL, and
+ * icon pixels are full of those. The caller gets ASCII and the page turns it
+ * back into an image - which is rendering, and belongs there. */
+static char ico_out[65536];
+static const char ico_alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static int (__stdcall *ico_DrawIconEx)(HDC, int, int, HICON, int, int, UINT, HBRUSH, UINT);
+static int (__stdcall *ico_DestroyIcon)(HICON);
+static HDC (__stdcall *ico_CreateCompatibleDC)(HDC);
+static int (__stdcall *ico_DeleteDC)(HDC);
+static void *(__stdcall *ico_CreateDIBSection)(HDC, const BITMAPINFO *, UINT, void **, HANDLE, DWORD);
+static void *(__stdcall *ico_SelectObject)(HDC, void *);
+static int (__stdcall *ico_DeleteObject)(void *);
+static DWORD_PTR (__stdcall *ico_SHGetFileInfoA)(const char *, DWORD, void *, UINT, UINT);
+
+static int ico_ready(void) {
+    HMODULE u, g, s;
+    if (ico_SHGetFileInfoA) return 1;
+    u = LoadLibraryA("user32.dll");
+    g = LoadLibraryA("gdi32.dll");
+    s = LoadLibraryA("shell32.dll");
+    if (!u || !g || !s) return 0;
+    ico_DrawIconEx = (int (__stdcall *)(HDC, int, int, HICON, int, int, UINT, HBRUSH, UINT))(void *)GetProcAddress(u, "DrawIconEx");
+    ico_DestroyIcon = (int (__stdcall *)(HICON))(void *)GetProcAddress(u, "DestroyIcon");
+    ico_CreateCompatibleDC = (HDC (__stdcall *)(HDC))(void *)GetProcAddress(g, "CreateCompatibleDC");
+    ico_DeleteDC = (int (__stdcall *)(HDC))(void *)GetProcAddress(g, "DeleteDC");
+    ico_CreateDIBSection = (void *(__stdcall *)(HDC, const BITMAPINFO *, UINT, void **, HANDLE, DWORD))(void *)GetProcAddress(g, "CreateDIBSection");
+    ico_SelectObject = (void *(__stdcall *)(HDC, void *))(void *)GetProcAddress(g, "SelectObject");
+    ico_DeleteObject = (int (__stdcall *)(void *))(void *)GetProcAddress(g, "DeleteObject");
+    ico_SHGetFileInfoA = (DWORD_PTR (__stdcall *)(const char *, DWORD, void *, UINT, UINT))(void *)GetProcAddress(s, "SHGetFileInfoA");
+    return ico_DrawIconEx && ico_CreateDIBSection && ico_SHGetFileInfoA ? 1 : 0;
+}
+
+const char *icon_base64(const char *path, long long size) {
+    struct { HICON hIcon; int iIcon; DWORD attrs; char name[260]; char type[80]; } sfi;
+    BITMAPINFO bi;
+    HDC dc = NULL;
+    void *dib = NULL, *old = NULL;
+    unsigned char *px = NULL;
+    int n, i, j, opaque = 0;
+    size_t out = 0;
+
+    char win[4096];
+    size_t p;
+
+    ico_out[0] = 0;
+    /* 64 is the ceiling the output buffer allows: 64*64*4 bytes of pixels
+       become 21848 characters of base64. */
+    if (!ico_ready() || size < 8 || size > 64) return orion_text_from_c(ico_out);
+    /* The shell parses paths rather than opening them, and it does not take
+       forward slashes - which is how the rest of this codebase writes them. */
+    for (p = 0; path[p] && p < sizeof(win) - 1; p++) win[p] = path[p] == '/' ? '\\' : path[p];
+    win[p] = 0;
+    memset(&sfi, 0, sizeof sfi);
+    /* 0x100 SHGFI_ICON, 0x0 SHGFI_LARGEICON (32px source) */
+    if (!ico_SHGetFileInfoA(win, 0, &sfi, (UINT)sizeof sfi, 0x100 | 0x0) || !sfi.hIcon)
+        return orion_text_from_c(ico_out);
+
+    n = (int)size;
+    memset(&bi, 0, sizeof bi);
+    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+    bi.bmiHeader.biWidth = n;
+    bi.bmiHeader.biHeight = -n;          /* top-down: row 0 is the top row */
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = 0;      /* BI_RGB */
+    dc = ico_CreateCompatibleDC(NULL);
+    if (dc) dib = ico_CreateDIBSection(dc, &bi, 0 /* DIB_RGB_COLORS */, (void **)&px, NULL, 0);
+    if (dc && dib && px) {
+        old = ico_SelectObject(dc, dib);
+        memset(px, 0, (size_t)n * n * 4);
+        ico_DrawIconEx(dc, 0, 0, sfi.hIcon, n, n, 0, NULL, 0x0003 /* DI_NORMAL */);
+        /* An icon with no alpha channel draws with alpha left at zero, which
+           would come out completely invisible. Its shape is then the whole
+           square, and saying so is better than showing nothing. */
+        for (i = 0; i < n * n; i++) if (px[i * 4 + 3]) { opaque = 1; break; }
+        if (!opaque) for (i = 0; i < n * n; i++) px[i * 4 + 3] = 255;
+
+        {   /* plain base64, padded - the tail matters: it is a whole pixel */
+            int total = n * n * 4;
+            for (i = 0; i < total; i += 3) {
+                int have = total - i;
+                unsigned long v = (unsigned long)px[i] << 16;
+                if (have > 1) v |= (unsigned long)px[i + 1] << 8;
+                if (have > 2) v |= px[i + 2];
+                for (j = 18; j >= 0; j -= 6) ico_out[out++] = ico_alphabet[(v >> j) & 63];
+                if (have == 1) { ico_out[out - 2] = '='; ico_out[out - 1] = '='; }
+                else if (have == 2) ico_out[out - 1] = '=';
+            }
+        }
+        ico_out[out] = 0;
+        ico_SelectObject(dc, old);
+    }
+    if (dib) ico_DeleteObject(dib);
+    if (dc) ico_DeleteDC(dc);
+    if (ico_DestroyIcon) ico_DestroyIcon(sfi.hIcon);
+    return orion_text_from_c(ico_out);
+}
+
+/* No blur verb here, and the reason is worth keeping so nobody spends the
+ * afternoon again. A window that hosts its content through DirectComposition
+ * (ours, for the per-pixel alpha ghost mode needs) cannot have a blurred
+ * backdrop. BOTH mechanisms were built and measured:
+ *
+ *   SetWindowCompositionAttribute (accent policy, undocumented) - accepted,
+ *   then paints its accent INSTEAD of the composition surface. The window
+ *   goes blank.
+ *
+ *   DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE, acrylic) - accepted,
+ *   returns S_OK, and changes nothing. DWM draws behind a redirection
+ *   surface, and this window does not have one.
+ *
+ * Translucent yes, frosted no - not without giving up the alpha.
+ *
+ * A window nobody should be able to reach by accident: no taskbar button, no
+ * alt-tab entry, no window list. It exists when it is called for and not
+ * before. WS_EX_TOOLWINDOW is that, and it only takes effect over a hide and
+ * a show - which is exactly what a summoned window does anyway. */
+long long win_set_toolwindow(const char *needle, long long on) {
+    void *h;
+    LONG_PTR ex;
+    win_any = 1;
+    h = win_target(needle);
+    win_any = 0;
+    if (!h || !wt_GetWindowLongPtr || !wt_SetWindowLongPtr) return -1;
+    ex = wt_GetWindowLongPtr(h, -20 /* GWL_EXSTYLE */);
+    if (on) ex = (ex | 0x00000080 /* WS_EX_TOOLWINDOW */) & ~(LONG_PTR)0x00040000 /* WS_EX_APPWINDOW */;
+    else ex = ex & ~(LONG_PTR)0x00000080;
+    wt_SetWindowLongPtr(h, -20, ex);
+    return 0;
+}
+/* A summoning key, pressed anywhere. The window raises ITSELF from its own
+ * wndproc, which is the only place the foreground is granted without asking
+ * for it: the hotkey IS the recent input Windows wants to see. The program
+ * finds out on its next poll. */
+#define OW_MSG_HOTKEY  (0x8000 + 43)   /* WM_APP + 43, wparam = mods, lparam = vk */
+static volatile LONG ow_hot_hit;
+static volatile LONG ow_hot_ok;   /* did the registration take? see the wndproc */
+/* Windows refuses the foreground to a process that did not just receive
+ * input, and receiving a HOTKEY does not count. A window raised that way is
+ * visible and dead: no key reaches it, so nothing can be typed and nothing
+ * can dismiss it. Borrowing the current foreground thread's input queue for
+ * the length of the call is the documented way to ask honestly - and it has
+ * to happen on BOTH ways in, the call and the key. */
+static void ow_take_foreground(void *h) {
+    unsigned long tf = 0, tw = 0;
+    void *fg = wt_GetForegroundWindow ? wt_GetForegroundWindow() : NULL;
+    if (wt_GetWindowThreadProcessId) {
+        if (fg) tf = wt_GetWindowThreadProcessId(fg, NULL);
+        tw = wt_GetWindowThreadProcessId(h, NULL);
+    }
+    if (tf && tw && tf != tw && wt_AttachThreadInput) wt_AttachThreadInput(tf, tw, 1);
+    if (wt_SetForegroundWindow) wt_SetForegroundWindow(h);
+    if (tf && tw && tf != tw && wt_AttachThreadInput) wt_AttachThreadInput(tf, tw, 0);
+}
+
+/* `mods` is MOD_ALT 1 | MOD_CONTROL 2 | MOD_SHIFT 4 | MOD_WIN 8, `key` a
+ * virtual key code. Only posted here - the window thread registers it (see
+ * OW_MSG_HOTKEY), because WM_HOTKEY lands in the queue of whoever registered.
+ * The window it summons is hidden by definition, so the lookup may see
+ * hidden ones. */
+long long win_hotkey(const char *needle, long long mods, long long key) {
+    void *h;
+    win_any = 1;
+    h = win_target(needle);
+    win_any = 0;
+    if (!h || !wt_PostMessageW) return -1;
+    wt_PostMessageW(h, OW_MSG_HOTKEY, (WPARAM)mods, (LPARAM)key);
+    return 0;
+}
+/* 1 exactly once per press: the program asks on its own schedule and must not
+ * see the same summon twice. */
+long long win_hotkey_taken(void) { return InterlockedExchange(&ow_hot_hit, 0); }
+/* 1 while the combination is ours. Asking is the only way to tell a stolen
+ * key from a bug: the registration fails quietly. */
+long long win_hotkey_held(void) { return ow_hot_ok; }
+/* Open whatever the shell would open: a .lnk, a folder, a document, a URL.
+ * CreateProcess cannot run a shortcut, and the Start menu is nothing but
+ * shortcuts, so a launcher needs this and not run_command. */
+long long shell_open(const char *path) {
+    static HINSTANCE (__stdcall *se)(HWND, const char *, const char *, const char *, const char *, int);
+    if (!se) {
+        HMODULE s = LoadLibraryA("shell32.dll");
+        if (!s) return -1;
+        se = (HINSTANCE (__stdcall *)(HWND, const char *, const char *, const char *, const char *, int))
+             (void *)GetProcAddress(s, "ShellExecuteA");
+        if (!se) return -1;
+    }
+    return (long long)(uintptr_t)se(NULL, "open", path, NULL, NULL, 1 /* SW_SHOWNORMAL */) > 32 ? 0 : -1;
+}
+/* Give the window a size and put it in the middle of its monitor's work area.
+ * A browser --app window opens at whatever size the profile last had; an
+ * installer wants one known shape, centered, and this is the only caller that
+ * can decide that (the page cannot resize its own OS window). */
+long long win_resize(const char *needle, long long w, long long h) {
+    void *h_ = win_target(needle);
+    MONITORINFO mi;
+    void *mon;
+    int x = 0, y = 0;
+    if (!h_) return -1;
+    if (wt_MonitorFromWindow && wt_GetMonitorInfoW) {
+        mi.cbSize = sizeof mi;
+        mon = wt_MonitorFromWindow(h_, 2 /* MONITOR_DEFAULTTONEAREST */);
+        if (mon && wt_GetMonitorInfoW(mon, &mi)) {
+            x = mi.rcWork.left + (int)(mi.rcWork.right - mi.rcWork.left - w) / 2;
+            y = mi.rcWork.top + (int)(mi.rcWork.bottom - mi.rcWork.top - h) / 2;
+        }
+    }
+    wt_SetWindowPos(h_, NULL, x, y, (int)w, (int)h, 0x0004 /* SWP_NOZORDER */);
+    return 0;
+}
 #else
 long long win_set_topmost(const char *needle, long long on) { (void)needle; (void)on; return -1; }
 long long win_set_opacity(const char *needle, long long percent) { (void)needle; (void)percent; return -1; }
 long long win_set_frameless(const char *needle, long long on, long long view_h) { (void)needle; (void)on; (void)view_h; return -1; }
+long long win_set_click_through(const char *needle, long long on) { (void)needle; (void)on; return -1; }
+long long win_click_through_on(const char *needle) { (void)needle; return -1; }
 long long win_move(const char *needle, long long x, long long y) { (void)needle; (void)x; (void)y; return -1; }
 long long win_command(const char *needle, const char *what) { (void)needle; (void)what; return -1; }
+long long win_resize(const char *needle, long long w, long long h) { (void)needle; (void)w; (void)h; return -1; }
+long long win_hotkey(const char *needle, long long mods, long long key) { (void)needle; (void)mods; (void)key; return -1; }
+long long win_hotkey_taken(void) { return 0; }
+long long win_hotkey_held(void) { return 0; }
+long long win_set_toolwindow(const char *needle, long long on) { (void)needle; (void)on; return -1; }
+const char *icon_base64(const char *path, long long size) { (void)path; (void)size; return orion_text_from_c(""); }
+/* The desktop opener each platform already ships. */
+long long shell_open(const char *path) {
+    char cmd[4200];
+#if defined(__APPLE__)
+    snprintf(cmd, sizeof cmd, "open \"%s\" >/dev/null 2>&1 &", path);
+#else
+    snprintf(cmd, sizeof cmd, "xdg-open \"%s\" >/dev/null 2>&1 &", path);
+#endif
+    return system(cmd) == 0 ? 0 : -1;
+}
+#endif
+
+/* ---- our own window, the OS webview inside: the Tauri model ----
+ * open_window borrows an Edge --app window, which carries a browser strip
+ * the app can only CLIP away - leaving a see-through band the window still
+ * reserves. This is the real thing instead: a window WE create (so there is
+ * no strip and nothing to clip) with the system WebView2 inside filling the
+ * whole client area. The caption is removed in WM_NCCALCSIZE (left/right/
+ * bottom resize borders kept); DWM still rounds and shadows it; the title
+ * FOLLOWS document.title so the app orb's title-needle verbs (topmost,
+ * opacity, move, min/max/close) keep working unchanged on it.
+ *
+ * WebView2Loader.dll (vendored beside the runtime, shipped beside a packaged
+ * exe) is looked up beside the exe, on the normal search path, then in
+ * %TEMP%\orion-webview\ - where a single-file setup exe unpacks it. All COM
+ * is spoken raw through vtable indices: three tiny handlers, no SDK headers.
+ * One own-window per process; own_window_gone() is how the app's serve loop
+ * learns the person closed it. */
+#ifdef _WIN32
+typedef HRESULT (__stdcall *ow_fn1)(void *);
+typedef HRESULT (__stdcall *ow_fn2)(void *, void *);
+typedef HRESULT (__stdcall *ow_fn3)(void *, void *, void *);
+typedef HRESULT (__stdcall *ow_flag_fn)(void *, int);
+typedef HRESULT (__stdcall *ow_bounds_fn)(void *, RECT);
+typedef struct { unsigned char a, r, g, b; } ow_color;   /* COREWEBVIEW2_COLOR */
+static void *ow_vt(void *obj, int i) { return (*(void ***)obj)[i]; }
+
+/* user32/ole32 by GetProcAddress, same reason as the wt_ block above: a
+ * static -luser32 would be demanded by every CLI program and test probe. */
+static ATOM (__stdcall *owu_RegisterClassW)(const WNDCLASSW *);
+static HWND (__stdcall *owu_CreateWindowExW)(DWORD, const wchar_t *, const wchar_t *, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, void *);
+static LRESULT (__stdcall *owu_DefWindowProcW)(HWND, UINT, WPARAM, LPARAM);
+static int (__stdcall *owu_DestroyWindow)(HWND);
+static int (__stdcall *owu_ShowWindow)(HWND, int);
+static int (__stdcall *owu_GetMessageW)(MSG *, HWND, UINT, UINT);
+static int (__stdcall *owu_TranslateMessage)(const MSG *);
+static LRESULT (__stdcall *owu_DispatchMessageW)(const MSG *);
+static void (__stdcall *owu_PostQuitMessage)(int);
+static int (__stdcall *owu_GetClientRect)(HWND, RECT *);
+static int (__stdcall *owu_SetWindowTextW)(HWND, const wchar_t *);
+static HCURSOR (__stdcall *owu_LoadCursorW)(HINSTANCE, const wchar_t *);
+static HICON (__stdcall *owu_LoadIconA)(HINSTANCE, const char *);
+static HICON (__stdcall *owu_LoadIconW)(HINSTANCE, const wchar_t *);
+static int (__stdcall *owu_GetSystemMetrics)(int);
+static HMONITOR (__stdcall *owu_MonitorFromWindow)(HWND, DWORD);
+static int (__stdcall *owu_GetMonitorInfoW)(HMONITOR, MONITORINFO *);
+static int (__stdcall *owu_SetWindowPos)(HWND, HWND, int, int, int, int, UINT);
+static int (__stdcall *owu_RegisterHotKey)(HWND, int, UINT, UINT);
+static int (__stdcall *owu_UnregisterHotKey)(HWND, int);
+static int (__stdcall *owu_SetForegroundWindow)(HWND);
+static HCURSOR (__stdcall *owu_SetCursor)(HCURSOR);
+static UINT_PTR (__stdcall *owu_SetTimer)(HWND, UINT_PTR, UINT, void *);
+static int (__stdcall *owu_KillTimer)(HWND, UINT_PTR);
+static int (__stdcall *owu_GetCursorPos)(POINT *);
+static int (__stdcall *owu_ScreenToClient)(HWND, POINT *);
+static HWND (__stdcall *owu_SetCapture)(HWND);
+static int (__stdcall *owu_ReleaseCapture)(void);
+static int (__stdcall *owu_TrackMouseEvent)(TRACKMOUSEEVENT *);
+static HRESULT (__stdcall *owu_CoInitializeEx)(void *, DWORD);
+static void (__stdcall *owu_CoTaskMemFree)(void *);
+
+/* What the host did, stage by stage, in %TEMP%\orion-webview\host.log - the
+ * window is async COM across a browser process, and when it comes up blank
+ * in the field this file is the only witness. */
+static void ow_log(const char *what, long long v) {
+    const char *tmp = getenv("TEMP");
+    char path[1024];
+    FILE *f;
+    if (!tmp) return;
+    snprintf(path, sizeof path, "%s\\orion-webview", tmp);
+    CreateDirectoryA(path, NULL);
+    snprintf(path, sizeof path, "%s\\orion-webview\\host.log", tmp);
+    f = fopen(path, "a");
+    if (!f) return;
+    fprintf(f, "%s %lld\n", what, v);
+    fclose(f);
+}
+static int ow_load_user(void) {
+    HMODULE u, o;
+    if (owu_CreateWindowExW) return 1;
+    u = LoadLibraryA("user32.dll");
+    o = LoadLibraryA("ole32.dll");
+    if (!u || !o) return 0;
+    owu_RegisterClassW = (ATOM (__stdcall *)(const WNDCLASSW *))(void *)GetProcAddress(u, "RegisterClassW");
+    owu_CreateWindowExW = (HWND (__stdcall *)(DWORD, const wchar_t *, const wchar_t *, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, void *))(void *)GetProcAddress(u, "CreateWindowExW");
+    owu_DefWindowProcW = (LRESULT (__stdcall *)(HWND, UINT, WPARAM, LPARAM))(void *)GetProcAddress(u, "DefWindowProcW");
+    owu_DestroyWindow = (int (__stdcall *)(HWND))(void *)GetProcAddress(u, "DestroyWindow");
+    owu_ShowWindow = (int (__stdcall *)(HWND, int))(void *)GetProcAddress(u, "ShowWindow");
+    owu_GetMessageW = (int (__stdcall *)(MSG *, HWND, UINT, UINT))(void *)GetProcAddress(u, "GetMessageW");
+    owu_TranslateMessage = (int (__stdcall *)(const MSG *))(void *)GetProcAddress(u, "TranslateMessage");
+    owu_DispatchMessageW = (LRESULT (__stdcall *)(const MSG *))(void *)GetProcAddress(u, "DispatchMessageW");
+    owu_PostQuitMessage = (void (__stdcall *)(int))(void *)GetProcAddress(u, "PostQuitMessage");
+    owu_GetClientRect = (int (__stdcall *)(HWND, RECT *))(void *)GetProcAddress(u, "GetClientRect");
+    owu_SetWindowTextW = (int (__stdcall *)(HWND, const wchar_t *))(void *)GetProcAddress(u, "SetWindowTextW");
+    owu_LoadCursorW = (HCURSOR (__stdcall *)(HINSTANCE, const wchar_t *))(void *)GetProcAddress(u, "LoadCursorW");
+    owu_LoadIconA = (HICON (__stdcall *)(HINSTANCE, const char *))(void *)GetProcAddress(u, "LoadIconA");
+    owu_LoadIconW = (HICON (__stdcall *)(HINSTANCE, const wchar_t *))(void *)GetProcAddress(u, "LoadIconW");
+    owu_GetSystemMetrics = (int (__stdcall *)(int))(void *)GetProcAddress(u, "GetSystemMetrics");
+    owu_MonitorFromWindow = (HMONITOR (__stdcall *)(HWND, DWORD))(void *)GetProcAddress(u, "MonitorFromWindow");
+    owu_GetMonitorInfoW = (int (__stdcall *)(HMONITOR, MONITORINFO *))(void *)GetProcAddress(u, "GetMonitorInfoW");
+    owu_SetWindowPos = (int (__stdcall *)(HWND, HWND, int, int, int, int, UINT))(void *)GetProcAddress(u, "SetWindowPos");
+    owu_RegisterHotKey = (int (__stdcall *)(HWND, int, UINT, UINT))(void *)GetProcAddress(u, "RegisterHotKey");
+    owu_SetForegroundWindow = (int (__stdcall *)(HWND))(void *)GetProcAddress(u, "SetForegroundWindow");
+    owu_UnregisterHotKey = (int (__stdcall *)(HWND, int))(void *)GetProcAddress(u, "UnregisterHotKey");
+    owu_SetCursor = (HCURSOR (__stdcall *)(HCURSOR))(void *)GetProcAddress(u, "SetCursor");
+    owu_SetTimer = (UINT_PTR (__stdcall *)(HWND, UINT_PTR, UINT, void *))(void *)GetProcAddress(u, "SetTimer");
+    owu_KillTimer = (int (__stdcall *)(HWND, UINT_PTR))(void *)GetProcAddress(u, "KillTimer");
+    owu_GetCursorPos = (int (__stdcall *)(POINT *))(void *)GetProcAddress(u, "GetCursorPos");
+    owu_ScreenToClient = (int (__stdcall *)(HWND, POINT *))(void *)GetProcAddress(u, "ScreenToClient");
+    owu_SetCapture = (HWND (__stdcall *)(HWND))(void *)GetProcAddress(u, "SetCapture");
+    owu_ReleaseCapture = (int (__stdcall *)(void))(void *)GetProcAddress(u, "ReleaseCapture");
+    owu_TrackMouseEvent = (int (__stdcall *)(TRACKMOUSEEVENT *))(void *)GetProcAddress(u, "TrackMouseEvent");
+    owu_CoInitializeEx = (HRESULT (__stdcall *)(void *, DWORD))(void *)GetProcAddress(o, "CoInitializeEx");
+    owu_CoTaskMemFree = (void (__stdcall *)(void *))(void *)GetProcAddress(o, "CoTaskMemFree");
+    return owu_RegisterClassW && owu_CreateWindowExW && owu_DefWindowProcW && owu_GetMessageW && owu_CoInitializeEx;
+}
+
+typedef struct ow_handler {
+    void **vtbl;
+    HRESULT (__stdcall *invoke)(struct ow_handler *, void *, void *);
+} ow_handler;
+static HRESULT __stdcall ow_h_qi(ow_handler *self, const void *riid, void **out) {
+    (void)riid; *out = self; return 0;
+}
+static ULONG __stdcall ow_h_addref(ow_handler *self) { (void)self; return 1; }
+static ULONG __stdcall ow_h_release(ow_handler *self) { (void)self; return 1; }
+static HRESULT __stdcall ow_h_invoke(ow_handler *self, void *a, void *b) {
+    return self->invoke(self, a, b);
+}
+static void *ow_handler_vtbl[4] = { (void *)ow_h_qi, (void *)ow_h_addref, (void *)ow_h_release, (void *)ow_h_invoke };
+
+static HWND ow_hwnd;
+static int ow_is_own_window(void *h) { return h && h == (void *)ow_hwnd; }
+
+/* ---- visual hosting: DirectComposition, so pixels can be HOLES ----
+ * hwnd hosting puts the webview in a child window: whole-window alpha works,
+ * per-pixel does not (colorkey measured dead - the child composes past the
+ * redirection surface). Visual hosting hands the webview a DComp visual on a
+ * WS_EX_NOREDIRECTIONBITMAP window instead: where the page paints nothing,
+ * there IS nothing - the work shows through at 100%. The price is that input
+ * becomes ours to forward (mouse + cursor below); the prize is ghost mode. */
+typedef struct { unsigned long a; unsigned short b, c; unsigned char d[8]; } ow_guid;
+static const ow_guid OW_IID_ENV3 = {0x80A22AE3, 0xBE7C, 0x4CE2, {0xAF, 0xE1, 0x5A, 0x50, 0x05, 0x6C, 0xDE, 0xEB}};
+static const ow_guid OW_IID_CONTROLLER = {0x4D00C0D1, 0x9434, 0x4EB6, {0x80, 0x78, 0x86, 0x97, 0xA5, 0x60, 0x33, 0x4F}};
+static const ow_guid OW_IID_CONTROLLER2 = {0xC979903E, 0xD4CA, 0x4228, {0x92, 0xEB, 0x47, 0xEE, 0x3F, 0xA9, 0x6E, 0xAB}};
+static const ow_guid OW_IID_DXGI_DEVICE = {0x54EC77FA, 0x1377, 0x44E6, {0x8C, 0x32, 0x88, 0xFD, 0x5F, 0x44, 0xC8, 0x4C}};
+static const ow_guid OW_IID_DCOMP_DEVICE = {0xC37EA93A, 0xE7AA, 0x450D, {0xB1, 0x6F, 0x97, 0x46, 0xCB, 0x04, 0x07, 0xF3}};
+static HRESULT ow_qi(void *obj, const ow_guid *iid, void **out) {
+    *out = NULL;
+    return ((HRESULT (__stdcall *)(void *, const void *, void **))ow_vt(obj, 0))(obj, iid, out);
+}
+
+static void *ow_dcdev, *ow_dctarget, *ow_dcvisual;
+static void *ow_comp;                   /* ICoreWebView2CompositionController */
+static int ow_visual;                   /* 1 = visual hosting is live */
+static void ow_dcommit(void) {
+    if (ow_dcdev) ((ow_fn1)ow_vt(ow_dcdev, 3 /* Commit */))(ow_dcdev);
+}
+/* D3D device -> DXGI -> DComp device -> target for our hwnd -> root visual.
+ * All dynamic (d3d11.dll / dcomp.dll); any miss means hwnd hosting instead. */
+static int ow_dcomp_init(HWND hwnd) {
+    HMODULE d3d = LoadLibraryA("d3d11.dll"), dc = LoadLibraryA("dcomp.dll");
+    HRESULT (__stdcall *create_d3d)(void *, int, HMODULE, UINT, const int *, UINT, UINT, void **, int *, void **);
+    HRESULT (__stdcall *create_dcomp)(void *, const void *, void **);
+    void *dev = NULL, *dxgi = NULL;
+    if (!d3d || !dc) return 0;
+    create_d3d = (HRESULT (__stdcall *)(void *, int, HMODULE, UINT, const int *, UINT, UINT, void **, int *, void **))(void *)GetProcAddress(d3d, "D3D11CreateDevice");
+    create_dcomp = (HRESULT (__stdcall *)(void *, const void *, void **))(void *)GetProcAddress(dc, "DCompositionCreateDevice");
+    if (!create_d3d || !create_dcomp) return 0;
+    if (create_d3d(NULL, 1 /* HARDWARE */, NULL, 0x20 /* BGRA_SUPPORT */, NULL, 0, 7 /* D3D11_SDK_VERSION */, &dev, NULL, NULL) != 0 || !dev) return 0;
+    if (ow_qi(dev, &OW_IID_DXGI_DEVICE, &dxgi) != 0 || !dxgi) return 0;
+    if (create_dcomp(dxgi, &OW_IID_DCOMP_DEVICE, &ow_dcdev) != 0 || !ow_dcdev) return 0;
+    if (((HRESULT (__stdcall *)(void *, HWND, int, void **))ow_vt(ow_dcdev, 6 /* CreateTargetForHwnd */))(ow_dcdev, hwnd, 1, &ow_dctarget) != 0 || !ow_dctarget) return 0;
+    if (((ow_fn2)ow_vt(ow_dcdev, 7 /* CreateVisual */))(ow_dcdev, (void *)&ow_dcvisual) != 0 || !ow_dcvisual) return 0;
+    if (((ow_fn2)ow_vt(ow_dctarget, 3 /* SetRoot */))(ow_dctarget, ow_dcvisual) != 0) return 0;
+    ow_dcommit();
+    return 1;
+}
+
+/* ---- ghost mode: the background is a hole, the images are solid ----
+ * The page sends the rectangles that should stay INTERACTIVE (items + bar)
+ * in device pixels, client coords. A 30ms timer follows the cursor: over a
+ * rect the window takes input as usual; over the void it wears
+ * WS_EX_TRANSPARENT and the click lands on the work underneath. ctrl+alt+c
+ * ends the mode from anywhere, and the page's state poll follows. */
+#define OW_MSG_GHOST (0x8000 + 42)     /* WM_APP + 42, lparam = malloc'd csv */
+#define OW_GHOST_TIMER 7
+static int ow_rects[256][4];
+static int ow_rect_count;
+static volatile LONG ow_ghost_on;
+static long long ow_ghost_query(void *h) { (void)h; return ow_ghost_on ? 1 : 0; }
+static void ow_ghost_styles(HWND h, int transparent) {
+    LONG_PTR ex;
+    if (!wt_GetWindowLongPtr || !wt_SetWindowLongPtr) return;
+    ex = wt_GetWindowLongPtr(h, -20 /* GWL_EXSTYLE */);
+    if (transparent) ex |= 0x00080000 | 0x00000020;      /* LAYERED|TRANSPARENT */
+    else ex &= ~(LONG_PTR)(0x00080000 | 0x00000020);
+    wt_SetWindowLongPtr(h, -20, ex);
+}
+static void ow_ghost_apply(HWND h, const char *csv) {
+    const char *p = csv;
+    ow_rect_count = 0;
+    while (*p && ow_rect_count < 256) {
+        int *r = ow_rects[ow_rect_count];
+        r[0] = (int)strtol(p, (char **)&p, 10); if (*p == ',') p++;
+        r[1] = (int)strtol(p, (char **)&p, 10); if (*p == ',') p++;
+        r[2] = (int)strtol(p, (char **)&p, 10); if (*p == ',') p++;
+        r[3] = (int)strtol(p, (char **)&p, 10);
+        ow_rect_count++;
+        while (*p && *p != ';') p++;
+        if (*p == ';') p++;
+    }
+    if (csv[0]) {
+        if (!ow_ghost_on) {
+            InterlockedExchange(&ow_ghost_on, 1);
+            if (owu_SetTimer) owu_SetTimer(h, OW_GHOST_TIMER, 30, NULL);
+            if (owu_RegisterHotKey) owu_RegisterHotKey(h, 1, 0x0002 | 0x0001, 'C');
+        }
+    } else if (ow_ghost_on) {
+        InterlockedExchange(&ow_ghost_on, 0);
+        ow_rect_count = 0;
+        if (owu_KillTimer) owu_KillTimer(h, OW_GHOST_TIMER);
+        if (owu_UnregisterHotKey) owu_UnregisterHotKey(h, 1);
+        ow_ghost_styles(h, 0);
+    }
+}
+static void ow_ghost_tick(HWND h) {
+    POINT p;
+    int i, inside = 0;
+    if (!ow_ghost_on || !owu_GetCursorPos || !owu_ScreenToClient) return;
+    owu_GetCursorPos(&p);
+    owu_ScreenToClient(h, &p);
+    for (i = 0; i < ow_rect_count; i++) {
+        if (p.x >= ow_rects[i][0] && p.x < ow_rects[i][0] + ow_rects[i][2] &&
+            p.y >= ow_rects[i][1] && p.y < ow_rects[i][1] + ow_rects[i][3]) { inside = 1; break; }
+    }
+    ow_ghost_styles(h, !inside);
+}
+/* The page's seam: rectangles that stay interactive, "" turns ghost off.
+ * Own windows only - the borrowed Edge window cannot make holes. */
+long long win_ghost(const char *needle, const char *rects) {
+    void *h = win_target(needle);
+    char *copy;
+    if (!h || !ow_is_own_window(h) || !ow_visual || !wt_PostMessageW) return -1;
+    copy = (char *)malloc(strlen(rects) + 1);
+    if (!copy) return -1;
+    strcpy(copy, rects);
+    wt_PostMessageW(h, OW_MSG_GHOST, 0, (LPARAM)copy);
+    return 0;
+}
+/* The hotkey must be registered from the thread that pumps the window's
+ * messages (WM_HOTKEY lands in the registrar's queue), and click-through is
+ * flipped from the app's server thread - so this only POSTS; the window
+ * thread does the registering in its wndproc. */
+#define OW_MSG_THROUGH (0x8000 + 41)   /* WM_APP + 41 */
+static void ow_through_hotkey(void *h, int on) {
+    if (ow_is_own_window(h) && wt_PostMessageW)
+        wt_PostMessageW(h, OW_MSG_THROUGH, (WPARAM)on, 0);
+}
+static void *ow_controller, *ow_webview;
+static volatile LONG ow_state;          /* 0 never opened, 1 open, 2 gone */
+static volatile LONG ow_ready;          /* 0 pending, 1 ok, -1 failed */
+static wchar_t ow_url[2048], ow_title[256];
+static int ow_w, ow_h;
+static ow_handler ow_on_env, ow_on_controller, ow_on_title;
+
+static void ow_fit_webview(void) {
+    RECT c;
+    if (!ow_controller || !ow_hwnd) return;
+    owu_GetClientRect(ow_hwnd, &c);
+    ((ow_bounds_fn)ow_vt(ow_controller, 6 /* put_Bounds */))(ow_controller, c);
+}
+/* Hiding the window is not enough and showing it is not either: the webview
+ * is a separate surface with its own visibility, and ShowWindow does not
+ * touch it. A window shown without this is an empty frame with the desktop
+ * showing through - the page is still there, just not being drawn.
+ * ICoreWebView2Controller: 4 put_IsVisible, 12 MoveFocus. */
+static void ow_set_visible(void *h, int on) {
+    if (!ow_is_own_window(h) || !ow_controller) return;
+    ((ow_flag_fn)ow_vt(ow_controller, 4 /* put_IsVisible */))(ow_controller, on);
+    /* and the keyboard belongs to the page, not to the frame around it */
+    if (on) ((ow_flag_fn)ow_vt(ow_controller, 12 /* MoveFocus */))(ow_controller, 0);
+}
+/* ICoreWebView2: 46 add_DocumentTitleChanged, 48 get_DocumentTitle */
+static HRESULT __stdcall ow_title_changed(ow_handler *self, void *sender, void *args) {
+    wchar_t *title = NULL;
+    (void)self; (void)args;
+    if (((ow_fn2)ow_vt(sender, 48))(sender, (void *)&title) == 0 && title) {
+        owu_SetWindowTextW(ow_hwnd, title);
+        owu_CoTaskMemFree(title);
+    }
+    return 0;
+}
+/* controller arrived: keep it, size it, find the webview, navigate. Under
+ * visual hosting the arg is the COMPOSITION controller: hand it our root
+ * visual, QI the plain controller out of it, and clear the default
+ * background so the page's transparent pixels really are holes. */
+static HRESULT __stdcall ow_controller_done(ow_handler *self, void *hr, void *controller) {
+    long long token[2] = {0, 0};
+    (void)self;
+    ow_log("controller_done hr", (long long)(intptr_t)hr);
+    if ((int)(intptr_t)hr != 0 || !controller) { InterlockedExchange(&ow_ready, -1); return 0; }
+    if (ow_visual) {
+        ((ow_fn1)ow_vt(controller, 1 /* AddRef */))(controller);
+        ow_comp = controller;
+        if (ow_qi(controller, &OW_IID_CONTROLLER, (void **)&ow_controller) != 0 || !ow_controller) {
+            ow_log("controller qi failed", -1);
+            InterlockedExchange(&ow_ready, -1);
+            return 0;
+        }
+        ((ow_fn2)ow_vt(ow_comp, 4 /* put_RootVisualTarget */))(ow_comp, ow_dcvisual);
+        ow_dcommit();
+        {
+            void *c2 = NULL;
+            if (ow_qi(ow_controller, &OW_IID_CONTROLLER2, &c2) == 0 && c2) {
+                ow_color clear = {0, 0, 0, 0};
+                ((HRESULT (__stdcall *)(void *, ow_color))ow_vt(c2, 27 /* put_DefaultBackgroundColor */))(c2, clear);
+            }
+        }
+    } else {
+        ((ow_fn1)ow_vt(controller, 1 /* AddRef */))(controller);
+        ow_controller = controller;
+    }
+    ((ow_fn2)ow_vt(ow_controller, 25 /* get_CoreWebView2 */))(ow_controller, (void *)&ow_webview);
+    if (!ow_webview) { InterlockedExchange(&ow_ready, -1); return 0; }
+    ((ow_fn1)ow_vt(ow_webview, 1 /* AddRef */))(ow_webview);
+    ow_fit_webview();
+    ow_on_title.vtbl = ow_handler_vtbl;
+    ow_on_title.invoke = ow_title_changed;
+    ((ow_fn3)ow_vt(ow_webview, 46 /* add_DocumentTitleChanged */))(ow_webview, &ow_on_title, token);
+    ow_log("navigate hr", (long long)((ow_fn2)ow_vt(ow_webview, 5 /* Navigate */))(ow_webview, ow_url));
+    ((HRESULT (__stdcall *)(void *, int))ow_vt(ow_controller, 12 /* MoveFocus */))(ow_controller, 0);
+    InterlockedExchange(&ow_ready, 1);
+    return 0;
+}
+/* environment arrived: ask it for a controller on our window - the visual
+ * kind when DComp is up and the runtime speaks Environment3, else the
+ * child-window kind (no ghost mode there, everything else identical). */
+static HRESULT __stdcall ow_env_done(ow_handler *self, void *hr, void *env) {
+    void *env3 = NULL;
+    (void)self;
+    ow_log("env_done hr", (long long)(intptr_t)hr);
+    if ((int)(intptr_t)hr != 0 || !env) { InterlockedExchange(&ow_ready, -1); return 0; }
+    ow_on_controller.vtbl = ow_handler_vtbl;
+    ow_on_controller.invoke = ow_controller_done;
+    if (ow_dcvisual && ow_qi(env, &OW_IID_ENV3, &env3) == 0 && env3) {
+        ow_visual = 1;
+        ow_log("hosting visual", 1);
+        ((ow_fn3)ow_vt(env3, 9 /* CreateCoreWebView2CompositionController */))(env3, ow_hwnd, &ow_on_controller);
+    } else {
+        ow_log("hosting hwnd", 0);
+        ((ow_fn3)ow_vt(env, 3 /* CreateCoreWebView2Controller */))(env, ow_hwnd, &ow_on_controller);
+    }
+    return 0;
+}
+/* Mouse, forwarded: visual hosting has no input child window - every event
+ * the window gets is ours to hand the webview, message id and all (the
+ * event-kind values ARE the WM_ numbers). Wheels arrive in screen coords. */
+static int ow_track;
+static void ow_send_mouse(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+    POINT pt;
+    UINT vk = (UINT)(wp & 0xFFFF), mdata = 0;
+    if (!ow_comp) return;
+    pt.x = (int)(short)(lp & 0xFFFF);
+    pt.y = (int)(short)((lp >> 16) & 0xFFFF);
+    if (m == 0x020A /* WHEEL */ || m == 0x020E /* HWHEEL */) {
+        mdata = (UINT)(int)(short)((wp >> 16) & 0xFFFF);
+        if (owu_ScreenToClient) owu_ScreenToClient(h, &pt);
+    }
+    if (m == 0x020B || m == 0x020C || m == 0x020D)   /* xbutton down/up/dbl */
+        mdata = (UINT)((wp >> 16) & 0xFFFF);
+    if (m == 0x02A3 /* LEAVE */) { pt.x = 0; pt.y = 0; vk = 0; }
+    ((HRESULT (__stdcall *)(void *, UINT, UINT, UINT, POINT))ow_vt(ow_comp, 5 /* SendMouseInput */))(ow_comp, m, vk, mdata, pt);
+}
+
+static LRESULT __stdcall ow_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+    /* visual hosting: the mouse is ours to forward, buttons capture so a
+       drag that leaves the window keeps reporting, and a leave is tracked
+       so hover states let go */
+    if (ow_visual && ((m >= 0x0200 && m <= 0x020E) || m == 0x02A3 /* MOUSELEAVE */)) {
+        if (m == 0x0200 && !ow_track && owu_TrackMouseEvent) {
+            TRACKMOUSEEVENT t;
+            t.cbSize = sizeof t; t.dwFlags = 2 /* TME_LEAVE */; t.hwndTrack = h; t.dwHoverTime = 0;
+            owu_TrackMouseEvent(&t);
+            ow_track = 1;
+        }
+        if (m == 0x02A3) ow_track = 0;
+        if ((m == 0x0201 || m == 0x0204 || m == 0x0207 || m == 0x020B) && owu_SetCapture) owu_SetCapture(h);
+        if ((m == 0x0202 || m == 0x0205 || m == 0x0208 || m == 0x020C) && owu_ReleaseCapture) owu_ReleaseCapture();
+        ow_send_mouse(h, m, wp, lp);
+        return 0;
+    }
+    switch (m) {
+    case WM_ERASEBKGND:
+        return 1;
+    case WM_SETCURSOR:
+        /* no child window means no one else sets the pointer - ask the
+           webview what it wants the cursor to be */
+        if (ow_visual && ow_comp && (lp & 0xFFFF) == 1 /* HTCLIENT */ && owu_SetCursor) {
+            void *cur = NULL;
+            if (((ow_fn2)ow_vt(ow_comp, 7 /* get_Cursor */))(ow_comp, (void *)&cur) == 0 && cur) {
+                owu_SetCursor((HCURSOR)cur);
+                return 1;
+            }
+        }
+        break;
+    case WM_SETFOCUS:
+        if (ow_controller)
+            ((HRESULT (__stdcall *)(void *, int))ow_vt(ow_controller, 12 /* MoveFocus */))(ow_controller, 0);
+        return 0;
+    case WM_TIMER:
+        if (wp == OW_GHOST_TIMER) { ow_ghost_tick(h); return 0; }
+        break;
+    case OW_MSG_GHOST: {
+        char *csv = (char *)lp;
+        if (csv) { ow_ghost_apply(h, csv); free(csv); }
+        return 0;
+    }
+    case WM_NCCALCSIZE:
+        /* keep the resize borders, remove only the caption: run the default
+           calc, then give the top edge back to the client area */
+        if (wp) {
+            NCCALCSIZE_PARAMS *p = (NCCALCSIZE_PARAMS *)lp;
+            int top = p->rgrc[0].top;
+            owu_DefWindowProcW(h, m, wp, lp);
+            p->rgrc[0].top = top;
+            return 0;
+        }
+        break;
+    case WM_GETMINMAXINFO: {
+        /* a maximised borderless window must stop at the work area, not
+           hang its (removed) frame past the screen edges */
+        MONITORINFO mi;
+        HMONITOR mon = owu_MonitorFromWindow(h, 2 /* MONITOR_DEFAULTTONEAREST */);
+        mi.cbSize = sizeof mi;
+        if (mon && owu_GetMonitorInfoW(mon, &mi)) {
+            MINMAXINFO *mm = (MINMAXINFO *)lp;
+            mm->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
+            mm->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
+            mm->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
+            mm->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+            return 0;
+        }
+        break;
+    }
+    case WM_SIZE:
+        ow_fit_webview();
+        return 0;
+    case WM_MOVE:
+        if (ow_controller)
+            ((ow_fn1)ow_vt(ow_controller, 23 /* NotifyParentWindowPositionChanged */))(ow_controller);
+        return 0;
+    case OW_MSG_THROUGH:
+        if (owu_RegisterHotKey && owu_UnregisterHotKey) {
+            if (wp) ow_log("hotkey reg", owu_RegisterHotKey(h, 1, 0x0002 | 0x0001 /* MOD_CONTROL|MOD_ALT */, 'C'));
+            else owu_UnregisterHotKey(h, 1);
+        }
+        return 0;
+    case OW_MSG_HOTKEY:
+        if (owu_RegisterHotKey) {
+            int got;
+            if (owu_UnregisterHotKey) owu_UnregisterHotKey(h, 2);
+            /* MOD_NOREPEAT: held down is one summon, not a stream of them */
+            got = owu_RegisterHotKey(h, 2, (UINT)wp | 0x4000, (UINT)lp);
+            /* Whether the key is OURS is a fact the program has to be able to
+               ask for. RegisterHotKey fails silently when somebody else holds
+               the combination, and "nothing happened" is then indistinguishable
+               from a bug anywhere else in the chain. */
+            InterlockedExchange(&ow_hot_ok, got ? 1 : 0);
+            ow_log("summon hotkey", got);
+        }
+        return 0;
+    case WM_HOTKEY:
+        /* ctrl+alt+c from anywhere: solid again - whichever mode was on.
+           The page polls the window's state and follows suit. */
+        if (wp == 2) {
+            InterlockedExchange(&ow_hot_hit, 1);
+            if (owu_ShowWindow) owu_ShowWindow(h, 5 /* SW_SHOW */);
+            /* the same z-order assertion win_command's "show" makes: the key
+               is the other way in, and both ways have to land on top */
+            if (owu_SetWindowPos)
+                owu_SetWindowPos(h, (HWND)(intptr_t)-1 /* HWND_TOPMOST */, 0, 0, 0, 0,
+                                 0x0001 | 0x0002 /* SWP_NOSIZE|SWP_NOMOVE */);
+            /* visible BEFORE foreground: handing focus to a webview that is
+               still marked invisible does nothing, and then the page has the
+               window but not the keyboard */
+            ow_set_visible(h, 1);
+            ow_take_foreground(h);
+            return 0;
+        }
+        if (wp == 1) {
+            if (ow_ghost_on) {
+                ow_ghost_apply(h, "");
+            } else if (wt_GetWindowLongPtr && wt_SetWindowLongPtr) {
+                wt_SetWindowLongPtr(h, -20, wt_GetWindowLongPtr(h, -20) & ~(LONG_PTR)0x00000020);
+                if (owu_UnregisterHotKey) owu_UnregisterHotKey(h, 1);
+            }
+        }
+        return 0;
+    case WM_CLOSE:
+        owu_DestroyWindow(h);
+        return 0;
+    case WM_DESTROY:
+        /* an ABANDONED attempt (timeout -> Edge fallback took over) must not
+           read as "the window closed" - that would stop the serve loop under
+           the fallback window the user is actually using */
+        InterlockedExchange(&ow_state, ow_abandoned ? 0 : 2);
+        owu_PostQuitMessage(0);
+        return 0;
+    }
+    return owu_DefWindowProcW(h, m, wp, lp);
+}
+
+/* WebView2Loader.dll: beside the exe, on the search path, or where a
+ * single-file setup exe unpacked it. */
+static HMODULE ow_loader(void) {
+    char path[4096];
+    const char *me = exe_path();
+    HMODULE lib = NULL;
+    if (me[0]) {
+        size_t n = strlen(me);
+        while (n > 0 && me[n-1] != '\\' && me[n-1] != '/') n--;
+        if (n + 20 < sizeof path) {
+            memcpy(path, me, n);
+            strcpy(path + n, "WebView2Loader.dll");
+            lib = LoadLibraryA(path);
+        }
+    }
+    if (!lib) lib = LoadLibraryA("WebView2Loader.dll");
+    if (!lib) {
+        const char *tmp = getenv("TEMP");
+        if (tmp && strlen(tmp) + 40 < sizeof path) {
+            snprintf(path, sizeof path, "%s\\orion-webview\\WebView2Loader.dll", tmp);
+            lib = LoadLibraryA(path);
+        }
+    }
+    return lib;
+}
+
+static DWORD __stdcall ow_thread(LPVOID unused) {
+    WNDCLASSW wc;
+    MSG msg;
+    HRESULT (__stdcall *create_env)(const wchar_t *, const wchar_t *, void *, void *);
+    HMODULE lib = ow_loader();
+    wchar_t data_dir[1024];
+    const char *local;
+    int sw, sh, x, y;
+    (void)unused;
+    if (!lib || !ow_load_user()) { InterlockedExchange(&ow_ready, -1); return 0; }
+    create_env = (HRESULT (__stdcall *)(const wchar_t *, const wchar_t *, void *, void *))
+        (void *)GetProcAddress(lib, "CreateCoreWebView2EnvironmentWithOptions");
+    if (!create_env) { InterlockedExchange(&ow_ready, -1); return 0; }
+    owu_CoInitializeEx(NULL, 0x2 /* APARTMENTTHREADED */);
+    memset(&wc, 0, sizeof wc);
+    wc.lpfnWndProc = (WNDPROC)ow_wndproc;
+    wc.hInstance = GetModuleHandleW(NULL);
+    wc.hCursor = owu_LoadCursorW(NULL, (const wchar_t *)(uintptr_t)32512 /* IDC_ARROW */);
+    wc.hIcon = owu_LoadIconA(GetModuleHandleA(NULL), (const char *)(uintptr_t)1); /* orbit's icon.rc */
+    if (!wc.hIcon) wc.hIcon = owu_LoadIconW(NULL, (const wchar_t *)(uintptr_t)32512 /* IDI_APPLICATION */);
+    wc.lpszClassName = L"OrionOwnWindow";
+    owu_RegisterClassW(&wc);
+    sw = owu_GetSystemMetrics(0 /* SM_CXSCREEN */);
+    sh = owu_GetSystemMetrics(1 /* SM_CYSCREEN */);
+    x = (sw - ow_w) / 2; if (x < 0) x = 0;
+    y = (sh - ow_h) / 2; if (y < 0) y = 0;
+    /* NOREDIRECTIONBITMAP: the window has no surface of its own - what the
+       DComp visual shows is ALL there is, so unpainted pixels are holes.
+       (Harmless under hwnd hosting: the child carries its own surface.) */
+    ow_hwnd = owu_CreateWindowExW(0x00200000 /* WS_EX_NOREDIRECTIONBITMAP */,
+                                  L"OrionOwnWindow", ow_title, WS_OVERLAPPEDWINDOW,
+                                  x, y, ow_w, ow_h, NULL, NULL, wc.hInstance, NULL);
+    if (!ow_hwnd) { InterlockedExchange(&ow_ready, -1); return 0; }
+    ow_log("dcomp", (long long)ow_dcomp_init(ow_hwnd));
+    /* creation-time WM_NCCALCSIZE comes with wparam FALSE, which our caption
+       removal does not touch - ask for the frame calc again now that the
+       window exists, this time the TRUE way */
+    if (owu_SetWindowPos)
+        owu_SetWindowPos(ow_hwnd, NULL, 0, 0, 0, 0,
+                         0x0001 | 0x0002 | 0x0004 | 0x0020 /* NOSIZE|NOMOVE|NOZORDER|FRAMECHANGED */);
+    owu_ShowWindow(ow_hwnd, 1 /* SW_SHOWNORMAL */);
+    /* the profile lives per user, shared by every orion app window */
+    local = getenv("LOCALAPPDATA");
+    data_dir[0] = 0;
+    if (local) {
+        wchar_t wl[900];
+        MultiByteToWideChar(CP_UTF8, 0, local, -1, wl, 900);
+        _snwprintf(data_dir, 1024, L"%s\\orion-webview", wl);
+    }
+    ow_on_env.vtbl = ow_handler_vtbl;
+    ow_on_env.invoke = ow_env_done;
+    {
+        HRESULT ce = create_env(NULL, data_dir[0] ? data_dir : NULL, NULL, &ow_on_env);
+        ow_log("create_env hr", (long long)ce);
+        if (ce != 0) {
+            owu_DestroyWindow(ow_hwnd);
+            InterlockedExchange(&ow_ready, -1);
+            return 0;
+        }
+    }
+    InterlockedExchange(&ow_state, 1);
+    while (owu_GetMessageW(&msg, NULL, 0, 0) > 0) {
+        owu_TranslateMessage(&msg);
+        owu_DispatchMessageW(&msg);
+    }
+    if (ow_controller) ((ow_fn1)ow_vt(ow_controller, 24 /* Close */))(ow_controller);
+    return 0;
+}
+
+/* Open our own webview window at url. 0 when it is up (webview navigating),
+ * -1 when the pieces are missing - the caller falls back to open_window. */
+long long own_window_open(const char *url, const char *title, long long w, long long h) {
+    HANDLE t;
+    int waited = 0;
+    if (ow_state == 1) return -1;              /* one per process */
+    MultiByteToWideChar(CP_UTF8, 0, url, -1, ow_url, 2048);
+    MultiByteToWideChar(CP_UTF8, 0, title, -1, ow_title, 256);
+    ow_w = (int)w; ow_h = (int)h;
+    InterlockedExchange(&ow_ready, 0);
+    t = CreateThread(NULL, 0, ow_thread, NULL, 0, NULL);
+    if (!t) return -1;
+    CloseHandle(t);
+    while (ow_ready == 0 && waited < 10000) { Sleep(20); waited += 20; }
+    if (ow_ready == 1) return 0;
+    /* Give up COMPLETELY: kill the half-born window so the Edge fallback is
+     * the only window there is. Before this, a timeout left the own-window
+     * thread alive - its webview could finish minutes later and the user got
+     * TWO windows, one of them transparent until (unless) the webview came. */
+    InterlockedExchange(&ow_abandoned, 1);
+    if (ow_hwnd) {
+        HMODULE u = LoadLibraryA("user32.dll");
+        LRESULT (__stdcall *post)(void *, unsigned int, WPARAM, LPARAM) = u
+            ? (LRESULT (__stdcall *)(void *, unsigned int, WPARAM, LPARAM))(void *)GetProcAddress(u, "PostMessageW")
+            : NULL;
+        if (post) post(ow_hwnd, 0x0010 /* WM_CLOSE */, 0, 0);
+        ow_hwnd = NULL;
+    }
+    return -1;
+}
+/* 1 once an own window was opened and then closed - the serve loop's cue. */
+long long own_window_gone(void) { return ow_state == 2 ? 1 : 0; }
+#else
+long long own_window_open(const char *url, const char *title, long long w, long long h) {
+    (void)url; (void)title; (void)w; (void)h; return -1;
+}
+long long own_window_gone(void) { return 0; }
+#endif
+
+/* ---- setup payload: an installer exe carries its app in its own tail ----
+ * A PE loader ignores whatever follows the image, so one file can be both a
+ * program and its own cargo. Layout, reading from the END of the file:
+ *
+ *   [stub exe][app zip][manifest text][ui html]
+ *   [zip_len u64][manifest_len u64][html_len u64]["ORBSETUP"]
+ *
+ * `orbit package` stitches with setup_stitch; the running setup.exe reads
+ * itself back with setup_section (manifest/html) and setup_extract (the zip).
+ * Lengths are little-endian, written a byte at a time - no struct games. */
+#define SETUP_MAGIC "ORBSETUP"
+
+static void setup_put_u64(FILE *f, unsigned long long v) {
+    for (int i = 0; i < 8; i++) fputc((int)((v >> (8 * i)) & 0xff), f);
+}
+static unsigned long long setup_get_u64(const unsigned char *p) {
+    unsigned long long v = 0;
+    for (int i = 7; i >= 0; i--) v = (v << 8) | p[i];
+    return v;
+}
+static long long setup_copy_into(FILE *out, const char *path) {
+    FILE *in = fopen(path, "rb");
+    char buf[65536];
+    size_t n;
+    long long total = 0;
+    if (!in) return -1;
+    while ((n = fread(buf, 1, sizeof buf, in)) > 0) {
+        if (fwrite(buf, 1, n, out) != n) { fclose(in); return -1; }
+        total += (long long)n;
+    }
+    fclose(in);
+    return total;
+}
+/* Stitch stub + zip + manifest + ui html into `out`. 0 ok, -1 not. */
+long long setup_stitch(const char *base, const char *zip, const char *manifest,
+                       const char *html, const char *out) {
+    FILE *f = fopen(out, "wb");
+    long long zip_len, html_len, manifest_len = (long long)strlen(manifest);
+    if (!f) return -1;
+    if (setup_copy_into(f, base) < 0) { fclose(f); return -1; }
+    zip_len = setup_copy_into(f, zip);
+    if (zip_len < 0) { fclose(f); return -1; }
+    if (manifest_len > 0 && fwrite(manifest, 1, (size_t)manifest_len, f) != (size_t)manifest_len) { fclose(f); return -1; }
+    html_len = setup_copy_into(f, html);
+    if (html_len < 0) { fclose(f); return -1; }
+    setup_put_u64(f, (unsigned long long)zip_len);
+    setup_put_u64(f, (unsigned long long)manifest_len);
+    setup_put_u64(f, (unsigned long long)html_len);
+    fwrite(SETUP_MAGIC, 1, 8, f);
+    return fclose(f) == 0 ? 0 : -1;
+}
+/* Open this very exe and find the payload. Returns the file (positioned
+ * nowhere in particular) or NULL; the three offsets/lengths come out through
+ * the pointers. */
+static FILE *setup_open_self(long long *zip_off, long long *zip_len,
+                             long long *man_off, long long *man_len,
+                             long long *html_off, long long *html_len) {
+    unsigned char tail[32];
+    const char *me = exe_path();
+    FILE *f;
+    long long end;
+    if (!me[0]) return NULL;
+    f = fopen(me, "rb");
+    if (!f) return NULL;
+    if (fseek(f, -32, SEEK_END) != 0 || fread(tail, 1, 32, f) != 32 ||
+        memcmp(tail + 24, SETUP_MAGIC, 8) != 0) { fclose(f); return NULL; }
+    end = ftell(f) - 32;
+    *zip_len = (long long)setup_get_u64(tail);
+    *man_len = (long long)setup_get_u64(tail + 8);
+    *html_len = (long long)setup_get_u64(tail + 16);
+    *html_off = end - *html_len;
+    *man_off = *html_off - *man_len;
+    *zip_off = *man_off - *zip_len;
+    if (*zip_off < 0) { fclose(f); return NULL; }
+    return f;
+}
+/* The manifest (which 0) or the ui page (which 1), "" when this exe carries
+ * no payload - which is how the stub knows it was run bare. */
+const char *setup_section(long long which) {
+    long long zo, zl, mo, ml, ho, hl, off, len;
+    FILE *f = setup_open_self(&zo, &zl, &mo, &ml, &ho, &hl);
+    char *buf;
+    const char *text;
+    if (!f) return orion_text_from_c("");
+    off = which == 0 ? mo : ho;
+    len = which == 0 ? ml : hl;
+    buf = (char *)malloc((size_t)len + 1);
+    if (!buf || fseek(f, (long)off, SEEK_SET) != 0 ||
+        fread(buf, 1, (size_t)len, f) != (size_t)len) {
+        free(buf); fclose(f); return orion_text_from_c("");
+    }
+    buf[len] = 0;
+    fclose(f);
+    text = orion_text_from_c(buf);
+    free(buf);
+    return text;
+}
+/* Write the app zip to `dest`. 0 ok, -1 when there is no payload. */
+long long setup_extract(const char *dest) {
+    long long zo, zl, mo, ml, ho, hl, left;
+    char buf[65536];
+    FILE *f = setup_open_self(&zo, &zl, &mo, &ml, &ho, &hl);
+    FILE *out;
+    if (!f) return -1;
+    out = fopen(dest, "wb");
+    if (!out || fseek(f, (long)zo, SEEK_SET) != 0) { if (out) fclose(out); fclose(f); return -1; }
+    left = zl;
+    while (left > 0) {
+        size_t want = left > (long long)sizeof buf ? sizeof buf : (size_t)left;
+        if (fread(buf, 1, want, f) != want || fwrite(buf, 1, want, out) != want) {
+            fclose(out); fclose(f); return -1;
+        }
+        left -= (long long)want;
+    }
+    fclose(f);
+    return fclose(out) == 0 ? 0 : -1;
+}
+
+/* ---- the per-user registry, just enough for Apps & features ----
+ * An installed app announces itself with a handful of values under
+ * HKCU\...\Uninstall\<name> - that is the whole listing. Per-user only
+ * (HKCU): no admin, no machine state, and uninstall is deleting the key.
+ * advapi32 loads dynamically for the same reason user32 does above. */
+#ifdef _WIN32
+static long long (__stdcall *rg_CreateKey)(void *, const char *, unsigned long, char *, unsigned long, unsigned long, void *, void **, unsigned long *);
+static long long (__stdcall *rg_SetValue)(void *, const char *, unsigned long, unsigned long, const unsigned char *, unsigned long);
+static long long (__stdcall *rg_CloseKey)(void *);
+static long long (__stdcall *rg_DeleteTree)(void *, const char *);
+#define RG_HKCU ((void *)(uintptr_t)0x80000001)
+static int rg_load(void) {
+    HMODULE a;
+    if (rg_CreateKey) return 1;
+    a = LoadLibraryA("advapi32.dll");
+    if (!a) return 0;
+    rg_CreateKey = (long long (__stdcall *)(void *, const char *, unsigned long, char *, unsigned long, unsigned long, void *, void **, unsigned long *))(void *)GetProcAddress(a, "RegCreateKeyExA");
+    rg_SetValue = (long long (__stdcall *)(void *, const char *, unsigned long, unsigned long, const unsigned char *, unsigned long))(void *)GetProcAddress(a, "RegSetValueExA");
+    rg_CloseKey = (long long (__stdcall *)(void *))(void *)GetProcAddress(a, "RegCloseKey");
+    rg_DeleteTree = (long long (__stdcall *)(void *, const char *))(void *)GetProcAddress(a, "RegDeleteTreeA");
+    return rg_CreateKey && rg_SetValue && rg_CloseKey && rg_DeleteTree;
+}
+static void *rg_open(const char *subkey) {
+    void *k = NULL;
+    if (!rg_load()) return NULL;
+    if (rg_CreateKey(RG_HKCU, subkey, 0, NULL, 0, 0x2 /* KEY_SET_VALUE */, NULL, &k, NULL) != 0) return NULL;
+    return k;
+}
+/* (The process code page is UTF-8 - runtime/orion.manifest - so the A calls
+ * store real UTF-8 names: "Skärmbild" survives.) */
+long long reg_user_set_text(const char *subkey, const char *name, const char *value) {
+    void *k = rg_open(subkey);
+    long long rc;
+    if (!k) return -1;
+    rc = rg_SetValue(k, name, 0, 1 /* REG_SZ */, (const unsigned char *)value, (unsigned long)strlen(value) + 1);
+    rg_CloseKey(k);
+    return rc == 0 ? 0 : -1;
+}
+long long reg_user_set_number(const char *subkey, const char *name, long long v) {
+    void *k = rg_open(subkey);
+    unsigned long dw = (unsigned long)v;
+    long long rc;
+    if (!k) return -1;
+    rc = rg_SetValue(k, name, 0, 4 /* REG_DWORD */, (const unsigned char *)&dw, 4);
+    rg_CloseKey(k);
+    return rc == 0 ? 0 : -1;
+}
+long long reg_user_delete(const char *subkey) {
+    if (!rg_load()) return -1;
+    return rg_DeleteTree(RG_HKCU, subkey) == 0 ? 0 : -1;
+}
+#else
+long long reg_user_set_text(const char *subkey, const char *name, const char *value) { (void)subkey; (void)name; (void)value; return -1; }
+long long reg_user_set_number(const char *subkey, const char *name, long long v) { (void)subkey; (void)name; (void)v; return -1; }
+long long reg_user_delete(const char *subkey) { (void)subkey; return -1; }
 #endif
 
 /* Exit the process with a code. */

@@ -17,7 +17,7 @@ function allocText(mem, s) {
   let M;
   const files = {}; // in-memory sandbox, matching the playground
   const env = {
-    __print: () => {}, host_sin: Math.sin, host_cos: Math.cos, host_sqrt: Math.sqrt,
+    __print: () => {}, host_sin: Math.sin, host_cos: Math.cos, host_sqrt: Math.sqrt, host_tan: Math.tan, host_exp: Math.exp, host_log: Math.log, host_pow: Math.pow, host_atan2: Math.atan2,
     __argc: () => 1, __argv: (i) => allocText(M, i === 0 ? 'prog' : ''),
     __file_write: (p, c) => { files[readText(M, p)] = readText(M, c); return 1; },
     __file_read: (p) => allocText(M, files[readText(M, p)] || ''),

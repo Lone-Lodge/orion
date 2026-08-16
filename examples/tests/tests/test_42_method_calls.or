@@ -6,9 +6,9 @@ define main() -> int:
     a = 21
     a_doubled = a.double_it()
 
-    # Builtin via method-call syntax: text.len()
+    # Builtin via method-call syntax: text.length()
     msg = "hello"
-    msg_len = msg.len()
+    msg_len = msg.length()
 
     # Builtin with arg: text.contains("world")
     has_lo = msg.contains("lo")

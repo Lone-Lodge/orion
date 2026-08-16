@@ -7,7 +7,7 @@ define main() -> int:
     k = 10
     add_k = (n): n + k
     doubled = each([1, 2, 3], (x): x * 2)     # [2, 4, 6]
-    label = if len(doubled) is 3:
+    label = if length(doubled) is 3:
         add_k(20)                            # 30
     else:
         0

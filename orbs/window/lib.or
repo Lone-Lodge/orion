@@ -1,0 +1,172 @@
+# window - the app-first window block (the extraction rule: it moves
+# toward a shared orb when a second consumer exists). A Win32 window plus
+# the runtime's software framebuffer: open, show a pixel frame, read
+# input, pace, resize, close. The project's Orbit.toml links the two C
+# halves:
+#
+#     link = "../orion/runtime/win32_min.c ../orion/runtime/gdi_min.c -luser32 -lgdi32"
+#
+# This is the GAME window path (own framebuffer). Orion's app orb owns
+# the other window path - OS webview windows for web-UI apps (folio).
+
+external define win_open(title: text, width: int, height: int) -> int
+external define win_pump() -> int
+external define win_close(window_handle: int)
+external define win_event_next() -> int
+external define win_event_kind() -> int
+external define win_event_key() -> int
+external define win_event_x() -> int
+external define win_event_y() -> int
+external define win_key_held(key_code: int) -> int
+external define win_wait_input(timeout_ms: int) -> int
+external define win_popup(window_handle: int, width: int, height: int) -> int
+external define win_topmost(window_handle: int, on: int) -> int
+external define win_place(window_handle: int, x: int, y: int) -> int
+external define win_workarea_w() -> int
+external define win_workarea_h() -> int
+external define win_epoch_seconds() -> int
+external define win_has_focus(window_handle: int) -> int
+external define win_local_day() -> int
+external define win_click_hole(window_handle: int, x: int, y: int, w: int, h: int) -> int
+external define win_sound_play(data: text, from: int, bytes: int, rate: int, channels: int, bits: int, left: int, right: int) -> int
+external define win_colorkey(window_handle: int, rgb: int) -> int
+external define win_minimize(window_handle: int) -> int
+external define win_restore(window_handle: int) -> int
+external define win_is_min(window_handle: int) -> int
+external define sw_og_init(window_handle: int, width: int, height: int) -> int
+external define sw_og_scale(scale: int) -> int
+external define sw_og_resize(width: int, height: int) -> int
+external define sw_og_blit(pixels: list of int, width: int, height: int) -> int
+external define sw_og_present() -> int
+external define sw_og_snapshot(path: text) -> int
+
+# One input event. kind: "mouse_down" "mouse_up" "mouse_move" "key_down"
+# "key_up" "close" "resize". key: mouse button (1/2/3) or virtual-key
+# code. For resize, x/y carry the new client size.
+public type Event: kind: text, key: int, x: int, y: int
+
+# Open a window with a framebuffer the same size. Returns the handle,
+# 0 when no window could be made.
+public define window_open(title: text, width: int, height: int) -> int:
+    window_handle = win_open(title, width, height)
+    if window_handle is 0:
+        return 0
+    started = sw_og_init(window_handle, width, height)
+    if started is 0 then 0 else window_handle
+
+# Open a window `scale` times the framebuffer, presented in whole
+# steps (nearest) - pixel art at 2x/3x stays crisp squares.
+public define window_open_scaled(title: text, width: int, height: int, scale: int) -> int:
+    window_handle = win_open(title, width * scale, height * scale)
+    if window_handle is 0:
+        return 0
+    started = sw_og_init(window_handle, width, height)
+    scaled = sw_og_scale(scale)
+    if started is 0 then 0 else window_handle
+
+# Show one frame: a top-down row-major 0xRRGGBB pixel list.
+public define window_frame(pixels: list of int, width: int, height: int) -> int:
+    blitted = sw_og_blit(pixels, width, height)
+    sw_og_present()
+
+# Drain the OS: 1 = keep running, 0 = the window closed. Call once per
+# frame, then read window_events().
+public define window_pump() -> int:
+    win_pump()
+
+define kind_name(kind_code: int) -> text:
+    choose kind_code:
+        1 -> "mouse_down"
+        2 -> "mouse_up"
+        3 -> "mouse_move"
+        4 -> "key_down"
+        5 -> "key_up"
+        6 -> "close"
+        7 -> "resize"
+        12 -> "char"
+        _ -> "unknown"
+
+# Every event since the last call, oldest first.
+public define window_events() -> list of Event:
+    edit out = []
+    loop:
+        if win_event_next() is 0:
+            break
+        out = push(out, Event{kind: kind_name(win_event_kind()), key: win_event_key(), x: win_event_x(), y: win_event_y()})
+    out
+
+# Is a key down right now? Polling - the natural shape for game
+# movement (key_code: 27 esc, 32 space, 37-40 arrows, 65+ letters).
+public define window_key_held(key_code: int) -> truth:
+    win_key_held(key_code) is 1
+
+# Sleep until input arrives or timeout_ms pass - frame pacing without a spin.
+public define window_wait(timeout_ms: int) -> int:
+    win_wait_input(timeout_ms)
+
+# Resize the framebuffer to a new client size (from a "resize" event).
+public define window_resize(width: int, height: int) -> int:
+    sw_og_resize(width, height)
+
+# The framebuffer to a BMP file - the headless proof path.
+public define window_snapshot(path: text) -> int:
+    sw_og_snapshot(path)
+
+public define window_close(window_handle: int):
+    win_close(window_handle)
+
+# ----- companion-window dressing -----
+# A fixed-size frameless always-on-top window: the shape of a pet that
+# sits beside your work. The whole surface drags it; there is no frame
+# and no resize. Composed from the same shim primitives as everything.
+
+public define window_companion(window_handle: int, width: int, height: int, on_top: truth) -> int:
+    styled = win_popup(window_handle, width, height)
+    win_topmost(window_handle, if on_top then 1 else 0)
+
+# Park the window in the work area's bottom-right corner (margin px
+# from the taskbar and screen edge).
+public define window_park(window_handle: int, width: int, height: int, margin: int) -> int:
+    win_place(window_handle, win_workarea_w() - width - margin, win_workarea_h() - height - margin)
+
+# Wall-clock seconds since the Unix epoch - shells stamp SAVES with
+# this; the game itself never reads a clock (the determinism law).
+public define window_epoch_seconds() -> int:
+    win_epoch_seconds()
+
+# The local calendar day as one whole number (julian day count) - the
+# shell's "what day is it", fed to games as new_day intents.
+public define window_local_day() -> int:
+    win_local_day()
+
+# Is this window focused? Key polling is global, so shells gate on it.
+public define window_has_focus(window_handle: int) -> truth:
+    win_has_focus(window_handle) is 1
+
+# The companion's hidden mode: minimized to the taskbar (so a person
+# can always bring her back, or close for real), sim still ticking.
+# A reminder restores her.
+public define window_minimize(window_handle: int) -> int:
+    win_minimize(window_handle)
+
+public define window_restore(window_handle: int) -> int:
+    win_restore(window_handle)
+
+public define window_minimized(window_handle: int) -> truth:
+    win_is_min(window_handle) is 1
+
+# The frame-skin pair: inside the hole the mouse belongs to the game
+# (clicks land); outside it the bezel drags the window. And the key
+# color becomes truly transparent - rounded corners over the desktop.
+public define window_click_hole(window_handle: int, x: int, y: int, w: int, h: int) -> int:
+    win_click_hole(window_handle, x, y, w, h)
+
+public define window_colorkey(window_handle: int, rgb: int) -> int:
+    win_colorkey(window_handle, rgb)
+
+# One-shot PCM playback, fire and forget - a small voice pool mixes.
+# `data` carries the whole file (orion text is binary-safe); from and
+# bytes point at the PCM inside it. left/right are 0..1000 shares -
+# the shell's pan law and volume bus arrive as two plain numbers.
+public define window_sound_play(data: text, from: int, bytes: int, rate: int, channels: int, bits: int, left: int, right: int) -> int:
+    win_sound_play(data, from, bytes, rate, channels, bits, left, right)

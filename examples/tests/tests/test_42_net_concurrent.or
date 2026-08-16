@@ -58,7 +58,7 @@ define slow_client(id: int) -> int uses net, clock:
     send(c, "\r\n")
     reply = read_reply(c)
     close(c)
-    if len(reply) > 0 then 1 else 0
+    if length(reply) > 0 then 1 else 0
 
 define fast_client(id: int) -> int uses net, clock:
     c = connect_within("127.0.0.1", 58425, 1000)
@@ -67,7 +67,7 @@ define fast_client(id: int) -> int uses net, clock:
     send(c, "GET /fast HTTP/1.0\r\n\r\n")
     reply = read_reply(c)
     close(c)
-    if len(reply) > 0 then 1 else 0
+    if length(reply) > 0 then 1 else 0
 
 define main() -> int uses net, console:
     slot_set("trace", "")

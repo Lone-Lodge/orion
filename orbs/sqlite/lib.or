@@ -31,7 +31,7 @@ external define sq_last_id(h: int) -> int
 
 # The 0x1f unit separator the bridge joins columns with - a byte no real
 # text contains.
-define unit_sep() -> text = bytes_to_text([31])
+define unit_sep() -> text = text_of([31])
 
 define join_params(params: [text]) -> text:
     join(params, unit_sep())
@@ -68,7 +68,7 @@ public define db_rows_with(db: int, sql: text, params: [text]) -> [text] uses fi
 
 # One row's cells. NULL comes back as "".
 public define columns(row: text) -> [text]:
-    example len(columns("a")) is 1
+    example length(columns("a")) is 1
     split(row, unit_sep())
 
 # The first cell of the first row - the shape of COUNT(*) and friends.
@@ -76,7 +76,7 @@ public define columns(row: text) -> [text]:
 # no example: reads a database file - proven by tools/sqlite_test.sh
 public define db_one(db: int, sql: text) -> text uses files:
     rows = db_rows(db, sql)
-    if len(rows) is 0 then "" else at(columns(at(rows, 0)), 0)
+    if length(rows) is 0 then "" else at(columns(at(rows, 0)), 0)
 
 # Why the last call on this handle failed, "" when it did not.
 # no example: database state - proven by tools/sqlite_test.sh

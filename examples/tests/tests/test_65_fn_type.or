@@ -1,4 +1,4 @@
-# A `fn(...)` parameter carries a real arity now: correct higher-order calls
+# A `function(...)` parameter carries a real arity now: correct higher-order calls
 # work, and the compiler checks the argument count (the wrong-count case is
 # examples/tests/negative/fn_arity.or).
 define inc(n: int) -> int:
@@ -8,9 +8,9 @@ define dbl(n: int) -> int:
 define add(a: int, b: int) -> int:
     a + b
 
-define apply(f: fn(int) -> int, x: int) -> int:
+define apply(f: function(int) -> int, x: int) -> int:
     f(x)
-define apply2(f: fn(int, int) -> int, a: int, b: int) -> int:
+define apply2(f: function(int, int) -> int, a: int, b: int) -> int:
     f(a, b)
 
 define main() -> int:

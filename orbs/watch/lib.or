@@ -48,16 +48,16 @@ public define first_change(old: text, new: text) -> text:
     example first_change("1:2 a\n", "") is "(file added or removed)"
     a = split(old, "\n")
     b = split(new, "\n")
-    if len(a) is not len(b):
+    if length(a) is not length(b):
         return "(file added or removed)"
-    loop i in 0 until len(a):
+    loop i in 0 until length(a):
         la = at(a, i)
         lb = at(b, i)
         if la is not lb:
-            line = if len(lb) > 0 then lb else la
+            line = if length(lb) > 0 then lb else la
             sp = index_of(line, " ")
             if sp < 0:
                 return line
-            lbs = bytes_from_text(line)
-            return bytes_to_text(bytes_slice(lbs, sp + 1, len(lbs)))
+            lbs = bytes_of(line)
+            return text_of(bytes_part(lbs, sp + 1, length(lbs)))
     ""

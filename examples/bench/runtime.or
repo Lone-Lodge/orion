@@ -48,7 +48,7 @@ define main() -> int:
     t6 = monotonic_ms()
     edit i_acc = 0
     loop i in 0..<itt_reps:
-        i_acc = i_acc + len(to_text(i))
+        i_acc = i_acc + length(to_text(i))
     t7 = monotonic_ms()
 
     # --- concat of two texts ---
@@ -56,7 +56,7 @@ define main() -> int:
     t8 = monotonic_ms()
     edit c_acc = 0
     loop i in 0..<cat_reps:
-        c_acc = c_acc + len(at(words, i % 5) + "-x")
+        c_acc = c_acc + length(at(words, i % 5) + "-x")
     t9 = monotonic_ms()
 
     # --- interpolation, the shape the compiler's own emitter writes ---
@@ -65,7 +65,7 @@ define main() -> int:
     edit s_acc = 0
     loop i in 0..<interp_reps:
         line = "  {a} = call i64 @orion_x(ptr {b}, i64 {c}, i64 {d})"
-        s_acc = s_acc + len(line)
+        s_acc = s_acc + length(line)
     t11 = monotonic_ms()
 
     map_ms = t1 - t0
@@ -80,5 +80,5 @@ define main() -> int:
     print_line("BENCH int_to_text {itt_ms} {itt_reps}")
     print_line("BENCH concat {cat_ms} {cat_reps}")
     print_line("BENCH interp {interp_ms} {interp_reps}")
-    guard = m_acc + l_acc + i_acc + c_acc + s_acc + len(xs)
+    guard = m_acc + l_acc + i_acc + c_acc + s_acc + length(xs)
     if guard == 0 then 1 else 0

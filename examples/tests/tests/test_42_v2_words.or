@@ -13,6 +13,6 @@ define main() -> int:
     total += triple(9)
     doubled = loop v in [1, 2, 3]: collect v * 2
     extra = choose total:
-        39 -> len(doubled)
+        39 -> length(doubled)
         _ -> 0
     total + extra

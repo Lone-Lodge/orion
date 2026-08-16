@@ -1,0 +1,503 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Astra",
+	"scopeName": "source.astra",
+	"comment": "The declarative game language (atlas0.0.1/docs/ASTRA-GAMES.md). The word set mirrors what the astra compiler actually holds - keep them in step. Order matters: block-opening lines (stat/rule/action/kin/screen) must be tried BEFORE entity-block, or `action f:` reads as an entity called f.",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#game-header"
+		},
+		{
+			"include": "#view-header"
+		},
+		{
+			"include": "#screen-header"
+		},
+		{
+			"include": "#stat-line"
+		},
+		{
+			"include": "#timed-rule"
+		},
+		{
+			"include": "#rule-line"
+		},
+		{
+			"include": "#click-action"
+		},
+		{
+			"include": "#key-action"
+		},
+		{
+			"include": "#kin-block"
+		},
+		{
+			"include": "#ui-node"
+		},
+		{
+			"include": "#ui-prop"
+		},
+		{
+			"include": "#tokens-block"
+		},
+		{
+			"include": "#style-block"
+		},
+		{
+			"include": "#buttons-block"
+		},
+		{
+			"include": "#view-modifiers"
+		},
+		{
+			"include": "#quit-word"
+		},
+		{
+			"include": "#entity-block"
+		},
+		{
+			"include": "#stat-change"
+		},
+		{
+			"include": "#body-words"
+		},
+		{
+			"include": "#switch-line"
+		},
+		{
+			"include": "#properties"
+		},
+		{
+			"include": "#actions"
+		},
+		{
+			"include": "#view-words"
+		},
+		{
+			"include": "#when-clause"
+		},
+		{
+			"include": "#and-clause"
+		},
+		{
+			"include": "#constants"
+		},
+		{
+			"include": "#score-ref"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#hex-color"
+		},
+		{
+			"include": "#numbers"
+		}
+	],
+	"repository": {
+		"comments": {
+			"match": "#(?![0-9A-Fa-f]{6}\\b).*$",
+			"name": "comment.line.number-sign.astra"
+		},
+		"game-header": {
+			"match": "^(game|spel)\\s+([A-Za-z_][A-Za-z0-9_]*)(:)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				},
+				"2": {
+					"name": "entity.name.type.astra"
+				},
+				"3": {
+					"name": "punctuation.astra"
+				}
+			}
+		},
+		"view-header": {
+			"match": "^(view|vy)(:)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				},
+				"2": {
+					"name": "punctuation.astra"
+				}
+			}
+		},
+		"stat-line": {
+			"comment": "`stat hunger 3 of 10` - a named value with a cap.",
+			"match": "^\\s+(stat|värde)\\s+([a-z_][a-z0-9_]*)\\s+(-?[0-9]+)\\s+(of|av)\\s+(-?[0-9]+)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				},
+				"2": {
+					"name": "variable.other.astra"
+				},
+				"3": {
+					"name": "constant.numeric.astra"
+				},
+				"4": {
+					"name": "keyword.operator.word.astra"
+				},
+				"5": {
+					"name": "constant.numeric.astra"
+				}
+			}
+		},
+		"timed-rule": {
+			"comment": "`rule every 180 seconds:` / `rule every 500 ticks:` / `rule every day:` - the optional when-tail is its own pattern.",
+			"match": "^\\s+(rule|regel)\\s+(every|varje)\\s+(?:(-?[0-9]+)\\s+(seconds|sekunder|ticks|tick)|(day|dag))(:)?",
+			"captures": {
+				"1": {
+					"name": "keyword.control.astra"
+				},
+				"2": {
+					"name": "keyword.control.astra"
+				},
+				"3": {
+					"name": "constant.numeric.astra"
+				},
+				"4": {
+					"name": "keyword.operator.word.astra"
+				},
+				"5": {
+					"name": "keyword.operator.word.astra"
+				},
+				"6": {
+					"name": "punctuation.astra"
+				}
+			}
+		},
+		"rule-line": {
+			"match": "^\\s+(rule|regel)\\s+([a-z_][a-z0-9_]*)\\s+(hits|träffar|leaves|lämnar)\\b",
+			"captures": {
+				"1": {
+					"name": "keyword.control.astra"
+				},
+				"2": {
+					"name": "entity.name.function.astra"
+				},
+				"3": {
+					"name": "keyword.control.astra"
+				}
+			}
+		},
+		"click-action": {
+			"comment": "`action click companion:` - answered by a click that lands on that entity.",
+			"match": "^\\s+(action|handling)\\s+(click|klick)\\s+([a-z_][a-z0-9_]*)(:)",
+			"captures": {
+				"1": {
+					"name": "keyword.control.astra"
+				},
+				"2": {
+					"name": "keyword.control.astra"
+				},
+				"3": {
+					"name": "entity.name.function.astra"
+				},
+				"4": {
+					"name": "punctuation.astra"
+				}
+			}
+		},
+		"key-action": {
+			"comment": "`action f:` - a key pressed once.",
+			"match": "^\\s+(action|handling)\\s+([A-Za-z_][A-Za-z0-9_]*)(:)",
+			"captures": {
+				"1": {
+					"name": "keyword.control.astra"
+				},
+				"2": {
+					"name": "constant.character.astra"
+				},
+				"3": {
+					"name": "punctuation.astra"
+				}
+			}
+		},
+		"entity-block": {
+			"comment": "`paddle left:` = kind + name; `ball:` or `paddle:` = one word (an entity, or a kind prototype).",
+			"match": "^\\s+([a-z_][a-z0-9_]*)(?:\\s+([a-z_][a-z0-9_]*))?(:)\\s*$",
+			"captures": {
+				"1": {
+					"name": "storage.type.astra"
+				},
+				"2": {
+					"name": "entity.name.function.astra"
+				},
+				"3": {
+					"name": "punctuation.astra"
+				}
+			}
+		},
+		"stat-change": {
+			"comment": "`hunger up 1` / `joy up between 1 and 3` / `shelf set 2` - body lines.",
+			"match": "^\\s+([a-z_][a-z0-9_.]*)\\s+(?:(up|upp|down|ner)\\s+(?:(-?[0-9]+)|(between|mellan)\\s+(-?[0-9]+)\\s+(and|och)\\s+(-?[0-9]+))|(set)\\s+(-?[0-9]+))\\s*$",
+			"captures": {
+				"1": {
+					"name": "variable.other.astra"
+				},
+				"2": {
+					"name": "keyword.operator.word.astra"
+				},
+				"3": {
+					"name": "constant.numeric.astra"
+				},
+				"4": {
+					"name": "keyword.operator.word.astra"
+				},
+				"5": {
+					"name": "constant.numeric.astra"
+				},
+				"6": {
+					"name": "keyword.operator.word.astra"
+				},
+				"7": {
+					"name": "constant.numeric.astra"
+				},
+				"8": {
+					"name": "keyword.operator.word.astra"
+				},
+				"9": {
+					"name": "constant.numeric.astra"
+				}
+			}
+		},
+		"properties": {
+			"match": "^\\s+(field|fält|deterministic|deterministisk|position|size|storlek|input|styr|speed|fart|velocity|hastighet|clamp|håll|free|fri|mirror|spegla|starts|börjar)\b",
+			"captures": {
+				"1": {
+					"name": "support.type.property-name.astra"
+				}
+			}
+		},
+		"actions": {
+			"match": "\\b(bounce|studsa|destroy|förstör|reset|återställ|score|poäng|along)\\b",
+			"name": "keyword.operator.word.astra"
+		},
+		"view-words": {
+			"match": "^\\s+(background|bakgrund|draw|rita|bar|mätare|label|etikett|clock|klocka|frame|ram)\b|\b(color|färg|asset|bildfil|at|vid)\b",
+			"captures": {
+				"1": {
+					"name": "support.type.property-name.astra"
+				},
+				"2": {
+					"name": "keyword.operator.word.astra"
+				}
+			}
+		},
+		"when-clause": {
+			"comment": "`when joy is less than 3` - the gate draws, labels, rules and actions share.",
+			"match": "\b(when|när)\\s+([a-z_][a-z0-9_.]*)\\s+(is|är)(?:\\s+(less|mindre|more|mer)\\s+(than|än))?",
+			"captures": {
+				"1": {
+					"name": "keyword.control.astra"
+				},
+				"2": {
+					"name": "variable.other.astra"
+				},
+				"3": {
+					"name": "keyword.operator.word.astra"
+				},
+				"4": {
+					"name": "keyword.operator.word.astra"
+				},
+				"5": {
+					"name": "keyword.operator.word.astra"
+				}
+			}
+		},
+		"constants": {
+			"match": "\b(center|mitten|integer|heltal|or|x|y|unlocked|upplåst)\b",
+			"name": "constant.language.astra"
+		},
+		"score-ref": {
+			"match": "\\b(score|poäng)\\.([a-z_][a-z0-9_]*)",
+			"captures": {
+				"1": {
+					"name": "keyword.operator.word.astra"
+				},
+				"2": {
+					"name": "variable.other.astra"
+				}
+			}
+		},
+		"strings": {
+			"comment": "A label's words. Quoted stretches are ONE token to the compiler, spaces and all.",
+			"match": "\"[^\"]*\"",
+			"name": "string.quoted.double.astra"
+		},
+		"hex-color": {
+			"match": "#[0-9A-Fa-f]{6}\\b",
+			"name": "constant.numeric.hex.astra"
+		},
+		"numbers": {
+			"match": "-?\\b[0-9]+\\b",
+			"name": "constant.numeric.astra"
+		},
+		"screen-header": {
+			"comment": "`screen room:` - a view screen block.",
+			"match": "^\\s+(screen|skärm)\\s+([a-z_][a-z0-9_]*)(:)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				},
+				"2": {
+					"name": "entity.name.type.astra"
+				},
+				"3": {
+					"name": "punctuation.astra"
+				}
+			}
+		},
+		"kin-block": {
+			"comment": "`kin arcana:` - a creature that owns its own life.",
+			"match": "^\\s+(kin)\\s+([a-z_][a-z0-9_]*)(:)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				},
+				"2": {
+					"name": "entity.name.type.astra"
+				},
+				"3": {
+					"name": "punctuation.astra"
+				}
+			}
+		},
+		"body-words": {
+			"comment": "`go study` / `sound crunch` / `unlock cat` - one-word body verbs.",
+			"match": "^\\s+(go|gå|sound|ljud|unlock|öppna)\\s+([a-z_][a-z0-9_]*)\\s*$",
+			"captures": {
+				"1": {
+					"name": "keyword.control.astra"
+				},
+				"2": {
+					"name": "entity.name.function.astra"
+				}
+			}
+		},
+		"switch-line": {
+			"comment": "`switch to cat` - she is the one in the window now.",
+			"match": "^\\s+(switch|byt)\\s+(to|till)\\s+([a-z_][a-z0-9_]*)\\s*$",
+			"captures": {
+				"1": {
+					"name": "keyword.control.astra"
+				},
+				"2": {
+					"name": "keyword.operator.word.astra"
+				},
+				"3": {
+					"name": "entity.name.function.astra"
+				}
+			}
+		},
+		"and-clause": {
+			"comment": "`and focus is 2` - a compound when chains with and.",
+			"match": "\b(and|och)\\s+([a-z_][a-z0-9_.]*)\\s+(is|är)(?:\\s+(less|mindre|more|mer)\\s+(than|än))?",
+			"captures": {
+				"1": {
+					"name": "keyword.control.astra"
+				},
+				"2": {
+					"name": "variable.other.astra"
+				},
+				"3": {
+					"name": "keyword.operator.word.astra"
+				},
+				"4": {
+					"name": "keyword.operator.word.astra"
+				},
+				"5": {
+					"name": "keyword.operator.word.astra"
+				}
+			}
+		},
+		"ui-node": {
+			"comment": "`Panel layout: column` / `Text \"SETTINGS\"` - a veil node in the view tree.",
+			"match": "^\\s+(Panel|Ruta|Text)\\b",
+			"captures": {
+				"1": {
+					"name": "entity.name.type.astra"
+				}
+			}
+		},
+		"ui-prop": {
+			"comment": "A node attribute: `layout: column`, `do: feed`, `w_from: hunger`.",
+			"match": "\\b(layout|flöde|align|justera|justify|fördela|gap|lucka|pad|marginal|grow|väx|fill|fyll|order|ordning|radius|radie|color|färg|ink|bläck|image|bild|show|visa|style|stil|size|storlek|text|w_from|b_av|w|h|do|gör)(:)",
+			"captures": {
+				"1": {
+					"name": "entity.other.attribute-name.astra"
+				},
+				"2": {
+					"name": "punctuation.separator.astra"
+				}
+			}
+		},
+		"tokens-block": {
+			"comment": "`tokens color:` - a named palette the view resolves against.",
+			"match": "^\\s+(tokens|palett)\\s+([a-z_][a-z0-9_]*)(:)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				},
+				"2": {
+					"name": "variable.other.astra"
+				},
+				"3": {
+					"name": "punctuation.separator.astra"
+				}
+			}
+		},
+		"style-block": {
+			"comment": "`style action:` - an attribute bundle a node wears.",
+			"match": "^\\s+(style|stil)\\s+([a-z_][a-z0-9_]*)(:)",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				},
+				"2": {
+					"name": "variable.other.astra"
+				},
+				"3": {
+					"name": "punctuation.separator.astra"
+				}
+			}
+		},
+		"buttons-block": {
+			"comment": "`buttons menu_list:` and its `button \"CAPTION\":` rows.",
+			"match": "^\\s+(buttons|knappar|button|knapp)\\s+(.*)$",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				},
+				"2": {
+					"name": "variable.other.astra"
+				}
+			}
+		},
+		"view-modifiers": {
+			"comment": "Words a view line hangs on its tail: `asset`, `small`, `centered`.",
+			"match": "\\b(asset|bildfil|small|liten|centered|centrerad|title|rubrik|target|mål)\\b",
+			"captures": {
+				"1": {
+					"name": "keyword.declaration.astra"
+				}
+			}
+		},
+		"quit-word": {
+			"comment": "`quit` - the game asks to be closed.",
+			"match": "^\\s+(quit|avsluta)\\s*$",
+			"captures": {
+				"1": {
+					"name": "support.function.astra"
+				}
+			}
+		}
+	}
+}

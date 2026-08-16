@@ -66,7 +66,7 @@ fn main() -> int:
 # Pure-Orion UTF-8 byte counter. Doesn't decode characters — just
 # returns bytes_length, which is the (ptr, len) JS needs.
 fn string_byte_count(text: Text) -> int:
-    bytes_data = bytes_from_text(text)
+    bytes_data = bytes_of(text)
     mut count = 0
     for _byte_value in bytes_data:
         count = count + 1

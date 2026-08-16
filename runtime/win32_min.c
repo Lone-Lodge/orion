@@ -12,9 +12,11 @@
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
+#include <mmsystem.h>   /* WAVEFORMATEX/WAVEHDR types only - winmm.dll loads dynamically */
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 /* ---- Input events -------------------------------------------------
  * Fixed ring buffer filled by wnd_proc during win_pump; drained from
@@ -123,9 +125,190 @@ long long win_frameless(long long hwnd_i, long long caption_h,
     return 1;
 }
 
+/* ---- companion-window primitives ----
+ * Small dumb functions; the POLICY (a pet window that sits on top of
+ * your work) lives in Orion's shell code, composed from these. */
+
+/* Fixed-size popup: no frame at all, no resize edges; the whole
+ * surface drags the window (see g_fixed in WM_NCHITTEST) - except an
+ * optional CLICK HOLE, where the mouse belongs to the app: a frame
+ * skin's bezel drags the pet window, the game area takes the pats. */
+static int g_fixed = 0;
+static int g_hole_x = 0, g_hole_y = 0, g_hole_w = 0, g_hole_h = 0;
+
+long long win_click_hole(long long hwnd_i, long long x, long long y,
+                         long long w, long long h) {
+    (void)hwnd_i;
+    g_hole_x = (int)x; g_hole_y = (int)y;
+    g_hole_w = (int)w; g_hole_h = (int)h;
+    return 1;
+}
+
+/* Layered color key: every pixel of exactly this color becomes truly
+ * transparent - the desktop shows through and clicks fall through.
+ * The frame skin's rounded corners, for free. */
+long long win_colorkey(long long hwnd_i, long long rgb) {
+    HWND hwnd = (HWND)(uintptr_t)hwnd_i;
+    SetWindowLongW(hwnd, GWL_EXSTYLE,
+                   GetWindowLongW(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+    COLORREF key = RGB((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+    SetLayeredWindowAttributes(hwnd, key, 0, LWA_COLORKEY);
+    return 1;
+}
+
+long long win_popup(long long hwnd_i, long long width, long long height) {
+    HWND hwnd = (HWND)(uintptr_t)hwnd_i;
+    g_fixed = 1;
+    g_frameless = 1;
+    SetWindowLongW(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+    /* A popup has no frame: outer size IS client size. Set it exactly,
+     * or the client keeps the old frame's slack and the framebuffer
+     * shows with a dead border. */
+    SetWindowPos(hwnd, NULL, 0, 0, (int)width, (int)height,
+                 SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    return 1;
+}
+
+long long win_topmost(long long hwnd_i, long long on) {
+    SetWindowPos((HWND)(uintptr_t)hwnd_i, on ? HWND_TOPMOST : HWND_NOTOPMOST,
+                 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    return 1;
+}
+
+/* (win_move is taken by orion_cli's find-window-by-title helper.) */
+long long win_place(long long hwnd_i, long long x, long long y) {
+    SetWindowPos((HWND)(uintptr_t)hwnd_i, NULL, (int)x, (int)y, 0, 0,
+                 SWP_NOSIZE | SWP_NOZORDER);
+    return 1;
+}
+
+/* The desktop work area (screen minus taskbar), for corner placement. */
+long long win_workarea_w(void) {
+    RECT rc;
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &rc, 0);
+    return rc.right - rc.left;
+}
+
+long long win_workarea_h(void) {
+    RECT rc;
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &rc, 0);
+    return rc.bottom - rc.top;
+}
+
+/* Wall-clock seconds since the Unix epoch - for stamping save files.
+ * The GAME never sees this: shells stamp saves and feed bounded
+ * catch-up ticks, so the world stays a pure function of its inputs. */
+long long win_epoch_seconds(void) {
+    return (long long)time(NULL);
+}
+
+/* The LOCAL calendar day as one whole number (a julian day count).
+ * The shell's answer to "what day is it" - so a game can live daily
+ * rules and away-days as fed intents without ever reading a clock. */
+long long win_local_day(void) {
+    time_t now = time(NULL);
+    struct tm *lt = localtime(&now);
+    long long y = lt->tm_year + 1900, m = lt->tm_mon + 1, d = lt->tm_mday;
+    long long a = (14 - m) / 12, yy = y + 4800 - a, mm = m + 12 * a - 3;
+    return d + (153 * mm + 2) / 5 + 365 * yy + yy / 4 - yy / 100 + yy / 400 - 32045;
+}
+
+/* ---- one-shot sounds: a small waveOut voice pool ----
+ * Raw PCM in, fire and forget: each play takes a free voice (or
+ * steals the oldest), copies the bytes (the caller's buffer is pool
+ * memory and dies), and Windows mixes the voices. winmm loads
+ * dynamically like the timer above - headless builds never touch it. */
+#define ORION_VOICES 4
+typedef struct { void* dev; char* buf; char hdr[64]; int open; } orion_voice;
+static orion_voice g_voice[ORION_VOICES];
+static int g_voice_next = 0;
+static HMODULE g_winmm = NULL;
+typedef unsigned int (WINAPI *WoOpenFn)(void**, unsigned int, const void*, uintptr_t, uintptr_t, unsigned int);
+typedef unsigned int (WINAPI *WoHdrFn)(void*, void*, unsigned int);
+typedef unsigned int (WINAPI *WoCloseFn)(void*);
+static WoOpenFn wo_open; static WoHdrFn wo_prepare, wo_write, wo_unprepare;
+static WoCloseFn wo_close, wo_reset;
+typedef unsigned int (WINAPI *WoVolFn)(void*, unsigned int);
+static WoVolFn wo_volume;
+
+/* left/right are 0..1000 shares - the shell's pan law and volume bus
+ * both land here as two plain numbers. */
+long long win_sound_play(const char* data, long long from, long long bytes,
+                         long long rate, long long channels, long long bits,
+                         long long left, long long right) {
+    if (!g_winmm) {
+        g_winmm = LoadLibraryA("winmm.dll");
+        if (!g_winmm) return 0;
+        wo_open = (WoOpenFn)GetProcAddress(g_winmm, "waveOutOpen");
+        wo_prepare = (WoHdrFn)GetProcAddress(g_winmm, "waveOutPrepareHeader");
+        wo_write = (WoHdrFn)GetProcAddress(g_winmm, "waveOutWrite");
+        wo_unprepare = (WoHdrFn)GetProcAddress(g_winmm, "waveOutUnprepareHeader");
+        wo_close = (WoCloseFn)GetProcAddress(g_winmm, "waveOutClose");
+        wo_reset = (WoCloseFn)GetProcAddress(g_winmm, "waveOutReset");
+        wo_volume = (WoVolFn)GetProcAddress(g_winmm, "waveOutSetVolume");
+    }
+    if (!wo_open || !wo_write || bytes <= 0) return 0;
+    orion_voice* v = &g_voice[g_voice_next];
+    g_voice_next = (g_voice_next + 1) % ORION_VOICES;
+    if (v->open) {
+        wo_reset(v->dev);
+        wo_unprepare(v->dev, v->hdr, sizeof v->hdr);
+        wo_close(v->dev);
+        free(v->buf);
+        v->open = 0;
+    }
+    WAVEFORMATEX fmt;
+    memset(&fmt, 0, sizeof fmt);
+    fmt.wFormatTag = 1; /* PCM */
+    fmt.nChannels = (WORD)channels;
+    fmt.nSamplesPerSec = (DWORD)rate;
+    fmt.wBitsPerSample = (WORD)bits;
+    fmt.nBlockAlign = (WORD)(channels * bits / 8);
+    fmt.nAvgBytesPerSec = fmt.nSamplesPerSec * fmt.nBlockAlign;
+    if (wo_open(&v->dev, 0xFFFFFFFFu /* WAVE_MAPPER */, &fmt, 0, 0, 0) != 0)
+        return 0;
+    if (wo_volume) {
+        if (left < 0) left = 0; if (left > 1000) left = 1000;
+        if (right < 0) right = 0; if (right > 1000) right = 1000;
+        unsigned int lv = (unsigned int)(left * 65535 / 1000);
+        unsigned int rv = (unsigned int)(right * 65535 / 1000);
+        wo_volume(v->dev, lv | (rv << 16));
+    }
+    v->buf = (char*)malloc((size_t)bytes);
+    if (!v->buf) { wo_close(v->dev); return 0; }
+    memcpy(v->buf, data + from, (size_t)bytes);
+    WAVEHDR* h = (WAVEHDR*)v->hdr;
+    memset(h, 0, sizeof(WAVEHDR));
+    h->lpData = v->buf;
+    h->dwBufferLength = (DWORD)bytes;
+    wo_prepare(v->dev, h, sizeof(WAVEHDR));
+    wo_write(v->dev, h, sizeof(WAVEHDR));
+    v->open = 1;
+    return 1;
+}
+
+/* Is this window the foreground window? A companion polls keys via
+ * GetAsyncKeyState (global), so its shell must gate on focus or typing
+ * in your editor would feed the pet. */
+long long win_has_focus(long long hwnd_i) {
+    return GetForegroundWindow() == (HWND)(uintptr_t)hwnd_i ? 1 : 0;
+}
+
 long long win_minimize(long long hwnd_i) {
     ShowWindow((HWND)(uintptr_t)hwnd_i, SW_MINIMIZE);
     return 1;
+}
+
+/* The companion's hidden mode is a MINIMIZED window: the taskbar
+ * button stays (so a person can always bring her back or close for
+ * real), the sim keeps ticking, and a reminder restores her. */
+long long win_restore(long long hwnd_i) {
+    ShowWindow((HWND)(uintptr_t)hwnd_i, SW_RESTORE);
+    return 1;
+}
+
+long long win_is_min(long long hwnd_i) {
+    return IsIconic((HWND)(uintptr_t)hwnd_i) ? 1 : 0;
 }
 
 long long win_maximize_toggle(long long hwnd_i) {
@@ -161,6 +344,18 @@ long long win_fullscreen(long long hwnd_i, long long on); /* defined below */
 
 static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_NCCALCSIZE && g_frameless && wp) return 0;
+    if (msg == WM_NCHITTEST && g_fixed) {
+        if (g_hole_w > 0) {
+            RECT rc;
+            GetWindowRect(hwnd, &rc);
+            int x = (int)(short)LOWORD(lp) - rc.left;
+            int y = (int)(short)HIWORD(lp) - rc.top;
+            if (x >= g_hole_x && x < g_hole_x + g_hole_w &&
+                y >= g_hole_y && y < g_hole_y + g_hole_h)
+                return HTCLIENT;
+        }
+        return HTCAPTION;
+    }
     if (msg == WM_NCHITTEST && g_frameless) {
         RECT rc;
         GetWindowRect(hwnd, &rc);

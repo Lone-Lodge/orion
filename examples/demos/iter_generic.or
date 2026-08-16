@@ -1,6 +1,6 @@
 # iter over any element type - the same map / filter / reduce / count that
 # work on `[int]` now work on `[text]`. The closure names the element type
-# (`fn(s: text): …`) so its body can call `len` / `at` / `get`; `int`
+# (`function(s: text): …`) so its body can call `len` / `at` / `get`; `int`
 # elements need no annotation.
 #
 # Build: orion.exe examples/demos/iter_generic.or out.ll orbs
@@ -10,18 +10,18 @@ define main() -> int:
     words = ["hi", "world", "x", "abcd", "no"]
 
     # map Text -> int: the length of every word.
-    lengths = each(words, fn(s: text): len(s))                    # [2,5,1,4,2]
+    lengths = each(words, function(s: text): length(s))                    # [2,5,1,4,2]
 
     # reduce over Text: total characters across all words.
-    total_chars = combine(words, 0, fn(acc, s: text): acc + len(s))   # 14
+    total_chars = combine(words, 0, function(acc, s: text): acc + length(s))   # 14
 
     # count / any / all - all predicate-driven over Text.
-    long_words = count(words, fn(s: text): if len(s) >= 4 then 1 else 0)  # 2
-    has_tiny   = any(words,   fn(s: text): if len(s) == 1 then 1 else 0)  # 1
-    all_short  = all(words,   fn(s: text): if len(s) <= 5 then 1 else 0)  # 1
+    long_words = count(words, function(s: text): if length(s) >= 4 then 1 else 0)  # 2
+    has_tiny   = any(words,   function(s: text): if length(s) == 1 then 1 else 0)  # 1
+    all_short  = all(words,   function(s: text): if length(s) <= 5 then 1 else 0)  # 1
 
     # find_index: first word of length >= 4.
-    first_long = find_index(words, fn(s: text): if len(s) >= 4 then 1 else 0)  # 1
+    first_long = find_index(words, function(s: text): if length(s) >= 4 then 1 else 0)  # 1
 
     print_line("chars={total_chars} long={long_words} tiny?={has_tiny} allshort?={all_short} firstlong@{first_long} len0={at(lengths,0)}")
     total_chars + long_words + first_long                        # 14 + 2 + 1 = 17

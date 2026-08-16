@@ -36,8 +36,8 @@ define is_digit(b: int) -> int:
 # ---- Tokenizer -------------------------------------------------------
 
 define tokenize(src: text) -> [table]:
-    bs = bytes_from_text(src)
-    n = len(bs)
+    bs = bytes_of(src)
+    n = length(bs)
     edit toks = []
     edit i = 0
     loop:
@@ -92,7 +92,7 @@ define parse_term(toks: [table], pos: int) -> Parsed:
     edit val = left.val
     edit i = left.next
     loop:
-        if i >= len(toks):
+        if i >= length(toks):
             break
         k = get(at(toks, i), "kind")
         if k != "star" and k != "slash":
@@ -114,7 +114,7 @@ define parse_expr(toks: [table], pos: int) -> Parsed:
     edit val = left.val
     edit i = left.next
     loop:
-        if i >= len(toks):
+        if i >= length(toks):
             break
         k = get(at(toks, i), "kind")
         if k != "plus" and k != "minus":

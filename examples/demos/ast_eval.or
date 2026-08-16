@@ -30,8 +30,8 @@ define is_digit(b: int) -> int:
 # ---- Tokenizer -------------------------------------------------------
 
 define tokenize(src: text) -> [table]:
-    bs = bytes_from_text(src)
-    n = len(bs)
+    bs = bytes_of(src)
+    n = length(bs)
     edit toks = []
     edit i = 0
     loop:
@@ -70,7 +70,7 @@ define tokenize(src: text) -> [table]:
 # push a node, return its index (its position in the arena after the push)
 define add_node(arena: [Node], node: Node) -> PR:
     grown = append(arena, node)
-    PR{arena: grown, idx: len(grown) - 1, next: 0}
+    PR{arena: grown, idx: length(grown) - 1, next: 0}
 
 define parse_factor(toks: [table], pos: int, arena: [Node]) -> PR:
     t = at(toks, pos)
@@ -92,7 +92,7 @@ define parse_term(toks: [table], pos: int, arena: [Node]) -> PR:
     edit node_i = left.idx
     edit i = left.next
     loop:
-        if i >= len(toks):
+        if i >= length(toks):
             break
         k = get(at(toks, i), "kind")
         if k != "star" and k != "slash":
@@ -111,7 +111,7 @@ define parse_expr(toks: [table], pos: int, arena: [Node]) -> PR:
     edit node_i = left.idx
     edit i = left.next
     loop:
-        if i >= len(toks):
+        if i >= length(toks):
             break
         k = get(at(toks, i), "kind")
         if k != "plus" and k != "minus":
@@ -140,7 +140,7 @@ define eval(arena: [Node], idx: int) -> int:
 define run(src: text) -> int:
     parsed = parse_expr(tokenize(src), 0, [])
     v = eval(parsed.arena, parsed.idx)
-    print_line("{src}   =  {v}   ({len(parsed.arena)} nodes)")
+    print_line("{src}   =  {v}   ({length(parsed.arena)} nodes)")
     v
 
 # ---- Main ------------------------------------------------------------

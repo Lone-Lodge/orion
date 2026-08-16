@@ -35,29 +35,29 @@ fn cg_type_to_c(type_name: Text) -> Text:
 fn cg_emit_str_literal(value: Text) -> Text:
     # Wrap the value in C double quotes. Inner double quotes / backslashes
     # would need escaping for production use; demo inputs are well-formed.
-    bytes_value = bytes_from_text(value)
-    value_length = bytes_length(bytes_value)
+    bytes_value = bytes_of(value)
+    value_length = bytes_count(bytes_value)
     mut escaped = bytes_zeros(0)
     for index in 0..<value_length:
         byte = byte_at(bytes_value, index)
         if byte == 34 or byte == 92:
             escaped = push(escaped, 92)
         escaped = push(escaped, byte)
-    "\"" + bytes_to_text(escaped) + "\""
+    "\"" + text_of(escaped) + "\""
 
 fn cg_emit_expr(node) -> Text:
-    kind = bytes_to_text(bytes_from_text(get(node, "kind")))
+    kind = text_of(bytes_of(get(node, "kind")))
     mut result = "/* unknown expr */ 0"
     if kind == "Int":
-        result = bytes_to_text(bytes_from_text(get(node, "value")))
+        result = text_of(bytes_of(get(node, "value")))
     if kind == "Str":
-        result = cg_emit_str_literal(bytes_to_text(bytes_from_text(get(node, "value"))))
+        result = cg_emit_str_literal(text_of(bytes_of(get(node, "value"))))
     if kind == "Ident":
-        result = bytes_to_text(bytes_from_text(get(node, "name")))
+        result = text_of(bytes_of(get(node, "name")))
     if kind == "Binary":
         left_c = cg_emit_expr(get(node, "left"))
         right_c = cg_emit_expr(get(node, "right"))
-        op_text = bytes_to_text(bytes_from_text(get(node, "op")))
+        op_text = text_of(bytes_of(get(node, "op")))
         result = "(" + left_c + " " + op_text + " " + right_c + ")"
     if kind == "Call":
         result = cg_emit_call(node)
@@ -74,9 +74,9 @@ fn cg_emit_expr(node) -> Text:
 # Special-case a small set of built-ins so generated code can do I/O
 # without us implementing a Text runtime. `print_line(text)` → `puts`.
 fn cg_emit_call(node) -> Text:
-    callee = bytes_to_text(bytes_from_text(get(node, "callee")))
+    callee = text_of(bytes_of(get(node, "callee")))
     args = get(node, "args")
-    arg_count = len(args)
+    arg_count = length(args)
     mut args_c = ""
     for index in 0..<arg_count:
         if index > 0:
@@ -100,7 +100,7 @@ fn cg_emit_call(node) -> Text:
 # inferencer threads through the param scope; this is enough for the
 # self-host demo.
 fn cg_guess_type(expr_node) -> Text:
-    expr_kind = bytes_to_text(bytes_from_text(get(expr_node, "kind")))
+    expr_kind = text_of(bytes_of(get(expr_node, "kind")))
     if expr_kind == "Str":
         "const char*"
     else:
@@ -118,11 +118,11 @@ fn cg_scope_has(name: Text) -> bool:
     if type_of(declared) == "none":
         false
     else:
-        total = len(declared)
+        total = length(declared)
         mut found = false
         for index in 0..<total:
             entry = at(declared, index)
-            if bytes_to_text(bytes_from_text(entry)) == name:
+            if text_of(bytes_of(entry)) == name:
                 found = true
         found
 
@@ -138,17 +138,17 @@ fn cg_indent(level: int) -> Text:
     spaces
 
 fn cg_emit_stmt(stmt_node, is_tail: bool, level: int) -> Text:
-    stmt_kind = bytes_to_text(bytes_from_text(get(stmt_node, "kind")))
+    stmt_kind = text_of(bytes_of(get(stmt_node, "kind")))
     indent = cg_indent(level)
     mut output = ""
     if stmt_kind == "MutLet":
-        let_name = bytes_to_text(bytes_from_text(get(stmt_node, "name")))
+        let_name = text_of(bytes_of(get(stmt_node, "name")))
         let_value = get(stmt_node, "value")
         type_c = cg_guess_type(let_value)
         cg_scope_add(let_name)
         output = indent + type_c + " " + let_name + " = " + cg_emit_expr(let_value) + ";\n"
     if stmt_kind == "LetOrAssign":
-        let_name = bytes_to_text(bytes_from_text(get(stmt_node, "name")))
+        let_name = text_of(bytes_of(get(stmt_node, "name")))
         let_value = get(stmt_node, "value")
         already_declared = cg_scope_has(let_name)
         if already_declared:
@@ -174,11 +174,11 @@ fn cg_emit_stmt(stmt_node, is_tail: bool, level: int) -> Text:
 
 fn cg_emit_block_at(block_node, level: int) -> Text:
     statements = get(block_node, "stmts")
-    stmt_count = len(statements)
+    stmt_count = length(statements)
     mut body_c = ""
     for index in 0..<stmt_count:
         stmt = at(statements, index)
-        stmt_kind = bytes_to_text(bytes_from_text(get(stmt, "kind")))
+        stmt_kind = text_of(bytes_of(get(stmt, "kind")))
         # ExprStmt is only the "return" of a fn if it's the last stmt
         # AND we're at level 1 (top of fn body). Loop/Break never return.
         is_tail = level == 1 and index == stmt_count - 1 and stmt_kind == "ExprStmt"
@@ -189,11 +189,11 @@ fn cg_emit_block(block_node) -> Text:
     cg_emit_block_at(block_node, 1)
 
 fn cg_emit_fn(fn_node) -> Text:
-    name = bytes_to_text(bytes_from_text(get(fn_node, "name")))
-    ret_type = bytes_to_text(bytes_from_text(get(get(fn_node, "ret"), "name")))
+    name = text_of(bytes_of(get(fn_node, "name")))
+    ret_type = text_of(bytes_of(get(get(fn_node, "ret"), "name")))
     ret_c = cg_type_to_c(ret_type)
     params = get(fn_node, "params")
-    param_count = len(params)
+    param_count = length(params)
     # Fresh scope per fn. Params count as declared so reassignment to
     # them generates `param = …` instead of redeclaring.
     cg_scope_reset()
@@ -202,8 +202,8 @@ fn cg_emit_fn(fn_node) -> Text:
         if index > 0:
             params_c = params_c + ", "
         param = at(params, index)
-        param_type = bytes_to_text(bytes_from_text(get(get(param, "type"), "name")))
-        param_name = bytes_to_text(bytes_from_text(get(param, "name")))
+        param_type = text_of(bytes_of(get(get(param, "type"), "name")))
+        param_name = text_of(bytes_of(get(param, "name")))
         cg_scope_add(param_name)
         params_c = params_c + cg_type_to_c(param_type) + " " + param_name
     if param_count == 0:
@@ -219,7 +219,7 @@ fn cg_emit_main_wrapper() -> Text:
 
 # Rename the AST's `main` to `orion_main` so the C `main` can wrap it.
 fn cg_rename_main(fn_node):
-    name = bytes_to_text(bytes_from_text(get(fn_node, "name")))
+    name = text_of(bytes_of(get(fn_node, "name")))
     if name == "main":
         set(fn_node, "name", "orion_main")
     else:
@@ -233,7 +233,7 @@ fn cg_runtime_header() -> Text:
 
 pub fn self_codegen(ast) -> Text:
     decls = get(ast, "decls")
-    decl_count = len(decls)
+    decl_count = length(decls)
     mut output = cg_runtime_header()
     for index in 0..<decl_count:
         renamed = cg_rename_main(at(decls, index))

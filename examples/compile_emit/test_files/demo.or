@@ -20,7 +20,7 @@
 # --- Typed data structures ---
 
 # An IR instruction. All fields present; unused ones zero/empty.
-# - name: fn name for call ops (else "")
+# - name: function name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
 type Inst: op: text, type_text: text, value: int, lhs: int, rhs: int, name: text, args: [int]
 
@@ -149,7 +149,7 @@ public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
 public define ir_text_len(value_id: int) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# slice(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
+# part(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
 public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
@@ -175,15 +175,15 @@ public define ir_argv(idx_id: int) -> Inst:
     Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
-# bytes_from_text(t) → [int] of byte values
+# bytes_of(t) → [int] of byte values
 public define ir_bytes_from_text(text_id: int) -> Inst:
     Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# bytes_to_text(list) → Text from list of byte values
+# text_of(list) → Text from list of byte values
 public define ir_bytes_to_text(list_id: int) -> Inst:
     Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# bytes_slice(list, lo, hi) → new list with items [lo, hi)
+# bytes_part(list, lo, hi) → new list with items [lo, hi)
 public define ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
@@ -312,7 +312,7 @@ public define ir_fn_add_param(fn_value: IRFn, param_name: text, param_type: text
     IRFn{name: fn_value.name, return_type: fn_value.return_type, params: new_params, instructions: fn_value.instructions}
 
 public define ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
-    new_id = len(fn_value.instructions)
+    new_id = length(fn_value.instructions)
     new_instructions = append(fn_value.instructions, inst)
     new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: new_instructions}
     PushResult{function: new_fn, id: new_id}
@@ -351,7 +351,7 @@ public define ir_dump_instruction(inst: Inst, my_id: int) -> text:
 
 public define ir_dump_fn(fn_value: IRFn) -> text:
     edit text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
-    total = len(fn_value.instructions)
+    total = length(fn_value.instructions)
     loop idx in 0..<total:
         inst = at(fn_value.instructions, idx)
         line = ir_dump_instruction(inst, idx)
@@ -360,7 +360,7 @@ public define ir_dump_fn(fn_value: IRFn) -> text:
 
 public define ir_dump_module(module: IRModule) -> text:
     edit text = "; orion_ir module dump\n"
-    total = len(module.functions)
+    total = length(module.functions)
     loop idx in 0..<total:
         fn_value = at(module.functions, idx)
         text = "{text}{ir_dump_fn(fn_value)}\n"
@@ -394,8 +394,8 @@ define hex_digit(value: int) -> text:
     at(digits, value)
 
 define llvm_escape(text: text) -> text:
-    bs = bytes_from_text(text)
-    total = len(bs)
+    bs = bytes_of(text)
+    total = length(bs)
     edit result = ""
     loop index in 0..<total:
         b = at(bs, index)
@@ -405,17 +405,17 @@ define llvm_escape(text: text) -> text:
             lo = hex_digit(b % 16)
             # NOTE: lodge-orion interprets `\\{` as a single literal `{`,
             # eating the backslash. Use a stringified byte to dodge that.
-            backslash = bytes_to_text([92])
+            backslash = text_of([92])
             result = "{result}{backslash}{hi}{lo}"
         else:
-            single = bytes_to_text([b])
+            single = text_of([b])
             result = "{result}{single}"
     result
 
 
 # Find the index of `target` in a list of strings. -1 if not found.
 define string_list_index(strings: [text], target: text) -> int:
-    total = len(strings)
+    total = length(strings)
     edit found = 0 - 1
     loop index in 0..<total:
         if at(strings, index) == target and found == (0 - 1):
@@ -426,11 +426,11 @@ define string_list_index(strings: [text], target: text) -> int:
 # Walk the module to collect every distinct string literal used by
 # print_str or const_str instructions. Returned list is in first-seen order.
 define collect_strings(module: IRModule) -> [text]:
-    n_fns = len(module.functions)
+    n_fns = length(module.functions)
     edit result = []
     loop fi in 0..<n_fns:
         fn_value = at(module.functions, fi)
-        n_insts = len(fn_value.instructions)
+        n_insts = length(fn_value.instructions)
         loop ii in 0..<n_insts:
             inst = at(fn_value.instructions, ii)
             is_str_op = inst.op == "print_str" or inst.op == "const_str"
@@ -443,8 +443,8 @@ define collect_strings(module: IRModule) -> [text]:
 
 # Split a pipe-separated label list "a|b" into ["a", "b"].
 define split_pipe(text: text) -> [text]:
-    bs = bytes_from_text(text)
-    total = len(bs)
+    bs = bytes_of(text)
+    total = length(bs)
     edit parts = []
     edit current = ""
     loop index in 0..<total:
@@ -453,7 +453,7 @@ define split_pipe(text: text) -> [text]:
             parts = append(parts, current)
             current = ""
         else:
-            single = bytes_to_text([ch])
+            single = text_of([ch])
             current = "{current}{single}"
     parts = append(parts, current)
     parts
@@ -478,7 +478,7 @@ define icmp_cc(op: text) -> text:
 
 # Look up a fn's return type in the module; defaults to "i64".
 define find_fn_return_type(module: IRModule, fn_name: text) -> text:
-    n = len(module.functions)
+    n = length(module.functions)
     edit result = "i64"
     loop index in 0..<n:
         f = at(module.functions, index)
@@ -522,7 +522,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             result = "    {value_ref(my_id)} = add i64 0, %p{inst.value}"
 
     if op == "call":
-        n_args = len(inst.args)
+        n_args = length(inst.args)
         edit arg_text = ""
         loop ai in 0..<n_args:
             arg_id = at(inst.args, ai)
@@ -708,7 +708,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         result = "{l1}\n{l2}"
 
     if op == "list_lit":
-        n = len(inst.args)
+        n = length(inst.args)
         edit text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
         loop ai in 0..<n:
             item_id = at(inst.args, ai)
@@ -752,7 +752,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
 
     if op == "map_lit":
         # args alternates key/val: [k0, v0, k1, v1, ...]
-        n_total = len(inst.args)
+        n_total = length(inst.args)
         n_pairs = n_total / 2
         edit text = "    {value_ref(my_id)} = call ptr @orion_map_new(i64 {n_pairs})"
         loop pi in 0..<n_pairs:
@@ -849,12 +849,12 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
 define llvm_type_of(orion_type: text) -> text:
     edit is_struct = false
     edit is_list_elem = false
-    bs = bytes_from_text(orion_type)
-    if len(bs) >= 7:
+    bs = bytes_of(orion_type)
+    if length(bs) >= 7:
         if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
             is_struct = true
     # `list:T` (parameterised list) - also a ptr at LLVM level.
-    if len(bs) >= 5:
+    if length(bs) >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
             is_list_elem = true
     if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or is_struct or is_list_elem then "ptr" else "i64"
@@ -862,8 +862,8 @@ define llvm_type_of(orion_type: text) -> text:
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).
 define list_elem_type(list_type: text) -> text:
-    bs = bytes_from_text(list_type)
-    n = len(bs)
+    bs = bytes_of(list_type)
+    n = length(bs)
     edit is_listed = false
     if n >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
@@ -874,13 +874,13 @@ define list_elem_type(list_type: text) -> text:
         # Extract bytes 5..n
         edit result = ""
         loop index in 5..<n:
-            single = bytes_to_text([at(bs, index)])
+            single = text_of([at(bs, index)])
             result = "{result}{single}"
         result
 
 
 define emit_param_list(params: [Param]) -> text:
-    n = len(params)
+    n = length(params)
     edit result = ""
     loop index in 0..<n:
         sep = if index == 0 then "" else ", "
@@ -903,7 +903,7 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
         is_user_main = name == "main"
         emit_name = if is_user_main then "orion_main" else name
         edit text = "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n"
-        total = len(fn_value.instructions)
+        total = length(fn_value.instructions)
         loop index in 0..<total:
             inst = at(fn_value.instructions, index)
             line = emit_instruction(inst, index, strings, fn_value, module)
@@ -915,8 +915,8 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
 # Emit the global for a single string literal.
 # Format: @.str_N = private unnamed_addr constant [LEN x i8] c"<bytes>\00"
 define emit_string_global(text_value: text, idx: int) -> text:
-    bs = bytes_from_text(text_value)
-    n = len(bs) + 1                          # +1 for null terminator
+    bs = bytes_of(text_value)
+    n = length(bs) + 1                          # +1 for null terminator
     escaped = llvm_escape(text_value)
     "@.str_{idx} = private unnamed_addr constant [{n} x i8] c\"{escaped}\\00\""
 
@@ -953,7 +953,7 @@ define emit_runtime() -> text:
     text = "{text}  %_ = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_int_raw, i64 %n)\n"
     text = "{text}  ret ptr %buf\n"
     text = "{text}\}\n\n"
-    # slice(text, lo, hi): copy bytes [lo, hi) into a new null-terminated buffer.
+    # part(text, lo, hi): copy bytes [lo, hi) into a new null-terminated buffer.
     # Clamps lo/hi to [0, strlen] for safety.
     text = "{text}declare ptr @memcpy(ptr, ptr, i64)\n\n"
     text = "{text}define ptr @orion_text_slice(ptr %src, i64 %lo, i64 %hi) \{\n"
@@ -1042,7 +1042,7 @@ define emit_runtime() -> text:
     text = "{text}after:\n"
     text = "{text}  ret ptr %list\n"
     text = "{text}\}\n\n"
-    # bytes_slice(list, lo, hi) → new list with items [lo, hi).
+    # bytes_part(list, lo, hi) → new list with items [lo, hi).
     text = "{text}define ptr @orion_bytes_slice(ptr %src, i64 %lo, i64 %hi) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %src_len = call i64 @orion_list_len(ptr %src)\n"
@@ -1335,11 +1335,11 @@ public define emit_module(module: IRModule) -> text:
     text = "{text}{emit_runtime()}"
     # Emit one global per distinct string literal in the module.
     strings = collect_strings(module)
-    n_strings = len(strings)
+    n_strings = length(strings)
     loop index in 0..<n_strings:
         text = "{text}{emit_string_global(at(strings, index), index)}\n"
     text = "{text}\n"
-    total = len(module.functions)
+    total = length(module.functions)
     loop index in 0..<total:
         fn_value = at(module.functions, index)
         text = "{text}{emit_fn(fn_value, strings, module)}\n"
@@ -1367,4 +1367,4 @@ define main() -> int:
     output = emit_module(module)
     file_write("/tmp/emit_test.ll", output)
     print_line("written")
-    len(bytes_from_text(output))
+    length(bytes_of(output))

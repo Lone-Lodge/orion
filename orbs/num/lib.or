@@ -56,8 +56,8 @@ public define gcd(a: int, b: int) -> int:
 # Pairs with split: split("3,4,5", ",") then parse each piece.
 public define parse(t: text) -> int:
     example parse("42") is 42
-    b = bytes_from_text(t)
-    total = bytes_length(b)
+    b = bytes_of(t)
+    total = bytes_count(b)
     edit value = 0
     edit start = 0
     edit neg = 0
@@ -127,8 +127,8 @@ public define fclamp(x: float, lo: float, hi: float) -> float:
 #   parse_float("-2.5e3")  ->  -2500.0
 public define parse_float(t: text) -> float:
     example parse_float("1.5") is 1.5
-    b = bytes_from_text(t)
-    n = bytes_length(b)
+    b = bytes_of(t)
+    n = bytes_count(b)
     edit i = 0
     edit neg = false
     if n > 0 and byte_at(b, 0) is 45:

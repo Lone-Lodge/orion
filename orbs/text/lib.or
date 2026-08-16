@@ -14,18 +14,18 @@
 public define is_empty(t: text) -> truth:
     example is_empty("")
     example not is_empty("x")
-    len(t) is 0
+    length(t) is 0
 
 public define byte_count(t: text) -> int:
     example byte_count("åsa") is 4
-    bytes_length(bytes_from_text(t))
+    bytes_count(bytes_of(t))
 
 public define starts_with(t: text, prefix: text) -> truth:
     example starts_with("hello", "he")
-    t_bytes = bytes_from_text(t)
-    p_bytes = bytes_from_text(prefix)
-    t_len = bytes_length(t_bytes)
-    p_len = bytes_length(p_bytes)
+    t_bytes = bytes_of(t)
+    p_bytes = bytes_of(prefix)
+    t_len = bytes_count(t_bytes)
+    p_len = bytes_count(p_bytes)
     if p_len > t_len:
         return false
     loop ci in 0 until p_len:
@@ -35,10 +35,10 @@ public define starts_with(t: text, prefix: text) -> truth:
 
 public define ends_with(t: text, suffix: text) -> truth:
     example ends_with("hello", "lo")
-    t_bytes = bytes_from_text(t)
-    s_bytes = bytes_from_text(suffix)
-    t_len = bytes_length(t_bytes)
-    s_len = bytes_length(s_bytes)
+    t_bytes = bytes_of(t)
+    s_bytes = bytes_of(suffix)
+    t_len = bytes_count(t_bytes)
+    s_len = bytes_count(s_bytes)
     if s_len > t_len:
         return false
     offset = t_len - s_len
@@ -61,8 +61,8 @@ public define repeat(t: text, n: int) -> text:
 public define reverse(t: text) -> text:
     example reverse("abc") is "cba"
     example reverse("åsa") is "aså"
-    t_bytes = bytes_from_text(t)
-    n = bytes_length(t_bytes)
+    t_bytes = bytes_of(t)
+    n = bytes_count(t_bytes)
     edit out = bytes_zeros(0)
     edit ci = 0
     loop:
@@ -78,9 +78,9 @@ public define reverse(t: text) -> text:
                 cend = cend + 1
             else:
                 break
-        out = bytes_concat(bytes_slice(t_bytes, ci, cend), out)
+        out = bytes_concat(bytes_part(t_bytes, ci, cend), out)
         ci = cend
-    bytes_to_text(out)
+    text_of(out)
 
 # ---- Unicode case ----------------------------------------------------
 #
@@ -114,7 +114,7 @@ define cp_size(lead: int) -> int:
 # Decode the code point starting at byte `i`. A truncated or ill-formed
 # sequence decodes as its lead byte, so decoding never fails.
 define cp_at(b: [int], i: int) -> int:
-    n = len(b)
+    n = length(b)
     lead = at(b, i)
     size = cp_size(lead)
     if i + size > n:
@@ -238,9 +238,9 @@ define lower_cp(cp: int) -> int:
         cp
 
 # Walk `t` code point by code point and rebuild it through `mapper`.
-define map_case(t: text, mapper: fn) -> text:
-    b = bytes_from_text(t)
-    n = len(b)
+define map_case(t: text, mapper: function) -> text:
+    b = bytes_of(t)
+    n = length(b)
     edit out = bytes_zeros(0)
     edit i = 0
     loop:
@@ -249,7 +249,7 @@ define map_case(t: text, mapper: fn) -> text:
         cp = cp_at(b, i)
         out = bytes_concat(out, cp_bytes(mapper(cp)))
         i = i + cp_size(at(b, i))
-    bytes_to_text(out)
+    text_of(out)
 
 # Upper-case, code point by code point.
 public define upper(t: text) -> text:
@@ -273,8 +273,8 @@ public define lower(t: text) -> text:
 public define characters(t: text) -> int:
     example characters("åsa") is 3
     example characters("abc") is 3
-    t_bytes = bytes_from_text(t)
-    n = bytes_length(t_bytes)
+    t_bytes = bytes_of(t)
+    n = bytes_count(t_bytes)
     edit count = 0
     loop ci in 0 until n:
         b = byte_at(t_bytes, ci)
@@ -286,8 +286,8 @@ public define characters(t: text) -> int:
 #   trim("  hi  ")  ->  "hi"
 public define trim(t: text) -> text:
     example trim("  hi  ") is "hi"
-    tb = bytes_from_text(t)
-    n = bytes_length(tb)
+    tb = bytes_of(t)
+    n = bytes_count(tb)
     edit lo = 0
     edit hi = n
     loop:
@@ -306,14 +306,14 @@ public define trim(t: text) -> text:
             hi = hi - 1
         else:
             break
-    bytes_to_text(bytes_slice(tb, lo, hi))
+    text_of(bytes_part(tb, lo, hi))
 
 # Join a list of pieces with `sep` between them.
 #   join(["a", "b", "c"], "-")  ->  "a-b-c"
 public define join(parts: [text], sep: text) -> text:
     example join(["a", "b", "c"], "-") is "a-b-c"
     edit out = ""
-    n = len(parts)
+    n = length(parts)
     loop i in 0 until n:
         if i > 0:
             out = "{out}{sep}"
@@ -324,11 +324,11 @@ public define join(parts: [text], sep: text) -> text:
 #   split("a,b,c", ",")  ->  ["a", "b", "c"]
 # An empty `sep` yields the whole string as a single piece.
 public define split(t: text, sep: text) -> [text]:
-    example len(split("a,b,c", ",")) is 3
-    tb = bytes_from_text(t)
-    sb = bytes_from_text(sep)
-    tlen = bytes_length(tb)
-    slen = bytes_length(sb)
+    example length(split("a,b,c", ",")) is 3
+    tb = bytes_of(t)
+    sb = bytes_of(sep)
+    tlen = bytes_count(tb)
+    slen = bytes_count(sb)
     edit out = []
     if slen is 0:
         out = append(out, t)
@@ -343,12 +343,12 @@ public define split(t: text, sep: text) -> [text]:
                 if byte_at(tb, i + j) is not byte_at(sb, j):
                     matched = false
             if matched:
-                out = append(out, bytes_to_text(bytes_slice(tb, start, i)))
+                out = append(out, text_of(bytes_part(tb, start, i)))
                 i = i + slen
                 start = i
             else:
                 i = i + 1
-        out = append(out, bytes_to_text(bytes_slice(tb, start, tlen)))
+        out = append(out, text_of(bytes_part(tb, start, tlen)))
     out
 
 # Replace every occurrence of `from` with `to` - split on `from`, rejoin
@@ -362,10 +362,10 @@ public define replace(t: text, from: text, to: text) -> text:
 public define index_of(t: text, sub: text) -> int:
     example index_of("hello", "ll") is 2
     example index_of("hello", "zz") is 0 - 1
-    tb = bytes_from_text(t)
-    sb = bytes_from_text(sub)
-    tlen = bytes_length(tb)
-    slen = bytes_length(sb)
+    tb = bytes_of(t)
+    sb = bytes_of(sub)
+    tlen = bytes_count(tb)
+    slen = bytes_count(sb)
     edit found = 0 - 1
     if slen is 0:
         found = 0
@@ -387,7 +387,7 @@ public define index_of(t: text, sub: text) -> int:
 public define pad_left(t: text, width: int, pad: text) -> text:
     example pad_left("7", 3, "0") is "007"
     edit out = t
-    edit k = len(t)
+    edit k = length(t)
     loop:
         if k >= width:
             break
@@ -399,7 +399,7 @@ public define pad_left(t: text, width: int, pad: text) -> text:
 public define pad_right(t: text, width: int, pad: text) -> text:
     example pad_right("7", 3, "0") is "700"
     edit out = t
-    edit k = len(t)
+    edit k = length(t)
     loop:
         if k >= width:
             break
@@ -420,8 +420,8 @@ public define int_from_text(t: text) -> int:
     example int_from_text("-7") is 0 - 7
     example int_from_text("12ab") is 12
     example int_from_text("x") is 0
-    bs = bytes_from_text(t)
-    n = len(bs)
+    bs = bytes_of(t)
+    n = length(bs)
     edit i = 0
     edit neg = false
     if n > 0 and at(bs, 0) is 45:

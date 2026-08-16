@@ -3,7 +3,7 @@
 # Inside `fn take<T>(xs: [T], n: int) -> [T]` the type var erases to an i64 slot,
 # which is right (one body serves every T). It used to leak out though: the CALL
 # got `list:i64` back, so an element read out of the result was an int and
-# `len(at(kept, 0))` was a compile error ("`first` is `int`, not text or a
+# `length(at(kept, 0))` was a compile error ("`first` is `int`, not text or a
 # list"). The call site knows what the body cannot - the argument says T = Text.
 #
 # The runtime representation never changed: a list of text pointers and a list
@@ -11,7 +11,7 @@
 # which one it holds.
 
 define take<T>(xs: [T], n: int) -> [T]:
-    edit out = slice(xs, 0, 0)
+    edit out = part(xs, 0, 0)
     loop i in 0..<n:
         out = append(out, at(xs, i))
     out
@@ -25,8 +25,8 @@ define sum_two(xs: [int]) -> int:
 define main() -> int:
     words = ["hi", "hello", "howdy"]
     kept = take(words, 2)
-    a = len(at(kept, 0))     # 2   ("hi")     needs T = Text
-    b = len(first_of(words)) # 2   bare `-> T` instantiates too
+    a = length(at(kept, 0))     # 2   ("hi")     needs T = Text
+    b = length(first_of(words)) # 2   bare `-> T` instantiates too
     # A concrete [int] argument still yields an int list.
     nums = [7, 8, 9]
     c = sum_two(take(nums, 2))   # 15

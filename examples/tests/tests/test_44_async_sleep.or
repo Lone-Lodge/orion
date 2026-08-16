@@ -16,11 +16,11 @@ define napper(id: int) -> int:
 
 define main() -> int:
     t0 = monotonic_ms()
-    edit ids = slice([0], 0, 0)
+    edit ids = part([0], 0, 0)
     loop i in 0..<8:
         ids = append(ids, spawn(napper, i + 1))
     edit sum = 0
-    loop j in 0..<len(ids):
+    loop j in 0..<length(ids):
         sum = sum + await(at(ids, j))
     elapsed = monotonic_ms() - t0
     print_line("8 tasks x 50ms: {elapsed} ms, sum={sum}")

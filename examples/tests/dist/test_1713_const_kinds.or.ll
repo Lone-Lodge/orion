@@ -79,6 +79,12 @@ declare i64 @orion_audio_bus_gain(i64, i64, i64)
 declare i64 @orion_audio_playing()
 declare i64 @orion_audio_debug_plays()
 declare void @orion_audio_shutdown()
+declare i64 @orion_mic_open(i64)
+declare i64 @orion_mic_level()
+declare i64 @orion_mic_buffered()
+declare i64 @orion_mic_rate()
+declare i64 @orion_mic_take_wav(ptr)
+declare void @orion_mic_close()
 declare void @orion_arena_ptr_guard(ptr, ptr)
 declare ptr @orion_slot_evac(ptr, ptr, i64)
 declare void @orion_crumb(ptr, ptr, i64)
@@ -1508,31 +1514,37 @@ retb:
 }
 
 
-
-define ptr @prog__call_handler(ptr %p0, ptr %p1) {
-entry:
-    %v0 = getelementptr i8, ptr %p0, i64 0
-    %v1 = getelementptr i8, ptr %p1, i64 0
-    %v2.fpi = call i64 @orion_list_at(ptr %v0, i64 0)
-    %v2.flg = call i64 @orion_list_at(ptr %v0, i64 1)
-    %v2.p = inttoptr i64 %v2.fpi to ptr
-    %v2.isl = icmp eq i64 %v2.flg, 1
-    br i1 %v2.isl, label %clam2, label %cpln2
-clam2:
-    %v2.r1 = call ptr %v2.p(ptr %v0, ptr %v1)
-    br label %cmrg2
-cpln2:
-    %v2.r2 = call ptr %v2.p(ptr %v1)
-    br label %cmrg2
-cmrg2:
-    %v2 = phi ptr [ %v2.r1, %clam2 ], [ %v2.r2, %cpln2 ]
-    ret ptr %v2
-}
+@.str_0 = private unnamed_addr constant [22 x i8] c"\7C\91\B2\25\00\00\00\00\05\00\00\00\00\00\00\00click\00", align 8
 
 define i64 @orion_main() {
 entry:
-    %v0 = add i64 0, 0
-    ret i64 %v0
+    %v0 = fadd double 0x3FFBC6A7EF9DB22D, 0x0000000000000000
+    %v1 = fadd double 0x408F400000000000, 0x0000000000000000
+    %v2 = fmul double %v0, %v1
+    %v3 = fptosi double %v2 to i64
+    %v4 = fadd double 0x4008000000000000, 0x0000000000000000
+    %v5 = fadd double 0x0000000000000000, 0x0000000000000000
+    %v6 = fsub double %v5, %v4
+    %v7 = fadd double 0x4024000000000000, 0x0000000000000000
+    %v8 = fmul double %v6, %v7
+    %v9 = fptosi double %v8 to i64
+    %v10 = getelementptr i8, ptr @.str_0, i64 16
+    %v11 = getelementptr i8, ptr @.str_0, i64 16
+    %v12.e = call i64 @orion_text_eq(ptr %v10, ptr %v11)
+    %v12 = add i64 %v12.e, 0
+    %v13.cb = icmp ne i64 %v12, 0
+    br i1 %v13.cb, label %if_13_then, label %if_13_else
+if_13_then:
+    %v15 = add i64 0, 7
+    br label %if_13_merge
+if_13_else:
+    %v18 = add i64 0, 0
+    br label %if_13_merge
+if_13_merge:
+    %v21 = phi i64 [ %v15, %if_13_then ], [ %v18, %if_13_else ]
+    %v22 = add i64 %v3, %v9
+    %v23 = add i64 %v22, %v21
+    ret i64 %v23
 }
 
 @orion_argc = global i64 0

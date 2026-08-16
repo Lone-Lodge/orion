@@ -7,6 +7,10 @@
  * these sizes are memset-class work; a full 800x900 repaint is
  * ~0.7MB of writes.
  */
+/* Portable C uses fopen; MSVC's CRT flags it "deprecated" in favour of
+ * non-portable _s variants. We stay portable - suppress (same as
+ * orion_rt.c). */
+#define _CRT_SECURE_NO_WARNINGS 1
 #include <windows.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -14,6 +18,7 @@
 
 static HWND      g_hwnd;
 static int       g_width, g_height;
+static int       g_scale = 1; /* whole-step present scale (nearest) */
 static uint32_t *g_fb;        /* BGRX, top-down */
 static uint32_t  g_clear;
 
@@ -112,13 +117,44 @@ static void blit(void) {
     bi.bmiHeader.biBitCount = 32;
     bi.bmiHeader.biCompression = BI_RGB;
     HDC dc = GetDC(g_hwnd);
-    StretchDIBits(dc, 0, 0, g_width, g_height, 0, 0, g_width, g_height,
+    /* COLORONCOLOR = nearest: whole-step upscales stay crisp squares. */
+    SetStretchBltMode(dc, COLORONCOLOR);
+    StretchDIBits(dc, 0, 0, g_width * g_scale, g_height * g_scale,
+                  0, 0, g_width, g_height,
                   g_fb, &bi, DIB_RGB_COLORS, SRCCOPY);
     ReleaseDC(g_hwnd, dc);
 }
 
+/* Present the framebuffer at a whole-number scale: the window is
+ * scale x bigger than the pixels, each pixel a crisp square. The
+ * framebuffer (and snapshots) stay at the render size. */
+long long sw_og_scale(long long scale) {
+    g_scale = scale < 1 ? 1 : (int)scale;
+    return 1;
+}
+
 long long sw_og_present(void) {
     blit();
+    return 1;
+}
+
+/* sw_og_blit(list, w, h): copy an Orion [int] pixel list (0xRRGGBB,
+ * top-down row-major) straight into the framebuffer. An Orion list is
+ * [cap, len, data...] in i64 words; 0xRRGGBB in a little-endian BGRX
+ * dword is byte-identical, so each pixel is one truncating store. This
+ * is the seam a software render block presents through. */
+long long sw_og_blit(long long list_ptr, long long w, long long h) {
+    if (!g_fb || !list_ptr) return 0;
+    long long *list = (long long *)(uintptr_t)list_ptr;
+    if (list[1] < w * h) return 0;
+    long long *data = list + 2;
+    int cw = (int)w < g_width ? (int)w : g_width;
+    int ch = (int)h < g_height ? (int)h : g_height;
+    for (int y = 0; y < ch; y++) {
+        uint32_t *row = g_fb + (size_t)y * g_width;
+        long long *src = data + (long long)y * w;
+        for (int x = 0; x < cw; x++) row[x] = (uint32_t)src[x];
+    }
     return 1;
 }
 

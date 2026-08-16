@@ -4,4 +4,4 @@
 define main() -> int:
     m = {"a": 7, "b": 9}
     s = "k={m["a"]}"        # "k=7"  (3 bytes)
-    len(s) * 10             # 30
+    length(s) * 10             # 30

@@ -48,7 +48,7 @@ public define await_task(t: Task):
 # no example: sleeps until a deadline — proven by test_44_async_sleep.or
 # no example: sleeps until the earliest deadline — proven by test_44_async_sleep.or
 public define await_next(tasks: [Task]):
-    n = len(tasks)
+    n = length(tasks)
     if n is 0:
         return
     edit earliest = at(tasks, 0).deadline_ms

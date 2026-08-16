@@ -1,0 +1,13 @@
+# A const is inlined at every read site - whole, decimal or text. The
+# wasm backend used to fold only the whole ones and read every other
+# kind as ZERO, without a word: `pi` was 0 in every wasm build. This
+# pins all three kinds against the native answer.
+const ratio = 1.736
+const plane = -3.0
+const tag = "click"
+
+define main() -> int:
+    scaled = to_whole(ratio * 1000.0)
+    depth = to_whole(plane * 10.0)
+    named = if tag is "click" then 7 else 0
+    scaled + depth + named

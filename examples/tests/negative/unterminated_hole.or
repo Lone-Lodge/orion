@@ -6,4 +6,4 @@
 # under a timeout so a spin is a failure, not a stuck run.
 define main() -> int:
     s = "{{"
-    len(s)
+    length(s)

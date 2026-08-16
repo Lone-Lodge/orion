@@ -24,12 +24,12 @@ define main() -> int:
         if at(a, i) is not at(b, i):
             same = false
     tok = secure_token(16)
-    ent_ok = len(a) is 32 and in_range and not same and len(tok) is 32
+    ent_ok = length(a) is 32 and in_range and not same and length(tok) is 32
 
     # Clock time: epoch zero formats exactly, and now() is after 2020.
     t_ok = utc_time(0, "%Y-%m-%d %H:%M:%S") is "1970-01-01 00:00:00"
     now_ok = now_unix() > 1577836800
-    stamp_ok = len(timestamp()) is 19
+    stamp_ok = length(timestamp()) is 19
 
     armed = interrupted()
     arm_ok = not armed

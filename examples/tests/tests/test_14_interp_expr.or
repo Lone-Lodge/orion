@@ -7,4 +7,4 @@ define main() -> int:
     xs = [3, 4]
     s = "{a + b}"          # "14"
     t = "{xs[0]}"          # "3"
-    len(s) * 7             # 2 * 7 = 14
+    length(s) * 7             # 2 * 7 = 14

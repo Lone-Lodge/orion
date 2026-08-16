@@ -17,4 +17,4 @@ define main() -> int:
         x * 10                     # yield x AND tail x*10 -> [1,10,2,20] -> 33
     c = loop x in [1, 2, 3, 4]:
         if x > 2: collect x          # ends in a statement -> [3, 4]      -> 7
-    sum(a) + sum(b) + sum(c) + len(a)   # 15 + 33 + 7 + 3 = 58
+    sum(a) + sum(b) + sum(c) + length(a)   # 15 + 33 + 7 + 3 = 58

@@ -10,4 +10,4 @@ define main() -> int:
     weak = loop e in items(w4) where get_int(e, "hp") < 9: collect e
     gone = if has_id(w4, b) then 0 else 7
     # 2 live * 10 + 1 weak * 5 + hp(a)=10 + gone 7 = 42
-    len(items(w4)) * 10 + len(weak) * 5 + get_int(entity(w4, a), "hp") + gone
+    length(items(w4)) * 10 + length(weak) * 5 + get_int(entity(w4, a), "hp") + gone

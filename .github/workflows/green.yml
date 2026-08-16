@@ -100,6 +100,18 @@ jobs:
       - name: sqlite
         run: bash tools/sqlite_test.sh
 
+      # Mic capture. The null-backend phase runs everywhere and proves the
+      # binding chain; the WASAPI phase skips itself on a runner with no
+      # capture device rather than failing the build.
+      - name: mic capture
+        run: bash tools/mic_test.sh
+
+      # Speech to text over the vendored whisper.cpp. Skips itself when the
+      # runner has no model (they are half a gigabyte and not in the repo),
+      # so this gates the wiring on every push and the recognition locally.
+      - name: whisper
+        run: bash tools/whisper_test.sh
+
       # A documented feature that no longer exists fails exactly like a stale
       # seed: it reads fine and nobody runs it. Every sample in the Field Guide
       # is a whole program, and this compiles all of them.

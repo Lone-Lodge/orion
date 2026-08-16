@@ -18,7 +18,7 @@ define main() -> int:
     w4 = write_file("dist/.watch/notes.md", "not a watched suffix")
 
     files = scan_tree("dist/.watch")
-    two_found = len(files) is 2
+    two_found = length(files) is 2
 
     s1 = snapshot("dist/.watch")
     same = first_change(s1, snapshot("dist/.watch")) is ""
@@ -34,7 +34,7 @@ define main() -> int:
     s3 = snapshot("dist/.watch")
     grew = first_change(s2, s3) is "(file added or removed)"
 
-    print_line("files={len(files)} hit={hit}")
+    print_line("files={length(files)} hit={hit}")
     p1 = if two_found then 10 else 0
     p2 = if same then 10 else 0
     p3 = if named then 12 else 0

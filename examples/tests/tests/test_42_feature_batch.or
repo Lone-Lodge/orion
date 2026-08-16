@@ -7,7 +7,7 @@ define scaled(base: int, factor = 3) -> int:
     base * factor
 
 define pick(xs: list of int, fallback = 9) -> int:
-    if len(xs) > 0 then at(xs, 0) else fallback
+    if length(xs) > 0 then at(xs, 0) else fallback
 
 define first given item (items: list of item) -> item:
     at(items, 0)
@@ -18,4 +18,4 @@ define main() -> int:
     c = pick([])                        # default fallback  -> 9  wait len 0 -> 9
     d = pick([7, 8])                    # -> 7... use to keep sum 42: skip d
     e = first(["x", "yz"])
-    a + b + c - len(e) - 1              # 15 + 20 + 9 - 1 - 1 = 42
+    a + b + c - length(e) - 1              # 15 + 20 + 9 - 1 - 1 = 42

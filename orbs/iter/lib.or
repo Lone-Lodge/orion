@@ -5,7 +5,7 @@
 # names the element type so its body can use `len` / `at` / `get`:
 #
 #   doubled = each([1, 2, 3], (x): x * 2)               # int, no annotation
-#   lengths = each(words,    fn(s: text): len(s))       # text - annotate `s`
+#   lengths = each(words,    function(s: text): length(s))       # text - annotate `s`
 #   evens   = keep(xs,       (x): x % 2 is 0)
 #   total   = combine(xs, 0, (acc, x): acc + x)          # sum
 #
@@ -13,89 +13,89 @@
 # Predicates return 1 (keep / true) or 0 (drop / false).
 
 # Apply `f` to every element, collecting the results.
-public define each<T>(xs: [T], f: fn) -> [int]:
+public define each<T>(xs: [T], f: function) -> [int]:
     example at(each([1, 2, 3], (x): x * 2), 1) is 4
     edit out = []
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         out = append(out, f(at(xs, i)))
     out
 
 # Keep the elements for which `pred(x)` holds. Result keeps the element type.
-public define keep<T>(xs: [T], pred: fn) -> [T]:
-    example len(keep([1, 2, 3, 4], (x): x > 2)) is 2
+public define keep<T>(xs: [T], pred: function) -> [T]:
+    example length(keep([1, 2, 3, 4], (x): x > 2)) is 2
     edit out = []
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         x = at(xs, i)
         if pred(x):
             out = append(out, x)
     out
 
 # Fold left: acc starts at `init`, then acc = f(acc, x) for each element.
-public define combine<T>(xs: [T], init: int, f: fn) -> int:
+public define combine<T>(xs: [T], init: int, f: function) -> int:
     example combine([1, 2, 3], 0, (a, b): a + b) is 6
     edit acc = init
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         acc = f(acc, at(xs, i))
     acc
 
 # true when `pred(x)` holds for at least one element.
-public define any<T>(xs: [T], pred: fn) -> truth:
+public define any<T>(xs: [T], pred: function) -> truth:
     example any([1, 5, 9], (x): x > 8)
     example not any([1, 2], (x): x > 8)
     edit found = false
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if pred(at(xs, i)):
             found = true
     found
 
 # true when `pred(x)` holds for every element (vacuously true when empty).
-public define all<T>(xs: [T], pred: fn) -> truth:
+public define all<T>(xs: [T], pred: function) -> truth:
     example all([2, 4], (x): x % 2 is 0)
     example not all([2, 5], (x): x % 2 is 0)
     edit ok = true
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if not pred(at(xs, i)):
             ok = false
     ok
 
 # Index of the first element where `pred(x)` holds, or -1 if none match.
-public define find_index<T>(xs: [T], pred: fn) -> int:
+public define find_index<T>(xs: [T], pred: function) -> int:
     example find_index([1, 9, 3], (x): x > 5) is 1
     edit idx = 0 - 1
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if idx < 0:
             if pred(at(xs, i)):
                 idx = i
     idx
 
 # How many elements satisfy `pred`.
-public define count<T>(xs: [T], pred: fn) -> int:
+public define count<T>(xs: [T], pred: function) -> int:
     example count([1, 9, 3, 7], (x): x > 5) is 2
     edit n = 0
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if pred(at(xs, i)):
             n = n + 1
     n
 
 # Sum of every element (0 for an empty list). No closure - the workhorse
-# `combine(xs, 0, fn(a, b): a + b)` written once.
+# `combine(xs, 0, function(a, b): a + b)` written once.
 public define sum(xs: [int]) -> int:
     example sum([1, 2, 3]) is 6
     example sum([40, 2]) is 42
     edit total = 0
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         total = total + at(xs, i)
     total
 
 # The element with the largest `key(x)`. Ties keep the earlier element.
 # Returns 0 for an empty list.
-public define max_by(xs: [int], key: fn) -> int:
+public define max_by(xs: [int], key: function) -> int:
     example max_by([1, 9, 3], (x): x) is 9
     edit best = 0
-    if len(xs) > 0:
+    if length(xs) > 0:
         best = at(xs, 0)
         edit best_k = key(best)
-        loop i in 1 until len(xs):
+        loop i in 1 until length(xs):
             x = at(xs, i)
             k = key(x)
             if k > best_k:
@@ -105,13 +105,13 @@ public define max_by(xs: [int], key: fn) -> int:
 
 # The element with the smallest `key(x)`. Ties keep the earlier element.
 # Returns 0 for an empty list.
-public define min_by(xs: [int], key: fn) -> int:
+public define min_by(xs: [int], key: function) -> int:
     example min_by([4, 2, 8], (x): x) is 2
     edit best = 0
-    if len(xs) > 0:
+    if length(xs) > 0:
         best = at(xs, 0)
         edit best_k = key(best)
-        loop i in 1 until len(xs):
+        loop i in 1 until length(xs):
             x = at(xs, i)
             k = key(x)
             if k < best_k:
@@ -121,9 +121,9 @@ public define min_by(xs: [int], key: fn) -> int:
 
 # Return a new list ordered so that `less(a, b)` means `a` comes first.
 # Stable selection sort - small lists, clarity over speed.
-#   sorted   = sort_by(xs, fn(a, b): if a < b then 1 else 0)   # ascending
-#   by_score = sort_by(ps, fn(a, b): if score(a) > score(b) then 1 else 0)
-public type order_of: less: fn
+#   sorted   = sort_by(xs, function(a, b): if a < b then 1 else 0)   # ascending
+#   by_score = sort_by(ps, function(a, b): if score(a) > score(b) then 1 else 0)
+public type order_of: less: function
 
 # Generic: works on ANY element type, because the ORDER comes in as a
 # capability record (`requires order`) rather than being baked into the
@@ -134,24 +134,24 @@ public define sorted<T>(xs: [T], order: order_of) -> [T]:
     sort_generic(xs, cmp)
 
 # The int-typed form (kept: the common case, no capability record needed).
-public define sort_by(xs: [int], less: fn) -> [int]:
+public define sort_by(xs: [int], less: function) -> [int]:
     example at(sort_by([3, 1, 2], (a, b): a < b), 0) is 1
     sort_generic(xs, less)
 
 # Selection sort, stable, element-type agnostic - the engine both forms use.
-define sort_generic<T>(xs: [T], less: fn) -> [T]:
+define sort_generic<T>(xs: [T], less: function) -> [T]:
     edit rest = xs
     edit out = []
-    loop _pass in 0 until len(xs):
+    loop _pass in 0 until length(xs):
         # Pick the element that should come before all others still in `rest`.
         edit best = 0
-        loop i in 1 until len(rest):
+        loop i in 1 until length(rest):
             if less(at(rest, i), at(rest, best)):
                 best = i
         out = append(out, at(rest, best))
         # Drop the chosen element, keeping the rest in order (stability).
         edit nrest = []
-        loop i in 0 until len(rest):
+        loop i in 0 until length(rest):
             if i is not best:
                 nrest = append(nrest, at(rest, i))
         rest = nrest

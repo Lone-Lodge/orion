@@ -15,7 +15,7 @@ define count_bytes(h: int) -> int:
         chunk = read_chunk(h, 4)          # tiny chunks on purpose
         if is_end(chunk):
             break
-        total = total + len(chunk)
+        total = total + length(chunk)
     total
 
 define main() -> int:
@@ -28,6 +28,6 @@ define main() -> int:
     ok1 = if wrote is 3 then 10 else 0
     ok2 = if streamed is 17 then 10 else 0          # alpha\nbeta\ngamma\n
     ok3 = if streamed is on_disk then 10 else 0     # stream == size on disk
-    ok4 = if len(whole) is streamed then 6 else 0   # stream == whole-file read
+    ok4 = if length(whole) is streamed then 6 else 0   # stream == whole-file read
     ok5 = if missing is 0 - 1 then 6 else 0         # a missing file says so
     ok1 + ok2 + ok3 + ok4 + ok5

@@ -24,7 +24,7 @@ define main() -> int:
     back = json_escape(esc)
     round_ok = if index_of(back, "\\t") >= 0 and index_of(back, "\\n") >= 0 then 1 else 0
     # A missing key is empty/zero, never a crash.
-    missing = json_int(root, "nope") + len(json_text(root, "nope"))
+    missing = json_int(root, "nope") + length(json_text(root, "nope"))
 
-    id + len(m) + ok + deep + second + tab_ok + round_ok + missing
+    id + length(m) + ok + deep + second + tab_ok + round_ok + missing
     # 7 + 20 + 1 + 42 + 2 + 1 + 1 + 0 == 74

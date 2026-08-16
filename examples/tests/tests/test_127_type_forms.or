@@ -25,4 +25,4 @@ define main() -> int:
     area = b.w * b.h                      # 12
     # Loot is the THIRD variant: it only resolves if commas continued the sum.
     c = cost(Tile.Loot) + cost(Tile.Wall) # 110
-    area + c + len(b.label)               # 12 + 110 + 5 == 127
+    area + c + length(b.label)               # 12 + 110 + 5 == 127

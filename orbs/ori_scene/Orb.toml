@@ -1,0 +1,3 @@
+name = "ori_scene"
+version = "0.1.0"
+description = "ORI 3D seam: the scene-frame contract between an engine and a renderer (camera, instances, triangles)"

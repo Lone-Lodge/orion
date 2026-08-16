@@ -28,23 +28,23 @@ fn tck_scope_bind(scope, name: Text, type_name: Text):
     push(scope, {"name": name, "type": type_name})
 
 fn tck_scope_lookup(scope, name: Text) -> Text:
-    total = len(scope)
+    total = length(scope)
     mut found = ""
     for index in 0..<total:
         entry = at(scope, index)
-        if bytes_to_text(bytes_from_text(get(entry, "name"))) == name:
-            found = bytes_to_text(bytes_from_text(get(entry, "type")))
+        if text_of(bytes_of(get(entry, "name"))) == name:
+            found = text_of(bytes_of(get(entry, "type")))
     found
 
 # --- expression type inference ---
 
 fn tck_infer_expr(node, scope) -> Text:
-    kind = bytes_to_text(bytes_from_text(get(node, "kind")))
+    kind = text_of(bytes_of(get(node, "kind")))
     if kind == "Int":
         "int"
     else:
         if kind == "Ident":
-            name = bytes_to_text(bytes_from_text(get(node, "name")))
+            name = text_of(bytes_of(get(node, "name")))
             looked_up = tck_scope_lookup(scope, name)
             if looked_up == "":
                 "error:unbound:" + name
@@ -54,7 +54,7 @@ fn tck_infer_expr(node, scope) -> Text:
             if kind == "Binary":
                 left_type = tck_infer_expr(get(node, "left"), scope)
                 right_type = tck_infer_expr(get(node, "right"), scope)
-                operator = bytes_to_text(bytes_from_text(get(node, "op")))
+                operator = text_of(bytes_of(get(node, "op")))
                 tck_check_binary(operator, left_type, right_type)
             else:
                 if kind == "Call":
@@ -79,14 +79,14 @@ fn tck_check_binary(op: Text, left_type: Text, right_type: Text) -> Text:
 #   * unsupported binary op
 
 fn tck_check_fn(fn_node) -> Text:
-    declared_ret = bytes_to_text(bytes_from_text(get(get(fn_node, "ret"), "name")))
+    declared_ret = text_of(bytes_of(get(get(fn_node, "ret"), "name")))
     params = get(fn_node, "params")
     mut scope = tck_scope_empty()
-    param_count = len(params)
+    param_count = length(params)
     for index in 0..<param_count:
         param = at(params, index)
-        param_name = bytes_to_text(bytes_from_text(get(param, "name")))
-        param_type = bytes_to_text(bytes_from_text(get(get(param, "type"), "name")))
+        param_name = text_of(bytes_of(get(param, "name")))
+        param_type = text_of(bytes_of(get(get(param, "type"), "name")))
         scope = tck_scope_bind(scope, param_name, param_type)
     body_type = tck_infer_expr(get(fn_node, "body"), scope)
     if str_starts_with(body_type, "error"):
@@ -101,12 +101,12 @@ fn tck_check_fn(fn_node) -> Text:
 
 pub fn self_typeck(ast) -> [Text]:
     decls = get(ast, "decls")
-    decl_count = len(decls)
+    decl_count = length(decls)
     mut diagnostics = []
     for index in 0..<decl_count:
         fn_node = at(decls, index)
         result = tck_check_fn(fn_node)
         if result != "":
-            fn_name = bytes_to_text(bytes_from_text(get(fn_node, "name")))
+            fn_name = text_of(bytes_of(get(fn_node, "name")))
             diagnostics = push(diagnostics, "in fn " + fn_name + ": " + result)
     diagnostics

@@ -79,6 +79,12 @@ declare i64 @orion_audio_bus_gain(i64, i64, i64)
 declare i64 @orion_audio_playing()
 declare i64 @orion_audio_debug_plays()
 declare void @orion_audio_shutdown()
+declare i64 @orion_mic_open(i64)
+declare i64 @orion_mic_level()
+declare i64 @orion_mic_buffered()
+declare i64 @orion_mic_rate()
+declare i64 @orion_mic_take_wav(ptr)
+declare void @orion_mic_close()
 declare void @orion_arena_ptr_guard(ptr, ptr)
 declare ptr @orion_slot_evac(ptr, ptr, i64)
 declare void @orion_crumb(ptr, ptr, i64)
@@ -3814,7 +3820,7 @@ entry:
     ret double %v3
 }
 
-define i64 @prog__text_of(ptr %p0, i64 %p1) {
+define i64 @prog__text_via(ptr %p0, i64 %p1) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
     %v1 = add i64 0, %p1
@@ -3886,7 +3892,7 @@ entry:
     call void @orion_list_set(ptr %v0, i64 0, i64 %v0.fp)
     call void @orion_list_set(ptr %v0, i64 1, i64 0)
     %v1 = add i64 0, 7
-    %v2 = call i64 @prog__text_of(ptr %v0, i64 %v1)
+    %v2 = call i64 @prog__text_via(ptr %v0, i64 %v1)
     %v3 = add i64 0, 3
     %v4.b = icmp eq i64 %v2, %v3
     %v4 = zext i1 %v4.b to i64

@@ -10,7 +10,7 @@
 
 # [0, 1, …, n-1]. Empty for n <= 0.
 public define range(n: int) -> [int]:
-    example len(range(4)) is 4
+    example length(range(4)) is 4
     edit out = []
     loop i in 0 until n:
         out = append(out, i)
@@ -20,7 +20,7 @@ public define range(n: int) -> [int]:
 public define reversed(xs: [int]) -> [int]:
     example at(reversed([1, 2, 3]), 0) is 3
     edit out = []
-    n = len(xs)
+    n = length(xs)
     loop i in 0 until n:
         out = append(out, at(xs, n - 1 - i))
     out
@@ -30,7 +30,7 @@ public define reversed(xs: [int]) -> [int]:
 public define includes(xs: [int], v: int) -> truth:
     example includes([1, 2, 3], 2)
     edit found = false
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if at(xs, i) is v:
             found = true
     found
@@ -40,7 +40,7 @@ public define find(xs: [int], v: int) -> int:
     example find([5, 6], 6) is 1
     example find([5, 6], 9) is 0 - 1
     edit idx = 0 - 1
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if idx < 0:
             if at(xs, i) is v:
                 idx = i
@@ -49,12 +49,12 @@ public define find(xs: [int], v: int) -> int:
 # First / last element, or 0 for an empty list.
 public define first(xs: [int]) -> int:
     example first([9, 8]) is 9
-    if len(xs) > 0 then at(xs, 0) else 0
+    if length(xs) > 0 then at(xs, 0) else 0
 
 public define last(xs: [int]) -> int:
     example last([9, 8]) is 8
     example last([9, 8]) is 8
-    n = len(xs)
+    n = length(xs)
     if n > 0 then at(xs, n - 1) else 0
 
 # (Summation lives in the `iter` orb: `sum(xs)`.)
@@ -64,9 +64,9 @@ public define last(xs: [int]) -> int:
 public define max_of(xs: [int]) -> int:
     example max_of([3, 42, 7]) is 42
     edit best = 0
-    if len(xs) > 0:
+    if length(xs) > 0:
         best = at(xs, 0)
-        loop i in 1 until len(xs):
+        loop i in 1 until length(xs):
             if at(xs, i) > best:
                 best = at(xs, i)
     best
@@ -74,9 +74,9 @@ public define max_of(xs: [int]) -> int:
 public define min_of(xs: [int]) -> int:
     example min_of([3, 42, 7]) is 3
     edit best = 0
-    if len(xs) > 0:
+    if length(xs) > 0:
         best = at(xs, 0)
-        loop i in 1 until len(xs):
+        loop i in 1 until length(xs):
             if at(xs, i) < best:
                 best = at(xs, i)
     best
@@ -84,7 +84,7 @@ public define min_of(xs: [int]) -> int:
 # Integer average (sum / count), truncated. 0 for an empty list.
 public define avg(xs: [int]) -> int:
     example avg([2, 4, 6]) is 4
-    n = len(xs)
+    n = length(xs)
     edit total = 0
     loop i in 0 until n:
         total = total + at(xs, i)
@@ -92,37 +92,52 @@ public define avg(xs: [int]) -> int:
 
 # a followed by b, as a new list.
 public define concat(a: [int], b: [int]) -> [int]:
-    example len(concat([1, 2], [3])) is 3
+    example length(concat([1, 2], [3])) is 3
     edit out = []
-    loop i in 0 until len(a):
+    loop i in 0 until length(a):
         out = append(out, at(a, i))
-    loop i in 0 until len(b):
+    loop i in 0 until length(b):
         out = append(out, at(b, i))
     out
 
 # The elements of `xs` with later duplicates removed (first occurrence kept).
 public define unique(xs: [int]) -> [int]:
-    example len(unique([1, 2, 1, 3])) is 3
+    example length(unique([1, 2, 1, 3])) is 3
     edit out = []
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if not includes(out, at(xs, i)):
             out = append(out, at(xs, i))
     out
 
 # The first `n` elements (all of them if n >= len, none if n <= 0).
 public define take(xs: [int], n: int) -> [int]:
-    example len(take([1, 2, 3], 2)) is 2
+    example length(take([1, 2, 3], 2)) is 2
     edit out = []
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if i < n:
             out = append(out, at(xs, i))
     out
 
 # All but the first `n` elements.
 public define drop(xs: [int], n: int) -> [int]:
-    example len(drop([1, 2, 3], 2)) is 1
+    example length(drop([1, 2, 3], 2)) is 1
     edit out = []
-    loop i in 0 until len(xs):
+    loop i in 0 until length(xs):
         if i >= n:
             out = append(out, at(xs, i))
+    out
+
+# A list of `count` copies of one value - THE way to born a big buffer
+# (a per-element push is a copy per element on backends without
+# in-place growth; this is one allocation everywhere).
+public define filled(count: int, value: int) -> list of int:
+    edit out = []
+    loop index in 0 until count:
+        out = push(out, value)
+    out
+
+public define filled_number(count: int, value: number) -> list of number:
+    edit out = []
+    loop index in 0 until count:
+        out = push(out, value)
     out

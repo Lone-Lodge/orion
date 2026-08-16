@@ -43,11 +43,11 @@ const PSR_MAX_DEPTH = 1000
 # "next": …} pair (same pattern as the lexer's scanners).
 
 # Interpolation arg classification: numeric literals → Int AST, everything
-# else → Ident (caller resolves). Lets `{fn(21)}` work in addition to
-# `{fn(var_name)}`.
+# else → Ident (caller resolves). Lets `{function(21)}` work in addition to
+# `{function(var_name)}`.
 define psr_arg_to_node(text: text) -> table:
-    bs = bytes_from_text(text)
-    n = bytes_length(bs)
+    bs = bytes_of(text)
+    n = bytes_count(bs)
     edit all_digits = n > 0
     edit dot_at = 0 - 1
     edit paren_at = 0 - 1
@@ -65,10 +65,10 @@ define psr_arg_to_node(text: text) -> table:
         {"kind": "Int", "value": text}
     else:
         if has_call:
-            callee = psr_trim_ws(bytes_to_text(bytes_slice(bs, 0, paren_at)))
-            inner = bytes_to_text(bytes_slice(bs, paren_at + 1, n - 1))
-            inner_bs = bytes_from_text(inner)
-            inner_len = bytes_length(inner_bs)
+            callee = psr_trim_ws(text_of(bytes_part(bs, 0, paren_at)))
+            inner = text_of(bytes_part(bs, paren_at + 1, n - 1))
+            inner_bs = bytes_of(inner)
+            inner_len = bytes_count(inner_bs)
             edit inner_args = []
             edit a_start = 0
             edit depth = 0
@@ -79,27 +79,27 @@ define psr_arg_to_node(text: text) -> table:
                 if bi == 41:
                     depth = depth - 1
                 if bi == 44 and depth == 0:
-                    chunk = psr_trim_ws(bytes_to_text(bytes_slice(inner_bs, a_start, ai)))
+                    chunk = psr_trim_ws(text_of(bytes_part(inner_bs, a_start, ai)))
                     inner_args = append(inner_args, psr_arg_to_node(chunk))
                     a_start = ai + 1
             if inner_len > 0:
-                tail = psr_trim_ws(bytes_to_text(bytes_slice(inner_bs, a_start, inner_len)))
+                tail = psr_trim_ws(text_of(bytes_part(inner_bs, a_start, inner_len)))
                 inner_args = append(inner_args, psr_arg_to_node(tail))
             {"kind": "Call", "callee": callee, "args": inner_args}
         else:
             if has_field:
-                obj_name = psr_trim_ws(bytes_to_text(bytes_slice(bs, 0, dot_at)))
-                field_name = psr_trim_ws(bytes_to_text(bytes_slice(bs, dot_at + 1, n)))
+                obj_name = psr_trim_ws(text_of(bytes_part(bs, 0, dot_at)))
+                field_name = psr_trim_ws(text_of(bytes_part(bs, dot_at + 1, n)))
                 {"kind": "Field", "object": {"kind": "Ident", "name": obj_name}, "field": field_name}
             else:
                 {"kind": "Ident", "name": text}
 
 
 # Trim leading/trailing whitespace (space, tab, newline, CR). Used by the
-# interpolation parser so `{fn(a, b)}` doesn't yield ` b` with a stray space.
+# interpolation parser so `{function(a, b)}` doesn't yield ` b` with a stray space.
 define psr_trim_ws(text: text) -> text:
-    bs = bytes_from_text(text)
-    n = bytes_length(bs)
+    bs = bytes_of(text)
+    n = bytes_count(bs)
     edit start = 0
     loop:
         if start >= n:
@@ -118,13 +118,13 @@ define psr_trim_ws(text: text) -> text:
         if not is_ws:
             break
         stop = stop - 1
-    bytes_to_text(bytes_slice(bs, start, stop))
+    text_of(bytes_part(bs, start, stop))
 
 
 # --- token helpers ---
 
 define psr_peek_kind(tokens: [table], position: int) -> text:
-    if position >= len(tokens):
+    if position >= length(tokens):
         "eof"
     else:
         # Round-trip through bytes so the typeck sees a concrete Text -
@@ -133,7 +133,7 @@ define psr_peek_kind(tokens: [table], position: int) -> text:
         get(at(tokens, position), "kind")
 
 define psr_peek_value(tokens: [table], position: int) -> text:
-    if position >= len(tokens):
+    if position >= length(tokens):
         ""
     else:
         get(at(tokens, position), "value")
@@ -149,16 +149,16 @@ define psr_skip_newlines(tokens: [table], position: int) -> int:
 # --- type parser ---
 
 define psr_parse_type(tokens: [table], position: int) -> table:
-    # `fn(T, ...) -> R` → function type. Bare `fn` (no `(`) stays a Named
+    # `function(T, ...) -> R` → function type. Bare `fn` (no `(`) stays a Named
     # type ("fn" - an opaque function pointer), so higher-order code that
     # never spelled out the signature keeps working.
-    is_fn_type = psr_peek_kind(tokens, position) == "ident" and psr_peek_value(tokens, position) == "fn" and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
+    is_fn_type = psr_peek_kind(tokens, position) == "ident" and (psr_peek_value(tokens, position) == "fn" or psr_peek_value(tokens, position) == "function") and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
     if is_fn_type:
         return psr_parse_fn_type(tokens, position)
     # `(A, B, ...)` → tuple type. Same shape the tuple literal builds.
     if psr_peek_kind(tokens, position) == "symbol" and psr_peek_value(tokens, position) == "(":
         edit tt_cursor = position + 1
-        tt_elems = slice([{"kind": "Named", "name": "int"}], 0, 0)
+        tt_elems = part([{"kind": "Named", "name": "int"}], 0, 0)
         edit tt_list = tt_elems
         loop:
             if psr_peek_kind(tokens, tt_cursor) == "symbol" and psr_peek_value(tokens, tt_cursor) == ")":
@@ -209,13 +209,13 @@ define psr_parse_type(tokens: [table], position: int) -> table:
                 # Bare int that's not a range - treat as Named with the text
                 {"node": {"kind": "Named", "name": low_text}, "next": position + 1}
         else:
-            name_text = psr_peek_value(tokens, position)
+            name_text = psr_spoken_type(psr_peek_value(tokens, position))
             # `Name<T, E>` - generic type application. The args are recorded but
             # erased at lowering (all instantiations share one representation).
             # Bare `Name` (no `<`) is unchanged.
             if psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "<":
                 edit ga_cursor = position + 2
-                ga_args = slice([{"kind": "Named", "name": "int"}], 0, 0)
+                ga_args = part([{"kind": "Named", "name": "int"}], 0, 0)
                 edit ga_list = ga_args
                 loop:
                     if psr_peek_kind(tokens, ga_cursor) == "symbol" and psr_peek_value(tokens, ga_cursor) == ">":
@@ -232,7 +232,7 @@ define psr_parse_type(tokens: [table], position: int) -> table:
             else:
                 {"node": {"kind": "Named", "name": name_text}, "next": position + 1}
 
-# `fn(T1, T2) -> R` - a function type in type position (param annotation,
+# `function(T1, T2) -> R` - a function type in type position (param annotation,
 # return type, data field). `position` is on `fn`, `position+1` on `(`.
 # Param types collect up to `)`; an omitted `-> R` defaults to Unit. The
 # node carries the full signature so later passes (typeck, generics) can
@@ -312,7 +312,7 @@ define psr_parse_sub_pattern(tokens: [table], cursor: int, name: text) -> table:
                 cur = cur + 1
                 break
             if sk == "ident":
-                sep = if len(sub_names) == 0 then "" else ","
+                sep = if length(sub_names) == 0 then "" else ","
                 sub_names = "{sub_names}{sep}{sv}"
             cur = cur + 1
         enc = "@{name}:{sub_names}"
@@ -397,7 +397,7 @@ define psr_parse_match_node(tokens: [table], position: int) -> table:
         # tokens (positions, re-read as Text later) that share this arm's body.
         # Alternatives are bare (payload-free variants or literals); a payload
         # on an alternative is not supported.
-        alt_positions = slice([0], 0, 0)
+        alt_positions = part([0], 0, 0)
         edit alt_pos_list = alt_positions
         loop:
             if psr_peek_kind(tokens, match_cursor) == "symbol" and psr_peek_value(tokens, match_cursor) == "|":
@@ -424,10 +424,10 @@ define psr_parse_match_node(tokens: [table], position: int) -> table:
             prim_arm = set(prim_arm, "guard", arm_guard)
         arms_list = append(arms_list, prim_arm)
         # One extra arm per or-alternative, sharing (aliasing) the same body/guard.
-        alt_count = len(alt_pos_list)
+        alt_count = length(alt_pos_list)
         loop alt_i in 0..<alt_count:
             alt_pos = at(alt_pos_list, alt_i)
-            edit alt_arm = {"pattern": psr_peek_value(tokens, alt_pos), "pat_kind": psr_peek_kind(tokens, alt_pos), "bindings": slice([""], 0, 0), "body": get_map(body_result, "node")}
+            edit alt_arm = {"pattern": psr_peek_value(tokens, alt_pos), "pat_kind": psr_peek_kind(tokens, alt_pos), "bindings": part([""], 0, 0), "body": get_map(body_result, "node")}
             if has_guard:
                 alt_arm = set(alt_arm, "guard", arm_guard)
             arms_list = append(arms_list, alt_arm)
@@ -482,7 +482,7 @@ define psr_parse_cond_match(tokens: [table], position: int) -> table:
         cursor = psr_skip_newlines(tokens, cursor)
         if cursor == cond_arm_start:
             break
-    cm_n = len(cm_cond_list)
+    cm_n = length(cm_cond_list)
     edit cm_chain = cm_else
     loop cm_i in 0..<cm_n:
         cm_idx = cm_n - 1 - cm_i
@@ -604,7 +604,7 @@ define psr_rewrite_yields(node: table, target: text) -> table:
 # has no tail expression, so nothing extra is collected there.
 define psr_yield_tail(block: table, target: text) -> table:
     yt_stmts = get_list(block, "stmts")
-    yt_n = len(yt_stmts)
+    yt_n = length(yt_stmts)
     if yt_n == 0:
         return block
     yt_last = at(yt_stmts, yt_n - 1)
@@ -676,6 +676,26 @@ define psr_parse_par_loop(tokens: [table], position: int) -> table:
 # `+`/`-` for the proof. The real parser uses full operator precedence
 # and unary ops; same pattern, more cases.
 
+# The directory (with trailing slash) of the source file that owns bundle
+# line `line` - the driver's chunk map (`src:map:*`), the same table the
+# diagnostics walk. "" when there is no map (an already-bundled text): an
+# embed path is then relative to the working directory.
+define psr_embed_dir(line: int) -> text:
+    total = if slot_has("src:map:n") then slot_get_int("src:map:n") else 0
+    edit best_at = 0
+    edit best_path = ""
+    loop i in 0..<total:
+        chunk_at = slot_get_int("src:map:{i}:at")
+        if chunk_at <= line and chunk_at > best_at:
+            best_at = chunk_at
+            best_path = slot_get("src:map:{i}:path")
+    path_bytes = bytes_of(best_path)
+    edit cut = 0 - 1
+    loop i in 0..<length(path_bytes):
+        if at(path_bytes, i) == 47 or at(path_bytes, i) == 92:
+            cut = i
+    if cut < 0 then "" else text_of(bytes_part(path_bytes, 0, cut + 1))
+
 define psr_parse_primary(tokens: [table], position: int) -> table:
     # Recursion-depth guard. Every nested expression (parens, unary run, call
     # argument, list/map/tuple element) re-enters here, so one check covers them
@@ -689,7 +709,7 @@ define psr_parse_primary(tokens: [table], position: int) -> table:
         # "eof") so every enclosing loop ends at once: one located error, no
         # re-descent, and no read past the end. NB no literal `{`/`}` in the
         # message - those would open a string-interpolation hole.
-        return {"node": {"kind": "Error", "why": "expression nested too deeply (over {PSR_MAX_DEPTH} levels); look for a runaway or unbalanced bracket", "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": len(tokens) - 1}
+        return {"node": {"kind": "Error", "why": "expression nested too deeply (over {PSR_MAX_DEPTH} levels); look for a runaway or unbalanced bracket", "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": length(tokens) - 1}
     # Flat dispatch - Orion's deeply-nested if/else mis-binds, so each
     # case sets a `result` Map and the tail expression returns it.
     kind = psr_peek_kind(tokens, position)
@@ -731,6 +751,10 @@ define psr_parse_primary(tokens: [table], position: int) -> table:
     is_int = kind == "int"
     is_float = kind == "float"
     is_str = kind == "str"
+    # `embed "path"` - the file's bytes as a text constant, read at COMPILE
+    # time, path relative to the file the embed is written in. Assets are
+    # FILES; the binary carries their bytes; no generated code, no loading.
+    is_embed = is_ident and value == "embed" and psr_peek_kind(tokens, position + 1) == "str"
     is_lbracket = kind == "symbol" and value == "["
     is_lbrace = kind == "symbol" and value == "\{"
     # Parenthesised expression - just parse the inner expr and consume `)`.
@@ -740,10 +764,10 @@ define psr_parse_primary(tokens: [table], position: int) -> table:
     is_if = is_ident and value == "if"
     is_match_expr = is_ident and value == "choose"
     is_for = is_ident and value == "loop"
-    # Anonymous fn / lambda in expression position: `fn(params): body`. Reuses
+    # Anonymous fn / lambda in expression position: `function(params): body`. Reuses
     # the `fn` keyword (a newcomer who knows `fn name(n): ...` can read this),
     # and lowers to the SAME Lambda node as the older `|n| body` form.
-    is_fn_lambda = is_ident and value == "fn" and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
+    is_fn_lambda = is_ident and (value == "fn" or value == "function") and psr_peek_kind(tokens, position + 1) == "symbol" and psr_peek_value(tokens, position + 1) == "("
     # `perform Effect.op(args)` - invoke an effect operation. It is an
     # EXPRESSION: the handler's `resume(v)` comes back here with v as its value.
     is_perform = is_ident and value == "perform" and psr_peek_kind(tokens, position + 1) == "ident"
@@ -771,8 +795,8 @@ define psr_parse_primary(tokens: [table], position: int) -> table:
     if is_match_expr:
         result = psr_parse_match_node(tokens, position)
     if is_fn_lambda:
-        # `fn(a, b): expr` - collect param idents up to `)`, skip `:`, parse body.
-        # A param may carry a type: `fn(s: text): len(s)`. Types collect into a
+        # `function(a, b): expr` - collect param idents up to `)`, skip `:`, parse body.
+        # A param may carry a type: `function(s: text): length(s)`. Types collect into a
         # parallel `param_types` list (defaulting to `int` when omitted) so the
         # lambda-lift can give the synthesized fn's param its real type - that's
         # what lets a closure use `len`/`at` on a captured or passed text/list.
@@ -784,7 +808,7 @@ define psr_parse_primary(tokens: [table], position: int) -> table:
         loop:
             # No-progress guard. A token that is neither `)`, eof, an ident nor
             # a comma left the cursor where it was and this loop spun forever:
-            # `fn(-n): n + 1` and `fn(n"): n + k` both did it. The fn-declaration
+            # `function(-n): n + 1` and `function(n"): n + k` both did it. The fn-declaration
             # parameter loop had the same hole; a lambda has its own copy.
             fl_before = fl_cursor
             fk = psr_peek_kind(tokens, fl_cursor)
@@ -817,12 +841,21 @@ define psr_parse_primary(tokens: [table], position: int) -> table:
         result = psr_parse_call(tokens, position, value)
     is_true = is_ident and value == "true"
     is_false = is_ident and value == "false"
-    if is_ident and not is_call and not is_if and not is_match_expr and not is_for and not is_fn_lambda and not is_true and not is_false and not is_perform:
+    if is_embed:
+        embed_line = psr_peek_line(tokens, position)
+        embed_rel = psr_peek_value(tokens, position + 1)
+        embed_full = psr_embed_dir(embed_line) + embed_rel
+        embed_content = file_read(embed_full)
+        if embed_content == "":
+            result = {"node": {"kind": "Error", "found": embed_rel, "why": "embed: cannot read `{embed_full}` (path is relative to the file the embed is written in)", "line": embed_line, "col": psr_peek_col(tokens, position)}, "next": position + 2}
+        else:
+            result = {"node": {"kind": "Str", "value": embed_content}, "next": position + 2}
+    if is_ident and not is_call and not is_if and not is_match_expr and not is_for and not is_fn_lambda and not is_true and not is_false and not is_perform and not is_embed:
         next_kind = psr_peek_kind(tokens, position + 1)
         next_value = psr_peek_value(tokens, position + 1)
-        value_bytes = bytes_from_text(value)
+        value_bytes = bytes_of(value)
         edit starts_capital = false
-        if len(value_bytes) > 0:
+        if length(value_bytes) > 0:
             first_byte = at(value_bytes, 0)
             if first_byte >= 65 and first_byte <= 90:
                 starts_capital = true
@@ -871,7 +904,7 @@ define psr_parse_primary(tokens: [table], position: int) -> table:
     # `(n): body` - the LIGHT anonymous function, no keyword: `each(xs, (n): n * 2)`.
     # Detected by scanning `( ident[, ident]* ) :` - no other expression is
     # ever followed by `:` right after its closing paren. Bare idents only;
-    # a TYPED param still uses the `fn(s: text): body` form.
+    # a TYPED param still uses the `function(s: text): body` form.
     edit ll_is = false
     edit ll_params = []
     edit ll_after = position
@@ -941,7 +974,7 @@ define psr_parse_primary(tokens: [table], position: int) -> table:
         # to a list literal (homogeneous for now; a mixed-type tuple trips the
         # existing "list mixes types" check - heterogeneous anon-struct tuples
         # are a later step).
-        edit tuple_items = append(slice([inner], 0, 0), get_map(inner, "node"))
+        edit tuple_items = append(part([inner], 0, 0), get_map(inner, "node"))
         edit saw_comma = false
         loop:
             if psr_peek_kind(tokens, inner_next) == "symbol" and psr_peek_value(tokens, inner_next) == ",":
@@ -1045,16 +1078,16 @@ define psr_stamp_pos(node: table, line: int, col: int) -> table:
             out = set(out, key, psr_stamp_pos(get_map(node, key), line, col))
     if has(node, "args"):
         call_args = get_list(node, "args")
-        edit stamped = slice(call_args, 0, 0)
-        loop ai in 0..<len(call_args):
+        edit stamped = part(call_args, 0, 0)
+        loop ai in 0..<length(call_args):
             arg_node = at(call_args, ai)
             stamped = append(stamped, if has(arg_node, "kind") then psr_stamp_pos(arg_node, line, col) else arg_node)
         out = set(out, "args", stamped)
     out
 
 define psr_interpolate_str(raw_text: text, str_line: int, str_col: int) -> table:
-    raw_bytes = bytes_from_text(raw_text)
-    total_len = bytes_length(raw_bytes)
+    raw_bytes = bytes_of(raw_text)
+    total_len = bytes_count(raw_bytes)
     # Scan once to confirm any UNESCAPED `{` exists; `\{` is a literal brace.
     # If no real interp braces, strip escapes and emit a plain Str.
     edit has_brace = 0
@@ -1075,15 +1108,15 @@ define psr_interpolate_str(raw_text: text, str_line: int, str_col: int) -> table
             if bp == 92 and pi + 1 < total_len:
                 nxt = byte_at(raw_bytes, pi + 1)
                 if nxt == 123 or nxt == 125:
-                    plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi + 1, pi + 2))
+                    plain_buf = bytes_concat(plain_buf, bytes_part(raw_bytes, pi + 1, pi + 2))
                     pi = pi + 2
                 else:
-                    plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi, pi + 1))
+                    plain_buf = bytes_concat(plain_buf, bytes_part(raw_bytes, pi, pi + 1))
                     pi = pi + 1
             else:
-                plain_buf = bytes_concat(plain_buf, bytes_slice(raw_bytes, pi, pi + 1))
+                plain_buf = bytes_concat(plain_buf, bytes_part(raw_bytes, pi, pi + 1))
                 pi = pi + 1
-        plain_value = bytes_to_text(plain_buf)
+        plain_value = text_of(plain_buf)
     edit result_node = {"kind": "Str", "value": plain_value}
 
     if has_brace == 1:
@@ -1108,16 +1141,16 @@ define psr_interpolate_str(raw_text: text, str_line: int, str_col: int) -> table
             nx_b = if current_byte == 92 and scan_index2 + 1 < total_len then byte_at(raw_bytes, scan_index2 + 1) else 0
             is_escaped_brace = current_byte == 92 and (nx_b == 123 or nx_b == 125)
             if is_escaped_brace:
-                literal_buf = bytes_concat(literal_buf, bytes_slice(raw_bytes, scan_index2 + 1, scan_index2 + 2))
+                literal_buf = bytes_concat(literal_buf, bytes_part(raw_bytes, scan_index2 + 1, scan_index2 + 2))
                 scan_index2 = scan_index2 + 2
             is_open = current_byte == 123 and not is_escaped_brace
             if not is_open and not is_escaped_brace:
-                literal_buf = bytes_concat(literal_buf, bytes_slice(raw_bytes, scan_index2, scan_index2 + 1))
+                literal_buf = bytes_concat(literal_buf, bytes_part(raw_bytes, scan_index2, scan_index2 + 1))
                 scan_index2 = scan_index2 + 1
             if is_open:
                 # Flush literal-so-far as a Str part if non-empty.
-                if bytes_length(literal_buf) > 0:
-                    literal_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
+                if bytes_count(literal_buf) > 0:
+                    literal_part = {"kind": "Str", "value": text_of(literal_buf)}
                     parts = append(parts, literal_part)
                     started_before_flush = node_started
                     if started_before_flush == 0:
@@ -1152,7 +1185,7 @@ define psr_interpolate_str(raw_text: text, str_line: int, str_col: int) -> table
                                 break
                             hole_depth = hole_depth - 1
                     scan_index2 = scan_index2 + 1
-                ident_text = bytes_to_text(bytes_slice(raw_bytes, ident_start, scan_index2))
+                ident_text = text_of(bytes_part(raw_bytes, ident_start, scan_index2))
                 # Parse the `{...}` content as a REAL expression: lex it, then
                 # run the expression parser. This handles arithmetic (`a + b`),
                 # indexing (`xs[0]`), nested calls - anything - instead of the
@@ -1160,7 +1193,7 @@ define psr_interpolate_str(raw_text: text, str_line: int, str_col: int) -> table
                 # (A nested string literal with `"` still can't appear, since
                 # the outer lexer ends the string at the first inner quote.)
                 edit raw_ident = {"kind": "Ident", "name": ident_text, "line": str_line, "col": str_col}
-                if bytes_length(bytes_from_text(ident_text)) > 0:
+                if bytes_count(bytes_of(ident_text)) > 0:
                     interp_tokens = self_lex(ident_text)
                     interp_parsed = psr_parse_expr(interp_tokens, 0)
                     # The hole is lexed on its own, so its tokens start at line 0
@@ -1179,8 +1212,8 @@ define psr_interpolate_str(raw_text: text, str_line: int, str_col: int) -> table
                     current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": ident_node}
                 if scan_index2 < total_len:
                     scan_index2 = scan_index2 + 1
-        if bytes_length(literal_buf) > 0:
-            tail_part = {"kind": "Str", "value": bytes_to_text(literal_buf)}
+        if bytes_count(literal_buf) > 0:
+            tail_part = {"kind": "Str", "value": text_of(literal_buf)}
             parts = append(parts, tail_part)
             started_before_tail = node_started
             if started_before_tail == 0:
@@ -1188,7 +1221,7 @@ define psr_interpolate_str(raw_text: text, str_line: int, str_col: int) -> table
             if started_before_tail == 1:
                 current_node = {"kind": "Binary", "op": "+", "left": current_node, "right": tail_part}
         result_node = current_node
-        if len(parts) >= 3:
+        if length(parts) >= 3:
             result_node = {"kind": "Call", "callee": "__interp_join", "args": parts, "line": str_line, "col": str_col}
     result_node
 
@@ -1300,7 +1333,7 @@ define psr_parse_if(tokens: [table], position: int) -> table:
     cursor = get_int(then_result, "next")
     # Allow newlines between `then EXPR` and `else` so multi-line
     # expression-form if works as a fn body:
-    #     if len(pb) > len(sb) then false
+    #     if length(pb) > length(sb) then false
     #     else compare_prefix(...)
     # Only consume the newlines when an `else` actually follows -
     # otherwise the newline ends the statement as before.
@@ -1355,7 +1388,24 @@ define psr_parse_call(tokens: [table], position: int, callee_name: text) -> tabl
             cursor += 1
         if cursor == before_arg:
             break
-    {"node": {"kind": "Call", "callee": callee_name, "args": args, "line": callee_line, "col": callee_col}, "next": cursor}
+    {"node": {"kind": "Call", "callee": psr_spoken_builtin(callee_name), "args": args, "line": callee_line, "col": callee_col}, "next": cursor}
+
+# The surface word a builtin is SPOKEN as, mapped to the one the
+# backends know. A rename lands here first: both words work while the
+# corpus turns over, and the two backends, the LSP and every tool go on
+# reading one name. `len` is the abbreviation `length` replaced.
+define psr_spoken_builtin(name: text) -> text:
+    name
+
+# The same for a TYPE word. `function` is what `fn` is spoken as now -
+# the abbreviation was the last one left in the surface. Both parse; the
+# backends, the IR and the compiler's own "fn" keys never learn there
+# were two spellings.
+define psr_spoken_type(name: text) -> text:
+    if name == "function":
+        "fn"
+    else:
+        name
 
 # Precedence table - higher binds tighter. Returns 0 for non-operator.
 # `and` and `or` are keywords (idents at the lex layer), everything
@@ -1441,7 +1491,7 @@ define psr_parse_postfix(tokens: [table], position: int, current_node: table) ->
                         cursor = cursor + 1
                     if cursor == arg_before:
                         break
-                node = {"kind": "MethodCall", "receiver": node, "method": field_name, "args": args_list, "line": dot_line, "col": dot_col}
+                node = {"kind": "MethodCall", "receiver": node, "method": psr_spoken_builtin(field_name), "args": args_list, "line": dot_line, "col": dot_col}
             else:
                 node = {"kind": "Field", "object": node, "field": field_name, "line": dot_line, "col": dot_col}
         is_lbracket = kind_here == "symbol" and value_here == "["
@@ -1575,14 +1625,14 @@ define psr_parse_params(tokens: [table], position: int) -> table:
 # indent level of an indented block.
 define psr_peek_col(tokens: [table], position: int) -> int:
     cursor = psr_skip_newlines(tokens, position)
-    if cursor >= len(tokens):
+    if cursor >= length(tokens):
         0
     else:
         get_int(at(tokens, cursor), "col")
 
 define psr_peek_line(tokens: [table], position: int) -> int:
     cursor = psr_skip_newlines(tokens, position)
-    if cursor >= len(tokens):
+    if cursor >= length(tokens):
         0
     else:
         get_int(at(tokens, cursor), "line")
@@ -1591,7 +1641,7 @@ define psr_peek_line(tokens: [table], position: int) -> int:
 # Used to spot `IDENT[idx] = …` element assignment: scan to the matching
 # bracket, then check whether `=` follows.
 define psr_match_bracket(tokens: [table], open_idx: int) -> int:
-    total = len(tokens)
+    total = length(tokens)
     edit depth = 0
     edit result = 0 - 1
     edit i = open_idx
@@ -1631,7 +1681,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
     defer psr_depth_drop()
     if depth_now > PSR_MAX_DEPTH:
         err_stmt = {"kind": "ExprStmt", "expr": {"kind": "Error", "why": "blocks nested too deeply (over {PSR_MAX_DEPTH} levels)", "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}}
-        return {"node": {"kind": "Block", "stmts": append([], err_stmt)}, "next": len(tokens) - 1}
+        return {"node": {"kind": "Block", "stmts": append([], err_stmt)}, "next": length(tokens) - 1}
     edit cursor = psr_skip_newlines(tokens, position)
     edit statements = []
     loop:
@@ -1644,12 +1694,12 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
         cursor = psr_skip_newlines(tokens, cursor)
         kind_here = psr_peek_kind(tokens, cursor)
         value_here = psr_peek_value(tokens, cursor)
-        col_here = if cursor >= len(tokens) then 0 else get_int(at(tokens, cursor), "col")
+        col_here = if cursor >= length(tokens) then 0 else get_int(at(tokens, cursor), "col")
         is_eof = kind_here == "eof"
-        # `fn(` is a lambda EXPRESSION (e.g. a bare `fn(n): n+1` as a fn body),
+        # `function(` is a lambda EXPRESSION (e.g. a bare `function(n): n+1` as a fn body),
         # not a new declaration - only `fn NAME(` starts a decl. Without this,
         # the body loop breaks on the lambda and it mis-parses as a decl named `(`.
-        fn_is_lambda = value_here == "fn" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "("
+        fn_is_lambda = (value_here == "fn" or value_here == "function") and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "("
         # `data` / `enum` NAME a thing (`data Point:`), so they only open a
         # declaration when an ident - the name - follows. Used any other way the
         # word is an ordinary identifier: `type = "int"`, a bare `type` return,
@@ -1686,7 +1736,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
         # not the name strings, so each name is re-read as real Text later
         # (an at() on a [text] built here would come back mis-typed as i64).
         edit is_destructure = false
-        de_positions = slice([0], 0, 0)
+        de_positions = part([0], 0, 0)
         edit de_pos_list = de_positions
         edit de_rhs_at = cursor
         if (not is_let_or_assign) and kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == ",":
@@ -1710,7 +1760,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
         # `:` means it's a construction, not a destructure) then `}` then `=`.
         # Desugars to a temp plus one `field = temp.field` read per name.
         edit is_struct_destr = false
-        sd_positions = slice([0], 0, 0)
+        sd_positions = part([0], 0, 0)
         edit sd_pos_list = sd_positions
         edit sd_rhs_at = cursor
         if kind_here == "ident" and psr_peek_kind(tokens, cursor + 1) == "symbol" and psr_peek_value(tokens, cursor + 1) == "\{":
@@ -1828,7 +1878,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
             de_rhs_r = psr_parse_expr(tokens, de_rhs_at)
             de_temp = "__td_{cursor}"
             statements = append(statements, {"kind": "MutLet", "name": de_temp, "value": get_map(de_rhs_r, "node")})
-            de_count = len(de_pos_list)
+            de_count = length(de_pos_list)
             loop de_i in 0..<de_count:
                 de_nm = psr_peek_value(tokens, at(de_pos_list, de_i))
                 de_read = {"kind": "Field", "object": {"kind": "Ident", "name": de_temp}, "field": "_{de_i}"}
@@ -1840,7 +1890,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
             sd_rhs_r = psr_parse_expr(tokens, sd_rhs_at)
             sd_temp = "__sd_{cursor}"
             statements = append(statements, {"kind": "MutLet", "name": sd_temp, "value": get_map(sd_rhs_r, "node")})
-            sd_count = len(sd_pos_list)
+            sd_count = length(sd_pos_list)
             loop sd_i in 0..<sd_count:
                 sd_fname = psr_peek_value(tokens, at(sd_pos_list, sd_i))
                 sd_field = {"kind": "Field", "object": {"kind": "Ident", "name": sd_temp}, "field": sd_fname}
@@ -1940,7 +1990,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
             # Block sitting in expression position hides the closure from it.
             pf_result = psr_parse_par_loop(tokens, cursor)
             pf_stmts = get_list(get_map(pf_result, "node"), "stmts")
-            loop pfi in 0..<len(pf_stmts):
+            loop pfi in 0..<length(pf_stmts):
                 statements = append(statements, at(pf_stmts, pfi))
             cursor = get_int(pf_result, "next")
         if is_for:
@@ -2017,7 +2067,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
             il_pat = psr_peek_value(tokens, cursor + 2)
             il_pat_kind = psr_peek_kind(tokens, cursor + 2)
             edit il_cursor = cursor + 3
-            il_binds = slice([""], 0, 0)
+            il_binds = part([""], 0, 0)
             edit il_bind_list = il_binds
             if psr_peek_kind(tokens, il_cursor) == "symbol" and psr_peek_value(tokens, il_cursor) == "(":
                 il_cursor = il_cursor + 1
@@ -2042,7 +2092,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
             il_body_r = psr_parse_body_at(tokens, il_cursor, il_body_col)
             il_cursor = get_int(il_body_r, "next")
             il_noop = {"kind": "ExprStmt", "expr": {"kind": "Int", "value": "0"}}
-            edit il_else_body = {"kind": "Block", "stmts": append(slice([il_noop], 0, 0), il_noop)}
+            edit il_else_body = {"kind": "Block", "stmts": append(part([il_noop], 0, 0), il_noop)}
             il_after = psr_skip_newlines(tokens, il_cursor)
             if psr_peek_kind(tokens, il_after) == "ident" and psr_peek_value(tokens, il_after) == "else" and psr_peek_col(tokens, il_after) == col_here:
                 edit el_cursor = il_after + 1
@@ -2053,8 +2103,8 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
                 il_else_body = get_map(el_body_r, "node")
                 il_cursor = get_int(el_body_r, "next")
             il_arm1 = {"pattern": il_pat, "pat_kind": il_pat_kind, "bindings": il_bind_list, "body": get_map(il_body_r, "node")}
-            il_arm2 = {"pattern": "_", "pat_kind": "ident", "bindings": slice([""], 0, 0), "body": il_else_body}
-            edit il_arms = slice([il_arm1], 0, 0)
+            il_arm2 = {"pattern": "_", "pat_kind": "ident", "bindings": part([""], 0, 0), "body": il_else_body}
+            edit il_arms = part([il_arm1], 0, 0)
             il_arms = append(il_arms, il_arm1)
             il_arms = append(il_arms, il_arm2)
             statements = append(statements, {"kind": "Match", "scrutinee": get_map(il_scrut, "node"), "arms": il_arms})
@@ -2064,7 +2114,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
             ll_pat = psr_peek_value(tokens, cursor + 2)
             ll_pat_kind = psr_peek_kind(tokens, cursor + 2)
             edit ll_cursor = cursor + 3
-            ll_binds = slice([""], 0, 0)
+            ll_binds = part([""], 0, 0)
             edit ll_bind_list = ll_binds
             if psr_peek_kind(tokens, ll_cursor) == "symbol" and psr_peek_value(tokens, ll_cursor) == "(":
                 ll_cursor = ll_cursor + 1
@@ -2091,14 +2141,14 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
             # Clean desugar now that `break` inside a match arm works: the `_`
             # arm simply breaks out of the loop.
             ll_brk = {"kind": "Break"}
-            ll_break_body = {"kind": "Block", "stmts": append(slice([ll_brk], 0, 0), ll_brk)}
+            ll_break_body = {"kind": "Block", "stmts": append(part([ll_brk], 0, 0), ll_brk)}
             ll_arm1 = {"pattern": ll_pat, "pat_kind": ll_pat_kind, "bindings": ll_bind_list, "body": get_map(ll_body_r, "node")}
-            ll_arm2 = {"pattern": "_", "pat_kind": "ident", "bindings": slice([""], 0, 0), "body": ll_break_body}
-            edit ll_arms = slice([ll_arm1], 0, 0)
+            ll_arm2 = {"pattern": "_", "pat_kind": "ident", "bindings": part([""], 0, 0), "body": ll_break_body}
+            edit ll_arms = part([ll_arm1], 0, 0)
             ll_arms = append(ll_arms, ll_arm1)
             ll_arms = append(ll_arms, ll_arm2)
             ll_match = {"kind": "Match", "scrutinee": get_map(ll_scrut, "node"), "arms": ll_arms}
-            ll_loop_body = {"kind": "Block", "stmts": append(slice([ll_match], 0, 0), ll_match)}
+            ll_loop_body = {"kind": "Block", "stmts": append(part([ll_match], 0, 0), ll_match)}
             statements = append(statements, {"kind": "Loop", "body": ll_loop_body})
             cursor = ll_cursor
         # Detect the block-form `if cond:` by looking for `:` AFTER
@@ -2166,7 +2216,7 @@ define psr_parse_body_at(tokens: [table], position: int, min_col: int) -> table:
                 # Fold ladder links right-to-left under the final else.
                 # Each link wraps in a Block - an else body is always
                 # a Block node downstream.
-                edit ci = len(chain_conds) - 1
+                edit ci = length(chain_conds) - 1
                 loop:
                     if ci < 0:
                         break
@@ -2204,7 +2254,7 @@ define psr_parse_enum_inline(tokens: [table], position: int) -> table:
     edit cursor = position + 1
     name = psr_peek_value(tokens, cursor)
     cursor += 1
-    enum_generics = slice([""], 0, 0)
+    enum_generics = part([""], 0, 0)
     edit enum_gen_list = enum_generics
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
         cursor = cursor + 1
@@ -2265,7 +2315,7 @@ define psr_parse_data(tokens: [table], position: int) -> table:
     name = psr_peek_value(tokens, cursor)
     cursor += 1
     # Optional generic type params: `type Wrapper<T>: inner: T`.
-    data_generics = slice([""], 0, 0)
+    data_generics = part([""], 0, 0)
     edit data_gen_list = data_generics
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
         cursor = cursor + 1
@@ -2329,7 +2379,7 @@ define psr_parse_enum(tokens: [table], position: int) -> table:
     name = psr_peek_value(tokens, cursor)
     cursor += 1
     # Optional generic type params: `type Result<T, E>: Ok(T) | Err(E)`.
-    enum_generics = slice([""], 0, 0)
+    enum_generics = part([""], 0, 0)
     edit enum_gen_list = enum_generics
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "<":
         cursor = cursor + 1
@@ -2475,9 +2525,9 @@ define psr_parse_fn(tokens: [table], position: int) -> table:
     edit params_result = psr_parse_params(tokens, cursor)
     cursor = get_int(params_result, "next")
     # Splice the `requires` records in as trailing params.
-    if len(req_list) > 0:
+    if length(req_list) > 0:
         edit fn_params_node = get_list(params_result, "node")
-        loop rqi in 0..<len(req_list):
+        loop rqi in 0..<length(req_list):
             rq_nm = at(req_list, rqi)
             fn_params_node = append(fn_params_node, {"name": rq_nm, "type": {"kind": "Named", "name": rq_nm}})
         params_result = set(params_result, "node", fn_params_node)
@@ -2578,10 +2628,10 @@ define psr_parse_handle(tokens: [table], position: int) -> table:
     handler_name = "__handler_{eff_name}_{op_name}"
     {"node": {"kind": "Fn", "name": handler_name, "generics": [], "params": get_map(params_result, "node"), "ret": return_node, "body": get_map(body_result, "node"), "line": handle_line, "col": handle_col}, "next": cursor}
 
-# `effect Name:` + an indented `op: fn(params) -> ret` line per operation.
+# `effect Name:` + an indented `op: function(params) -> ret` line per operation.
 # The operation signatures are the reader's contract; the HANDLER carries the
 # real types and `perform` resolves through it, so the block is parsed and
-# skipped. Skipping it is not cosmetic: the `fn(...)` inside an op signature
+# skipped. Skipping it is not cosmetic: the `function(...)` inside an op signature
 # was otherwise picked up by the decl loop as a nameless top-level fn, which
 # is what made an effect declaration hang the compiler.
 define psr_skip_effect(tokens: [table], position: int) -> int:
@@ -2645,7 +2695,7 @@ define psr_skip_use(tokens: [table], position: int) -> int:
 define psr_parse_use(tokens: [table], position: int) -> table:
     name = psr_peek_value(tokens, position + 1)
     edit cursor = position + 2
-    edit only = slice([""], 0, 0)
+    edit only = part([""], 0, 0)
     if psr_peek_kind(tokens, cursor) == "symbol" and psr_peek_value(tokens, cursor) == "(":
         cursor = cursor + 1
         loop:

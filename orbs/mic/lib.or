@@ -1,0 +1,74 @@
+# mic - microphone capture, the other half of the audio stack.
+#
+# atlas_audio can make sound; nothing in Orion could hear until this.
+# It is a baseline orb and not a game seam on purpose: a mic is a
+# platform capability like the filesystem, and voice tools, authoring
+# tools and games all want it on the same terms.
+#
+#     if mic_open(16000):
+#         loop:
+#             if mic_level() > 20:          # someone started talking
+#                 frames = mic_take_wav("heard.wav")
+#
+# Capture runs on its own thread into a ring that keeps the last 30
+# seconds and overwrites the oldest. A listener always wants what was
+# just said, so falling behind costs you history, never the present.
+#
+# The device picks its own rate and channel count; `rate` is what YOU
+# want and the ring downmixes to mono and decimates on the way in.
+# Speech recognisers want 16000.
+#
+# Headless builds link the weak null backend in orion_rt.c instead of
+# wasapi_min.c: mic_open succeeds, the level is silent forever, and a
+# take writes nothing. Gates run the whole listen path without a card.
+
+external define orion_mic_open(rate: int) -> int
+external define orion_mic_level() -> int
+external define orion_mic_buffered() -> int
+external define orion_mic_rate() -> int
+external define orion_mic_take_wav(path: text) -> int
+external define orion_mic_close()
+
+# Start capturing at `rate` samples a second, mono. false means there is
+# no capture device - run silent rather than refusing to start.
+# no example: needs a live capture device - proven by tools/mic_test.sh
+public define mic_open(rate: int) -> truth = orion_mic_open(rate) is 1
+
+# Loudness right now, 0 to 1000 (rms). Quiet room sits near 0, speech
+# lands well above 20. This is the cheap way to ask "is anyone talking"
+# without touching a single sample.
+# no example: reads a live device - proven by tools/mic_test.sh
+public define mic_level() -> int = orion_mic_level()
+
+# no example: reads a live device - proven by tools/mic_test.sh
+public define mic_hearing(threshold: int) -> truth = orion_mic_level() > threshold
+
+# Frames waiting in the ring. Divide by mic_rate() for seconds.
+# no example: reads a live device - proven by tools/mic_test.sh
+public define mic_buffered() -> int = orion_mic_buffered()
+
+# The rate capture actually runs at, or 0 when closed.
+# no example: reads a live device - proven by tools/mic_test.sh
+public define mic_rate() -> int = orion_mic_rate()
+
+# How many seconds are waiting. Whole seconds - for a VAD you want
+# mic_buffered() and the rate, not this.
+# no example: reads a live device - proven by tools/mic_test.sh
+public define mic_seconds() -> int:
+    rate = orion_mic_rate()
+    if rate is 0 then 0 else orion_mic_buffered() // rate
+
+# Write everything captured so far to `path` as mono PCM16 wav and empty
+# the ring. Returns frames written, 0 when nothing was heard.
+#
+# A file and not a list of bytes on purpose: Orion carries binary as
+# [int], and marshalling a minute of audio through one is slow and is
+# the exact shape that bit the vec codegen. Everything downstream reads
+# wav anyway, orion_audio_load included - which is what lets a test
+# record and then play back what it recorded.
+# no example: writes a file from a live device - proven by tools/mic_test.sh
+public define mic_take_wav(path: text) -> int uses files = orion_mic_take_wav(path)
+
+# no example: releases a live device - proven by tools/mic_test.sh
+public define mic_close():
+    orion_mic_close()

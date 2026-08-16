@@ -27,8 +27,8 @@ use orion_emit_wasm
 # exit non-zero.
 
 define drv_dirname(path: text) -> text:
-    bs = bytes_from_text(path)
-    n = len(bs)
+    bs = bytes_of(path)
+    n = length(bs)
     edit last_sep = 0 - 1
     loop i in 0..<n:
         c = at(bs, i)
@@ -37,17 +37,17 @@ define drv_dirname(path: text) -> text:
     if last_sep < 0:
         "."
     else:
-        bytes_to_text(bytes_slice(bs, 0, last_sep))
+        text_of(bytes_part(bs, 0, last_sep))
 
 # "use foo" → "foo"; anything else → "".
 define drv_use_name(line: text) -> text:
-    bs0 = bytes_from_text(line)
+    bs0 = bytes_of(line)
     # `pub use X` (a facade RE-EXPORTING X) loads X exactly like `use X` does -
     # the visibility difference is the compiler's business, not the loader's.
     # Missing this made a facade orb stop pulling in the orbs it re-exports.
-    is_pub_use = len(bs0) > 4 and at(bs0, 0) == 112 and at(bs0, 1) == 117 and at(bs0, 2) == 98 and at(bs0, 3) == 32
-    bs = if is_pub_use then bytes_slice(bs0, 4, len(bs0)) else bs0
-    n = len(bs)
+    is_pub_use = length(bs0) > 4 and at(bs0, 0) == 112 and at(bs0, 1) == 117 and at(bs0, 2) == 98 and at(bs0, 3) == 32
+    bs = if is_pub_use then bytes_part(bs0, 4, length(bs0)) else bs0
+    n = length(bs)
     if n < 5:
         return ""
     is_use = at(bs, 0) == 117 and at(bs, 1) == 115 and at(bs, 2) == 101 and at(bs, 3) == 32
@@ -63,15 +63,15 @@ define drv_use_name(line: text) -> text:
         # `text` - the selective list is the parser's business, not the loader's.
         if c == 32 or c == 13 or c == 10 or c == 35 or c == 40:
             break
-        single = bytes_to_text(bytes_slice(bs, i, i + 1))
+        single = text_of(bytes_part(bs, i, i + 1))
         name = "{name}{single}"
         i = i + 1
     name
 
 # All `use` names in a source, by walking its lines.
 define drv_uses_of(src: text) -> [text]:
-    bs = bytes_from_text(src)
-    n = len(bs)
+    bs = bytes_of(src)
+    n = length(bs)
     edit names = []
     edit line_start = 0
     edit i = 0
@@ -93,7 +93,7 @@ define drv_uses_of(src: text) -> [text]:
             # the compiler before it printed a single diagnostic.
             first = if line_start < i then at(bs, line_start) else -1
             if first == 117 or first == 112:
-                line = bytes_to_text(bytes_slice(bs, line_start, i))
+                line = text_of(bytes_part(bs, line_start, i))
                 name = drv_use_name(line)
                 if name != "":
                     names = append(names, name)
@@ -104,7 +104,7 @@ define drv_uses_of(src: text) -> [text]:
     names
 
 define drv_list_has(items: [text], needle: text) -> truth:
-    n = len(items)
+    n = length(items)
     edit found = false
     loop i in 0..<n:
         if at(items, i) == needle:
@@ -114,7 +114,7 @@ define drv_list_has(items: [text], needle: text) -> truth:
 # Try each root for NAME/lib.or. Empty text = not found (orb sources
 # are never empty).
 define drv_resolve(name: text, roots: [text]) -> text:
-    n = len(roots)
+    n = length(roots)
     edit src = ""
     loop i in 0..<n:
         if src == "":
@@ -130,7 +130,7 @@ define drv_resolve(name: text, roots: [text]) -> text:
 # message needs: without it a diagnostic can only name a line in the
 # concatenated program, i.e. a line in no file that exists on disk.
 define drv_resolve_path(name: text, roots: [text]) -> text:
-    n = len(roots)
+    n = length(roots)
     edit path = ""
     loop i in 0..<n:
         if path == "":
@@ -141,8 +141,8 @@ define drv_resolve_path(name: text, roots: [text]) -> text:
     path
 
 define drv_count_lines(s: text) -> int:
-    b = bytes_from_text(s)
-    n = len(b)
+    b = bytes_of(s)
+    n = length(b)
     edit count = 0
     loop i in 0..<n:
         if at(b, i) == 10:
@@ -192,19 +192,19 @@ define drv_want_quiet() -> truth:
 # 3 and up, so `--perf` quietly became a search path named `--perf/` that could
 # never resolve. Harmless by luck, wrong by construction.
 define drv_is_flag(a: text) -> truth:
-    bs = bytes_from_text(a)
-    len(bs) >= 2 and at(bs, 0) == 45 and at(bs, 1) == 45
+    bs = bytes_of(a)
+    length(bs) >= 2 and at(bs, 0) == 45 and at(bs, 1) == 45
 
 define drv_total_insts(m: IRModule) -> int:
     edit total = 0
-    loop fi in 0..<len(m.functions):
+    loop fi in 0..<length(m.functions):
         f = at(m.functions, fi)
-        total = total + len(f.instructions)
+        total = total + length(f.instructions)
     total
 
 define drv_sty(code: text, s: text) -> text:
     if orion_console_color() == 1:
-        e = bytes_to_text(append([], 27))
+        e = text_of(append([], 27))
         "{e}[{code}m{s}{e}[0m"
     else:
         s
@@ -243,11 +243,11 @@ define drv_type_name(t: table) -> text:
         if kind == "Named":
             base = get(t, "name")
             targs = if has(t, "args") then get_list(t, "args") else []
-            if len(targs) == 0:
+            if length(targs) == 0:
                 base
             else:
                 edit acc = ""
-                loop ai in 0..<len(targs):
+                loop ai in 0..<length(targs):
                     sep = if ai == 0 then "" else ","
                     acc = "{acc}{sep}{drv_type_name(at(targs, ai))}"
                 "{base}<{acc}>"
@@ -260,7 +260,7 @@ define drv_type_name(t: table) -> text:
 define drv_symbols(ast: table) -> int:
     decls = get_list(ast, "decls")
     edit orb_now = ""
-    loop di in 0..<len(decls):
+    loop di in 0..<length(decls):
         d = at(decls, di)
         k = get(d, "kind")
         if k == "OrbMark":
@@ -268,7 +268,7 @@ define drv_symbols(ast: table) -> int:
         if k == "Fn":
             params = get_list(d, "params")
             edit psig = ""
-            loop pi in 0..<len(params):
+            loop pi in 0..<length(params):
                 p = at(params, pi)
                 sep = if pi == 0 then "" else ","
                 pty = if has(p, "type") then drv_type_name(get_map(p, "type")) else "int"
@@ -278,7 +278,7 @@ define drv_symbols(ast: table) -> int:
         if k == "Data":
             fields = get_list(d, "fields")
             edit fsig = ""
-            loop fi in 0..<len(fields):
+            loop fi in 0..<length(fields):
                 f = at(fields, fi)
                 sep2 = if fi == 0 then "" else ","
                 fty = if has(f, "type") then drv_type_name(get_map(f, "type")) else "?"
@@ -287,7 +287,7 @@ define drv_symbols(ast: table) -> int:
         if k == "Enum":
             variants = get_list(d, "variants")
             edit vsig = ""
-            loop vi in 0..<len(variants):
+            loop vi in 0..<length(variants):
                 sep3 = if vi == 0 then "" else ","
                 vsig = "{vsig}{sep3}{get(at(variants, vi), \"name\")}"
             print_line("SUM {get(d, \"name\")}|{vsig}|{orb_now}")
@@ -311,7 +311,7 @@ public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> t
     edit line_at = 1
     edit map_n = 0
     loop:
-        if qi >= len(queue):
+        if qi >= length(queue):
             break
         name = at(queue, qi)
         qi = qi + 1
@@ -326,18 +326,18 @@ public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> t
         map_n = map_n + 1
         line_at = line_at + drv_count_lines(src) + 2
         orb_count = orb_count + 1
-        orb_bytes = orb_bytes + len(bytes_from_text(src))
+        orb_bytes = orb_bytes + length(bytes_of(src))
         # Stamp each chunk with its origin. The program is ONE concatenated
         # text by the time the lexer sees it, so without this marker every
         # function in the build looks like it came from the same place - which
         # is exactly why the namespace was flat and two orbs could not both
         # have a private helper of the same name.
-        q = bytes_to_text(append([], 34))
+        q = text_of(append([], 34))
         chunks = append(chunks, "orb " + q + name + q + "\n")
         chunks = append(chunks, src)
         chunks = append(chunks, "\n")
         deps = drv_uses_of(src)
-        n_deps = len(deps)
+        n_deps = length(deps)
         loop di in 0..<n_deps:
             queue = append(queue, at(deps, di))
     okb = orb_bytes // 1024
@@ -345,7 +345,7 @@ public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> t
         print_line(drv_dim("  orbs {orb_count} ({okb} KB)"))
     # The entry program is its own scope: `""` owns whatever it declares
     # privately, so a game's local helper cannot collide with an orb's.
-    eq = bytes_to_text(append([], 34))
+    eq = text_of(append([], 34))
     drv_map_chunk(map_n, line_at, entry_path)
     chunks = append(chunks, "orb " + eq + eq + "\n")
     chunks = append(chunks, entry_src)
@@ -402,10 +402,10 @@ define drv_is_scope_primitive(name: text) -> truth:
     drv_ends(name, "_on") or drv_ends(name, "_off") or drv_ends(name, "_st")
 
 define drv_ends(t: text, suffix: text) -> truth:
-    bt = bytes_from_text(t)
-    bs = bytes_from_text(suffix)
-    n = len(bt)
-    m = len(bs)
+    bt = bytes_of(t)
+    bs = bytes_of(suffix)
+    n = length(bt)
+    m = length(bs)
     if m > n:
         false
     else:
@@ -424,15 +424,15 @@ define drv_is_close(callee: text) -> truth:
 define drv_scope_check(module: IRModule, verbose: int) -> int:
     fns = module.functions
     edit bad = 0
-    loop fi in 0..<len(fns):
+    loop fi in 0..<length(fns):
         f = drv_fn_at(fns, fi)
         if drv_is_scope_primitive(f.name):
             continue
-        edit stems = slice([""], 0, 0)
-        edit opens = slice([0], 0, 0)
-        edit closes = slice([0], 0, 0)
-        edit depth = slice([0], 0, 0)      # running open-minus-close, in order
-        loop ii in 0..<len(f.instructions):
+        edit stems = part([""], 0, 0)
+        edit opens = part([0], 0, 0)
+        edit closes = part([0], 0, 0)
+        edit depth = part([0], 0, 0)      # running open-minus-close, in order
+        loop ii in 0..<length(f.instructions):
             inst = drv_inst_at(f.instructions, ii)
             if inst.op == "call":
                 stem = drv_mode_stem(inst.name)
@@ -443,7 +443,7 @@ define drv_scope_check(module: IRModule, verbose: int) -> int:
                         opens = append(opens, 0)
                         closes = append(closes, 0)
                         depth = append(depth, 0)
-                        idx = len(stems) - 1
+                        idx = length(stems) - 1
                     if drv_is_close(inst.name):
                         closes = set(closes, idx, drv_int_at(closes, idx) + 1)
                         depth = set(depth, idx, drv_int_at(depth, idx) - 1)
@@ -456,12 +456,12 @@ define drv_scope_check(module: IRModule, verbose: int) -> int:
             # final return has depth 0 in a balanced function, so only an early
             # one trips this.
             if inst.op == "return":
-                loop si in 0..<len(stems):
+                loop si in 0..<length(stems):
                     if drv_int_at(depth, si) > 0:
                         bad = bad + 1
                         if verbose == 1:
                             print_line("    {f.name}: returns with {text_at_drv(stems, si)} still open (early return between open and close)")
-        loop si in 0..<len(stems):
+        loop si in 0..<length(stems):
             o = drv_int_at(opens, si)
             c = drv_int_at(closes, si)
             if o != c:
@@ -481,10 +481,10 @@ define drv_inst_at(xs: [Inst], i: int) -> Inst:
     at(xs, i)
 
 define drv_starts(t: text, p: text) -> truth:
-    tb = bytes_from_text(t)
-    pb = bytes_from_text(p)
-    pn = len(pb)
-    if len(tb) < pn:
+    tb = bytes_of(t)
+    pb = bytes_of(p)
+    pn = length(pb)
+    if length(tb) < pn:
         return false
     loop i in 0..<pn:
         if at(tb, i) != at(pb, i):
@@ -504,7 +504,7 @@ define drv_or(a: int, b: int) -> int:
     out
 
 define drv_name_idx(names: [text], name: text) -> int:
-    n = len(names)
+    n = length(names)
     loop i in 0..<n:
         if at(names, i) == name:
             return i
@@ -545,7 +545,7 @@ define drv_call_bits(callee: text, names: [text]) -> int:
 
 define drv_direct_bits(f: IRFn, names: [text]) -> int:
     edit bits = 0
-    n = len(f.instructions)
+    n = length(f.instructions)
     loop i in 0..<n:
         inst = drv_inst_at(f.instructions, i)
         op = inst.op
@@ -602,7 +602,7 @@ define drv_flags_text(bits: int) -> text:
 # construction: a name we cannot prove unreachable stays.
 define drv_reachable(module: IRModule) -> [int]:
     fns = module.functions
-    n = len(fns)
+    n = length(fns)
     edit names = []
     loop i in 0 until n:
         names = append(names, drv_fn_at(fns, i).name)
@@ -621,7 +621,7 @@ define drv_reachable(module: IRModule) -> [int]:
         loop i in 0 until n:
             if drv_int_at(live, i) is 1:
                 f = drv_fn_at(fns, i)
-                loop j in 0 until len(f.instructions):
+                loop j in 0 until length(f.instructions):
                     inst = drv_inst_at(f.instructions, j)
                     # A call names its callee; fn_ref names a function whose
                     # address is taken (closures, par_run workers, call_ptr).
@@ -641,14 +641,14 @@ define drv_prune(module: IRModule) -> IRModule:
     fns = module.functions
     live = drv_reachable(module)
     edit kept = []
-    loop i in 0 until len(fns):
+    loop i in 0 until length(fns):
         if drv_int_at(live, i) is 1:
             kept = append(kept, drv_fn_at(fns, i))
     IRModule{functions: kept}
 
 define drv_effect_closure(module: IRModule, names: [text]) -> [int]:
     fns = module.functions
-    n = len(fns)
+    n = length(fns)
     edit bits = []
     loop i in 0..<n:
         bits = append(bits, drv_direct_bits(drv_fn_at(fns, i), names))
@@ -662,7 +662,7 @@ define drv_effect_closure(module: IRModule, names: [text]) -> [int]:
             f2 = drv_fn_at(fns, i)
             cur = drv_int_at(bits, i)
             edit acc = cur
-            ni = len(f2.instructions)
+            ni = length(f2.instructions)
             loop j in 0..<ni:
                 inst = drv_inst_at(f2.instructions, j)
                 if inst.op == "call":
@@ -681,7 +681,7 @@ define drv_effect_closure(module: IRModule, names: [text]) -> [int]:
 define drv_module_names(module: IRModule) -> [text]:
     fns = module.functions
     edit names = []
-    loop i in 0..<len(fns):
+    loop i in 0..<length(fns):
         names = append(names, drv_fn_at(fns, i).name)
     names
 
@@ -694,13 +694,13 @@ define drv_module_names(module: IRModule) -> [text]:
 # netcode, rests on: the compiler proves the fn is replayable.
 define drv_check_deterministic(module: IRModule) -> int:
     marked = deterministic_fn_names()
-    if len(marked) == 0:
+    if length(marked) == 0:
         return 0
     names = drv_module_names(module)
     bits = drv_effect_closure(module, names)
     nd_mask = drv_or(drv_or(drv_or(2, 4), drv_or(8, 64)), 128)
     edit bad = 0
-    loop i in 0..<len(marked):
+    loop i in 0..<length(marked):
         idx = drv_name_idx(names, at(marked, i))
         if idx >= 0:
             eff = drv_int_at(bits, idx)
@@ -712,13 +712,13 @@ define drv_check_deterministic(module: IRModule) -> int:
 
 # `orb__name` -> a readable `name` for the error; leaves already-plain names be.
 define drv_deterministic_label(mangled: text) -> text:
-    bs = bytes_from_text(mangled)
-    n = len(bs)
+    bs = bytes_of(mangled)
+    n = length(bs)
     edit cut = 0 - 1
     loop i in 0..<n - 1:
         if at(bs, i) == 95 and at(bs, i + 1) == 95:
             cut = i + 2
-    if cut < 0 then mangled else bytes_to_text(bytes_slice(bs, cut, n))
+    if cut < 0 then mangled else text_of(bytes_part(bs, cut, n))
 
 define drv_flag_and(a: int, b: int) -> int:
     edit r = 0
@@ -733,7 +733,7 @@ define drv_flag_and(a: int, b: int) -> int:
 
 define drv_facts(module: IRModule) -> int:
     fns = module.functions
-    n = len(fns)
+    n = length(fns)
     names = drv_module_names(module)
     bits = drv_effect_closure(module, names)
     edit pure_count = 0
@@ -745,13 +745,13 @@ define drv_facts(module: IRModule) -> int:
             fl = drv_flags_text(b)
             fname = at(names, i)
             print_line("{fname}:{fl}")
-    print_line("facts: {n} fn(s), {pure_count} pure")
+    print_line("facts: {n} function(s), {pure_count} pure")
     0
 
 # True when the output path ends in ".wasm".
 define drv_wants_wasm(p: text) -> truth:
-    b = bytes_from_text(p)
-    n = len(b)
+    b = bytes_of(p)
+    n = length(b)
     if n < 5:
         return false
     at(b, n - 5) == 46 and at(b, n - 4) == 119 and at(b, n - 3) == 97 and at(b, n - 2) == 115 and at(b, n - 1) == 109
@@ -768,7 +768,7 @@ define drv_emit_wasm(ast: table, out_path: text) -> int:
     if compile_errors() > errs_before:
         print_line(drv_red("orion: wasm compilation FAILED - no output written"))
         return 1
-    file_write(out_path, bytes_to_text(wbytes))
+    file_write(out_path, text_of(wbytes))
     if not (slot_has("drv:quiet")):
         print_line(drv_green("  ok") + drv_dim("  {out_path}"))
     0
@@ -796,8 +796,6 @@ public define driver_main() -> int:
         roots = append(roots, "orbs/")
         roots = append(roots, "../orbs/")
         src = drv_collect(entry_src, roots, in_path)
-        # Keep the collected source so error diagnostics can show the line + caret.
-        slot_set("src:full", orion_persist_text(src))
         # `--trace` (orbit debug): ast_fn_to_ir prefixes every define with a
         # call-trail entry. Communicated by slot, like drv:quiet.
         loop flag_i in 1..<argc():
@@ -842,9 +840,9 @@ public define driver_main() -> int:
         # baseline, so a slowdown shows up as a number instead of a feeling.
         # Off by default: the row is only useful to a tool, so it needs asking.
         if drv_want_perf():
-            src_bytes = len(bytes_from_text(src))
+            src_bytes = length(bytes_of(src))
             src_lines = drv_count_lines(src) + 1
-            n_fns = len(module.functions)
+            n_fns = length(module.functions)
             n_insts = drv_total_insts(module)
             kb = orion_os_private_kb()
             per_kloc = if src_lines > 0 then d_total * 1000 // src_lines else 0

@@ -38,7 +38,7 @@ public type DrawCmd:
 public type DisplayList: commands: [DrawCmd]
 
 public define empty_list() -> DisplayList:
-    example len(empty_list().commands) is 0
+    example length(empty_list().commands) is 0
     DisplayList{commands: []}
 
 public define push_cmd(list: DisplayList, cmd: DrawCmd) -> DisplayList:

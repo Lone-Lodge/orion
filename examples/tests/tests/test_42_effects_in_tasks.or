@@ -14,7 +14,7 @@
 use async
 
 effect Ask:
-    n: fn(x: int) -> int
+    n: function(x: int) -> int
 
 handle Ask.n(x: int) -> int:
     resume(x * 10)

@@ -3,12 +3,17 @@
 # The neutral render-contract geometry: Point, Size, Rect. Lives in orion (the
 # shared base both atlas and veil already depend on) so the render contract is
 # not owned by any one UI block. `DrawCmd` (ori_display) is built on these.
+#
+# Coordinates are numbers and extents are wide/high - the same words and
+# kinds ori_scene's world types use, so one wasm module can carry BOTH
+# seams (a game world and a UI overlay) under the one-name-one-kind
+# field law.
 
-public type Point: x: int, y: int
-public type Size: width: int, height: int
-public type Rect: x: int, y: int, width: int, height: int
+public type Point: x: number, y: number
+public type Size: wide: number, high: number
+public type Rect: x: number, y: number, wide: number, high: number
 
 public define rect_contains(rect: Rect, point: Point) -> truth:
-    example rect_contains(Rect{x: 0, y: 0, width: 4, height: 4}, Point{x: 1, y: 1})
-    example not rect_contains(Rect{x: 0, y: 0, width: 4, height: 4}, Point{x: 9, y: 1})
-    point.x >= rect.x and point.x < rect.x + rect.width and point.y >= rect.y and point.y < rect.y + rect.height
+    example rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 1, y: 1})
+    example not rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 9, y: 1})
+    point.x is at least rect.x and point.x is less than rect.x + rect.wide and point.y is at least rect.y and point.y is less than rect.y + rect.high

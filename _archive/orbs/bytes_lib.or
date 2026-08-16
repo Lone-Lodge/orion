@@ -13,10 +13,10 @@ extern fn __os_bytes_to_text(byte_list: [int]) -> Text
 # IEEE-754 bit pattern → f64. The runtime owns the float layout.
 extern fn __os_read_f32_le(byte_list: [int], offset: int) -> f64
 
-pub fn bytes_from_text(text: Text) -> [int]:
+pub fn bytes_of(text: Text) -> [int]:
     __os_bytes_from_text(text)
 
-pub fn bytes_to_text(byte_list: [int]) -> Text:
+pub fn text_of(byte_list: [int]) -> Text:
     __os_bytes_to_text(byte_list)
 
 pub fn read_f32_le(byte_list: [int], offset: int) -> f64:
@@ -34,8 +34,8 @@ fn _clamp_byte(value: int) -> int:
         else:
             value
 
-pub fn bytes_length(byte_list: [int]) -> int:
-    len(byte_list)
+pub fn bytes_count(byte_list: [int]) -> int:
+    length(byte_list)
 
 pub fn byte_at(byte_list: [int], index: int) -> int:
     fetched = at(byte_list, index)
@@ -44,8 +44,8 @@ pub fn byte_at(byte_list: [int], index: int) -> int:
     else:
         fetched
 
-pub fn bytes_slice(byte_list: [int], low: int, high: int) -> [int]:
-    total = len(byte_list)
+pub fn bytes_part(byte_list: [int], low: int, high: int) -> [int]:
+    total = length(byte_list)
     capped_high = if high < 0 then 0 else if high > total then total else high
     capped_low = if low < 0 then 0 else if low > capped_high then capped_high else low
     mut output = []
@@ -55,10 +55,10 @@ pub fn bytes_slice(byte_list: [int], low: int, high: int) -> [int]:
 
 pub fn bytes_concat(left: [int], right: [int]) -> [int]:
     mut output = []
-    left_length = len(left)
+    left_length = length(left)
     for index in 0..<left_length:
         output = push(output, at(left, index))
-    right_length = len(right)
+    right_length = length(right)
     for index in 0..<right_length:
         output = push(output, at(right, index))
     output
@@ -67,7 +67,7 @@ pub fn bytes_repeat(byte_list: [int], count: int) -> [int]:
     if count <= 0:
         []
     else:
-        single_length = len(byte_list)
+        single_length = length(byte_list)
         mut output = []
         mut iteration = 0
         loop:
@@ -92,7 +92,7 @@ pub fn bytes_zeros(count: int) -> [int]:
 # native behaviour we replaced.
 
 pub fn read_u16_le(byte_list: [int], offset: int) -> int:
-    if offset < 0 or offset + 2 > len(byte_list):
+    if offset < 0 or offset + 2 > length(byte_list):
         0
     else:
         low_byte = byte_at(byte_list, offset)
@@ -100,7 +100,7 @@ pub fn read_u16_le(byte_list: [int], offset: int) -> int:
         low_byte + high_byte * 256
 
 pub fn read_u16_be(byte_list: [int], offset: int) -> int:
-    if offset < 0 or offset + 2 > len(byte_list):
+    if offset < 0 or offset + 2 > length(byte_list):
         0
     else:
         high_byte = byte_at(byte_list, offset)
@@ -108,7 +108,7 @@ pub fn read_u16_be(byte_list: [int], offset: int) -> int:
         high_byte * 256 + low_byte
 
 pub fn read_u32_le(byte_list: [int], offset: int) -> int:
-    if offset < 0 or offset + 4 > len(byte_list):
+    if offset < 0 or offset + 4 > length(byte_list):
         0
     else:
         byte_0 = byte_at(byte_list, offset)
@@ -118,7 +118,7 @@ pub fn read_u32_le(byte_list: [int], offset: int) -> int:
         byte_0 + byte_1 * 256 + byte_2 * 65536 + byte_3 * 16777216
 
 pub fn read_u32_be(byte_list: [int], offset: int) -> int:
-    if offset < 0 or offset + 4 > len(byte_list):
+    if offset < 0 or offset + 4 > length(byte_list):
         0
     else:
         byte_0 = byte_at(byte_list, offset)

@@ -1,8 +1,8 @@
 define main() -> int:
-    # Inline lambda - `fn(params): body`. Lifted to a synthesized fn at
+    # Inline lambda - `function(params): body`. Lifted to a synthesized fn at
     # compile time.
-    double = fn(x): x * 2
-    inc = fn(x): x + 1
+    double = function(x): x * 2
+    inc = function(x): x + 1
     # 10 -> double(10)=20 -> inc(20)=21 -> 21*2=42
     a = double(10)
     b = inc(a)

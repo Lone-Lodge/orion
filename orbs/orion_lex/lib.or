@@ -64,7 +64,7 @@ define slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col:
         if not slx_is_ident_continue(byte_at(bytes, cursor)):
             break
         cursor += 1
-    text_value = bytes_to_text(bytes_slice(bytes, start, cursor))
+    text_value = text_of(bytes_part(bytes, start, cursor))
     # Every word lexes as `ident`. The PARSER decides what is a keyword, by
     # comparing the value in the position where that keyword is meaningful,
     # which is what lets `type`, `loop` or `data` also be ordinary variable
@@ -160,7 +160,7 @@ define slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col
                 cursor += 1
             else:
                 break
-    text_value = bytes_to_text(bytes_slice(bytes, start, cursor))
+    text_value = text_of(bytes_part(bytes, start, cursor))
     kind = if saw_dot then "float" else "int"
     {"token": slx_make_token(kind, text_value, line, col), "next": cursor}
 
@@ -191,13 +191,13 @@ define slx_int_to_text(n: int) -> text:
         digits = append(digits, 48 + (v % 10))
         v = v // 10
     edit out = bytes_zeros(0)
-    edit i = len(digits) - 1
+    edit i = length(digits) - 1
     loop:
         if i < 0:
             break
         out = append(out, at(digits, i))
         i = i - 1
-    bytes_to_text(out)
+    text_of(out)
 
 # A character literal `'c'` (or an escape like `'\n'`) lexes to an int token
 # holding the byte value. Readable notation for a byte - `match b: '+' -> …`
@@ -271,7 +271,7 @@ define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col
                 brace_depth = brace_depth - 1
             buffer = append(buffer, current)
             cursor += 1
-    text_value = bytes_to_text(buffer)
+    text_value = text_of(buffer)
     # `holes` = interpolation braces still open at the end of the literal. The
     # scanner already counts them; carrying the count out is what lets the
     # parser reject `"{{"` with a message. (Before, the unterminated hole was
@@ -438,8 +438,8 @@ define slx_push_token(tokens_in: [table], token: table) -> [table]:
     tokens
 
 public define self_lex(source: text) -> [table]:
-    bytes = bytes_from_text(source)
-    byte_count = bytes_length(bytes)
+    bytes = bytes_of(source)
+    byte_count = bytes_count(bytes)
     slot_set("slx:last_kind", "")
     edit tokens = []
     edit cursor = 0
@@ -488,7 +488,7 @@ public define self_lex(source: text) -> [table]:
             if op_text == "":
                 cursor += 1
             else:
-                op_length = bytes_length(bytes_from_text(op_text))
+                op_length = bytes_count(bytes_of(op_text))
                 tokens = slx_push_token(tokens, slx_make_token("symbol", op_text, line, col))
                 cursor += op_length
     tokens = slx_push_token(tokens, slx_make_token("newline", "\n", line, byte_count - line_start))

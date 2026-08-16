@@ -1,4 +1,4 @@
 define main() -> int:
     a = ["x"]
-    b = slice(a, 0, 0)
-    len(b)
+    b = part(a, 0, 0)
+    length(b)

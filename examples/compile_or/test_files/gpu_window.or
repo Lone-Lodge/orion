@@ -56,7 +56,7 @@ define main() -> int:
         # board frame
         og_rect(40, 40, 720, 520, 40, 44, 56)
         # placed blocks (grid-snapped 40px)
-        n = len(blocks_x)
+        n = length(blocks_x)
         loop i in 0..<n:
             bx = at(blocks_x, i)
             by = at(blocks_y, i)

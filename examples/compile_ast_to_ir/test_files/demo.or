@@ -20,7 +20,7 @@
 # --- Typed data structures ---
 
 # An IR instruction. All fields present; unused ones zero/empty.
-# - name: fn name for call ops (else "")
+# - name: function name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
 type Inst: op: text, type_text: text, value: int, lhs: int, rhs: int, name: text, args: [int]
 
@@ -149,7 +149,7 @@ public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
 public define ir_text_len(value_id: int) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# slice(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
+# part(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
 public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
@@ -175,15 +175,15 @@ public define ir_argv(idx_id: int) -> Inst:
     Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
-# bytes_from_text(t) → [int] of byte values
+# bytes_of(t) → [int] of byte values
 public define ir_bytes_from_text(text_id: int) -> Inst:
     Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# bytes_to_text(list) → Text from list of byte values
+# text_of(list) → Text from list of byte values
 public define ir_bytes_to_text(list_id: int) -> Inst:
     Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# bytes_slice(list, lo, hi) → new list with items [lo, hi)
+# bytes_part(list, lo, hi) → new list with items [lo, hi)
 public define ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
     Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
@@ -312,7 +312,7 @@ public define ir_fn_add_param(fn_value: IRFn, param_name: text, param_type: text
     IRFn{name: fn_value.name, return_type: fn_value.return_type, params: new_params, instructions: fn_value.instructions}
 
 public define ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
-    new_id = len(fn_value.instructions)
+    new_id = length(fn_value.instructions)
     new_instructions = append(fn_value.instructions, inst)
     new_fn = IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: new_instructions}
     PushResult{function: new_fn, id: new_id}
@@ -351,7 +351,7 @@ public define ir_dump_instruction(inst: Inst, my_id: int) -> text:
 
 public define ir_dump_fn(fn_value: IRFn) -> text:
     edit text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
-    total = len(fn_value.instructions)
+    total = length(fn_value.instructions)
     loop idx in 0..<total:
         inst = at(fn_value.instructions, idx)
         line = ir_dump_instruction(inst, idx)
@@ -360,7 +360,7 @@ public define ir_dump_fn(fn_value: IRFn) -> text:
 
 public define ir_dump_module(module: IRModule) -> text:
     edit text = "; orion_ir module dump\n"
-    total = len(module.functions)
+    total = length(module.functions)
     loop idx in 0..<total:
         fn_value = at(module.functions, idx)
         text = "{text}{ir_dump_fn(fn_value)}\n"
@@ -406,13 +406,13 @@ define scope_add_enum_decl(scope: Scope, enum_name: text, variant_csv: text) -> 
 
 # Find the index of a variant in an enum. -1 if not enum or no match.
 define scope_lookup_enum_variant(scope: Scope, enum_name: text, variant: text) -> int:
-    total = len(scope.en_names)
+    total = length(scope.en_names)
     edit result = 0 - 1
     loop index in 0..<total:
         if at(scope.en_names, index) == enum_name:
             csv = at(scope.en_variants, index)
-            csv_bytes = bytes_from_text(csv)
-            n = len(csv_bytes)
+            csv_bytes = bytes_of(csv)
+            n = length(csv_bytes)
             edit current = ""
             edit found_at = 0 - 1
             edit idx_count = 0
@@ -424,7 +424,7 @@ define scope_lookup_enum_variant(scope: Scope, enum_name: text, variant: text) -
                     current = ""
                     idx_count = idx_count + 1
                 else:
-                    single = bytes_to_text([b])
+                    single = text_of([b])
                     current = "{current}{single}"
             if current == variant and found_at == (0 - 1):
                 found_at = idx_count
@@ -440,7 +440,7 @@ define scope_add_data_decl(scope: Scope, struct_name: text, spec: text) -> Scope
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: new_names, ds_specs: new_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
 define scope_lookup_data_spec(scope: Scope, struct_name: text) -> text:
-    total = len(scope.ds_names)
+    total = length(scope.ds_names)
     edit result = ""
     loop index in 0..<total:
         if at(scope.ds_names, index) == struct_name:
@@ -450,8 +450,8 @@ define scope_lookup_data_spec(scope: Scope, struct_name: text) -> text:
 
 # Parse "name:type|name:type|..." into parallel lists.
 define parse_data_spec(spec: text) -> [text]:
-    bs = bytes_from_text(spec)
-    total = len(bs)
+    bs = bytes_of(spec)
+    total = length(bs)
     edit parts = []
     edit current = ""
     loop index in 0..<total:
@@ -460,9 +460,9 @@ define parse_data_spec(spec: text) -> [text]:
             parts = append(parts, current)
             current = ""
         else:
-            single = bytes_to_text([b])
+            single = text_of([b])
             current = "{current}{single}"
-    if len(bytes_from_text(current)) > 0:
+    if length(bytes_of(current)) > 0:
         parts = append(parts, current)
     parts
 
@@ -470,13 +470,13 @@ define parse_data_spec(spec: text) -> [text]:
 # Given parsed parts ["name:type", ...] find the index of field_name.
 # Returns -1 if not found.
 define find_field_index(parts: [text], field_name: text) -> int:
-    n = len(parts)
+    n = length(parts)
     edit result = 0 - 1
     loop index in 0..<n:
         part = at(parts, index)
         # Split on ':' to get name
-        bs = bytes_from_text(part)
-        bs_n = len(bs)
+        bs = bytes_of(part)
+        bs_n = length(bs)
         edit name_buf = ""
         edit found_colon = 0
         loop ci in 0..<bs_n:
@@ -485,7 +485,7 @@ define find_field_index(parts: [text], field_name: text) -> int:
                 if b == 58:  # ':'
                     found_colon = 1
                 else:
-                    single = bytes_to_text([b])
+                    single = text_of([b])
                     name_buf = "{name_buf}{single}"
         if name_buf == field_name and result == (0 - 1):
             result = index
@@ -494,19 +494,19 @@ define find_field_index(parts: [text], field_name: text) -> int:
 
 # Given parsed parts and an index, return the type after ':'.
 define field_type_at(parts: [text], idx: int) -> text:
-    n = len(parts)
+    n = length(parts)
     if idx < 0 or idx >= n:
         "i64"
     else:
         part = at(parts, idx)
-        bs = bytes_from_text(part)
-        bs_n = len(bs)
+        bs = bytes_of(part)
+        bs_n = length(bs)
         edit type_buf = ""
         edit found_colon = 0
         loop ci in 0..<bs_n:
             b = at(bs, ci)
             if found_colon == 1:
-                single = bytes_to_text([b])
+                single = text_of([b])
                 type_buf = "{type_buf}{single}"
             else:
                 if b == 58:
@@ -519,7 +519,7 @@ define scope_add_fn_sig(scope: Scope, fn_name: text, ret_type: text) -> Scope:
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: scope.loop_headers, loop_ends: scope.loop_ends, fn_sig_names: new_names, fn_sig_rets: new_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
 define scope_lookup_fn_ret(scope: Scope, fn_name: text) -> text:
-    total = len(scope.fn_sig_names)
+    total = length(scope.fn_sig_names)
     edit result = ""
     loop index in 0..<total:
         if at(scope.fn_sig_names, index) == fn_name:
@@ -553,15 +553,15 @@ define scope_push_loop(scope: Scope, header_lbl: text, end_lbl: text) -> Scope:
     Scope{names: scope.names, ids: scope.ids, mut_flags: scope.mut_flags, loop_headers: new_headers, loop_ends: new_ends, fn_sig_names: scope.fn_sig_names, fn_sig_rets: scope.fn_sig_rets, ds_names: scope.ds_names, ds_specs: scope.ds_specs, en_names: scope.en_names, en_variants: scope.en_variants}
 
 define scope_top_loop_header(scope: Scope) -> text:
-    n = len(scope.loop_headers)
+    n = length(scope.loop_headers)
     if n == 0 then "" else at(scope.loop_headers, n - 1)
 
 define scope_top_loop_end(scope: Scope) -> text:
-    n = len(scope.loop_ends)
+    n = length(scope.loop_ends)
     if n == 0 then "" else at(scope.loop_ends, n - 1)
 
 define scope_lookup(scope: Scope, name: text) -> int:
-    total = len(scope.names)
+    total = length(scope.names)
     edit result = 0 - 1
     loop index in 0..<total:
         from_end = total - 1 - index
@@ -571,7 +571,7 @@ define scope_lookup(scope: Scope, name: text) -> int:
     result
 
 define scope_is_mut(scope: Scope, name: text) -> int:
-    total = len(scope.names)
+    total = length(scope.names)
     edit result = 0
     edit found = 0
     loop index in 0..<total:
@@ -588,7 +588,7 @@ define scope_is_mut(scope: Scope, name: text) -> int:
 # We use this to avoid emitting redundant branches (which LLVM rejects).
 define last_op(fn_value: IRFn) -> text:
     insts = fn_value.instructions
-    n = len(insts)
+    n = length(insts)
     if n == 0 then "" else at(insts, n - 1).op
 
 define is_block_terminated(fn_value: IRFn) -> int:
@@ -611,9 +611,9 @@ type ConvResult: function: IRFn, scope: Scope, id: int
 
 # Convert a text-encoded int literal to int.
 # Use bytes (text[i] returns whole string - Orion bug as of 2026-06).
-define parse_int(text: text) -> int:
-    byte_list = bytes_from_text(text)
-    total = len(byte_list)
+define parse_int_demo(text: text) -> int:
+    byte_list = bytes_of(text)
+    total = length(byte_list)
     edit value = 0
     edit start = 0
     edit is_neg = false
@@ -665,7 +665,7 @@ define ast_binary_to_ir(fn2: IRFn, scope: Scope, op: text, left_id: int, right_i
 
 define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     stmts = get_list(node, "stmts")
-    total_stmts = len(stmts)
+    total_stmts = length(stmts)
     edit current_fn = fn_value
     edit current_scope = scope
     edit last_id = 0 - 1
@@ -778,7 +778,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 # `loop:` - infinite loop with `break`/`continue` for exit.
 define ast_loop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     body_node = get(node, "body")
-    n = len(fn_value.instructions)
+    n = length(fn_value.instructions)
     header_lbl = "loop_{n}_header"
     end_lbl = "loop_{n}_end"
 
@@ -809,7 +809,7 @@ define ast_for_in_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult
     iter_node = get(node, "iter")
     body_node = get(node, "body")
 
-    n = len(fn_value.instructions)
+    n = length(fn_value.instructions)
     header_lbl = "fin_{n}_header"
     body_lbl = "fin_{n}_body"
     step_lbl = "fin_{n}_step"
@@ -867,7 +867,7 @@ define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvRes
     high_node = get(node, "high")
     body_node = get(node, "body")
 
-    n = len(fn_value.instructions)
+    n = length(fn_value.instructions)
     header_lbl = "for_{n}_header"
     body_lbl = "for_{n}_body"
     step_lbl = "for_{n}_step"
@@ -988,7 +988,7 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 # O(distance from last label to end), amortized O(1) in practice.
 define current_block(fn_value: IRFn) -> text:
     insts = fn_value.instructions
-    total = len(insts)
+    total = length(insts)
     edit found = "entry"
     edit done = 0
     loop index in 0..<total:
@@ -1007,7 +1007,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     else_node = get(node, "else")
 
     # Unique label names based on current inst position.
-    n = len(fn_value.instructions)
+    n = length(fn_value.instructions)
     then_lbl = "if_{n}_then"
     else_lbl = "if_{n}_else"
     merge_lbl = "if_{n}_merge"
@@ -1139,7 +1139,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         arg_node = at(args, 0)
         arg_r = ast_expr_to_ir(fn_value, scope, arg_node)
         arg_type = get_value_type(arg_r.function, arg_r.id)
-        # len(text) → strlen via runtime; len(list/map) → list_len.
+        # length(text) → strlen via runtime; length(list/map) → list_len.
         if arg_type == "text":
             pr = ir_fn_push(arg_r.function, ir_text_len(arg_r.id))
             result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
@@ -1158,7 +1158,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         map_insts = map_fn.instructions
         map_inst = at(map_insts, map_r.id)
         map_args = map_inst.args
-        if map_inst.op == "map_lit" and len(map_args) >= 2:
+        if map_inst.op == "map_lit" and length(map_args) >= 2:
             first_val_id = at(map_args, 1)
             first_val_type = get_value_type(map_fn, first_val_id)
             if first_val_type == "i64":
@@ -1294,7 +1294,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_user_fn = (is_print_line == false) and (is_to_text == false) and (is_at == false) and (is_len == false) and (is_get == false) and (is_has == false) and (is_push == false) and (is_slice == false) and (is_contains == false) and (is_file_read == false) and (is_file_write == false) and (is_argc == false) and (is_argv == false) and (is_b_from_t == false) and (is_b_to_t == false) and (is_b_slice == false) and (is_b_concat == false) and (is_b_zeros == false) and (is_byte_at == false) and (is_b_length == false) and (is_slot_get == false) and (is_slot_set == false) and (is_get_int == false) and (is_get_map == false) and (is_get_list == false)
     if is_user_fn:
         # User-defined fn call. Evaluate each arg and collect SSA ids.
-        total_args = len(args)
+        total_args = length(args)
         edit current_fn = fn_value
         edit current_scope = scope
         edit arg_ids = []
@@ -1336,7 +1336,7 @@ define ast_str_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 
 define ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     items = get_list(node, "items")
-    n_items = len(items)
+    n_items = length(items)
     edit current_fn = fn_value
     edit current_scope = scope
     edit item_ids = []
@@ -1360,8 +1360,8 @@ define ast_list_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResu
 define ast_match_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     scrutinee_node = get(node, "scrutinee")
     arms = get(node, "arms")
-    n_arms = len(arms)
-    n = len(fn_value.instructions)
+    n_arms = length(arms)
+    n = length(fn_value.instructions)
     end_lbl = "match_{n}_end"
 
     scrut_r = ast_expr_to_ir(fn_value, scope, scrutinee_node)
@@ -1454,25 +1454,25 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
     if spec == "":
         print_line("orion-self: ERROR - unknown data type `{struct_name}`")
     parts = parse_data_spec(spec)
-    n_fields_decl = len(parts)
-    n_provided = len(fields)
+    n_fields_decl = length(parts)
+    n_provided = length(fields)
     # Build value_ids in declared field order.
     edit current_fn = fn_value
     edit current_scope = scope
     edit value_ids = []
     loop di in 0..<n_fields_decl:
         decl_part = at(parts, di)
-        decl_bs = bytes_from_text(decl_part)
+        decl_bs = bytes_of(decl_part)
         edit decl_name = ""
         edit found_colon = 0
-        decl_bs_n = len(decl_bs)
+        decl_bs_n = length(decl_bs)
         loop ci in 0..<decl_bs_n:
             b = at(decl_bs, ci)
             if found_colon == 0:
                 if b == 58:
                     found_colon = 1
                 else:
-                    single = bytes_to_text([b])
+                    single = text_of([b])
                     decl_name = "{decl_name}{single}"
         # Search provided fields for decl_name.
         edit matched_id = 0 - 1
@@ -1513,13 +1513,13 @@ define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         obj_r = ast_expr_to_ir(fn_value, scope, obj_node)
         obj_type = get_value_type(obj_r.function, obj_r.id)
         edit struct_name = ""
-        obj_bytes = bytes_from_text(obj_type)
-        n = len(obj_bytes)
+        obj_bytes = bytes_of(obj_type)
+        n = length(obj_bytes)
         edit past_colon = 0
         loop ci in 0..<n:
             b = at(obj_bytes, ci)
             if past_colon == 1:
-                single = bytes_to_text([b])
+                single = text_of([b])
                 struct_name = "{struct_name}{single}"
             else:
                 if b == 58:
@@ -1537,7 +1537,7 @@ define ast_field_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 
 define ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     pairs = get(node, "pairs")
-    n_pairs = len(pairs)
+    n_pairs = length(pairs)
     edit current_fn = fn_value
     edit current_scope = scope
     edit pair_ids = []
@@ -1605,8 +1605,8 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
 # Map a parser type-node to an IR type string ("text" / "list" / "i64").
 # Given a "list:T" encoding, return T. Fallback "i64" for plain "list".
 define extract_list_elem(type_text: text) -> text:
-    bs = bytes_from_text(type_text)
-    n = len(bs)
+    bs = bytes_of(type_text)
+    n = length(bs)
     edit is_param = false
     if n >= 5:
         if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
@@ -1616,7 +1616,7 @@ define extract_list_elem(type_text: text) -> text:
     else:
         edit result = ""
         loop ci in 5..<n:
-            single = bytes_to_text([at(bs, ci)])
+            single = text_of([at(bs, ci)])
             result = "{result}{single}"
         result
 
@@ -1638,9 +1638,9 @@ define ast_type_to_ir(type_node) -> text:
                 # Capitalised names (Inst, Item, IRFn, …) are presumed
                 # to be data-struct types. Snake-case / lowercase names
                 # (int, bool, void) get the i64 default.
-                name_bs = bytes_from_text(name)
+                name_bs = bytes_of(name)
                 edit starts_cap = false
-                if len(name_bs) > 0:
+                if length(name_bs) > 0:
                     first = at(name_bs, 0)
                     if first >= 65 and first <= 90:
                         starts_cap = true
@@ -1665,7 +1665,7 @@ define ast_type_to_ir_with_scope(type_node, scope: Scope) -> text:
                 "map"
             else:
                 ds_names = scope.ds_names
-                n_structs = len(ds_names)
+                n_structs = length(ds_names)
                 edit is_struct = false
                 loop si in 0..<n_structs:
                     if at(ds_names, si) == name:
@@ -1679,7 +1679,7 @@ public define ast_fn_to_ir(ast_fn, initial_scope: Scope) -> IRFn:
     ret_type = ast_type_to_ir_with_scope(ret_type_node, initial_scope)
     edit fn_value = ir_fn_new(name, ret_type)
     params = get(ast_fn, "params")
-    n_params = len(params)
+    n_params = length(params)
     edit scope = initial_scope
     loop index in 0..<n_params:
         param = at(params, index)
@@ -1703,7 +1703,7 @@ public define ast_fn_to_ir(ast_fn, initial_scope: Scope) -> IRFn:
 
 public define ast_program_to_ir(program) -> IRModule:
     decls = get(program, "decls")
-    total = len(decls)
+    total = length(decls)
     # Pass 1a: collect Data decls and Enum decls first. Pass 1b uses them so
     # fn ret types like `-> Inst` correctly become "struct:Inst" not "i64",
     # and `EnumName.Variant` expressions resolve to variant indices.
@@ -1713,7 +1713,7 @@ public define ast_program_to_ir(program) -> IRModule:
         if get(decl, "kind") == "Data":
             struct_name = get(decl, "name")
             data_fields = get(decl, "fields")
-            n_df = len(data_fields)
+            n_df = length(data_fields)
             edit spec = ""
             loop fi in 0..<n_df:
                 fld = at(data_fields, fi)
@@ -1725,7 +1725,7 @@ public define ast_program_to_ir(program) -> IRModule:
         if get(decl, "kind") == "Enum":
             enum_name = get(decl, "name")
             variants = get(decl, "variants")
-            n_vars = len(variants)
+            n_vars = length(variants)
             edit csv = ""
             loop vi in 0..<n_vars:
                 v = at(variants, vi)
@@ -1769,4 +1769,4 @@ define main() -> int:
     fn_decl = {"kind": "Fn", "name": "main", "params": [], "ret": type_int, "body": block_node}
     program = {"kind": "Program", "decls": [fn_decl]}
     module = ast_program_to_ir(program)
-    len(module.functions)
+    length(module.functions)

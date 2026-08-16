@@ -1,4 +1,4 @@
-# A fn(...) parameter's declared RETURN type is propagated through the call, so
+# A function(...) parameter's declared RETURN type is propagated through the call, so
 # a pointer result (text/list) and an f64 result keep their type instead of
 # collapsing to i64. Each storage class is exercised.
 use text
@@ -9,15 +9,15 @@ define triple(n: int) -> [int]:
 define half(n: int) -> f64:
     (n as f64) / 2.0
 
-define text_of(f: fn(int) -> text, x: int) -> int:
+define text_via(f: function(int) -> text, x: int) -> int:
     byte_count(f(x))
-define list_of(f: fn(int) -> [int], x: int) -> int:
-    len(f(x))
-define float_of(f: fn(int) -> f64, x: int) -> int:
+define list_of(f: function(int) -> [int], x: int) -> int:
+    length(f(x))
+define float_of(f: function(int) -> f64, x: int) -> int:
     (f(x) * 4.0) as int
 
 define main() -> int:
-    ok_text = if text_of(label, 7) == 3 then 1 else 0
+    ok_text = if text_via(label, 7) == 3 then 1 else 0
     ok_list = if list_of(triple, 9) == 3 then 1 else 0
     ok_float = if float_of(half, 5) == 10 then 1 else 0
     ok_text * 22 + ok_list * 22 + ok_float * 22   # 66
