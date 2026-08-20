@@ -11,14 +11,14 @@
 #
 # State lives in global slots under "timer:{id}:..." so a timer is just a name.
 
-define ts_int(key: text) -> int:
+define ts_int(key: text) -> number:
     if slot_has(key) then slot_get_int(key) else 0
 
 # --- countdown -------------------------------------------------------------
 
 # Start (or restart) a timer running toward dur_ms.
 # no example: mutates timer state - proven by test_42_timer.or
-public define timer_start(id: text, dur_ms: int) uses clock:
+public define timer_start(id: text, dur_ms: number) uses clock:
     slot_set("timer:{id}:dur", dur_ms)
     slot_set("timer:{id}:el", 0)
     slot_set("timer:{id}:on", 1)
@@ -38,7 +38,7 @@ public define timer_reset(id: text):
 
 # Advance by dt_ms. Returns 1 on the single tick it completes, else 0.
 # A completed or stopped timer is inert (returns 0).
-public define timer_tick(id: text, dt_ms: int) -> int:
+public define timer_tick(id: text, dt_ms: number) -> number:
     example timer_tick("unstarted-timer", 10) is 0
     onkey = "timer:{id}:on"
     if ts_int(onkey) is 0:
@@ -52,17 +52,17 @@ public define timer_tick(id: text, dt_ms: int) -> int:
         return 1
     0
 
-public define timer_elapsed(id: text) -> int:
+public define timer_elapsed(id: text) -> number:
     example timer_elapsed("never-started") is 0
     ts_int("timer:{id}:el")
 
-public define timer_remaining(id: text) -> int:
+public define timer_remaining(id: text) -> number:
     example timer_remaining("never-started") is 0
     r = ts_int("timer:{id}:dur") - ts_int("timer:{id}:el")
     if r > 0 then r else 0
 
 # Progress as permille (0..1000), clamped. A zero-duration timer reads 1000.
-public define timer_progress(id: text) -> int:
+public define timer_progress(id: text) -> number:
     example timer_progress("never-started") is 1000
     dur = ts_int("timer:{id}:dur")
     if dur <= 0:
@@ -88,7 +88,7 @@ public define timer_active(id: text) -> truth:
 # is carried, so cadence never drifts. Independent of timer_start/tick above.
 # no example: mutates timer state - proven by test_42_timer.or
 # no example: mutates timer state - proven by test_42_timer.or
-public define timer_every(id: text, period_ms: int, dt_ms: int) -> int:
+public define timer_every(id: text, period_ms: number, dt_ms: number) -> number:
     if period_ms <= 0:
         return 0
     acckey = "timer:{id}:acc"

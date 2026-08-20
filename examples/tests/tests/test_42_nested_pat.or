@@ -3,21 +3,21 @@
 # part of its variant, so it falls through to the next arm when the inner tag
 # differs (here `Some(Bad(m))`), and it never counts as full coverage.
 type Res:
-    Ok(int)
+    Ok(number)
     Bad(text)
 
 type Opt:
     Some(Res)
     None
 
-define score(v: Opt) -> int:
+define score(v: Opt) -> number:
     choose v:
-        Some(Ok(n)) -> n
-        Some(Bad(m)) -> length(m)
-        None -> 100
+        Some(Ok(n)) then n
+        Some(Bad(m)) then length(m)
+        None then 100
 
-define main() -> int:
+define main() -> number:
     good = score(Opt.Some(Res.Ok(35)))     # 35
     bad = score(Opt.Some(Res.Bad("abcde")))  # 5
     empty = score(Opt.None)                # 100
-    good + bad + (empty - 98)              # 35 + 5 + 2 == 42
+    good + bad + (empty - 98)              # 35 + 5 + 2 is 42

@@ -7,15 +7,15 @@
 #   - Fn call w/ field arg:   {function(obj.field)}  ← was a bug
 #   - Multiple in one string
 
-type Obj: field: int, name: text
+type Obj: field: number, name: text
 
-define double_int(x: int) -> int:
+define double_int(x: number) -> number:
     x + x
 
 define label_for(name: text) -> text:
     "label:{name}"
 
-define main() -> int:
+define main() -> number:
     obj = Obj{field: 21, name: "alpha"}
     val = 21
 

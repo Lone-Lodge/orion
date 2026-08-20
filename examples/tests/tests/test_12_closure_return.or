@@ -1,8 +1,8 @@
 # Closure factory: make_adder(base) returns a closure that captured `base`
 # (a lambda in bare/return expression position, lifted + env-packed).
 # add7 = make_adder(7); add7(5) = 5 + 7 = 12.
-define make_adder(base: int) -> function:
+define make_adder(base: number) -> function:
     function(n): n + base
-define main() -> int:
+define main() -> number:
     add7 = make_adder(7)
     add7(5)

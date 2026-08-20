@@ -14,19 +14,65 @@
 use ori_geometry
 
 public type DrawCmd:
+    # These payloads stay `int` ON PURPOSE. One enum gets one answer for its
+    # `number` payloads (a `choose` arm hands back a bare payload with no
+    # conversion), so a single fraction reaching any one of them widens every
+    # coordinate in the list to f64. Most of these are pixel counts, and this
+    # is a rendering seam whose behaviour is not checked by the test suite -
+    # so the word that says what they are is the one that stays.
+    # tonumber: skip
+    #
+    # These payloads stay `int` ON PURPOSE. One enum gets one answer for its
+    # `number` payloads (a `choose` arm hands back a bare payload with no
+    # conversion on the way out), so a single fraction reaching any one of
+    # them widens every coordinate in the draw list to f64. Most of these are
+    # pixel counts, and this is a rendering seam the test suite does not run.
+    # The marker above is read by tools/migrate/tonumber.py.
     DrawRect(Rect, text, int)
     # Filled rounded rectangle: rect, colour, corner radius (px), src eid.
     # Backends fill it as horizontal og_rect spans with circular corner
     # insets - the chrome primitive for hover cells, chips, and cards.
-    DrawRoundRect(Rect, text, int, int)
+    # rect, colour, corner radii "8" or "8 8 0 0" (top-left, top-right,
+    # bottom-right, bottom-left), src eid. Four, because a tab is round on
+    # top and square on the bottom and so is every joined button group.
+    DrawRoundRect(Rect, text, text, int)
+    # A soft drop shadow: rect, colour, corner radius, blur in px, src eid.
+    # Same shape as a DrawRoundRect, drawn with the distance ramp spread
+    # over `blur` pixels instead of one. Backends that cannot soften an
+    # edge skip it - a hard block where a shadow belongs is worse than
+    # nothing.
+    # Clip everything after this to `rect`, until the next SetClip. A rect
+    # with no area clears it. A UI needs this the moment anything can be
+    # longer than the box it sits in - a list, a line of typing - because
+    # the alternative is content shoving its neighbours out of the way.
+    # rect, corner radius, src eid. The radius matters: a scissor is a
+    # rectangle and always will be, so a list inside a rounded panel would
+    # square off at the corners without it - which is the one place every
+    # card and every avatar shows it.
+    SetClip(Rect, int, int)
+    DrawShadow(Rect, text, int, int, int)
     DrawText(Point, text, text, int, int)
     # point, icon name, pixel size, src eid.
-    DrawIcon(Point, text, int, int)
+    # point, icon name, size, colour, src eid. An icon that cannot take a
+    # colour is an icon that can only ever mean one thing: a file tree
+    # tells you what a file IS by the colour of its mark, and every editor
+    # in the world does it that way.
+    DrawIcon(Point, text, int, text, int)
     # path data, colour, src eid.
     DrawPath(text, text, int)
+    # A ring, or a slice of one: centre, outer radius, how thick, and the
+    # span in degrees measured from the top going clockwise. The one shape
+    # a rectangle cannot approximate, and the one every cooldown sweep and
+    # radial meter is made of.
+    DrawArc(Point, int, int, int, int, text, int)
     # A pixel-art sprite: top-left Point, image path, integer scale, src
     # eid. The rect-only backends blit it as og_rect runs (see
     # atlas_sprite); no GPU texture needed.
+    # A panel skinned from a picture: box, picture, corner size in the
+    # PICTURE's own pixels, tint, blend, src eid. The corners keep their
+    # size, the edges stretch along their run, the middle stretches both
+    # ways. Every game frame that is not flat colour is one of these.
+    DrawNine(Rect, text, int, text, text, int)
     DrawSprite(Point, text, int, int)
     # A textured image quad (the modern path): top-left Point, image path,
     # dest width, dest height, tint ("#rrggbb"/"#rrggbbaa" or a named colour;

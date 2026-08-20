@@ -1,18 +1,18 @@
 # The v2 surface words parse as aliases of the v1 keywords (Runda B):
-#   define=fn  public=pub  edit=mut  choose=match  collect=yield
+#   define=fn  public=public edit=edit choose=choose  collect=collect
 # Old spellings still work during the migration; these are additive.
-define double(x: int) -> int:
+define double(x: number) -> number:
     x * 2
 
-public define triple(x: int) -> int:
+public define triple(x: number) -> number:
     x * 3
 
-define main() -> int:
+define main() -> number:
     edit total = 0
     total += double(6)
     total += triple(9)
     doubled = loop v in [1, 2, 3]: collect v * 2
     extra = choose total:
-        39 -> length(doubled)
-        _ -> 0
+        39 then length(doubled)
+        _ then 0
     total + extra

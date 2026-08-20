@@ -1,12 +1,12 @@
 # Character literals: `'c'` lexes to the byte value, so it's readable
 # notation for an ASCII code - `'+'` is exactly `43`. No new type; the
 # parser treats it as an int. Escapes work too (`'\n'` = 10, `'\''` = 39).
-define classify(b: int) -> text:
+define classify(b: number) -> text:
     choose b:
-        '+' -> "plus"
-        '-' -> "minus"
-        _ -> "other"
-define main() -> int:
+        '+' then "plus"
+        '-' then "minus"
+        _ then "other"
+define main() -> number:
     p = classify('+')
     # '+'=43, '\n'=10, '\''=39  -> 92; guarded by the match result
-    if p == "plus" then '+' + '\n' + '\'' else 0
+    if p is "plus" then '+' + '\n' + '\'' else 0

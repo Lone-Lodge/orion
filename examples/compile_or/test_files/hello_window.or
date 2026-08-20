@@ -3,16 +3,16 @@ external define win_pump() -> int
 external define win_close(hwnd: int)
 
 
-define main() -> int:
+define main() -> number:
     print_line("Opening native Orion window...")
     hwnd = win_open("Hello from native Orion", 640, 480)
-    if hwnd == 0:
+    if hwnd is 0:
         print_line("CreateWindowExW failed")
         return 1
     print_line("Window is open. Close it to exit.")
     loop:
         keep = win_pump()
-        if keep == 0:
+        if keep is 0:
             break
     win_close(hwnd)
     print_line("Window closed. Bye.")

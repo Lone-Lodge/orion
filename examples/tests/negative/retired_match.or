@@ -1,5 +1,5 @@
-# expect: `match` was retired
-define main() -> int:
+# expect: `choose` was retired
+define main() -> number:
     match 5:
         5 -> 1
         _ -> 0

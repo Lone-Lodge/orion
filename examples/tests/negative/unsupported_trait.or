@@ -3,7 +3,7 @@
 # through as unknown, was skipped a token at a time, and the FUNCTION AFTER it
 # took the blame. Reserved-but-unimplemented must say so, where it stands.
 trait Drawable:
-    draw: function() -> int
+    draw: function() -> number
 
-define main() -> int:
+define main() -> number:
     7

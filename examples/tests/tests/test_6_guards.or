@@ -1,11 +1,11 @@
 # Match guards + binding patterns: `x if COND -> body` binds x to the scrutinee
 # and matches only when COND holds; a failed guard falls through to the next arm.
-define classify(n: int) -> int:
+define classify(n: number) -> number:
     choose n:
-        x if x > 100 -> 3
-        x if x > 10  -> 2
-        x if x > 0   -> 1
-        _            -> 0
+        x if x > 100 then 3
+        x if x > 10 then 2
+        x if x > 0 then 1
+        _ then 0
 
-define main() -> int:
-    classify(5) + classify(50) + classify(500) + classify(0)   # 1 + 2 + 3 + 0 == 6
+define main() -> number:
+    classify(5) + classify(50) + classify(500) + classify(0)   # 1 + 2 + 3 + 0 is 6

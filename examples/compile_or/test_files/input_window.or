@@ -8,41 +8,41 @@ external define win_event_x() -> int
 external define win_event_y() -> int
 
 
-define main() -> int:
+define main() -> number:
     hwnd = win_open("Orion input test - click, type, press Esc", 640, 480)
-    if hwnd == 0:
+    if hwnd is 0:
         print_line("window failed")
         return 1
     print_line("window open - click/type in it; Esc or close to exit")
     edit running = 1
     loop:
-        if running == 0:
+        if running is 0:
             break
         keep = win_pump()
-        if keep == 0:
+        if keep is 0:
             break
         loop:
             has_event = win_event_next()
-            if has_event == 0:
+            if has_event is 0:
                 break
             kind = win_event_kind()
-            if kind == 1:
+            if kind is 1:
                 b = win_event_key()
                 ex = win_event_x()
                 ey = win_event_y()
                 print_line("mouse_down button={b} at {ex},{ey}")
-            if kind == 2:
+            if kind is 2:
                 b2 = win_event_key()
                 print_line("mouse_up button={b2}")
-            if kind == 4:
+            if kind is 4:
                 vk = win_event_key()
                 print_line("key_down vk={vk}")
-                if vk == 27:
+                if vk is 27:
                     running = 0
-            if kind == 6:
+            if kind is 6:
                 print_line("close requested")
                 running = 0
-            if kind == 7:
+            if kind is 7:
                 w = win_event_x()
                 h = win_event_y()
                 print_line("resized to {w}x{h}")

@@ -30,34 +30,42 @@ external define orion_task_spawn(f: function, arg: int) -> int
 external define orion_task_await(id: int) -> int
 external define orion_task_yield() -> int
 external define orion_task_run_all() -> int
+external define orion_task_pump() -> int
 external define orion_task_state(id: int) -> int
 external define orion_task_live_count() -> int
 
 # Start a task. Returns its id, or -1 if the task table is full (1024).
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define spawn(f: function, arg: int) -> int = orion_task_spawn(f, arg)
+public define spawn(f: function, arg: number) -> number = orion_task_spawn(f, arg)
 
 # Run the scheduler until this task finishes, then take its result.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define await(id: int) -> int = orion_task_await(id)
+public define await(id: number) -> number = orion_task_await(id)
 
 # Give the scheduler a turn. No-op outside a task.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define yield_now() -> int = orion_task_yield()
+public define yield_now() -> number = orion_task_yield()
 
 # Drive every ready task to completion; returns how many are finished.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define run_all() -> int = orion_task_run_all()
+public define run_all() -> number = orion_task_run_all()
+
+# ONE scheduler turn, never sleeping: ready tasks get a slice, io- and
+# proc-parked tasks are polled so they become ready next turn. For loops
+# that must keep doing their own work (a server accepting connections)
+# while detached tasks run - run_all() would block until all finished.
+# no example: needs the running task scheduler - proven by dots' server
+public define pump() -> number = orion_task_pump()
 
 # 0 = no such task, 1 = ready, 2 = running, 3 = finished (result not taken yet).
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define task_state(id: int) -> int = orion_task_state(id)
+public define task_state(id: number) -> number = orion_task_state(id)
 
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define task_count() -> int = orion_task_live_count()
+public define task_count() -> number = orion_task_live_count()
 
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define is_done(id: int) -> truth = orion_task_state(id) is 3
+public define is_done(id: number) -> truth = orion_task_state(id) is 3
 
 external define orion_task_sleep(ms: int) -> int
 
@@ -70,7 +78,7 @@ external define orion_task_sleep(ms: int) -> int
 # a task, ten tasks each waiting 100 ms took a second, because the first one
 # parked the whole scheduler in the OS.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define sleep_task(ms: int) -> int = orion_task_sleep(ms)
+public define sleep_task(ms: number) -> number = orion_task_sleep(ms)
 
 # ---- delimited continuations: the handler survives the resume ---------
 #
@@ -79,11 +87,11 @@ public define sleep_task(ms: int) -> int = orion_task_sleep(ms)
 # continuation runs. Here the handler runs on its own stack (a fiber), so it
 # survives and `resume_with` RETURNS the continuation result.
 #
-#     fn body(seed: int) -> int:
+#     define body(seed: int) -> int:
 #         x = ask(decide, seed)    # the handler decides what x is
 #         x * 10                   # the rest of the task: the continuation
 #
-#     fn decide(seed: int) -> int:
+#     define decide(seed: int) -> int:
 #         answer = resume_with(4)  # runs the rest of the task with x = 4
 #         answer + 2               # ...and gets 40 back, so this returns 42
 #
@@ -106,11 +114,11 @@ external define orion_ms_supported() -> int
 # Inside a task: hand control to `handler`, which may resume this point once and
 # then keep working. Returns the handler's value, or the resumed value.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define ask(handler: function, arg: int) -> int = orion_ms_perform(handler, arg)
+public define ask(handler: function, arg: number) -> number = orion_ms_perform(handler, arg)
 
 # Inside such a handler: run the rest of the task with `v`, and get its result.
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
-public define resume_with(v: int) -> int = orion_ms_resume(v)
+public define resume_with(v: number) -> number = orion_ms_resume(v)
 
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define resumable_ok() -> truth = orion_ms_supported() is 1

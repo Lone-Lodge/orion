@@ -1,9 +1,9 @@
 # Struct destructuring bind: `Name{a, b} = expr` pulls named fields into
 # locals. Desugars to a temp plus one `field = temp.field` read per name;
 # the temp carries the struct type so field access resolves.
-type Point: x: int, y: int
+type Point: x: number, y: number
 
-define main() -> int:
+define main() -> number:
     p = Point{x: 20, y: 5}
-    Point{x, y} = p    # x == 20, y == 5
+    Point{x, y} = p    # x is 20, y is 5
     x + y              # 25

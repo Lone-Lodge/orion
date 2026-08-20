@@ -25,7 +25,12 @@ static uint32_t  g_clear;
 static void blit(void);
 extern void (*win_paint_hook)(void);
 
+/* The software path draws into ONE window's DIB - there is no second
+ * framebuffer to blit to. Returns a target handle like the d3d12 path so
+ * callers are uniform; a second window is refused cleanly rather than
+ * quietly repointing this one. */
 long long sw_og_init(long long hwnd_i, long long width, long long height) {
+    if (g_hwnd) return 0;
     g_hwnd = (HWND)(uintptr_t)hwnd_i;
     g_width = (int)width;
     g_height = (int)height;
@@ -34,7 +39,8 @@ long long sw_og_init(long long hwnd_i, long long width, long long height) {
     return g_fb ? 1 : 0;
 }
 
-void sw_og_begin(long long r, long long g, long long b) {
+void sw_og_begin(long long target, long long r, long long g, long long b) {
+    (void)target;   /* only ever one software target */
     g_clear = ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
     uint32_t *p = g_fb, *end = g_fb + (size_t)g_width * g_height;
     while (p < end) *p++ = g_clear;
@@ -198,7 +204,8 @@ long long sw_og_vsync(long long on) {
 
 long long sw_og_caps(void) { return 1; /* 1 = software, 2 = d3d12 */ }
 
-long long sw_og_resize(long long w, long long h) {
+long long sw_og_resize(long long target, long long w, long long h) {
+    (void)target;
     if (w <= 0 || h <= 0) return 0;
     uint32_t *fresh = (uint32_t *)malloc((size_t)w * h * 4);
     if (!fresh) return 0;

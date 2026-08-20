@@ -1,23 +1,23 @@
 # A match arm can be an indented block, not just a single expression: bind a
 # local, then the last expression is the arm's value - exactly like an `if`
 # branch. Inline arms (`-> expr`) still work. Both the scrutinee form and the
-# subjectless cond form (`match:`) support it.
-define score(kind: int) -> int:
+# subjectless cond form (`choose:`) support it.
+define score(kind: number) -> number:
     choose kind:
-        1 ->
+        1 then 
             base = 20
             base * 2 + 2      # 42
-        2 -> 7                # inline arm still fine
-        _ -> 0
-define main() -> int:
+        2 then 7                # inline arm still fine
+        _ then 0
+define main() -> number:
     a = score(1)              # 42
     b = score(2)              # 7
     n = 9
     c = choose:
-        n > 100 -> 1
-        n > 5 ->
+        n > 100 then 1
+        n > 5 then 
             step = n - 5      # 4
             step - 4          # 0
-        else -> 99
+        else then 99
     # 42 + 7 - 7 + 0 = 42
     a + b - 7 + c

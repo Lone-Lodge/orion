@@ -5,6 +5,6 @@ define writer(p: text) uses files:
 define caller(p: text) uses console:
     writer(p)
 
-define main() -> int:
+define main() -> number:
     caller("t.txt")
     0

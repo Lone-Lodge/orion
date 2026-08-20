@@ -1,17 +1,17 @@
 # result - Result<T>: a value, or an error message.
 #
 # A native generic sum type. The point is that you cannot look at the value
-# without saying what happens in the error case: `match` is exhaustive, so the
+# without saying what happens in the error case: `choose` is exhaustive, so the
 # compiler makes you follow up.
 #
 #   use result
 #
-#   fn safe_div(a: int, b: int) -> Result<int>:
+#   define safe_div(a: int, b: int) -> Result<int>:
 #       if b is 0 then Result.Err("divide by zero") else Result.Ok(a / b)
 #
-#   match safe_div(10, 0):
-#       Ok(v)  -> print_line("got {v}")
-#       Err(m) -> print_line("error: {m}")
+#   choose safe_div(10, 0):
+#       Ok(v) then print_line("got {v}")
+#       Err(m) then print_line("error: {m}")
 #
 # Softer forms when you do not want to branch by hand:
 #   n = unwrap_or(safe_div(10, 0), 0 - 1)   # fallback value
@@ -22,20 +22,17 @@
 # function and binds `v` to the Ok payload otherwise.
 #
 # There is deliberately no `unwrap`. Orion has no panic, so an `unwrap` here
-# could only lie and hand back a zero. Use `match`, `if let`, `?` or
+# could only lie and hand back a zero. Use `choose`, `if let`, `?` or
 # `unwrap_or`.
 
-public type Result<T>:
-    Ok(T)
-    Err(text)
 
 # The payload, or `default` if this is an Err.
 public define unwrap_or<T>(r: Result<T>, default: T) -> T:
     example unwrap_or(Result.Ok(7), 0) is 7
     example unwrap_or(Result.Err("x"), 9) is 9
     choose r:
-        Ok(v) -> v
-        Err(m) -> default
+        Ok(v) then v
+        Err(m) then default
 
 # 1 if this is an Ok, else 0.
 public define is_ok<T>(r: Result<T>) -> truth:

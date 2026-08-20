@@ -5,8 +5,15 @@ declare i32 @printf(ptr, ...)
 declare i32 @puts(ptr)
 declare ptr @malloc(i64)
 declare ptr @orion_f64_literal_hex(ptr)
+declare i64 @orion_text_to_int(ptr)
+declare double @orion_text_to_f64(ptr)
 declare i64 @orion_par_run(ptr, i64)
 declare i64 @orion_trace_enter(ptr)
+declare i64 @orion_line(ptr)
+declare i64 @orion_dbg_i(ptr, i64)
+declare i64 @orion_trace_exit()
+declare i64 @orion_slot_watch(ptr)
+declare i64 @orion_dbg_t(ptr, ptr)
 declare i64 @orion_trail_note_trap()
 declare i64 @orion_breakpoint(ptr)
 declare ptr @orion_alloc(i64)
@@ -54,6 +61,7 @@ declare i64 @orion_task_spawn(ptr, i64)
 declare i64 @orion_task_await(i64)
 declare i64 @orion_task_yield()
 declare i64 @orion_task_run_all()
+declare i64 @orion_task_pump()
 declare i64 @orion_task_state(i64)
 declare i64 @orion_task_live_count()
 declare i64 @orion_task_sleep(i64)
@@ -763,39 +771,8 @@ declare i64 @ftell(ptr)
 @.fmode_w = private unnamed_addr constant [3 x i8] c"wb\00"
 @.empty_str = private unnamed_addr constant [17 x i8] c"\05\15\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00", align 8
 
-define ptr @orion_file_read(ptr %path) {
-entry:
-  %fp = call ptr @fopen(ptr %path, ptr @.fmode_r)
-  %is_null = icmp eq ptr %fp, null
-  br i1 %is_null, label %err, label %ok
-err:
-  %eo = getelementptr i8, ptr @.empty_str, i64 16
-  ret ptr %eo
-ok:
-  %_seek = call i32 @fseek(ptr %fp, i64 0, i32 2)
-  %size = call i64 @ftell(ptr %fp)
-  %_rew = call i32 @fseek(ptr %fp, i64 0, i32 0)
-  %buf = call ptr @orion_text_alloc(i64 %size)
-  %_read = call i64 @fread(ptr %buf, i64 1, i64 %size, ptr %fp)
-  %term = getelementptr i8, ptr %buf, i64 %size
-  store i8 0, ptr %term
-  %_close = call i32 @fclose(ptr %fp)
-  ret ptr %buf
-}
-
-define i64 @orion_file_write(ptr %path, ptr %content) {
-entry:
-  %fp = call ptr @fopen(ptr %path, ptr @.fmode_w)
-  %is_null = icmp eq ptr %fp, null
-  br i1 %is_null, label %err, label %ok
-err:
-  ret i64 0
-ok:
-  %len = call i64 @orion_tlen(ptr %content)
-  %_wrote = call i64 @fwrite(ptr %content, i64 1, i64 %len, ptr %fp)
-  %_close = call i32 @fclose(ptr %fp)
-  ret i64 1
-}
+declare ptr @orion_file_read(ptr)
+declare i64 @orion_file_write(ptr, ptr)
 
 define ptr @orion_list_new(i64 %cap) {
 entry:
@@ -874,31 +851,8 @@ mok:
   ret i64 %mr
 }
 
-define i64 @orion_require(i64 %c) {
-entry:
-  %rq = icmp eq i64 %c, 0
-  br i1 %rq, label %rfail, label %rok
-rfail:
-  %_rp = call i32 (ptr, ...) @printf(ptr @.msg_require)
-  %_rt = call i64 @orion_trail_note_trap()
-  call void @exit(i32 70)
-  unreachable
-rok:
-  ret i64 %c
-}
-
-define i64 @orion_ensure(i64 %c) {
-entry:
-  %eq0 = icmp eq i64 %c, 0
-  br i1 %eq0, label %efail, label %eok
-efail:
-  %_ep = call i32 (ptr, ...) @printf(ptr @.msg_ensure)
-  %_et = call i64 @orion_trail_note_trap()
-  call void @exit(i32 70)
-  unreachable
-eok:
-  ret i64 %c
-}
+declare i64 @orion_require_at(i64, ptr)
+declare i64 @orion_ensure_at(i64, ptr)
 
 define ptr @orion_list_slice(ptr %list, i64 %lo, i64 %hi) {
 entry:
@@ -1288,6 +1242,28 @@ entry:
   ret i64 %len
 }
 
+define ptr @orion_arguments() {
+entry:
+  %n = load i64, ptr @orion_argc
+  %out = call ptr @orion_list_new(i64 %n)
+  br label %hdr
+hdr:
+  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]
+  %done = icmp sge i64 %i, %n
+  br i1 %done, label %after, label %bdy
+bdy:
+  %arr = load ptr, ptr @orion_argv
+  %slot = getelementptr ptr, ptr %arr, i64 %i
+  %raw = load ptr, ptr %slot
+  %t = call ptr @orion_text_from_c(ptr %raw)
+  %ti = ptrtoint ptr %t to i64
+  call void @orion_list_set(ptr %out, i64 %i, i64 %ti)
+  %i_next = add i64 %i, 1
+  br label %hdr
+after:
+  ret ptr %out
+}
+
 define ptr @orion_map_keys(ptr %map) {
 entry:
   %entries = load ptr, ptr %map
@@ -1514,12 +1490,13 @@ retb:
 }
 
 
-@.str_0 = private unnamed_addr constant [19 x i8] c"\31\3E\81\05\00\00\00\00\02\00\00\00\00\00\00\00aa\00", align 8
-@.str_1 = private unnamed_addr constant [21 x i8] c"\95\BA\32\37\00\00\00\00\04\00\00\00\00\00\00\00bbbb\00", align 8
-@.str_2 = private unnamed_addr constant [19 x i8] c"\39\3F\81\05\00\00\00\00\02\00\00\00\00\00\00\00cc\00", align 8
-@.str_3 = private unnamed_addr constant [24 x i8] c"\C8\37\E6\08\00\00\00\00\07\00\00\00\00\00\00\00bumped=\00", align 8
-@.str_4 = private unnamed_addr constant [27 x i8] c"\FE\F1\60\2D\00\00\00\00\0A\00\00\00\00\00\00\00 text_len=\00", align 8
-@.str_5 = private unnamed_addr constant [25 x i8] c"\E5\0C\42\10\00\00\00\00\08\00\00\00\00\00\00\00 inline=\00", align 8
+@.str_0 = private unnamed_addr constant [32 x i8] c"\93\0D\14\24\00\00\00\00\0F\00\00\00\00\00\00\00ASSERT FAILED: \00", align 8
+@.str_1 = private unnamed_addr constant [19 x i8] c"\31\3E\81\05\00\00\00\00\02\00\00\00\00\00\00\00aa\00", align 8
+@.str_2 = private unnamed_addr constant [21 x i8] c"\95\BA\32\37\00\00\00\00\04\00\00\00\00\00\00\00bbbb\00", align 8
+@.str_3 = private unnamed_addr constant [19 x i8] c"\39\3F\81\05\00\00\00\00\02\00\00\00\00\00\00\00cc\00", align 8
+@.str_4 = private unnamed_addr constant [24 x i8] c"\C8\37\E6\08\00\00\00\00\07\00\00\00\00\00\00\00bumped=\00", align 8
+@.str_5 = private unnamed_addr constant [27 x i8] c"\FE\F1\60\2D\00\00\00\00\0A\00\00\00\00\00\00\00 text_len=\00", align 8
+@.str_6 = private unnamed_addr constant [25 x i8] c"\E5\0C\42\10\00\00\00\00\08\00\00\00\00\00\00\00 inline=\00", align 8
 
 define ptr @iter__each(ptr %p0, ptr %p1) {
 entry:
@@ -2307,6 +2284,28 @@ for_7_end:
     ret ptr %v100
 }
 
+define i64 @assert__assert(i64 %p0, i64 %p1) {
+entry:
+    %v0 = add i64 0, %p0
+    %v1 = add i64 0, %p1
+    %v2.cb = icmp ne i64 %v0, 0
+    br i1 %v2.cb, label %if_2_then, label %if_2_else
+if_2_then:
+    %v4 = add i64 0, 1
+    br label %if_2_merge
+if_2_else:
+    %v7 = getelementptr i8, ptr @.str_0, i64 16
+    %v8 = call ptr @orion_int_to_text(i64 %v1)
+    %v9 = call ptr @orion_text_concat(ptr %v7, ptr %v8)
+    call i32 @puts(ptr %v9)
+    %v10 = add i64 0, 0
+    %v11 = add i64 0, 0
+    br label %if_2_merge
+if_2_merge:
+    %v14 = phi i64 [ %v4, %if_2_then ], [ %v11, %if_2_else ]
+    ret i64 %v14
+}
+
 define i64 @prog__is_long(ptr %p0) {
 entry:
     %v0 = getelementptr i8, ptr %p0, i64 0
@@ -2347,9 +2346,9 @@ entry:
     call void @orion_list_set(ptr %v1, i64 2, i64 %v0)
     %v2 = add i64 0, 5
     %v3 = call i64 @prog__apply(ptr %v1, i64 %v2)
-    %v4 = getelementptr i8, ptr @.str_0, i64 16
-    %v5 = getelementptr i8, ptr @.str_1, i64 16
-    %v6 = getelementptr i8, ptr @.str_2, i64 16
+    %v4 = getelementptr i8, ptr @.str_1, i64 16
+    %v5 = getelementptr i8, ptr @.str_2, i64 16
+    %v6 = getelementptr i8, ptr @.str_3, i64 16
     %v7 = call ptr @orion_list_new(i64 3)
     %v7.lp0 = ptrtoint ptr %v4 to i64
     call void @orion_list_set(ptr %v7, i64 0, i64 %v7.lp0)
@@ -2375,11 +2374,11 @@ entry:
     %v16.i = call i64 @orion_list_at(ptr %v14, i64 %v15)
     %v16 = inttoptr i64 %v16.i to ptr
     %v17 = call i64 @orion_tlen(ptr %v16)
-    %v18 = getelementptr i8, ptr @.str_3, i64 16
+    %v18 = getelementptr i8, ptr @.str_4, i64 16
     %v19 = call ptr @orion_int_to_text(i64 %v3)
-    %v20 = getelementptr i8, ptr @.str_4, i64 16
+    %v20 = getelementptr i8, ptr @.str_5, i64 16
     %v21 = call ptr @orion_int_to_text(i64 %v12)
-    %v22 = getelementptr i8, ptr @.str_5, i64 16
+    %v22 = getelementptr i8, ptr @.str_6, i64 16
     %v23 = call ptr @orion_int_to_text(i64 %v17)
     %v24 = call ptr @orion_list_new(i64 6)
     %v24.lp0 = ptrtoint ptr %v18 to i64

@@ -2,8 +2,8 @@
 # Two different POINTER kinds in one list literal. (Mixing an int with a text is
 # deliberately allowed: i64 is treated as a wildcard so the dynamic-storage
 # idiom - ints and handles in one list - does not false-positive.)
-type Point: x: int, y: int
+type Point: x: number, y: number
 
-define main() -> int:
+define main() -> number:
     xs = [Point{x: 1, y: 2}, "not a point"]
     length(xs)

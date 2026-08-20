@@ -1,20 +1,20 @@
-type Point: x: int, y: int
+type Point: x: number, y: number
 
 type Color:
     Red
     Green
     Blue
 
-define color_code(c: Color) -> int:
+define color_code(c: Color) -> number:
     choose c:
-        Red -> 0xff0000
-        Green -> 0x00ff00
-        Blue -> 0x0000ff
+        Red then 0xff0000
+        Green then 0x00ff00
+        Blue then 0x0000ff
 
-define dist_sq(p: Point) -> int:
+define dist_sq(p: Point) -> number:
     p.x * p.x + p.y * p.y
 
-define main() -> int:
+define main() -> number:
     pt = Point{x: 3, y: 4}
     d = dist_sq(pt)
     c = color_code(Color.Green)

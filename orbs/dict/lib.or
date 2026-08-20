@@ -20,6 +20,6 @@ public define has_key(m: table, k: text) -> truth:
     has(m, k)
 
 # The values of an int-valued map, in key order.
-public define values(m: table) -> [int]:
-    example at(values({"a": 7}), 0) is 7
+public define values(m: table) -> [number]:
+    example values({"a": 7})[0] is 7
     map_values(m)

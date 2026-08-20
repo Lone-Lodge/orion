@@ -8,15 +8,15 @@
 #   - `apply` returns Err on divide-by-zero / unknown operator
 #   - `expr?` unwraps Ok to the int, or early-returns the Err up the stack
 #   - stack underflow and leftover operands are errors too
-#   - `match` on the result at the top reports Ok / Err
+#   - `choose` on the result at the top reports Ok / Err
 #
 # `?` is exercised in a spot the tests don't reach: inside a `for` loop, inside
-# a `match` arm - the short-circuit still returns straight out of `eval`.
+# a `choose` arm - the short-circuit still returns straight out of `eval`.
 
-type Token: Num(int), Op(text)
-type Eval:  Ok(int), Err(text)
+type Token: Num(number), Op(text)
+type Eval:  Ok(number), Err(text)
 
-define is_digit(b: int) -> int:
+define is_digit(b: number) -> number:
     if b >= '0' and b <= '9' then 1 else 0
 
 # ---- Tokenizer -------------------------------------------------------
@@ -29,17 +29,17 @@ define tokenize(src: text) -> [Token]:
     loop:
         if i >= n:
             break
-        b = at(bs, i)
-        if b == ' ':
+        b = bs[i]
+        if b is ' ':
             i = i + 1
         else:
-            if is_digit(b) == 1:
+            if is_digit(b) is 1:
                 edit num = 0
                 loop:
                     if i >= n:
                         break
-                    d = at(bs, i)
-                    if is_digit(d) == 0:
+                    d = bs[i]
+                    if is_digit(d) is 0:
                         break
                     num = num * 10 + (d - '0')
                     i = i + 1
@@ -51,17 +51,17 @@ define tokenize(src: text) -> [Token]:
 
 # ---- A fallible operator ---------------------------------------------
 
-define apply(op: text, a: int, b: int) -> Eval:
+define apply(op: text, a: number, b: number) -> Eval:
     choose op:
-        "+" -> Eval.Ok(a + b)
-        "-" -> Eval.Ok(a - b)
-        "*" -> Eval.Ok(a * b)
-        "/" ->
-            if b == 0:
+        "+" then Eval.Ok(a + b)
+        "-" then Eval.Ok(a - b)
+        "*" then Eval.Ok(a * b)
+        "/" then 
+            if b is 0:
                 Eval.Err("division by zero")
             else:
                 Eval.Ok(a / b)
-        _ -> Eval.Err("unknown operator '{op}'")
+        _ then Eval.Err("unknown operator '{op}'")
 
 # ---- Evaluator: errors bubble up via `?` -----------------------------
 
@@ -69,32 +69,32 @@ define eval(toks: [Token]) -> Eval:
     edit stack = []
     loop t in toks:
         choose t:
-            Num(v) -> stack = append(stack, v)
-            Op(o) ->
+            Num(v) then stack = append(stack, v)
+            Op(o) then 
                 if length(stack) < 2:
                     return Eval.Err("stack underflow at '{o}'")
                 top = length(stack)
-                b = at(stack, top - 1)
-                a = at(stack, top - 2)
+                b = stack[top - 1]
+                a = stack[top - 2]
                 stack = part(stack, 0, top - 2)
                 val = apply(o, a, b)?           # unwrap Ok, or return the Err
                 stack = append(stack, val)
-    if length(stack) != 1:
+    if length(stack) is not 1:
         return Eval.Err("expected one result, stack has {length(stack)}")
-    Eval.Ok(at(stack, 0))
+    Eval.Ok(stack[0])
 
-define run(src: text) -> int:
+define run(src: text) -> number:
     choose eval(tokenize(src)):
-        Ok(v) ->
+        Ok(v) then 
             print_line("{src}   =>  {v}")
             v
-        Err(m) ->
+        Err(m) then 
             print_line("{src}   =>  error: {m}")
             0
 
 # ---- Main ------------------------------------------------------------
 
-define main() -> int:
+define main() -> number:
     a = run("3 4 + 5 *")        # ok:  (3 + 4) * 5 = 35
     run("10 0 /")               # err: division by zero
     run("1 +")                  # err: stack underflow

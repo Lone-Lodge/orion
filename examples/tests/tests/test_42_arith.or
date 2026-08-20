@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     a = 10
     b = 5
     c = a + b

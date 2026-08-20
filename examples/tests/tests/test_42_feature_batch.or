@@ -3,16 +3,16 @@
 #   parameter defaults        - define f(x, loud = false)
 #   `list of T`               - items: list of int
 #   `given` generics clause   - define first given item (...)
-define scaled(base: int, factor = 3) -> int:
+define scaled(base: number, factor = 3) -> number:
     base * factor
 
-define pick(xs: list of int, fallback = 9) -> int:
-    if length(xs) > 0 then at(xs, 0) else fallback
+define pick(xs: list of number, fallback = 9) -> number:
+    if length(xs) > 0 then xs[0] else fallback
 
 define first given item (items: list of item) -> item:
-    at(items, 0)
+    items[0]
 
-define main() -> int:
+define main() -> number:
     a = scaled(5)                       # default factor 3 -> 15
     b = scaled(5, factor: 4)            # named + explicit  -> 20
     c = pick([])                        # default fallback  -> 9  wait len 0 -> 9

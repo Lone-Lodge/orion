@@ -8,9 +8,9 @@ define save_and_log(path: text, msg: text) uses files, console:
     file_write(path, msg)
     log_it(msg)
 
-define pure_math(a: int, b: int) -> int:
+define pure_math(a: number, b: number) -> number:
     a * b
 
-define main() -> int:
+define main() -> number:
     save_and_log("dist/.uses_test.txt", "hej")
     pure_math(6, 7)

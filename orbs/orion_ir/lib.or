@@ -4,7 +4,7 @@
 #   - SSA-form: each instruction PRODUCES exactly one value.
 #   - Other instructions REFERENCE values by ID (index into the
 #     function's instructions list).
-#   - Typed: every value has a type (i64, ptr, bool, void).
+#   - Typed: every value has a type (i64, ptr, truth, void).
 #
 # Pipeline: lex → parse → AST → IR → orion_emit_llvm → .ll → clang → .exe
 
@@ -14,7 +14,7 @@
 # An IR instruction. All fields present; unused ones zero/empty.
 # - name: function name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
-type Inst: op: text, type_text: text, value: int, lhs: int, rhs: int, name: text, args: [int]
+type Inst: op: text, type_text: text, value: number, lhs: number, rhs: number, name: text, args: [number]
 
 # A function parameter.
 type Param: name: text, type_text: text
@@ -27,7 +27,7 @@ type IRModule: functions: [IRFn]
 
 # Result of pushing an instruction: the updated function + the new
 # instruction's SSA value id.
-type PushResult: function: IRFn, id: int
+type PushResult: function: IRFn, id: number
 
 
 # --- Value types (text constants) ---
@@ -74,81 +74,81 @@ public define compile_error(msg: text):
     print_line(msg)
     orion_err_bump()
 
-public define compile_errors() -> int:
+public define compile_errors() -> number:
     orion_err_get()
 
 
 # --- Instruction builders ---
 
-public define ir_iconst(value: int) -> Inst:
+public define ir_iconst(value: number) -> Inst:
     Inst{op: "iconst", type_text: "i64", value: value, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_iadd(lhs: int, rhs: int) -> Inst:
+public define ir_iadd(lhs: number, rhs: number) -> Inst:
     Inst{op: "iadd", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_isub(lhs: int, rhs: int) -> Inst:
+public define ir_isub(lhs: number, rhs: number) -> Inst:
     Inst{op: "isub", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_imul(lhs: int, rhs: int) -> Inst:
+public define ir_imul(lhs: number, rhs: number) -> Inst:
     Inst{op: "imul", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_idiv(lhs: int, rhs: int) -> Inst:
+public define ir_idiv(lhs: number, rhs: number) -> Inst:
     Inst{op: "idiv", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_imod(lhs: int, rhs: int) -> Inst:
+public define ir_imod(lhs: number, rhs: number) -> Inst:
     Inst{op: "imod", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Bitwise, on the BITS (distinct from `and`/`or`, which coerce to 0/1). These
 # had no lowering at all: the parser dropped the operator and the program kept
 # the left operand, so `12 & 10` answered 12.
-public define ir_bit_and(lhs: int, rhs: int) -> Inst:
+public define ir_bit_and(lhs: number, rhs: number) -> Inst:
     Inst{op: "bit_and", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_bit_or(lhs: int, rhs: int) -> Inst:
+public define ir_bit_or(lhs: number, rhs: number) -> Inst:
     Inst{op: "bit_or", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_bit_xor(lhs: int, rhs: int) -> Inst:
+public define ir_bit_xor(lhs: number, rhs: number) -> Inst:
     Inst{op: "bit_xor", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_shl(lhs: int, rhs: int) -> Inst:
+public define ir_shl(lhs: number, rhs: number) -> Inst:
     Inst{op: "shl", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Arithmetic shift right: ints are signed, so the sign bit is preserved.
-public define ir_shr(lhs: int, rhs: int) -> Inst:
+public define ir_shr(lhs: number, rhs: number) -> Inst:
     Inst{op: "shr", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical and/or: each operand is coerced to 0/1 (any nonzero → 1),
 # then bitwise AND/OR. Result is 0 or 1.
-public define ir_iand(lhs: int, rhs: int) -> Inst:
+public define ir_iand(lhs: number, rhs: number) -> Inst:
     Inst{op: "iand", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_ior(lhs: int, rhs: int) -> Inst:
+public define ir_ior(lhs: number, rhs: number) -> Inst:
     Inst{op: "ior", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical NOT: 0 → 1, non-zero → 0.
-public define ir_inot(value_id: int) -> Inst:
+public define ir_inot(value_id: number) -> Inst:
     Inst{op: "inot", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Comparison ops. Produce i64 with value 0 (false) or 1 (true).
-public define ir_icmp_eq(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_eq(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_eq", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_ne(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_ne(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_ne", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_lt(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_lt(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_lt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_le(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_le(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_le", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_gt(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_gt(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_gt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_ge(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_ge(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_ge", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_return(value_id: int) -> Inst:
+public define ir_return(value_id: number) -> Inst:
     Inst{op: "return", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 public define ir_return_void() -> Inst:
@@ -156,15 +156,15 @@ public define ir_return_void() -> Inst:
 
 # Print an i64 value as decimal text + newline to stdout.
 # Produces a void value (the instruction has no SSA-id consumers).
-public define ir_print_int(value_id: int) -> Inst:
+public define ir_print_int(value_id: number) -> Inst:
     Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_print_float(value_id: int) -> Inst:
+public define ir_print_float(value_id: number) -> Inst:
     Inst{op: "print_float", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# Select: result = if cond != 0 then then_id else else_id.
+# Select: result = if cond is not 0 then then_id else else_id.
 # Branchless via cmov - works for any tree-shaped IR.
-public define ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
+public define ir_select(cond_id: number, then_id: number, else_id: number) -> Inst:
     Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
 
 
@@ -177,18 +177,18 @@ public define ir_fconst(literal: text) -> Inst:
     Inst{op: "fconst", type_text: "f64", value: 0, lhs: 0, rhs: 0, name: literal, args: []}
 
 # Float arithmetic: op_name is fadd/fsub/fmul/fdiv.
-public define ir_fbin(op_name: text, lhs: int, rhs: int) -> Inst:
+public define ir_fbin(op_name: text, lhs: number, rhs: number) -> Inst:
     Inst{op: op_name, type_text: "f64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Float comparison: cc is oeq/one/olt/ole/ogt/oge. Produces i64 0/1.
-public define ir_fcmp(cc: text, lhs: int, rhs: int) -> Inst:
+public define ir_fcmp(cc: text, lhs: number, rhs: number) -> Inst:
     Inst{op: "fcmp", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: cc, args: []}
 
 # int → float / float → int conversions.
-public define ir_sitofp(value_id: int) -> Inst:
+public define ir_sitofp(value_id: number) -> Inst:
     Inst{op: "sitofp", type_text: "f64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_fptosi(value_id: int) -> Inst:
+public define ir_fptosi(value_id: number) -> Inst:
     Inst{op: "fptosi", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
@@ -197,7 +197,7 @@ public define ir_fptosi(value_id: int) -> Inst:
 # Call user-defined function `fn_name` with arg-value-ids.
 # ret_type lets later passes (binop type-detection, phi, etc.) see the
 # call's actual return type without needing a module lookup.
-public define ir_call(fn_name: text, arg_ids: [int], ret_type: text) -> Inst:
+public define ir_call(fn_name: text, arg_ids: [number], ret_type: text) -> Inst:
     Inst{op: "call", type_text: ret_type, value: 0, lhs: 0, rhs: 0, name: fn_name, args: arg_ids}
 
 
@@ -211,7 +211,7 @@ public define ir_const_str(text: text) -> Inst:
     Inst{op: "const_str", type_text: "text", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
 # Concatenate two text SSA values - calls runtime helper.
-public define ir_text_concat(left_id: int, right_id: int) -> Inst:
+public define ir_text_concat(left_id: number, right_id: number) -> Inst:
     Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
 # Concatenate a LIST of text values in one shot - one allocation for the
@@ -220,86 +220,91 @@ public define ir_text_concat(left_id: int, right_id: int) -> Inst:
 # that chain allocated a buffer and re-copied everything to its left: N-1
 # mallocs and O(N^2) bytes moved for what is one string. The parser hands
 # multi-part interpolations here instead.
-public define ir_text_join(parts_id: int) -> Inst:
+public define ir_text_join(parts_id: number) -> Inst:
     Inst{op: "text_join", type_text: "text", value: parts_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Convert an i64 to text - calls runtime helper.
-public define ir_int_to_text(value_id: int) -> Inst:
+public define ir_int_to_text(value_id: number) -> Inst:
     Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Text equality / inequality / lexicographic compare via strcmp.
 # Result is i64 0/1.
-public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
+public define ir_text_cmp(op_name: text, left_id: number, right_id: number) -> Inst:
     Inst{op: op_name, type_text: "i64", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
 # Length of a text string (calls libc strlen).
-public define ir_text_len(value_id: int) -> Inst:
+public define ir_text_len(value_id: number) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # part(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
-public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
+public define ir_text_slice(text_id: number, lo_id: number, hi_id: number) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
 # part(list, lo, hi) - half-open, clamped; type_text carries the
 # source list type so element typing survives the slice.
-public define ir_list_slice(list_id: int, lo_id: int, hi_id: int, list_type: text) -> Inst:
+public define ir_list_slice(list_id: number, lo_id: number, hi_id: number, list_type: text) -> Inst:
     Inst{op: "list_slice", type_text: list_type, value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
 # Float math - name holds the libm symbol (sqrt/sin/.../log).
-public define ir_fmath1(libm: text, arg_id: int) -> Inst:
+public define ir_fmath1(libm: text, arg_id: number) -> Inst:
     Inst{op: "fmath1", type_text: "f64", value: arg_id, lhs: 0, rhs: 0, name: libm, args: []}
 
-public define ir_fmath2(libm: text, a_id: int, b_id: int) -> Inst:
+public define ir_fmath2(libm: text, a_id: number, b_id: number) -> Inst:
     Inst{op: "fmath2", type_text: "f64", value: a_id, lhs: b_id, rhs: 0, name: libm, args: []}
 
 # contains(text, sub) - returns i64 1 if sub appears anywhere in text, else 0.
-public define ir_text_contains(text_id: int, sub_id: int) -> Inst:
+public define ir_text_contains(text_id: number, sub_id: number) -> Inst:
     Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
 
 
 # --- File I/O (libc fopen/fread/fwrite) ---
-public define ir_file_read(path_id: int) -> Inst:
+public define ir_file_read(path_id: number) -> Inst:
     Inst{op: "file_read", type_text: "text", value: path_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_file_write(path_id: int, content_id: int) -> Inst:
+public define ir_file_write(path_id: number, content_id: number) -> Inst:
     Inst{op: "file_write", type_text: "i64", value: path_id, lhs: content_id, rhs: 0, name: "", args: []}
 
 
 # CLI args. argc() → count, argv(i) → ith arg as Text.
+# `arguments` - the program's argv as a `list of text`. A value, not a call:
+# `length(arguments)`, `arguments[0]`.
+public define ir_arguments() -> Inst:
+    Inst{op: "arguments", type_text: "list:text", value: 0, lhs: 0, rhs: 0, name: "", args: []}
+
 public define ir_argc() -> Inst:
     Inst{op: "argc", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_argv(idx_id: int) -> Inst:
+public define ir_argv(idx_id: number) -> Inst:
     Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # bytes_of(t) → [int] of byte values
-public define ir_bytes_from_text(text_id: int) -> Inst:
+public define ir_bytes_from_text(text_id: number) -> Inst:
     Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # text_of(list) → Text from list of byte values
-public define ir_bytes_to_text(list_id: int) -> Inst:
+public define ir_bytes_to_text(list_id: number) -> Inst:
     Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # bytes_part(list, lo, hi) → new list with items [lo, hi)
-public define ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
+public define ir_bytes_slice(list_id: number, lo_id: number, hi_id: number) -> Inst:
     Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
 # bytes_concat(a, b) → new list with items of a followed by items of b
-public define ir_bytes_concat(a_id: int, b_id: int) -> Inst:
+public define ir_bytes_concat(a_id: number, b_id: number) -> Inst:
     Inst{op: "bytes_concat", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 
 # bytes_zeros(n) → list of n zeros
-public define ir_bytes_zeros(n_id: int) -> Inst:
+public define ir_bytes_zeros(n_id: number) -> Inst:
     Inst{op: "bytes_zeros", type_text: "list", value: n_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Global state slots - key→ptr Map. slot_get's caller decides type by usage.
 # In our orbs, slots store text values; ir_slot_get defaults to text type.
-public define ir_slot_get(key_id: int) -> Inst:
+public define ir_slot_get(key_id: number) -> Inst:
     Inst{op: "slot_get", type_text: "text", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_slot_set(key_id: int, val_id: int) -> Inst:
+public define ir_slot_set(key_id: number, val_id: number) -> Inst:
     Inst{op: "slot_set", type_text: "i64", value: key_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 
@@ -308,18 +313,18 @@ public define ir_slot_set(key_id: int, val_id: int) -> Inst:
 # LIMITATION: only int items work - text lists like ["a", "b"] fail at
 # compile because list_set takes i64, not ptr. Type-aware lists are a
 # future enhancement.
-public define ir_list_lit(item_ids: [int], elem_type: text) -> Inst:
+public define ir_list_lit(item_ids: [number], elem_type: text) -> Inst:
     Inst{op: "list_lit", type_text: "list:{elem_type}", value: 0, lhs: 0, rhs: 0, name: "", args: item_ids}
 
-public define ir_list_at(list_id: int, index_id: int) -> Inst:
+public define ir_list_at(list_id: number, index_id: number) -> Inst:
     Inst{op: "list_at", type_text: "i64", value: list_id, lhs: index_id, rhs: 0, name: "", args: []}
 
-public define ir_list_len(list_id: int) -> Inst:
+public define ir_list_len(list_id: number) -> Inst:
     Inst{op: "list_len", type_text: "i64", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Push: copy all items + append val, return new list ptr.
 # Caller pattern: `xs = append(xs, val)`.
-public define ir_list_push(list_id: int, val_id: int) -> Inst:
+public define ir_list_push(list_id: number, val_id: number) -> Inst:
     Inst{op: "list_push", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 # In-place push - ONLY emitted for the self-rebind statement form
@@ -327,31 +332,31 @@ public define ir_list_push(list_id: int, val_id: int) -> Inst:
 # statement. Amortized O(1) vs list_push's O(n) copy. Callers holding
 # an alias to x across a self-rebind push observe the mutation - same
 # caveat as lodge-orion's Arc::get_mut fast path.
-public define ir_list_push_mut(list_id: int, val_id: int) -> Inst:
+public define ir_list_push_mut(list_id: number, val_id: number) -> Inst:
     Inst{op: "list_push_mut", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 # SIMD-style elementwise vector ops. Returns a new int list (vec_add/sub/mul)
 # or i64 (vec_dot).
-public define ir_vec_add(a_id: int, b_id: int) -> Inst:
+public define ir_vec_add(a_id: number, b_id: number) -> Inst:
     Inst{op: "vec_add", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 # In-place SIMD add: dst[i] += src[i] over the whole column, vectorized
 # <4 x i64>. Mutates and returns dst (no allocation) - the ECS system-loop
 # fast path. Distinct from vec_add, which allocates a fresh result list.
-public define ir_vec_addi(a_id: int, b_id: int) -> Inst:
+public define ir_vec_addi(a_id: number, b_id: number) -> Inst:
     Inst{op: "vec_addi", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 # In-place SIMD multiply-add: dst[i] += src[i] * k (physics integrate,
 # pos += vel*dt in one <4 x i64> pass). Mutates and returns dst.
-public define ir_vec_madd(dst_id: int, src_id: int, k_id: int) -> Inst:
+public define ir_vec_madd(dst_id: number, src_id: number, k_id: number) -> Inst:
     Inst{op: "vec_madd", type_text: "list", value: dst_id, lhs: src_id, rhs: k_id, name: "", args: []}
 # Multicore multiply-add: dst[i] += src[i] * k, split across CPU cores on
 # disjoint slices (deterministic). Backed by orion_par_madd in orion_rt.c.
-public define ir_par_madd(dst_id: int, src_id: int, k_id: int) -> Inst:
+public define ir_par_madd(dst_id: number, src_id: number, k_id: number) -> Inst:
     Inst{op: "par_madd", type_text: "list", value: dst_id, lhs: src_id, rhs: k_id, name: "", args: []}
-public define ir_vec_sub(a_id: int, b_id: int) -> Inst:
+public define ir_vec_sub(a_id: number, b_id: number) -> Inst:
     Inst{op: "vec_sub", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
-public define ir_vec_mul(a_id: int, b_id: int) -> Inst:
+public define ir_vec_mul(a_id: number, b_id: number) -> Inst:
     Inst{op: "vec_mul", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
-public define ir_vec_dot(a_id: int, b_id: int) -> Inst:
+public define ir_vec_dot(a_id: number, b_id: number) -> Inst:
     Inst{op: "vec_dot", type_text: "i64", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 
 # Async runtime primitives.
@@ -359,7 +364,7 @@ public define ir_time_now_ms() -> Inst:
     Inst{op: "time_now_ms", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
 public define ir_monotonic_ms() -> Inst:
     Inst{op: "monotonic_ms", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
-public define ir_sleep_ms(ms_id: int) -> Inst:
+public define ir_sleep_ms(ms_id: number) -> Inst:
     Inst{op: "sleep_ms", type_text: "void", value: ms_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
@@ -372,52 +377,58 @@ public define ir_sleep_ms(ms_id: int) -> Inst:
 # It rides in type_text as `map:<val_type>` so get()/[] recover the value type
 # through mut slots, set-results and copies - a bare `map` lost it and made
 # `get` guess `text`, concatenating int values as pointers (a crash).
-public define ir_map_lit(pair_ids: [int], val_type: text) -> Inst:
+public define ir_map_lit(pair_ids: [number], val_type: text) -> Inst:
     Inst{op: "map_lit", type_text: "map:{val_type}", value: 0, lhs: 0, rhs: 0, name: "", args: pair_ids}
 
-public define ir_map_get(map_id: int, key_id: int, value_type: text) -> Inst:
+public define ir_map_get(map_id: number, key_id: number, value_type: text) -> Inst:
     Inst{op: "map_get", type_text: value_type, value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
-public define ir_map_has(map_id: int, key_id: int) -> Inst:
+public define ir_map_has(map_id: number, key_id: number) -> Inst:
     Inst{op: "map_has", type_text: "i64", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
 # set(map, key, val) - mutates in place (indirect handle survives
 # growth) and re-yields the map so `m = set(m, k, v)` value-semantics
 # call sites keep working. Same aliasing caveat as list_push_mut.
-public define ir_map_set_val(map_id: int, key_id: int, val_id: int, map_type: text) -> Inst:
+public define ir_map_set_val(map_id: number, key_id: number, val_id: number, map_type: text) -> Inst:
     Inst{op: "map_set_val", type_text: map_type, value: map_id, lhs: key_id, rhs: val_id, name: "", args: []}
 
-public define ir_map_remove(map_id: int, key_id: int) -> Inst:
+public define ir_map_remove(map_id: number, key_id: number) -> Inst:
     Inst{op: "map_remove", type_text: "map", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
 # set(list, index, val) - in-place store, re-yields the list.
-public define ir_list_set_val(list_id: int, idx_id: int, val_id: int, list_type: text) -> Inst:
+public define ir_list_set_val(list_id: number, idx_id: number, val_id: number, list_type: text) -> Inst:
     Inst{op: "list_set_val", type_text: list_type, value: list_id, lhs: idx_id, rhs: val_id, name: "", args: []}
 
 # slot_has(key) → 0/1; slot_get_int(key) → raw i64 (0 when unset).
 # The typed pair that replaces interp-only `type_of(slot_get(k))`
 # probing - works identically native and interpreted.
-public define ir_slot_has(key_id: int) -> Inst:
+public define ir_slot_has(key_id: number) -> Inst:
     Inst{op: "slot_has", type_text: "i64", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_slot_get_int(key_id: int) -> Inst:
+# The hash of a text. Native texts carry one lazily in their header, so it
+# is a load after the first ask; wasm works it out over the bytes. It is what
+# lets a cache be keyed by a SHORT name instead of by a whole paragraph.
+public define ir_text_hash(text_id: number) -> Inst:
+    Inst{op: "text_hash", type_text: "i64", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
+
+public define ir_slot_get_int(key_id: number) -> Inst:
     Inst{op: "slot_get_int", type_text: "i64", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_map_len(map_id: int) -> Inst:
+public define ir_map_len(map_id: number) -> Inst:
     Inst{op: "map_len", type_text: "i64", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_map_keys(map_id: int) -> Inst:
+public define ir_map_keys(map_id: number) -> Inst:
     Inst{op: "map_keys", type_text: "list:text", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_map_values(map_id: int) -> Inst:
+public define ir_map_values(map_id: number) -> Inst:
     Inst{op: "map_values", type_text: "list", value: map_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # get_or(map, key, default) - result typed after the default value.
-public define ir_map_get_or(map_id: int, key_id: int, dflt_id: int, value_type: text) -> Inst:
+public define ir_map_get_or(map_id: number, key_id: number, dflt_id: number, value_type: text) -> Inst:
     Inst{op: "map_get_or", type_text: value_type, value: map_id, lhs: key_id, rhs: dflt_id, name: "", args: []}
 
 # f64 → Text ("%g") for interpolation and to_text.
-public define ir_f64_to_text(value_id: int) -> Inst:
+public define ir_f64_to_text(value_id: number) -> Inst:
     Inst{op: "f64_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
@@ -425,19 +436,19 @@ public define ir_f64_to_text(value_id: int) -> Inst:
 # A struct value is a ptr to a heap buffer of i64 slots, one per field.
 # type_text encodes the struct name as "struct:Player".
 # Field args carry the SSA value ids in declared field order.
-public define ir_struct_cons(struct_name: text, n_fields: int, value_ids: [int]) -> Inst:
+public define ir_struct_cons(struct_name: text, n_fields: number, value_ids: [number]) -> Inst:
     Inst{op: "struct_cons", type_text: "struct:{struct_name}", value: n_fields, lhs: 0, rhs: 0, name: struct_name, args: value_ids}
 
 # Load a field from a struct by index. field_type tells emit what type to load.
-public define ir_field_load(struct_id: int, field_index: int, field_type: text) -> Inst:
+public define ir_field_load(struct_id: number, field_index: number, field_type: text) -> Inst:
     Inst{op: "field_load", type_text: field_type, value: struct_id, lhs: field_index, rhs: 0, name: "", args: []}
 
 # Print a dynamically-computed text value (calls puts on the ptr).
-public define ir_print_text(value_id: int) -> Inst:
+public define ir_print_text(value_id: number) -> Inst:
     Inst{op: "print_text", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Like print_text but with no trailing newline (calls orion_print_raw, not puts).
-public define ir_print_raw(value_id: int) -> Inst:
+public define ir_print_raw(value_id: number) -> Inst:
     Inst{op: "print_raw", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
@@ -448,11 +459,11 @@ public define ir_alloca(stored_type: text) -> Inst:
     Inst{op: "alloca", type_text: stored_type, value: 0, lhs: 0, rhs: 0, name: "", args: []}
 
 # Load value of `loaded_type` from ptr SSA id.
-public define ir_load(ptr_id: int, loaded_type: text) -> Inst:
+public define ir_load(ptr_id: number, loaded_type: text) -> Inst:
     Inst{op: "load", type_text: loaded_type, value: ptr_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Store value_id to ptr_id. Void. The stored type is inferred from value's type.
-public define ir_store(ptr_id: int, value_id: int) -> Inst:
+public define ir_store(ptr_id: number, value_id: number) -> Inst:
     Inst{op: "store", type_text: "void", value: ptr_id, lhs: value_id, rhs: 0, name: "", args: []}
 
 
@@ -470,20 +481,20 @@ public define ir_br(target_label: text) -> Inst:
 
 # Conditional jump. value = cond ssa-id (i64 0/1).
 # name = "then_label|else_label" (pipe-separated).
-public define ir_br_if(cond_id: int, then_label: text, else_label: text) -> Inst:
+public define ir_br_if(cond_id: number, then_label: text, else_label: text) -> Inst:
     Inst{op: "br_if", type_text: "void", value: cond_id, lhs: 0, rhs: 0, name: "{then_label}|{else_label}", args: []}
 
 # Phi node merging two predecessors.
 # lhs = then-value-id, rhs = else-value-id.
 # name = "then_label|else_label" (pipe-separated).
 # type_text is set at emit time from the operand types.
-public define ir_phi(then_val_id: int, then_label: text, else_val_id: int, else_label: text, phi_type: text) -> Inst:
+public define ir_phi(then_val_id: number, then_label: text, else_val_id: number, else_label: text, phi_type: text) -> Inst:
     Inst{op: "phi", type_text: phi_type, value: 0, lhs: then_val_id, rhs: else_val_id, name: "{then_label}|{else_label}", args: []}
 
 
 # Reference a function parameter by index (0-based). type_text matches
 # the param's declared type ("i64" or "text").
-public define ir_param(param_index: int, param_type: text) -> Inst:
+public define ir_param(param_index: number, param_type: text) -> Inst:
     Inst{op: "param", type_text: param_type, value: param_index, lhs: 0, rhs: 0, name: "", args: []}
 
 
@@ -510,9 +521,9 @@ public define ir_fn_push(fn_value: IRFn, inst: Inst) -> PushResult:
     PushResult{function: new_fn, id: new_id}
 
 # Overwrite the instruction at `idx` - used to back-patch an alloca's element
-# type once inference resolves an empty list (`mut x = []` then `push`). Same
+# type once inference resolves an empty list (`edit x = []` then `push`). Same
 # in-place caveat as ir_fn_push: the caller drops the old IRFn.
-public define ir_fn_set_inst(fn_value: IRFn, idx: int, inst: Inst) -> IRFn:
+public define ir_fn_set_inst(fn_value: IRFn, idx: number, inst: Inst) -> IRFn:
     edit insts = fn_value.instructions
     insts = set(insts, idx, inst)
     IRFn{name: fn_value.name, return_type: fn_value.return_type, params: fn_value.params, instructions: insts}
@@ -530,19 +541,19 @@ public define ir_module_add_fn(module: IRModule, fn_value: IRFn) -> IRModule:
 
 # --- Text dumper (Cranelift CLIF-style) ---
 
-public define ir_dump_value_ref(value_id: int) -> text:
+public define ir_dump_value_ref(value_id: number) -> text:
     if value_id < 0:
         "void"
     else:
         "v{value_id}"
 
-public define ir_dump_instruction(inst: Inst, my_id: int) -> text:
+public define ir_dump_instruction(inst: Inst, my_id: number) -> text:
     prefix = "{ir_dump_value_ref(my_id)} = "
     op = inst.op
-    if op == "iconst":
+    if op is "iconst":
         "{prefix}iconst.{inst.type_text} {inst.value}"
     else:
-        if op == "return":
+        if op is "return":
             "return {ir_dump_value_ref(inst.value)}"
         else:
             lhs_ref = ir_dump_value_ref(inst.lhs)
@@ -554,11 +565,11 @@ public define ir_dump_instruction(inst: Inst, my_id: int) -> text:
 # setjmp dance so `resume(v)` can come back with a value. EVERY argument rides
 # in `args` (up to the runtime's 4): they used to be squeezed into the single
 # `lhs` slot, so a second argument was evaluated and then dropped.
-public define ir_perform_int(handler_name: text, arg_ids: [int]) -> Inst:
+public define ir_perform_int(handler_name: text, arg_ids: [number]) -> Inst:
     Inst{op: "perform_int", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: handler_name, args: arg_ids}
 
 
-public define ir_perform_text(handler_name: text, arg_ids: [int]) -> Inst:
+public define ir_perform_text(handler_name: text, arg_ids: [number]) -> Inst:
     Inst{op: "perform_text", type_text: "text", value: 0, lhs: 0, rhs: 0, name: handler_name, args: arg_ids}
 
 
@@ -571,7 +582,7 @@ public define ir_fn_ref(fn_name: text) -> Inst:
 # Indirect call through a fn-ptr value (not a global fn name).
 # callee_id is the SSA value holding the ptr; ret_type is what the
 # fn returns. For now we restrict to all-i64 args / i64 or text ret.
-public define ir_indirect_call(callee_id: int, arg_ids: [int], ret_type: text) -> Inst:
+public define ir_indirect_call(callee_id: number, arg_ids: [number], ret_type: text) -> Inst:
     Inst{op: "indirect_call", type_text: ret_type, value: callee_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
 
 
@@ -579,28 +590,28 @@ public define ir_indirect_call(callee_id: int, arg_ids: [int], ret_type: text) -
 # `is_lambda` (lhs) is 1 for a lambda (its fn takes the closure as a leading
 # `env` arg and reads captures out of it), 0 for a plain fn-ref (called with
 # no env). `name` is the target fn; `args` are the captured SSA value ids.
-public define ir_make_closure(fn_name: text, cap_ids: [int], is_lambda: int) -> Inst:
+public define ir_make_closure(fn_name: text, cap_ids: [number], is_lambda: number) -> Inst:
     Inst{op: "make_closure", type_text: "ptr", value: 0, lhs: is_lambda, rhs: 0, name: fn_name, args: cap_ids}
 
 
 # Call a closure value: load its fn-ptr, and dispatch on the is_lambda flag -
 # a lambda is invoked as function(env, args...), a plain fn-ref as function(args...).
-public define ir_closure_call(closure_id: int, arg_ids: [int], ret_type: text) -> Inst:
+public define ir_closure_call(closure_id: number, arg_ids: [number], ret_type: text) -> Inst:
     Inst{op: "closure_call", type_text: ret_type, value: closure_id, lhs: 0, rhs: 0, name: "", args: arg_ids}
 
 
 # Reinterpret an i64 (a ptr stored as int - e.g. a text/list/map closure
 # capture read back from the env) as a typed ptr value. type_text carries
 # the intended type ("text" / "list:i64" / "map") so downstream ops see it.
-public define ir_int_to_ptr(src_id: int, type_text: text) -> Inst:
+public define ir_int_to_ptr(src_id: number, type_text: text) -> Inst:
     Inst{op: "int_to_ptr", type_text: type_text, value: src_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 public define ir_dump_fn(fn_value: IRFn) -> text:
     edit text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = length(fn_value.instructions)
-    loop idx in 0..<total:
-        inst = at(fn_value.instructions, idx)
+    loop idx in 0 until total:
+        inst = fn_value.instructions[idx]
         line = ir_dump_instruction(inst, idx)
         text = "{text}    {line}\n"
     text
@@ -608,7 +619,7 @@ public define ir_dump_fn(fn_value: IRFn) -> text:
 public define ir_dump_module(module: IRModule) -> text:
     edit text = "; orion_ir module dump\n"
     total = length(module.functions)
-    loop idx in 0..<total:
-        fn_value = at(module.functions, idx)
+    loop idx in 0 until total:
+        fn_value = module.functions[idx]
         text = "{text}{ir_dump_fn(fn_value)}\n"
     text

@@ -1,0 +1,13 @@
+# The spoken constructors are the LAST resort. An enum of your own with a
+# variant named `ok` keeps it - a variant name shadows everything else by
+# construction, which is the rule that was already here.
+type status: ok, busy
+
+define main() -> number:
+    a = choose status.ok:
+        ok then 4                       # ours, not Result.Ok
+        busy then 0
+    b = choose (if true then some(5) else none):
+        some(v) then v                  # 5
+        none then 0
+    a + b                               # 9

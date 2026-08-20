@@ -1,17 +1,17 @@
-type Maybe: Some(int), None(int)
+type Maybe: Some(number), None(number)
 
-define safe_div(a: int, b: int) -> Maybe:
-    if b == 0:
+define safe_div(a: number, b: number) -> Maybe:
+    if b is 0:
         Maybe.None(0)
     else:
         Maybe.Some(a // b)
 
-define unwrap(m: Maybe) -> int:
+define unwrap(m: Maybe) -> number:
     choose m:
-        Some(v) -> v
-        None(_) -> 0
+        Some(v) then v
+        None(_) then 0
 
-define main() -> int:
+define main() -> number:
     r1 = safe_div(84, 2)
     r2 = safe_div(100, 0)
     unwrap(r1) + unwrap(r2)

@@ -24,11 +24,14 @@
  * the Orion externs stay trivially typed.
  *
  * Kinds: 1 mouse_down, 2 mouse_up, 3 mouse_move, 4 key_down,
- *        5 key_up, 6 close, 7 resize.
+ *        5 key_up, 6 close, 7 resize, 13 wheel, 14 double click.
  * key: mouse button (1 left, 2 right, 3 middle) or virtual-key code.
- * For resize, x/y carry the new client width/height. */
+ * For resize, x/y carry the new client width/height.
+ * `who` is the window the event came from: one process can drive
+ * several windows through this one queue, and a resize meant for the
+ * side panel must not resize the main one. */
 
-typedef struct { long long kind, key, x, y; } OrionEvent;
+typedef struct { long long kind, key, x, y, who; } OrionEvent;
 
 #define EV_CAP 256
 static OrionEvent ev_ring[EV_CAP];
@@ -40,7 +43,7 @@ static OrionEvent ev_current;
  * (GPU/DWM tail is invisible from here - this measures OUR share.) */
 static LARGE_INTEGER g_last_input_qpc;
 
-static void ev_push(long long kind, long long key, long long x, long long y) {
+static void ev_push(HWND who, long long kind, long long key, long long x, long long y) {
     int next = (ev_tail + 1) % EV_CAP;
     if (next == ev_head) return;       /* full: drop newest (potato-simple) */
     if (kind >= 1 && kind <= 5)
@@ -49,6 +52,7 @@ static void ev_push(long long kind, long long key, long long x, long long y) {
     ev_ring[ev_tail].key = key;
     ev_ring[ev_tail].x = x;
     ev_ring[ev_tail].y = y;
+    ev_ring[ev_tail].who = (long long)(uintptr_t)who;
     ev_tail = next;
 }
 
@@ -79,6 +83,7 @@ long long win_event_kind(void) { return ev_current.kind; }
 long long win_event_key(void)  { return ev_current.key; }
 long long win_event_x(void)    { return ev_current.x; }
 long long win_event_y(void)    { return ev_current.y; }
+long long win_event_who(void)  { return ev_current.who; }
 
 static long long lp_x(LPARAM lp) { return (long long)(short)LOWORD(lp); }
 static long long lp_y(LPARAM lp) { return (long long)(short)HIWORD(lp); }
@@ -97,6 +102,154 @@ void (*win_paint_hook)(void) = 0;
 __attribute__((weak)) void atlas_live_frame(long long w, long long h);
 static int g_live_resize = 0;
 
+/* The pointer shape over the client area. An I-beam over text and a hand
+ * over something clickable is most of what makes a UI feel like a UI, and
+ * Windows resets the cursor on every move unless the window says otherwise
+ * in WM_SETCURSOR. 0 arrow, 1 I-beam, 2 hand, 3 wait, 4 crosshair. */
+static int g_cursor = 0;
+
+/* What this window's screen calls 100%. Windows reports dots per inch and
+ * 96 is one to one, so 144 is 150%. Looked up per WINDOW rather than per
+ * process, because a laptop with an external monitor has two answers and
+ * the right one is the one the window is currently on. */
+long long win_dpi(long long window_handle) {
+    HWND h = (HWND)(uintptr_t)window_handle;
+    if (!h) return 96;
+    HMODULE u = GetModuleHandleA("user32.dll");
+    if (u) {
+        typedef UINT (WINAPI *GetDpiFn)(HWND);
+        GetDpiFn fn = (GetDpiFn)(void *)GetProcAddress(u, "GetDpiForWindow");
+        if (fn) {
+            UINT d = fn(h);
+            if (d >= 48 && d <= 960) return (long long)d;
+        }
+    }
+    HDC dc = GetDC(h);
+    if (!dc) return 96;
+    int d = GetDeviceCaps(dc, LOGPIXELSX);
+    ReleaseDC(h, dc);
+    return d > 0 ? (long long)d : 96;
+}
+
+/* --- a game controller ---------------------------------------------------
+ * XInput, loaded at run time so a machine without it still starts. One
+ * pad (index 0) is what a UI needs: the stick and the d-pad move focus,
+ * A presses, B goes back. The stick is reported as -1/0/1 per axis with a
+ * dead zone, because a menu wants STEPS and not a velocity - holding the
+ * stick over should move the focus once, and again when it is let go and
+ * pushed a second time. That edge is the caller's business; this reports
+ * where the pad is right now. */
+typedef DWORD (WINAPI *XIGetStateFn)(DWORD, void *);
+static XIGetStateFn g_xi;
+static int g_xi_tried;
+
+static void pad_load(void) {
+    if (g_xi_tried) return;
+    g_xi_tried = 1;
+    const char *names[3] = { "xinput1_4.dll", "xinput1_3.dll", "xinput9_1_0.dll" };
+    for (int i = 0; i < 3; i++) {
+        HMODULE m = LoadLibraryA(names[i]);
+        if (m) {
+            g_xi = (XIGetStateFn)(void *)GetProcAddress(m, "XInputGetState");
+            if (g_xi) return;
+        }
+    }
+}
+
+/* Raw XINPUT_STATE is 16 bytes: packet(4), buttons(2), lt(1), rt(1),
+ * lx,ly,rx,ry (2 each). Read as bytes so no XInput header is needed. */
+static int pad_read(unsigned char *out) {
+    pad_load();
+    if (!g_xi) return 0;
+    unsigned char st[16];
+    memset(st, 0, sizeof st);
+    if (g_xi(0, st) != 0) return 0;
+    memcpy(out, st, 16);
+    return 1;
+}
+
+static int stick_step(short v) {
+    if (v > 12000) return 1;
+    if (v < -12000) return -1;
+    return 0;
+}
+
+/* -1, 0 or 1. The d-pad and the left stick both answer, so a menu does
+ * not care which the hand reached for. */
+long long win_pad_x(void) {
+    unsigned char st[16];
+    if (!pad_read(st)) return 0;
+    unsigned short btn = (unsigned short)(st[4] | (st[5] << 8));
+    if (btn & 0x0004) return -1;   /* DPAD_LEFT  */
+    if (btn & 0x0008) return 1;    /* DPAD_RIGHT */
+    return stick_step((short)(st[8] | (st[9] << 8)));
+}
+
+long long win_pad_y(void) {
+    unsigned char st[16];
+    if (!pad_read(st)) return 0;
+    unsigned short btn = (unsigned short)(st[4] | (st[5] << 8));
+    if (btn & 0x0001) return -1;   /* DPAD_UP   */
+    if (btn & 0x0002) return 1;    /* DPAD_DOWN */
+    /* The stick's Y points up; a screen's points down. */
+    return -stick_step((short)(st[10] | (st[11] << 8)));
+}
+
+/* 0 none, 1 A, 2 B, 3 X, 4 Y, 5 left shoulder, 6 right shoulder. */
+long long win_pad_press(void) {
+    unsigned char st[16];
+    if (!pad_read(st)) return 0;
+    unsigned short btn = (unsigned short)(st[4] | (st[5] << 8));
+    if (btn & 0x1000) return 1;
+    if (btn & 0x2000) return 2;
+    if (btn & 0x4000) return 3;
+    if (btn & 0x8000) return 4;
+    if (btn & 0x0100) return 5;
+    if (btn & 0x0200) return 6;
+    return 0;
+}
+
+/* Whether a pad answered at all, so an app can say so rather than guess. */
+long long win_pad_here(void) {
+    unsigned char st[16];
+    return pad_read(st) ? 1 : 0;
+}
+
+/* --- was that a finger? ---------------------------------------------------
+ * Windows turns touch into ordinary mouse messages, so touch "works"
+ * without anyone doing anything - and a UI that does not KNOW it is being
+ * touched gets it subtly wrong: it lights things up under a finger that
+ * has already left, and it draws a hover state nobody can see. The signal
+ * is a mark Windows puts in the message's extra info, documented since
+ * Windows 7 and unchanged since. */
+static int g_from_touch;
+
+static int came_from_touch(void) {
+    LPARAM x = GetMessageExtraInfo();
+    return ((x & 0xFFFFFF80) == 0xFF515700) ? 1 : 0;
+}
+
+/* Whether the last pointer message came from a finger rather than a mouse. */
+long long win_from_touch(void) { return g_from_touch; }
+
+long long win_cursor(long long shape) {
+    g_cursor = (int)shape;
+    return 1;
+}
+
+static LPCWSTR cursor_name(int shape) {
+    if (shape == 1) return IDC_IBEAM;
+    if (shape == 2) return IDC_HAND;
+    if (shape == 3) return IDC_WAIT;
+    if (shape == 4) return IDC_CROSS;
+    /* The two a splitter needs: a line you drag sideways, and one you drag
+     * up and down. Without them nothing on screen says the line between
+     * two panels is a thing you can take hold of. */
+    if (shape == 5) return IDC_SIZEWE;
+    if (shape == 6) return IDC_SIZENS;
+    return IDC_ARROW;
+}
+
 long long win_live_resize(long long on, long long bg) {
     g_live_resize = (int)on;
     (void)bg;
@@ -107,19 +260,57 @@ long long win_live_resize(long long on, long long bg) {
  * frameless: WM_NCCALCSIZE returns 0 so the client area fills the
  * whole window - native caption gone, WS_THICKFRAME resize kept.
  * WM_NCHITTEST then hands back resize edges plus a caption drag-zone
- * the app declares: the top `g_caption_h` pixels act as HTCAPTION,
- * except `g_caption_left`/`g_caption_right` pixels reserved at each
+ * the app declares: the top `caption_h` pixels act as HTCAPTION,
+ * except `caption_left`/`caption_right` pixels reserved at each
  * end for clickable UI (tool icons, window buttons). */
-static int g_frameless = 0;
-static int g_caption_h = 36, g_caption_left = 0, g_caption_right = 0;
+/* PER WINDOW, not per process. One process drives several windows, and
+ * these were globals: opening a fixed companion popup switched EVERY
+ * window in the process to "the whole surface drags me", so the main
+ * window's hit test returned HTCAPTION for every pixel. Nothing in it was
+ * clickable and the mouse never produced a client-area message at all -
+ * which also meant hover never lit anything. Synthetic clicks still worked,
+ * because PostMessage skips the hit test; a real mouse does not. */
+#define MAX_DRESSED 8
+typedef struct {
+    HWND hwnd;
+    int frameless, fixed;
+    int caption_h, caption_left, caption_right;
+    int hole_x, hole_y, hole_w, hole_h;
+    int faux_max;
+    RECT faux_rect;
+} Dress;
+static Dress g_dress[MAX_DRESSED];
+
+/* The dressing for this window, claiming a slot on first use. NULL only
+ * when all slots are taken. */
+static Dress *dress_of(HWND hwnd) {
+    for (int i = 0; i < MAX_DRESSED; i++)
+        if (g_dress[i].hwnd == hwnd) return &g_dress[i];
+    for (int i = 0; i < MAX_DRESSED; i++)
+        if (!g_dress[i].hwnd) {
+            g_dress[i].hwnd = hwnd;
+            g_dress[i].caption_h = 36;
+            return &g_dress[i];
+        }
+    return NULL;
+}
+
+/* Read-only: NULL for a plain window nobody has dressed. */
+static Dress *dress_find(HWND hwnd) {
+    for (int i = 0; i < MAX_DRESSED; i++)
+        if (g_dress[i].hwnd == hwnd) return &g_dress[i];
+    return NULL;
+}
 
 long long win_frameless(long long hwnd_i, long long caption_h,
                         long long left_keep, long long right_keep) {
     HWND hwnd = (HWND)(uintptr_t)hwnd_i;
-    g_frameless = 1;
-    g_caption_h = (int)caption_h;
-    g_caption_left = (int)left_keep;
-    g_caption_right = (int)right_keep;
+    Dress *d = dress_of(hwnd);
+    if (!d) return 0;
+    d->frameless = 1;
+    d->caption_h = (int)caption_h;
+    d->caption_left = (int)left_keep;
+    d->caption_right = (int)right_keep;
     SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
     return 1;
@@ -130,17 +321,15 @@ long long win_frameless(long long hwnd_i, long long caption_h,
  * your work) lives in Orion's shell code, composed from these. */
 
 /* Fixed-size popup: no frame at all, no resize edges; the whole
- * surface drags the window (see g_fixed in WM_NCHITTEST) - except an
+ * surface drags the window (see `fixed` in WM_NCHITTEST) - except an
  * optional CLICK HOLE, where the mouse belongs to the app: a frame
  * skin's bezel drags the pet window, the game area takes the pats. */
-static int g_fixed = 0;
-static int g_hole_x = 0, g_hole_y = 0, g_hole_w = 0, g_hole_h = 0;
-
 long long win_click_hole(long long hwnd_i, long long x, long long y,
                          long long w, long long h) {
-    (void)hwnd_i;
-    g_hole_x = (int)x; g_hole_y = (int)y;
-    g_hole_w = (int)w; g_hole_h = (int)h;
+    Dress *d = dress_of((HWND)(uintptr_t)hwnd_i);
+    if (!d) return 0;
+    d->hole_x = (int)x; d->hole_y = (int)y;
+    d->hole_w = (int)w; d->hole_h = (int)h;
     return 1;
 }
 
@@ -158,8 +347,10 @@ long long win_colorkey(long long hwnd_i, long long rgb) {
 
 long long win_popup(long long hwnd_i, long long width, long long height) {
     HWND hwnd = (HWND)(uintptr_t)hwnd_i;
-    g_fixed = 1;
-    g_frameless = 1;
+    Dress *d = dress_of(hwnd);
+    if (!d) return 0;
+    d->fixed = 1;
+    d->frameless = 1;
     SetWindowLongW(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
     /* A popup has no frame: outer size IS client size. Set it exactly,
      * or the client keeps the old frame's slack and the framebuffer
@@ -307,13 +498,26 @@ long long win_restore(long long hwnd_i) {
     return 1;
 }
 
+/* Gone rather than minimized: no taskbar button, no dark rectangle left
+ * on the desktop. What a notification needs when it has nothing to say -
+ * minimizing would leave a button sitting there claiming otherwise. */
+long long win_visible(long long hwnd_i, long long on) {
+    ShowWindow((HWND)(uintptr_t)hwnd_i, on ? SW_SHOWNOACTIVATE : SW_HIDE);
+    return 1;
+}
+
 long long win_is_min(long long hwnd_i) {
     return IsIconic((HWND)(uintptr_t)hwnd_i) ? 1 : 0;
 }
 
 long long win_maximize_toggle(long long hwnd_i) {
     HWND hwnd = (HWND)(uintptr_t)hwnd_i;
-    ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+    /* Through WM_SYSCOMMAND, not ShowWindow: that is where the frameless
+     * work-area fit lives, and it is the path the OS itself uses for a
+     * caption double-click or Win+Up. */
+    Dress *d = dress_find(hwnd);
+    int big = (d && d->faux_max) || IsZoomed(hwnd);
+    SendMessageW(hwnd, WM_SYSCOMMAND, big ? SC_RESTORE : SC_MAXIMIZE, 0);
     return 1;
 }
 
@@ -343,20 +547,21 @@ long long win_round_corners(long long hwnd_i, long long pref) {
 long long win_fullscreen(long long hwnd_i, long long on); /* defined below */
 
 static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-    if (msg == WM_NCCALCSIZE && g_frameless && wp) return 0;
-    if (msg == WM_NCHITTEST && g_fixed) {
-        if (g_hole_w > 0) {
+    Dress *dr = dress_find(hwnd);
+    if (msg == WM_NCCALCSIZE && dr && dr->frameless && wp) return 0;
+    if (msg == WM_NCHITTEST && dr && dr->fixed) {
+        if (dr->hole_w > 0) {
             RECT rc;
             GetWindowRect(hwnd, &rc);
             int x = (int)(short)LOWORD(lp) - rc.left;
             int y = (int)(short)HIWORD(lp) - rc.top;
-            if (x >= g_hole_x && x < g_hole_x + g_hole_w &&
-                y >= g_hole_y && y < g_hole_y + g_hole_h)
+            if (x >= dr->hole_x && x < dr->hole_x + dr->hole_w &&
+                y >= dr->hole_y && y < dr->hole_y + dr->hole_h)
                 return HTCLIENT;
         }
         return HTCAPTION;
     }
-    if (msg == WM_NCHITTEST && g_frameless) {
+    if (msg == WM_NCHITTEST && dr && dr->frameless) {
         RECT rc;
         GetWindowRect(hwnd, &rc);
         int x = (int)(short)LOWORD(lp) - rc.left;
@@ -374,11 +579,18 @@ static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
             if (lef) return HTLEFT;
             if (rig) return HTRIGHT;
         }
-        if (y < g_caption_h && x >= g_caption_left && x < w - g_caption_right)
+        if (y < dr->caption_h && x >= dr->caption_left && x < w - dr->caption_right)
             return HTCAPTION;
         return HTCLIENT;
     }
     switch (msg) {
+    case WM_SETCURSOR:
+        /* Only the client area; the frame keeps its resize arrows. */
+        if (LOWORD(lp) == HTCLIENT) {
+            SetCursor(LoadCursorW(NULL, cursor_name(g_cursor)));
+            return TRUE;
+        }
+        break;
     case WM_PAINT:
         if (win_paint_hook) {
             PAINTSTRUCT ps;
@@ -388,16 +600,33 @@ static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
             return 0;
         }
         break;
-    case WM_LBUTTONDOWN: ev_push(1, 1, lp_x(lp), lp_y(lp)); return 0;
-    case WM_RBUTTONDOWN: ev_push(1, 2, lp_x(lp), lp_y(lp)); return 0;
-    case WM_MBUTTONDOWN: ev_push(1, 3, lp_x(lp), lp_y(lp)); return 0;
-    case WM_LBUTTONUP:   ev_push(2, 1, lp_x(lp), lp_y(lp)); return 0;
-    case WM_RBUTTONUP:   ev_push(2, 2, lp_x(lp), lp_y(lp)); return 0;
-    case WM_MBUTTONUP:   ev_push(2, 3, lp_x(lp), lp_y(lp)); return 0;
-    case WM_MOUSEMOVE:   ev_push(3, 0, lp_x(lp), lp_y(lp)); return 0;
-    case WM_KEYDOWN:     ev_push(4, (long long)wp, 0, 0); return 0;
-    case WM_KEYUP:       ev_push(5, (long long)wp, 0, 0); return 0;
-    case WM_CHAR:        ev_push(12, (long long)wp, 0, 0); return 0;
+    /* The wheel arrives in SCREEN coordinates and in notches of 120. Both
+     * are converted here so an app never has to know either. */
+    case WM_MOUSEWHEEL: {
+        POINT pt = {(int)(short)LOWORD(lp), (int)(short)HIWORD(lp)};
+        ScreenToClient(hwnd, &pt);
+        ev_push(hwnd, 13, (long long)((short)HIWORD(wp)) / WHEEL_DELTA,
+                pt.x, pt.y);
+        return 0;
+    }
+    /* A second click inside the double-click time, which the window class
+     * has to ask for with CS_DBLCLKS or Windows never sends it. It comes
+     * INSTEAD of the second WM_LBUTTONDOWN, so an app that only handles
+     * single clicks would lose every other one - the down is pushed too. */
+    case WM_LBUTTONDBLCLK:
+        ev_push(hwnd, 1, 1, lp_x(lp), lp_y(lp));
+        ev_push(hwnd, 14, 1, lp_x(lp), lp_y(lp));
+        return 0;
+    case WM_LBUTTONDOWN: g_from_touch = came_from_touch(); ev_push(hwnd, 1, 1, lp_x(lp), lp_y(lp)); return 0;
+    case WM_RBUTTONDOWN: ev_push(hwnd, 1, 2, lp_x(lp), lp_y(lp)); return 0;
+    case WM_MBUTTONDOWN: ev_push(hwnd, 1, 3, lp_x(lp), lp_y(lp)); return 0;
+    case WM_LBUTTONUP:   ev_push(hwnd, 2, 1, lp_x(lp), lp_y(lp)); return 0;
+    case WM_RBUTTONUP:   ev_push(hwnd, 2, 2, lp_x(lp), lp_y(lp)); return 0;
+    case WM_MBUTTONUP:   ev_push(hwnd, 2, 3, lp_x(lp), lp_y(lp)); return 0;
+    case WM_MOUSEMOVE:   g_from_touch = came_from_touch(); ev_push(hwnd, 3, 0, lp_x(lp), lp_y(lp)); return 0;
+    case WM_KEYDOWN:     ev_push(hwnd, 4, (long long)wp, 0, 0); return 0;
+    case WM_KEYUP:       ev_push(hwnd, 5, (long long)wp, 0, 0); return 0;
+    case WM_CHAR:        ev_push(hwnd, 12, (long long)wp, 0, 0); return 0;
     case WM_SYSKEYDOWN:
         /* Alt+Enter → our own borderless fullscreen (crisp, native res).
          * DXGI's stretched exclusive mode is disabled via
@@ -409,14 +638,45 @@ static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
             return 0;
         }
         break;
+    /* A real maximise sizes a frameless window to the monitor PLUS its
+     * invisible resize border: it lands at -8,-8, our own top strip is
+     * partly off-screen and the taskbar is covered. Windows ignores both
+     * documented levers here (MINMAXINFO, and repositioning from
+     * WM_SIZE - a zoomed window snaps straight back), so a frameless
+     * window never actually maximises. It fills the work area and
+     * remembers where it came from. Same trick as win_fullscreen. */
+    case WM_SYSCOMMAND: {
+        UINT cmd = (UINT)(wp & 0xFFF0);
+        if (dr && dr->frameless && cmd == SC_MAXIMIZE && !dr->faux_max) {
+            MONITORINFO mi = { sizeof(mi) };
+            GetWindowRect(hwnd, &dr->faux_rect);
+            if (GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi)) {
+                dr->faux_max = 1;
+                SetWindowPos(hwnd, NULL, mi.rcWork.left, mi.rcWork.top,
+                             mi.rcWork.right - mi.rcWork.left,
+                             mi.rcWork.bottom - mi.rcWork.top,
+                             SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                return 0;
+            }
+        }
+        if (dr && dr->frameless && cmd == SC_RESTORE && dr->faux_max) {
+            dr->faux_max = 0;
+            SetWindowPos(hwnd, NULL, dr->faux_rect.left, dr->faux_rect.top,
+                         dr->faux_rect.right - dr->faux_rect.left,
+                         dr->faux_rect.bottom - dr->faux_rect.top,
+                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+            return 0;
+        }
+        break;
+    }
     case WM_SIZE:
-        ev_push(7, 0, (long long)LOWORD(lp), (long long)HIWORD(lp));
+        ev_push(hwnd, 7, 0, (long long)LOWORD(lp), (long long)HIWORD(lp));
         if (g_live_resize && &atlas_live_frame && wp != SIZE_MINIMIZED
             && LOWORD(lp) > 0 && HIWORD(lp) > 0) {
             atlas_live_frame((long long)LOWORD(lp), (long long)HIWORD(lp));
         }
         return 0;
-    case WM_CLOSE:       ev_push(6, 0, 0, 0); DestroyWindow(hwnd); return 0;
+    case WM_CLOSE:       ev_push(hwnd, 6, 0, 0, 0); DestroyWindow(hwnd); return 0;
     case WM_DESTROY:     PostQuitMessage(0); return 0;
     }
     return DefWindowProcW(hwnd, msg, wp, lp);
@@ -497,7 +757,9 @@ static void ensure_class(void) {
     if (class_registered) return;
     WNDCLASSEXW wc = {0};
     wc.cbSize = sizeof(wc);
-    wc.style = CS_HREDRAW | CS_VREDRAW;
+    /* CS_DBLCLKS: without it Windows never sends WM_LBUTTONDBLCLK at all,
+     * and a double click is indistinguishable from two singles. */
+    wc.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
     wc.lpfnWndProc = orion_wnd_proc;
     wc.hInstance = GetModuleHandleW(NULL);
     wc.hCursor = LoadCursorW(NULL, IDC_ARROW);

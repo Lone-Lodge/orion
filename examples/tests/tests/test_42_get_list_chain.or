@@ -1,9 +1,9 @@
-define main() -> int:
+define main() -> number:
     s1 = {"kind": "Int", "value": "42"}
     inner = {"items": [s1]}
     items = get_list(inner, "items")
-    item = at(items, 0)
-    if get(item, "kind") == "Int":
+    item = items[0]
+    if get(item, "kind") is "Int":
         42
     else:
         0

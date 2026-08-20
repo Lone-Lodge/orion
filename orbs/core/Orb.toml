@@ -1,0 +1,3 @@
+name = "core"
+version = "0.1.0"
+description = "maybe and result - the two types every program may assume"

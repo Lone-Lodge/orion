@@ -1,10 +1,10 @@
 # expect: non-exhaustive match on enum `Tile`
 type Tile: Empty, Wall, Loot
 
-define cost(t: Tile) -> int:
+define cost(t: Tile) -> number:
     choose t:
-        Empty -> 0
-        Wall -> 1
+        Empty then 0
+        Wall then 1
 
-define main() -> int:
+define main() -> number:
     cost(Tile.Loot)

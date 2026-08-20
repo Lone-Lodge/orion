@@ -1,13 +1,13 @@
 # Typed closure parameters: `function(s: text): ...`. Without the annotation a
 # lambda param is int, so `length(s)` on a passed Text couldn't compile. Now
 # the param carries its real type through the lambda-lift.
-define each_len(xs: [text], f: function) -> [int]:
+define each_len(xs: [text], f: function) -> [number]:
     edit out = []
-    loop i in 0..<length(xs):
-        out = append(out, f(at(xs, i)))
+    loop i in 0 until length(xs):
+        out = append(out, f(xs[i]))
     out
 
-define main() -> int:
+define main() -> number:
     words = ["ab", "cde"]
     lens = each_len(words, function(s: text): length(s))   # [2, 3]
-    at(lens, 0) + at(lens, 1)                      # 5
+    lens[0] + lens[1]                      # 5

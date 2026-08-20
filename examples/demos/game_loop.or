@@ -4,7 +4,7 @@
 #   * sum types (enum Tile, Action, Outcome)
 #   * effects + continuations (Random.roll, Log.msg)
 #   * return keyword (early-exit guards)
-#   * pattern match (tile-kind dispatch)
+#   * pattern choose (tile-kind dispatch)
 #   * string interpolation in print_line
 #
 # The handlers in this file are the PRODUCTION versions. For tests you'd
@@ -29,7 +29,7 @@ effect Log:
 # `handle Effect.op(...)` names the handler explicitly; `resume(v)` sends a
 # value back to the `perform` site (int or text, inferred from `v`).
 
-handle Random.roll(max: int) -> int:
+handle Random.roll(max: number) -> number:
     # Deterministic for the demo. Production would call OS random.
     resume(73)
 
@@ -39,7 +39,7 @@ handle Log.msg(message: text) -> text:
 
 # ---- Game logic ------------------------------------------------------
 
-define loot_value() -> int:
+define loot_value() -> number:
     perform Log.msg("rolling loot table")
     roll = perform Random.roll(100)
     if roll > 95:
@@ -53,22 +53,22 @@ define loot_value() -> int:
             else:
                 0
 
-define process_tile(tile_kind: int) -> int:
-    if tile_kind == 0:
+define process_tile(tile_kind: number) -> number:
+    if tile_kind is 0:
         return 0
-    if tile_kind == 1:
+    if tile_kind is 1:
         perform Log.msg("blocked by wall")
         return 0
-    if tile_kind == 2:
+    if tile_kind is 2:
         loot_value()
     else:
-        if tile_kind == 3:
+        if tile_kind is 3:
             perform Log.msg("hit a trap!")
             0 - 50
         else:
             0
 
-define main() -> int:
+define main() -> number:
     perform Log.msg("=== game starts ===")
 
     a = process_tile(0)   # Empty → 0
@@ -81,7 +81,7 @@ define main() -> int:
     perform Log.msg("=== game ends ===")
 
     # 0 + 25 + (-50) + 25 = 0. Add 42 as sentinel for success.
-    if total == 0:
+    if total is 0:
         42
     else:
         99

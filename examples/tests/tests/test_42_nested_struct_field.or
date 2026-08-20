@@ -1,7 +1,7 @@
-type Point: x: int, y: int
+type Point: x: number, y: number
 type Line: start: Point, end: Point
 
-define main() -> int:
+define main() -> number:
     p1 = Point{x: 1, y: 2}
     p2 = Point{x: 3, y: 4}
     line = Line{start: p1, end: p2}

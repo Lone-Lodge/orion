@@ -18,15 +18,15 @@ define read_code_from_stdin() -> text:
     edit acc = ""
     loop:
         line = orion_stdin_line()
-        if length(line) == 0:
+        if length(line) is 0:
             break
         acc = "{acc}{line}"
     acc
 
-define main() -> int uses net, console:
+define main() -> number uses net, console:
     # argv(0) is the exe itself - the code is the first real argument.
     code = if arg_count() > 1 then arg(1) else read_code_from_stdin()
-    if length(code) == 0:
+    if length(code) is 0:
         eprint("usage: blender_bridge \"<python>\"  (or pipe the code on stdin)")
         return 2
     escaped = json_escape(code)
@@ -40,20 +40,20 @@ define main() -> int uses net, console:
     edit reply = ""
     loop:
         chunk = recv(conn, 65536)
-        if length(chunk) == 0:
+        if length(chunk) is 0:
             break
         reply = "{reply}{chunk}"
         if contains(reply, "\n"):
             break
     # the peer vanished mid-request (or replied nothing): say so, don't parse
-    if length(reply) == 0:
+    if length(reply) is 0:
         eprint("bridge closed without a reply")
         return 1
     root = json_parse(reply)
     output = json_text(root, "output")
     if length(output) > 0:
         print_line(trim(output))
-    if json_int(root, "ok") == 1:
+    if json_int(root, "ok") is 1:
         return 0
     eprint(json_text(root, "error"))
     1

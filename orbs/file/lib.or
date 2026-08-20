@@ -28,13 +28,13 @@ external define file_bytes(path: text) -> int
 # --- opening ---
 # -1 when the file cannot be opened (missing, locked, out of handles).
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define open_read(path: text) -> int uses files = file_open(path, 0)
+public define open_read(path: text) -> number uses files = file_open(path, 0)
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define open_write(path: text) -> int uses files = file_open(path, 1)
+public define open_write(path: text) -> number uses files = file_open(path, 1)
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define open_append(path: text) -> int uses files = file_open(path, 2)
+public define open_append(path: text) -> number uses files = file_open(path, 2)
 
-public define ok(handle: int) -> truth:
+public define ok(handle: number) -> truth:
     example ok(0 - 1) is false
     example ok(2)
     handle >= 0
@@ -42,18 +42,18 @@ public define ok(handle: int) -> truth:
 # --- moving bytes ---
 # Up to `maxlen` bytes. "" means end of stream.
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define read_chunk(handle: int, maxlen: int) -> text uses files = file_read_chunk(handle, maxlen)
+public define read_chunk(handle: number, maxlen: number) -> text uses files = file_read_chunk(handle, maxlen)
 
 # How many bytes were written (-1 on failure).
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define write_chunk(handle: int, data: text) -> int uses files = file_write_chunk(handle, data)
+public define write_chunk(handle: number, data: text) -> number uses files = file_write_chunk(handle, data)
 
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define close(handle: int) -> int uses files = file_close(handle)
+public define close(handle: number) -> number uses files = file_close(handle)
 
 # Size in bytes without reading the contents. -1 if it does not exist.
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define size_of(path: text) -> int uses files = file_bytes(path)
+public define size_of(path: text) -> number uses files = file_bytes(path)
 
 # Is this chunk the end of the stream?
 public define is_end(chunk: text) -> truth:
@@ -66,7 +66,7 @@ public define is_end(chunk: text) -> truth:
 # (including an early return - the close is a `defer`). -1 when the open
 # failed, so a caller can tell "could not open" from a body result.
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define with_read(path: text, body: function) -> int uses files:
+public define with_read(path: text, body: function) -> number uses files:
     h = open_read(path)
     if not ok(h):
         return 0 - 1
@@ -74,7 +74,7 @@ public define with_read(path: text, body: function) -> int uses files:
     body(h)
 
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define with_write(path: text, body: function) -> int uses files:
+public define with_write(path: text, body: function) -> number uses files:
     h = open_write(path)
     if not ok(h):
         return 0 - 1
@@ -82,7 +82,7 @@ public define with_write(path: text, body: function) -> int uses files:
     body(h)
 
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define with_append(path: text, body: function) -> int uses files:
+public define with_append(path: text, body: function) -> number uses files:
     h = open_append(path)
     if not ok(h):
         return 0 - 1
@@ -94,14 +94,14 @@ public define with_append(path: text, body: function) -> int uses files:
 # it is safe to call in a loop but not the fastest way to write many lines -
 # for that, open once with `with_append` and `write_line` into the handle.
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define append_line(path: text, line: text) -> int uses files:
+public define append_line(path: text, line: text) -> number uses files:
     with_append(path, (h): write_chunk(h, "{line}\n"))
 
 # no example: touches the filesystem - proven by test_42_file_stream.or
-public define write_line(handle: int, line: text) -> int uses files:
+public define write_line(handle: number, line: text) -> number uses files:
     write_chunk(handle, "{line}\n")
 
 # Collision-friendly alias: `close` and `ok` exist in the net orb too, and an
 # orb using both (a file server) needs the selective import to stay readable.
 # no example: closes a handle - proven by the app orb
-public define close_file(handle: int) -> int uses files = file_close(handle)
+public define close_file(handle: number) -> number uses files = file_close(handle)

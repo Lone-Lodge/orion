@@ -1,0 +1,42 @@
+# `number` reaches a function TYPE, and a lambda carries a real answer.
+#
+# The site of a function type is not a value the pass can look inside - it is
+# whatever function gets passed - so the two are UNIFIED at the call, the same
+# way a list and its parameter are. A call `f(x)` reads its result type off the
+# annotation while the function itself was compiled from its own.
+
+define twice(n: number) -> number:
+    n * 2
+
+define halve(n: number) -> number:
+    n / 2
+
+define apply_w(f: function(number) -> number, x: number) -> number:
+    f(x)
+
+define apply_r(f: function(number) -> number, x: number) -> number:
+    f(x)
+
+define apply_l(f: function(number) -> number, x: number) -> number:
+    f(x)
+
+define main() -> number:
+    whole = apply_w(twice, 21)              # 42, i64 all through
+    real = apply_r(halve, 9)                # 4.5
+
+    # an inline LAMBDA has no name to look up, so its body is read instead.
+    # This answered 4 for a half before that.
+    from_lambda = apply_l((n): n / 2, 5)    # 2.5
+
+    # a lambda BOUND to a local, then called through it. A lifted lambda's
+    # answer was hardcoded `int` and the closure call went out over an i64
+    # ABI, so this cut the half off and said 4. Both ends carry the real now.
+    halver = (m): m / 2
+    bound = halver(9)                       # 4.5
+
+    a = if whole is 42 then 10 else 0
+    b = if real > 4.4 and real < 4.6 then 20 else 0
+    c = if from_lambda > 2.4 and from_lambda < 2.6 then 13 else 0
+    d = if bound > 4.4 and bound < 4.6 then 10 else 0
+
+    a + b + c + d   # 10 + 20 + 13 + 10

@@ -1,7 +1,7 @@
 # net: real sockets. A listener + a client on loopback, in-process.
 use net
 
-define main() -> int:
+define main() -> number:
     s = listen(58421)
     if not ok(s):
         return 1

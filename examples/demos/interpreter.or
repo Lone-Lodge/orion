@@ -17,7 +17,7 @@
 
 use text
 
-define tok_num(v: int) -> table:
+define tok_num(v: number) -> table:
     {"kind": "num", "val": v, "name": ""}
 
 define tok_op(k: text) -> table:
@@ -26,12 +26,12 @@ define tok_op(k: text) -> table:
 define tok_ident(nm: text) -> table:
     {"kind": "ident", "val": 0, "name": nm}
 
-type Parsed: val: int, next: int
+type Parsed: val: number, next: number
 
-define is_digit(b: int) -> int:
+define is_digit(b: number) -> number:
     if b >= '0' and b <= '9' then 1 else 0
 
-define is_alpha(b: int) -> int:
+define is_alpha(b: number) -> number:
     if (b >= 'a' and b <= 'z') or (b >= 'A' and b <= 'Z') then 1 else 0
 
 # ---- Tokenizer -------------------------------------------------------
@@ -44,79 +44,79 @@ define tokenize(src: text) -> [table]:
     loop:
         if i >= n:
             break
-        b = at(bs, i)
-        if b == ' ':
+        b = bs[i]
+        if b is ' ':
             i = i + 1
         else:
-            if is_digit(b) == 1:                # a run of digits -> number
+            if is_digit(b) is 1:                # a run of digits -> number
                 edit num = 0
                 loop:
                     if i >= n:
                         break
-                    d = at(bs, i)
-                    if is_digit(d) == 0:
+                    d = bs[i]
+                    if is_digit(d) is 0:
                         break
                     num = num * 10 + (d - '0')
                     i = i + 1
                 toks = append(toks, tok_num(num))
             else:
-                if is_alpha(b) == 1:            # a run of letters -> identifier
+                if is_alpha(b) is 1:            # a run of letters -> identifier
                     edit chars = []
                     loop:
                         if i >= n:
                             break
-                        c = at(bs, i)
-                        if is_alpha(c) == 0:
+                        c = bs[i]
+                        if is_alpha(c) is 0:
                             break
                         chars = append(chars, c)
                         i = i + 1
                     toks = append(toks, tok_ident(text_of(chars)))
                 else:
                     kind = choose b:
-                        '+' -> "plus"
-                        '-' -> "minus"
-                        '*' -> "star"
-                        '/' -> "slash"
-                        '(' -> "lparen"
-                        ')' -> "rparen"
-                        '=' -> "assign"
-                        _ -> "bad"
+                        '+' then "plus"
+                        '-' then "minus"
+                        '*' then "star"
+                        '/' then "slash"
+                        '(' then "lparen"
+                        ')' then "rparen"
+                        '=' then "assign"
+                        _ then "bad"
                     toks = append(toks, tok_op(kind))
                     i = i + 1
     toks
 
 # ---- Recursive-descent evaluator (env threaded through) --------------
 
-define parse_factor(toks: [table], pos: int, env: table) -> Parsed:
-    t = at(toks, pos)
+define parse_factor(toks: [table], pos: number, env: table) -> Parsed:
+    t = toks[pos]
     # A flat 4-way dispatch - block arms let the `(` and unary-minus cases
-    # bind an intermediate before returning, so this reads as one `match`
+    # bind an intermediate before returning, so this reads as one `choose`
     # instead of a nested if/else ladder.
     choose get(t, "kind"):
-        "lparen" ->
+        "lparen" then 
             inner = parse_expr(toks, pos + 1, env)
             Parsed{val: inner.val, next: inner.next + 1}
-        "minus" ->                              # unary minus
+        "minus" then # unary minus
             f = parse_factor(toks, pos + 1, env)
             Parsed{val: 0 - f.val, next: f.next}
-        "ident" -> Parsed{val: get_or(env, get(t, "name"), 0), next: pos + 1}
-        _ -> Parsed{val: get(t, "val"), next: pos + 1}
+        "ident" then Parsed{val: get_or(env, get(t, "name"), 0), next: pos + 1}
+        _ then Parsed{val: get(t, "val"), next: pos + 1}
 
-define parse_term(toks: [table], pos: int, env: table) -> Parsed:
+define parse_term(toks: [table], pos: number, env: table) -> Parsed:
     left = parse_factor(toks, pos, env)
     edit val = left.val
     edit i = left.next
     loop:
         if i >= length(toks):
             break
-        k = get(at(toks, i), "kind")
-        if k != "star" and k != "slash":
+        k = get(toks[i], "kind")
+        if k is not "star" and k is not "slash":
             break
         r = parse_factor(toks, i + 1, env)
-        if k == "star":
+        if k is "star":
             val = val * r.val
         else:
-            if r.val == 0:
+            if r.val is 0:
                 print_line("  (interpreter: divide by zero - using 0)")
                 val = 0
             else:
@@ -124,35 +124,35 @@ define parse_term(toks: [table], pos: int, env: table) -> Parsed:
         i = r.next
     Parsed{val: val, next: i}
 
-define parse_expr(toks: [table], pos: int, env: table) -> Parsed:
+define parse_expr(toks: [table], pos: number, env: table) -> Parsed:
     left = parse_term(toks, pos, env)
     edit val = left.val
     edit i = left.next
     loop:
         if i >= length(toks):
             break
-        k = get(at(toks, i), "kind")
-        if k != "plus" and k != "minus":
+        k = get(toks[i], "kind")
+        if k is not "plus" and k is not "minus":
             break
         r = parse_term(toks, i + 1, env)
-        val = if k == "plus" then val + r.val else val - r.val
+        val = if k is "plus" then val + r.val else val - r.val
         i = r.next
     Parsed{val: val, next: i}
 
 # ---- Main - run a little program, carrying the environment forward ---
 
-define is_assign(toks: [table]) -> int:
-    if length(toks) >= 2 and get(at(toks, 0), "kind") == "ident" and get(at(toks, 1), "kind") == "assign" then 1 else 0
+define is_assign(toks: [table]) -> number:
+    if length(toks) >= 2 and get(toks[0], "kind") is "ident" and get(toks[1], "kind") is "assign" then 1 else 0
 
-define main() -> int:
+define main() -> number:
     program = ["x = 3", "y = x * 2 + 1", "z = (x + y) * 2", "z - x"]
 
     edit env = {}
     edit result = 0
     loop stmt in program:
         toks = tokenize(stmt)
-        if is_assign(toks) == 1:
-            name = get(at(toks, 0), "name")
+        if is_assign(toks) is 1:
+            name = get(toks[0], "name")
             r = parse_expr(toks, 2, env)        # expr after the `=`
             env[name] = r.val
             print_line("{stmt}   ->  {name} = {r.val}")

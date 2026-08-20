@@ -11,28 +11,28 @@
 # `bytes_from_text`, read it back with `bytes_to_text`.
 
 # The nibble value of a hex digit byte, or -1 if it is not one.
-define hex_val(c: int) -> int:
+define hex_val(c: number) -> number:
     if c >= 48 and c <= 57 then c - 48                    # '0'..'9'
     else if c >= 97 and c <= 102 then c - 97 + 10         # 'a'..'f'
     else if c >= 65 and c <= 70 then c - 65 + 10          # 'A'..'F'
     else 0 - 1
 
 # bytes -> lowercase hex text.
-public define hex_encode(data: [int]) -> text:
+public define hex_encode(data: [number]) -> text:
     example hex_encode([255, 16]) is "ff10"
     example hex_encode([]) is ""
     hex = bytes_of("0123456789abcdef")
     edit out = []
     loop i in 0 until length(data):
-        b = at(data, i)
-        out = append(out, at(hex, (b >> 4) & 15))
-        out = append(out, at(hex, b & 15))
+        b = data[i]
+        out = append(out, hex[(b >> 4) & 15])
+        out = append(out, hex[b & 15])
     text_of(out)
 
 # hex text -> bytes. Non-hex characters are skipped; a trailing half-byte is
 # dropped.
-public define hex_decode(s: text) -> [int]:
-    example at(hex_decode("ff10"), 0) is 255
+public define hex_decode(s: text) -> [number]:
+    example hex_decode("ff10")[0] is 255
     b = bytes_of(s)
     n = bytes_count(b)
     edit out = []
@@ -49,7 +49,7 @@ public define hex_decode(s: text) -> [int]:
 
 # The base64 value of a byte, or -1 for padding / anything else (so newlines
 # and '=' are skipped on decode).
-define b64_val(c: int) -> int:
+define b64_val(c: number) -> number:
     if c >= 65 and c <= 90 then c - 65                    # 'A'..'Z' -> 0..25
     else if c >= 97 and c <= 122 then c - 97 + 26         # 'a'..'z' -> 26..51
     else if c >= 48 and c <= 57 then c - 48 + 52          # '0'..'9' -> 52..61
@@ -58,7 +58,7 @@ define b64_val(c: int) -> int:
     else 0 - 1
 
 # bytes -> base64 text (standard alphabet, '=' padded).
-public define base64_encode(data: [int]) -> text:
+public define base64_encode(data: [number]) -> text:
     example base64_encode([77, 97, 110]) is "TWFu"
     example base64_encode([]) is ""
     alpha = bytes_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
@@ -69,19 +69,19 @@ public define base64_encode(data: [int]) -> text:
         if i >= n: break
         has1 = i + 1 < n
         has2 = i + 2 < n
-        b0 = at(data, i)
-        b1 = if has1 then at(data, i + 1) else 0
-        b2 = if has2 then at(data, i + 2) else 0
-        out = append(out, at(alpha, (b0 >> 2) & 63))
-        out = append(out, at(alpha, ((b0 << 4) | (b1 >> 4)) & 63))
-        out = append(out, if has1 then at(alpha, ((b1 << 2) | (b2 >> 6)) & 63) else 61)   # '='
-        out = append(out, if has2 then at(alpha, b2 & 63) else 61)
+        b0 = data[i]
+        b1 = if has1 then data[i + 1] else 0
+        b2 = if has2 then data[i + 2] else 0
+        out = append(out, alpha[(b0 >> 2) & 63])
+        out = append(out, alpha[((b0 << 4) | (b1 >> 4)) & 63])
+        out = append(out, if has1 then alpha[((b1 << 2) | (b2 >> 6)) & 63] else 61)   # '='
+        out = append(out, if has2 then alpha[b2 & 63] else 61)
         i = i + 3
     text_of(out)
 
 # base64 text -> bytes. Padding, newlines and stray characters are ignored.
-public define base64_decode(s: text) -> [int]:
-    example at(base64_decode("TWFu"), 0) is 77
+public define base64_decode(s: text) -> [number]:
+    example base64_decode("TWFu")[0] is 77
     b = bytes_of(s)
     n = bytes_count(b)
     edit out = []

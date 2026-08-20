@@ -12,32 +12,32 @@
 # helpers, and `parse_float` (the int-only `parse` above cannot read a decimal).
 
 # Absolute value.
-public define abs(x: int) -> int:
+public define abs(x: number) -> number:
     example abs(0 - 5) is 5
     if x < 0 then 0 - x else x
 
 # The smaller of two values.
-public define min(a: int, b: int) -> int:
+public define min(a: number, b: number) -> number:
     example min(3, 7) is 3
     if a < b then a else b
 
 # The larger of two values.
-public define max(a: int, b: int) -> int:
+public define max(a: number, b: number) -> number:
     example max(3, 7) is 7
     if a > b then a else b
 
 # Constrain `x` to the range [lo, hi].
-public define clamp(x: int, lo: int, hi: int) -> int:
+public define clamp(x: number, lo: number, hi: number) -> number:
     example clamp(15, 0, 10) is 10
     if x < lo then lo else (if x > hi then hi else x)
 
 # -1, 0, or 1 by the sign of `x`.
-public define sign(x: int) -> int:
+public define sign(x: number) -> number:
     example sign(0 - 9) is 0 - 1
     if x > 0 then 1 else (if x < 0 then 0 - 1 else 0)
 
 # Greatest common divisor (Euclid). gcd(0, 0) is 0.
-public define gcd(a: int, b: int) -> int:
+public define gcd(a: number, b: number) -> number:
     example gcd(12, 18) is 6
     edit x = abs(a)
     edit y = abs(b)
@@ -54,7 +54,7 @@ public define gcd(a: int, b: int) -> int:
 #   parse("42")   ->  42
 #   parse("-7")   ->  -7
 # Pairs with split: split("3,4,5", ",") then parse each piece.
-public define parse(t: text) -> int:
+public define parse(t: text) -> number:
     example parse("42") is 42
     b = bytes_of(t)
     total = bytes_count(b)
@@ -73,7 +73,7 @@ public define parse(t: text) -> int:
 
 # Integer power (ipow): base^exp for exp >= 0. Negative exp yields 0.
 #   ipow(2, 10)  ->  1024
-public define ipow(base: int, exp: int) -> int:
+public define ipow(base: number, exp: number) -> number:
     example ipow(2, 10) is 1024
     edit result = 1
     if exp >= 0:
@@ -84,12 +84,12 @@ public define ipow(base: int, exp: int) -> int:
     result
 
 # 1 if `n` is even, else 0.
-public define is_even(n: int) -> truth:
+public define is_even(n: number) -> truth:
     example is_even(4)
     n % 2 is 0
 
 # 1 if `n` is odd, else 0.
-public define is_odd(n: int) -> truth:
+public define is_odd(n: number) -> truth:
     example is_odd(7)
     n % 2 is not 0
 
@@ -174,7 +174,7 @@ external define fmt_float(x: float, decimals: int) -> text
 
 # `x` as text with a fixed number of decimals - the one formatting ask
 # plain to_text cannot answer.
-public define with_decimals(x: float, decimals: int) -> text:
+public define with_decimals(x: float, decimals: number) -> text:
     example with_decimals(3.14159, 2) is "3.14"
     example with_decimals(2.5, 0) is "2"
     example with_decimals(1.0, 3) is "1.000"

@@ -3,11 +3,11 @@
 # is an interpolation delimiter in source).
 use json
 
-define main() -> int:
-    ok_arr = if json_stringify(jarr([jint(1), jint(2), jint(3)])) == "[1,2,3]" then 1 else 0
-    ok_prim = if json_stringify(jnull()) == "null" and json_stringify(jbool(1)) == "true" and json_stringify(jbool(0)) == "false" then 1 else 0
-    ok_str = if json_stringify(jstr("hi")) == "\"hi\"" then 1 else 0
+define main() -> number:
+    ok_arr = if json_stringify(jarr([jint(1), jint(2), jint(3)])) is "[1,2,3]" then 1 else 0
+    ok_prim = if json_stringify(jnull()) is "null" and json_stringify(jbool(1)) is "true" and json_stringify(jbool(0)) is "false" then 1 else 0
+    ok_str = if json_stringify(jstr("hi")) is "\"hi\"" then 1 else 0
     obj = jobj(["age", "name"], [jint(42), jstr("Jo")])
     rp = json_parse(json_stringify(obj))
-    ok_round = if json_int(rp, "age") == 42 and json_text(rp, "name") == "Jo" then 1 else 0
+    ok_round = if json_int(rp, "age") is 42 and json_text(rp, "name") is "Jo" then 1 else 0
     ok_arr * 16 + ok_prim * 16 + ok_str * 16 + ok_round * 16   # 64

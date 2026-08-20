@@ -1,7 +1,7 @@
 # expect: is not valid here, an expression was expected
 # Orion has no pipe operator. The old message was "unhandled AST node kind
 # `Error`" at line 0:0, which named a compiler internal at no location.
-define inc(x: int) -> int: x + 1
+define inc(x: number) -> number: x + 1
 
-define main() -> int:
+define main() -> number:
     41 |> inc

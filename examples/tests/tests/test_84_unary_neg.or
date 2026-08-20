@@ -1,10 +1,10 @@
-define abs(x: int) -> int:
+define abs(x: number) -> number:
     if x < 0:
         -x
     else:
         x
 
-define main() -> int:
+define main() -> number:
     a = -5
     b = -10
     c = abs(-42)

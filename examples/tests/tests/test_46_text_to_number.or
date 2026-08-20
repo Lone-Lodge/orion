@@ -1,0 +1,9 @@
+# to_whole/to_real på en text ska PARSA talet. De släppte tidigare igenom
+# textpekaren oförändrad - som såg rätt ut i print (som följer typen) men
+# var skräp som tal. 40 + 4 + 2 = 46.
+define main() -> number:
+    a = to_whole("40")
+    b = to_whole(" 4 ")
+    r = to_real("2.9")
+    c = to_whole(r)
+    a + b + c

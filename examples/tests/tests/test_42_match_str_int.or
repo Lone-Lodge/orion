@@ -1,14 +1,14 @@
-define day_value(day: text) -> int:
+define day_value(day: text) -> number:
     choose day:
-        "mon" -> 10
-        "fri" -> 32
-        _ -> 0
+        "mon" then 10
+        "fri" then 32
+        _ then 0
 
-define level_value(level: int) -> int:
+define level_value(level: number) -> number:
     choose level:
-        0 -> 0
-        1 -> 100
-        _ -> 200
+        0 then 0
+        1 then 100
+        _ then 200
 
-define main() -> int:
+define main() -> number:
     day_value("fri") + level_value(1) - level_value(1) + 10

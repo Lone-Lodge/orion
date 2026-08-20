@@ -7,5 +7,5 @@
 # stderr (see orion_stderr_line in the orb).
 use orion_lsp
 
-define main() -> int:
+define main() -> number:
     lsp_serve()

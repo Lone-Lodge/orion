@@ -1,8 +1,8 @@
 # Struct update / spread: `Point{..p, x: 7}` copies every field not written
 # from `p` and overrides the rest. Ideal for immutable, data-oriented updates.
-type Point: x: int, y: int, z: int
+type Point: x: number, y: number, z: number
 
-define main() -> int:
+define main() -> number:
     p = Point{x: 1, y: 20, z: 100}
     q = Point{..p, x: 7}     # x=7 (given), y=20 & z=100 copied from p
-    q.x + q.y + q.z          # 7 + 20 + 100 == 127
+    q.x + q.y + q.z          # 7 + 20 + 100 is 127

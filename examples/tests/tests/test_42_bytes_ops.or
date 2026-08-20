@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     bs = bytes_of("hello world")
     head = bytes_part(bs, 0, 5)
     tail = bytes_part(bs, 6, 11)

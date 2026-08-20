@@ -13,13 +13,13 @@ external define og_present() -> int
 external define og_shutdown()
 
 
-define main() -> int:
+define main() -> number:
     hwnd = win_open("Native Orion + D3D12 - click to place, Esc quits", 800, 600)
-    if hwnd == 0:
+    if hwnd is 0:
         print_line("window failed")
         return 1
     ok = og_init(hwnd, 800, 600)
-    if ok == 0:
+    if ok is 0:
         print_line("og_init failed")
         return 1
     print_line("gpu up - click to place blocks, move mouse, Esc to quit")
@@ -30,26 +30,26 @@ define main() -> int:
     edit blocks_x = []
     edit blocks_y = []
     loop:
-        if running == 0:
+        if running is 0:
             break
         keep = win_pump()
-        if keep == 0:
+        if keep is 0:
             break
         loop:
             has_event = win_event_next()
-            if has_event == 0:
+            if has_event is 0:
                 break
             kind = win_event_kind()
-            if kind == 3:
+            if kind is 3:
                 mx = win_event_x()
                 my = win_event_y()
-            if kind == 1:
+            if kind is 1:
                 blocks_x = append(blocks_x, win_event_x())
                 blocks_y = append(blocks_y, win_event_y())
-            if kind == 4:
-                if win_event_key() == 27:
+            if kind is 4:
+                if win_event_key() is 27:
                     running = 0
-            if kind == 6:
+            if kind is 6:
                 running = 0
 
         og_begin(24, 26, 34)
@@ -57,9 +57,9 @@ define main() -> int:
         og_rect(40, 40, 720, 520, 40, 44, 56)
         # placed blocks (grid-snapped 40px)
         n = length(blocks_x)
-        loop i in 0..<n:
-            bx = at(blocks_x, i)
-            by = at(blocks_y, i)
+        loop i in 0 until n:
+            bx = blocks_x[i]
+            by = blocks_y[i]
             sx = (bx / 40) * 40
             sy = (by / 40) * 40
             og_rect(sx, sy, 36, 36, 231, 76, 255)

@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     base = "hello world!"
     n = length(base)
     # length("hello world!") = 12

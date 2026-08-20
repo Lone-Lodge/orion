@@ -25,30 +25,30 @@
 
 # --- byte-class predicates ---
 
-define slx_is_space(byte: int) -> truth:
-    byte == 32 or byte == 9 or byte == 13
+define slx_is_space(byte: number) -> truth:
+    byte is 32 or byte is 9 or byte is 13
 
-define slx_is_newline(byte: int) -> truth:
-    byte == 10
+define slx_is_newline(byte: number) -> truth:
+    byte is 10
 
-define slx_is_digit(byte: int) -> truth:
+define slx_is_digit(byte: number) -> truth:
     byte >= 48 and byte <= 57
 
-define slx_is_lower(byte: int) -> truth:
+define slx_is_lower(byte: number) -> truth:
     byte >= 97 and byte <= 122
 
-define slx_is_upper(byte: int) -> truth:
+define slx_is_upper(byte: number) -> truth:
     byte >= 65 and byte <= 90
 
-define slx_is_ident_start(byte: int) -> truth:
-    slx_is_lower(byte) or slx_is_upper(byte) or byte == 95
+define slx_is_ident_start(byte: number) -> truth:
+    slx_is_lower(byte) or slx_is_upper(byte) or byte is 95
 
-define slx_is_ident_continue(byte: int) -> truth:
+define slx_is_ident_continue(byte: number) -> truth:
     slx_is_ident_start(byte) or slx_is_digit(byte)
 
 # --- token construction ---
 
-define slx_make_token(kind: text, value: text, line: int, col: int) -> table:
+define slx_make_token(kind: text, value: text, line: number, col: number) -> table:
     # No return type - Orion typeck treats Map as Unknown when the
     # annotation is omitted, which is what we want for token records.
     {"kind": kind, "value": value, "line": line, "col": col}
@@ -56,7 +56,7 @@ define slx_make_token(kind: text, value: text, line: int, col: int) -> table:
 # --- scanners ---
 # Each scanner returns a Map: {"token": <token Map>, "next": <next byte index>}.
 
-define slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+define slx_scan_ident(bytes: [number], start: number, byte_count: number, line: number, col: number) -> table:
     edit cursor = start
     loop:
         if cursor >= byte_count:
@@ -82,7 +82,7 @@ define slx_scan_ident(bytes: [int], start: int, byte_count: int, line: int, col:
     # reserved-but-unimplemented word gets its behaviour pinned.
     {"token": slx_make_token("ident", text_value, line, col), "next": cursor}
 
-define slx_hex_digit(c: int) -> int:
+define slx_hex_digit(c: number) -> number:
     if c >= 48 and c <= 57:
         c - 48
     else:
@@ -95,27 +95,27 @@ define slx_hex_digit(c: int) -> int:
                 0 - 1
 
 # `0x1F`, `0b1010`, `0o17` - a leading 0 plus a base marker. Returns the token
-# and the new cursor, or next == start when this is not a based literal.
+# and the new cursor, or next is start when this is not a based literal.
 #
 # These did not lex at all: `0x81` came out as the number 0 followed by an
 # identifier `x81`, so a mask like `& 0xFF` was a syntax error two tokens later.
 # Real in-tree code uses them (atlas_ws builds WebSocket frame headers), and the
 # editor grammar highlighted them, which made the gap look like a bug in the
 # file rather than in the lexer.
-define slx_scan_based(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+define slx_scan_based(bytes: [number], start: number, byte_count: number, line: number, col: number) -> table:
     if start + 2 >= byte_count:
         return {"token": slx_make_token("int", "0", line, col), "next": start}
-    if byte_at(bytes, start) != 48:
+    if byte_at(bytes, start) is not 48:
         return {"token": slx_make_token("int", "0", line, col), "next": start}
     marker = byte_at(bytes, start + 1)
     edit base = 0
-    if marker == 120 or marker == 88:
+    if marker is 120 or marker is 88:
         base = 16
-    if marker == 98 or marker == 66:
+    if marker is 98 or marker is 66:
         base = 2
-    if marker == 111 or marker == 79:
+    if marker is 111 or marker is 79:
         base = 8
-    if base == 0:
+    if base is 0:
         return {"token": slx_make_token("int", "0", line, col), "next": start}
     edit cursor = start + 2
     edit value = 0
@@ -124,7 +124,7 @@ define slx_scan_based(bytes: [int], start: int, byte_count: int, line: int, col:
         if cursor >= byte_count:
             break
         c = byte_at(bytes, cursor)
-        if c == 95:
+        if c is 95:
             cursor = cursor + 1
             continue
         d = slx_hex_digit(c)
@@ -133,13 +133,13 @@ define slx_scan_based(bytes: [int], start: int, byte_count: int, line: int, col:
         value = value * base + d
         digits = digits + 1
         cursor = cursor + 1
-    if digits == 0:
+    if digits is 0:
         return {"token": slx_make_token("int", "0", line, col), "next": start}
     # Emitted as a decimal int token: the parser and every later stage only ever
     # see the VALUE, so no base survives past here.
     {"token": slx_make_token("int", "{value}", line, col), "next": cursor}
 
-define slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+define slx_scan_number(bytes: [number], start: number, byte_count: number, line: number, col: number) -> table:
     based = slx_scan_based(bytes, start, byte_count, line, col)
     if get_int(based, "next") > start:
         return based
@@ -154,7 +154,7 @@ define slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col
         else:
             # A single `.` followed by a digit is a decimal point - anything
             # else terminates the number.
-            is_dot_then_digit = current == 46 and (not saw_dot) and cursor + 1 < byte_count and slx_is_digit(byte_at(bytes, cursor + 1))
+            is_dot_then_digit = current is 46 and (not saw_dot) and cursor + 1 < byte_count and slx_is_digit(byte_at(bytes, cursor + 1))
             if is_dot_then_digit:
                 saw_dot = true
                 cursor += 1
@@ -166,22 +166,22 @@ define slx_scan_number(bytes: [int], start: int, byte_count: int, line: int, col
 
 # Single-byte escape lookup - returns the resolved byte, or -1 to mean
 # "preserve the backslash and the next byte unchanged" (used for \{ and \}).
-define slx_resolve_escape(escape_char: int) -> int:
+define slx_resolve_escape(escape_char: number) -> number:
     edit result = 0 - 1
-    if escape_char == 34: result = 34
-    if escape_char == 92: result = 92
-    if escape_char == 110: result = 10
-    if escape_char == 114: result = 13
-    if escape_char == 116: result = 9
-    if escape_char == 48: result = 0
-    if escape_char == 39: result = 39
+    if escape_char is 34: result = 34
+    if escape_char is 92: result = 92
+    if escape_char is 110: result = 10
+    if escape_char is 114: result = 13
+    if escape_char is 116: result = 9
+    if escape_char is 48: result = 0
+    if escape_char is 39: result = 39
     result
 
 # Decimal text for a small non-negative int (byte values 0-255). Used to
 # emit a char literal as an ordinary int token - the parser then treats
 # `'+'` exactly like `43`, so no new AST node or type is needed.
-define slx_int_to_text(n: int) -> text:
-    if n == 0:
+define slx_int_to_text(n: number) -> text:
+    if n is 0:
         return "0"
     edit digits = bytes_zeros(0)
     edit v = n
@@ -195,31 +195,31 @@ define slx_int_to_text(n: int) -> text:
     loop:
         if i < 0:
             break
-        out = append(out, at(digits, i))
+        out = append(out, digits[i])
         i = i - 1
     text_of(out)
 
 # A character literal `'c'` (or an escape like `'\n'`) lexes to an int token
-# holding the byte value. Readable notation for a byte - `match b: '+' -> …`
+# holding the byte value. Readable notation for a byte - `choose b: '+' -> …`
 # instead of the magic number `43`.
-define slx_scan_char(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+define slx_scan_char(bytes: [number], start: number, byte_count: number, line: number, col: number) -> table:
     edit cursor = start + 1
     edit value = 0
     edit ok = false
     if cursor < byte_count:
         c = byte_at(bytes, cursor)
-        if c == 92 and cursor + 1 < byte_count:
+        if c is 92 and cursor + 1 < byte_count:
             resolved = slx_resolve_escape(byte_at(bytes, cursor + 1))
             if resolved >= 0:
                 value = resolved
                 cursor += 2
                 ok = true
         else:
-            if c != 39:
+            if c is not 39:
                 value = c
                 cursor += 1
                 ok = true
-    if ok and cursor < byte_count and byte_at(bytes, cursor) == 39:
+    if ok and cursor < byte_count and byte_at(bytes, cursor) is 39:
         cursor += 1
         {"token": slx_make_token("int", slx_int_to_text(value), line, col), "next": cursor}
     else:
@@ -227,7 +227,7 @@ define slx_scan_char(bytes: [int], start: int, byte_count: int, line: int, col: 
         # loop can't hang; emit nothing usable - a later parse error follows.
         {"token": slx_make_token("newline", "\n", line, col), "next": start + 1}
 
-define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col: int) -> table:
+define slx_scan_string(bytes: [number], start: number, byte_count: number, line: number, col: number) -> table:
     # Consume the opening quote, walk until the closing one. Returns
     # next=start when the string is unterminated - caller turns that into
     # a lex error.
@@ -242,15 +242,15 @@ define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col
         if cursor >= byte_count:
             break
         current = byte_at(bytes, cursor)
-        is_close_quote = current == 34 and brace_depth == 0
+        is_close_quote = current is 34 and brace_depth is 0
         if is_close_quote:
             closed = true
             cursor += 1
             break
-        if current == 10:
+        if current is 10:
             # Unterminated - bail out of the loop, leave `closed = false`.
             break
-        if current == 92 and cursor + 1 < byte_count:
+        if current is 92 and cursor + 1 < byte_count:
             next_byte = byte_at(bytes, cursor + 1)
             resolved = slx_resolve_escape(next_byte)
             if resolved >= 0:
@@ -265,9 +265,9 @@ define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col
         else:
             # Track interpolation depth on unescaped braces (escaped `\{` is
             # handled above and never reaches here).
-            if current == 123:
+            if current is 123:
                 brace_depth = brace_depth + 1
-            if current == 125 and brace_depth > 0:
+            if current is 125 and brace_depth > 0:
                 brace_depth = brace_depth - 1
             buffer = append(buffer, current)
             cursor += 1
@@ -284,7 +284,7 @@ define slx_scan_string(bytes: [int], start: int, byte_count: int, line: int, col
 
 # Returns the operator text + how many bytes to consume. Returns "" for
 # unrecognized characters so the main loop can produce a useful error.
-define slx_scan_op(bytes: [int], start: int, byte_count: int) -> text:
+define slx_scan_op(bytes: [number], start: number, byte_count: number) -> text:
     first = byte_at(bytes, start)
     edit second = 0
     if start + 1 < byte_count:
@@ -294,113 +294,113 @@ define slx_scan_op(bytes: [int], start: int, byte_count: int) -> text:
         third = byte_at(bytes, start + 2)
     # Three-char tokens first so `..=` doesn't get scanned as `..` then `=`.
     edit op = ""
-    if first == 46 and second == 46 and third == 60:
+    if first is 46 and second is 46 and third is 60:
         op = "..<"
-    if first == 46 and second == 46 and third == 61:
+    if first is 46 and second is 46 and third is 61:
         op = "..="
-    if op == "":
+    if op is "":
         op = slx_scan_op_short(first, second)
     op
 
-define slx_scan_op_short(first: int, second: int) -> text:
+define slx_scan_op_short(first: number, second: number) -> text:
     # Two-char tokens - flat sequential checks, then fall through to single.
     # (Deep nested if/else-as-expression chains trigger the native compiler's
     # nesting bug - see [[orion_nesting_bug]].)
     edit result = ""
-    if first == 61 and second == 61:
+    if first is 61 and second is 61:
         result = "=="
-    if first == 33 and second == 61:
+    if first is 33 and second is 61:
         result = "!="
-    if first == 60 and second == 61:
+    if first is 60 and second is 61:
         result = "<="
-    if first == 62 and second == 61:
+    if first is 62 and second is 61:
         result = ">="
-    if first == 45 and second == 62:
+    if first is 45 and second is 62:
         result = "->"
-    if first == 43 and second == 61:
+    if first is 43 and second is 61:
         result = "+="
-    if first == 45 and second == 61:
+    if first is 45 and second is 61:
         result = "-="
-    if first == 42 and second == 61:
+    if first is 42 and second is 61:
         result = "*="
-    if first == 47 and second == 47:
+    if first is 47 and second is 47:
         result = "//"
-    if first == 47 and second == 61:
+    if first is 47 and second is 61:
         result = "/="
     # Bit shifts. `syntax.md` listed `<<` and `>>` among the operators, and the
     # other four (`&` `|` `^` `~`) really did work - these two never lexed at
     # all, so `plen >> 8` came out as `>` `>` and died as "not valid here". Real
     # code hit it: atlas_ws builds WebSocket frame headers with shifts.
-    if first == 60 and second == 60:
+    if first is 60 and second is 60:
         result = "<<"
-    if first == 62 and second == 62:
+    if first is 62 and second is 62:
         result = ">>"
-    if result == "":
+    if result is "":
         result = slx_scan_op_single(first)
     result
 
-define slx_scan_op_single(first: int) -> text:
+define slx_scan_op_single(first: number) -> text:
     # Single-char punctuation/operators. Direct table lookup with literal
     # results - avoids native compiler issues with push-to-bytes-zeros.
     edit result_text = ""
-    if first == 43:
+    if first is 43:
         result_text = "+"
-    if first == 45:
+    if first is 45:
         result_text = "-"
-    if first == 42:
+    if first is 42:
         result_text = "*"
-    if first == 47:
+    if first is 47:
         result_text = "/"
-    if first == 61:
+    if first is 61:
         result_text = "="
-    if first == 60:
+    if first is 60:
         result_text = "<"
-    if first == 62:
+    if first is 62:
         result_text = ">"
-    if first == 33:
+    if first is 33:
         result_text = "!"
-    if first == 40:
+    if first is 40:
         result_text = "("
-    if first == 41:
+    if first is 41:
         result_text = ")"
-    if first == 44:
+    if first is 44:
         result_text = ","
-    if first == 58:
+    if first is 58:
         result_text = ":"
-    if first == 59:
+    if first is 59:
         result_text = ";"
-    if first == 46:
+    if first is 46:
         result_text = "."
-    if first == 91:
+    if first is 91:
         result_text = "["
-    if first == 93:
+    if first is 93:
         result_text = "]"
-    if first == 123:
+    if first is 123:
         result_text = "\{"
-    if first == 125:
+    if first is 125:
         result_text = "\}"
-    if first == 63:
+    if first is 63:
         result_text = "?"
-    if first == 64:
+    if first is 64:
         result_text = "@"
-    if first == 38:
+    if first is 38:
         result_text = "&"
-    if first == 124:
+    if first is 124:
         result_text = "|"
-    if first == 94:
+    if first is 94:
         result_text = "^"
-    if first == 37:
+    if first is 37:
         result_text = "%"
     # `~` (126) was missing from this table entirely, so it lexed as nothing and
     # `~x` came through as a bare `x`: the operator vanished before the parser
     # ever saw it, and `~12` answered 12.
-    if first == 126:
+    if first is 126:
         result_text = "~"
     result_text
 
 # --- comment skip ---
 
-define slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
+define slx_skip_comment(bytes: [number], start: number, byte_count: number) -> number:
     edit cursor = start
     loop:
         if cursor >= byte_count:
@@ -423,8 +423,8 @@ define slx_skip_comment(bytes: [int], start: int, byte_count: int) -> int:
 # token list back just to peek at its last element.
 define slx_push_token(tokens_in: [table], token: table) -> [table]:
     last_kind = slot_get("slx:last_kind")
-    is_newline = get(token, "kind") == "newline"
-    last_was_newline = last_kind == "newline" or last_kind == ""
+    is_newline = get(token, "kind") is "newline"
+    last_was_newline = last_kind is "newline" or last_kind is ""
     suppress = is_newline and last_was_newline
     edit tokens = tokens_in
     if not suppress:
@@ -452,9 +452,9 @@ public define self_lex(source: text) -> [table]:
         col = cursor - line_start
         is_nl = slx_is_newline(current)
         is_ws = slx_is_space(current)
-        is_comment = current == 35
-        is_string = current == 34
-        is_char = current == 39
+        is_comment = current is 35
+        is_string = current is 34
+        is_char = current is 39
         is_digit = slx_is_digit(current)
         is_ident = slx_is_ident_start(current)
         if is_nl:
@@ -485,7 +485,7 @@ public define self_lex(source: text) -> [table]:
         is_unknown = not (is_nl or is_ws or is_comment or is_string or is_char or is_digit or is_ident)
         if is_unknown:
             op_text = slx_scan_op(bytes, cursor, byte_count)
-            if op_text == "":
+            if op_text is "":
                 cursor += 1
             else:
                 op_length = bytes_count(bytes_of(op_text))
@@ -496,11 +496,11 @@ public define self_lex(source: text) -> [table]:
     tokens = append(tokens, eof_token)
     tokens
 
-fn main() -> int:
+fn main() -> number:
     src = "42 + 0"
     toks = self_lex(src)
-    first = at(toks, 0)
+    first = toks[0]
     # `42` `+` `0` plus the newline/eof the lexer appends. Assert the shape that
     # matters (an int token first, at least the three real ones), not a count.
-    ok = if len(toks) >= 3 and get(first, "value") == "42" and get(first, "kind") == "int" then 1 else 0
+    ok = if length(toks) >= 3 and get(first, "value") is "42" and get(first, "kind") is "int" then 1 else 0
     ok * 42

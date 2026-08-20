@@ -4,7 +4,7 @@
 # pi stays reachable in the same body: only the shadowed NAME is excluded.
 use num
 
-define main() -> int:
+define main() -> number:
     edit e = 0
     loop:
         if e >= 40:

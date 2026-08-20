@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 extern long long sw_og_init(long long hwnd, long long w, long long h);
-extern void      sw_og_begin(long long r, long long g, long long b);
+extern void      sw_og_begin(long long t, long long r, long long g, long long b);
 extern void      sw_og_rect(long long x, long long y, long long w, long long h,
                             long long r, long long g, long long b);
 extern void      sw_og_rect_a(long long x, long long y, long long w, long long h,
@@ -21,7 +21,7 @@ extern void      sw_og_vgrad(long long x, long long y, long long w, long long h,
                             long long r1, long long g1, long long b1);
 extern long long sw_og_present(void);
 extern long long sw_og_vsync(long long on);
-extern long long sw_og_resize(long long w, long long h);
+extern long long sw_og_resize(long long t, long long w, long long h);
 extern void      sw_og_shutdown(void);
 extern long long sw_og_snapshot(const char *path);
 
@@ -29,8 +29,8 @@ extern long long sw_og_snapshot(const char *path);
 WEAK long long dx_og_init(long long hwnd, long long w, long long h) {
     (void)hwnd; (void)w; (void)h; return 0;
 }
-WEAK void      dx_og_begin(long long r, long long g, long long b) {
-    (void)r; (void)g; (void)b;
+WEAK void      dx_og_begin(long long t, long long r, long long g, long long b) {
+    (void)t; (void)r; (void)g; (void)b;
 }
 WEAK void      dx_og_rect(long long x, long long y, long long w, long long h,
                           long long r, long long g, long long b) {
@@ -47,8 +47,8 @@ WEAK void      dx_og_vgrad(long long x, long long y, long long w, long long h,
 }
 WEAK long long dx_og_present(void) { return 0; }
 WEAK long long dx_og_vsync(long long on) { (void)on; return 0; }
-WEAK long long dx_og_resize(long long w, long long h) {
-    (void)w; (void)h; return 0;
+WEAK long long dx_og_resize(long long t, long long w, long long h) {
+    (void)t; (void)w; (void)h; return 0;
 }
 WEAK void      dx_og_shutdown(void) {}
 WEAK long long dx_og_texture(const char *path) { (void)path; return -1; }
@@ -59,10 +59,41 @@ WEAK void      dx_og_sprite(long long id, long long dx, long long dy,
     (void)id; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy;
     (void)sw; (void)sh; (void)tint; (void)blend;
 }
-WEAK void      dx_og_clip(long long x, long long y, long long w, long long h) {
-    (void)x; (void)y; (void)w; (void)h;
+WEAK void      dx_og_clip(long long x, long long y, long long w, long long h,
+                          long long radius) {
+    (void)x; (void)y; (void)w; (void)h; (void)radius;
 }
 WEAK void      dx_og_clip_none(void) {}
+WEAK long long dx_og_round_rect(long long x, long long y, long long w,
+                                long long h, long long r, long long g,
+                                long long b, long long a, long long radius,
+                                long long soft) {
+    (void)x; (void)y; (void)w; (void)h; (void)r; (void)g; (void)b;
+    (void)a; (void)radius; (void)soft; return 0;
+}
+WEAK long long dx_og_arc(long long cx, long long cy, long long outer,
+                         long long inner, long long from_deg, long long to_deg,
+                         long long r, long long g, long long b, long long a,
+                         long long soft) {
+    (void)cx; (void)cy; (void)outer; (void)inner; (void)from_deg;
+    (void)to_deg; (void)r; (void)g; (void)b; (void)a; (void)soft; return 0;
+}
+WEAK long long dx_og_round_rect4(long long x, long long y, long long w,
+                                 long long h, long long r, long long g,
+                                 long long b, long long a, long long tl,
+                                 long long tr, long long br, long long bl,
+                                 long long soft) {
+    (void)x; (void)y; (void)w; (void)h; (void)r; (void)g; (void)b; (void)a;
+    (void)tl; (void)tr; (void)br; (void)bl; (void)soft; return 0;
+}
+WEAK long long dx_og_tri(long long x0, long long y0, long long x1,
+                         long long y1, long long x2, long long y2,
+                         long long r, long long g, long long b, long long a) {
+    (void)x0; (void)y0; (void)x1; (void)y1; (void)x2; (void)y2;
+    (void)r; (void)g; (void)b; (void)a; return 0;
+}
+WEAK long long dx_og_tex_w(long long id) { (void)id; return 0; }
+WEAK long long dx_og_tex_h(long long id) { (void)id; return 0; }
 WEAK long long dx_og_glyph_id(long long key) { (void)key; return -1; }
 WEAK long long dx_og_texture_mem(long long key, long long w, long long h,
                                  const long long *rgba) {
@@ -75,25 +106,33 @@ static int g_want_vsync = 0;
 
 long long ogpu_pref(long long pref) { g_pref = (int)pref; return g_pref; }
 
+/* Returns a TARGET HANDLE (1-based; 0 = failed), which the caller hands
+ * back to og_begin and og_resize. One process can drive several windows;
+ * which backend is in play is decided once, by the first one. */
 long long og_init(long long hwnd, long long w, long long h) {
-    g_mode = 0;
-    if (g_pref != 1 && dx_og_init(hwnd, w, h)) {
-        g_mode = 2;
-        dx_og_vsync(g_want_vsync);
-        return 1;
+    if (g_mode == 0) {
+        long long t;
+        if (g_pref != 1 && (t = dx_og_init(hwnd, w, h))) {
+            g_mode = 2;
+            dx_og_vsync(g_want_vsync);
+            return t;
+        }
+        if (g_pref == 2)
+            fprintf(stderr, "[gpu] d3d12 unavailable - software fallback\n");
+        if ((t = sw_og_init(hwnd, w, h))) {
+            g_mode = 1;
+            return t;
+        }
+        return 0;
     }
-    if (g_pref == 2)
-        fprintf(stderr, "[gpu] d3d12 unavailable - software fallback\n");
-    if (sw_og_init(hwnd, w, h)) {
-        g_mode = 1;
-        return 1;
-    }
-    return 0;
+    /* A later window joins whichever backend the first one settled on. */
+    if (g_mode == 2) return dx_og_init(hwnd, w, h);
+    return sw_og_init(hwnd, w, h);
 }
 
-void og_begin(long long r, long long g, long long b) {
-    if (g_mode == 2) dx_og_begin(r, g, b);
-    else if (g_mode == 1) sw_og_begin(r, g, b);
+void og_begin(long long target, long long r, long long g, long long b) {
+    if (g_mode == 2) dx_og_begin(target, r, g, b);
+    else if (g_mode == 1) sw_og_begin(target, r, g, b);
 }
 
 void og_rect(long long x, long long y, long long w, long long h,
@@ -141,12 +180,54 @@ void og_sprite(long long id, long long dx, long long dy, long long dw,
                long long sh, long long tint, long long blend) {
     if (g_mode == 2) dx_og_sprite(id, dx, dy, dw, dh, sx, sy, sw, sh, tint, blend);
 }
-void og_clip(long long x, long long y, long long w, long long h) {
-    if (g_mode == 2) dx_og_clip(x, y, w, h);
+void og_clip(long long x, long long y, long long w, long long h,
+             long long radius) {
+    if (g_mode == 2) dx_og_clip(x, y, w, h, radius);
 }
 void og_clip_none(void) {
     if (g_mode == 2) dx_og_clip_none();
 }
+
+/* A rounded rect shaded by a distance function. Returns 0 when the backend
+ * cannot do it (software, or the pipeline failed to build), and the caller
+ * falls back to filling spans - which works, but steps at every corner. */
+long long og_round_rect(long long x, long long y, long long w, long long h,
+                        long long r, long long g, long long b, long long a,
+                        long long radius, long long soft) {
+    if (g_mode == 2)
+        return dx_og_round_rect(x, y, w, h, r, g, b, a, radius, soft);
+    return 0;
+}
+/* A ring or a slice of one. 0 when the backend cannot shade it, and the
+ * caller falls back to whatever it can draw out of rectangles. */
+long long og_arc(long long cx, long long cy, long long outer, long long inner,
+                 long long from_deg, long long to_deg, long long r,
+                 long long g, long long b, long long a, long long soft) {
+    if (g_mode == 2)
+        return dx_og_arc(cx, cy, outer, inner, from_deg, to_deg, r, g, b, a, soft);
+    return 0;
+}
+/* A rounded rect with a radius per corner. A tab is round on top and
+ * square on the bottom; one radius for all four cannot say that. */
+long long og_round_rect4(long long x, long long y, long long w, long long h,
+                         long long r, long long g, long long b, long long a,
+                         long long tl, long long tr, long long br,
+                         long long bl, long long soft) {
+    if (g_mode == 2)
+        return dx_og_round_rect4(x, y, w, h, r, g, b, a, tl, tr, br, bl, soft);
+    return 0;
+}
+/* How big a loaded texture is, which nine-slice has to know. */
+/* One triangle. Three points is all a polygon, a chart or a gauge needle
+ * is made of. */
+long long og_tri(long long x0, long long y0, long long x1, long long y1,
+                 long long x2, long long y2, long long r, long long g,
+                 long long b, long long a) {
+    if (g_mode == 2) return dx_og_tri(x0, y0, x1, y1, x2, y2, r, g, b, a);
+    return 0;
+}
+long long og_tex_w(long long id) { return g_mode == 2 ? dx_og_tex_w(id) : 0; }
+long long og_tex_h(long long id) { return g_mode == 2 ? dx_og_tex_h(id) : 0; }
 long long og_glyph_id(long long key) {
     if (g_mode == 2) return dx_og_glyph_id(key);
     return -1;
@@ -157,9 +238,9 @@ long long og_texture_mem(long long key, long long w, long long h,
     return -1;
 }
 
-long long og_resize(long long w, long long h) {
-    if (g_mode == 2) return dx_og_resize(w, h);
-    if (g_mode == 1) return sw_og_resize(w, h);
+long long og_resize(long long target, long long w, long long h) {
+    if (g_mode == 2) return dx_og_resize(target, w, h);
+    if (g_mode == 1) return sw_og_resize(target, w, h);
     return 0;
 }
 

@@ -1,16 +1,16 @@
 # `loop` in expression position collects into a list. Covers the yield forms:
-# one-liner (trailing expr is yielded), indented body with explicit `yield`,
-# `if cond: yield` as the filter (the old `where` is gone), multiple yields per
-# iteration, a leading `yield` on a one-liner, and a NESTED collecting loop
+# one-liner (trailing expr is yielded), indented body with explicit `collect`,
+# `if cond: collect` as the filter (the old `where` is gone), multiple yields per
+# iteration, a leading `collect` on a one-liner, and a NESTED collecting loop
 # (each loop's own `__yield` accumulator, so the inner map does not leak out).
 
-define sum(xs: [int]) -> int:
+define sum(xs: [number]) -> number:
     edit s = 0
     loop v in xs:
         s = s + v
     s
 
-define main() -> int:
+define main() -> number:
     xs = [1, 2, 3, 4]
     doubled = loop x in xs: x * 2                 # [2, 4, 6, 8]      -> 20
     big = loop x in xs:

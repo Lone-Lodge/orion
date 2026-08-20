@@ -10,9 +10,9 @@
 # does, `atlas/orbs/atlas_ws` (a WebSocket implementation in Orion), cannot
 # compile for an unrelated reason and so was never built.
 #
-# Bitwise binds TIGHTER than comparison here, deliberately: `flags & MASK == 0`
+# Bitwise binds TIGHTER than comparison here, deliberately: `flags & MASK is 0`
 # reads the way it looks. C binds it the other way and that is a famous trap.
-define main() -> int:
+define main() -> number:
     a = 12                      # 1100
     b = 10                      # 1010
     and_ = a & b                # 1000 = 8
@@ -33,17 +33,17 @@ define main() -> int:
     hi = (plen >> 8) & 0xFF     # 1
     lo = plen & 0xFF            # 44
 
-    # Tighter than comparison: this is (a & 4) == 4, not a & (4 == 4).
-    masked = if a & 4 == 4 then 1 else 0
+    # Tighter than comparison: this is (a & 4) is 4, not a & (4 is 4).
+    masked = if a & 4 is 4 then 1 else 0
 
     print_line("bits {and_} {or_} {xor_} shifts {shifted_up} {shifted_down} {signed_shr}")
     print_line("literals {hex_} {bin_} {oct_} {underscored} frame {hi} {lo} masked {masked}")
 
-    ok_bits = if and_ == 8 and or_ == 14 and xor_ == 6 then 1 else 0
-    ok_shift = if shifted_up == 256 and shifted_down == 16 and signed_shr == 0 - 4 then 1 else 0
-    ok_lit = if hex_ == 255 and bin_ == 10 and oct_ == 15 and underscored == 65535 then 1 else 0
-    ok_frame = if hi == 1 and lo == 44 and masked == 1 then 1 else 0
+    ok_bits = if and_ is 8 and or_ is 14 and xor_ is 6 then 1 else 0
+    ok_shift = if shifted_up is 256 and shifted_down is 16 and signed_shr is 0 - 4 then 1 else 0
+    ok_lit = if hex_ is 255 and bin_ is 10 and oct_ is 15 and underscored is 65535 then 1 else 0
+    ok_frame = if hi is 1 and lo is 44 and masked is 1 then 1 else 0
     # `~x` is `x ^ -1`. It was missing from the LEXER's single-char table, so
     # the operator vanished before the parser saw it and `~12` answered 12.
-    ok_not = if ~12 == 0 - 13 and ~0 == 0 - 1 then 1 else 0
+    ok_not = if ~12 is 0 - 13 and ~0 is 0 - 1 then 1 else 0
     ok_bits * 7 + ok_shift * 7 + ok_lit * 7 + ok_frame * 6 + ok_not * 1   # 28

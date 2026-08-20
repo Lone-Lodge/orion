@@ -6,29 +6,29 @@
 
 # ---- Building blocks (named fns) ------------------------------------
 
-define double(x: int) -> int:
+define double(x: number) -> number:
     x * 2
 
-define inc(x: int) -> int:
+define inc(x: number) -> number:
     x + 1
 
-define add(a: int, b: int) -> int:
+define add(a: number, b: number) -> number:
     a + b
 
 # ---- Higher-order helpers ------------------------------------------
 
-define apply(f: function, x: int) -> int:
+define apply(f: function, x: number) -> number:
     f(x)
 
-define compose_call(g: function, h: function, x: int) -> int:
+define compose_call(g: function, h: function, x: number) -> number:
     g(h(x))   # g(h(x))
 
-define twice(f: function, x: int) -> int:
+define twice(f: function, x: number) -> number:
     f(f(x))
 
 # ---- Main - uses fns as first-class values --------------------------
 
-define main() -> int:
+define main() -> number:
     # First-class fn binding
     op = inc
 

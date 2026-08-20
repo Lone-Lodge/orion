@@ -1,5 +1,5 @@
 # expect: `total` cannot change (bound stable)
-define main() -> int:
+define main() -> number:
     total = 40
     total = total + 2
     total

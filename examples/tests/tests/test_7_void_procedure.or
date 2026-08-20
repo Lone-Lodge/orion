@@ -1,9 +1,9 @@
 # A fn with no `-> type` is a void procedure (Unit return), called for its
 # effect. Its body's tail expression may be any type - here `text` - without
 # tripping the return-type check, which only guards an EXPLICIT `-> type`.
-define describe(n: int):
+define describe(n: number):
     label = "n = {n}"
     print_line(label)
-define main() -> int:
+define main() -> number:
     describe(7)
     7

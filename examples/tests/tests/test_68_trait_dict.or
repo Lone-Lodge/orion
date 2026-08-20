@@ -2,27 +2,27 @@
 # instance is a struct value you pass by hand, and `o.method(args)` calls the
 # fn-typed field (not a UFCS global). No implicit resolution: you can see which
 # dictionary is passed. Here two Ord instances drive one `minimum`.
-type Ord: lt: function(int, int) -> int, eq: function(int, int) -> int
+type Ord: lt: function(number, number) -> number, eq: function(number, number) -> number
 
-define int_lt(a: int, b: int) -> int:
+define int_lt(a: number, b: number) -> number:
     if a < b then 1 else 0
-define int_eq(a: int, b: int) -> int:
-    if a == b then 1 else 0
-define desc_lt(a: int, b: int) -> int:
+define int_eq(a: number, b: number) -> number:
+    if a is b then 1 else 0
+define desc_lt(a: number, b: number) -> number:
     if a > b then 1 else 0
 
-define minimum(o: Ord, xs: [int]) -> int:
-    edit best = at(xs, 0)
-    loop i in 1..<length(xs):
-        if o.lt(at(xs, i), best) == 1:
-            best = at(xs, i)
+define minimum(o: Ord, xs: [number]) -> number:
+    edit best = xs[0]
+    loop i in 1 until length(xs):
+        if o.lt(xs[i], best) is 1:
+            best = xs[i]
     best
 
-define main() -> int:
+define main() -> number:
     asc = Ord{lt: int_lt, eq: int_eq}
     desc = Ord{lt: desc_lt, eq: int_eq}
     xs = [30, 10, 50, 20]
-    ok_min = if minimum(asc, xs) == 10 then 1 else 0
-    ok_max = if minimum(desc, xs) == 50 then 1 else 0     # min by desc-lt = the largest
-    ok_eq = if asc.eq(7, 7) == 1 and asc.eq(7, 8) == 0 then 1 else 0
+    ok_min = if minimum(asc, xs) is 10 then 1 else 0
+    ok_max = if minimum(desc, xs) is 50 then 1 else 0     # min by desc-lt = the largest
+    ok_eq = if asc.eq(7, 7) is 1 and asc.eq(7, 8) is 0 then 1 else 0
     ok_min * 23 + ok_max * 23 + ok_eq * 22                # 68

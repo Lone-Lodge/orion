@@ -1,6 +1,6 @@
 type Color: Red, Green, Blue
 
-define main() -> int:
+define main() -> number:
     a = Color.Red
     b = Color.Green
     c = Color.Blue

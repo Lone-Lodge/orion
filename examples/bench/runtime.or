@@ -8,7 +8,7 @@
 # Every case is sized to run ~100ms so a 1ms scheduling hiccup is noise, and
 # every loop feeds a guard value the exit code depends on, so no case can be
 # optimized away as dead.
-define main() -> int:
+define main() -> number:
     words = ["alpha", "beta", "gamma", "delta", "epsilon"]
     small = {"alpha": 1, "beta": 2, "gamma": 3, "delta": 4, "epsilon": 5}
     a = "alpha"
@@ -20,8 +20,8 @@ define main() -> int:
     map_reps = 10000000
     t0 = monotonic_ms()
     edit m_acc = 0
-    loop i in 0..<map_reps:
-        k = at(words, i % 5)
+    loop i in 0 until map_reps:
+        k = words[i % 5]
         m_acc = m_acc + small[k]
     t1 = monotonic_ms()
 
@@ -30,16 +30,16 @@ define main() -> int:
     list_reps = 10000000
     t2 = monotonic_ms()
     edit l_acc = 0
-    loop i in 0..<list_reps:
+    loop i in 0 until list_reps:
         set(buf, i % 8, i)
-        l_acc = l_acc + at(buf, i % 8)
+        l_acc = l_acc + buf[i % 8]
     t3 = monotonic_ms()
 
     # --- append into a growing list (promoted in place) ---
     push_reps = 2000000
     t4 = monotonic_ms()
     edit xs = [0]
-    loop i in 0..<push_reps:
+    loop i in 0 until push_reps:
         xs = append(xs, i)
     t5 = monotonic_ms()
 
@@ -47,7 +47,7 @@ define main() -> int:
     itt_reps = 2500000
     t6 = monotonic_ms()
     edit i_acc = 0
-    loop i in 0..<itt_reps:
+    loop i in 0 until itt_reps:
         i_acc = i_acc + length(to_text(i))
     t7 = monotonic_ms()
 
@@ -55,15 +55,15 @@ define main() -> int:
     cat_reps = 2500000
     t8 = monotonic_ms()
     edit c_acc = 0
-    loop i in 0..<cat_reps:
-        c_acc = c_acc + length(at(words, i % 5) + "-x")
+    loop i in 0 until cat_reps:
+        c_acc = c_acc + length(words[i % 5] + "-x")
     t9 = monotonic_ms()
 
     # --- interpolation, the shape the compiler's own emitter writes ---
     interp_reps = 750000
     t10 = monotonic_ms()
     edit s_acc = 0
-    loop i in 0..<interp_reps:
+    loop i in 0 until interp_reps:
         line = "  {a} = call i64 @orion_x(ptr {b}, i64 {c}, i64 {d})"
         s_acc = s_acc + length(line)
     t11 = monotonic_ms()
@@ -81,4 +81,4 @@ define main() -> int:
     print_line("BENCH concat {cat_ms} {cat_reps}")
     print_line("BENCH interp {interp_ms} {interp_reps}")
     guard = m_acc + l_acc + i_acc + c_acc + s_acc + length(xs)
-    if guard == 0 then 1 else 0
+    if guard is 0 then 1 else 0

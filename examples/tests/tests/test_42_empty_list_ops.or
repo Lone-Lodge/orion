@@ -1,8 +1,8 @@
-define main() -> int:
+define main() -> number:
     edit xs = []
     n_empty = length(xs)
     xs = append(xs, 21)
     xs = append(xs, 21)
     n_full = length(xs)
     # 21 + 21 + 0 + 0 = 42
-    at(xs, 0) + at(xs, 1) + n_empty + (n_full - 2)
+    xs[0] + xs[1] + n_empty + (n_full - 2)

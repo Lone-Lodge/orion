@@ -1,7 +1,7 @@
 # The store orb: state as a database - stable ids, loop-as-query.
 use store
 
-define main() -> int:
+define main() -> number:
     w0 = store_new()
     w1, a = insert(w0, {"hp": 10, "x": 1})
     w2, b = insert(w1, {"hp": 3, "x": 2})

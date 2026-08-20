@@ -4,6 +4,6 @@
 # no-progress guard and spun. A hang is worse than any error message, and
 # nothing in the suite could have caught it: negative_test.sh now runs each case
 # under a timeout so a spin is a failure, not a stuck run.
-define main() -> int:
+define main() -> number:
     s = "{{"
     length(s)

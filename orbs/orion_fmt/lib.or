@@ -20,11 +20,11 @@ define fmt_trim_trailing(line_text: text) -> text:
         if end_index <= 0:
             break
         last_byte = byte_at(bytes, end_index - 1)
-        if last_byte == 32 or last_byte == 9:
+        if last_byte is 32 or last_byte is 9:
             end_index -= 1
         else:
             break
-    if end_index == byte_count:
+    if end_index is byte_count:
         line_text
     else:
         text_of(bytes_part(bytes, 0, end_index))
@@ -36,8 +36,8 @@ public define fmt_normalize(source: text) -> text:
     raw_lines = split(source, "\n")
     line_count = length(raw_lines)
     edit normalized_lines = []
-    loop index in 0..<line_count:
-        raw_line = at(raw_lines, index)
+    loop index in 0 until line_count:
+        raw_line = raw_lines[index]
         without_tabs = fmt_expand_tabs(raw_line)
         stripped = fmt_trim_trailing(without_tabs)
         normalized_lines = append(normalized_lines, stripped)
@@ -45,18 +45,18 @@ public define fmt_normalize(source: text) -> text:
     collapsed = []
     edit output_lines = collapsed
     edit last_was_blank = false
-    loop index in 0..<line_count:
-        current_line = at(normalized_lines, index)
-        is_blank = current_line == ""
+    loop index in 0 until line_count:
+        current_line = normalized_lines[index]
+        is_blank = current_line is ""
         keep = not (is_blank and last_was_blank)
         if keep:
             output_lines = append(output_lines, current_line)
         last_was_blank = is_blank
     # Drop the trailing blank line so join + "\n" produces one final LF.
     final_count = length(output_lines)
-    if final_count > 0 and at(output_lines, final_count - 1) == "":
+    if final_count > 0 and output_lines[final_count - 1] is "":
         edit trimmed = []
-        loop index in 0..<(final_count - 1):
-            trimmed = append(trimmed, at(output_lines, index))
+        loop index in 0 until (final_count - 1):
+            trimmed = append(trimmed, output_lines[index])
         output_lines = trimmed
     join(output_lines, "\n") + "\n"

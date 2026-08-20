@@ -17,7 +17,7 @@ define try_one(url: text, marker: text) -> truth:
     print_line("{url} -> status={r.status} {r.body}")
     false
 
-define main() -> int:
+define main() -> number:
     a = try_one("https://example.com", "Example Domain")
     b = try_one("https://sqlite.org/", "SQLite")
     if a or b:

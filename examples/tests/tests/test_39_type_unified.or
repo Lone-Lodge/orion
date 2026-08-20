@@ -1,23 +1,23 @@
 # `type` is the one type-declaration keyword now: inline fields = product,
 # indented variants = sum, `= T` = alias. And a bare top-level `NAME = expr`
 # is a constant, no keyword. (`data`/`enum`/`const` still work as aliases.)
-type Point: x: int, y: int
+type Point: x: number, y: number
 
 type Shape:
-    Circle(int)
-    Rect(int, int)
+    Circle(number)
+    Rect(number, number)
 
 type Meters = int
 
 BASE = 30
 
-define area(s: Shape) -> int:
+define area(s: Shape) -> number:
     choose s:
-        Circle(r) -> r * r
-        Rect(w, h) -> w * h
+        Circle(r) then r * r
+        Rect(w, h) then w * h
 
-define main() -> int:
+define main() -> number:
     p = Point{x: 2, y: 3}
     edit d: Meters = 5
     a = area(Shape.Rect(4, 3))   # 12
-    a + p.x + BASE - d           # 12 + 2 + 30 - 5 == 39
+    a + p.x + BASE - d           # 12 + 2 + 30 - 5 is 39

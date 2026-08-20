@@ -2,6 +2,6 @@
 define sneaky(msg: text) uses files:
     print_line(msg)
 
-define main() -> int:
+define main() -> number:
     sneaky("hi")
     0

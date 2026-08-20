@@ -1,6 +1,6 @@
 # expect: `get` is a builtin
-define get(path: text, x: int) -> int:
+define get(path: text, x: number) -> number:
     x
 
-define main() -> int:
+define main() -> number:
     get("a", 1)

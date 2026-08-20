@@ -183,7 +183,7 @@ static const char *orion_region_of(uintptr_t a) {
  * non-NULL, is retracted to `need` on a shrink so the mem report shows
  * the recent peak, not a stale session high-water. `streak` NULL opts a
  * region out of shrinking (pools are ring-bounded and never spike). */
-#define SHRINK_PATIENCE 180 /* ~3 s at 60 fps of sustained low use */
+#define SHRINK_PATIENCE 45  /* ~0.75 s at 60 fps of sustained low use */
 static void region_fit(const char *name, unsigned char **base, size_t *cap,
                        size_t *high, size_t need, size_t floor, int *streak) {
     if (!*base) return;
@@ -206,8 +206,20 @@ static void region_fit(const char *name, unsigned char **base, size_t *cap,
         return;
     }
     if (++(*streak) < SHRINK_PATIENCE) return;
+    /* Straight down to what actually fits, not half a step at a time. One
+     * expensive frame - the first, which rasterises a font - used to set
+     * the size for the whole session and then take fifteen seconds of
+     * halving to come back, so an app that needs one megabyte held sixty
+     * four. The recent high-water with room to breathe is the honest
+     * answer, and it is reached in one go. */
     size_t want = *cap / 2;
+    size_t fits = (high && *high > need ? *high : need) * 2;
+    if (fits < want) {
+        want = floor;
+        while (want < fits) want *= 2;
+    }
     if (want < floor) want = floor;
+    if (want >= *cap) return;
     unsigned char *fresh = (unsigned char *)malloc(want);
     if (!fresh) return; /* keep the old buffer; nothing lost */
     orion_note_freed(name, *base, *cap);
@@ -1129,6 +1141,12 @@ const char *orion_f64_literal_hex(const char *s) {
     return buf + 16;
 }
 
+/* to_whole / to_real on a text: parse a leading decimal number (optional
+ * sign, surrounding spaces fine), 0 when none. The compiler routes the
+ * text-typed argument here; numeric arguments never reach these. */
+long long orion_text_to_int(const char *s) { return strtoll(s, NULL, 10); }
+double orion_text_to_f64(const char *s) { return strtod(s, NULL); }
+
 /* Thread-local stack of one jmp_buf - only one perform pending at a time
  * for the MVP. Nested perform/resume requires a real stack here. */
 static jmp_buf *current_k = NULL;
@@ -1295,10 +1313,336 @@ static long long orion_rt_slot(void *p, long long i) {
 static const char *orion_trail_name[ORION_TRAIL_N];
 static long long orion_trail_seq = 0;
 
+/* ORION_TRACE_LOG=path: a traced build also APPENDS every entered define
+ * to that file - the full run as a timeline, not just the last 64. A
+ * debugger UI reads it and lets you walk the execution afterwards.
+ * Buffered; flushed every 256 hops and at breakpoints/traps/exit. */
+static FILE *orion_trace_f = NULL;
+static int orion_trace_f_tried = 0;
+static long long orion_trace_flush_ctr = 0;
+
+static void orion_trace_close(void) { if (orion_trace_f) fflush(orion_trace_f); }
+
+/* ORION_BREAK_AT=fn1,fn2: a traced build breaks at those defines' ENTRY -
+ * source-level breakpoints from a debugger UI, no breakpoint() in code. */
+static const char *orion_break_at = NULL;
+static int orion_break_at_tried = 0;
+static int orion_dbg_n; /* watch-kartan, definierad nedan */
+static long long orion_call_depth; /* definierad nedan */
+long long orion_breakpoint(const char *where);
+
 long long orion_trace_enter(const char *name) {
+    orion_call_depth++;
+    orion_dbg_n = 0; /* ny funktion - watch-kartan börjar om */
     orion_trail_name[(int)(orion_trail_seq % ORION_TRAIL_N)] = name;
     orion_trail_seq++;
+    if (!orion_trace_f_tried) {
+        orion_trace_f_tried = 1;
+        const char *p = getenv("ORION_TRACE_LOG");
+        if (p && p[0]) { orion_trace_f = fopen(p, "w"); if (orion_trace_f) atexit(orion_trace_close); }
+    }
+    if (orion_trace_f) {
+        fputs(name, orion_trace_f);
+        fputc('\n', orion_trace_f);
+        if ((++orion_trace_flush_ctr & 255) == 0) fflush(orion_trace_f);
+    }
+    if (!orion_break_at_tried) {
+        orion_break_at_tried = 1;
+        const char *q = getenv("ORION_BREAK_AT");
+        if (q && q[0]) orion_break_at = q;
+    }
+    if (orion_break_at) {
+        size_t nl = strlen(name);
+        const char *s = orion_break_at;
+        while (*s) {
+            const char *e = strchr(s, ',');
+            size_t len = e ? (size_t)(e - s) : strlen(s);
+            if (len == nl && strncmp(s, name, nl) == 0) { orion_breakpoint(name); break; }
+            s = e ? e + 1 : s + len;
+        }
+    }
     return 0;
+}
+
+/* ---- radnivå: orion_line("fil:rad:kol") före varje sats i --trace ----
+ * ORION_BREAK_AT tar fil:rad-poster ("src/main.or:12") utöver define-
+ * namn; matchning är prefix fram till satsens kolondel. Pausprotokollet
+ * på stdin-pipen: tom rad/c = fortsätt, s = stega (pausa vid nästa
+ * sats), q = avsluta 70. Kostar bara i debugbyggen. */
+static int orion_step_mode = 0; /* 0 kör, 1 stega in, 2 över, 3 ut */
+static long long orion_call_depth = 0;
+static long long orion_step_depth = 0;
+
+/* Emittern lägger denna före varje ret i --trace-byggen - djupräknaren
+ * bakom stega över (n) och stega ut (o). */
+long long orion_trace_exit(void) {
+    if (orion_call_depth > 0) orion_call_depth--;
+    return 0;
+}
+
+/* Databrytpunkt: ORION_BREAK_SLOT=namn1,namn2 pausar vid slot_set på de
+ * nycklarna - "vem skrev den här sloten?" med trail + lokaler. Anropet
+ * ligger före varje slot_set i --trace-byggen; utan env kostar det en
+ * cache:ad getenv + en pekarkoll per skrivning. */
+static const char *orion_break_slot = NULL;
+static int orion_break_slot_tried = 0;
+static void orion_dbg_pause(const char *where);
+long long orion_trail_print(void);
+
+long long orion_slot_watch(const char *key) {
+    if (!orion_break_slot_tried) {
+        orion_break_slot_tried = 1;
+        const char *q = getenv("ORION_BREAK_SLOT");
+        if (q && q[0]) orion_break_slot = q;
+    }
+    if (!orion_break_slot || !key) return 0;
+    size_t kl = strlen(key);
+    const char *s = orion_break_slot;
+    while (*s) {
+        const char *e = strchr(s, ',');
+        size_t len = e ? (size_t)(e - s) : strlen(s);
+        if (len == kl && strncmp(s, key, kl) == 0) {
+            fprintf(stderr, "[orion] slot `%s` skrivs har\n", key);
+            orion_trail_print();
+            orion_dbg_pause(key);
+            break;
+        }
+        s = e ? e + 1 : s + len;
+    }
+    return 0;
+}
+
+/* ---- watch v1: kompilatorn instrumenterar tilldelningar i --trace med
+ * orion_dbg_i/orion_dbg_t; runtimen håller namn->värde för AKTUELL
+ * funktion (nollas vid varje entré) och skriver dem vid varje paus. */
+#define ORION_DBG_N 48
+static const char *orion_dbg_name[ORION_DBG_N];
+static long long orion_dbg_ival[ORION_DBG_N];
+static const char *orion_dbg_tval[ORION_DBG_N];
+static int orion_dbg_kind[ORION_DBG_N]; /* 0 = tal, 1 = text */
+static int orion_dbg_n = 0;
+
+static int orion_dbg_slot(const char *name) {
+    for (int i = 0; i < orion_dbg_n; i++)
+        if (orion_dbg_name[i] == name || strcmp(orion_dbg_name[i], name) == 0) return i;
+    if (orion_dbg_n < ORION_DBG_N) { orion_dbg_name[orion_dbg_n] = name; return orion_dbg_n++; }
+    return -1;
+}
+long long orion_dbg_i(const char *name, long long v) {
+    int i = orion_dbg_slot(name);
+    if (i >= 0) { orion_dbg_kind[i] = 0; orion_dbg_ival[i] = v; }
+    /* tidsresan: vardet in i sparloggen ("=namn=3") sa skrubbning
+     * efterat visar variablerna, inte bara platsen */
+    if (orion_trace_f) {
+        fprintf(orion_trace_f, "=%s=%lld\n", name, v);
+        if ((++orion_trace_flush_ctr & 255) == 0) fflush(orion_trace_f);
+    }
+    return v;
+}
+long long orion_dbg_t(const char *name, const char *v) {
+    int i = orion_dbg_slot(name);
+    if (i >= 0) { orion_dbg_kind[i] = 1; orion_dbg_tval[i] = v; }
+    if (orion_trace_f) {
+        fprintf(orion_trace_f, "=%s=\"%.40s\"\n", name, v ? v : "");
+        if ((++orion_trace_flush_ctr & 255) == 0) fflush(orion_trace_f);
+    }
+    return 0;
+}
+static void orion_dbg_locals_print(void) {
+    if (orion_dbg_n == 0) return;
+    fprintf(stderr, "[orion] locals:");
+    for (int i = 0; i < orion_dbg_n; i++) {
+        if (orion_dbg_kind[i] == 0) fprintf(stderr, " %s=%lld", orion_dbg_name[i], orion_dbg_ival[i]);
+        else {
+            const char *t = orion_dbg_tval[i] ? orion_dbg_tval[i] : "";
+            fprintf(stderr, " %s=\"%.40s%s\"", orion_dbg_name[i], t, strlen(t) > 40 ? "…" : "");
+        }
+    }
+    fputc('\n', stderr);
+}
+
+static void orion_dbg_pause(const char *where) {
+    fflush(stdout);
+    if (orion_trace_f) fflush(orion_trace_f);
+    fprintf(stderr, "[orion] paused at %s\n", where);
+    orion_dbg_locals_print();
+    fflush(stderr);
+#ifdef _WIN32
+    int interactive = _isatty(_fileno(stdin));
+#else
+    int interactive = isatty(0);
+#endif
+    const char *bw = getenv("ORION_BREAK_WAIT");
+    if (!interactive && !(bw && bw[0] == '1')) { orion_step_mode = 0; return; }
+    int c = fgetc(stdin);
+    int cmd = c;
+    while (c != '\n' && c != EOF) c = fgetc(stdin);
+    if (cmd == 'q') exit(70);
+    orion_step_mode = (cmd == 's') ? 1 : (cmd == 'n') ? 2 : (cmd == 'o') ? 3 : 0;
+    orion_step_depth = orion_call_depth;
+}
+
+static const char *orion_last_line = NULL; /* senaste satsen - trapparnas plats */
+
+long long orion_line(const char *where) {
+    orion_last_line = where;
+    if (orion_trace_f) {
+        fputc('@', orion_trace_f);
+        fputs(where, orion_trace_f);
+        fputc('\n', orion_trace_f);
+        if ((++orion_trace_flush_ctr & 255) == 0) fflush(orion_trace_f);
+    }
+    if (orion_step_mode == 1
+        || (orion_step_mode == 2 && orion_call_depth <= orion_step_depth)
+        || (orion_step_mode == 3 && orion_call_depth < orion_step_depth)) {
+        orion_dbg_pause(where);
+        return 0;
+    }
+    if (!orion_break_at_tried) {
+        orion_break_at_tried = 1;
+        const char *q = getenv("ORION_BREAK_AT");
+        if (q && q[0]) orion_break_at = q;
+    }
+    if (orion_break_at) {
+        const char *s = orion_break_at;
+        while (*s) {
+            const char *e = strchr(s, ',');
+            size_t len = e ? (size_t)(e - s) : strlen(s);
+            if (len > 0 && strncmp(s, where, len) == 0 && (where[len] == ':' || where[len] == 0)) {
+                orion_dbg_pause(where);
+                break;
+            }
+            s = e ? e + 1 : s + len;
+        }
+    }
+    return 0;
+}
+
+/* ---- effektinspelning: deterministisk replay -------------------------
+ * ORION_RECORD=fil skriver varje effekts SVAR till loggen;
+ * ORION_REPLAY=fil laser dem i samma ordning I STALLET for att utfora
+ * effekten - exakt samma korning igen, hur manga ganger som helst.
+ * Osynk (annan kodvag an inspelningen) stoppar hogljutt. Ytan v1:
+ * klocka (now/time_now_ms/monotonic_ms), env_get, file_read, filmeta
+ * (mtime/size/exists/is_dir) samt file_write som no-op vid replay.
+ * Sockets/processer ingar INTE i v1 - de gar live aven under replay. */
+FILE *orion_fx_rec = NULL;
+FILE *orion_fx_rep = NULL;
+static int orion_fx_tried = 0;
+static void orion_fx_init(void) {
+    if (orion_fx_tried) return;
+    /* bara TRACADE binarer spelar in/av: orbit sjalv (otracad) laser
+     * hundratals filer at kompileringen och far inte hamna i loggen -
+     * i en tracad binar har main() redan stampat trailen fore forsta
+     * programniva-effekten, sa gransen ar exakt ratt. */
+    if (orion_trail_seq == 0) return;
+    orion_fx_tried = 1;
+    const char *r = getenv("ORION_RECORD");
+    if (r && r[0]) orion_fx_rec = fopen(r, "wb");
+    const char *p = getenv("ORION_REPLAY");
+    if (p && p[0]) orion_fx_rep = fopen(p, "rb");
+}
+static void orion_fx_desync(const char *tag) {
+    fprintf(stderr, "[orion] replay ur synk vid `%s` - loggen ar fran en annan korning/kodvag\n", tag);
+    exit(70);
+}
+long long orion_fx_i64(const char *tag, long long live) {
+    orion_fx_init();
+    if (orion_fx_rep) {
+        char t[64];
+        long long v;
+        if (fscanf(orion_fx_rep, "%63s %lld ", t, &v) != 2 || strcmp(t, tag) != 0) orion_fx_desync(tag);
+        return v;
+    }
+    if (orion_fx_rec) fprintf(orion_fx_rec, "%s %lld\n", tag, live);
+    return live;
+}
+int orion_fx_replaying(void) { orion_fx_init(); return orion_fx_rep != NULL; }
+/* text-effekt: "tag len\nbytes\n". live kors ALDRIG under replay. */
+const char *orion_fx_text(const char *tag, const char *(*live)(const char *), const char *arg) {
+    orion_fx_init();
+    if (orion_fx_rep) {
+        char t[64];
+        long long len;
+        if (fscanf(orion_fx_rep, "%63s %lld", t, &len) != 2 || strcmp(t, tag) != 0 || len < 0) orion_fx_desync(tag);
+        fgetc(orion_fx_rep); /* radbrytningen */
+        char *p = orion_text_alloc(len);
+        if ((long long)fread(p, 1, (size_t)len, orion_fx_rep) != len) orion_fx_desync(tag);
+        fgetc(orion_fx_rep);
+        p[len] = 0;
+        return p;
+    }
+    const char *v = live(arg);
+    if (orion_fx_rec) {
+        long long len = orion_tlen_c(v);
+        fprintf(orion_fx_rec, "%s %lld\n", tag, len);
+        fwrite(v, 1, (size_t)len, orion_fx_rec);
+        fputc('\n', orion_fx_rec);
+    }
+    return v;
+}
+
+/* Kontrakten: require/ensure trappar med sin PLATS ("fil:rad") och
+ * lokalerna (tracade byggen) - felet forklarar sig sjalvt. Gamla
+ * enrads-versionerna bodde som IR i emittern; en seed fran fore
+ * flytten definierar dem sjalv, sa inga kollisioner. */
+long long orion_trail_note_trap(void);
+
+static void orion_contract_fail(const char *kind, const char *where) {
+    fflush(stdout);
+    fprintf(stderr, "orion: %s failed at %s\n", kind, where);
+    orion_trail_note_trap();
+    fflush(stderr);
+    exit(70);
+}
+long long orion_require_at(long long c, const char *where) {
+    if (!c) orion_contract_fail("require", where);
+    return c;
+}
+long long orion_ensure_at(long long c, const char *where) {
+    if (!c) orion_contract_fail("ensure", where);
+    return c;
+}
+
+/* file_read/file_write bodde som handskriven IR i emittern - flyttade
+ * hit for att kunna spelas in/av (och for att C ar lattare att aga).
+ * Beteendeidentiska: "rb"/"wb", "" vid oppningsfel, 1/0 fran write. */
+static const char *orion_file_read_live(const char *path) {
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return orion_text_empty();
+    fseek(fp, 0, SEEK_END);
+    long long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    char *buf = orion_text_alloc(size);
+    size_t got = fread(buf, 1, (size_t)size, fp);
+    fclose(fp);
+    buf[got] = 0;
+    if ((long long)got != size) ((long long *)buf)[-1] = (long long)got;
+    return buf;
+}
+/* weak under EN generation: en seed-kompilator fran fore flytten bar
+ * annu definitionerna som IR - weak later den lanka; nya kompilatorer
+ * deklarerar bara och far C-varianterna. Kan tas bort nasta arv. */
+__attribute__((weak)) const char *orion_file_read(const char *path) {
+    return orion_fx_text("fr", orion_file_read_live, path);
+}
+__attribute__((weak)) long long orion_file_write(const char *path, const char *content) {
+    orion_fx_init();
+    if (orion_fx_rep) return 1; /* replay ror aldrig disken */
+    FILE *fp = fopen(path, "wb");
+    if (!fp) return 0;
+    fwrite(content, 1, (size_t)orion_tlen_c(content), fp);
+    fclose(fp);
+    return 1;
+}
+
+/* Swimlanes: schemalaggaren loggar taskbyten ("~id") i sparloggen sa
+ * tidslinjen kan visa VILKEN task varje steg tillhor. Bara vid byte. */
+static long long orion_trace_last_task = -2;
+static void orion_trace_task(long long id) {
+    if (!orion_trace_f || id == orion_trace_last_task) return;
+    orion_trace_last_task = id;
+    fprintf(orion_trace_f, "~%lld\n", id);
 }
 
 /* Newest-first, to stderr. Quiet when the program was not built with
@@ -1314,10 +1658,19 @@ long long orion_trail_print(void) {
     return n;
 }
 
-/* The require/ensure/index traps call this before exit(70). */
+/* The require/ensure/index traps call this before exit(70). Post mortem:
+ * trailen, LOKALERNA (watch-kartan ar fylld i --trace-byggen) och en
+ * flushad sparlogg - debuggerns tidslinje oppnar pa kraschogonblicket. */
 long long orion_trail_note_trap(void) {
     fflush(stdout);
-    return orion_trail_print();
+    if (orion_trace_f) fflush(orion_trace_f);
+    /* tracade byggen vet SENASTE SATSEN - index-trappar m.fl. far en
+     * plats utan att varje at() behover bara en strang */
+    if (orion_last_line) fprintf(stderr, "[orion]   at %s\n", orion_last_line);
+    long long n = orion_trail_print();
+    orion_dbg_locals_print();
+    fflush(stderr);
+    return n;
 }
 
 #if !defined(_WIN32)
@@ -1330,14 +1683,19 @@ long long orion_trail_note_trap(void) {
  * continues, so a forgotten breakpoint never hangs a script. */
 long long orion_breakpoint(const char *where) {
     fflush(stdout);
+    if (orion_trace_f) fflush(orion_trace_f);
     fprintf(stderr, "[orion] breakpoint in `%s`\n", where);
     orion_trail_print();
+    fflush(stderr);
 #ifdef _WIN32
     int interactive = _isatty(_fileno(stdin));
 #else
     int interactive = isatty(0);
 #endif
-    if (!interactive) {
+    /* ORION_BREAK_WAIT=1: wait on a PIPED stdin too - a debugger UI on the
+     * other end sends the continue line (that is the whole protocol). */
+    const char *bw = getenv("ORION_BREAK_WAIT");
+    if (!interactive && !(bw && bw[0] == '1')) {
         fprintf(stderr, "[orion]   (stdin is not a terminal - continuing)\n");
         return 0;
     }
@@ -2686,8 +3044,12 @@ typedef struct {
     long long exit_code;
 #ifdef _WIN32
     HANDLE handle;
+    HANDLE stdin_w;   /* write end of the child's stdin pipe, or NULL */
+    HANDLE out_r;     /* read end of the child's pty output, or NULL */
+    void *pty;        /* HPCON when the child runs under a pseudoconsole */
 #else
     long long pid;
+    int stdin_fd;     /* write end of the child's stdin pipe, or -1 */
 #endif
 } orion_proc_slot;
 
@@ -2701,8 +3063,11 @@ static orion_proc_slot orion_procs[ORION_MAX_PROCS];
 #endif
 
 /* Start `cmd`; stdout+stderr go to `outfile` when given (truncated), else they
- * are inherited. Returns a job id, or -1 (table full / spawn failed). */
-static long long orion_proc_spawn(const char *cmd, const char *outfile) {
+ * are inherited. With `want_stdin` the child gets a piped stdin whose write end
+ * stays in the slot (proc_write feeds it, proc_stdin_close sends EOF) - the
+ * seam interactive terminals and language servers stand on.
+ * Returns a job id, or -1 (table full / spawn failed). */
+static long long orion_proc_spawn(const char *cmd, const char *outfile, int want_stdin) {
     int id = -1;
     for (int i = 0; i < ORION_MAX_PROCS; i++)
         if (orion_procs[i].state == 0) { id = i; break; }
@@ -2718,6 +3083,7 @@ static long long orion_proc_spawn(const char *cmd, const char *outfile) {
     si.cb = sizeof(si);
     ZeroMemory(&pi, sizeof(pi));
     HANDLE out = INVALID_HANDLE_VALUE;
+    HANDLE in_r = NULL, in_w = NULL;
     if (outfile && outfile[0]) {
         SECURITY_ATTRIBUTES sa;
         sa.nLength = sizeof(sa);
@@ -2731,27 +3097,191 @@ static long long orion_proc_spawn(const char *cmd, const char *outfile) {
         si.hStdOutput = out;
         si.hStdError = out;
     }
+    if (want_stdin) {
+        SECURITY_ATTRIBUTES psa;
+        psa.nLength = sizeof(psa);
+        psa.lpSecurityDescriptor = NULL;
+        psa.bInheritHandle = TRUE;
+        if (!CreatePipe(&in_r, &in_w, &psa, 0)) {
+            if (out != INVALID_HANDLE_VALUE) CloseHandle(out);
+            return -1;
+        }
+        SetHandleInformation(in_w, HANDLE_FLAG_INHERIT, 0); /* only the read end follows */
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdInput = in_r;
+        if (out == INVALID_HANDLE_VALUE) {
+            si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+            si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+        }
+    }
     BOOL ok = CreateProcessA(NULL, buf, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
     if (out != INVALID_HANDLE_VALUE) CloseHandle(out);
-    if (!ok) return -1;
+    if (in_r) CloseHandle(in_r);
+    if (!ok) { if (in_w) CloseHandle(in_w); return -1; }
     CloseHandle(pi.hThread);
     orion_procs[id].handle = pi.hProcess;
+    orion_procs[id].stdin_w = want_stdin ? in_w : NULL;
+    orion_procs[id].out_r = NULL;
+    orion_procs[id].pty = NULL;
 #else
+    int inpipe[2] = { -1, -1 };
+    if (want_stdin && pipe(inpipe) != 0) return -1;
     pid_t pid = fork();
-    if (pid < 0) return -1;
+    if (pid < 0) {
+        if (want_stdin) { close(inpipe[0]); close(inpipe[1]); }
+        return -1;
+    }
     if (pid == 0) {
         if (outfile && outfile[0]) {
             int fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if (fd >= 0) { dup2(fd, 1); dup2(fd, 2); close(fd); }
         }
+        if (want_stdin) { dup2(inpipe[0], 0); close(inpipe[0]); close(inpipe[1]); }
         execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
         _exit(127);
     }
+    if (want_stdin) close(inpipe[0]);
     orion_procs[id].pid = (long long)pid;
+    orion_procs[id].stdin_fd = want_stdin ? inpipe[1] : -1;
 #endif
     orion_procs[id].exit_code = -1;
     orion_procs[id].state = 1;
     return id;
+}
+
+/* Start `cmd` under a PSEUDOCONSOLE (Windows ConPTY): the child believes it
+ * has a real terminal - prompts, colors, cursor addressing, full-screen TUIs.
+ * We hold the input write end (proc_write) and the output read end
+ * (proc_read_out); the pty translates to VT sequences. -1 where unsupported. */
+long long proc_start_pty(const char *cmd, const char *dir, long long cols, long long rows) {
+#ifdef _WIN32
+    int id = -1;
+    for (int i = 0; i < ORION_MAX_PROCS; i++)
+        if (orion_procs[i].state == 0) { id = i; break; }
+    if (id < 0) return -1;
+    HANDLE in_r = NULL, in_w = NULL, out_r = NULL, out_w = NULL;
+    if (!CreatePipe(&in_r, &in_w, NULL, 0)) return -1;
+    if (!CreatePipe(&out_r, &out_w, NULL, 0)) {
+        CloseHandle(in_r); CloseHandle(in_w);
+        return -1;
+    }
+    COORD size;
+    size.X = (SHORT)(cols > 0 ? cols : 120);
+    size.Y = (SHORT)(rows > 0 ? rows : 32);
+    HPCON pc = NULL;
+    if (CreatePseudoConsole(size, in_r, out_w, 0, &pc) != S_OK) {
+        CloseHandle(in_r); CloseHandle(in_w); CloseHandle(out_r); CloseHandle(out_w);
+        return -1;
+    }
+    SIZE_T attr_size = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &attr_size);
+    LPPROC_THREAD_ATTRIBUTE_LIST attrs = (LPPROC_THREAD_ATTRIBUTE_LIST)malloc(attr_size);
+    if (!attrs || !InitializeProcThreadAttributeList(attrs, 1, 0, &attr_size) ||
+        !UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, pc, sizeof(pc), NULL, NULL)) {
+        if (attrs) free(attrs);
+        ClosePseudoConsole(pc); CloseHandle(in_w); CloseHandle(out_r);
+        return -1;
+    }
+    STARTUPINFOEXA si;
+    ZeroMemory(&si, sizeof(si));
+    si.StartupInfo.cb = sizeof(si);
+    si.lpAttributeList = attrs;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&pi, sizeof(pi));
+    char buf[32768];
+    size_t n = 0;
+    while (cmd[n] && n < sizeof(buf) - 1) { buf[n] = cmd[n]; n++; }
+    buf[n] = 0;
+    BOOL ok = CreateProcessA(NULL, buf, NULL, NULL, FALSE,
+                             EXTENDED_STARTUPINFO_PRESENT, NULL,
+                             (dir && dir[0]) ? dir : NULL, &si.StartupInfo, &pi);
+    DeleteProcThreadAttributeList(attrs);
+    free(attrs);
+    /* pty-sidans handtag stängs EFTER spawnen - barnet ska hinna ärva. */
+    CloseHandle(in_r);
+    CloseHandle(out_w);
+    if (!ok) {
+        ClosePseudoConsole(pc); CloseHandle(in_w); CloseHandle(out_r);
+        return -1;
+    }
+    CloseHandle(pi.hThread);
+    orion_procs[id].handle = pi.hProcess;
+    orion_procs[id].stdin_w = in_w;
+    orion_procs[id].out_r = out_r;
+    orion_procs[id].pty = pc;
+    orion_procs[id].exit_code = -1;
+    orion_procs[id].state = 1;
+    return id;
+#else
+    (void)cmd; (void)dir; (void)cols; (void)rows;
+    return -1;
+#endif
+}
+
+/* Read whatever pty output is available right now (never blocks; "" when
+ * nothing waits). Raw VT bytes - the terminal view interprets them. */
+const char *proc_read_out(long long id, long long max) {
+    if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state == 0) return orion_text_from_c("");
+#ifdef _WIN32
+    HANDLE h = orion_procs[id].out_r;
+    if (!h) return orion_text_from_c("");
+    DWORD avail = 0;
+    if (!PeekNamedPipe(h, NULL, 0, NULL, &avail, NULL) || avail == 0) return orion_text_from_c("");
+    if (max > 0 && (long long)avail > max) avail = (DWORD)max;
+    char *out = (char *)malloc((size_t)avail + 1);
+    if (!out) return orion_text_from_c("");
+    DWORD got = 0;
+    if (!ReadFile(h, out, avail, &got, NULL)) { free(out); return orion_text_from_c(""); }
+    out[got] = 0;
+    const char *res = orion_text_from_c(out);
+    free(out);
+    return res;
+#else
+    (void)max;
+    return orion_text_from_c("");
+#endif
+}
+
+/* Tell the pty the view changed size (no-op without a pty). */
+long long proc_pty_resize(long long id, long long cols, long long rows) {
+    if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state == 0) return 0;
+#ifdef _WIN32
+    if (!orion_procs[id].pty) return 0;
+    COORD size;
+    size.X = (SHORT)(cols > 0 ? cols : 120);
+    size.Y = (SHORT)(rows > 0 ? rows : 32);
+    return ResizePseudoConsole((HPCON)orion_procs[id].pty, size) == S_OK ? 1 : 0;
+#else
+    (void)cols; (void)rows;
+    return 0;
+#endif
+}
+
+/* Send EOF to the child's stdin (idempotent; no-op without a pipe). */
+long long proc_stdin_close(long long id) {
+    if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state == 0) return 0;
+#ifdef _WIN32
+    if (orion_procs[id].stdin_w) { CloseHandle(orion_procs[id].stdin_w); orion_procs[id].stdin_w = NULL; }
+#else
+    if (orion_procs[id].stdin_fd >= 0) { close(orion_procs[id].stdin_fd); orion_procs[id].stdin_fd = -1; }
+#endif
+    return 1;
+}
+
+/* Write `data` to the child's stdin pipe. Bytes written, -1 = no pipe/error. */
+long long proc_write(long long id, const char *data) {
+    if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state != 1 || !data) return -1;
+    size_t len = strlen(data);
+#ifdef _WIN32
+    if (!orion_procs[id].stdin_w) return -1;
+    DWORD wrote = 0;
+    if (!WriteFile(orion_procs[id].stdin_w, data, (DWORD)len, &wrote, NULL)) return -1;
+    return (long long)wrote;
+#else
+    if (orion_procs[id].stdin_fd < 0) return -1;
+    ssize_t wrote = write(orion_procs[id].stdin_fd, data, len);
+    return (long long)wrote;
+#endif
 }
 
 /* Has job `id` exited? Non-blocking; reaps (and remembers the exit code) the
@@ -2789,8 +3319,9 @@ long long host_cpus(void) {
 #endif
 }
 
-long long proc_start(const char *cmd) { return orion_proc_spawn(cmd, NULL); }
-long long proc_start_to_file(const char *cmd, const char *path) { return orion_proc_spawn(cmd, path); }
+long long proc_start(const char *cmd) { return orion_proc_spawn(cmd, NULL, 0); }
+long long proc_start_to_file(const char *cmd, const char *path) { return orion_proc_spawn(cmd, path, 0); }
+long long proc_start_pipe_to_file(const char *cmd, const char *path) { return orion_proc_spawn(cmd, path, 1); }
 
 /* Exit code of a finished job, freeing its slot - taken ONCE, like a task
  * result. -1 while it still runs (or for an unknown id). */
@@ -2798,6 +3329,11 @@ long long proc_result(long long id) {
     if (id < 0 || id >= ORION_MAX_PROCS) return -1;
     if (!orion_proc_poll((int)id)) return -1;
     long long code = orion_procs[id].exit_code;
+    proc_stdin_close(id); /* the pipe dies with the job */
+#ifdef _WIN32
+    if (orion_procs[id].pty) { ClosePseudoConsole((HPCON)orion_procs[id].pty); orion_procs[id].pty = NULL; }
+    if (orion_procs[id].out_r) { CloseHandle(orion_procs[id].out_r); orion_procs[id].out_r = NULL; }
+#endif
     orion_procs[id].state = 0;
     return code;
 }
@@ -2806,6 +3342,7 @@ long long proc_result(long long id) {
  * kill status the OS reports, not the program's own. */
 long long proc_stop(long long id) {
     if (id < 0 || id >= ORION_MAX_PROCS || orion_procs[id].state != 1) return 0;
+    proc_stdin_close(id);
 #ifdef _WIN32
     TerminateProcess(orion_procs[id].handle, 137);
 #else
@@ -2963,7 +3500,9 @@ static long long orion_sched_drive(int until_idx) {
             if (orion_tasks[i].state != 1) continue;
             orion_task_current = i;
             orion_tasks[i].state = 2;
+            orion_trace_task(i);
             SwitchToFiber(orion_tasks[i].stack_ctx);
+            orion_trace_task(-1);
             orion_task_current = -1;
             ran = 1;
             switches++;
@@ -3190,6 +3729,29 @@ long long orion_task_run_all(void) {
     return done;
 }
 
+/* One scheduler turn, never sleeping: wake what is due, give every ready
+ * task one slice, poll io- and proc-parked tasks so they become ready for
+ * the NEXT turn. This is the heartbeat for a loop that must keep doing its
+ * own work (accepting connections) while detached tasks run - run_all()
+ * would block it until every task finished. Returns tasks given a slice. */
+long long orion_task_pump(void) {
+    orion_sched_wake_due();
+    long long ran = 0;
+    for (int i = 0; i < ORION_MAX_TASKS; i++) {
+        if (orion_tasks[i].state != 1) continue;
+        orion_task_current = i;
+        orion_tasks[i].state = 2;
+        orion_trace_task(i);
+        SwitchToFiber(orion_tasks[i].stack_ctx);
+        orion_trace_task(-1);
+        orion_task_current = -1;
+        ran++;
+    }
+    if (orion_sched_io_soonest() >= 0) orion_sched_poll_io(0);
+    orion_sched_poll_procs();
+    return ran;
+}
+
 long long orion_task_state(long long id) {
     if (id < 0 || id >= ORION_MAX_TASKS) return 0;
     return orion_tasks[(int)id].state;
@@ -3367,7 +3929,26 @@ void orion_ms_do_replay(int idx) {
 #ifdef _WIN32
 static int orion_net_up = 0;
 static void orion_net_init(void) {
-    if (!orion_net_up) { WSADATA w; WSAStartup(MAKEWORD(2, 2), &w); orion_net_up = 1; }
+    if (orion_net_up) return;
+    WSADATA w; WSAStartup(MAKEWORD(2, 2), &w);
+    /* Ask Windows for a millisecond clock. Without it the scheduler tick
+     * is 15.6 ms, and EVERY wait shorter than that is 15.6 ms - so a
+     * server polling its listener for "one millisecond" spends a whole
+     * frame not looking at the connections it already has. It measured
+     * exactly that: 5 ms of real work per request and a 15.6 ms floor.
+     *
+     * The window layer already does this for games; a headless server
+     * never opens a window and was left on the slow clock. Loaded at run
+     * time so a build that never touches sockets never touches winmm. */
+    {
+        HMODULE mm = LoadLibraryA("winmm.dll");
+        if (mm) {
+            typedef unsigned int (WINAPI *OrTbpFn)(unsigned int);
+            OrTbpFn tbp = (OrTbpFn)GetProcAddress(mm, "timeBeginPeriod");
+            if (tbp) tbp(1);
+        }
+    }
+    orion_net_up = 1;
 }
 #define ORION_BADSOCK INVALID_SOCKET
 #define orion_closesock closesocket
@@ -3691,4 +4272,14 @@ long long tcp_accept_wait(long long listener, long long ms) {
     int r = select((int)listener + 1, &rd, NULL, NULL, &tv);
     if (r <= 0) return -1;
     return tcp_accept(listener);
+}
+
+/* Value of an environment variable, "" when unset. Here rather than in
+ * orion_cli.c because GUI builds link only this file and still need it. */
+static const char *env_get_live(const char *name) {
+    const char *v = getenv(name);
+    return orion_text_from_c(v ? v : "");
+}
+const char *env_get(const char *name) {
+    return orion_fx_text("env", env_get_live, name);
 }

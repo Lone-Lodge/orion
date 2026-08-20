@@ -11,14 +11,14 @@ use bytes
 
 # --- Helpers ---
 
-define value_ref(value_id: int) -> text:
+define value_ref(value_id: number) -> text:
     "%v{value_id}"
 
 
 # Escape a string for use in LLVM IR `c"..."` constant.
 # Printable ASCII passes through; quote/backslash/non-printable use \NN hex.
 # ASCII code of hex digit `value` (0-15): '0'-'9' then 'A'-'F'.
-define hex_code(value: int) -> int:
+define hex_code(value: number) -> number:
     if value < 10 then 48 + value else 55 + value
 
 define llvm_escape(text: text) -> text:
@@ -27,9 +27,9 @@ define llvm_escape(text: text) -> text:
     bs = bytes_of(text)
     total = length(bs)
     edit out = []
-    loop index in 0..<total:
-        b = at(bs, index)
-        needs_escape = b == 34 or b == 92 or b < 32 or b > 126
+    loop index in 0 until total:
+        b = bs[index]
+        needs_escape = b is 34 or b is 92 or b < 32 or b > 126
         if needs_escape:
             out = append(out, 92)
             out = append(out, hex_code(b // 16))
@@ -40,11 +40,11 @@ define llvm_escape(text: text) -> text:
 
 
 # Find the index of `target` in a list of strings. -1 if not found.
-define string_list_index(strings: [text], target: text) -> int:
+define string_list_index(strings: [text], target: text) -> number:
     total = length(strings)
     edit found = 0 - 1
-    loop index in 0..<total:
-        if at(strings, index) == target and found == (0 - 1):
+    loop index in 0 until total:
+        if strings[index] is target and found is (0 - 1):
             found = index
     found
 
@@ -57,19 +57,19 @@ define is_runtime_symbol(name: text) -> truth:
     bs = bytes_of(name)
     n = length(bs)
     # orion_* prefix
-    starts_orion = n >= 6 and at(bs, 0) == 111 and at(bs, 1) == 114 and at(bs, 2) == 105 and at(bs, 3) == 111 and at(bs, 4) == 110 and at(bs, 5) == 95
+    starts_orion = n >= 6 and bs[0] is 111 and bs[1] is 114 and bs[2] is 105 and bs[3] is 111 and bs[4] is 110 and bs[5] is 95
     # __orion_* prefix
-    starts_uu_orion = n >= 8 and at(bs, 0) == 95 and at(bs, 1) == 95 and at(bs, 2) == 111 and at(bs, 3) == 114 and at(bs, 4) == 105 and at(bs, 5) == 111 and at(bs, 6) == 110 and at(bs, 7) == 95
-    is_libc = name == "puts" or name == "printf" or name == "malloc" or name == "strlen" or name == "strcpy" or name == "strcat" or name == "strcmp" or name == "snprintf" or name == "memcpy" or name == "strstr" or name == "fopen" or name == "fclose" or name == "fread" or name == "fwrite" or name == "ftell" or name == "fseek"
+    starts_uu_orion = n >= 8 and bs[0] is 95 and bs[1] is 95 and bs[2] is 111 and bs[3] is 114 and bs[4] is 105 and bs[5] is 111 and bs[6] is 110 and bs[7] is 95
+    is_libc = name is "puts" or name is "printf" or name is "malloc" or name is "strlen" or name is "strcpy" or name is "strcat" or name is "strcmp" or name is "snprintf" or name is "memcpy" or name is "strstr" or name is "fopen" or name is "fclose" or name is "fread" or name is "fwrite" or name is "ftell" or name is "fseek"
     starts_orion or starts_uu_orion or is_libc
 
 # True if `name` is defined by a user-level fn in the module.
 define is_module_defined(module: IRModule, name: text) -> truth:
     n_fns = length(module.functions)
     edit found = false
-    loop fi in 0..<n_fns:
-        f = at(module.functions, fi)
-        if f.name == name:
+    loop fi in 0 until n_fns:
+        f = module.functions[fi]
+        if f.name is name:
             found = true
     found
 
@@ -81,12 +81,12 @@ define collect_extern_calls(module: IRModule) -> [text]:
     n_fns = length(module.functions)
     edit names = []
     edit declares = []
-    loop fi in 0..<n_fns:
-        fn_value = at(module.functions, fi)
+    loop fi in 0 until n_fns:
+        fn_value = module.functions[fi]
         n_insts = length(fn_value.instructions)
-        loop ii in 0..<n_insts:
-            inst = at(fn_value.instructions, ii)
-            if inst.op == "call":
+        loop ii in 0 until n_insts:
+            inst = fn_value.instructions[ii]
+            if inst.op is "call":
                 name = inst.name
                 if not is_runtime_symbol(name):
                     if not is_module_defined(module, name):
@@ -94,10 +94,10 @@ define collect_extern_calls(module: IRModule) -> [text]:
                             names = append(names, name)
                             n_args = length(inst.args)
                             edit sig = ""
-                            loop ai in 0..<n_args:
-                                arg_id = at(inst.args, ai)
+                            loop ai in 0 until n_args:
+                                arg_id = inst.args[ai]
                                 arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
-                                sep = if ai == 0 then "" else ", "
+                                sep = if ai is 0 then "" else ", "
                                 sig = "{sig}{sep}{arg_ty}"
                             declares = append(declares, "declare i64 @{name}({sig})")
     declares
@@ -108,12 +108,12 @@ define collect_extern_calls(module: IRModule) -> [text]:
 define collect_strings(module: IRModule) -> [text]:
     n_fns = length(module.functions)
     edit result = []
-    loop fi in 0..<n_fns:
-        fn_value = at(module.functions, fi)
+    loop fi in 0 until n_fns:
+        fn_value = module.functions[fi]
         n_insts = length(fn_value.instructions)
-        loop ii in 0..<n_insts:
-            inst = at(fn_value.instructions, ii)
-            is_str_op = inst.op == "print_str" or inst.op == "const_str"
+        loop ii in 0 until n_insts:
+            inst = fn_value.instructions[ii]
+            is_str_op = inst.op is "print_str" or inst.op is "const_str"
             if is_str_op:
                 existing = string_list_index(result, inst.name)
                 if existing < 0:
@@ -127,9 +127,9 @@ define split_pipe(text: text) -> [text]:
     total = length(bs)
     edit parts = []
     edit current = ""
-    loop index in 0..<total:
-        ch = at(bs, index)
-        if ch == 124:  # '|'
+    loop index in 0 until total:
+        ch = bs[index]
+        if ch is 124:  # '|'
             parts = append(parts, current)
             current = ""
         else:
@@ -141,15 +141,15 @@ define split_pipe(text: text) -> [text]:
 
 define icmp_cc(op: text) -> text:
     edit cc = "eq"
-    if op == "icmp_ne":
+    if op is "icmp_ne":
         cc = "ne"
-    if op == "icmp_lt":
+    if op is "icmp_lt":
         cc = "slt"
-    if op == "icmp_le":
+    if op is "icmp_le":
         cc = "sle"
-    if op == "icmp_gt":
+    if op is "icmp_gt":
         cc = "sgt"
-    if op == "icmp_ge":
+    if op is "icmp_ge":
         cc = "sge"
     cc
 
@@ -162,80 +162,82 @@ define find_fn_return_type(module: IRModule, fn_name: text) -> text:
     edit result = "i64"
     # Built-in runtime fns we provide in emit_runtime - return types are
     # known statically, no AST entry exists for them.
-    if fn_name == "__orion_resume_int":
+    if fn_name is "__orion_resume_int":
         result = "void"
-    if fn_name == "__orion_perform_int":
+    if fn_name is "__orion_perform_int":
         result = "i64"
-    if fn_name == "orion_struct_field_int":
+    if fn_name is "orion_struct_field_int":
         result = "i64"
-    if fn_name == "orion_struct_field_text":
+    if fn_name is "orion_struct_field_text":
         result = "text"
-    if fn_name == "orion_persist_text":
+    if fn_name is "orion_text_to_f64":
+        result = "f64"
+    if fn_name is "orion_persist_text":
         result = "text"
-    loop index in 0..<n:
-        f = at(module.functions, index)
-        if f.name == fn_name:
+    loop index in 0 until n:
+        f = module.functions[index]
+        if f.name is fn_name:
             result = f.return_type
     result
 
 
 # Actual produced type of an SSA value. For call ops, look up the called
 # fn's return type (the call inst itself has a placeholder type).
-define ssa_value_type(value_id: int, fn_value: IRFn, module: IRModule) -> text:
+define ssa_value_type(value_id: number, fn_value: IRFn, module: IRModule) -> text:
     if value_id < 0:
         "i64"
     else:
-        inst = at(fn_value.instructions, value_id)
-        if inst.op == "call":
+        inst = fn_value.instructions[value_id]
+        if inst.op is "call":
             find_fn_return_type(module, inst.name)
         else:
             inst.type_text
 
 
-public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value: IRFn, module: IRModule) -> text:
+public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_value: IRFn, module: IRModule) -> text:
     op = inst.op
-    is_icmp = op == "icmp_eq" or op == "icmp_ne" or op == "icmp_lt" or op == "icmp_le" or op == "icmp_gt" or op == "icmp_ge"
-    is_logical = op == "iand" or op == "ior"
+    is_icmp = op is "icmp_eq" or op is "icmp_ne" or op is "icmp_lt" or op is "icmp_le" or op is "icmp_gt" or op is "icmp_ge"
+    is_logical = op is "iand" or op is "ior"
     # Default for unknown ops: emit a defined SSA slot (= 0) plus a
     # marker comment. Without the slot, downstream phi nodes or
     # consumers would reference undefined `%vN` and clang would reject
     # the whole module with a confusing error.
     edit result = "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}"
 
-    if op == "iconst":
+    if op is "iconst":
         result = "    {value_ref(my_id)} = add i64 0, {inst.value}"
 
-    if op == "param":
+    if op is "param":
         # Rebind the parameter to its function-arg name "%pN".
         ty = llvm_type_of(inst.type_text)
-        if ty == "ptr":
+        if ty is "ptr":
             result = "    {value_ref(my_id)} = getelementptr i8, ptr %p{inst.value}, i64 0"
         else:
-            if ty == "double":
+            if ty is "double":
                 result = "    {value_ref(my_id)} = fadd double %p{inst.value}, 0x0000000000000000"
             else:
                 result = "    {value_ref(my_id)} = add i64 0, %p{inst.value}"
 
-    if op == "call":
+    if op is "call":
         n_args = length(inst.args)
         edit arg_text = ""
-        loop ai in 0..<n_args:
-            arg_id = at(inst.args, ai)
+        loop ai in 0 until n_args:
+            arg_id = inst.args[ai]
             arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
-            sep = if ai == 0 then "" else ", "
+            sep = if ai is 0 then "" else ", "
             arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
         # __orion_resume_int / __orion_resume_text return void - emit
         # `call void` + dummy SSA. Other fns go through the normal path;
         # their return-type lookup is in find_fn_return_type which
         # defaults non-matches to i64.
-        is_void_resume = inst.name == "__orion_resume_int" or inst.name == "__orion_resume_text"
+        is_void_resume = inst.name is "__orion_resume_int" or inst.name is "__orion_resume_text"
         if is_void_resume:
             result = "    call void @{inst.name}({arg_text})\n    {value_ref(my_id)} = add i64 0, 0"
         else:
             ret_ty = llvm_type_of(find_fn_return_type(module, inst.name))
             result = "    {value_ref(my_id)} = call {ret_ty} @{inst.name}({arg_text})"
 
-    if op == "perform_int" or op == "perform_text":
+    if op is "perform_int" or op is "perform_text":
         # The handler fn goes in as a ptr constant (inst.name), then the arg
         # COUNT, then four i64 slots - every Orion value is a 64-bit word, so a
         # pointer argument is passed as its bits (ptrtoint) and unused slots are
@@ -245,12 +247,12 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         pf_n = length(inst.args)
         edit pf_pre = ""
         edit pf_slots = ""
-        loop pfi in 0..<4:
-            pf_sep = if pfi == 0 then "" else ", "
+        loop pfi in 0 until 4:
+            pf_sep = if pfi is 0 then "" else ", "
             if pfi < pf_n:
-                pf_id = at(inst.args, pfi)
+                pf_id = inst.args[pfi]
                 pf_ty = llvm_type_of(ssa_value_type(pf_id, fn_value, module))
-                if pf_ty == "ptr":
+                if pf_ty is "ptr":
                     pf_tmp = "%v{my_id}.a{pfi}"
                     pf_pre = "{pf_pre}    {pf_tmp} = ptrtoint ptr {value_ref(pf_id)} to i64\n"
                     pf_slots = "{pf_slots}{pf_sep}i64 {pf_tmp}"
@@ -258,32 +260,32 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                     pf_slots = "{pf_slots}{pf_sep}i64 {value_ref(pf_id)}"
             else:
                 pf_slots = "{pf_slots}{pf_sep}i64 0"
-        pf_fam = if op == "perform_int" then "__orion_perform_int_n" else "__orion_perform_text_n"
-        pf_ret = if op == "perform_int" then "i64" else "ptr"
+        pf_fam = if op is "perform_int" then "__orion_perform_int_n" else "__orion_perform_text_n"
+        pf_ret = if op is "perform_int" then "i64" else "ptr"
         result = "{pf_pre}    {value_ref(my_id)} = call {pf_ret} @{pf_fam}(ptr @{inst.name}, i64 {pf_n}, {pf_slots})"
 
-    if op == "fn_ref":
+    if op is "fn_ref":
         # Function pointer constant - `@<name>` evaluates to a ptr in LLVM.
         # Use getelementptr with 0 offset to force it into an SSA slot.
         result = "    {value_ref(my_id)} = getelementptr i8, ptr @{inst.name}, i64 0"
 
-    if op == "indirect_call":
+    if op is "indirect_call":
         # Indirect call: callee SSA value is in inst.value; args same as call.
         n_args = length(inst.args)
         edit arg_text = ""
-        loop ai in 0..<n_args:
-            arg_id = at(inst.args, ai)
+        loop ai in 0 until n_args:
+            arg_id = inst.args[ai]
             arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
-            sep = if ai == 0 then "" else ", "
+            sep = if ai is 0 then "" else ", "
             arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
         ret_ty = llvm_type_of(inst.type_text)
         callee_ref = value_ref(inst.value)
         result = "    {value_ref(my_id)} = call {ret_ty} {callee_ref}({arg_text})"
 
-    if op == "int_to_ptr":
+    if op is "int_to_ptr":
         result = "    {value_ref(my_id)} = inttoptr i64 {value_ref(inst.value)} to ptr"
 
-    if op == "make_closure":
+    if op is "make_closure":
         # Build [fn_ptr_as_int, is_lambda_flag, cap0, cap1, ...] as a list.
         n_caps = length(inst.args)
         total = 2 + n_caps
@@ -291,18 +293,18 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         mc = "{mc}\n    %v{my_id}.fp = ptrtoint ptr @{inst.name} to i64"
         mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 0, i64 %v{my_id}.fp)"
         mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 1, i64 {inst.lhs})"
-        loop ci in 0..<n_caps:
-            cap_id = at(inst.args, ci)
+        loop ci in 0 until n_caps:
+            cap_id = inst.args[ci]
             cap_slot = 2 + ci
             cap_ty = llvm_type_of(ssa_value_type(cap_id, fn_value, module))
-            if cap_ty == "ptr":
+            if cap_ty is "ptr":
                 mc = "{mc}\n    %v{my_id}.c{ci} = ptrtoint ptr {value_ref(cap_id)} to i64"
                 mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {cap_slot}, i64 %v{my_id}.c{ci})"
             else:
                 mc = "{mc}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {cap_slot}, i64 {value_ref(cap_id)})"
         result = mc
 
-    if op == "closure_call":
+    if op is "closure_call":
         # Load fn-ptr + flag; a lambda is called function(env, args), a plain fn-ref
         # function(args). env is the closure list itself.
         # The closure operand must be a ptr to the closure list. It usually is
@@ -313,18 +315,18 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         clos_lty = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
         edit clos = clos_raw
         edit clos_pre = ""
-        if clos_lty != "ptr":
+        if clos_lty is not "ptr":
             clos_pre = "    %v{my_id}.clp = inttoptr i64 {clos_raw} to ptr\n"
             clos = "%v{my_id}.clp"
         cc_ret = llvm_type_of(inst.type_text)
         n_ca = length(inst.args)
         edit cc_args = ""
-        loop cai in 0..<n_ca:
-            ca_id = at(inst.args, cai)
+        loop cai in 0 until n_ca:
+            ca_id = inst.args[cai]
             ca_ty = llvm_type_of(ssa_value_type(ca_id, fn_value, module))
-            csep = if cai == 0 then "" else ", "
+            csep = if cai is 0 then "" else ", "
             cc_args = "{cc_args}{csep}{ca_ty} {value_ref(ca_id)}"
-        lam_args = if n_ca == 0 then "ptr {clos}" else "ptr {clos}, {cc_args}"
+        lam_args = if n_ca is 0 then "ptr {clos}" else "ptr {clos}, {cc_args}"
         edit cc = "{clos_pre}    %v{my_id}.fpi = call i64 @orion_list_at(ptr {clos}, i64 0)"
         cc = "{cc}\n    %v{my_id}.flg = call i64 @orion_list_at(ptr {clos}, i64 1)"
         cc = "{cc}\n    %v{my_id}.p = inttoptr i64 %v{my_id}.fpi to ptr"
@@ -340,75 +342,75 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         cc = "{cc}\n    {value_ref(my_id)} = phi {cc_ret} [ %v{my_id}.r1, %clam{my_id} ], [ %v{my_id}.r2, %cpln{my_id} ]"
         result = cc
 
-    if op == "label":
+    if op is "label":
         # Emit basic-block label (no leading 4-space indent).
         result = "{inst.name}:"
 
-    if op == "br":
+    if op is "br":
         result = "    br label %{inst.name}"
 
-    if op == "br_if":
+    if op is "br_if":
         # name = "then_lbl|else_lbl" - split on '|'.
         # Coerce cond from i64 to i1 first.
         labels = split_pipe(inst.name)
-        then_lbl = at(labels, 0)
-        else_lbl = at(labels, 1)
+        then_lbl = labels[0]
+        else_lbl = labels[1]
         cond_bool = "%v{my_id}.cb"
         l1 = "    {cond_bool} = icmp ne i64 {value_ref(inst.value)}, 0"
         l2 = "    br i1 {cond_bool}, label %{then_lbl}, label %{else_lbl}"
         result = "{l1}\n{l2}"
 
-    if op == "phi":
+    if op is "phi":
         labels = split_pipe(inst.name)
-        then_lbl = at(labels, 0)
-        else_lbl = at(labels, 1)
+        then_lbl = labels[0]
+        else_lbl = labels[1]
         # phi's type matches its operands' type (both should agree).
-        then_inst = at(fn_value.instructions, inst.lhs)
+        then_inst = fn_value.instructions[inst.lhs]
         phi_ty = llvm_type_of(then_inst.type_text)
         result = "    {value_ref(my_id)} = phi {phi_ty} [ {value_ref(inst.lhs)}, %{then_lbl} ], [ {value_ref(inst.rhs)}, %{else_lbl} ]"
 
-    if op == "fconst":
+    if op is "fconst":
         # Exact IEEE-754 bits via strtod at compile time - LLVM rejects
         # inexact decimal FP literals (0.1), hex form is always exact.
         hex_bits = orion_f64_literal_hex(inst.name)
         result = "    {value_ref(my_id)} = fadd double {hex_bits}, 0x0000000000000000"
 
-    if op == "fadd" or op == "fsub" or op == "fmul" or op == "fdiv" or op == "frem":
+    if op is "fadd" or op is "fsub" or op is "fmul" or op is "fdiv" or op is "frem":
         result = "    {value_ref(my_id)} = {op} double {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
 
-    if op == "fcmp":
+    if op is "fcmp":
         fb = "%v{my_id}.b"
         l1 = "    {fb} = fcmp {inst.name} double {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
         l2 = "    {value_ref(my_id)} = zext i1 {fb} to i64"
         result = "{l1}\n{l2}"
 
-    if op == "sitofp":
+    if op is "sitofp":
         result = "    {value_ref(my_id)} = sitofp i64 {value_ref(inst.value)} to double"
 
-    if op == "fptosi":
+    if op is "fptosi":
         result = "    {value_ref(my_id)} = fptosi double {value_ref(inst.value)} to i64"
 
-    if op == "iadd":
+    if op is "iadd":
         result = "    {value_ref(my_id)} = add i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "isub":
+    if op is "isub":
         result = "    {value_ref(my_id)} = sub i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "imul":
+    if op is "imul":
         result = "    {value_ref(my_id)} = mul i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "idiv":
+    if op is "idiv":
         result = "    {value_ref(my_id)} = call i64 @orion_idiv(i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
-    if op == "imod":
+    if op is "imod":
         result = "    {value_ref(my_id)} = call i64 @orion_imod(i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
     # Bitwise + shifts map straight onto LLVM. `shr` is ARITHMETIC (ashr): an
     # Orion int is signed, so shifting a negative right must keep its sign.
-    if op == "bit_and":
+    if op is "bit_and":
         result = "    {value_ref(my_id)} = and i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "bit_or":
+    if op is "bit_or":
         result = "    {value_ref(my_id)} = or i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "bit_xor":
+    if op is "bit_xor":
         result = "    {value_ref(my_id)} = xor i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "shl":
+    if op is "shl":
         result = "    {value_ref(my_id)} = shl i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "shr":
+    if op is "shr":
         result = "    {value_ref(my_id)} = ashr i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
 
     if is_icmp:
@@ -416,33 +418,33 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         bool_name = "%v{my_id}.b"
         lhs_ll = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
         rhs_ll = llvm_type_of(ssa_value_type(inst.rhs, fn_value, module))
-        both_i64 = lhs_ll == "i64" and rhs_ll == "i64"
-        both_ptr = lhs_ll == "ptr" and rhs_ll == "ptr"
+        both_i64 = lhs_ll is "i64" and rhs_ll is "i64"
+        both_ptr = lhs_ll is "ptr" and rhs_ll is "ptr"
         # ptrtoint any ptr operand so we can always do icmp i64. Both-ptr
         # keeps identity semantics; mixed casts the ptr side to i64.
         edit prelude = ""
         edit lhs_ref = value_ref(inst.lhs)
         edit rhs_ref = value_ref(inst.rhs)
         icmp_ty = if both_ptr then "ptr" else "i64"
-        if both_ptr == false:
-            if lhs_ll == "ptr":
+        if both_ptr is false:
+            if lhs_ll is "ptr":
                 lhs_ref = "%v{my_id}.pl"
                 prelude = "    {lhs_ref} = ptrtoint ptr {value_ref(inst.lhs)} to i64\n"
-            if rhs_ll == "ptr":
+            if rhs_ll is "ptr":
                 rhs_ref = "%v{my_id}.pr"
                 prelude = "{prelude}    {rhs_ref} = ptrtoint ptr {value_ref(inst.rhs)} to i64\n"
         l1 = "{prelude}    {bool_name} = icmp {cc} {icmp_ty} {lhs_ref}, {rhs_ref}"
         l2 = "    {value_ref(my_id)} = zext i1 {bool_name} to i64"
         result = "{l1}\n{l2}"
 
-    if op == "select":
+    if op is "select":
         cond_name = "%v{my_id}.c"
         l1 = "    {cond_name} = icmp ne i64 {value_ref(inst.value)}, 0"
         l2 = "    {value_ref(my_id)} = select i1 {cond_name}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)}"
         result = "{l1}\n{l2}"
 
     if is_logical:
-        bool_op = if op == "iand" then "and" else "or"
+        bool_op = if op is "iand" then "and" else "or"
         ab = "%v{my_id}.la"
         bb = "%v{my_id}.lb"
         rb = "%v{my_id}.lr"
@@ -452,25 +454,25 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         l4 = "    {value_ref(my_id)} = zext i1 {rb} to i64"
         result = "{l1}\n{l2}\n{l3}\n{l4}"
 
-    if op == "inot":
+    if op is "inot":
         eq0 = "%v{my_id}.n"
         l1 = "    {eq0} = icmp eq i64 {value_ref(inst.value)}, 0"
         l2 = "    {value_ref(my_id)} = zext i1 {eq0} to i64"
         result = "{l1}\n{l2}"
 
-    if op == "print_int":
+    if op is "print_int":
         # Side-effect call. Emit a sentinel %vN = 0 after so the SSA slot
         # is defined (in case a phi or downstream consumer references it).
         l1 = "    call i32 (ptr, ...) @printf(ptr @.fmt_int, i64 {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "print_float":
+    if op is "print_float":
         l1 = "    call i32 (ptr, ...) @printf(ptr @.fmt_float, double {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "print_str":
+    if op is "print_str":
         # Look up the global name for this string and call puts -
         # the bytes start 16 past the H1 header.
         idx = string_list_index(strings, inst.name)
@@ -480,39 +482,42 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l0}\n{l1}\n{l2}"
 
-    if op == "const_str":
+    if op is "const_str":
         idx = string_list_index(strings, inst.name)
         # Pointer to the first byte of the global string.
         result = "    {value_ref(my_id)} = getelementptr i8, ptr @.str_{idx}, i64 16"
 
-    if op == "text_concat":
+    if op is "text_concat":
         result = "    {value_ref(my_id)} = call ptr @orion_text_concat(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.rhs)})"
 
-    if op == "text_join":
+    if op is "text_join":
         result = "    {value_ref(my_id)} = call ptr @orion_text_join(ptr {value_ref(inst.value)})"
 
-    if op == "int_to_text":
+    if op is "int_to_text":
         result = "    {value_ref(my_id)} = call ptr @orion_int_to_text(i64 {value_ref(inst.value)})"
 
-    if op == "text_len":
+    if op is "text_len":
         result = "    {value_ref(my_id)} = call i64 @orion_tlen(ptr {value_ref(inst.value)})"
 
-    if op == "text_slice":
+    if op is "text_slice":
         result = "    {value_ref(my_id)} = call ptr @orion_text_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
 
-    if op == "text_contains":
+    if op is "text_contains":
         result = "    {value_ref(my_id)} = call i64 @orion_text_contains(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
 
-    if op == "file_read":
+    if op is "file_read":
         result = "    {value_ref(my_id)} = call ptr @orion_file_read(ptr {value_ref(inst.value)})"
 
-    if op == "file_write":
+    if op is "file_write":
         result = "    {value_ref(my_id)} = call i64 @orion_file_write(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
 
-    if op == "argc":
+    if op is "arguments":
+        result = "    {value_ref(my_id)} = call ptr @orion_arguments()"
+
+    if op is "argc":
         result = "    {value_ref(my_id)} = load i64, ptr @orion_argc"
 
-    if op == "argv":
+    if op is "argv":
         slot_name = "%v{my_id}.slot"
         arr_name = "%v{my_id}.arr"
         l1 = "    {arr_name} = load ptr, ptr @orion_argv"
@@ -524,9 +529,9 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         l4 = "    {value_ref(my_id)} = call ptr @orion_text_from_c(ptr {raw_name})"
         result = "{l1}\n{l2}\n{l3}\n{l4}"
 
-    if op == "bytes_from_text":
+    if op is "bytes_from_text":
         v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-        if v_ll == "ptr":
+        if v_ll is "ptr":
             result = "    {value_ref(my_id)} = call ptr @orion_bytes_from_text(ptr {value_ref(inst.value)})"
         else:
             cst = "%v{my_id}.arg"
@@ -534,9 +539,9 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             l2 = "    {value_ref(my_id)} = call ptr @orion_bytes_from_text(ptr {cst})"
             result = "{l1}\n{l2}"
 
-    if op == "bytes_to_text":
+    if op is "bytes_to_text":
         v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-        if v_ll == "ptr":
+        if v_ll is "ptr":
             result = "    {value_ref(my_id)} = call ptr @orion_bytes_to_text(ptr {value_ref(inst.value)})"
         else:
             cst = "%v{my_id}.arg"
@@ -544,9 +549,9 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             l2 = "    {value_ref(my_id)} = call ptr @orion_bytes_to_text(ptr {cst})"
             result = "{l1}\n{l2}"
 
-    if op == "bytes_slice":
+    if op is "bytes_slice":
         v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-        if v_ll == "ptr":
+        if v_ll is "ptr":
             result = "    {value_ref(my_id)} = call ptr @orion_bytes_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
         else:
             cst = "%v{my_id}.arg"
@@ -554,39 +559,42 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             l2 = "    {value_ref(my_id)} = call ptr @orion_bytes_slice(ptr {cst}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
             result = "{l1}\n{l2}"
 
-    if op == "bytes_concat":
+    if op is "bytes_concat":
         v_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
         l_ll = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
-        a_ref = if v_ll == "ptr" then value_ref(inst.value) else "%v{my_id}.a"
-        b_ref = if l_ll == "ptr" then value_ref(inst.lhs) else "%v{my_id}.b"
+        a_ref = if v_ll is "ptr" then value_ref(inst.value) else "%v{my_id}.a"
+        b_ref = if l_ll is "ptr" then value_ref(inst.lhs) else "%v{my_id}.b"
         edit prelude = ""
-        if v_ll != "ptr":
+        if v_ll is not "ptr":
             prelude = "    {a_ref} = inttoptr i64 {value_ref(inst.value)} to ptr\n"
-        if l_ll != "ptr":
+        if l_ll is not "ptr":
             prelude = "{prelude}    {b_ref} = inttoptr i64 {value_ref(inst.lhs)} to ptr\n"
         result = "{prelude}    {value_ref(my_id)} = call ptr @orion_bytes_concat(ptr {a_ref}, ptr {b_ref})"
 
-    if op == "bytes_zeros":
+    if op is "bytes_zeros":
         result = "    {value_ref(my_id)} = call ptr @orion_bytes_zeros(i64 {value_ref(inst.value)})"
 
-    if op == "slot_get":
+    if op is "slot_get":
         # Always returns ptr; type_text on inst tells caller what to do.
         result = "    {value_ref(my_id)} = call ptr @orion_slot_get(ptr {value_ref(inst.value)})"
 
-    if op == "slot_has":
+    if op is "slot_has":
         result = "    {value_ref(my_id)} = call i64 @orion_slot_has(ptr {value_ref(inst.value)})"
 
-    if op == "slot_get_int":
+    if op is "text_hash":
+        result = "    {value_ref(my_id)} = call i64 @orion_text_hash(ptr {value_ref(inst.value)})"
+
+    if op is "slot_get_int":
         result = "    {value_ref(my_id)} = call i64 @orion_slot_get_int(ptr {value_ref(inst.value)})"
 
-    if op == "slot_set":
+    if op is "slot_set":
         # val_id may be i64 or ptr. Pointer values pass the evacuation
         # boundary: a region-born value deep-copies to the malloc heap
         # (typed by the static code below) instead of dangling - the
         # old guard's abort survives only for types with no copier.
-        val_inst = at(fn_value.instructions, inst.lhs)
+        val_inst = fn_value.instructions[inst.lhs]
         val_ty = llvm_type_of(val_inst.type_text)
-        if val_ty == "ptr":
+        if val_ty is "ptr":
             code = evac_code(val_inst.type_text)
             # STATISTIC, recorded where the fact is known. Code 0 means the
             # boundary has no copier for this shape, so a region-born value
@@ -595,7 +603,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             # at compile time - so count them and be able to name them, rather
             # than discovering one from a crash report. See memfacts_report.
             memfact_count("stores")
-            if code == 0:
+            if code is 0:
                 memfact_note(fn_value.name, val_inst.type_text)
             evp = "%v{my_id}.ev"
             tmp = "%v{my_id}.sp"
@@ -606,23 +614,23 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         else:
             result = "    {value_ref(my_id)} = call i64 @orion_slot_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
-    is_text_cmp = op == "text_eq" or op == "text_ne" or op == "text_lt" or op == "text_le" or op == "text_gt" or op == "text_ge"
+    is_text_cmp = op is "text_eq" or op is "text_ne" or op is "text_lt" or op is "text_le" or op is "text_gt" or op is "text_ge"
     if is_text_cmp:
-        if op == "text_eq" or op == "text_ne":
+        if op is "text_eq" or op is "text_ne":
             # H3 harvest of the H1 headers: equality via orion_text_eq -
             # same-ptr, length and cached-hash rejects run before any
             # byte is touched. Ordering below still walks bytes.
             eq_id = "%v{my_id}.e"
             l1 = "    {eq_id} = call i64 @orion_text_eq(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.rhs)})"
-            l2 = if op == "text_eq" then "    {value_ref(my_id)} = add i64 {eq_id}, 0" else "    {value_ref(my_id)} = xor i64 {eq_id}, 1"
+            l2 = if op is "text_eq" then "    {value_ref(my_id)} = add i64 {eq_id}, 0" else "    {value_ref(my_id)} = xor i64 {eq_id}, 1"
             result = "{l1}\n{l2}"
         else:
             edit cc = "slt"
-            if op == "text_le":
+            if op is "text_le":
                 cc = "sle"
-            if op == "text_gt":
+            if op is "text_gt":
                 cc = "sgt"
-            if op == "text_ge":
+            if op is "text_ge":
                 cc = "sge"
             cmp_id = "%v{my_id}.s"
             bool_id = "%v{my_id}.b"
@@ -631,24 +639,24 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             l3 = "    {value_ref(my_id)} = zext i1 {bool_id} to i64"
             result = "{l1}\n{l2}\n{l3}"
 
-    if op == "print_text":
+    if op is "print_text":
         l1 = "    call i32 @puts(ptr {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "print_raw":
+    if op is "print_raw":
         l1 = "    call void @orion_print_raw(ptr {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "list_lit":
+    if op is "list_lit":
         n = length(inst.args)
         # `[]` interns to one shared constant: cap 0 forces every push -
         # plain, push_mut, and the retired implicit rewrite is gone -
         # down the grow/copy path, and bounds-checked list_set rejects
         # all writes. Empty literals in per-frame code otherwise malloc
         # 16 bytes each, forever (~32 B per idle frame in cubsy).
-        if n == 0:
+        if n is 0:
             return "    {value_ref(my_id)} = getelementptr i64, ptr @orion_empty_list, i64 0"
         edit text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
         # Box each element by the LIST's element type - the SAME source
@@ -660,14 +668,14 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         # is ptrtoint'd, a double stores its bits (list_at bitcasts back),
         # everything else stores as-is.
         elem_ll = llvm_type_of(list_elem_type(inst.type_text))
-        loop ai in 0..<n:
-            item_id = at(inst.args, ai)
-            if elem_ll == "ptr":
+        loop ai in 0 until n:
+            item_id = inst.args[ai]
+            if elem_ll is "ptr":
                 tmp = "%v{my_id}.lp{ai}"
                 text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(item_id)} to i64"
                 text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {tmp})"
             else:
-                if elem_ll == "double":
+                if elem_ll is "double":
                     ftmp = "%v{my_id}.lf{ai}"
                     text = "{text}\n    {ftmp} = bitcast double {value_ref(item_id)} to i64"
                     text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {ftmp})"
@@ -675,22 +683,22 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                     text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {value_ref(item_id)})"
         result = text
 
-    if op == "list_at":
+    if op is "list_at":
         # If the source list has a known element type (e.g. "list:text"),
         # cast the i64 result back to ptr after loading.
-        src_inst = at(fn_value.instructions, inst.value)
+        src_inst = fn_value.instructions[inst.value]
         elem = list_elem_type(src_inst.type_text)
         elem_ll = llvm_type_of(elem)
-        la_i64 = llvm_type_of(ssa_value_type(inst.value, fn_value, module)) == "i64"
+        la_i64 = llvm_type_of(ssa_value_type(inst.value, fn_value, module)) is "i64"
         la_src = if la_i64 then "%v{my_id}.m" else value_ref(inst.value)
         la_pre = if la_i64 then "    {la_src} = inttoptr i64 {value_ref(inst.value)} to ptr\n" else ""
-        if elem_ll == "ptr":
+        if elem_ll is "ptr":
             int_name = "%v{my_id}.i"
             l1 = "    {int_name} = call i64 @orion_list_at(ptr {la_src}, i64 {value_ref(inst.lhs)})"
             l2 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
             result = "{la_pre}{l1}\n{l2}"
         else:
-            if elem_ll == "double":
+            if elem_ll is "double":
                 di_name = "%v{my_id}.di"
                 l1 = "    {di_name} = call i64 @orion_list_at(ptr {la_src}, i64 {value_ref(inst.lhs)})"
                 l2 = "    {value_ref(my_id)} = bitcast i64 {di_name} to double"
@@ -698,38 +706,38 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             else:
                 result = "{la_pre}    {value_ref(my_id)} = call i64 @orion_list_at(ptr {la_src}, i64 {value_ref(inst.lhs)})"
 
-    if op == "list_len":
+    if op is "list_len":
         ll_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-        if ll_ll == "i64":
+        if ll_ll is "i64":
             llp = "%v{my_id}.m"
             result = "    {llp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call i64 @orion_list_len(ptr {llp})"
         else:
             result = "    {value_ref(my_id)} = call i64 @orion_list_len(ptr {value_ref(inst.value)})"
 
-    if op == "fmath1":
+    if op is "fmath1":
         result = "    {value_ref(my_id)} = call double @{inst.name}(double {value_ref(inst.value)})"
 
-    if op == "fmath2":
+    if op is "fmath2":
         result = "    {value_ref(my_id)} = call double @{inst.name}(double {value_ref(inst.value)}, double {value_ref(inst.lhs)})"
 
-    if op == "list_slice":
+    if op is "list_slice":
         ls_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-        if ls_ll == "i64":
+        if ls_ll is "i64":
             lsp = "%v{my_id}.m"
             result = "    {lsp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call ptr @orion_list_slice(ptr {lsp}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
         else:
             result = "    {value_ref(my_id)} = call ptr @orion_list_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
 
-    if op == "list_push":
-        val_inst = at(fn_value.instructions, inst.lhs)
+    if op is "list_push":
+        val_inst = fn_value.instructions[inst.lhs]
         val_ty = llvm_type_of(val_inst.type_text)
-        if val_ty == "ptr":
+        if val_ty is "ptr":
             tmp = "%v{my_id}.p"
             l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
             l2 = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {tmp})"
             result = "{l1}\n{l2}"
         else:
-            if val_ty == "double":
+            if val_ty is "double":
                 tmp = "%v{my_id}.pf"
                 l1 = "    {tmp} = bitcast double {value_ref(inst.lhs)} to i64"
                 l2 = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {tmp})"
@@ -737,16 +745,16 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             else:
                 result = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
-    if op == "list_push_mut":
-        val_inst = at(fn_value.instructions, inst.lhs)
+    if op is "list_push_mut":
+        val_inst = fn_value.instructions[inst.lhs]
         val_ty = llvm_type_of(val_inst.type_text)
-        if val_ty == "ptr":
+        if val_ty is "ptr":
             tmp = "%v{my_id}.p"
             l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
             l2 = "    {value_ref(my_id)} = call ptr @orion_list_push_mut(ptr {value_ref(inst.value)}, i64 {tmp})"
             result = "{l1}\n{l2}"
         else:
-            if val_ty == "double":
+            if val_ty is "double":
                 tmp = "%v{my_id}.pf"
                 l1 = "    {tmp} = bitcast double {value_ref(inst.lhs)} to i64"
                 l2 = "    {value_ref(my_id)} = call ptr @orion_list_push_mut(ptr {value_ref(inst.value)}, i64 {tmp})"
@@ -756,41 +764,41 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
 
     # SIMD-style vector ops over int lists. Lowered to elementwise runtime
     # fns (orion_vec_add/sub/mul return ptr; orion_vec_dot returns i64).
-    if op == "vec_add":
+    if op is "vec_add":
         result = "    {value_ref(my_id)} = call ptr @orion_vec_add(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
-    if op == "vec_addi":
+    if op is "vec_addi":
         result = "    {value_ref(my_id)} = call ptr @orion_vec_addi(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
-    if op == "vec_madd":
+    if op is "vec_madd":
         result = "    {value_ref(my_id)} = call ptr @orion_vec_madd(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
-    if op == "par_madd":
+    if op is "par_madd":
         result = "    {value_ref(my_id)} = call ptr @orion_par_madd(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
-    if op == "vec_sub":
+    if op is "vec_sub":
         result = "    {value_ref(my_id)} = call ptr @orion_vec_sub(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
-    if op == "vec_mul":
+    if op is "vec_mul":
         result = "    {value_ref(my_id)} = call ptr @orion_vec_mul(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
-    if op == "vec_dot":
+    if op is "vec_dot":
         result = "    {value_ref(my_id)} = call i64 @orion_vec_dot(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
-    if op == "time_now_ms":
+    if op is "time_now_ms":
         result = "    {value_ref(my_id)} = call i64 @__orion_time_now_ms()"
-    if op == "monotonic_ms":
+    if op is "monotonic_ms":
         result = "    {value_ref(my_id)} = call i64 @__orion_monotonic_ms()"
-    if op == "sleep_ms":
+    if op is "sleep_ms":
         l1 = "    call void @__orion_sleep_ms(i64 {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "map_lit":
+    if op is "map_lit":
         # args alternates key/val: [k0, v0, k1, v1, ...]
         n_total = length(inst.args)
         n_pairs = n_total // 2
         edit text = "    {value_ref(my_id)} = call ptr @orion_map_new(i64 {n_pairs})"
-        loop pi in 0..<n_pairs:
-            key_id = at(inst.args, pi * 2)
-            val_id = at(inst.args, pi * 2 + 1)
-            val_inst = at(fn_value.instructions, val_id)
+        loop pi in 0 until n_pairs:
+            key_id = inst.args[pi * 2]
+            val_id = inst.args[pi * 2 + 1]
+            val_inst = fn_value.instructions[val_id]
             val_ty = llvm_type_of(val_inst.type_text)
             # Map slots are i64. ptr-typed values need ptrtoint first.
-            if val_ty == "ptr":
+            if val_ty is "ptr":
                 tmp = "%v{my_id}.p{pi}"
                 text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(val_id)} to i64"
                 text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {tmp})"
@@ -798,16 +806,16 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                 text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {value_ref(val_id)})"
         result = text
 
-    if op == "map_set_val":
+    if op is "map_set_val":
         # value is map_id, lhs is key_id, rhs is val_id. Mutate, then
         # re-yield the map pointer as this inst's SSA value. Key shape
         # picks the runtime family (i64 → _ik value compare).
         msv_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
-        msv_fam = if msv_key == "i64" then "orion_map_set_ik" else "orion_map_set"
-        msv_kty = if msv_key == "i64" then "i64" else "ptr"
-        msv_val_inst = at(fn_value.instructions, inst.rhs)
+        msv_fam = if msv_key is "i64" then "orion_map_set_ik" else "orion_map_set"
+        msv_kty = if msv_key is "i64" then "i64" else "ptr"
+        msv_val_inst = fn_value.instructions[inst.rhs]
         msv_val_ty = llvm_type_of(msv_val_inst.type_text)
-        if msv_val_ty == "ptr":
+        if msv_val_ty is "ptr":
             tmp = "%v{my_id}.p"
             l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.rhs)} to i64"
             l2 = "    call void @{msv_fam}(ptr {value_ref(inst.value)}, {msv_kty} {value_ref(inst.lhs)}, i64 {tmp})"
@@ -818,27 +826,27 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             l2 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
             result = "{l1}\n{l2}"
 
-    if op == "map_remove":
+    if op is "map_remove":
         # value is map_id, lhs is key_id. In-place swap-remove; the map
         # pointer re-yields as this inst's SSA value.
         mr_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
-        mr_fam = if mr_key == "i64" then "orion_map_remove_ik" else "orion_map_remove"
-        mr_kty = if mr_key == "i64" then "i64" else "ptr"
+        mr_fam = if mr_key is "i64" then "orion_map_remove_ik" else "orion_map_remove"
+        mr_kty = if mr_key is "i64" then "i64" else "ptr"
         l1 = "    call void @{mr_fam}(ptr {value_ref(inst.value)}, {mr_kty} {value_ref(inst.lhs)})"
         l2 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
         result = "{l1}\n{l2}"
 
-    if op == "list_set_val":
-        lsv_val_inst = at(fn_value.instructions, inst.rhs)
+    if op is "list_set_val":
+        lsv_val_inst = fn_value.instructions[inst.rhs]
         lsv_val_ty = llvm_type_of(lsv_val_inst.type_text)
-        if lsv_val_ty == "ptr":
+        if lsv_val_ty is "ptr":
             tmp = "%v{my_id}.p"
             l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.rhs)} to i64"
             l2 = "    call void @orion_list_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {tmp})"
             l3 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
             result = "{l1}\n{l2}\n{l3}"
         else:
-            if lsv_val_ty == "double":
+            if lsv_val_ty is "double":
                 tmp = "%v{my_id}.sf"
                 l1 = "    {tmp} = bitcast double {value_ref(inst.rhs)} to i64"
                 l2 = "    call void @orion_list_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {tmp})"
@@ -849,39 +857,39 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                 l2 = "    {value_ref(my_id)} = getelementptr i8, ptr {value_ref(inst.value)}, i64 0"
                 result = "{l1}\n{l2}"
 
-    if op == "map_len":
+    if op is "map_len":
         ml_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-        if ml_ll == "i64":
+        if ml_ll is "i64":
             mlp = "%v{my_id}.m"
             result = "    {mlp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call i64 @orion_map_len(ptr {mlp})"
         else:
             result = "    {value_ref(my_id)} = call i64 @orion_map_len(ptr {value_ref(inst.value)})"
 
-    if op == "map_keys":
+    if op is "map_keys":
         mk_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-        if mk_ll == "i64":
+        if mk_ll is "i64":
             mkp = "%v{my_id}.m"
             result = "    {mkp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call ptr @orion_map_keys(ptr {mkp})"
         else:
             result = "    {value_ref(my_id)} = call ptr @orion_map_keys(ptr {value_ref(inst.value)})"
 
-    if op == "map_values":
+    if op is "map_values":
         mv_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-        if mv_ll == "i64":
+        if mv_ll is "i64":
             mvp = "%v{my_id}.m"
             result = "    {mvp} = inttoptr i64 {value_ref(inst.value)} to ptr\n    {value_ref(my_id)} = call ptr @orion_map_values(ptr {mvp})"
         else:
             result = "    {value_ref(my_id)} = call ptr @orion_map_values(ptr {value_ref(inst.value)})"
 
-    if op == "map_get_or":
+    if op is "map_get_or":
         # Key's LLVM shape picks the runtime family: i64 keys → _ik
         # (value compare), ptr keys → strcmp. Default's shape decides
         # the result cast.
         mgo_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
-        mgo_fam = if mgo_key == "i64" then "orion_map_get_or_ik" else "orion_map_get_or"
-        mgo_kty = if mgo_key == "i64" then "i64" else "ptr"
+        mgo_fam = if mgo_key is "i64" then "orion_map_get_or_ik" else "orion_map_get_or"
+        mgo_kty = if mgo_key is "i64" then "i64" else "ptr"
         mgo_ty = llvm_type_of(inst.type_text)
-        if mgo_ty == "ptr":
+        if mgo_ty is "ptr":
             dtmp = "%v{my_id}.d"
             rtmp = "%v{my_id}.r"
             l1 = "    {dtmp} = ptrtoint ptr {value_ref(inst.rhs)} to i64"
@@ -891,18 +899,18 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         else:
             result = "    {value_ref(my_id)} = call i64 @{mgo_fam}(ptr {value_ref(inst.value)}, {mgo_kty} {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
 
-    if op == "f64_to_text":
+    if op is "f64_to_text":
         result = "    {value_ref(my_id)} = call ptr @orion_f64_to_text(double {value_ref(inst.value)})"
 
-    if op == "map_get":
+    if op is "map_get":
         # map_get returns i64. The caller decides via type_text whether to
         # cast back to ptr (for text/list/map) or keep as i64. Key shape
         # picks the runtime family (i64 → _ik value compare).
         mg_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
-        mg_fam = if mg_key == "i64" then "orion_map_get_ik" else "orion_map_get"
-        mg_kty = if mg_key == "i64" then "i64" else "ptr"
+        mg_fam = if mg_key is "i64" then "orion_map_get_ik" else "orion_map_get"
+        mg_kty = if mg_key is "i64" then "i64" else "ptr"
         ty = llvm_type_of(inst.type_text)
-        if ty == "ptr":
+        if ty is "ptr":
             # A MISSING key reads back as 0, and turning that into a pointer
             # handed the program a null: `length(get_list(m, "nope"))` crashed with
             # an access violation at address 0x8 instead of answering 0. Both
@@ -911,7 +919,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             int_name = "%v{my_id}.i"
             null_name = "%v{my_id}.isnull"
             raw_name = "%v{my_id}.raw"
-            mg_empty = if inst.type_text == "text" then "getelementptr(i8, ptr @.str_empty_h, i64 16)" else "@orion_empty_list"
+            mg_empty = if inst.type_text is "text" then "getelementptr(i8, ptr @.str_empty_h, i64 16)" else "@orion_empty_list"
             l1 = "    {int_name} = call i64 @{mg_fam}(ptr {value_ref(inst.value)}, {mg_kty} {value_ref(inst.lhs)})"
             l2 = "    {raw_name} = inttoptr i64 {int_name} to ptr"
             l3 = "    {null_name} = icmp eq i64 {int_name}, 0"
@@ -920,28 +928,28 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         else:
             result = "    {value_ref(my_id)} = call i64 @{mg_fam}(ptr {value_ref(inst.value)}, {mg_kty} {value_ref(inst.lhs)})"
 
-    if op == "map_has":
+    if op is "map_has":
         mh_key = llvm_type_of(ssa_value_type(inst.lhs, fn_value, module))
-        mh_fam = if mh_key == "i64" then "orion_map_has_ik" else "orion_map_has"
-        mh_kty = if mh_key == "i64" then "i64" else "ptr"
+        mh_fam = if mh_key is "i64" then "orion_map_has_ik" else "orion_map_has"
+        mh_kty = if mh_key is "i64" then "i64" else "ptr"
         result = "    {value_ref(my_id)} = call i64 @{mh_fam}(ptr {value_ref(inst.value)}, {mh_kty} {value_ref(inst.lhs)})"
 
-    if op == "struct_cons":
+    if op is "struct_cons":
         n_fields = inst.value
         bytes_needed = n_fields * 8
         edit text2 = "    {value_ref(my_id)} = call ptr @orion_alloc(i64 {bytes_needed})"
-        loop fi in 0..<n_fields:
-            val_id = at(inst.args, fi)
-            val_inst = at(fn_value.instructions, val_id)
+        loop fi in 0 until n_fields:
+            val_id = inst.args[fi]
+            val_inst = fn_value.instructions[val_id]
             val_ty = llvm_type_of(val_inst.type_text)
             slot_name = "%v{my_id}.f{fi}"
             text2 = "{text2}\n    {slot_name} = getelementptr i64, ptr {value_ref(my_id)}, i64 {fi}"
-            if val_ty == "ptr":
+            if val_ty is "ptr":
                 int_name = "%v{my_id}.f{fi}.i"
                 text2 = "{text2}\n    {int_name} = ptrtoint ptr {value_ref(val_id)} to i64"
                 text2 = "{text2}\n    store i64 {int_name}, ptr {slot_name}"
             else:
-                if val_ty == "double":
+                if val_ty is "double":
                     bits_name = "%v{my_id}.f{fi}.b"
                     text2 = "{text2}\n    {bits_name} = bitcast double {value_ref(val_id)} to i64"
                     text2 = "{text2}\n    store i64 {bits_name}, ptr {slot_name}"
@@ -949,44 +957,44 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                     text2 = "{text2}\n    store i64 {value_ref(val_id)}, ptr {slot_name}"
         result = text2
 
-    if op == "field_load":
+    if op is "field_load":
         ty = llvm_type_of(inst.type_text)
         slot_name = "%v{my_id}.slot"
         l1 = "    {slot_name} = getelementptr i64, ptr {value_ref(inst.value)}, i64 {inst.lhs}"
-        if ty == "double":
+        if ty is "double":
             fl_bits = "%v{my_id}.b"
             l2d = "    {fl_bits} = load i64, ptr {slot_name}"
             l3d = "    {value_ref(my_id)} = bitcast i64 {fl_bits} to double"
             result = "{l1}\n{l2d}\n{l3d}"
-        if ty == "ptr":
+        if ty is "ptr":
             int_name = "%v{my_id}.i"
             l2 = "    {int_name} = load i64, ptr {slot_name}"
             l3 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
             result = "{l1}\n{l2}\n{l3}"
-        if ty == "i64":
+        if ty is "i64":
             l2 = "    {value_ref(my_id)} = load i64, ptr {slot_name}"
             result = "{l1}\n{l2}"
 
-    if op == "alloca":
+    if op is "alloca":
         ty = llvm_type_of(inst.type_text)
         result = "    {value_ref(my_id)} = alloca {ty}, align 8"
 
-    if op == "load":
+    if op is "load":
         ty = llvm_type_of(inst.type_text)
         result = "    {value_ref(my_id)} = load {ty}, ptr {value_ref(inst.value)}"
 
-    if op == "store":
+    if op is "store":
         # Stored value's type comes from its defining inst.
-        val_inst = at(fn_value.instructions, inst.lhs)
+        val_inst = fn_value.instructions[inst.lhs]
         ty = llvm_type_of(val_inst.type_text)
         l1 = "    store {ty} {value_ref(inst.lhs)}, ptr {value_ref(inst.value)}"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "return":
+    if op is "return":
         ret_ty = llvm_type_of(fn_value.return_type)
         if inst.value < 0:
-            if ret_ty == "ptr":
+            if ret_ty is "ptr":
                 result = "    ret ptr null"
             else:
                 result = "    ret i64 0"
@@ -995,13 +1003,13 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             # with the declared return type (untyped map reads flowing
             # out of int-returning fns and vice versa).
             val_ll = llvm_type_of(ssa_value_type(inst.value, fn_value, module))
-            if ret_ty == "i64" and val_ll == "ptr":
+            if ret_ty is "i64" and val_ll is "ptr":
                 rc = "%v{my_id}.rc"
                 l1 = "    {rc} = ptrtoint ptr {value_ref(inst.value)} to i64"
                 l2 = "    ret i64 {rc}"
                 result = "{l1}\n{l2}"
             else:
-                if ret_ty == "ptr" and val_ll == "i64":
+                if ret_ty is "ptr" and val_ll is "i64":
                     rc = "%v{my_id}.rc"
                     l1 = "    {rc} = inttoptr i64 {value_ref(inst.value)} to ptr"
                     l2 = "    ret ptr {rc}"
@@ -1009,11 +1017,16 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                 else:
                     result = "    ret {ret_ty} {value_ref(inst.value)}"
 
+    # --trace: exit-hook fore VARJE ret - djupraknaren bakom stega
+    # over/ut. Speglar trace_enter som ast_to_ir lagger i prologen.
+    if op is "return" and slot_get_int("drv:trace") is 1:
+        result = "    call i64 @orion_trace_exit()\n{result}"
+
     # An op no branch above handled would silently emit a placeholder
     # `add i64 0, 0` - valid LLVM, wrong program. If `result` still
     # equals the default sentinel, no branch matched: count it as a
     # compile error so drivers refuse to ship the module.
-    if result == "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}":
+    if result is "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}":
         compile_error("orion: ERROR - IR op `{op}` has no LLVM lowering (fn `{fn_value.name}`)")
 
     result
@@ -1034,7 +1047,7 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
 define memfact_count(kind: text):
     slot_set("emit:mf:" + kind, memfact_get(kind) + 1)
 
-define memfact_get(kind: text) -> int:
+define memfact_get(kind: text) -> number:
     if slot_has("emit:mf:" + kind) then slot_get_int("emit:mf:" + kind) else 0
 
 define memfact_note(fn_name: text, type_text: text):
@@ -1047,22 +1060,22 @@ define memfact_note(fn_name: text, type_text: text):
 public define memfacts_report():
     stores = memfact_get("stores")
     opaque = memfact_get("opaque")
-    if stores == 0:
+    if stores is 0:
         return 0
-    if opaque == 0:
+    if opaque is 0:
         print_line("  memory: {stores} slot store(s), all evacuable")
     else:
         print_line("  memory: {stores} slot store(s), {opaque} with no copier (`orion <file> memfacts` to list)")
     0
 
 # The sites themselves, on request: `orion <file> memfacts`.
-public define memfacts_list() -> int:
+public define memfacts_list() -> number:
     stores = memfact_get("stores")
     opaque = memfact_get("opaque")
     print_line("")
     print_line("  slot-store boundary: {stores} pointer store(s), {opaque} with no copier")
     print_line("")
-    if opaque == 0:
+    if opaque is 0:
         print_line("  Every pointer stored in a slot has a deep copier, so a region-born")
         print_line("  value is evacuated to the heap rather than left to dangle.")
     else:
@@ -1071,7 +1084,7 @@ public define memfacts_list() -> int:
         print_line("  the runtime aborts. Each one is therefore either wrapped in a persist")
         print_line("  scope by hand, or a latent abort - and the compiler cannot tell which.")
         print_line("")
-        loop i in 0..<opaque:
+        loop i in 0 until opaque:
             print_line("    " + slot_get("emit:mfo:{i}"))
     print_line("")
     0
@@ -1079,16 +1092,16 @@ public define memfacts_list() -> int:
 # Evacuation type code for the slot-store boundary - what
 # orion_slot_evac needs to deep-copy a region-born value. 0 = no
 # copier (opaque struct/fn/ptr): in-region still fails fast.
-define evac_code(orion_type: text) -> int:
-    if orion_type == "text":
+define evac_code(orion_type: text) -> number:
+    if orion_type is "text":
         1
-    else if orion_type == "list" or orion_type == "list:i64" or orion_type == "list:f64":
+    else if orion_type is "list" or orion_type is "list:i64" or orion_type is "list:f64":
         2
-    else if orion_type == "list:text":
+    else if orion_type is "list:text":
         3
-    else if orion_type == "map" or orion_type == "map:i64" or orion_type == "map:text" or orion_type == "map:map":
+    else if orion_type is "map" or orion_type is "map:i64" or orion_type is "map:text" or orion_type is "map:map":
         4
-    else if orion_type == "list:map":
+    else if orion_type is "list:map":
         5
     else:
         0
@@ -1098,21 +1111,21 @@ define llvm_type_of(orion_type: text) -> text:
     edit is_list_elem = false
     bs = bytes_of(orion_type)
     if length(bs) >= 7:
-        if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
+        if bs[0] is 115 and bs[1] is 116 and bs[2] is 114 and bs[3] is 117 and bs[4] is 99 and bs[5] is 116 and bs[6] is 58:
             is_struct = true
     # `list:T` (parameterised list) - also a ptr at LLVM level.
     if length(bs) >= 5:
-        if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
+        if bs[0] is 108 and bs[1] is 105 and bs[2] is 115 and bs[3] is 116 and bs[4] is 58:
             is_list_elem = true
     # `map:T` (value-typed map) - a map handle, also a ptr.
     edit is_map_elem = false
     if length(bs) >= 4:
-        if at(bs, 0) == 109 and at(bs, 1) == 97 and at(bs, 2) == 112 and at(bs, 3) == 58:
+        if bs[0] is 109 and bs[1] is 97 and bs[2] is 112 and bs[3] is 58:
             is_map_elem = true
-    if orion_type == "f64":
+    if orion_type is "f64":
         "double"
     else:
-        if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "dyn" or orion_type == "ptr" or orion_type == "fn" or is_struct or is_list_elem or is_map_elem then "ptr" else "i64"
+        if orion_type is "text" or orion_type is "list" or orion_type is "map" or orion_type is "dyn" or orion_type is "ptr" or orion_type is "fn" or is_struct or is_list_elem or is_map_elem then "ptr" else "i64"
 
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).
@@ -1121,15 +1134,15 @@ define list_elem_type(list_type: text) -> text:
     n = length(bs)
     edit is_listed = false
     if n >= 5:
-        if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
+        if bs[0] is 108 and bs[1] is 105 and bs[2] is 115 and bs[3] is 116 and bs[4] is 58:
             is_listed = true
     if not is_listed:
         "i64"
     else:
         # Extract bytes 5..n
         edit result = ""
-        loop index in 5..<n:
-            single = text_of([at(bs, index)])
+        loop index in 5 until n:
+            single = text_of([bs[index]])
             result = "{result}{single}"
         result
 
@@ -1137,9 +1150,9 @@ define list_elem_type(list_type: text) -> text:
 define emit_param_list(params: [Param]) -> text:
     n = length(params)
     edit result = ""
-    loop index in 0..<n:
-        sep = if index == 0 then "" else ", "
-        ty = llvm_type_of(at(params, index).type_text)
+    loop index in 0 until n:
+        sep = if index is 0 then "" else ", "
+        ty = llvm_type_of(params[index].type_text)
         result = "{result}{sep}{ty} %p{index}"
     result
 
@@ -1147,9 +1160,9 @@ define emit_param_list(params: [Param]) -> text:
 define emit_param_types(params: [Param]) -> text:
     n = length(params)
     edit result = ""
-    loop index in 0..<n:
-        sep = if index == 0 then "" else ", "
-        ty = llvm_type_of(at(params, index).type_text)
+    loop index in 0 until n:
+        sep = if index is 0 then "" else ", "
+        ty = llvm_type_of(params[index].type_text)
         result = "{result}{sep}{ty}"
     result
 
@@ -1159,13 +1172,13 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
     # Skip emission of compile-time aliases that exist only so lodge-orion
     # can interpret the source; orion-self dispatches their callers directly
     # to typed runtime helpers.
-    is_alias = name == "get_int" or name == "get_map" or name == "get_list"
+    is_alias = name is "get_int" or name is "get_map" or name is "get_list"
     if is_alias:
         ""
     else:
         ret_type = llvm_type_of(fn_value.return_type)
         param_list = emit_param_list(fn_value.params)
-        is_user_main = name == "main"
+        is_user_main = name is "main"
         emit_name = if is_user_main then "orion_main" else name
         # Chunk list + single join, NOT repeated `"{text}{line}"` concat -
         # concat re-copies the whole accumulated text per line, O(n²)
@@ -1182,14 +1195,14 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
         # SSA name is the instruction index, unchanged by emit order, so moving
         # the emission is sound: emit every alloca first (entry block), then the
         # rest in order.
-        loop hi in 0..<total:
-            h_inst = at(fn_value.instructions, hi)
-            if h_inst.op == "alloca":
+        loop hi in 0 until total:
+            h_inst = fn_value.instructions[hi]
+            if h_inst.op is "alloca":
                 chunks = append(chunks, emit_instruction(h_inst, hi, strings, fn_value, module))
                 chunks = append(chunks, "\n")
-        loop index in 0..<total:
-            inst = at(fn_value.instructions, index)
-            if inst.op != "alloca":
+        loop index in 0 until total:
+            inst = fn_value.instructions[index]
+            if inst.op is not "alloca":
                 line = emit_instruction(inst, index, strings, fn_value, module)
                 chunks = append(chunks, line)
                 chunks = append(chunks, "\n")
@@ -1202,7 +1215,7 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
 # +16 to the bytes. Hash is BAKED (rodata cannot lazy-write):
 # polynomial base 131 seed 5381 mod 1e9+7, identical to the
 # runtime's orion_text_hash, remapped 0 -> 1.
-define emit_string_global(text_value: text, idx: int) -> text:
+define emit_string_global(text_value: text, idx: number) -> text:
     bs = bytes_of(text_value)
     blen = length(bs)
     n = blen + 17
@@ -1211,29 +1224,29 @@ define emit_string_global(text_value: text, idx: int) -> text:
     header = i64_le_escapes(h) + i64_le_escapes(blen)
     "@.str_{idx} = private unnamed_addr constant [{n} x i8] c\"{header}{escaped}\\00\", align 8"
 
-define bake_hash(bs: [int]) -> int:
+define bake_hash(bs: [number]) -> number:
     n = length(bs)
     edit h = 5381
-    loop i in 0..<n:
-        h = (h * 131 + at(bs, i)) - ((h * 131 + at(bs, i)) // 1000000007) * 1000000007
-    if h == 0 then 1 else h
+    loop i in 0 until n:
+        h = (h * 131 + bs[i]) - ((h * 131 + bs[i]) // 1000000007) * 1000000007
+    if h is 0 then 1 else h
 
-define i64_le_escapes(v: int) -> text:
+define i64_le_escapes(v: number) -> text:
     edit out = ""
     edit x = v
-    loop i in 0..<8:
+    loop i in 0 until 8:
         b = x - (x // 256) * 256
         out = out + "\\" + hex2(b)
         x = x // 256
     out
 
-define hex2(b: int) -> text:
+define hex2(b: number) -> text:
     hi = b // 16
     lo = b - hi * 16
     hex1(hi) + hex1(lo)
 
-define hex1(d: int) -> text:
-    if d == 0 then "0" else if d == 1 then "1" else if d == 2 then "2" else if d == 3 then "3" else if d == 4 then "4" else if d == 5 then "5" else if d == 6 then "6" else if d == 7 then "7" else if d == 8 then "8" else if d == 9 then "9" else if d == 10 then "A" else if d == 11 then "B" else if d == 12 then "C" else if d == 13 then "D" else if d == 14 then "E" else "F"
+define hex1(d: number) -> text:
+    if d is 0 then "0" else if d is 1 then "1" else if d is 2 then "2" else if d is 3 then "3" else if d is 4 then "4" else if d is 5 then "5" else if d is 6 then "6" else if d is 7 then "7" else if d is 8 then "8" else if d is 9 then "9" else if d is 10 then "A" else if d is 11 then "B" else if d is 12 then "C" else if d is 13 then "D" else if d is 14 then "E" else "F"
 
 
 # Runtime helpers in LLVM IR. Defined alongside user code so we can
@@ -1251,12 +1264,21 @@ define emit_runtime() -> text:
     # Float-literal hex conversion lives in orion_rt.c (strtod) - declare
     # here since the orion_ prefix skips the auto-extern-declare path.
     text = "{text}declare ptr @orion_f64_literal_hex(ptr)\n"
+    # to_whole/to_real on a text route to these C parsers (orion_ prefix
+    # skips the auto-extern path, so declare here).
+    text = "{text}declare i64 @orion_text_to_int(ptr)\n"
+    text = "{text}declare double @orion_text_to_f64(ptr)\n"
     # Parallel closure runner (orion_rt.c): run each closure(arg) on a worker,
     # sum the results. orion_ prefix skips the auto-extern path, so declare here.
     text = "{text}declare i64 @orion_par_run(ptr, i64)\n"
     # Debugger v1 (orion_ prefix skips the auto-extern path, so declare here):
     # --trace fn-entry hook, the trap-time trail dump, and breakpoint().
     text = "{text}declare i64 @orion_trace_enter(ptr)\n"
+    text = "{text}declare i64 @orion_line(ptr)\n"
+    text = "{text}declare i64 @orion_dbg_i(ptr, i64)\n"
+    text = "{text}declare i64 @orion_trace_exit()\n"
+    text = "{text}declare i64 @orion_slot_watch(ptr)\n"
+    text = "{text}declare i64 @orion_dbg_t(ptr, ptr)\n"
     text = "{text}declare i64 @orion_trail_note_trap()\n"
     text = "{text}declare i64 @orion_breakpoint(ptr)\n"
     # Frame-arena allocator (orion_rt.c): ALL runtime allocations route
@@ -1313,6 +1335,7 @@ define emit_runtime() -> text:
     text = "{text}declare i64 @orion_task_await(i64)\n"
     text = "{text}declare i64 @orion_task_yield()\n"
     text = "{text}declare i64 @orion_task_run_all()\n"
+    text = "{text}declare i64 @orion_task_pump()\n"
     text = "{text}declare i64 @orion_task_state(i64)\n"
     text = "{text}declare i64 @orion_task_live_count()\n"
     text = "{text}declare i64 @orion_task_sleep(i64)\n"
@@ -2066,40 +2089,11 @@ define emit_runtime() -> text:
     # Headered empty text: hash 5381 (0x1505 LE) + len 0 + NUL, the
     # pointer everyone returns is blob+16.
     text = "{text}@.empty_str = private unnamed_addr constant [17 x i8] c\"\\05\\15\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\", align 8\n\n"
-    # file_read(path) → Text. Returns "" on open failure.
-    text = "{text}define ptr @orion_file_read(ptr %path) \{\n"
-    text = "{text}entry:\n"
-    text = "{text}  %fp = call ptr @fopen(ptr %path, ptr @.fmode_r)\n"
-    text = "{text}  %is_null = icmp eq ptr %fp, null\n"
-    text = "{text}  br i1 %is_null, label %err, label %ok\n"
-    text = "{text}err:\n"
-    text = "{text}  %eo = getelementptr i8, ptr @.empty_str, i64 16\n"
-    text = "{text}  ret ptr %eo\n"
-    text = "{text}ok:\n"
-    text = "{text}  %_seek = call i32 @fseek(ptr %fp, i64 0, i32 2)\n"
-    text = "{text}  %size = call i64 @ftell(ptr %fp)\n"
-    text = "{text}  %_rew = call i32 @fseek(ptr %fp, i64 0, i32 0)\n"
-    text = "{text}  %buf = call ptr @orion_text_alloc(i64 %size)\n"
-    text = "{text}  %_read = call i64 @fread(ptr %buf, i64 1, i64 %size, ptr %fp)\n"
-    text = "{text}  %term = getelementptr i8, ptr %buf, i64 %size\n"
-    text = "{text}  store i8 0, ptr %term\n"
-    text = "{text}  %_close = call i32 @fclose(ptr %fp)\n"
-    text = "{text}  ret ptr %buf\n"
-    text = "{text}\}\n\n"
-    # file_write(path, content) → i64 1 on success, 0 on failure.
-    text = "{text}define i64 @orion_file_write(ptr %path, ptr %content) \{\n"
-    text = "{text}entry:\n"
-    text = "{text}  %fp = call ptr @fopen(ptr %path, ptr @.fmode_w)\n"
-    text = "{text}  %is_null = icmp eq ptr %fp, null\n"
-    text = "{text}  br i1 %is_null, label %err, label %ok\n"
-    text = "{text}err:\n"
-    text = "{text}  ret i64 0\n"
-    text = "{text}ok:\n"
-    text = "{text}  %len = call i64 @orion_tlen(ptr %content)\n"
-    text = "{text}  %_wrote = call i64 @fwrite(ptr %content, i64 1, i64 %len, ptr %fp)\n"
-    text = "{text}  %_close = call i32 @fclose(ptr %fp)\n"
-    text = "{text}  ret i64 1\n"
-    text = "{text}\}\n\n"
+    # file_read/file_write bor i C-runtimen (orion_rt.c) - flyttade fran
+    # handskriven IR sa effektinspelningen (ORION_RECORD/REPLAY) kan
+    # fanga dem. Beteendet ar identiskt: "" vid oppningsfel, 1/0 write.
+    text = "{text}declare ptr @orion_file_read(ptr)\n"
+    text = "{text}declare i64 @orion_file_write(ptr, ptr)\n\n"
     # Lists: heap buffer [i64 cap, i64 len, i64 item0, ...].
     # push is amortized O(1): in-place while len < cap, doubling grow
     # otherwise. Callers MUST rebind (`x = append(x, v)`) - on grow a new
@@ -2186,34 +2180,11 @@ define emit_runtime() -> text:
     text = "{text}  %mr = srem i64 %a, %b\n"
     text = "{text}  ret i64 %mr\n"
     text = "{text}\}\n\n"
-    # Contract checks. `require`/`ensure` evaluate a condition and trap loudly
-    # (clear message + exit 70) when it is false, instead of the old behaviour
-    # where the statement was dropped silently. Returns i64 so the emitted
-    # `call` can default its return type to i64; the value is discarded.
-    text = "{text}define i64 @orion_require(i64 %c) \{\n"
-    text = "{text}entry:\n"
-    text = "{text}  %rq = icmp eq i64 %c, 0\n"
-    text = "{text}  br i1 %rq, label %rfail, label %rok\n"
-    text = "{text}rfail:\n"
-    text = "{text}  %_rp = call i32 (ptr, ...) @printf(ptr @.msg_require)\n"
-    text = "{text}  %_rt = call i64 @orion_trail_note_trap()\n"
-    text = "{text}  call void @exit(i32 70)\n"
-    text = "{text}  unreachable\n"
-    text = "{text}rok:\n"
-    text = "{text}  ret i64 %c\n"
-    text = "{text}\}\n\n"
-    text = "{text}define i64 @orion_ensure(i64 %c) \{\n"
-    text = "{text}entry:\n"
-    text = "{text}  %eq0 = icmp eq i64 %c, 0\n"
-    text = "{text}  br i1 %eq0, label %efail, label %eok\n"
-    text = "{text}efail:\n"
-    text = "{text}  %_ep = call i32 (ptr, ...) @printf(ptr @.msg_ensure)\n"
-    text = "{text}  %_et = call i64 @orion_trail_note_trap()\n"
-    text = "{text}  call void @exit(i32 70)\n"
-    text = "{text}  unreachable\n"
-    text = "{text}eok:\n"
-    text = "{text}  ret i64 %c\n"
-    text = "{text}\}\n\n"
+    # Contract checks bor i C-runtimen: trappen sager VAR kravet foll
+    # ("require failed at fil:rad") och skriver lokalerna i tracade
+    # byggen - felet forklarar sig sjalvt i stallet for en enrads-suck.
+    text = "{text}declare i64 @orion_require_at(i64, ptr)\n"
+    text = "{text}declare i64 @orion_ensure_at(i64, ptr)\n\n"
     # part(list, lo, hi) - half-open [lo, hi), bounds clamped like the interp.
     text = "{text}define ptr @orion_list_slice(ptr %list, i64 %lo, i64 %hi) \{\n"
     text = "{text}entry:\n"
@@ -2610,6 +2581,29 @@ define emit_runtime() -> text:
     text = "{text}  ret i64 %len\n"
     text = "{text}\}\n\n"
     # map_keys / map_values: snapshot into a fresh pre-sized list.
+    # arguments - the program argv as a `list of text`. argc/argv are the C
+    # names for the same thing; this is the one a reader should ever meet.
+    text = "{text}define ptr @orion_arguments() \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %n = load i64, ptr @orion_argc\n"
+    text = "{text}  %out = call ptr @orion_list_new(i64 %n)\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}hdr:\n"
+    text = "{text}  %i = phi i64 [ 0, %entry ], [ %i_next, %bdy ]\n"
+    text = "{text}  %done = icmp sge i64 %i, %n\n"
+    text = "{text}  br i1 %done, label %after, label %bdy\n"
+    text = "{text}bdy:\n"
+    text = "{text}  %arr = load ptr, ptr @orion_argv\n"
+    text = "{text}  %slot = getelementptr ptr, ptr %arr, i64 %i\n"
+    text = "{text}  %raw = load ptr, ptr %slot\n"
+    text = "{text}  %t = call ptr @orion_text_from_c(ptr %raw)\n"
+    text = "{text}  %ti = ptrtoint ptr %t to i64\n"
+    text = "{text}  call void @orion_list_set(ptr %out, i64 %i, i64 %ti)\n"
+    text = "{text}  %i_next = add i64 %i, 1\n"
+    text = "{text}  br label %hdr\n"
+    text = "{text}after:\n"
+    text = "{text}  ret ptr %out\n"
+    text = "{text}\}\n\n"
     text = "{text}define ptr @orion_map_keys(ptr %map) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %entries = load ptr, ptr %map\n"
@@ -2726,10 +2720,10 @@ define emit_runtime() -> text:
 define emit_uses_print_raw(module: IRModule) -> truth:
     edit found = false
     fns = module.functions
-    loop fi in 0..<length(fns):
-        insts = at(fns, fi).instructions
-        loop ii in 0..<length(insts):
-            if at(insts, ii).op == "print_raw":
+    loop fi in 0 until length(fns):
+        insts = fns[fi].instructions
+        loop ii in 0 until length(insts):
+            if insts[ii].op is "print_raw":
                 found = true
     found
 
@@ -2746,26 +2740,26 @@ public define emit_module(module: IRModule) -> text:
     # above. Without these declares clang rejects the .ll before linking.
     externs = collect_extern_calls(module)
     n_ext = length(externs)
-    loop xi in 0..<n_ext:
-        chunks = append(chunks, at(externs, xi))
+    loop xi in 0 until n_ext:
+        chunks = append(chunks, externs[xi])
         chunks = append(chunks, "\n")
     chunks = append(chunks, "\n")
     # Emit one global per distinct string literal in the module.
     strings = collect_strings(module)
     n_strings = length(strings)
-    loop index in 0..<n_strings:
-        chunks = append(chunks, emit_string_global(at(strings, index), index))
+    loop index in 0 until n_strings:
+        chunks = append(chunks, emit_string_global(strings[index], index))
         chunks = append(chunks, "\n")
     chunks = append(chunks, "\n")
     total = length(module.functions)
-    loop index in 0..<total:
-        fn_value = at(module.functions, index)
+    loop index in 0 until total:
+        fn_value = module.functions[index]
         # Body-less fn = extern declaration → typed declare; the symbol
         # resolves at link time (C shim / libc). Runtime symbols skip
         # even the declare: emit_runtime DEFINES those and LLVM rejects
         # declare+define of one name in a module. Guard-if style, not
         # if/else - lodge-orion's dangling-else binds else to the inner if.
-        is_extern_decl = length(fn_value.instructions) == 0
+        is_extern_decl = length(fn_value.instructions) is 0
         if is_extern_decl:
             if not is_runtime_symbol(fn_value.name):
                 ret_ll = llvm_type_of(fn_value.return_type)

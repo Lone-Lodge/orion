@@ -690,9 +690,17 @@ long long orion_mic_open(long long rate) {
     return 1;
 }
 
+/* Loudness as 0..1000, scaled for VOICE rather than for full scale.
+ *
+ * Speech into a desktop mic sits around 0.01-0.1 rms and a quiet room
+ * around 0.0005. Mapping 1.0 rms to 1000 spent the whole range on levels
+ * that never occur and truncated every real signal to zero - the orb sat
+ * dead still no matter how loud the room was. Mapping 0.1 to 1000 puts
+ * normal speech in the 100-1000 band and leaves room noise around 5. */
 long long orion_mic_level(void) {
     if (!om_ok) return 0;
-    return (long long)(om_level * 1000.0f);
+    long long scaled = (long long)(om_level * 10000.0f);
+    return scaled > 1000 ? 1000 : scaled;
 }
 
 long long orion_mic_buffered(void) {

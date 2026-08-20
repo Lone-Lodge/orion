@@ -25,7 +25,7 @@ external define orion_console_color() -> int
 #      that hangs is stopped at its deadline instead of hanging the suite.
 
 
-define parse_expected(filename: text) -> int:
+define parse_expected(filename: text) -> number:
     b = bytes_of(filename)
     total = length(b)
     edit start = 0
@@ -33,9 +33,9 @@ define parse_expected(filename: text) -> int:
         start = 5
     edit value = 0
     edit done = 0
-    loop index in start..<total:
-        if done == 0:
-            ch = at(b, index)
+    loop index in start until total:
+        if done is 0:
+            ch = b[index]
             if ch >= 48 and ch <= 57:
                 value = value * 10 + (ch - 48)
             else:
@@ -47,19 +47,19 @@ define parse_expected(filename: text) -> int:
 # Windows/Linux/Mac: clang location, the datalayout mangling + target triple
 # to retarget the compiler's Windows IR to (0=Win 1=Linux 2=Mac).
 define host_clang() -> text:
-    if os_kind() == 0 then "C:\\Program Files\\LLVM\\bin\\clang.exe" else "clang"
+    if os_kind() is 0 then "C:\\Program Files\\LLVM\\bin\\clang.exe" else "clang"
 
 define host_mangle() -> text:
-    if os_kind() == 0:
+    if os_kind() is 0:
         return "w"
-    if os_kind() == 2:
+    if os_kind() is 2:
         return "o"
     "e"
 
 define host_triple_of() -> text:
-    if os_kind() == 0:
+    if os_kind() is 0:
         return ""
-    if os_kind() == 2:
+    if os_kind() is 2:
         return "arm64-apple-macosx"
     "x86_64-unknown-linux-gnu"
 
@@ -72,16 +72,16 @@ define host_triple_of() -> text:
 define or_files() -> [text]:
     raw_files = list_dir("tests")
     edit files = []
-    loop raw_index in 0..<length(raw_files):
-        raw_name = at(raw_files, raw_index)
+    loop raw_index in 0 until length(raw_files):
+        raw_name = raw_files[raw_index]
         name_bytes = bytes_of(raw_name)
         name_len = length(name_bytes)
         edit is_or_file = false
         if name_len >= 3:
-            tail_dot = at(name_bytes, name_len - 3)
-            tail_o = at(name_bytes, name_len - 2)
-            tail_r = at(name_bytes, name_len - 1)
-            if tail_dot == 46 and tail_o == 111 and tail_r == 114:
+            tail_dot = name_bytes[name_len - 3]
+            tail_o = name_bytes[name_len - 2]
+            tail_r = name_bytes[name_len - 1]
+            if tail_dot is 46 and tail_o is 111 and tail_r is 114:
                 is_or_file = true
         if is_or_file:
             files = append(files, raw_name)
@@ -89,7 +89,7 @@ define or_files() -> [text]:
 
 
 # Emit one source file to LLVM IR. Returns 1 if ok, 0 if compilation failed.
-define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) -> int:
+define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) -> number:
     raw = read_file(src_path)
     # Resolve `use` the way the real driver does, so a test sees exactly what
     # a normal build sees.
@@ -100,7 +100,7 @@ define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) 
     # module, the resulting exe exits 0, and any test expecting 0 would
     # falsely pass.
     decls = get_list(ast, "decls")
-    if length(decls) == 0:
+    if length(decls) is 0:
         return 0
     # A type/lowering error makes the .ll unsound. compile_errors() is a
     # process-global counter, so compare the delta for THIS file.
@@ -114,7 +114,7 @@ define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) 
     # scratch file - ll_path is tracked in git and must stay byte-identical
     # to what the compiler emitted on every machine.
     write_file(ll_path, llvm_text)
-    if mangle != "w":
+    if mangle is not "w":
         retargeted = replace(llvm_text, "datalayout = \"e-m:w", "datalayout = \"e-m:{mangle}")
         host_text = replace(retargeted, "triple = \"x86_64-pc-windows-msvc19.44.35209\"", "triple = \"{host_triple}\"")
         write_file("{ll_path}.host.ll", host_text)
@@ -124,7 +124,7 @@ define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) 
 # Link one emitted test with clang and run the exe, both as child processes
 # the task can park on. Records the outcome in the shared counters and
 # prints the row. Runs INSIDE a worker task.
-define finish_one(filename: text, clang_path: text) -> int:
+define finish_one(filename: text, clang_path: text) -> number:
     esc = text_of([27])
     c_green = "{esc}[32m"
     c_red = "{esc}[31m"
@@ -136,20 +136,20 @@ define finish_one(filename: text, clang_path: text) -> int:
     ll_path = "dist/{filename}.ll"
     exe_path = "dist/{filename}.exe"
     expected = parse_expected(filename)
-    link_path = if host_mangle() == "w" then ll_path else "{ll_path}.host.ll"
+    link_path = if host_mangle() is "w" then ll_path else "{ll_path}.host.ll"
 
     link_start = now()
     edit built = 0
-    if slot_get_int("ok:{filename}") == 1:
+    if slot_get_int("ok:{filename}") is 1:
         cj = start_command_to_file(clang_path, [link_path, "dist/orion_rt.o", "dist/orion_cli.o", "-O2", "-Wno-override-module", "-o", exe_path], "dist/.clang_{filename}.txt")
         if cj >= 0 and finished_within(cj, 120000):
-            built = if command_result(cj) == 0 then 1 else 0
+            built = if command_result(cj) is 0 then 1 else 0
         else:
             stopped = stop_command(cj)
             reaped = command_result(cj)
 
     edit actual = 0 - 1
-    if built == 1:
+    if built is 1:
         rj = start_command_to_file(exe_path, [], "dist/.out_{filename}.txt")
         if rj >= 0 and finished_within(rj, 30000):
             actual = command_result(rj)
@@ -162,7 +162,7 @@ define finish_one(filename: text, clang_path: text) -> int:
     slot_set("tms", slot_get_int("tms") + compile_ms)
     slot_set("tbytes", slot_get_int("tbytes") + size_bytes)
 
-    passed = built == 1 and actual == expected
+    passed = built is 1 and actual is expected
     status_txt = if passed then "{c_green}PASS{c_off}" else "{c_red}FAIL{c_off}"
     if passed:
         slot_set("pass", slot_get_int("pass") + 1)
@@ -179,19 +179,19 @@ define finish_one(filename: text, clang_path: text) -> int:
     # Piped (CI): one row per test as it finishes. On a TTY: a live progress
     # line that rewrites itself with `\r`; failures stay as permanent rows
     # above it. A failed test names the log its child wrote.
-    if slot_get_int("tty") == 1:
+    if slot_get_int("tty") is 1:
         if not passed:
             print("{cr}{esc}[K")
             print_line(row)
-            log_hint = if built == 1 then "dist/.out_{filename}.txt" else "dist/.clang_{filename}.txt"
+            log_hint = if built is 1 then "dist/.out_{filename}.txt" else "dist/.clang_{filename}.txt"
             print_line("{c_dim}      output: {log_hint}{c_off}")
         frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-        spin = at(frames, done_n - (done_n // 10) * 10)
+        spin = frames[done_n - (done_n // 10) * 10]
         print("{cr}  {c_cyan}{spin}{c_off} {c_dim}{done_n}/{total}{c_off}  {c_green}{pass_count} ok{c_off}  {c_red}{fail_count} fail{c_off}  {c_dim}{filename}{c_off}{esc}[K")
     else:
         print_line(row)
         if not passed:
-            log_hint = if built == 1 then "dist/.out_{filename}.txt" else "dist/.clang_{filename}.txt"
+            log_hint = if built is 1 then "dist/.out_{filename}.txt" else "dist/.clang_{filename}.txt"
             print_line("{c_dim}      output: {log_hint}{c_off}")
     0
 
@@ -199,7 +199,7 @@ define finish_one(filename: text, clang_path: text) -> int:
 # One worker task: pull the next un-linked test, finish it, repeat. Between
 # reading `next` and bumping it there is no park point, and the scheduler is
 # cooperative and single-threaded - two workers can never claim the same test.
-define worker(w: int) -> int:
+define worker(w: number) -> number:
     files = or_files()
     total = length(files)
     clang_path = host_clang()
@@ -208,11 +208,11 @@ define worker(w: int) -> int:
         if i >= total:
             break
         slot_set("next", i + 1)
-        junk = finish_one(at(files, i), clang_path)
+        junk = finish_one(files[i], clang_path)
     0
 
 
-define main() -> int:
+define main() -> number:
     wall_start = now()
     mkdir_all("dist")
     clang_path = host_clang()
@@ -225,8 +225,13 @@ define main() -> int:
     # Windows.h) from scratch - the single biggest per-test cost. orion_cli.c
     # is what carries the `os` orb's externs (sys_run, now, fs ops), so a
     # test that says `use os` links clean.
-    run_command(clang_path, ["-c", "-Os", rt_c, "-o", rt_obj])
-    run_command(clang_path, ["-c", "-Os", "../../runtime/orion_cli.c", "-o", "dist/orion_cli.o"])
+    # -ffunction-sections + -fdata-sections har samma skal som i orbit.or:
+    # linkern kan da strippa runtimekod testet aldrig anropar. Utan dem bar
+    # VARJE testbinar med sig Winsock (WS2_32) och CreateProcessA - en osignerad,
+    # nyskriven exe med den importprofilen ar precis vad Defenders ML flaggar
+    # (Trojan:Win64/Zusy!MTB). Ger ocksa ~44% mindre testbinarer.
+    run_command(clang_path, ["-c", "-Os", "-ffunction-sections", "-fdata-sections", rt_c, "-o", rt_obj])
+    run_command(clang_path, ["-c", "-Os", "-ffunction-sections", "-fdata-sections", "../../runtime/orion_cli.c", "-o", "dist/orion_cli.o"])
 
     files = or_files()
     total_tests = length(files)
@@ -245,14 +250,14 @@ define main() -> int:
     print_line("  {c_dim}──────────────────────────────────────────────{c_off}")
     print_line("")
 
-    is_tty = orion_console_color() == 1
+    is_tty = orion_console_color() is 1
     # Keep the in-process compiler's per-file "orbs N" chatter off the progress
     # line (it prints once per compile otherwise).
     slot_set("drv:quiet", 1)
 
     # Phase 1: emit every test to IR, serially, on the main stack.
-    loop file_index in 0..<total_tests:
-        filename = at(files, file_index)
+    loop file_index in 0 until total_tests:
+        filename = files[file_index]
         emit_start = now()
         ok = emit_one("tests/{filename}", "dist/{filename}.ll", mangle, host_triple)
         slot_set("ok:{filename}", ok)
@@ -275,10 +280,10 @@ define main() -> int:
     slot_set("tty", if is_tty then 1 else 0)
     jobs = cpu_count()
     edit workers = []
-    loop w in 0..<jobs:
+    loop w in 0 until jobs:
         workers = append(workers, spawn(worker, w))
-    loop t in 0..<length(workers):
-        junk = await(at(workers, t))
+    loop t in 0 until length(workers):
+        junk = await(workers[t])
 
     if is_tty:
         print("{cr}{esc}[K")
@@ -291,7 +296,7 @@ define main() -> int:
 
     print_line("--------------------------------------------------------------------")
     print_line("")
-    all_pass = fail_count == 0
+    all_pass = fail_count is 0
     summary_color = if all_pass then c_green else c_red
     print_line("{summary_color}Pass: {pass_count} / {total_tests}{c_off}")
     if fail_count > 0:

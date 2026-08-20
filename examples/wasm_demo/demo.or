@@ -9,7 +9,7 @@ external define host_cos(a: f64) -> f64
 # Draw eight circles orbiting the centre at growing radii, rotating with t.
 define render(t: f64):
     clear()
-    loop i in 0..<8:
+    loop i in 0 until 8:
         fi = to_real(i)
         angle = t * 0.8 + fi * 0.7853981
         radius = 40.0 + fi * 18.0

@@ -2,7 +2,7 @@
 # interpolate: the hole scanner is brace- and quote-aware.
 use text
 
-define main() -> int:
+define main() -> number:
     n = 7
     sp = " "
     boxed = "[{pad_left("{n}", 3, sp)}]"

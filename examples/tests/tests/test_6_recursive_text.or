@@ -1,6 +1,6 @@
-define repeat(s: text, n: int) -> text:
+define repeat(s: text, n: number) -> text:
     if n <= 0 then "" else s + repeat(s, n - 1)
 
-define main() -> int:
+define main() -> number:
     out = repeat("a", 6)
-    if out == "aaaaaa" then 6 else 0
+    if out is "aaaaaa" then 6 else 0

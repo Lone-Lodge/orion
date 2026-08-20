@@ -1,6 +1,6 @@
 # expect: is declared to return
-define answer() -> int:
+define answer() -> number:
     "not an int"
 
-define main() -> int:
+define main() -> number:
     answer()

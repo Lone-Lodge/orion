@@ -4,7 +4,7 @@
 # language critique named was `upper("Åsa")` in a Swedish project.
 use text
 
-define main() -> int:
+define main() -> number:
     # Latin-1: the original complaint, both directions.
     a = if upper("åsa är glad") is "ÅSA ÄR GLAD" and lower("RÄKSMÖRGÅS") is "räksmörgås" then 12 else 0
     # Greek, including the accent pairs and final sigma ς -> Σ.

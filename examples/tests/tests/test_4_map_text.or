@@ -1,9 +1,9 @@
-define main() -> int:
+define main() -> number:
     m = {"kind": "Block", "name": "main"}
     edit score = 0
-    if get(m, "kind") == "Block":
+    if get(m, "kind") is "Block":
         score = score + 1
-    if get(m, "name") == "main":
+    if get(m, "name") is "main":
         score = score + 1
     if has(m, "kind"):
         score = score + 1

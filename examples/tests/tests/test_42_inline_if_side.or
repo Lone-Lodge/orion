@@ -1,12 +1,12 @@
-define track_42() -> int:
+define track_42() -> number:
     print_line("then")
     42
 
-define track_0() -> int:
+define track_0() -> number:
     print_line("else - should NOT print")
     0
 
-define main() -> int:
+define main() -> number:
     # Inline if-then-else with side effects - only one branch should run.
     cond = 1
-    if cond == 1 then track_42() else track_0()
+    if cond is 1 then track_42() else track_0()

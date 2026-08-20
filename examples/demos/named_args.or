@@ -6,8 +6,8 @@
 #
 # Run (lodge-orion interp):  orion run named_args.or main   → expects 47
 
-define sub(a: int, b: int) -> int:
+define sub(a: number, b: number) -> number:
     a - b
 
-define main() -> int:
+define main() -> number:
     sub(b = 3, a = 50)     # reversed order, still a=50 b=3 → 47

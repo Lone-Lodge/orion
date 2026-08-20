@@ -1,0 +1,35 @@
+# `number` reaches a variant's PAYLOAD too.
+#
+# One enum, one answer for its `number` payloads. A `choose` arm hands back a
+# bare payload with no conversion on the way out, so an enum whose payloads
+# disagreed would answer with one of them read as the other. Agreeing costs a
+# whole payload nothing but width; disagreeing cost a right answer.
+
+type score: Points(number), Ratio(number), Nothing
+type tally: Count(number), Empty
+
+define read_score(s: score) -> number:
+    choose s:
+        Points(p) then p
+        Ratio(r) then r * 2
+        Nothing then 0
+
+define read_tally(t: tally) -> number:
+    choose t:
+        Count(c) then c + 1
+        Empty then 0
+
+define main() -> number:
+    # `score` meets a fraction, so BOTH its payloads are real - including the
+    # whole one, which is promoted where it is built
+    whole_in_real = read_score(score.Points(20))    # 20.0
+    real_in_real = read_score(score.Ratio(0.25))    # 0.5
+
+    # `tally` never meets one, so it stays i64 throughout
+    exact = read_tally(tally.Count(41))             # 42
+
+    a = if whole_in_real > 19.9 and whole_in_real < 20.1 then 20 else 0
+    b = if real_in_real > 0.4 and real_in_real < 0.6 then 15 else 0
+    c = if exact is 42 then 42 else 0
+
+    a + b + c   # 20 + 15 + 42

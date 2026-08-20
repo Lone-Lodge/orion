@@ -7,7 +7,7 @@
 # AND text (substring). (`xs[lo..hi]` bracket-range sugar is deliberately
 # NOT a thing - it would need lexer surgery for worse ergonomics.)
 
-define main() -> int:
+define main() -> number:
     xs = [10, 20, 30, 40, 50, 60]
 
     mid = xs.part(1, 4)              # [20, 30, 40]
@@ -20,5 +20,5 @@ define main() -> int:
     # Works on text too - a substring.
     word = "hello world".part(0, 5)     # "hello"
 
-    print_line("mid={at(mid,0)}..{at(mid,2)}  head0={at(head,0)}  tail1={at(tail,1)}  third={at(third,0)}  word_len={length(word)}")
+    print_line("mid={mid[0]}..{mid[2]}  head0={head[0]}  tail1={tail[1]}  third={third[0]}  word_len={length(word)}")
     length(mid) + length(head) + length(tail) + length(third) + length(word)   # 3+2+2+1+5 = 13

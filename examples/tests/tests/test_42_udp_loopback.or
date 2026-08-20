@@ -4,7 +4,7 @@
 use net
 use text
 
-define main() -> int:
+define main() -> number:
     a = udp(0)
     b = udp(0)
     if a < 0 or b < 0:

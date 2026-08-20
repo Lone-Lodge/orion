@@ -2,7 +2,7 @@
 #
 # In expression position `loop x in xs: body` collects into a list. One rule
 # spans one-liner and block: the body's trailing expression is collected, and
-# `yield` collects additional values inside the body (so `if c: collect x` is the
+# `collect` collects additional values inside the body (so `if c: collect x` is the
 # filter). In statement position the same `loop x in xs:` is a plain side-effect
 # loop. Same keyword; position decides.
 #
@@ -13,9 +13,9 @@
 #
 # Run:  orbit run loop_collect.or main   -> expects 12
 
-define main() -> int:
+define main() -> number:
     xs = [1, 2, 3, 4]
     doubled = loop x in xs: x * 2          # [2, 4, 6, 8]
     big = loop x in xs:                    # [3, 4]
         if x > 2: collect x
-    at(doubled, 0) + at(doubled, 3) + length(big)   # 2 + 8 + 2 = 12
+    doubled[0] + doubled[3] + length(big)   # 2 + 8 + 2 = 12

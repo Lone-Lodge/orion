@@ -1,7 +1,7 @@
-define double(n: int) -> int:
+define double(n: number) -> number:
     example double(21) is 42
     example double(0) is 0
     n * 2
 
-define main() -> int:
+define main() -> number:
     double(21)

@@ -6,7 +6,7 @@ use rand
 use time
 use text
 
-define main() -> int:
+define main() -> number:
     # Every platform sets SOMETHING findable: PATH on POSIX and modern
     # Windows shells; absent names answer "".
     path_ok = env("PATH") is not "" or env("Path") is not ""
@@ -19,9 +19,9 @@ define main() -> int:
     edit in_range = true
     edit same = true
     loop i in 0 until 32:
-        if at(a, i) < 0 or at(a, i) > 255:
+        if a[i] < 0 or a[i] > 255:
             in_range = false
-        if at(a, i) is not at(b, i):
+        if a[i] is not b[i]:
             same = false
     tok = secure_token(16)
     ent_ok = length(a) is 32 and in_range and not same and length(tok) is 32

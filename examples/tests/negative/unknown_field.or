@@ -1,6 +1,6 @@
 # expect: has no field `z`
-type Point: x: int, y: int
+type Point: x: number, y: number
 
-define main() -> int:
+define main() -> number:
     p = Point{x: 1, y: 2}
     p.z

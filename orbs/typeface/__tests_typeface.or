@@ -15,22 +15,22 @@ use list
 use num
 
 # ---- big-endian byte readers over a [int] byte array ----
-define be_u16(b: [int], off: int) -> int:
+define be_u16(b: [number], off: number) -> number:
     byte_at(b, off) * 256 + byte_at(b, off + 1)
 
-define be_u32(b: [int], off: int) -> int:
+define be_u32(b: [number], off: number) -> number:
     byte_at(b, off) * 16777216 + byte_at(b, off + 1) * 65536 + byte_at(b, off + 2) * 256 + byte_at(b, off + 3)
 
-define be_i16(b: [int], off: int) -> int:
+define be_i16(b: [number], off: number) -> number:
     v = be_u16(b, off)
     if v >= 32768 then v - 65536 else v
 
-define tag_is(b: [int], off: int, c0: int, c1: int, c2: int, c3: int) -> truth:
-    byte_at(b, off) == c0 and byte_at(b, off + 1) == c1 and byte_at(b, off + 2) == c2 and byte_at(b, off + 3) == c3
+define tag_is(b: [number], off: number, c0: number, c1: number, c2: number, c3: number) -> truth:
+    byte_at(b, off) is c0 and byte_at(b, off + 1) is c1 and byte_at(b, off + 2) is c2 and byte_at(b, off + 3) is c3
 
 # A parsed font: the raw bytes plus resolved table offsets and header fields.
 # loc_fmt: 0 = short loca (u16 offsets, doubled), 1 = long loca (u32).
-public type Font: bytes: [int], upm: int, nglyphs: int, loc_fmt: int, off_head: int, off_maxp: int, off_cmap: int, off_loca: int, off_glyf: int, off_hhea: int, off_hmtx: int, ok: truth
+public type Font: bytes: [number], upm: number, nglyphs: number, loc_fmt: number, off_head: number, off_maxp: number, off_cmap: number, off_loca: number, off_glyf: number, off_hhea: number, off_hmtx: number, ok: truth
 
 # Parse the sfnt table directory and the head/maxp headers from an
 # embedded blob. Returns a Font with ok=false when the blob isn't a
@@ -48,7 +48,7 @@ public define load_font_blob(blob: text) -> Font:
     edit glyf = 0
     edit hhea = 0
     edit hmtx = 0
-    loop i in 0..<ntables:
+    loop i in 0 until ntables:
         rec = 12 + i * 16
         off = be_u32(b, rec + 8)
         if tag_is(b, rec, 104, 101, 97, 100):
@@ -75,30 +75,30 @@ public define load_font_blob(blob: text) -> Font:
 # Locate a format-4 Unicode subtable within the cmap table; return its
 # absolute byte offset, or 0 if none. Prefers a Windows-Unicode (3,1) or
 # Unicode (0,*) record, but accepts any subtable that is format 4.
-define cmap_format4_sub(f: Font) -> int:
+define cmap_format4_sub(f: Font) -> number:
     b = f.bytes
     base = f.off_cmap
-    if base == 0:
+    if base is 0:
         return 0
     ntab = be_u16(b, base + 2)
     edit chosen = 0
-    loop i in 0..<ntab:
+    loop i in 0 until ntab:
         rec = base + 4 + i * 8
         plat = be_u16(b, rec)
         enc = be_u16(b, rec + 2)
         sub = base + be_u32(b, rec + 4)
-        if be_u16(b, sub) == 4:
-            unicode_pref = (plat == 3 and enc == 1) or plat == 0
-            if chosen == 0 or unicode_pref:
+        if be_u16(b, sub) is 4:
+            unicode_pref = (plat is 3 and enc is 1) or plat is 0
+            if chosen is 0 or unicode_pref:
                 chosen = sub
     chosen
 
 # Map a Unicode codepoint to a glyph id via the format-4 segment tables.
 # 0 (.notdef) when unmapped or no usable cmap.
-public define glyph_id(f: Font, cp: int) -> int:
+public define glyph_id(f: Font, cp: number) -> number:
     b = f.bytes
     sub = cmap_format4_sub(f)
-    if sub == 0:
+    if sub is 0:
         return 0
     seg2 = be_u16(b, sub + 6)
     segc = seg2 // 2
@@ -108,7 +108,7 @@ public define glyph_id(f: Font, cp: int) -> int:
     range_base = sub + 16 + seg2 * 3
     edit result = 0
     edit found = 0 - 1
-    loop i in 0..<segc:
+    loop i in 0 until segc:
         if found < 0 and cp <= be_u16(b, end_base + i * 2):
             found = i
     if found >= 0:
@@ -117,74 +117,74 @@ public define glyph_id(f: Font, cp: int) -> int:
             ro_pos = range_base + found * 2
             ro = be_u16(b, ro_pos)
             delta = be_i16(b, delta_base + found * 2)
-            if ro == 0:
+            if ro is 0:
                 result = md16(cp + delta)
             else:
                 gpos = ro_pos + ro + (cp - start) * 2
                 g = be_u16(b, gpos)
-                result = if g == 0 then 0 else md16(g + delta)
+                result = if g is 0 then 0 else md16(g + delta)
     result
 
 # Wrap into u16 range (idDelta arithmetic is modulo 65536).
-define md16(x: int) -> int:
+define md16(x: number) -> number:
     m = x - (x // 65536) * 65536
     if m < 0 then m + 65536 else m
 
 # ---- glyph outlines (glyf/loca) + metrics (hmtx) ----
 
-define pow2(k: int) -> int:
+define pow2(k: number) -> number:
     edit p = 1
-    loop _i in 0..<k:
+    loop _i in 0 until k:
         p = p * 2
     p
 
 # Bit k of v (0 or 1).
-define bit(v: int, k: int) -> int:
+define bit(v: number, k: number) -> number:
     q = v // pow2(k)
     q - (q // 2) * 2
 
 # Number of advance-width entries in hmtx (rest of glyphs reuse the last).
-define num_hmetrics(f: Font) -> int:
-    if f.off_hhea == 0 then 0 else be_u16(f.bytes, f.off_hhea + 34)
+define num_hmetrics(f: Font) -> number:
+    if f.off_hhea is 0 then 0 else be_u16(f.bytes, f.off_hhea + 34)
 
 # Advance width of a glyph in font units.
-public define advance_width(f: Font, gid: int) -> int:
+public define advance_width(f: Font, gid: number) -> number:
     nh = num_hmetrics(f)
-    if nh == 0 or f.off_hmtx == 0:
+    if nh is 0 or f.off_hmtx is 0:
         0
     else:
         g = if gid < nh then gid else nh - 1
         be_u16(f.bytes, f.off_hmtx + g * 4)
 
 # Typographic ascent in font units (hhea.ascender). The baseline sits this
-# far below the top of the em box, so a renderer places text at (x, y) by
+# far below the top of the em box, so a renderer places text x[y] by
 # putting the baseline at y + ascent*scale and drawing glyphs upward from it.
-public define font_ascent(f: Font) -> int:
-    if f.off_hhea == 0 then 0 else be_i16(f.bytes, f.off_hhea + 4)
+public define font_ascent(f: Font) -> number:
+    if f.off_hhea is 0 then 0 else be_i16(f.bytes, f.off_hhea + 4)
 
 # Typographic descent in font units (hhea.descender, negative below the
 # baseline). ascent - descent spans the whole line.
-public define font_descent(f: Font) -> int:
-    if f.off_hhea == 0 then 0 else be_i16(f.bytes, f.off_hhea + 6)
+public define font_descent(f: Font) -> number:
+    if f.off_hhea is 0 then 0 else be_i16(f.bytes, f.off_hhea + 6)
 
 # Byte offset of glyph `g`'s outline data within the glyf table region.
-define loca_off(f: Font, g: int) -> int:
+define loca_off(f: Font, g: number) -> number:
     b = f.bytes
-    if f.loc_fmt == 1 then be_u32(b, f.off_loca + g * 4) else be_u16(b, f.off_loca + g * 2) * 2
+    if f.loc_fmt is 1 then be_u32(b, f.off_loca + g * 4) else be_u16(b, f.off_loca + g * 2) * 2
 
 # One glyph outline as flat parallel point arrays plus contour-end indices.
 # Contour i spans points (ends[i-1]+1 .. ends[i]). on_curve[j] = 1 for an
 # on-curve point, 0 for a quadratic off-curve control point. Empty (space)
 # glyphs return empty arrays with ok=true; composite glyphs are assembled
 # from their components. `adv` is the advance width in font units.
-public type Glyph: xs: [int], ys: [int], on_curve: [int], ends: [int], adv: int, ok: truth
+public type Glyph: xs: [number], ys: [number], on_curve: [number], ends: [number], adv: number, ok: truth
 
 # Signed 8-bit and F2Dot14 (2.14 fixed-point) readers for composite args.
-define sbyte(b: [int], i: int) -> int:
+define sbyte(b: [number], i: number) -> number:
     v = byte_at(b, i)
     if v >= 128 then v - 256 else v
 
-define f2dot14(b: [int], i: int) -> f64:
+define f2dot14(b: [number], i: number) -> f64:
     to_real(be_i16(b, i)) / 16384.0
 
 # A composite glyph references other glyphs (e.g. `i` = dotless-i + dot),
@@ -193,7 +193,7 @@ define f2dot14(b: [int], i: int) -> f64:
 # transform, and concatenate - so accented and dotted letters render instead
 # of silently vanishing. Assumes ARGS_ARE_XY_VALUES (the ubiquitous case;
 # point-matching composites are not used by UI fonts).
-define composite_outline(f: Font, gp: int, adv: int) -> Glyph:
+define composite_outline(f: Font, gp: number, adv: number) -> Glyph:
     b = f.bytes
     edit xs = []
     edit ys = []
@@ -203,14 +203,14 @@ define composite_outline(f: Font, gp: int, adv: int) -> Glyph:
     edit pos = gp + 10
     edit more = 1
     loop:
-        if more == 0:
+        if more is 0:
             break
         flags = be_u16(b, pos)
         cgid = be_u16(b, pos + 2)
         pos = pos + 4
         edit dx = 0
         edit dy = 0
-        if bit(flags, 0) == 1:
+        if bit(flags, 0) is 1:
             dx = be_i16(b, pos)
             dy = be_i16(b, pos + 2)
             pos = pos + 4
@@ -222,17 +222,17 @@ define composite_outline(f: Font, gp: int, adv: int) -> Glyph:
         edit bb = 0.0
         edit c = 0.0
         edit d = 1.0
-        if bit(flags, 3) == 1:
+        if bit(flags, 3) is 1:
             a = f2dot14(b, pos)
             d = a
             pos = pos + 2
         else:
-            if bit(flags, 6) == 1:
+            if bit(flags, 6) is 1:
                 a = f2dot14(b, pos)
                 d = f2dot14(b, pos + 2)
                 pos = pos + 4
             else:
-                if bit(flags, 7) == 1:
+                if bit(flags, 7) is 1:
                     a = f2dot14(b, pos)
                     bb = f2dot14(b, pos + 2)
                     c = f2dot14(b, pos + 4)
@@ -240,20 +240,20 @@ define composite_outline(f: Font, gp: int, adv: int) -> Glyph:
                     pos = pos + 8
         cg = glyph_outline(f, cgid)
         np = length(cg.xs)
-        loop i in 0..<np:
-            px = to_real(at(cg.xs, i))
-            py = to_real(at(cg.ys, i))
+        loop i in 0 until np:
+            px = to_real(cg.xs[i])
+            py = to_real(cg.ys[i])
             xs = append(xs, to_whole(a * px + c * py) + dx)
             ys = append(ys, to_whole(bb * px + d * py) + dy)
-            on = append(on, at(cg.on_curve, i))
+            on = append(on, cg.on_curve[i])
         ne = length(cg.ends)
-        loop i in 0..<ne:
-            ends = append(ends, at(cg.ends, i) + base)
+        loop i in 0 until ne:
+            ends = append(ends, cg.ends[i] + base)
         base = base + np
         more = bit(flags, 5)
     Glyph{xs: xs, ys: ys, on_curve: on, ends: ends, adv: adv, ok: true}
 
-public define glyph_outline(f: Font, gid: int) -> Glyph:
+public define glyph_outline(f: Font, gid: number) -> Glyph:
     b = f.bytes
     adv = advance_width(f, gid)
     o0 = loca_off(f, gid)
@@ -265,9 +265,9 @@ public define glyph_outline(f: Font, gid: int) -> Glyph:
     if ncont < 0:
         return composite_outline(f, gp, adv)
     edit ends = []
-    loop i in 0..<ncont:
+    loop i in 0 until ncont:
         ends = append(ends, be_u16(b, gp + 10 + i * 2))
-    npts = if ncont > 0 then at(ends, ncont - 1) + 1 else 0
+    npts = if ncont > 0 then ends[ncont - 1] + 1 else 0
     instr_len_pos = gp + 10 + ncont * 2
     instr_len = be_u16(b, instr_len_pos)
     edit pos = instr_len_pos + 2 + instr_len
@@ -279,96 +279,96 @@ public define glyph_outline(f: Font, gid: int) -> Glyph:
         flag = byte_at(b, pos)
         pos = pos + 1
         flags = append(flags, flag)
-        if bit(flag, 3) == 1:
+        if bit(flag, 3) is 1:
             rep = byte_at(b, pos)
             pos = pos + 1
-            loop _r in 0..<rep:
+            loop _r in 0 until rep:
                 if length(flags) < npts:
                     flags = append(flags, flag)
     # X coords: bit1 = short(1 byte, bit4=sign); else bit4 = same(delta 0), else i16.
     edit xs = []
     edit xacc = 0
-    loop i in 0..<npts:
-        fl = at(flags, i)
-        if bit(fl, 1) == 1:
+    loop i in 0 until npts:
+        fl = flags[i]
+        if bit(fl, 1) is 1:
             d = byte_at(b, pos)
             pos = pos + 1
-            xacc = xacc + (if bit(fl, 4) == 1 then d else 0 - d)
+            xacc = xacc + (if bit(fl, 4) is 1 then d else 0 - d)
         else:
-            if bit(fl, 4) == 0:
+            if bit(fl, 4) is 0:
                 xacc = xacc + be_i16(b, pos)
                 pos = pos + 2
         xs = append(xs, xacc)
     # Y coords: bit2 = short, bit5 = sign/same.
     edit ys = []
     edit yacc = 0
-    loop i in 0..<npts:
-        fl = at(flags, i)
-        if bit(fl, 2) == 1:
+    loop i in 0 until npts:
+        fl = flags[i]
+        if bit(fl, 2) is 1:
             d = byte_at(b, pos)
             pos = pos + 1
-            yacc = yacc + (if bit(fl, 5) == 1 then d else 0 - d)
+            yacc = yacc + (if bit(fl, 5) is 1 then d else 0 - d)
         else:
-            if bit(fl, 5) == 0:
+            if bit(fl, 5) is 0:
                 yacc = yacc + be_i16(b, pos)
                 pos = pos + 2
         ys = append(ys, yacc)
     edit on = []
-    loop i in 0..<npts:
-        on = append(on, bit(at(flags, i), 0))
+    loop i in 0 until npts:
+        on = append(on, bit(flags[i], 0))
     Glyph{xs: xs, ys: ys, on_curve: on, ends: ends, adv: adv, ok: true}
 
 # ---- flattening (quadratic beziers -> polylines) + scanline fill ----
 
 # Flattened glyph: closed polygons in FONT UNITS as f64 parallel arrays,
 # with per-contour end indices. `adv` carried through.
-public type FlatGlyph: px: [f64], py: [f64], ends: [int], adv: int
+public type FlatGlyph: px: [f64], py: [f64], ends: [number], adv: number
 
-define wrap(i: int, n: int) -> int:
+define wrap(i: number, n: number) -> number:
     if i < n then i else i - n
 
 # Flatten every contour: insert implied on-curve midpoints between adjacent
 # off-curve points, start at an on-curve vertex, then walk emitting line
 # points and 8-step subdivisions of each quadratic. Result is a set of
 # closed polygons ready for trapezoidal fill.
-public define flatten_glyph(f: Font, gid: int) -> FlatGlyph:
+public define flatten_glyph(f: Font, gid: number) -> FlatGlyph:
     g = glyph_outline(f, gid)
     edit px = part([0.0], 0, 0)
     edit py = part([0.0], 0, 0)
     edit fends = []
     nc = length(g.ends)
     edit cstart = 0
-    loop c in 0..<nc:
-        cend = at(g.ends, c)
+    loop c in 0 until nc:
+        cend = g.ends[c]
         m = cend - cstart + 1
         if m >= 2:
             # Normalized cyclic point list with implied midpoints inserted.
             edit nx = part([0.0], 0, 0)
             edit ny = part([0.0], 0, 0)
             edit non = []
-            loop j in 0..<m:
-                ax = to_real(at(g.xs, cstart + j))
-                ay = to_real(at(g.ys, cstart + j))
-                ac = at(g.on_curve, cstart + j)
+            loop j in 0 until m:
+                ax = to_real(g.xs[cstart + j])
+                ay = to_real(g.ys[cstart + j])
+                ac = g.on_curve[cstart + j]
                 nx = append(nx, ax)
                 ny = append(ny, ay)
                 non = append(non, ac)
                 nj = wrap(j + 1, m)
-                if ac == 0 and at(g.on_curve, cstart + nj) == 0:
-                    bx = to_real(at(g.xs, cstart + nj))
-                    by = to_real(at(g.ys, cstart + nj))
+                if ac is 0 and g.on_curve[cstart + nj] is 0:
+                    bx = to_real(g.xs[cstart + nj])
+                    by = to_real(g.ys[cstart + nj])
                     nx = append(nx, (ax + bx) / 2.0)
                     ny = append(ny, (ay + by) / 2.0)
                     non = append(non, 1)
             mm = length(nx)
             edit start = 0 - 1
-            loop j in 0..<mm:
-                if start < 0 and at(non, j) == 1:
+            loop j in 0 until mm:
+                if start < 0 and non[j] is 1:
                     start = j
             if start < 0:
                 start = 0
-            px = append(px, at(nx, start))
-            py = append(py, at(ny, start))
+            px = append(px, nx[start])
+            py = append(py, ny[start])
             edit ci = start
             edit guard = 0
             loop:
@@ -376,25 +376,25 @@ public define flatten_glyph(f: Font, gid: int) -> FlatGlyph:
                 if guard > mm + 4:
                     break
                 ni = wrap(ci + 1, mm)
-                if at(non, ni) == 1:
-                    px = append(px, at(nx, ni))
-                    py = append(py, at(ny, ni))
+                if non[ni] is 1:
+                    px = append(px, nx[ni])
+                    py = append(py, ny[ni])
                     ci = ni
                 else:
                     nni = wrap(ci + 2, mm)
-                    x0 = at(nx, ci)
-                    y0 = at(ny, ci)
-                    cxx = at(nx, ni)
-                    cyy = at(ny, ni)
-                    x1 = at(nx, nni)
-                    y1 = at(ny, nni)
-                    loop s in 1..<9:
+                    x0 = nx[ci]
+                    y0 = ny[ci]
+                    cxx = nx[ni]
+                    cyy = ny[ni]
+                    x1 = nx[nni]
+                    y1 = ny[nni]
+                    loop s in 1 until 9:
                         t = to_real(s) / 8.0
                         u = 1.0 - t
                         px = append(px, u * u * x0 + 2.0 * u * t * cxx + t * t * x1)
                         py = append(py, u * u * y0 + 2.0 * u * t * cyy + t * t * y1)
                     ci = nni
-                if ci == start:
+                if ci is start:
                     break
             fends = append(fends, length(px) - 1)
         cstart = cend + 1
@@ -402,35 +402,35 @@ public define flatten_glyph(f: Font, gid: int) -> FlatGlyph:
 
 # x on the edge (x0,y0)-(x1,y1) at height y.
 define edge_x_at(x0: f64, y0: f64, x1: f64, y1: f64, y: f64) -> f64:
-    if y1 == y0 then x0 else x0 + (x1 - x0) * (y - y0) / (y1 - y0)
+    if y1 is y0 then x0 else x0 + (x1 - x0) * (y - y0) / (y1 - y0)
 
 # Round to nearest int, correct for both signs (glyphs can have a negative
 # left side-bearing, so x may be slightly < 0).
-define round_i(x: f64) -> int:
+define round_i(x: f64) -> number:
     if x >= 0.0 then to_whole(x + 0.5) else 0 - to_whole(0.5 - x)
 
 # Overwrite element i (index must exist). Separate f64/int helpers since
 # Orion function names are global (no overloading).
-define fset(xs: [f64], i: int, v: f64) -> [f64]:
+define fset(xs: [f64], i: number, v: f64) -> [f64]:
     edit o = part([0.0], 0, 0)
-    loop k in 0..<length(xs):
-        o = append(o, if k == i then v else at(xs, k))
+    loop k in 0 until length(xs):
+        o = append(o, if k is i then v else xs[k])
     o
 
-define iset(xs: [int], i: int, v: int) -> [int]:
+define iset(xs: [number], i: number, v: number) -> [number]:
     edit o = []
-    loop k in 0..<length(xs):
-        o = append(o, if k == i then v else at(xs, k))
+    loop k in 0 until length(xs):
+        o = append(o, if k is i then v else xs[k])
     o
 
 # Scanline-fill closed polygons into horizontal pixel spans. Input is
 # design-unit outlines: parallel px/py with Y pointing UP (the font
 # convention) and `ends` giving each contour's last index; `scale` is
 # pixels-per-design-unit. Output is a flat [int] of (x0, x1, y) triples
-# in local pixels, origin at (0,0) with Y growing DOWNWARD (screen
+# in local pixels, origin 0[0] with Y growing DOWNWARD (screen
 # convention) - the caller adds the pen/baseline offset. Non-zero
 # winding, so counters and holes fall out for free.
-public define polygon_fill_spans(px: [f64], py: [f64], ends: [int], scale: f64) -> [int]:
+public define polygon_fill_spans(px: [f64], py: [f64], ends: [number], scale: f64) -> [number]:
     np = length(px)
     edit spans = []
     if np < 3:
@@ -445,21 +445,21 @@ public define polygon_fill_spans(px: [f64], py: [f64], ends: [int], scale: f64) 
     edit ymax = 0.0
     edit seen = 0
     edit cstart = 0
-    loop c in 0..<length(ends):
-        cend = at(ends, c)
-        loop i in cstart..<(cend + 1):
+    loop c in 0 until length(ends):
+        cend = ends[c]
+        loop i in cstart until (cend + 1):
             j = if i < cend then i + 1 else cstart
-            ax = at(px, i) * scale
-            ay = 0.0 - at(py, i) * scale
-            bx = at(px, j) * scale
-            by = 0.0 - at(py, j) * scale
-            if seen == 0:
+            ax = px[i] * scale
+            ay = 0.0 - py[i] * scale
+            bx = px[j] * scale
+            by = 0.0 - py[j] * scale
+            if seen is 0:
                 ymin = ay
                 ymax = ay
                 seen = 1
             ymin = fmin(ymin, ay)
             ymax = fmax(ymax, ay)
-            if ay != by:
+            if ay is not by:
                 ex0 = append(ex0, ax)
                 ey0 = append(ey0, ay)
                 ex1 = append(ex1, bx)
@@ -469,38 +469,38 @@ public define polygon_fill_spans(px: [f64], py: [f64], ends: [int], scale: f64) 
     ne = length(edir)
     row0 = round_i(ymin)
     row1 = round_i(ymax)
-    loop row in row0..<(row1 + 1):
+    loop row in row0 until (row1 + 1):
         yc = to_real(row) + 0.5
         # Crossings at this scanline, then insertion-sort by x.
         edit cx = part([0.0], 0, 0)
         edit cd = []
-        loop e in 0..<ne:
-            elo = fmin(at(ey0, e), at(ey1, e))
-            ehi = fmax(at(ey0, e), at(ey1, e))
+        loop e in 0 until ne:
+            elo = fmin(ey0[e], ey1[e])
+            ehi = fmax(ey0[e], ey1[e])
             if elo <= yc and ehi > yc:
-                cx = append(cx, edge_x_at(at(ex0, e), at(ey0, e), at(ex1, e), at(ey1, e), yc))
-                cd = append(cd, at(edir, e))
+                cx = append(cx, edge_x_at(ex0[e], ey0[e], ex1[e], ey1[e], yc))
+                cd = append(cd, edir[e])
         nc = length(cd)
-        loop a in 1..<nc:
-            ka = at(cx, a)
-            kd = at(cd, a)
+        loop a in 1 until nc:
+            ka = cx[a]
+            kd = cd[a]
             edit bb = a - 1
             loop:
                 if bb < 0:
                     break
-                if at(cx, bb) <= ka:
+                if cx[bb] <= ka:
                     break
-                cx = fset(cx, bb + 1, at(cx, bb))
-                cd = iset(cd, bb + 1, at(cd, bb))
+                cx = fset(cx, bb + 1, cx[bb])
+                cd = iset(cd, bb + 1, cd[bb])
                 bb = bb - 1
             cx = fset(cx, bb + 1, ka)
             cd = iset(cd, bb + 1, kd)
         edit w = 0
-        loop i in 0..<(nc - 1):
-            w = w + at(cd, i)
-            if w != 0:
-                x0i = round_i(at(cx, i))
-                x1i = round_i(at(cx, i + 1))
+        loop i in 0 until (nc - 1):
+            w = w + cd[i]
+            if w is not 0:
+                x0i = round_i(cx[i])
+                x1i = round_i(cx[i + 1])
                 if x1i > x0i:
                     spans = append(spans, x0i)
                     spans = append(spans, x1i)
@@ -509,7 +509,7 @@ public define polygon_fill_spans(px: [f64], py: [f64], ends: [int], scale: f64) 
 
 # Scanline-fill one glyph into pixel spans (see polygon_fill_spans). `scale`
 # is pixels-per-font-unit (size/unitsPerEm); the baseline sits at y=0.
-public define glyph_fill_spans(f: Font, gid: int, scale: f64) -> [int]:
+public define glyph_fill_spans(f: Font, gid: number, scale: f64) -> [number]:
     fg = flatten_glyph(f, gid)
     polygon_fill_spans(fg.px, fg.py, fg.ends, scale)
 
@@ -529,7 +529,7 @@ public define glyph_fill_spans(f: Font, gid: int, scale: f64) -> [int]:
 # centered: x is the line's CENTER instead of its left edge - the
 # shell measures the line and splits it, so a sketch never counts
 # letter widths.
-public type Word: content: text, titled: truth, centered: truth, x: number, y: number, em: number, color: int
+public type Word: content: text, titled: truth, centered: truth, x: number, y: number, em: number, color: number
 
 # The engine's two faces, embedded with the engine itself. The .subset
 # files are the ASCII the sketches can say (orion tools/subset_font.js, run
@@ -546,7 +546,7 @@ public define font_title() -> Font:
 # warmed pixel size; `slots` holds, per size, 512 entries (face*256 +
 # letter) of stash-index-plus-one (0 = not warmed); `stash` holds the
 # masks themselves.
-public type Typeset: body: Font, heading: Font, sizes: [int], slots: [int], stash: list of [int]
+public type Typeset: body: Font, heading: Font, sizes: [number], slots: [number], stash: list of [number]
 
 # The unwarmed set: fonts parsed, every glyph rasterized on demand.
 # What the web shell uses - it re-instantiates per frame anyway.
@@ -557,10 +557,10 @@ public define cold_typeset() -> Typeset:
 # anything on the game plane, so words land where the sketch said.
 # Public: the compositor scales a field-space DisplayList by the same
 # number, so UI rects and words agree with the game to the pixel.
-public define px_per_unit(height: int, field_h: number) -> number:
+public define px_per_unit(height: number, field_h: number) -> number:
     field_scale(field_h) * (1.0 / tan(game_fov / 2.0)) * (1.0 / (0.0 - game_plane)) * (to_real(height) / 2.0)
 
-define floor_div(a: int, b: int) -> int:
+define floor_div(a: number, b: number) -> number:
     if a >= 0 then a // b else 0 - ((0 - a + b - 1) // b)
 
 # One glyph as an antialiased alpha mask, flat for the cache:
@@ -568,22 +568,22 @@ define floor_div(a: int, b: int) -> int:
 # (baseline at y=0) and alpha 0..255. Fill at 4x with the proven 1-bit
 # scanline fill, then box-downsample - 17 coverage levels, no new
 # rasterizer to get wrong. Empty glyph -> [0, 0, 0, 0].
-define glyph_mask(f: Font, cp: int, em_px: int) -> [int]:
+define glyph_mask(f: Font, cp: number, em_px: number) -> [number]:
     ss = 4
     gid = glyph_id(f, cp)
     scale = to_real(em_px) / to_real(f.upm)
     spans = glyph_fill_spans(f, gid, scale * to_real(ss))
     ns = length(spans) // 3
-    if ns == 0:
+    if ns is 0:
         return [0, 0, 0, 0]
-    edit minx = at(spans, 0)
-    edit maxx = at(spans, 1)
-    edit miny = at(spans, 2)
-    edit maxy = at(spans, 2)
-    loop i in 0..<ns:
-        x0 = at(spans, i * 3)
-        x1 = at(spans, i * 3 + 1)
-        y = at(spans, i * 3 + 2)
+    edit minx = spans[0]
+    edit maxx = spans[1]
+    edit miny = spans[2]
+    edit maxy = spans[2]
+    loop i in 0 until ns:
+        x0 = spans[i * 3]
+        x1 = spans[i * 3 + 1]
+        y = spans[i * 3 + 2]
         if x0 < minx: minx = x0
         if x1 > maxx: maxx = x1
         if y < miny: miny = y
@@ -595,43 +595,43 @@ define glyph_mask(f: Font, cp: int, em_px: int) -> [int]:
     if ow <= 0 or oh <= 0:
         return [0, 0, 0, 0]
     edit cov = filled(ow * oh, 0)
-    loop i in 0..<ns:
-        x0 = at(spans, i * 3)
-        x1 = at(spans, i * 3 + 1)
-        y = at(spans, i * 3 + 2)
+    loop i in 0 until ns:
+        x0 = spans[i * 3]
+        x1 = spans[i * 3 + 1]
+        y = spans[i * 3 + 2]
         oyy = floor_div(y, ss) - oy
-        loop hx in x0..<x1:
+        loop hx in x0 until x1:
             idx = oyy * ow + (floor_div(hx, ss) - ox)
-            cov = set(cov, idx, at(cov, idx) + 1)
+            cov = set(cov, idx, cov[idx] + 1)
     denom = ss * ss
     edit mask = [ow, oh, ox, oy]
-    loop p in 0..<(ow * oh):
-        a = at(cov, p) * 255 // denom
+    loop p in 0 until (ow * oh):
+        a = cov[p] * 255 // denom
         mask = append(mask, if a > 255 then 255 else a)
     mask
 
 # A size's slot block in `slots`, or -1 while that size is unwarmed.
-define size_block(types: Typeset, em_px: int) -> int:
+define size_block(types: Typeset, em_px: number) -> number:
     edit found = 0 - 1
-    loop i in 0..<length(types.sizes):
-        if at(types.sizes, i) == em_px:
+    loop i in 0 until length(types.sizes):
+        if types.sizes[i] is em_px:
             found = i * 512
     found
 
 # The cached mask, or a fresh one on a miss. Reads never insert - an
 # insert mid-frame would land in the frame pool and dangle after reset;
 # only warm_typeset (outside the pools) fills the cache.
-define mask_of(types: Typeset, titled: truth, cp: int, em_px: int) -> [int]:
+define mask_of(types: Typeset, titled: truth, cp: number, em_px: number) -> [number]:
     block = size_block(types, em_px)
-    slot = if block < 0 then 0 else at(types.slots, block + (if titled then 256 else 0) + cp)
+    slot = if block < 0 then 0 else types.slots[block + (if titled then 256 else 0) + cp]
     if block >= 0 and slot > 0:
-        return at(types.stash, slot - 1)
+        return types.stash[slot - 1]
     glyph_mask(if titled then types.heading else types.body, cp, em_px)
 
 # Parse both faces and rasterize every letter the game's word book can
 # show, at the size this window will draw it. Call ONCE at startup,
 # before any frame pool is active.
-public define warm_typeset(book: list of Word, height: int, field_h: number) -> Typeset:
+public define warm_typeset(book: list of Word, height: number, field_h: number) -> Typeset:
     body = font_body()
     heading = font_title()
     ppu = px_per_unit(height, field_h)
@@ -641,27 +641,27 @@ public define warm_typeset(book: list of Word, height: int, field_h: number) -> 
     loop word in book:
         em_px = to_whole(word.em * ppu + 0.5)
         edit block = 0 - 1
-        loop i in 0..<length(sizes):
-            if at(sizes, i) == em_px:
+        loop i in 0 until length(sizes):
+            if sizes[i] is em_px:
                 block = i * 512
         if block < 0:
             block = length(sizes) * 512
             sizes = append(sizes, em_px)
-            loop _s in 0..<512:
+            loop _s in 0 until 512:
                 slots = append(slots, 0)
         letters = bytes_of(word.content)
-        loop i in 0..<bytes_count(letters):
+        loop i in 0 until bytes_count(letters):
             cp = byte_at(letters, i)
             slot = block + (if word.titled then 256 else 0) + cp
-            if at(slots, slot) == 0:
+            if slots[slot] is 0:
                 stash = push(stash, glyph_mask(if word.titled then heading else body, cp, em_px))
                 slots = set(slots, slot, length(stash))
     Typeset{body: body, heading: heading, sizes: sizes, slots: slots, stash: stash}
 
-define blend_channel(bg: int, ink: int, alpha: int) -> int:
+define blend_channel(bg: number, ink: number, alpha: number) -> number:
     bg + (ink - bg) * alpha // 255
 
-define blend_px(bg: int, ink: int, alpha: int) -> int:
+define blend_px(bg: number, ink: number, alpha: number) -> number:
     red = blend_channel((bg // 65536) % 256, (ink // 65536) % 256, alpha)
     green = blend_channel((bg // 256) % 256, (ink // 256) % 256, alpha)
     blue = blend_channel(bg % 256, ink % 256, alpha)
@@ -671,46 +671,46 @@ define blend_px(bg: int, ink: int, alpha: int) -> int:
 # top_px the line's top (baseline = top + ascent). The lowest rung of
 # the ladder - draw_words and the DisplayList compositor both end here,
 # so every letter on screen comes through one blitter.
-public define blit_line(pixels: [int], width: int, height: int, left_px: number, top_px: number, content: text, titled: truth, em_px: int, color: int, types: Typeset) -> [int]:
+public define blit_line(pixels: [number], width: number, height: number, left_px: number, top_px: number, content: text, titled: truth, em_px: number, color: number, types: Typeset) -> [number]:
     f = if titled then types.heading else types.body
     scale = to_real(em_px) / to_real(f.upm)
     base_row = round_i(top_px + to_real(font_ascent(f)) * scale)
     edit out = pixels
     edit penx = left_px
     letters = bytes_of(content)
-    loop i in 0..<bytes_count(letters):
+    loop i in 0 until bytes_count(letters):
         cp = byte_at(letters, i)
         mask = mask_of(types, titled, cp, em_px)
-        mask_w = at(mask, 0)
-        mask_h = at(mask, 1)
-        glyph_left = round_i(penx) + at(mask, 2)
-        glyph_top = base_row + at(mask, 3)
-        loop row in 0..<mask_h:
+        mask_w = mask[0]
+        mask_h = mask[1]
+        glyph_left = round_i(penx) + mask[2]
+        glyph_top = base_row + mask[3]
+        loop row in 0 until mask_h:
             py = glyph_top + row
             if py >= 0 and py < height:
-                loop col in 0..<mask_w:
-                    alpha = at(mask, 4 + row * mask_w + col)
+                loop col in 0 until mask_w:
+                    alpha = mask[4 + row * mask_w + col]
                     px = glyph_left + col
                     if alpha > 0 and px >= 0 and px < width:
-                        out = set(out, py * width + px, blend_px(at(out, py * width + px), color, alpha))
+                        out = set(out, py * width + px, blend_px(out[py * width + px], color, alpha))
         penx = penx + to_real(advance_width(f, glyph_id(f, cp))) * scale
     out
 
 # The width of a line in pixels at em size em_px - the blitter's own
 # advance sum, for centering without drawing.
-public define line_width_px(content: text, titled: truth, em_px: int, types: Typeset) -> number:
+public define line_width_px(content: text, titled: truth, em_px: number, types: Typeset) -> number:
     f = if titled then types.heading else types.body
     scale = to_real(em_px) / to_real(f.upm)
     edit wide = 0.0
     letters = bytes_of(content)
-    loop i in 0..<bytes_count(letters):
+    loop i in 0 until bytes_count(letters):
         wide = wide + to_real(advance_width(f, glyph_id(f, byte_at(letters, i)))) * scale
     wide
 
 # Draw every word over the rendered frame, letters placed on the pen
 # line exactly as the font's metrics say. Words sit ABOVE everything -
 # they are the HUD's voice, same as the old always-on-top labels.
-public define draw_words(pixels: [int], width: int, height: int, field_w: number, field_h: number, spoken: list of Word, types: Typeset) -> [int]:
+public define draw_words(pixels: [number], width: number, height: number, field_w: number, field_h: number, spoken: list of Word, types: Typeset) -> [number]:
     ppu = px_per_unit(height, field_h)
     edit out = pixels
     loop word in spoken:
@@ -733,8 +733,8 @@ define test_polygon_fill_spans_fills_a_square():
     sq_y = append(append(append(append(py, 0.0), 0.0), 10.0), 10.0)
     spans = polygon_fill_spans(sq_x, sq_y, [3], 1.0)
     require length(spans) // 3 >= 9
-    require at(spans, 0) == 0
-    require at(spans, 1) == 10
+    require spans[0] is 0
+    require spans[1] is 10
 
 
 # generated by `orbit test` - runs every test_* in the entry file

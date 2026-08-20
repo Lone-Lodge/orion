@@ -1,15 +1,15 @@
-# `match:` - subjectless cond-form (Minimal Orion: "match, den enda förgreningen").
+# `choose:` - subjectless cond-form (Minimal Orion: "match, den enda förgreningen").
 #
-# `match:` with no scrutinee is a condition chain - the first true arm wins,
+# `choose:` with no scrutinee is a condition chain - the first true arm wins,
 # `else:` is the catch-all. It replaces `if / else if / else`. Desugars to a
 # right-nested if/else at parse time, so eval and typeck are untouched.
 #
-# Arms must be indented deeper than the `match` keyword (same rule as a
-# scrutinee `match`).
+# Arms must be indented deeper than the `choose` keyword (same rule as a
+# scrutinee `choose`).
 #
 # Run (lodge-orion interp):  orion run match_cond.or main   → expects 1
 
-define main() -> int:
+define main() -> number:
     score = 120
     choose:
         score > 100: 1     # first true arm wins  → 1

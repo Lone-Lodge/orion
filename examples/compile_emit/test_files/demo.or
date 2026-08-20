@@ -4,7 +4,7 @@
 #   - SSA-form: each instruction PRODUCES exactly one value.
 #   - Other instructions REFERENCE values by ID (index into the
 #     function's instructions list).
-#   - Typed: every value has a type (i64, ptr, bool, void).
+#   - Typed: every value has a type (i64, ptr, truth, void).
 #
 # Pipeline: lex → parse → AST → IR → orion_emit_llvm → .ll → clang → .exe
 #
@@ -22,7 +22,7 @@
 # An IR instruction. All fields present; unused ones zero/empty.
 # - name: function name for call ops (else "")
 # - args: arg-value-ids for call ops (else [])
-type Inst: op: text, type_text: text, value: int, lhs: int, rhs: int, name: text, args: [int]
+type Inst: op: text, type_text: text, value: number, lhs: number, rhs: number, name: text, args: [number]
 
 # A function parameter.
 type Param: name: text, type_text: text
@@ -35,7 +35,7 @@ type IRModule: functions: [IRFn]
 
 # Result of pushing an instruction: the updated function + the new
 # instruction's SSA value id.
-type PushResult: function: IRFn, id: int
+type PushResult: function: IRFn, id: number
 
 
 # --- Value types (text constants) ---
@@ -48,56 +48,56 @@ public define ir_type_void() -> text: "void"
 
 # --- Instruction builders ---
 
-public define ir_iconst(value: int) -> Inst:
+public define ir_iconst(value: number) -> Inst:
     Inst{op: "iconst", type_text: "i64", value: value, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_iadd(lhs: int, rhs: int) -> Inst:
+public define ir_iadd(lhs: number, rhs: number) -> Inst:
     Inst{op: "iadd", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_isub(lhs: int, rhs: int) -> Inst:
+public define ir_isub(lhs: number, rhs: number) -> Inst:
     Inst{op: "isub", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_imul(lhs: int, rhs: int) -> Inst:
+public define ir_imul(lhs: number, rhs: number) -> Inst:
     Inst{op: "imul", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_idiv(lhs: int, rhs: int) -> Inst:
+public define ir_idiv(lhs: number, rhs: number) -> Inst:
     Inst{op: "idiv", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_imod(lhs: int, rhs: int) -> Inst:
+public define ir_imod(lhs: number, rhs: number) -> Inst:
     Inst{op: "imod", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical and/or: each operand is coerced to 0/1 (any nonzero → 1),
 # then bitwise AND/OR. Result is 0 or 1.
-public define ir_iand(lhs: int, rhs: int) -> Inst:
+public define ir_iand(lhs: number, rhs: number) -> Inst:
     Inst{op: "iand", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_ior(lhs: int, rhs: int) -> Inst:
+public define ir_ior(lhs: number, rhs: number) -> Inst:
     Inst{op: "ior", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical NOT: 0 → 1, non-zero → 0.
-public define ir_inot(value_id: int) -> Inst:
+public define ir_inot(value_id: number) -> Inst:
     Inst{op: "inot", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Comparison ops. Produce i64 with value 0 (false) or 1 (true).
-public define ir_icmp_eq(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_eq(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_eq", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_ne(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_ne(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_ne", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_lt(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_lt(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_lt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_le(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_le(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_le", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_gt(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_gt(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_gt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_icmp_ge(lhs: int, rhs: int) -> Inst:
+public define ir_icmp_ge(lhs: number, rhs: number) -> Inst:
     Inst{op: "icmp_ge", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
-public define ir_return(value_id: int) -> Inst:
+public define ir_return(value_id: number) -> Inst:
     Inst{op: "return", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 public define ir_return_void() -> Inst:
@@ -105,12 +105,12 @@ public define ir_return_void() -> Inst:
 
 # Print an i64 value as decimal text + newline to stdout.
 # Produces a void value (the instruction has no SSA-id consumers).
-public define ir_print_int(value_id: int) -> Inst:
+public define ir_print_int(value_id: number) -> Inst:
     Inst{op: "print_int", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
-# Select: result = if cond != 0 then then_id else else_id.
+# Select: result = if cond is not 0 then then_id else else_id.
 # Branchless via cmov - works for any tree-shaped IR.
-public define ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
+public define ir_select(cond_id: number, then_id: number, else_id: number) -> Inst:
     Inst{op: "select", type_text: "i64", value: cond_id, lhs: then_id, rhs: else_id, name: "", args: []}
 
 
@@ -119,7 +119,7 @@ public define ir_select(cond_id: int, then_id: int, else_id: int) -> Inst:
 # Call user-defined function `fn_name` with arg-value-ids.
 # ret_type lets later passes (binop type-detection, phi, etc.) see the
 # call's actual return type without needing a module lookup.
-public define ir_call(fn_name: text, arg_ids: [int], ret_type: text) -> Inst:
+public define ir_call(fn_name: text, arg_ids: [number], ret_type: text) -> Inst:
     Inst{op: "call", type_text: ret_type, value: 0, lhs: 0, rhs: 0, name: fn_name, args: arg_ids}
 
 
@@ -133,37 +133,37 @@ public define ir_const_str(text: text) -> Inst:
     Inst{op: "const_str", type_text: "text", value: 0, lhs: 0, rhs: 0, name: text, args: []}
 
 # Concatenate two text SSA values - calls runtime helper.
-public define ir_text_concat(left_id: int, right_id: int) -> Inst:
+public define ir_text_concat(left_id: number, right_id: number) -> Inst:
     Inst{op: "text_concat", type_text: "text", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
 # Convert an i64 to text - calls runtime helper.
-public define ir_int_to_text(value_id: int) -> Inst:
+public define ir_int_to_text(value_id: number) -> Inst:
     Inst{op: "int_to_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Text equality / inequality / lexicographic compare via strcmp.
 # Result is i64 0/1.
-public define ir_text_cmp(op_name: text, left_id: int, right_id: int) -> Inst:
+public define ir_text_cmp(op_name: text, left_id: number, right_id: number) -> Inst:
     Inst{op: op_name, type_text: "i64", value: 0, lhs: left_id, rhs: right_id, name: "", args: []}
 
 # Length of a text string (calls libc strlen).
-public define ir_text_len(value_id: int) -> Inst:
+public define ir_text_len(value_id: number) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # part(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
-public define ir_text_slice(text_id: int, lo_id: int, hi_id: int) -> Inst:
+public define ir_text_slice(text_id: number, lo_id: number, hi_id: number) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
 # contains(text, sub) - returns i64 1 if sub appears anywhere in text, else 0.
-public define ir_text_contains(text_id: int, sub_id: int) -> Inst:
+public define ir_text_contains(text_id: number, sub_id: number) -> Inst:
     Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
 
 
 # --- File I/O (libc fopen/fread/fwrite) ---
-public define ir_file_read(path_id: int) -> Inst:
+public define ir_file_read(path_id: number) -> Inst:
     Inst{op: "file_read", type_text: "text", value: path_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_file_write(path_id: int, content_id: int) -> Inst:
+public define ir_file_write(path_id: number, content_id: number) -> Inst:
     Inst{op: "file_write", type_text: "i64", value: path_id, lhs: content_id, rhs: 0, name: "", args: []}
 
 
@@ -171,36 +171,36 @@ public define ir_file_write(path_id: int, content_id: int) -> Inst:
 public define ir_argc() -> Inst:
     Inst{op: "argc", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_argv(idx_id: int) -> Inst:
+public define ir_argv(idx_id: number) -> Inst:
     Inst{op: "argv", type_text: "text", value: idx_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
 # bytes_of(t) → [int] of byte values
-public define ir_bytes_from_text(text_id: int) -> Inst:
+public define ir_bytes_from_text(text_id: number) -> Inst:
     Inst{op: "bytes_from_text", type_text: "list", value: text_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # text_of(list) → Text from list of byte values
-public define ir_bytes_to_text(list_id: int) -> Inst:
+public define ir_bytes_to_text(list_id: number) -> Inst:
     Inst{op: "bytes_to_text", type_text: "text", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # bytes_part(list, lo, hi) → new list with items [lo, hi)
-public define ir_bytes_slice(list_id: int, lo_id: int, hi_id: int) -> Inst:
+public define ir_bytes_slice(list_id: number, lo_id: number, hi_id: number) -> Inst:
     Inst{op: "bytes_slice", type_text: "list", value: list_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
 # bytes_concat(a, b) → new list with items of a followed by items of b
-public define ir_bytes_concat(a_id: int, b_id: int) -> Inst:
+public define ir_bytes_concat(a_id: number, b_id: number) -> Inst:
     Inst{op: "bytes_concat", type_text: "list", value: a_id, lhs: b_id, rhs: 0, name: "", args: []}
 
 # bytes_zeros(n) → list of n zeros
-public define ir_bytes_zeros(n_id: int) -> Inst:
+public define ir_bytes_zeros(n_id: number) -> Inst:
     Inst{op: "bytes_zeros", type_text: "list", value: n_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Global state slots - key→ptr Map. slot_get's caller decides type by usage.
 # In our orbs, slots store text values; ir_slot_get defaults to text type.
-public define ir_slot_get(key_id: int) -> Inst:
+public define ir_slot_get(key_id: number) -> Inst:
     Inst{op: "slot_get", type_text: "text", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
 
-public define ir_slot_set(key_id: int, val_id: int) -> Inst:
+public define ir_slot_set(key_id: number, val_id: number) -> Inst:
     Inst{op: "slot_set", type_text: "i64", value: key_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 
@@ -209,18 +209,18 @@ public define ir_slot_set(key_id: int, val_id: int) -> Inst:
 # LIMITATION: only int items work - text lists like ["a", "b"] fail at
 # compile because list_set takes i64, not ptr. Type-aware lists are a
 # future enhancement.
-public define ir_list_lit(item_ids: [int], elem_type: text) -> Inst:
+public define ir_list_lit(item_ids: [number], elem_type: text) -> Inst:
     Inst{op: "list_lit", type_text: "list:{elem_type}", value: 0, lhs: 0, rhs: 0, name: "", args: item_ids}
 
-public define ir_list_at(list_id: int, index_id: int) -> Inst:
+public define ir_list_at(list_id: number, index_id: number) -> Inst:
     Inst{op: "list_at", type_text: "i64", value: list_id, lhs: index_id, rhs: 0, name: "", args: []}
 
-public define ir_list_len(list_id: int) -> Inst:
+public define ir_list_len(list_id: number) -> Inst:
     Inst{op: "list_len", type_text: "i64", value: list_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Push: copy all items + append val, return new list ptr.
 # Caller pattern: `xs = append(xs, val)`.
-public define ir_list_push(list_id: int, val_id: int) -> Inst:
+public define ir_list_push(list_id: number, val_id: number) -> Inst:
     Inst{op: "list_push", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
 
 
@@ -229,13 +229,13 @@ public define ir_list_push(list_id: int, val_id: int) -> Inst:
 #   [i64 length, i64 key0_ptr, i64 val0, i64 key1_ptr, i64 val1, ...]
 # Keys are text pointers stored as i64 (lossless on 64-bit).
 # args alternates: [key0_id, val0_id, key1_id, val1_id, ...].
-public define ir_map_lit(pair_ids: [int]) -> Inst:
+public define ir_map_lit(pair_ids: [number]) -> Inst:
     Inst{op: "map_lit", type_text: "map", value: 0, lhs: 0, rhs: 0, name: "", args: pair_ids}
 
-public define ir_map_get(map_id: int, key_id: int, value_type: text) -> Inst:
+public define ir_map_get(map_id: number, key_id: number, value_type: text) -> Inst:
     Inst{op: "map_get", type_text: value_type, value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
-public define ir_map_has(map_id: int, key_id: int) -> Inst:
+public define ir_map_has(map_id: number, key_id: number) -> Inst:
     Inst{op: "map_has", type_text: "i64", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
 
@@ -243,15 +243,15 @@ public define ir_map_has(map_id: int, key_id: int) -> Inst:
 # A struct value is a ptr to a heap buffer of i64 slots, one per field.
 # type_text encodes the struct name as "struct:Player".
 # Field args carry the SSA value ids in declared field order.
-public define ir_struct_cons(struct_name: text, n_fields: int, value_ids: [int]) -> Inst:
+public define ir_struct_cons(struct_name: text, n_fields: number, value_ids: [number]) -> Inst:
     Inst{op: "struct_cons", type_text: "struct:{struct_name}", value: n_fields, lhs: 0, rhs: 0, name: struct_name, args: value_ids}
 
 # Load a field from a struct by index. field_type tells emit what type to load.
-public define ir_field_load(struct_id: int, field_index: int, field_type: text) -> Inst:
+public define ir_field_load(struct_id: number, field_index: number, field_type: text) -> Inst:
     Inst{op: "field_load", type_text: field_type, value: struct_id, lhs: field_index, rhs: 0, name: "", args: []}
 
 # Print a dynamically-computed text value (calls puts on the ptr).
-public define ir_print_text(value_id: int) -> Inst:
+public define ir_print_text(value_id: number) -> Inst:
     Inst{op: "print_text", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 
@@ -262,11 +262,11 @@ public define ir_alloca(stored_type: text) -> Inst:
     Inst{op: "alloca", type_text: stored_type, value: 0, lhs: 0, rhs: 0, name: "", args: []}
 
 # Load value of `loaded_type` from ptr SSA id.
-public define ir_load(ptr_id: int, loaded_type: text) -> Inst:
+public define ir_load(ptr_id: number, loaded_type: text) -> Inst:
     Inst{op: "load", type_text: loaded_type, value: ptr_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Store value_id to ptr_id. Void. The stored type is inferred from value's type.
-public define ir_store(ptr_id: int, value_id: int) -> Inst:
+public define ir_store(ptr_id: number, value_id: number) -> Inst:
     Inst{op: "store", type_text: "void", value: ptr_id, lhs: value_id, rhs: 0, name: "", args: []}
 
 
@@ -284,20 +284,20 @@ public define ir_br(target_label: text) -> Inst:
 
 # Conditional jump. value = cond ssa-id (i64 0/1).
 # name = "then_label|else_label" (pipe-separated).
-public define ir_br_if(cond_id: int, then_label: text, else_label: text) -> Inst:
+public define ir_br_if(cond_id: number, then_label: text, else_label: text) -> Inst:
     Inst{op: "br_if", type_text: "void", value: cond_id, lhs: 0, rhs: 0, name: "{then_label}|{else_label}", args: []}
 
 # Phi node merging two predecessors.
 # lhs = then-value-id, rhs = else-value-id.
 # name = "then_label|else_label" (pipe-separated).
 # type_text is set at emit time from the operand types.
-public define ir_phi(then_val_id: int, then_label: text, else_val_id: int, else_label: text, phi_type: text) -> Inst:
+public define ir_phi(then_val_id: number, then_label: text, else_val_id: number, else_label: text, phi_type: text) -> Inst:
     Inst{op: "phi", type_text: phi_type, value: 0, lhs: then_val_id, rhs: else_val_id, name: "{then_label}|{else_label}", args: []}
 
 
 # Reference a function parameter by index (0-based). type_text matches
 # the param's declared type ("i64" or "text").
-public define ir_param(param_index: int, param_type: text) -> Inst:
+public define ir_param(param_index: number, param_type: text) -> Inst:
     Inst{op: "param", type_text: param_type, value: param_index, lhs: 0, rhs: 0, name: "", args: []}
 
 
@@ -330,19 +330,19 @@ public define ir_module_add_fn(module: IRModule, fn_value: IRFn) -> IRModule:
 
 # --- Text dumper (Cranelift CLIF-style) ---
 
-public define ir_dump_value_ref(value_id: int) -> text:
+public define ir_dump_value_ref(value_id: number) -> text:
     if value_id < 0:
         "void"
     else:
         "v{value_id}"
 
-public define ir_dump_instruction(inst: Inst, my_id: int) -> text:
+public define ir_dump_instruction(inst: Inst, my_id: number) -> text:
     prefix = "{ir_dump_value_ref(my_id)} = "
     op = inst.op
-    if op == "iconst":
+    if op is "iconst":
         "{prefix}iconst.{inst.type_text} {inst.value}"
     else:
-        if op == "return":
+        if op is "return":
             "return {ir_dump_value_ref(inst.value)}"
         else:
             lhs_ref = ir_dump_value_ref(inst.lhs)
@@ -352,8 +352,8 @@ public define ir_dump_instruction(inst: Inst, my_id: int) -> text:
 public define ir_dump_fn(fn_value: IRFn) -> text:
     edit text = "fn {fn_value.name} -> {fn_value.return_type}:\n"
     total = length(fn_value.instructions)
-    loop idx in 0..<total:
-        inst = at(fn_value.instructions, idx)
+    loop idx in 0 until total:
+        inst = fn_value.instructions[idx]
         line = ir_dump_instruction(inst, idx)
         text = "{text}    {line}\n"
     text
@@ -361,8 +361,8 @@ public define ir_dump_fn(fn_value: IRFn) -> text:
 public define ir_dump_module(module: IRModule) -> text:
     edit text = "; orion_ir module dump\n"
     total = length(module.functions)
-    loop idx in 0..<total:
-        fn_value = at(module.functions, idx)
+    loop idx in 0 until total:
+        fn_value = module.functions[idx]
         text = "{text}{ir_dump_fn(fn_value)}\n"
     text
 
@@ -383,23 +383,23 @@ use bytes
 
 # --- Helpers ---
 
-define value_ref(value_id: int) -> text:
+define value_ref(value_id: number) -> text:
     "%v{value_id}"
 
 
 # Escape a string for use in LLVM IR `c"..."` constant.
 # Printable ASCII passes through; quote/backslash/non-printable use \NN hex.
-define hex_digit(value: int) -> text:
+define hex_digit(value: number) -> text:
     digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]
-    at(digits, value)
+    digits[value]
 
 define llvm_escape(text: text) -> text:
     bs = bytes_of(text)
     total = length(bs)
     edit result = ""
-    loop index in 0..<total:
-        b = at(bs, index)
-        needs_escape = b == 34 or b == 92 or b < 32 or b > 126
+    loop index in 0 until total:
+        b = bs[index]
+        needs_escape = b is 34 or b is 92 or b < 32 or b > 126
         if needs_escape:
             hi = hex_digit(b / 16)
             lo = hex_digit(b % 16)
@@ -414,11 +414,11 @@ define llvm_escape(text: text) -> text:
 
 
 # Find the index of `target` in a list of strings. -1 if not found.
-define string_list_index(strings: [text], target: text) -> int:
+define string_list_index(strings: [text], target: text) -> number:
     total = length(strings)
     edit found = 0 - 1
-    loop index in 0..<total:
-        if at(strings, index) == target and found == (0 - 1):
+    loop index in 0 until total:
+        if strings[index] is target and found is (0 - 1):
             found = index
     found
 
@@ -428,12 +428,12 @@ define string_list_index(strings: [text], target: text) -> int:
 define collect_strings(module: IRModule) -> [text]:
     n_fns = length(module.functions)
     edit result = []
-    loop fi in 0..<n_fns:
-        fn_value = at(module.functions, fi)
+    loop fi in 0 until n_fns:
+        fn_value = module.functions[fi]
         n_insts = length(fn_value.instructions)
-        loop ii in 0..<n_insts:
-            inst = at(fn_value.instructions, ii)
-            is_str_op = inst.op == "print_str" or inst.op == "const_str"
+        loop ii in 0 until n_insts:
+            inst = fn_value.instructions[ii]
+            is_str_op = inst.op is "print_str" or inst.op is "const_str"
             if is_str_op:
                 existing = string_list_index(result, inst.name)
                 if existing < 0:
@@ -447,9 +447,9 @@ define split_pipe(text: text) -> [text]:
     total = length(bs)
     edit parts = []
     edit current = ""
-    loop index in 0..<total:
-        ch = at(bs, index)
-        if ch == 124:  # '|'
+    loop index in 0 until total:
+        ch = bs[index]
+        if ch is 124:  # '|'
             parts = append(parts, current)
             current = ""
         else:
@@ -461,15 +461,15 @@ define split_pipe(text: text) -> [text]:
 
 define icmp_cc(op: text) -> text:
     edit cc = "eq"
-    if op == "icmp_ne":
+    if op is "icmp_ne":
         cc = "ne"
-    if op == "icmp_lt":
+    if op is "icmp_lt":
         cc = "slt"
-    if op == "icmp_le":
+    if op is "icmp_le":
         cc = "sle"
-    if op == "icmp_gt":
+    if op is "icmp_gt":
         cc = "sgt"
-    if op == "icmp_ge":
+    if op is "icmp_ge":
         cc = "sge"
     cc
 
@@ -480,94 +480,94 @@ define icmp_cc(op: text) -> text:
 define find_fn_return_type(module: IRModule, fn_name: text) -> text:
     n = length(module.functions)
     edit result = "i64"
-    loop index in 0..<n:
-        f = at(module.functions, index)
-        if f.name == fn_name:
+    loop index in 0 until n:
+        f = module.functions[index]
+        if f.name is fn_name:
             result = f.return_type
     result
 
 
 # Actual produced type of an SSA value. For call ops, look up the called
 # fn's return type (the call inst itself has a placeholder type).
-define ssa_value_type(value_id: int, fn_value: IRFn, module: IRModule) -> text:
+define ssa_value_type(value_id: number, fn_value: IRFn, module: IRModule) -> text:
     if value_id < 0:
         "i64"
     else:
-        inst = at(fn_value.instructions, value_id)
-        if inst.op == "call":
+        inst = fn_value.instructions[value_id]
+        if inst.op is "call":
             find_fn_return_type(module, inst.name)
         else:
             inst.type_text
 
 
-public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value: IRFn, module: IRModule) -> text:
+public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_value: IRFn, module: IRModule) -> text:
     op = inst.op
-    is_icmp = op == "icmp_eq" or op == "icmp_ne" or op == "icmp_lt" or op == "icmp_le" or op == "icmp_gt" or op == "icmp_ge"
-    is_logical = op == "iand" or op == "ior"
+    is_icmp = op is "icmp_eq" or op is "icmp_ne" or op is "icmp_lt" or op is "icmp_le" or op is "icmp_gt" or op is "icmp_ge"
+    is_logical = op is "iand" or op is "ior"
     # Default for unknown ops: emit a defined SSA slot (= 0) plus a
     # marker comment. Without the slot, downstream phi nodes or
     # consumers would reference undefined `%vN` and clang would reject
     # the whole module with a confusing error.
     edit result = "    {value_ref(my_id)} = add i64 0, 0    ; UNSUPPORTED op={op}"
 
-    if op == "iconst":
+    if op is "iconst":
         result = "    {value_ref(my_id)} = add i64 0, {inst.value}"
 
-    if op == "param":
+    if op is "param":
         # Rebind the parameter to its function-arg name "%pN".
         ty = llvm_type_of(inst.type_text)
-        if ty == "ptr":
+        if ty is "ptr":
             result = "    {value_ref(my_id)} = getelementptr i8, ptr %p{inst.value}, i64 0"
         else:
             result = "    {value_ref(my_id)} = add i64 0, %p{inst.value}"
 
-    if op == "call":
+    if op is "call":
         n_args = length(inst.args)
         edit arg_text = ""
-        loop ai in 0..<n_args:
-            arg_id = at(inst.args, ai)
+        loop ai in 0 until n_args:
+            arg_id = inst.args[ai]
             arg_ty = llvm_type_of(ssa_value_type(arg_id, fn_value, module))
-            sep = if ai == 0 then "" else ", "
+            sep = if ai is 0 then "" else ", "
             arg_text = "{arg_text}{sep}{arg_ty} {value_ref(arg_id)}"
         ret_ty = llvm_type_of(find_fn_return_type(module, inst.name))
         result = "    {value_ref(my_id)} = call {ret_ty} @{inst.name}({arg_text})"
 
-    if op == "label":
+    if op is "label":
         # Emit basic-block label (no leading 4-space indent).
         result = "{inst.name}:"
 
-    if op == "br":
+    if op is "br":
         result = "    br label %{inst.name}"
 
-    if op == "br_if":
+    if op is "br_if":
         # name = "then_lbl|else_lbl" - split on '|'.
         # Coerce cond from i64 to i1 first.
         labels = split_pipe(inst.name)
-        then_lbl = at(labels, 0)
-        else_lbl = at(labels, 1)
+        then_lbl = labels[0]
+        else_lbl = labels[1]
         cond_bool = "%v{my_id}.cb"
         l1 = "    {cond_bool} = icmp ne i64 {value_ref(inst.value)}, 0"
         l2 = "    br i1 {cond_bool}, label %{then_lbl}, label %{else_lbl}"
         result = "{l1}\n{l2}"
 
-    if op == "phi":
+    if op is "phi":
         labels = split_pipe(inst.name)
-        then_lbl = at(labels, 0)
-        else_lbl = at(labels, 1)
+        then_lbl = labels[0]
+        else_lbl = labels[1]
         # phi's type matches its operands' type (both should agree).
-        then_inst = at(fn_value.instructions, inst.lhs)
+        then_inst = fn_value.instructions[inst.lhs]
         phi_ty = llvm_type_of(then_inst.type_text)
         result = "    {value_ref(my_id)} = phi {phi_ty} [ {value_ref(inst.lhs)}, %{then_lbl} ], [ {value_ref(inst.rhs)}, %{else_lbl} ]"
 
-    if op == "iadd":
+    if op is "iadd":
         result = "    {value_ref(my_id)} = add i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "isub":
+    if op is "isub":
         result = "    {value_ref(my_id)} = sub i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "imul":
+    if op is "imul":
         result = "    {value_ref(my_id)} = mul i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "idiv":
+    if op is "idiv":
         result = "    {value_ref(my_id)} = sdiv i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
-    if op == "imod":
+    if op is "imod":
         result = "    {value_ref(my_id)} = srem i64 {value_ref(inst.lhs)}, {value_ref(inst.rhs)}"
 
     if is_icmp:
@@ -577,14 +577,14 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         l2 = "    {value_ref(my_id)} = zext i1 {bool_name} to i64"
         result = "{l1}\n{l2}"
 
-    if op == "select":
+    if op is "select":
         cond_name = "%v{my_id}.c"
         l1 = "    {cond_name} = icmp ne i64 {value_ref(inst.value)}, 0"
         l2 = "    {value_ref(my_id)} = select i1 {cond_name}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)}"
         result = "{l1}\n{l2}"
 
     if is_logical:
-        bool_op = if op == "iand" then "and" else "or"
+        bool_op = if op is "iand" then "and" else "or"
         ab = "%v{my_id}.la"
         bb = "%v{my_id}.lb"
         rb = "%v{my_id}.lr"
@@ -594,56 +594,56 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         l4 = "    {value_ref(my_id)} = zext i1 {rb} to i64"
         result = "{l1}\n{l2}\n{l3}\n{l4}"
 
-    if op == "inot":
+    if op is "inot":
         eq0 = "%v{my_id}.n"
         l1 = "    {eq0} = icmp eq i64 {value_ref(inst.value)}, 0"
         l2 = "    {value_ref(my_id)} = zext i1 {eq0} to i64"
         result = "{l1}\n{l2}"
 
-    if op == "print_int":
+    if op is "print_int":
         # Side-effect call. Emit a sentinel %vN = 0 after so the SSA slot
         # is defined (in case a phi or downstream consumer references it).
         l1 = "    call i32 (ptr, ...) @printf(ptr @.fmt_int, i64 {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "print_str":
+    if op is "print_str":
         # Look up the global name for this string and call puts.
         idx = string_list_index(strings, inst.name)
         l1 = "    call i32 @puts(ptr @.str_{idx})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "const_str":
+    if op is "const_str":
         idx = string_list_index(strings, inst.name)
         # Pointer to the first byte of the global string.
         result = "    {value_ref(my_id)} = getelementptr i8, ptr @.str_{idx}, i64 0"
 
-    if op == "text_concat":
+    if op is "text_concat":
         result = "    {value_ref(my_id)} = call ptr @orion_text_concat(ptr {value_ref(inst.lhs)}, ptr {value_ref(inst.rhs)})"
 
-    if op == "int_to_text":
+    if op is "int_to_text":
         result = "    {value_ref(my_id)} = call ptr @orion_int_to_text(i64 {value_ref(inst.value)})"
 
-    if op == "text_len":
+    if op is "text_len":
         result = "    {value_ref(my_id)} = call i64 @strlen(ptr {value_ref(inst.value)})"
 
-    if op == "text_slice":
+    if op is "text_slice":
         result = "    {value_ref(my_id)} = call ptr @orion_text_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
 
-    if op == "text_contains":
+    if op is "text_contains":
         result = "    {value_ref(my_id)} = call i64 @orion_text_contains(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
 
-    if op == "file_read":
+    if op is "file_read":
         result = "    {value_ref(my_id)} = call ptr @orion_file_read(ptr {value_ref(inst.value)})"
 
-    if op == "file_write":
+    if op is "file_write":
         result = "    {value_ref(my_id)} = call i64 @orion_file_write(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
 
-    if op == "argc":
+    if op is "argc":
         result = "    {value_ref(my_id)} = load i64, ptr @orion_argc"
 
-    if op == "argv":
+    if op is "argv":
         slot_name = "%v{my_id}.slot"
         arr_name = "%v{my_id}.arr"
         l1 = "    {arr_name} = load ptr, ptr @orion_argv"
@@ -651,30 +651,30 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         l3 = "    {value_ref(my_id)} = load ptr, ptr {slot_name}"
         result = "{l1}\n{l2}\n{l3}"
 
-    if op == "bytes_from_text":
+    if op is "bytes_from_text":
         result = "    {value_ref(my_id)} = call ptr @orion_bytes_from_text(ptr {value_ref(inst.value)})"
 
-    if op == "bytes_to_text":
+    if op is "bytes_to_text":
         result = "    {value_ref(my_id)} = call ptr @orion_bytes_to_text(ptr {value_ref(inst.value)})"
 
-    if op == "bytes_slice":
+    if op is "bytes_slice":
         result = "    {value_ref(my_id)} = call ptr @orion_bytes_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
 
-    if op == "bytes_concat":
+    if op is "bytes_concat":
         result = "    {value_ref(my_id)} = call ptr @orion_bytes_concat(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
 
-    if op == "bytes_zeros":
+    if op is "bytes_zeros":
         result = "    {value_ref(my_id)} = call ptr @orion_bytes_zeros(i64 {value_ref(inst.value)})"
 
-    if op == "slot_get":
+    if op is "slot_get":
         # Always returns ptr; type_text on inst tells caller what to do.
         result = "    {value_ref(my_id)} = call ptr @orion_slot_get(ptr {value_ref(inst.value)})"
 
-    if op == "slot_set":
+    if op is "slot_set":
         # val_id may be i64 or ptr - cast ptr→i64 for uniform storage.
-        val_inst = at(fn_value.instructions, inst.lhs)
+        val_inst = fn_value.instructions[inst.lhs]
         val_ty = llvm_type_of(val_inst.type_text)
-        if val_ty == "ptr":
+        if val_ty is "ptr":
             tmp = "%v{my_id}.sp"
             l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
             l2 = "    {value_ref(my_id)} = call i64 @orion_slot_set(ptr {value_ref(inst.value)}, i64 {tmp})"
@@ -682,18 +682,18 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         else:
             result = "    {value_ref(my_id)} = call i64 @orion_slot_set(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
-    is_text_cmp = op == "text_eq" or op == "text_ne" or op == "text_lt" or op == "text_le" or op == "text_gt" or op == "text_ge"
+    is_text_cmp = op is "text_eq" or op is "text_ne" or op is "text_lt" or op is "text_le" or op is "text_gt" or op is "text_ge"
     if is_text_cmp:
         edit cc = "eq"
-        if op == "text_ne":
+        if op is "text_ne":
             cc = "ne"
-        if op == "text_lt":
+        if op is "text_lt":
             cc = "slt"
-        if op == "text_le":
+        if op is "text_le":
             cc = "sle"
-        if op == "text_gt":
+        if op is "text_gt":
             cc = "sgt"
-        if op == "text_ge":
+        if op is "text_ge":
             cc = "sge"
         cmp_id = "%v{my_id}.s"
         bool_id = "%v{my_id}.b"
@@ -702,19 +702,19 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         l3 = "    {value_ref(my_id)} = zext i1 {bool_id} to i64"
         result = "{l1}\n{l2}\n{l3}"
 
-    if op == "print_text":
+    if op is "print_text":
         l1 = "    call i32 @puts(ptr {value_ref(inst.value)})"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "list_lit":
+    if op is "list_lit":
         n = length(inst.args)
         edit text = "    {value_ref(my_id)} = call ptr @orion_list_new(i64 {n})"
-        loop ai in 0..<n:
-            item_id = at(inst.args, ai)
-            item_inst = at(fn_value.instructions, item_id)
+        loop ai in 0 until n:
+            item_id = inst.args[ai]
+            item_inst = fn_value.instructions[item_id]
             item_ty = llvm_type_of(item_inst.type_text)
-            if item_ty == "ptr":
+            if item_ty is "ptr":
                 tmp = "%v{my_id}.lp{ai}"
                 text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(item_id)} to i64"
                 text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {tmp})"
@@ -722,13 +722,13 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                 text = "{text}\n    call void @orion_list_set(ptr {value_ref(my_id)}, i64 {ai}, i64 {value_ref(item_id)})"
         result = text
 
-    if op == "list_at":
+    if op is "list_at":
         # If the source list has a known element type (e.g. "list:text"),
         # cast the i64 result back to ptr after loading.
-        src_inst = at(fn_value.instructions, inst.value)
+        src_inst = fn_value.instructions[inst.value]
         elem = list_elem_type(src_inst.type_text)
         elem_ll = llvm_type_of(elem)
-        if elem_ll == "ptr":
+        if elem_ll is "ptr":
             int_name = "%v{my_id}.i"
             l1 = "    {int_name} = call i64 @orion_list_at(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
             l2 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
@@ -736,13 +736,13 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         else:
             result = "    {value_ref(my_id)} = call i64 @orion_list_at(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
-    if op == "list_len":
+    if op is "list_len":
         result = "    {value_ref(my_id)} = call i64 @orion_list_len(ptr {value_ref(inst.value)})"
 
-    if op == "list_push":
-        val_inst = at(fn_value.instructions, inst.lhs)
+    if op is "list_push":
+        val_inst = fn_value.instructions[inst.lhs]
         val_ty = llvm_type_of(val_inst.type_text)
-        if val_ty == "ptr":
+        if val_ty is "ptr":
             tmp = "%v{my_id}.p"
             l1 = "    {tmp} = ptrtoint ptr {value_ref(inst.lhs)} to i64"
             l2 = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {tmp})"
@@ -750,18 +750,18 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         else:
             result = "    {value_ref(my_id)} = call ptr @orion_list_push(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
-    if op == "map_lit":
+    if op is "map_lit":
         # args alternates key/val: [k0, v0, k1, v1, ...]
         n_total = length(inst.args)
         n_pairs = n_total / 2
         edit text = "    {value_ref(my_id)} = call ptr @orion_map_new(i64 {n_pairs})"
-        loop pi in 0..<n_pairs:
-            key_id = at(inst.args, pi * 2)
-            val_id = at(inst.args, pi * 2 + 1)
-            val_inst = at(fn_value.instructions, val_id)
+        loop pi in 0 until n_pairs:
+            key_id = inst.args[pi * 2]
+            val_id = inst.args[pi * 2 + 1]
+            val_inst = fn_value.instructions[val_id]
             val_ty = llvm_type_of(val_inst.type_text)
             # Map slots are i64. ptr-typed values need ptrtoint first.
-            if val_ty == "ptr":
+            if val_ty is "ptr":
                 tmp = "%v{my_id}.p{pi}"
                 text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(val_id)} to i64"
                 text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {tmp})"
@@ -769,11 +769,11 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                 text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {value_ref(val_id)})"
         result = text
 
-    if op == "map_get":
+    if op is "map_get":
         # map_get returns i64. The caller decides via type_text whether to
         # cast back to ptr (for text/list/map) or keep as i64.
         ty = llvm_type_of(inst.type_text)
-        if ty == "ptr":
+        if ty is "ptr":
             int_name = "%v{my_id}.i"
             l1 = "    {int_name} = call i64 @orion_map_get(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
             l2 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
@@ -781,20 +781,20 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
         else:
             result = "    {value_ref(my_id)} = call i64 @orion_map_get(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
 
-    if op == "map_has":
+    if op is "map_has":
         result = "    {value_ref(my_id)} = call i64 @orion_map_has(ptr {value_ref(inst.value)}, ptr {value_ref(inst.lhs)})"
 
-    if op == "struct_cons":
+    if op is "struct_cons":
         n_fields = inst.value
         bytes_needed = n_fields * 8
         edit text2 = "    {value_ref(my_id)} = call ptr @malloc(i64 {bytes_needed})"
-        loop fi in 0..<n_fields:
-            val_id = at(inst.args, fi)
-            val_inst = at(fn_value.instructions, val_id)
+        loop fi in 0 until n_fields:
+            val_id = inst.args[fi]
+            val_inst = fn_value.instructions[val_id]
             val_ty = llvm_type_of(val_inst.type_text)
             slot_name = "%v{my_id}.f{fi}"
             text2 = "{text2}\n    {slot_name} = getelementptr i64, ptr {value_ref(my_id)}, i64 {fi}"
-            if val_ty == "ptr":
+            if val_ty is "ptr":
                 int_name = "%v{my_id}.f{fi}.i"
                 text2 = "{text2}\n    {int_name} = ptrtoint ptr {value_ref(val_id)} to i64"
                 text2 = "{text2}\n    store i64 {int_name}, ptr {slot_name}"
@@ -802,11 +802,11 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
                 text2 = "{text2}\n    store i64 {value_ref(val_id)}, ptr {slot_name}"
         result = text2
 
-    if op == "field_load":
+    if op is "field_load":
         ty = llvm_type_of(inst.type_text)
         slot_name = "%v{my_id}.slot"
         l1 = "    {slot_name} = getelementptr i64, ptr {value_ref(inst.value)}, i64 {inst.lhs}"
-        if ty == "ptr":
+        if ty is "ptr":
             int_name = "%v{my_id}.i"
             l2 = "    {int_name} = load i64, ptr {slot_name}"
             l3 = "    {value_ref(my_id)} = inttoptr i64 {int_name} to ptr"
@@ -815,26 +815,26 @@ public define emit_instruction(inst: Inst, my_id: int, strings: [text], fn_value
             l2 = "    {value_ref(my_id)} = load i64, ptr {slot_name}"
             result = "{l1}\n{l2}"
 
-    if op == "alloca":
+    if op is "alloca":
         ty = llvm_type_of(inst.type_text)
         result = "    {value_ref(my_id)} = alloca {ty}, align 8"
 
-    if op == "load":
+    if op is "load":
         ty = llvm_type_of(inst.type_text)
         result = "    {value_ref(my_id)} = load {ty}, ptr {value_ref(inst.value)}"
 
-    if op == "store":
+    if op is "store":
         # Stored value's type comes from its defining inst.
-        val_inst = at(fn_value.instructions, inst.lhs)
+        val_inst = fn_value.instructions[inst.lhs]
         ty = llvm_type_of(val_inst.type_text)
         l1 = "    store {ty} {value_ref(inst.lhs)}, ptr {value_ref(inst.value)}"
         l2 = "    {value_ref(my_id)} = add i64 0, 0"
         result = "{l1}\n{l2}"
 
-    if op == "return":
+    if op is "return":
         ret_ty = llvm_type_of(fn_value.return_type)
         if inst.value < 0:
-            if ret_ty == "ptr":
+            if ret_ty is "ptr":
                 result = "    ret ptr null"
             else:
                 result = "    ret i64 0"
@@ -851,13 +851,13 @@ define llvm_type_of(orion_type: text) -> text:
     edit is_list_elem = false
     bs = bytes_of(orion_type)
     if length(bs) >= 7:
-        if at(bs, 0) == 115 and at(bs, 1) == 116 and at(bs, 2) == 114 and at(bs, 3) == 117 and at(bs, 4) == 99 and at(bs, 5) == 116 and at(bs, 6) == 58:
+        if bs[0] is 115 and bs[1] is 116 and bs[2] is 114 and bs[3] is 117 and bs[4] is 99 and bs[5] is 116 and bs[6] is 58:
             is_struct = true
     # `list:T` (parameterised list) - also a ptr at LLVM level.
     if length(bs) >= 5:
-        if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
+        if bs[0] is 108 and bs[1] is 105 and bs[2] is 115 and bs[3] is 116 and bs[4] is 58:
             is_list_elem = true
-    if orion_type == "text" or orion_type == "list" or orion_type == "map" or orion_type == "ptr" or is_struct or is_list_elem then "ptr" else "i64"
+    if orion_type is "text" or orion_type is "list" or orion_type is "map" or orion_type is "ptr" or is_struct or is_list_elem then "ptr" else "i64"
 
 
 # Given a "list:T" encoding, return T (or "i64" as fallback).
@@ -866,15 +866,15 @@ define list_elem_type(list_type: text) -> text:
     n = length(bs)
     edit is_listed = false
     if n >= 5:
-        if at(bs, 0) == 108 and at(bs, 1) == 105 and at(bs, 2) == 115 and at(bs, 3) == 116 and at(bs, 4) == 58:
+        if bs[0] is 108 and bs[1] is 105 and bs[2] is 115 and bs[3] is 116 and bs[4] is 58:
             is_listed = true
     if not is_listed:
         "i64"
     else:
         # Extract bytes 5..n
         edit result = ""
-        loop index in 5..<n:
-            single = text_of([at(bs, index)])
+        loop index in 5 until n:
+            single = text_of([bs[index]])
             result = "{result}{single}"
         result
 
@@ -882,9 +882,9 @@ define list_elem_type(list_type: text) -> text:
 define emit_param_list(params: [Param]) -> text:
     n = length(params)
     edit result = ""
-    loop index in 0..<n:
-        sep = if index == 0 then "" else ", "
-        ty = llvm_type_of(at(params, index).type_text)
+    loop index in 0 until n:
+        sep = if index is 0 then "" else ", "
+        ty = llvm_type_of(params[index].type_text)
         result = "{result}{sep}{ty} %p{index}"
     result
 
@@ -894,18 +894,18 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
     # Skip emission of compile-time aliases that exist only so lodge-orion
     # can interpret the source; orion-self dispatches their callers directly
     # to typed runtime helpers.
-    is_alias = name == "get_int" or name == "get_map"
+    is_alias = name is "get_int" or name is "get_map"
     if is_alias:
         ""
     else:
         ret_type = llvm_type_of(fn_value.return_type)
         param_list = emit_param_list(fn_value.params)
-        is_user_main = name == "main"
+        is_user_main = name is "main"
         emit_name = if is_user_main then "orion_main" else name
         edit text = "define {ret_type} @{emit_name}({param_list}) \{\nentry:\n"
         total = length(fn_value.instructions)
-        loop index in 0..<total:
-            inst = at(fn_value.instructions, index)
+        loop index in 0 until total:
+            inst = fn_value.instructions[index]
             line = emit_instruction(inst, index, strings, fn_value, module)
             text = "{text}{line}\n"
         text = "{text}\}\n"
@@ -914,7 +914,7 @@ public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text
 
 # Emit the global for a single string literal.
 # Format: @.str_N = private unnamed_addr constant [LEN x i8] c"<bytes>\00"
-define emit_string_global(text_value: text, idx: int) -> text:
+define emit_string_global(text_value: text, idx: number) -> text:
     bs = bytes_of(text_value)
     n = length(bs) + 1                          # +1 for null terminator
     escaped = llvm_escape(text_value)
@@ -1336,12 +1336,12 @@ public define emit_module(module: IRModule) -> text:
     # Emit one global per distinct string literal in the module.
     strings = collect_strings(module)
     n_strings = length(strings)
-    loop index in 0..<n_strings:
-        text = "{text}{emit_string_global(at(strings, index), index)}\n"
+    loop index in 0 until n_strings:
+        text = "{text}{emit_string_global(strings[index], index)}\n"
     text = "{text}\n"
     total = length(module.functions)
-    loop index in 0..<total:
-        fn_value = at(module.functions, index)
+    loop index in 0 until total:
+        fn_value = module.functions[index]
         text = "{text}{emit_fn(fn_value, strings, module)}\n"
     # Wrapper @main: stash argc/argv to globals so argc()/argv(i) can read
     # them, then delegate to user's orion_main. We always emit this - if
@@ -1359,7 +1359,7 @@ public define emit_module(module: IRModule) -> text:
     text = "{text}  ret i32 %ret32\n"
     text = "{text}\}\n"
     text
-define main() -> int:
+define main() -> number:
     inst = ir_iconst(42)
     ret = ir_return(0)
     fn_value = IRFn{name: "main", return_type: "i64", params: [], instructions: [inst, ret]}

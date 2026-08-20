@@ -134,7 +134,7 @@ define main():
     total   = sum(numbers)                     <span class="c"># 16</span>
     doubled = each(numbers, (n): n * 2)        <span class="c"># [8, 2, 18, 4]</span>
     big     = keep(numbers, (n): n &gt; 3)        <span class="c"># [4, 9]</span>
-    print_line("{total} {len(doubled)} {len(big)}")
+    print_line("{total} {length(doubled)} {length(big)}")
 </code></pre>
 
 <p>Most code over a collection states the intent &mdash; <code>sum</code>,
@@ -149,7 +149,7 @@ yourself, there is exactly one iteration keyword:</p>
         total += i
     doubled = loop x in [1, 2, 3]: collect x * 2      <span class="c"># [2, 4, 6]</span>
     big = loop x in [1, 2, 3] where x &gt; 1: collect x  <span class="c"># [2, 3]</span>
-    print_line("{total + len(doubled) + len(big)}")
+    print_line("{total + length(doubled) + length(big)}")
 </code></pre>
 
 <p><code>collect</code> gathers values into a list &mdash; <code>each</code>
@@ -164,7 +164,7 @@ filters the run. The ranges read the way English does:
     xs = [10, 20, 30]
     ys = append(xs, 40)          <span class="c"># append returns a new list</span>
     m = {"a": 1, "b": 2}
-    print_line("first={xs[0]} len={len(ys)} b={get(m, "b")}")
+    print_line("first={xs[0]} len={length(ys)} b={get(m, "b")}")
 </code></pre>
 
 <p>Value semantics are unconditional: nothing is secretly shared. The compiler
@@ -226,9 +226,9 @@ define main():
     greet("Ada")
     greet(name: "Bo", loud: true)
     words = split("alpha,beta,gamma", ",")
-    lengths = loop w in words: collect len(w)
+    lengths = loop w in words: collect length(w)
     total = combine(lengths, 0, (a, b): a + b)
-    print_line("words={len(words)} letters={total}")
+    print_line("words={length(words)} letters={total}")
 </code></pre>
 
 <p>A library is an <em>orb</em>: <code>use text</code> brings one in, and
@@ -280,11 +280,11 @@ at block end, last registered first, and before any <code>return</code>.</p>
 
 define main():
     args = arguments()
-    who = if len(args) &gt; 1 then at(args, 1) else "world"
+    who = if length(args) &gt; 1 then at(args, 1) else "world"
     print_line("hello {who}")
     file_write("greeting.txt", "hello {who}")
     back = file_read("greeting.txt")
-    print_line("{len(back)} bytes round-tripped")
+    print_line("{length(back)} bytes round-tripped")
 </code></pre>
 
 <p><code>arguments()</code> is the command line as a <code>list of text</code>,

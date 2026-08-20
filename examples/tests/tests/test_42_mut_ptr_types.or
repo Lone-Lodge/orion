@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     # mut variables reassigned with compatible ptr types
     edit acc = ""
     acc = "hello"

@@ -1,0 +1,31 @@
+# `loop k in m:` walks a map's KEYS, `loop k, v in m:` walks key and value.
+# The map's element is its key, because from a key you can reach the value
+# and from a value you cannot reach the key. Same "locator, value" shape
+# `loop i, x in xs:` already has over a list.
+define main() -> number:
+    ages = {"ada": 36, "linus": 54}
+
+    # one name: the key
+    edit keylen = 0
+    loop name in ages:
+        keylen = keylen + length(name)      # 3 + 5 is 8
+
+    # two names: key, value
+    edit total = 0
+    loop name, age in ages:
+        total = total + age                 # 36 + 54 is 90
+
+    # `where` filters the same way it does over a list
+    edit old = 0
+    loop name, age in ages where age > 40:
+        old = old + 1                       # linus only is 1
+
+    # break and continue reach the map loop too
+    edit seen = 0
+    loop name, age in ages:
+        if age < 40:
+            continue
+        seen = seen + 1
+        break                               # is 1
+
+    total + keylen - old + seen              # 90 + 8 - 1 + 1 is 98

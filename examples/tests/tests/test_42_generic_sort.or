@@ -3,13 +3,13 @@
 use iter
 use text
 
-type player: name: text, score: int
+type player: name: text, score: number
 
-define main() -> int:
+define main() -> number:
     nums = sorted([3, 1, 2], order_of{less: (a, b): a < b})
     desc = sorted([3, 1, 2], order_of{less: (a, b): a > b})
     words = sorted(["pear", "apple"], order_of{less: (a: text, b: text): index_of(a, "a") is 0})
-    ok1 = if at(nums, 0) is 1 and at(nums, 2) is 3 then 20 else 0
-    ok2 = if at(desc, 0) is 3 then 12 else 0
-    ok3 = if at(words, 0) is "apple" then 10 else 0
+    ok1 = if nums[0] is 1 and nums[2] is 3 then 20 else 0
+    ok2 = if desc[0] is 3 then 12 else 0
+    ok3 = if words[0] is "apple" then 10 else 0
     ok1 + ok2 + ok3

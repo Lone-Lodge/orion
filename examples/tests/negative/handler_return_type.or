@@ -3,5 +3,5 @@ effect Log:
   msg: function(text) -> int
 handle Log.msg(s: text) -> text:
   42
-define main() -> int:
+define main() -> number:
   0

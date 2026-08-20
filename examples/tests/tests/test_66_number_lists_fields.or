@@ -1,0 +1,44 @@
+# `number` reaches a data FIELD and a list ELEMENT too, so `int` is not needed
+# to say what a whole number is anywhere.
+#
+# The two positions differ in one way that matters. A scalar can be promoted
+# where it is passed - the lowering emits sitofp - so a `number` parameter
+# taints one direction. Nothing converts a list of whole numbers into a list
+# of real ones, so a list parameter and its argument must AGREE: real anywhere
+# is real along the chain, and a literal written at such a call is built real.
+
+type counter: hits: number, tag: text
+type meter: level: number
+
+define total(xs: list of number) -> number:
+    edit s: number = 0
+    loop x in xs:
+        s = s + x
+    s
+
+define whole_only(xs: list of number) -> number:
+    edit s: number = 0
+    loop x in xs:
+        s = s + x
+    s
+
+define main() -> number:
+    # a field written whole stays whole; one written 0.5 does not
+    c = counter{hits: 20, tag: "a"}
+    m = meter{level: 0.5}
+
+    # `total` is handed both, so BOTH its lists are real - including the
+    # whole-looking literal, which is built real rather than misread
+    mixed_whole = total([1, 2, 3])          # 6.0
+    mixed_real = total([1.5, 2.5])          # 4.0
+
+    # `whole_only` never meets a fraction, so it stays i64 throughout
+    exact = whole_only([10, 20, 12])        # 42
+
+    a = if c.hits is 20 then 10 else 0
+    b = if m.level > 0.4 and m.level < 0.6 then 10 else 0
+    d = if mixed_whole > 5.9 and mixed_whole < 6.1 then 10 else 0
+    e = if mixed_real > 3.9 and mixed_real < 4.1 then 10 else 0
+    f = if exact is 42 then 26 else 0
+
+    a + b + d + e + f   # 10*4 + 26

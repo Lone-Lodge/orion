@@ -8,7 +8,7 @@ external define orion_arena_used() -> int
 # With the arena reset per frame, RSS stays ~flat at the arena size.
 # Without it (malloc passthrough) this would leak ~2GB.
 
-define main() -> int:
+define main() -> number:
     # Persistent state: pre-sized OUTSIDE arena mode, mutated in place
     # during frames (set never allocates; push_mut within capacity
     # never allocates).
@@ -23,7 +23,7 @@ define main() -> int:
         orion_arena_on()
         # ~transient frame work: entity packing, draw lists, debug text
         edit draws = []
-        loop r in 0..<100:
+        loop r in 0 until 100:
             draws = append(draws, r * 7)
         msg = "frame {i} draws {length(draws)} score {i}"
         m = {"x": i, "y": i * 2, "label": msg}

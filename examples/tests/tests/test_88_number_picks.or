@@ -1,0 +1,50 @@
+# `number` is the word; i64 or f64 is the machine. Which one is decided once
+# for the whole program - Orion concatenates every orb into one text, so there
+# is no separate-compilation boundary to guess across.
+#
+# The rule runs one direction: a site is WHOLE until something real reaches it.
+# Over-approximating costs speed; under-approximating would round someone's
+# number without saying so. The four ways a real can arrive are all here.
+
+define twice(a: number) -> number:
+    a * 2                       # nothing real anywhere -> i64 in, i64 out
+
+define half(a: number) -> number:
+    a / 2                       # `/` is real division: whole in, REAL out
+
+define scale(a: number) -> number:
+    a * 3                       # a literal 1.5 reaches it below
+
+define chained(a: number) -> number:
+    twice(a) + 1                # twice is whole, so this is too
+
+# the three ways a real arrives without a fraction in sight
+define from_param(x: float) -> number:
+    scale(x)                    # a DECLARED real, handed one hop on
+
+define gives_real() -> float:
+    1.5
+
+define from_return(a: number) -> number:
+    a + 1                       # reached by gives_real() below
+
+define main() -> number:
+    exact = twice(21)                       # 42, not 42.0
+    from_div = half(9)                      # 4.5
+    from_lit = scale(1.5)                   # 4.5
+    transitive = chained(20)                # 41
+    hop = from_param(2.0)                   # 6.0
+    ret = from_return(gives_real())         # 2.5
+
+    f: float = 0.5
+    from_local = scale(f)                   # 1.5
+
+    a = if exact is 42 then 12 else 0
+    b = if from_div > 4.4 and from_div < 4.6 then 12 else 0
+    c = if from_lit > 4.4 and from_lit < 4.6 then 12 else 0
+    d = if transitive is 41 then 12 else 0
+    e = if hop > 5.9 and hop < 6.1 then 12 else 0
+    g = if ret > 2.4 and ret < 2.6 then 12 else 0
+    h = if from_local > 1.4 and from_local < 1.6 then 16 else 0
+
+    a + b + c + d + e + g + h   # 12*6 + 16

@@ -10,58 +10,58 @@
 #   2. running the defers before the return expression is the wrong order -
 #      `defer close(f)` must not close the handle that `return read(f)` reads
 # so `defer` is now an AST rewrite: save the value, run the defers, then return.
-define note(n: int) -> int:
+define note(n: number) -> number:
     prev = if slot_has("trace") then slot_get_int("trace") else 0
     slot_set("trace", prev * 10 + n)
     n
 
 # Body first, then defers in reverse registration order. The block's VALUE is
 # still the body's last expression, not the last deferred call.
-define block_end() -> int:
+define block_end() -> number:
     defer note(1)
     defer note(2)
     note(3)
 
 # The return expression is evaluated, THEN the defer runs, then the saved value
 # is returned: trace 87, value 8.
-define nested_return(x: int) -> int:
+define nested_return(x: number) -> number:
     defer note(7)
     if x > 0:
         return note(8)
     note(9)
 
 # A defer inside a loop body belongs to that body: it runs once per iteration.
-define in_loop() -> int:
+define in_loop() -> number:
     edit total = 0
-    loop i in 0..<3:
+    loop i in 0 until 3:
         defer note(4)
         total = total + 1
     total
 
-# A `match` in TAIL position is the block's value too, and it is a Match node,
+# A `choose` in TAIL position is the block's value too, and it is a Match node,
 # not an ExprStmt. Only ExprStmt got the save-then-run treatment, so the defers
 # were appended AFTER the match and the deferred call became the value: this
 # returned 0 instead of 84.
-define tail_match() -> int:
+define tail_match() -> number:
     defer note(5)
     choose 1:
-        1 -> 84
-        _ -> 0
+        1 then 84
+        _ then 0
 
 # A tail if/else is the block's value too, and unlike a match it is NOT an
 # expression -- `y = if c: a else: b` does not parse -- so it cannot be hoisted
 # into a temp. The defers are pushed into each branch instead. Before that, a
 # defer above a tail if/else returned the deferred call's value (0) rather than
 # the branch's.
-define tail_if() -> int:
+define tail_if() -> number:
     defer note(6)
     x = 18
-    if x == 18:
+    if x is 18:
         84
     else:
         0
 
-define main() -> int:
+define main() -> number:
     v1 = block_end()
     t1 = if slot_has("trace") then slot_get_int("trace") else 0
     slot_set("trace", 0)
@@ -82,9 +82,9 @@ define main() -> int:
     t5 = if slot_has("trace") then slot_get_int("trace") else 0
 
     print_line("block_end {t1}/{v1}  nested {t2}/{v2}  loop {t3}/{v3}  tailmatch {t4}/{v4}  tailif {t5}/{v5}")
-    ok1 = if t1 == 321 and v1 == 3 then 1 else 0     # LIFO after the body
-    ok2 = if t2 == 87 and v2 == 8 then 1 else 0      # value first, then defer
-    ok3 = if t3 == 444 and v3 == 3 then 1 else 0     # once per iteration
-    ok4 = if t4 == 5 and v4 == 84 then 1 else 0      # the match value survives
-    ok5 = if t5 == 6 and v5 == 84 then 1 else 0      # branch value survives, defer ran
-    ok1 * 14 + ok2 * 10 + ok3 * 6 + ok4 * 4 + ok5 * 4   # 14 + 10 + 6 + 4 + 4 == 38
+    ok1 = if t1 is 321 and v1 is 3 then 1 else 0     # LIFO after the body
+    ok2 = if t2 is 87 and v2 is 8 then 1 else 0      # value first, then defer
+    ok3 = if t3 is 444 and v3 is 3 then 1 else 0     # once per iteration
+    ok4 = if t4 is 5 and v4 is 84 then 1 else 0      # the match value survives
+    ok5 = if t5 is 6 and v5 is 84 then 1 else 0      # branch value survives, defer ran
+    ok1 * 14 + ok2 * 10 + ok3 * 6 + ok4 * 4 + ok5 * 4   # 14 + 10 + 6 + 4 + 4 is 38

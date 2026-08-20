@@ -1,12 +1,12 @@
 # expect: unknown identifier
-# A subjectless `match:` whose arm body has orphaned statements (a dropped `->`
+# A subjectless `choose:` whose arm body has orphaned statements (a dropped `->`
 # header) used to spin the cond-arm loop forever. It must terminate with a
 # located error instead. Regression guard for a fuzzer-found hang.
-define main() -> int:
+define main() -> number:
   n = 9
   c = choose:
-    n > 100 -> 1
+    n > 100 then 1
         step = n - 5
         step - 4
-    else -> 99
+    else then 99
   c

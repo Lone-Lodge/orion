@@ -5,7 +5,7 @@
 define area(w: number, h: number) -> number:
     w * h
 
-define main() -> int:
+define main() -> number:
     half = 10 / 4
     q = 10.0 // 4.0
     a = area(6.0, 7.0)

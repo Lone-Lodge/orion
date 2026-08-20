@@ -1,2 +1,2 @@
-define main() -> int:
+define main() -> number:
     5 - 5

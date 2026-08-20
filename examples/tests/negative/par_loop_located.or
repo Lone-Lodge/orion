@@ -12,8 +12,8 @@
 # collects names, not references, so the closest true position it has is the
 # lambda's. The name is in the message, which is what makes it findable.
 
-define main() -> int:
+define main() -> number:
     edit out = [0, 0, 0]
-    loop parallel i in 0..<3:
+    loop parallel i in 0 until 3:
         out[i] = ii * 2
     1

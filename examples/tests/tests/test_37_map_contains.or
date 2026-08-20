@@ -1,0 +1,12 @@
+# One word for "finns det har?": `contains` searches text for a substring and
+# a map for a KEY. Over a list it refuses and names `includes` - it used to
+# emit the text search on a list pointer, which clang rejected with a type
+# error naming an internal symbol.
+define main() -> number:
+    caps = {"se": "Stockholm", "no": "Oslo"}
+    hit = if contains(caps, "se") then 1 else 0
+    miss = if contains(caps, "dk") then 1 else 0
+    agrees = if contains(caps, "se") is has(caps, "se") then 1 else 0
+    sub = if contains("Stockholm", "holm") then 1 else 0
+    nosub = if contains("Stockholm", "oslo") then 1 else 0
+    hit * 12 + (1 - miss) * 12 + agrees * 6 + sub * 6 + (1 - nosub) * 1   # 37

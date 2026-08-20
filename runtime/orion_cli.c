@@ -27,6 +27,8 @@
 /* orion_rt.c wraps a raw C string into a headered orion Text; without it a
  * returned `const char*` isn't a real Text and `==` against a literal fails. */
 extern const char *orion_text_from_c(const char *s);
+/* effektinspelningen (orion_rt.c): spela in/av programnivans effekter */
+extern long long orion_fx_i64(const char *tag, long long live);
 
 #ifdef _WIN32
 #include <windows.h>
@@ -108,21 +110,21 @@ long long remove_file(const char *path) { return DeleteFileA(path) ? 0 : -1; }
 
 long long file_exists(const char *path) {
     DWORD a = GetFileAttributesA(path);
-    return (a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY)) ? 1 : 0;
+    return orion_fx_i64("fe", (a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY)) ? 1 : 0);
 }
 long long is_dir(const char *path) {
     DWORD a = GetFileAttributesA(path);
-    return (a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY)) ? 1 : 0;
+    return orion_fx_i64("fd", (a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY)) ? 1 : 0);
 }
 long long is_file(const char *path) { return file_exists(path); }
 
 /* Milliseconds since boot - the test runner times compiles with now()/elapsed. */
-long long now(void) { return (long long)GetTickCount64(); }
+long long now(void) { return orion_fx_i64("now", (long long)GetTickCount64()); }
 
 long long file_size(const char *path) {
     WIN32_FILE_ATTRIBUTE_DATA d;
-    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return -1;
-    return ((long long)d.nFileSizeHigh << 32) | (long long)d.nFileSizeLow;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return orion_fx_i64("fs", -1);
+    return orion_fx_i64("fs", ((long long)d.nFileSizeHigh << 32) | (long long)d.nFileSizeLow);
 }
 
 /* Delete a directory and everything under it. Returns 0 when the directory
@@ -155,15 +157,16 @@ long long fs_remove_tree(const char *path) {
  * file cannot be read - a watcher treats that as "changed". */
 long long file_mtime(const char *path) {
     WIN32_FILE_ATTRIBUTE_DATA d;
-    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return -1;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return orion_fx_i64("fm", -1);
     long long t = ((long long)d.ftLastWriteTime.dwHighDateTime << 32) |
                   (long long)d.ftLastWriteTime.dwLowDateTime;
-    return t / 10000; /* 100ns ticks -> ms */
+    return orion_fx_i64("fm", t / 10000); /* 100ns ticks -> ms */
 }
 
-/* Run a command and capture its stdout as one string (static buffer;
- * orion-self copies the returned bytes into a headered Text). */
-const char *capture(const char *cmd) {
+/* Run a command and capture its output as one string (static buffer;
+ * orion-self copies the returned bytes into a headered Text). `redir`
+ * decides what happens to the child's stderr - see capture/capture_all. */
+static const char *capture_with(const char *cmd, const char *redir) {
     static char cbuf[65536];
     cbuf[0] = 0;
     /* cmd.exe strips the outermost quote pair from a `cmd /c` string, so a
@@ -174,10 +177,7 @@ const char *capture(const char *cmd) {
     wbuf[w++] = '"';
     while (cmd[j] && w < sizeof(wbuf) - 8) wbuf[w++] = cmd[j++];
     wbuf[w++] = '"';
-    /* Swallow stderr: `where clang` (nb_clang's probe) prints
-     * "INFO: Could not find files..." to stderr on a miss, which _popen
-     * leaves leaking to the console. We only ever want the stdout here. */
-    { const char *r = " 2>nul"; while (*r) wbuf[w++] = *r++; }
+    { const char *r = redir; while (*r) wbuf[w++] = *r++; }
     wbuf[w] = 0;
     FILE *p = _popen(wbuf, "r");
     if (!p) return orion_text_from_c(cbuf);
@@ -189,6 +189,15 @@ const char *capture(const char *cmd) {
     _pclose(p);
     return orion_text_from_c(cbuf);
 }
+
+/* Swallow stderr: `where clang` (nb_clang's probe) prints
+ * "INFO: Could not find files..." to stderr on a miss, which _popen
+ * leaves leaking to the console. We only ever want the stdout here. */
+const char *capture(const char *cmd) { return capture_with(cmd, " 2>nul"); }
+
+/* Keep stderr: a terminal or debug view wants BOTH streams, interleaved
+ * the way a console would show them (git and trap trails print to stderr). */
+const char *capture_all(const char *cmd) { return capture_with(cmd, " 2>&1"); }
 
 #else /* POSIX */
 #include <sys/stat.h>
@@ -220,31 +229,31 @@ long long mkdir_all(const char *path) {
 long long remove_file(const char *path) { return remove(path) == 0 ? 0 : -1; }
 long long file_exists(const char *path) {
     struct stat st;
-    return (stat(path, &st) == 0 && S_ISREG(st.st_mode)) ? 1 : 0;
+    return orion_fx_i64("fe", (stat(path, &st) == 0 && S_ISREG(st.st_mode)) ? 1 : 0);
 }
 long long is_dir(const char *path) {
     struct stat st;
-    return (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) ? 1 : 0;
+    return orion_fx_i64("fd", (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) ? 1 : 0);
 }
 long long is_file(const char *path) { return file_exists(path); }
 
 long long now(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    return orion_fx_i64("now", (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000);
 }
 
 long long file_size(const char *path) {
     struct stat st;
-    return stat(path, &st) == 0 ? (long long)st.st_size : -1;
+    return orion_fx_i64("fs", stat(path, &st) == 0 ? (long long)st.st_size : -1);
 }
 
 /* Last-write time in milliseconds. Only comparisons and deltas are
  * meaningful (the epoch differs from Windows). -1 if unreadable. */
 long long file_mtime(const char *path) {
     struct stat st;
-    if (stat(path, &st) != 0) return -1;
-    return (long long)st.st_mtime * 1000;
+    if (stat(path, &st) != 0) return orion_fx_i64("fm", -1);
+    return orion_fx_i64("fm", (long long)st.st_mtime * 1000);
 }
 
 #include <dirent.h>
@@ -267,10 +276,12 @@ long long fs_remove_tree(const char *path) {
     return rmdir(path) == 0 ? 0 : -1;
 }
 
-const char *capture(const char *cmd) {
+static const char *capture_with(const char *cmd, const char *redir) {
     static char cbuf[65536];
     cbuf[0] = 0;
-    FILE *p = popen(cmd, "r");
+    char wbuf[65600];
+    snprintf(wbuf, sizeof(wbuf), "%s%s", cmd, redir);
+    FILE *p = popen(wbuf, "r");
     if (!p) return orion_text_from_c(cbuf);
     size_t total = 0, n;
     while (total < sizeof(cbuf) - 1 &&
@@ -280,17 +291,18 @@ const char *capture(const char *cmd) {
     pclose(p);
     return orion_text_from_c(cbuf);
 }
+
+const char *capture(const char *cmd) { return capture_with(cmd, ""); }
+
+/* Merge stderr into the capture - terminal/debug views want both streams. */
+const char *capture_all(const char *cmd) { return capture_with(cmd, " 2>&1"); }
 #endif
 
 /* ---- the general-software floor: env, interrupt, entropy, clock time ----
  * Small, portable, and the pieces almost every program eventually asks for.
  * All two-branch #ifdef like the rest of this file (see docs/PLATFORMS.md). */
 
-/* Value of an environment variable, "" when unset. */
-const char *env_get(const char *name) {
-    const char *v = getenv(name);
-    return orion_text_from_c(v ? v : "");
-}
+/* env_get lives in orion_rt.c - GUI builds do not link this file. */
 
 /* Ctrl+C as a QUESTION instead of a kill. The first call arms the handler;
  * from then on one Ctrl+C sets a flag the program polls (a server's loop
@@ -352,7 +364,7 @@ long long *entropy_bytes(long long n) {
 
 /* Unix time in seconds, and strftime-formatting of one - the floor a date
  * orb builds on. `local` 1 = the machine's timezone, 0 = UTC. */
-long long unix_now(void) { return (long long)time(NULL); }
+long long unix_now(void) { return orion_fx_i64("unow", (long long)time(NULL)); }
 
 /* Calendar parts (UTC) -> unix seconds. -1 on an impossible date. */
 long long time_from_parts(long long y, long long mo, long long d,

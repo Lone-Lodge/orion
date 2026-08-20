@@ -1,22 +1,22 @@
-define deadline_from_now(offset_ms: int) -> int:
+define deadline_from_now(offset_ms: number) -> number:
     monotonic_ms() + offset_ms
 
-define sleep_until(deadline_ms: int):
+define sleep_until(deadline_ms: number):
     now = monotonic_ms()
     remaining = deadline_ms - now
     if remaining > 0:
         sleep_ms(remaining)
 
-define count_due(timers: [int]) -> int:
+define count_due(timers: [number]) -> number:
     n = length(timers)
     now = monotonic_ms()
     edit count = 0
-    loop i in 0..<n:
-        if at(timers, i) <= now:
+    loop i in 0 until n:
+        if timers[i] <= now:
             count = count + 1
     count
 
-define main() -> int:
+define main() -> number:
     start = monotonic_ms()
     # Three timers: 10ms, 25ms, 50ms from now.
     edit timers = bytes_zeros(0)
@@ -29,6 +29,6 @@ define main() -> int:
     due = count_due(timers)
     after = monotonic_ms()
     elapsed = after - start
-    ok_due = if due == 3 then 1 else 0
+    ok_due = if due is 3 then 1 else 0
     ok_time = if elapsed >= 50 then 1 else 0
-    if ok_due == 1 and ok_time == 1 then 42 else 0
+    if ok_due is 1 and ok_time is 1 then 42 else 0

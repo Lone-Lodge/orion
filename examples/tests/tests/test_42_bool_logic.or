@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     a = true
     b = false
     # true and not false = true and true = true

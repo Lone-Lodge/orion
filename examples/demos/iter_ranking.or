@@ -5,7 +5,7 @@
 # every ordering: ascending, descending, or by any computed key.
 use iter
 
-define main() -> int:
+define main() -> number:
     scores = [40, 75, 88, 12, 95, 60]
 
     # Leaderboard: highest first. The closure IS the ordering.
@@ -19,5 +19,5 @@ define main() -> int:
     # turns "nearness" into an int min_by can compare.
     nearest_pass = min_by(scores, function(x): if x >= 65 then x - 65 else 65 - x)  # 60
 
-    print_line("winner: {at(board, 0)}   spread: {spread}   nearest 65: {nearest_pass}")
-    at(board, 0)
+    print_line("winner: {board[0]}   spread: {spread}   nearest 65: {nearest_pass}")
+    board[0]

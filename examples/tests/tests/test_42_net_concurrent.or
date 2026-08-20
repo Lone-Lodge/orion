@@ -11,7 +11,7 @@ use net
 use text
 use async
 
-define handle(conn: int) -> int uses net, clock:
+define handle(conn: number) -> number uses net, clock:
     edit raw = ""
     deadline = monotonic_ms() + 2000
     loop:
@@ -32,7 +32,7 @@ define handle(conn: int) -> int uses net, clock:
     slot_set("trace", "{slot_get(\"trace\")}{mark}")
     1
 
-define acceptor(listener: int) -> int uses net:
+define acceptor(listener: number) -> number uses net:
     edit got = 0
     loop:
         if got >= 3:
@@ -45,11 +45,11 @@ define acceptor(listener: int) -> int uses net:
             got = got + 1
     got
 
-define read_reply(sock: int) -> text uses net, clock:
+define read_reply(sock: number) -> text uses net, clock:
     deadline = monotonic_ms() + 2000
     if readable_within(sock, deadline - monotonic_ms()) then recv(sock, 512) else ""
 
-define slow_client(id: int) -> int uses net, clock:
+define slow_client(id: number) -> number uses net, clock:
     c = connect_within("127.0.0.1", 58425, 1000)
     if not ok(c):
         return 0
@@ -60,7 +60,7 @@ define slow_client(id: int) -> int uses net, clock:
     close(c)
     if length(reply) > 0 then 1 else 0
 
-define fast_client(id: int) -> int uses net, clock:
+define fast_client(id: number) -> number uses net, clock:
     c = connect_within("127.0.0.1", 58425, 1000)
     if not ok(c):
         return 0
@@ -69,7 +69,7 @@ define fast_client(id: int) -> int uses net, clock:
     close(c)
     if length(reply) > 0 then 1 else 0
 
-define main() -> int uses net, console:
+define main() -> number uses net, console:
     slot_set("trace", "")
     listener = listen(58425)
     if not ok(listener):

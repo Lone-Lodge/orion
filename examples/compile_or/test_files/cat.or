@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     if argc() < 2:
         print_line("usage: cat <file>")
         0 - 1

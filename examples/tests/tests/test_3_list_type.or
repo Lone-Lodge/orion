@@ -1,8 +1,8 @@
 # `list` (and `List`) as a bare type annotation now resolves to a list,
 # like `text`/`map`. Before it was an unknown name that became i64, so
 # `length(xs)` failed. (Prefer `[int]` when you know the element type.)
-define count_items(xs: list) -> int:
+define count_items(xs: list) -> number:
     length(xs)
 
-define main() -> int:
+define main() -> number:
     count_items([10, 20, 30])

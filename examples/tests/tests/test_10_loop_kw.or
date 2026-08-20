@@ -1,9 +1,9 @@
 # `loop` is now the canonical iteration keyword; `for` still works as an
 # alias during the transition. Exercises the counted form and the bare
 # unconditional form under the new spelling.
-define main() -> int:
+define main() -> number:
     edit sum = 0
-    loop i in 0..<5:      # 0+1+2+3+4 == 10
+    loop i in 0 until 5:      # 0+1+2+3+4 is 10
         sum += i
     loop:                 # unconditional loop + break
         break

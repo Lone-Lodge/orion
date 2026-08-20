@@ -24,7 +24,7 @@ case "$(uname -s 2>/dev/null || echo Linux)" in
         # /MANIFEST:EMBED gives the compiler UTF-8 as its code page, same as
         # every exe orbit links (see runtime/orion.manifest).
         "$CLANG" "$LL" "$R/runtime/orion_rt.c" -Os -Xlinker /STACK:67108864 \
-            -Xlinker /MANIFEST:EMBED -Xlinker "/MANIFESTINPUT:$R/runtime/orion.manifest" \
+            -Xlinker -MANIFEST:EMBED -Xlinker "-MANIFESTINPUT:$R/runtime/orion.manifest" \
             -o "$R/dist/orion.exe"
         echo "built dist/orion.exe for Windows (native triple) - verify: printf 'fn main()->int:\\n 42\\n' > /tmp/t.or && dist/orion.exe /tmp/t.or /tmp/t.ll"
         exit 0 ;;

@@ -1,5 +1,5 @@
-define length_score(name: text) -> int:
-    if name == "Orion" then 42 else 0
+define length_score(name: text) -> number:
+    if name is "Orion" then 42 else 0
 
-define main() -> int:
+define main() -> number:
     length_score("Orion") + length_score("Orion")

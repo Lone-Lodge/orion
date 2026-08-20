@@ -1,0 +1,334 @@
+# regex - en liten regexmotor. Skriven för sök (dots grep, verktyg), inte
+# för att tävla: mönstret TOLKAS direkt under matchningen, ingen kompilering,
+# inga instruktioner. Kärnidén är en enda: "vilka slutpositioner i texten kan
+# mönsterbiten [ps..pe) nå från position ti?" - en mängd, inte en position.
+# Med mängder blir kvantifierare en stängning (upprepa tills inga nya
+# positioner), grupper en union över alternativen, och backtracking finns
+# inte som begrepp - alla vägar bärs framåt samtidigt. Totalt och ändligt:
+# positionerna är max textlängden + 1.
+#
+# Stöds: bokstäver, . (allt utom radbryt), klasser [a-z0-9_] och [^...],
+# \d \w \s och \x-literaler, kvantifierare * + ?, grupper (..), alternation
+# a|b (i grupper och på toppnivå), ankare ^ och $. Motorn ser BYTE: ett
+# flerbyte-tecken (å ä ö...) matchar som literal i följd, men i en klass
+# eller mot . blir det sina enskilda bytes.
+#
+#     regex_test("gr(ay|ey)", "50 shades of grey")  -> true
+#     regex_first("\\d+", "rad 42 kol 7")           -> 4
+#     regex_valid("a[b")                            -> false (oavslutad klass)
+
+# En enhet i mönstret: tecken/klass/grupp/ankare som börjar på ps.
+# ue = förbi enheten, qe = förbi ev kvantifierare, quant = kvantifierarens
+# byte (42 * / 43 + / 63 ?) eller 0, ok = 0 vid trasigt mönster.
+type ReUnit: ue: number, qe: number, quant: number, ok: number
+
+# --- mönsterskanning ---------------------------------------------------
+
+# Index förbi klassen som börjar med '[' på ps, -1 om oavslutad.
+define re_class_end(p: [number], ps: number) -> number:
+    n = length(p)
+    edit i = ps + 1
+    if i < n and p[i] is 94:
+        i = i + 1
+    edit found = 0 - 1
+    loop:
+        if i >= n:
+            break
+        c = p[i]
+        if c is 92:
+            i = i + 2
+        else:
+            if c is 93:
+                found = i + 1
+                break
+            i = i + 1
+    found
+
+# Index förbi gruppen som börjar med '(' på ps, -1 om oavslutad. Nästlade
+# grupper räknas; klasser hoppas över så ett ')' i en klass inte lurar oss.
+define re_group_end(p: [number], ps: number) -> number:
+    n = length(p)
+    edit i = ps + 1
+    edit depth = 1
+    edit found = 0 - 1
+    loop:
+        if i >= n:
+            break
+        c = p[i]
+        if c is 92:
+            i = i + 2
+        else:
+            if c is 91:
+                ce = re_class_end(p, i)
+                if ce < 0:
+                    break
+                i = ce
+            else:
+                if c is 40:
+                    depth = depth + 1
+                if c is 41:
+                    depth = depth - 1
+                    if depth is 0:
+                        found = i + 1
+                        break
+                i = i + 1
+    found
+
+define re_unit(p: [number], ps: number) -> ReUnit:
+    n = length(p)
+    c = p[ps]
+    edit ue = ps + 1
+    edit ok = 1
+    if c is 92:
+        ue = ps + 2
+        if ue > n:
+            ok = 0
+    if c is 91:
+        ue = re_class_end(p, ps)
+        if ue < 0:
+            ok = 0
+    if c is 40:
+        ue = re_group_end(p, ps)
+        if ue < 0:
+            ok = 0
+    edit quant = 0
+    edit qe = ue
+    if ok is 1 and ue < n:
+        q = p[ue]
+        if q is 42 or q is 43 or q is 63:
+            quant = q
+            qe = ue + 1
+    ReUnit{ue: ue, qe: qe, quant: quant, ok: ok}
+
+# Toppnivå-alternativens gränser i [ps..pe): [s1, e1, s2, e2, ...].
+# '|' inne i klasser och grupper delar inte.
+define re_alts(p: [number], ps: number, pe: number) -> [number]:
+    edit bounds = []
+    edit start = ps
+    edit i = ps
+    loop:
+        if i >= pe:
+            break
+        c = p[i]
+        if c is 92:
+            i = i + 2
+        else:
+            if c is 91:
+                ce = re_class_end(p, i)
+                i = if ce < 0 then pe else ce
+            else:
+                if c is 40:
+                    ge = re_group_end(p, i)
+                    i = if ge < 0 then pe else ge
+                else:
+                    if c is 124:
+                        bounds = append(bounds, start)
+                        bounds = append(bounds, i)
+                        start = i + 1
+                    i = i + 1
+    bounds = append(bounds, start)
+    bounds = append(bounds, pe)
+    bounds
+
+# --- teckenmatchning ---------------------------------------------------
+
+define re_is_digit(c: number) -> truth = c >= 48 and c <= 57
+define re_is_word(c: number) -> truth = re_is_digit(c) or (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or c is 95
+define re_is_space(c: number) -> truth = c is 32 or c is 9 or c is 10 or c is 13
+
+# Matchar escapet \X (X på index pi) byten c?
+define re_escape_match(x: number, c: number) -> truth:
+    edit hit = x is c
+    if x is 100:
+        hit = re_is_digit(c)
+    if x is 119:
+        hit = re_is_word(c)
+    if x is 115:
+        hit = re_is_space(c)
+    if x is 110:
+        hit = c is 10
+    if x is 116:
+        hit = c is 9
+    hit
+
+# Matchar klassen [ps..ue) byten c? Innehåll: literaler, a-z-intervall,
+# \d \w \s, inledande ^ negerar.
+define re_class_match(p: [number], ps: number, ue: number, c: number) -> truth:
+    edit i = ps + 1
+    edit neg = false
+    if p[i] is 94:
+        neg = true
+        i = i + 1
+    stop = ue - 1
+    edit hit = false
+    loop:
+        if i >= stop:
+            break
+        a = p[i]
+        if a is 92:
+            if re_escape_match(p[i + 1], c):
+                hit = true
+            i = i + 2
+        else:
+            if i + 2 < stop and p[i + 1] is 45:
+                if c >= a and c <= p[i + 2]:
+                    hit = true
+                i = i + 3
+            else:
+                if a is c:
+                    hit = true
+                i = i + 1
+    if neg then not hit else hit
+
+# Matchar en-teckens-enheten [ps..ue) byten c?
+define re_char_match(p: [number], ps: number, ue: number, c: number) -> truth:
+    a = p[ps]
+    edit hit = a is c
+    if a is 46:
+        hit = not (c is 10)
+    if a is 92:
+        hit = re_escape_match(p[ps + 1], c)
+    if a is 91:
+        hit = re_class_match(p, ps, ue, c)
+    hit
+
+# --- mängdmaskineriet --------------------------------------------------
+
+# Lägg till position utan dubbletter (mängderna är små - linjär koll räcker).
+define re_add(ends: [number], v: number) -> [number]:
+    edit found = false
+    loop i in 0 until length(ends):
+        if ends[i] is v:
+            found = true
+    if found then ends else append(ends, v)
+
+define re_union(into: [number], more: [number]) -> [number]:
+    edit result = into
+    loop i in 0 until length(more):
+        result = re_add(result, more[i])
+    result
+
+# Alla slutpositioner enheten [ps..ue) kan nå från ti (utan kvantifierare).
+define re_ends_unit(p: [number], ps: number, ue: number, t: [number], ti: number) -> [number]:
+    n = length(t)
+    a = p[ps]
+    edit ends = []
+    if a is 94:
+        if ti is 0:
+            ends = append(ends, ti)
+        return ends
+    if a is 36:
+        if ti is n:
+            ends = append(ends, ti)
+        return ends
+    if a is 40:
+        bounds = re_alts(p, ps + 1, ue - 1)
+        edit bi = 0
+        loop:
+            if bi >= length(bounds):
+                break
+            ends = re_union(ends, re_ends_seq(p, bounds[bi], bounds[bi + 1], t, ti))
+            bi = bi + 2
+        return ends
+    if ti < n and re_char_match(p, ps, ue, t[ti]):
+        ends = append(ends, ti + 1)
+    ends
+
+# Alla slutpositioner den kvantifierade enheten på ps kan nå från s.
+# * och + är en stängning: upprepa enhetens steg tills inga nya positioner
+# dyker upp (bara framåtsteg räknas, så tomma gruppträffar kan inte snurra).
+define re_ends_quant(p: [number], ps: number, ue: number, quant: number, t: [number], s: number) -> [number]:
+    if quant is 0:
+        return re_ends_unit(p, ps, ue, t, s)
+    if quant is 63:
+        return re_add(re_ends_unit(p, ps, ue, t, s), s)
+    edit reach = if quant is 42 then [s] else []
+    edit frontier = [s]
+    loop:
+        if length(frontier) is 0:
+            break
+        edit fresh = []
+        loop fi in 0 until length(frontier):
+            from = frontier[fi]
+            stepped = re_ends_unit(p, ps, ue, t, from)
+            loop si in 0 until length(stepped):
+                e = stepped[si]
+                edit seen = e <= from
+                loop ri in 0 until length(reach):
+                    if reach[ri] is e:
+                        seen = true
+                if not seen:
+                    fresh = re_add(fresh, e)
+                    reach = append(reach, e)
+        frontier = fresh
+    reach
+
+# Alla slutpositioner sekvensen [ps..pe) kan nå från ti. Mängden vandrar
+# vänster till höger genom enheterna - varje enhet ser hela mängden en gång,
+# så kostnaden är enheter x positioner, aldrig multiplikativ.
+define re_ends_seq(p: [number], ps: number, pe: number, t: [number], ti: number) -> [number]:
+    edit cur = [ti]
+    edit i = ps
+    loop:
+        if i >= pe or length(cur) is 0:
+            break
+        u = re_unit(p, i)
+        if u.ok is 0:
+            cur = []
+            break
+        edit next = []
+        loop ci in 0 until length(cur):
+            next = re_union(next, re_ends_quant(p, i, u.ue, u.quant, t, cur[ci]))
+        cur = next
+        i = u.qe
+    cur
+
+# --- publika ------------------------------------------------------------
+
+# Är mönstret helt? (Oavslutade klasser/grupper och släpande \ avvisas.)
+public define regex_valid(pattern: text) -> truth:
+    example regex_valid("a[b-z]+") is true
+    p = bytes_of(pattern)
+    n = length(p)
+    edit i = 0
+    edit good = true
+    loop:
+        if i >= n:
+            break
+        c = p[i]
+        if c is 124:
+            i = i + 1
+        else:
+            u = re_unit(p, i)
+            if u.ok is 0 or u.qe <= i:
+                good = false
+                break
+            i = u.qe
+    good
+
+# Startindex (i byte) för första träffen, -1 när mönstret inte finns i texten.
+public define regex_first(pattern: text, txt: text) -> number:
+    example regex_first("l+o", "hello") is 2
+    p = bytes_of(pattern)
+    t = bytes_of(txt)
+    n = length(t)
+    bounds = re_alts(p, 0, length(p))
+    edit found = 0 - 1
+    edit start = 0
+    loop:
+        if start > n or found >= 0:
+            break
+        edit bi = 0
+        loop:
+            if bi >= length(bounds) or found >= 0:
+                break
+            if length(re_ends_seq(p, bounds[bi], bounds[bi + 1], t, start)) > 0:
+                found = start
+            bi = bi + 2
+        start = start + 1
+    found
+
+# Finns mönstret någonstans i texten?
+public define regex_test(pattern: text, txt: text) -> truth:
+    example regex_test("b.g", "en bag") is true
+    regex_first(pattern, txt) >= 0

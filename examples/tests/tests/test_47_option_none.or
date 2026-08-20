@@ -5,15 +5,15 @@ type Opt<T>:
     Some(T)
     None
 
-define find(k: int) -> Opt<int>:
+define find(k: number) -> Opt<int>:
     if k > 0 then Opt.Some(k * 10) else Opt.None
 
-define main() -> int:
+define main() -> number:
     edit total = 0
     if let Some(v) = find(4):
         total = v            # Some(40) -> 40
     if let Some(v) = find(0):
         total = total + 99   # not taken (None)
     else:
-        total = total + 7    # 40 + 7 == 47
+        total = total + 7    # 40 + 7 is 47
     total

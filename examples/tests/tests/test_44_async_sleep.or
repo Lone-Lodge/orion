@@ -10,20 +10,20 @@
 # so this distinguishes the two without being a stopwatch test.
 use async
 
-define napper(id: int) -> int:
+define napper(id: number) -> number:
     sleep_task(50)
     id
 
-define main() -> int:
+define main() -> number:
     t0 = monotonic_ms()
     edit ids = part([0], 0, 0)
-    loop i in 0..<8:
+    loop i in 0 until 8:
         ids = append(ids, spawn(napper, i + 1))
     edit sum = 0
-    loop j in 0..<length(ids):
-        sum = sum + await(at(ids, j))
+    loop j in 0 until length(ids):
+        sum = sum + await(ids[j])
     elapsed = monotonic_ms() - t0
     print_line("8 tasks x 50ms: {elapsed} ms, sum={sum}")
     overlapped = if elapsed < 200 then 1 else 0     # serial would be ~400
-    all_ran = if sum == 36 then 1 else 0            # 1+2+…+8
-    overlapped * 22 + all_ran * 22                  # 22 + 22 == 44
+    all_ran = if sum is 36 then 1 else 0            # 1+2+…+8
+    overlapped * 22 + all_ran * 22                  # 22 + 22 is 44

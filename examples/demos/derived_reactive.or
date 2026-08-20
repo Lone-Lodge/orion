@@ -8,10 +8,10 @@
 #
 # Run:  orion run derived_reactive.or main   → expects 180
 
-define doubled(base: int) -> int:
+define doubled(base: number) -> number:
     base * 2
 
-define main() -> int:
+define main() -> number:
     edit base = 10
     a = doubled(base)     # snapshot taken at base=10 → 20
     base = 100            # change the input...

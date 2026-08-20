@@ -1,10 +1,10 @@
 # expect: but the parameter is declared
 # Passing a [int] where a function(text) -> int param is declared is a compile error
 # (concrete pointer kinds differ), same rule as a direct call's arg-shape check.
-define strlen(t: text) -> int:
+define strlen(t: text) -> number:
     byte_count(t)
-define takes(f: function(text) -> int, s: [int]) -> int:
+define takes(f: function(text) -> number, s: [number]) -> number:
     f(s)
 use text
-define main() -> int:
+define main() -> number:
     takes(strlen, [1, 2, 3])

@@ -8,5 +8,5 @@
 
 use orion_driver
 
-define main() -> int:
+define main() -> number:
     driver_main()

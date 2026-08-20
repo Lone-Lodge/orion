@@ -6,7 +6,7 @@
 use json
 use text
 
-define main() -> int:
+define main() -> number:
     src = "\{\"id\":7,\"method\":\"textDocument/didOpen\",\"ok\":true,\"nested\":\{\"deep\":\{\"n\":42\}\},\"items\":[\{\"a\":1\},\{\"a\":2\}],\"esc\":\"tab\\there\\nline\"\}"
     root = json_parse(src)
 
@@ -15,11 +15,11 @@ define main() -> int:
     ok = json_int(root, "ok")                                 # true -> 1
     deep = json_int(json_obj(json_obj(root, "nested"), "deep"), "n")   # 42
     items = json_list(root, "items")
-    second = json_int(at(items, 1), "a")                      # 2
+    second = json_int(items[1], "a")                      # 2
     esc = json_text(root, "esc")                              # escapes resolved
 
     # A tab and a newline came back as ONE byte each, not two.
-    tab_ok = if index_of(esc, "tab\there") == 0 then 1 else 0
+    tab_ok = if index_of(esc, "tab\there") is 0 then 1 else 0
     # Re-escaping restores the two-character forms.
     back = json_escape(esc)
     round_ok = if index_of(back, "\\t") >= 0 and index_of(back, "\\n") >= 0 then 1 else 0
@@ -27,4 +27,4 @@ define main() -> int:
     missing = json_int(root, "nope") + length(json_text(root, "nope"))
 
     id + length(m) + ok + deep + second + tab_ok + round_ok + missing
-    # 7 + 20 + 1 + 42 + 2 + 1 + 1 + 0 == 74
+    # 7 + 20 + 1 + 42 + 2 + 1 + 1 + 0 is 74

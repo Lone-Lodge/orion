@@ -20,7 +20,7 @@
 # LIFETIME: today a socket is closed by `close` - pair it with
 # `defer close(c)` so an early return cannot leak it. The planned model makes
 # the resource scope-owned (a handler owns the socket; closing happens on
-# scope exit) - see Tema 10 in NEXTGEN-PLAN.md.
+# scope exit) - see "Resurser och samtidighet" in docs/SYNTAX-INVENTORY.md.
 
 external define tcp_listen(port: int) -> int
 external define tcp_accept(listener: int) -> int
@@ -34,24 +34,24 @@ external define tcp_connect_wait(host: text, port: int, ms: int) -> int
 external define sock_wait_ready(sock: int, ms: int, want_write: int) -> int
 
 # --- client ---
-public define connect(host: text, port: int) -> int uses net:
+public define connect(host: text, port: number) -> number uses net:
     example not ok(connect("127.0.0.1", 1))
     tcp_connect(host, port)
 # no example: needs a live peer - proven by test_42_net_loopback.or
-public define send(sock: int, data: text) -> int uses net = tcp_send(sock, data)
+public define send(sock: number, data: text) -> number uses net = tcp_send(sock, data)
 # no example: needs a live peer - proven by test_42_net_timeout.or
-public define recv(sock: int, maxlen: int) -> text uses net = tcp_recv(sock, maxlen)
-public define close(sock: int) -> int uses net:
+public define recv(sock: number, maxlen: number) -> text uses net = tcp_recv(sock, maxlen)
+public define close(sock: number) -> number uses net:
     example close(0 - 1) is 0
     tcp_close(sock)
 
 # --- server ---
 # Open a listening socket on `port` (loopback). -1 if the port is taken.
-public define listen(port: int) -> int uses net:
+public define listen(port: number) -> number uses net:
     example close(listen(58499)) is 0
     tcp_listen(port)
 # no example: blocks for a client - proven by test_42_net_loopback.or
-public define accept(server: int) -> int uses net = tcp_accept(server)
+public define accept(server: number) -> number uses net = tcp_accept(server)
 
 # --- lifetime-safe forms ---
 # The socket you cannot forget to close: the ORB owns the handle, runs your
@@ -63,7 +63,7 @@ public define accept(server: int) -> int uses net = tcp_accept(server)
 #   answer = with_connection("127.0.0.1", 8080, (c): send(c, "hi"))
 # The body gets the socket and returns a number; -1 means the connect failed.
 # no example: needs a live peer - proven by examples/demos/httpd.or
-public define with_connection(host: text, port: int, body: function) -> int uses net:
+public define with_connection(host: text, port: number, body: function) -> number uses net:
     c = connect(host, port)
     if not ok(c):
         return 0 - 1
@@ -73,7 +73,7 @@ public define with_connection(host: text, port: int, body: function) -> int uses
 # The same for a listening socket: serve, hand the listener to the body, and
 # close it however the body leaves.
 # no example: binds a port - proven by test_42_net_scoped.or
-public define with_listener(port: int, body: function) -> int uses net:
+public define with_listener(port: number, body: function) -> number uses net:
     s = listen(port)
     if not ok(s):
         return 0 - 1
@@ -85,12 +85,12 @@ public define with_listener(port: int, body: function) -> int uses net:
 # blocking. Set it on a LISTENER before accept, or on a connection before
 # recv - a server that cannot time out cannot do anything else.
 # no example: needs a live socket - proven by test_42_net_timeout.or
-public define set_timeout(sock: int, ms: int) -> int uses net = tcp_set_timeout(sock, ms)
+public define set_timeout(sock: number, ms: number) -> number uses net = tcp_set_timeout(sock, ms)
 
 # Wait up to `ms` for a client; -1 when nobody came. This is the one a
 # server loop wants: it can time out, do other work, and come back.
 # no example: needs a listener + timing - proven by test_42_net_timeout.or
-public define accept_within(listener: int, ms: int) -> int uses net = tcp_accept_wait(listener, ms)
+public define accept_within(listener: number, ms: number) -> number uses net = tcp_accept_wait(listener, ms)
 
 # Connect, but give up after `ms` instead of blocking. Plain `connect` is the
 # one socket call that cannot time out, and a blocked connect parks the whole
@@ -98,7 +98,7 @@ public define accept_within(listener: int, ms: int) -> int uses net = tcp_accept
 # theoretical: ten clients against a server whose listen backlog was full
 # deadlocked, because the connect that had to wait was holding the scheduler
 # the acceptor needed. Inside a task, use this and `sleep_task` between tries.
-public define connect_within(host: text, port: int, ms: int) -> int uses net:
+public define connect_within(host: text, port: number, ms: number) -> number uses net:
     example not ok(connect_within("127.0.0.1", 1, 50))
     tcp_connect_wait(host, port, ms)
 
@@ -111,7 +111,7 @@ public define connect_within(host: text, port: int, ms: int) -> int uses net:
 # select, so a round costs one wait however many tasks are in it. Outside a
 # task it is an ordinary wait, so the same call is right in both places.
 # no example: needs a live socket - proven by test_42_net_concurrent.or
-public define readable_within(sock: int, ms: int) -> truth uses net:
+public define readable_within(sock: number, ms: number) -> truth uses net:
     sock_wait_ready(sock, ms, 0) is 1
 
 # Did a read time out (or the peer close)? Both surface as "".
@@ -121,7 +121,7 @@ public define timed_out(chunk: text) -> truth:
     length(chunk) is 0
 
 # Did the call succeed? Reads better than comparing to -1 at every site.
-public define ok(handle: int) -> truth:
+public define ok(handle: number) -> truth:
     example ok(0 - 1) is false
     example ok(3)
     handle >= 0
@@ -137,16 +137,16 @@ external define udp_last_sender() -> text
 
 # A bound UDP socket, or -1. Port 0 picks an ephemeral one.
 # no example: opens a socket - proven by test_42_udp_loopback.or
-public define udp(port: int) -> int uses net = udp_open(port)
+public define udp(port: number) -> number uses net = udp_open(port)
 
 # Send one datagram to host:port. Bytes sent, or -1.
 # no example: sends on the network - proven by test_42_udp_loopback.or
-public define udp_send(sock: int, host: text, port: int, data: text) -> int uses net = udp_send_to(sock, host, port, data)
+public define udp_send(sock: number, host: text, port: number, data: text) -> number uses net = udp_send_to(sock, host, port, data)
 
 # One datagram as text ("" when nothing). Pair with readable_within for a
 # deadline; ask udp_sender() right after for who sent it.
 # no example: reads the network - proven by test_42_udp_loopback.or
-public define udp_receive(sock: int, maxlen: int) -> text uses net = udp_recv_from(sock, maxlen)
+public define udp_receive(sock: number, maxlen: number) -> text uses net = udp_recv_from(sock, maxlen)
 
 # "ip:port" of the last datagram udp_receive returned, "" before any.
 # no example: network state - proven by test_42_udp_loopback.or
@@ -156,11 +156,11 @@ external define sock_local_port(sock: int) -> int
 
 # The port a socket actually bound to - what `listen(0)`/`udp(0)` picked.
 # no example: opens a socket - proven by test_42_udp_loopback.or
-public define local_port(sock: int) -> int uses net = sock_local_port(sock)
+public define local_port(sock: number) -> number uses net = sock_local_port(sock)
 
 external define tcp_send_len(sock: int, data: text) -> int
 
 # Binary-safe send: the byte count comes from the text's length header, not
 # a null scan - a JPEG survives intact. What a file server answers with.
 # no example: sends on a socket - proven by folio (the image viewer)
-public define send_raw(sock: int, data: text) -> int uses net = tcp_send_len(sock, data)
+public define send_raw(sock: number, data: text) -> number uses net = tcp_send_len(sock, data)

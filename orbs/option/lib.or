@@ -5,12 +5,12 @@
 #
 #   use option
 #
-#   fn find(k: int) -> Option<int>:
+#   define find(k: int) -> Option<int>:
 #       if k > 0 then Option.Some(k * 10) else Option.None
 #
-#   match find(4):
-#       Some(v) -> print_line("found {v}")
-#       None    -> print_line("not found")
+#   choose find(4):
+#       Some(v) then print_line("found {v}")
+#       None then print_line("not found")
 #
 # Softer forms:
 #   id = unwrap_or(find(0), 0)      # fallback value
@@ -21,19 +21,16 @@
 # when there is nothing, and binds `v` otherwise.
 #
 # No `unwrap` on purpose - Orion has no panic, so it could only lie and hand
-# back a zero. Use `match`, `if let`, `?` or `unwrap_or`.
+# back a zero. Use `choose`, `if let`, `?` or `unwrap_or`.
 
-public type Option<T>:
-    Some(T)
-    None
 
 # The payload, or `default` if this is None.
 public define unwrap_or<T>(o: Option<T>, default: T) -> T:
     example unwrap_or(Option.Some(7), 0) is 7
     example unwrap_or(Option.None, 9) is 9
     choose o:
-        Some(v) -> v
-        None -> default
+        Some(v) then v
+        None then default
 
 # 1 if a value is present, else 0.
 public define is_some<T>(o: Option<T>) -> truth:

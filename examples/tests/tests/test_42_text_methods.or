@@ -1,7 +1,7 @@
-define is_empty(t: text) -> int:
-    if length(t) == 0 then 1 else 0
+define is_empty(t: text) -> number:
+    if length(t) is 0 then 1 else 0
 
-define starts_with(t: text, prefix: text) -> int:
+define starts_with(t: text, prefix: text) -> number:
     t_bytes = bytes_of(t)
     p_bytes = bytes_of(prefix)
     t_len = bytes_count(t_bytes)
@@ -10,14 +10,14 @@ define starts_with(t: text, prefix: text) -> int:
     if p_len > t_len:
         result = 0
     if p_len <= t_len:
-        loop ci in 0..<p_len:
+        loop ci in 0 until p_len:
             tb = byte_at(t_bytes, ci)
             pb = byte_at(p_bytes, ci)
-            if tb != pb:
+            if tb is not pb:
                 result = 0
     result
 
-define main() -> int:
+define main() -> number:
     msg = "hello world"
     empty = ""
 

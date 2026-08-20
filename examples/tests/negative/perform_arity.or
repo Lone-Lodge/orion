@@ -4,8 +4,8 @@
 effect Math:
     add: function(a: int, b: int) -> int
 
-handle Math.add(a: int, b: int) -> int:
+handle Math.add(a: number, b: number) -> number:
     resume(a + b)
 
-define main() -> int:
+define main() -> number:
     perform Math.add(40)

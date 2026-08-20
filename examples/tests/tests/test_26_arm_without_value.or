@@ -9,38 +9,38 @@
 #
 # A diverging arm (`_ -> break`) was already handled; this is the other way an
 # arm can have nothing to store, and it was not.
-type Opt: Some(int), None
+type Opt: Some(number), None
 
-define from_if_let(o: Opt) -> int:
+define from_if_let(o: Opt) -> number:
     edit score = 0
     if let Some(v) = o:
         # A nested block-form `if`: this is the shape that crashed.
-        if v == 4:
+        if v is 4:
             score = score + 10
     score
 
-define from_match(o: Opt) -> int:
+define from_match(o: Opt) -> number:
     edit hits = 0
     choose o:
-        Some(v) ->
+        Some(v) then 
             if v > 0:
                 hits = hits + 1
-        None -> hits = hits
+        None then hits = hits
     hits
 
-define from_loop_arm(o: Opt) -> int:
+define from_loop_arm(o: Opt) -> number:
     edit total = 0
     choose o:
-        Some(n) ->
-            loop i in 0..<n:
+        Some(n) then 
+            loop i in 0 until n:
                 total = total + i
-        None -> total = total
+        None then total = total
     total
 
-define main() -> int:
+define main() -> number:
     a = from_if_let(Opt.Some(4))      # 10
     b = from_if_let(Opt.None)         # 0
     c = from_match(Opt.Some(9))       # 1
     d = from_loop_arm(Opt.Some(5))    # 0+1+2+3+4 = 10
     print_line("if_let={a}/{b} match={c} loop={d}")
-    a + b + c + d + 5                 # 10 + 0 + 1 + 10 + 5 == 26
+    a + b + c + d + 5                 # 10 + 0 + 1 + 10 + 5 is 26

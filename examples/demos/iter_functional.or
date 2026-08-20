@@ -6,7 +6,7 @@
 # a closure that captures a local (`bonus`).
 use iter
 
-define main() -> int:
+define main() -> number:
     scores = [40, 75, 88, 12, 95, 60]
     bonus = 5
 
@@ -18,7 +18,7 @@ define main() -> int:
     total   = combine(passing, 0, function(acc, s): acc + s)            # 338
 
     # count how many were perfect (100), same boosted values.
-    perfect = count(boosted, function(s): if s == 100 then 1 else 0)   # 1
+    perfect = count(boosted, function(s): if s is 100 then 1 else 0)   # 1
 
     print_line("total: {total}   perfect: {perfect}")
     total

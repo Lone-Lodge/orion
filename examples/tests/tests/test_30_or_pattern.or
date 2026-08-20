@@ -1,10 +1,10 @@
 # Or-patterns: `A | B | C -> body` runs one body for several patterns. It
 # desugars to one match arm per alternative, so match lowering is untouched.
-define classify(n: int) -> int:
+define classify(n: number) -> number:
     choose n:
-        1 | 2 | 3 -> 10
-        4 | 5 -> 20
-        _ -> 0
+        1 | 2 | 3 then 10
+        4 | 5 then 20
+        _ then 0
 
-define main() -> int:
-    classify(3) + classify(4)   # third alt of arm 1 + first alt of arm 2 == 30
+define main() -> number:
+    classify(3) + classify(4)   # third alt of arm 1 + first alt of arm 2 is 30

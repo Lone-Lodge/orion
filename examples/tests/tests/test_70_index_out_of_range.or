@@ -1,6 +1,6 @@
 # Out-of-range list indexing used to load adjacent memory and return
 # garbage with exit 0 (a silent wrong answer). It now traps loudly:
 # prints `orion: list index N out of range (len L)` and exits 70.
-define main() -> int:
+define main() -> number:
     xs = [10, 20, 30]
     xs[9]

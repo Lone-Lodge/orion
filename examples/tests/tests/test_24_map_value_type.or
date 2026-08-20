@@ -1,6 +1,6 @@
-# `Map<T>` - a map that says what it holds.
+# `table<T>` - a map that says what it holds.
 #
-# A bare `Map` holds anything, so every read out of one had to GUESS an element
+# A bare `table` holds anything, so every read out of one had to GUESS an element
 # type. It guessed `map`, which is right for walking an AST and silently wrong
 # for a list of texts: `len` on an element became a map's length and returned a
 # wrong number with no error. The IR already understood `map:T` and `get` already
@@ -9,17 +9,17 @@
 #
 # Nothing changes at runtime (every value is a 64-bit word). This is the
 # annotation finally reaching the reader.
-define greeting_len(m: table<text>) -> int:
+define greeting_len(m: table<text>) -> number:
     length(get(m, "greeting"))                  # a text, so text length
 
-define second_word_len(m: table<[text]>) -> int:
+define second_word_len(m: table<[text]>) -> number:
     ws = get_list(m, "words")                # list:text, from the map's type
-    length(at(ws, 1))
+    length(ws[1])
 
-define total(m: table<int>) -> int:
+define total(m: table<int>) -> number:
     get_int(m, "a") + get_int(m, "b")
 
-define main() -> int:
+define main() -> number:
     a = greeting_len({"greeting": "hello"})              # 5
     b = second_word_len({"words": ["ab", "cdef"]})       # 4
     c = total({"a": 6, "b": 8})                          # 14
@@ -28,4 +28,4 @@ define main() -> int:
     plain = {"nodes": [{"kind": "Leaf"}]}
     d = length(get_list(plain, "nodes"))                     # 1
     print_line("a={a} b={b} c={c} d={d}")
-    a + b + c + d                                         # 5 + 4 + 14 + 1 == 24
+    a + b + c + d                                         # 5 + 4 + 14 + 1 is 24

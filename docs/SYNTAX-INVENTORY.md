@@ -1,10 +1,13 @@
-# Orion: syntaxreferens
+# Orion: syntax + plan
 
-Den next-gen-form vi bestämt. KISS, läsbart för en människa (verb, inte kryptik), intent- och data-drivet. Det här är målbilden; bygget pågår (teman och ordning i `../NEXTGEN-PLAN.md` i orion-roten).
+En fil. Överst vad språket **är** idag, sedan vad som **återstår**, med rutor att bocka av.
+Allt under "Byggt" är verifierat genom att kompilera ett program per påstående, inte genom att läsa den här filen.
+
+Senast verifierad: 2026-08-19.
 
 ---
 
-## Så här ser koden ut
+# Del 1 - Så här ser koden ut
 
 ```
 public define update(edit items: list of number):
@@ -15,154 +18,265 @@ public define update(edit items: list of number):
 define alive(hp: number) -> truth:
     hp > 0
 
-define first given item (items: list of item) -> maybe item:
-    if length(items) > 0 then some(items[0]) else none
+define spawn(at: point, health = 100) -> enemy:
+    example spawn(origin).hp is 100
+    enemy{position: at, hp: health}
 
-define load(path: text) -> result text:
-    read_file(path)
-
-define total(path: text) -> result number:
-    raw = try load(path)                      # fel skickas uppåt
-    ok(combine(numbers_in(raw), (a, b): a + b))
-
-define greet_user(id: number):
-    choose find_user(id):
-        ok(user)   then print("hi {user.name}")
-        error(msg) then print(msg)
+define greet_all(scores: table):
+    loop name, points in scores:
+        print_line("{name}: {points}")
 ```
 
 ## Typer
-- `number` - alla tal (kompilatorn väljer heltal/flyttal/bredd). `/` = riktig division, `//` = golv.
-- `truth` - `true` / `false`.
-- `text` - Unicode-text. En textbit av längd 1 räcker som "tecken".
-- `table` - nyckel-värde. Literal `{"name": "Ada"}`, läsning `t[k]` eller `get`. Text-nycklar (andra nyckeltyper senare). Typad via generics: `get()` ger rätt typ.
-- `byte` - rått tal 0-255, bara vid gränser (fil/nät).
-- `list of T` - `list of enemy`, `list of number`.
-- `maybe T` - ett värde eller inget: `some(v)` / `none`.
-- `result T` - lyckades eller fel: `ok(v)` / `error(msg)`.
-- Funktionstyp: `(number) -> number`.
-- **Allt är gemener** - även egna typer och varianter:
-  `type player: name: text, hp: number` (produkt)
-  `type tile: empty, wall, loot` (val)
-- Generisk typ introduceras med `given`, ett läsbart ord: `given item (...) -> item`.
-- Krav på en generisk typ: **`requires`**. En capability är bara en record av funktioner:
-  `type order given item: less: (item, item) -> truth`
-  `define largest given item requires order (items: list of item) -> item:`
-  Anropet skickar recorden som named argument: `largest(xs, order: number_order)`.
-  Dictionary-passing synligt i koden, ingen dold resolution.
-- Ingen returtyp skriven = funktionen ger inget värde.
+
+| ord | betyder |
+|---|---|
+| `number` | tal. `/` riktig division, `//` golv. Kompilatorn väljer i64 eller f64 |
+| `truth` | `true` / `false` |
+| `text` | Unicode-text. En textbit av längd 1 räcker som tecken |
+| `table` | nyckel-värde. `{"name": "Ada"}`, läses `t[k]` |
+| `list of T` | `list of enemy`, `list of number`. Skrivs även `[T]` |
+| `maybe T` | ett värde eller inget: `some(v)` / `none` |
+| `result T` | lyckades eller fel: `ok(v)` / `error(msg)` |
+
+`maybe` och `result` bor i `orbs/core` och finns i varje program utan `use`. De tar aldrig ett
+namn ifrån dig: en egen enum, en egen variant eller en egen funktion vid samma namn vinner alltid.
+Funktionerna ÖVER dem (`unwrap_or`, `is_some`, `err_msg`) ligger kvar bakom `use option` / `use result`.
+
+En tables **element är dess nyckel**. `loop k in t:` ger nycklarna, `loop k, v in t:` ger båda,
+`contains(t, k)` frågar efter nyckeln. Från en nyckel når du värdet, från ett värde når du inte nyckeln.
+En table vars värden inte är samma typ vägrar `t[k]` och hänvisar till `get_int` / `get_map` / `get_list`.
+
+Bytes är `list of number`. Ingen egen typ - `bytes_of(t)` ger en vanlig lista.
+
+Egna typer, allt gemener:
+
+```
+type player: name: text, hp: number     # produkt
+type tile: empty, wall, loot            # val
+```
+
+Generiskt med `given`, krav med `requires`. En capability är bara en record av funktioner:
+
+```
+type order given item: less: (item, item) -> truth
+define largest given item requires order (items: list of item) -> item:
+```
+
+Anropet skickar recorden som named argument: `largest(xs, order: number_order)`.
+Dictionary-passing syns i koden, ingen dold resolution.
+
+## En stavning per sak
+
+Där två stavningar fanns är den vänstra den enda som skrivs. Parsern gör samma nod av båda,
+så migrationen var ren omstavning - identisk IR.
+
+| skrivs | inte |
+|---|---|
+| `is` / `is not` | `==` / `!=` |
+| `xs[i]` | `at(xs, i)` |
+| `0 until n` | `0..<n` |
+| `loop` | `for` |
+| `edit` | `mut` |
+| `define` | `fn` |
+| `public` | `pub` |
+| `choose` … `then` | `match` … `->` |
+| `some` / `none` / `ok` / `error` | `Some` / `None` / `Ok` / `Err` |
+| `maybe T` / `result T` | `Option<T>` / `Result<T>` |
+| `collect` | `yield` |
+| `length` | `len` |
+| `truth` / `text` / `table` | `bool` / `Text` / `Map` |
+| `part` | `slice` |
 
 ## Funktioner
-```
-public define spawn(at: point, health = 100) -> enemy:
-    enemy{position: at, hp: health}
-```
-- **`define`** definierar en funktion. (`action` är fritt för spel-domänen.)
-- **`public`** exponerar den ur orben. Utan = privat.
-- **Returtyp inferreras** för privata; valfri på publika som kontrakt (skrivs med `->`).
-- **Named arguments** (valfria): `spawn(at: origin, health: 50)`.
-- **Default-värden**: `health = 100`.
-- **Anonym funktion**: `(n): n + k` - ingen keyword. `each(xs, (n): n * 2)`.
-- Anrop är uniformt: `x.f()` betyder `f(x)`.
-- **`uses`** - en publik funktion som rör omvärlden säger det i signaturen:
-  `public define save(w: world) uses files:`
-  Standard-capabilities: `console`, `files`, `net`, `clock`, `random`. Privata
-  funktioner (och `main`) inferreras. Ingen klausul = ren beräkning.
-  Byt handler i test i stället för att mocka; spela in svaren för replay.
-- **`example`** - varje `public define` bär körbara exempel, raden under signaturen:
-  `example clamp(15, 0, 10) is 10`
-  Bygget kompilerar och kör dem; referenssidan visar dem. Docs kan inte ljuga.
+
+- `define` definierar. `public` exponerar ur orben. Utan = privat.
+- Returtyp inferreras för privata, valfri på publika som kontrakt.
+- Named arguments och default-värden: `spawn(at: origin, health: 50)`, `health = 100`.
+- Anonym funktion utan keyword: `(n): n + k`. `each(xs, (n): n * 2)`.
+- `x.f()` betyder `f(x)`.
+- `uses` säger vad en publik funktion rör: `public define save(w: world) uses files:`.
+  Capabilities: `console`, `files`, `net`, `clock`, `random`. Privata och `main` inferreras.
+  Ingen klausul = ren beräkning. Kompilatorn håller det.
+- `example` under signaturen körs av bygget: `example clamp(15, 0, 10) is 10`.
 
 ## Muterbarhet
-- Allt är oföränderligt som standard: `x = 41`.
-- **`edit`** markerar en binding eller parameter som får ändras: `edit x = 0`, `define tick(edit world: world):`.
-- Värde-semantik i språket; kompilatorn muterar unikt ägda värden in-place.
 
-## Jämförelser & logik
-- Likhet: **`is`** / **`is not`** - `if x is 5`, `if name is not ""`. (`is not` är EN operator; negerade ord-jämförelser finns inte - skriv `not (x < 5)` eller vänd operatorn.)
-- Storlek: symboler `<` `>` `<=` `>=` ELLER ord `is less than` / `is more than` / `is at most` / `is at least`. Båda giltiga.
-- Logik: **`and`** / **`or`** / **`not`**.
-- Aritmetik: `+` `-` `*` `/` `//` `%`.
+Allt oföränderligt som standard. `edit` markerar det som får ändras: `edit x = 0`,
+`define tick(edit world: world):`. Värde-semantik i språket; kompilatorn muterar unikt ägda värden in-place.
 
 ## Kontrollflöde
-- **`if cond: ... else: ...`** eller inline **`if cond then a else b`** - allt är ett uttryck, ger värde.
-- **`loop:`** (oändlig, `break`), **`loop x in xs:`**.
-- Intervall: **`0 to n`** = till och med n, **`0 until n`** = fram till n (som engelskan läser dem). Bara i loop-position.
-- Samla ur en loop: **`collect`** - `doubled = loop x in xs: collect x * 2`. Filtrera: `where` (eller villkorlig collect).
-- Kedjor av `each`/`keep`/`collect` fuserar - inga mellanlistor byggs. Samma svar som steg-för-steg; evalueringen ägs av kompilatorn.
-- **`choose x:`** med fall, mönstermatchning. Arm-form: **`pattern then body`**.
-```
-choose first(items):
-    some(x) then x
-    none    then 0
-```
-- `break` / `continue` / `return` (return bara för tidig retur; sista uttrycket är annars värdet).
+
+- `if cond: … else: …` eller `if cond then a else b`. Allt är ett uttryck.
+- `loop:` (oändlig, `break`), `loop x in xs:`, `loop i, x in xs:` (plats, värde).
+  Samma två former över en `table`.
+- `0 to n` till och med, `0 until n` fram till.
+- `collect` samlar ur en loop, `where` filtrerar.
+- `choose x:` med `pattern then body`-armar.
+- Kedjor av `each`/`keep`/`collect` fuserar - inga mellanlistor.
 
 ## Fel
-- Fel är data. `result T` med `ok(v)` / `error(msg)`. Inga exceptions, inget try/catch, inga dolda hopp.
-- Propagera uppåt: **`x = try risky()`** - packar upp `ok`, skickar `error` vidare uppåt.
-- Ingen auto-wrap: en funktion som ger `result T` avslutar med `ok(...)` eller `error(...)` (eller värdet från ett annat result-anrop).
-- Hantera: `choose r: ok(v) then ... error(m) then ...`.
-- `parse("abc")` och liknande ger `maybe number`, aldrig odefinierat.
 
-## Kontrakt & effekter
-- **`require cond`** / **`ensure cond`** - för- och eftervillkor, toolchain jagar motexempel.
-- **`defer expr`** - kör vid utträde (LIFO).
-- Effekter (språkets kraft, ersätter exceptions/async/generatorer):
-```
-effect clock:
-    now: () -> number
+Fel är data. Inga exceptions, inget try/catch, inga dolda hopp.
+`try risky()` packar upp och skickar felet uppåt. Hantera med `choose`.
 
-handle clock.now():
-    resume(1000)
+## Kontrakt, effekter, determinism
 
-perform clock.now()
-```
-- **`deterministic`** markerar ren, reproducerbar beräkning - och den är bit-exakt: i deterministisk kod väljer kompilatorn fixed-point för bråktal, så samma program + input + seed ger samma output på varje plattform. (Utanför deterministic lovas inte float-bitar cross-platform.)
+- `require` / `ensure` - för- och eftervillkor.
+- `defer expr` - kör vid utträde (LIFO).
+- `effect` / `handle` / `perform` / `resume` - ersätter exceptions, async och generatorer.
+- `deterministic` - ren och reproducerbar, bit-exakt: fixed-point för bråktal.
 
 ## Builtins (ingen `use`)
-- Samlingar: `len`, `append`, `xs[i]`, `slice`, `contains`, `each`, `keep`, `combine`, `get`/`set`/`has`.
-- Text/utskrift: `print`, `print_line`, textinterpolation `"{uttryck}"`.
-- Tal: `abs` `min` `max` `clamp` `floor` `ceil` `round` `sqrt` `sin` `cos` ... (en uppsättning, inga `f`-varianter).
-- Konvertering: `to_number`, `to_text`, `parse` (ger `maybe`). Formattering via named args + defaults: `to_text(3.14159, decimals: 2)`.
-- Program: `arguments` (en `list of text`).
-- Test: `assert(cond)`.
 
-## Data (state som databas, inte objektgraf)
-- Program-state formas som platta stores av värden med id:n. Värde-semantiken gör pekargrafer omöjliga - inget delas i smyg.
-- **`store`-orben** är entitets-lagret: `use store`, sen
-  `id = insert(enemies, e)` · `remove(enemies, id)` · `get(enemies, id)` -
-  och `loop e in enemies where e.hp < 10: ...` ÄR queryn.
-- Spel kallar det ECS, affärssystem kallar det relationer - samma idé. Kompilatorn får äga lagringslayouten (SoA/AoS) som senare optimering; koden ändras inte.
+- Samlingar: `length`, `append`, `xs[i]`, `part`, `each`, `keep`, `combine`, `get`/`set`/`has`.
+- `contains(x, y)` - text: delsträng. table: nyckeln. Lista: `includes(xs, v)` ur `list`.
+- Utskrift: `print`, `print_line`, interpolation `"{uttryck}"`.
+- Tal: `abs` `min` `max` `clamp` `floor` `ceil` `round` `sqrt` `sin` `cos` … en uppsättning.
+- Konvertering: `to_number`, `to_text`, `parse`. Formattering via named args: `to_text(x, decimals: 2)`.
+- Program: `arguments` (en `list of text`, ett värde - inte ett anrop).
+- Test: `assert(villkor)`. Etiketten är valfri.
+
+## Data som databas, inte objektgraf
+
+Program-state är platta stores av värden med id:n. Värde-semantiken gör pekargrafer omöjliga.
+`store`-orben: `insert` / `remove` / `get`, och `loop e in enemies where e.hp < 10:` ÄR queryn.
+Spel kallar det ECS, affärssystem kallar det relationer.
+
+`int` finns kvar på ett ställe där det är **rätt**: `external define` mot C. Där beskriver
+ordet en främmande ABI, och den tar en int oavsett vad Orion tycker.
 
 ## Moduler
-- **`orb`** = modul. **`use text`** importerar. En ensam `.or` kör utan projektfil.
-- `type` deklarerar typer, `external` för C-interop.
-- Konstanter behöver inget nyckelord: en toppnivå-binding `max_players = 8` ÄR en konstant (allt är oföränderligt by default). Const korsar orb-gränser (`num.pi` är ett värde, inte ett anrop).
-- **`define main():`** är programmets startpunkt. Ingen returtyp - fel rapporteras via `result`/effekter, inte exit-koder.
+
+`orb` = modul. En ensam `.or` kör utan projektfil.
+
+**`use` behövs sällan.** Ett namn som exakt en orb på sökvägen exporterar hämtas åt dig -
+kompilatorn visste redan vilket orb det var: felet sa *it is exported by `text`*.
+Två orbar som exporterar samma namn är fortfarande ett fel som namnger båda, och `use` är
+svaret på det. Det är den enda uppgift `use` har kvar.
+
+Reglerna, i ordning: det du själv deklarerar vinner. Sedan det du själv importerat.
+Sist auto-import, och bara för namn i **anropsposition** - en lokal variabel som heter
+`first` hämtar ingenting. Kärnorden `some` / `none` / `ok` / `error` hämtar aldrig heller,
+annars hade `log.error` tagit `error(m)` ifrån varje program som skriver det.
+Bara den primära orb-katalogen indexeras; systerprojekt namnger du själv.
+
+En toppnivå-binding ÄR en konstant. `define main():` är startpunkten - ingen returtyp,
+fel går via `result`/effekter, inte exit-koder.
 
 ---
 
-Referens genererad ur parser + compiler, inte docs. Strukturell riktning (effekter som ryggrad, determinism, lazy iterators, docs-som-tester): `../NEXTGEN-PLAN.md`.
+# Del 2 - Byggt
 
-## Ord som bytt namn (2026-08-13)
+- [x] Sized types `i8..u64` som **wrap-semantik** (`u8` wrappar vid 256), `x as T`,
+      literal-range-check. Lagringen är i64 för alla heltal och f64 för alla flyttal -
+      backenden har ingen smal representation, och `f32` betyder därför f64
+- [x] `Result<T>` / `Option<T>` som riktiga generiska sumtyper, `?`-propagering
+- [x] Effekter: one-shot `perform` / `handle` / `resume`
+- [x] `number` som ytord, `/` riktig division, `//` golv
+- [x] Gemena typer, varianttyper, `given`, `requires`
+- [x] Named arguments, default-värden, lätt lambda `(n):`, if som uttryck
+- [x] `uses`-klausulen, och kompilatorn håller den
+- [x] `example`-rader som bygget kör
+- [x] `require` / `ensure` / `defer` / `deterministic`
+- [x] `store`-orben
+- [x] `main` utan exit-kod, ett `print`, `x.f()`, `xs[i] = v`
+- [x] En stavning per sak (tabellen ovan) - hela korpusen migrerad
+- [x] `arguments` som `list of text`
+- [x] Ett `assert(villkor)`
+- [x] `each` / `keep` / `combine` / `assert` utan `use`
+- [x] `loop k in t:` och `loop k, v in t:` över en table
+- [x] `contains` på table; blandad table vägrar `t[k]` i stället för att segfaulta
+- [x] Stdlib-kommentarerna slutar lära ut retirerade ord
+- [x] `then` som enda arm-stavning
+- [x] `maybe` / `result` som kärntyper i `orbs/core` - inget `use`, och de skuggar aldrig ditt eget
+- [x] **Auto-`use`**: ett namn som exakt en orb exporterar hämtas åt dig. `use` svarar bara på *vilken*
+- [x] **`number` väljer i64 eller f64** genom helprogramsanalys - ett ord, kompilatorn väljer maskinen
+- [x] Hela korpusen skriver `number`: parametrar, returer, let-annoteringar, datafält,
+      listelement, varianters nyttolast, funktionstyper och **tupelpositioner**.
+      Det enda `int` en användare skriver är mot C: `external define`. Verifierat genom byte-identisk IR för 204 testprogram och fyra korpusprojekt
+- [x] Den talade ytan på wasm också - grindens baseline höjd från 141 till 154
 
-Ytan säger hela ordet. Båda stavningarna parsas idag - parsern
-översätter den talade formen till den backends känner
-(`psr_spoken_builtin` / `psr_spoken_type` i `orbs/orion_parse`), så en
-framtida omdöpning kostar en rad där plus en mekanisk omskrivning.
+# Del 3 - Återstår
 
-| förr | nu | varför |
-|---|---|---|
-| `len` | `length` | förkortning |
-| `fn` | `function` | förkortning (typordet, `Game{rules: function}`) |
-| `slice` | `part` | "en del av listan", inte CPU-tänk |
-| `to_int` | `to_whole` | `int` finns inte i ytan; talen heter `number` |
-| `to_float` | `to_real` | samma, och `/` kallas redan riktig division |
-| `bytes_from_text` | `bytes_of` | familjen blev symmetrisk |
-| `bytes_to_text` | `text_of` | |
-| `bytes_length` | `bytes_count` | `byte_count` var upptaget av text-orben |
-| `bytes_slice` | `bytes_part` | följer `part` |
+## Talas om men finns inte
 
-`app`-orbens `text_of(body) -> response` heter nu `text_response` - den
-byggde ett svar, inte en text, och namnet behövdes.
+- [ ] **Den namngivna funktionstyp-formen.** `function(max: number) -> number` parsas som
+      TVÅ parametrar - `max` som en okänd typ och `number` - så anropet felar med "expects 3
+      argument(s)". Formen `function(number) -> number` fungerar. Felet är högt, inte tyst,
+      men ordet `max` läser som dokumentation och borde få vara det.
+
+- [ ] **Bredder.** `number` väljer heltal eller flyttal; det väljer ännu inte i32, u8 eller
+      f32. Att smalna ett helt tal till en bredd som rymmer det är en *optimering* som aldrig
+      ändrar ett svar, till skillnad från valet helt-eller-reellt som är semantik. Kräver
+      intervallanalys.
+- [ ] **Bredder som lagring.** `number` väljer helt eller reellt; ingenting i språket väljer
+      i32, u8 eller f32 som *lagring*. `u8` är en i64 med en mask, och det gäller de explicita
+      typerna lika mycket som `number`. Att smalna kräver intervallanalys OCH smal lagring i
+      båda backends - och det är en optimering, inte semantik: i64 är alltid ett korrekt svar
+      för ett helt tal inom sitt intervall. Två ställen där det ändå spelar roll: minneslayout
+      för stora listor, och `external define` mot C där ABI:n är given.
+- [ ] **En enum får ett svar för alla sina `number`-nyttolaster.** Det är därför `ori_display`
+      medvetet behåller `int`: ett bråktal någonstans breddar varje koordinat i listan.
+      Regeln finns för att en `choose`-arm lämnar tillbaka en bar nyttolast utan konvertering.
+      Fixas den i sänkningen kan nyttolasterna avgöras var för sig.
+- [ ] **`given` som enda generic-stavning** - `<T>` används på 29 ställen, `given` på 9
+
+## Ett ord per begrepp
+
+- [ ] **Sex läsare för en operation.** `get` 743, `get_map` 378, `get_int` 284, `get_list` 236,
+      `get_or` 7, `get_text_list` 4, `get_int_list` 1. `t[k]` bär redan typen genom, även nästlat.
+      De typade läsarna behövs bara för blandade tabeller - kompilatorns egen AST.
+- [ ] Tre tids/task-system (`async` + `scheduler` + `timer`) → ett
+- [ ] Dubbelt JSON-API (`j*` sumtyp vs `json_*` table) → ett
+- [ ] `closure`-orben läcker env+fn_id som API fast språket har lambdas → radera
+- [ ] `pi()` som funktion → const som korsar orb-gräns
+- [ ] Rå mekanik på ytan: `ptr`, `call_ptr`, `struct_field_int/text`, `slot_get/set/has`,
+      `vec_add` / `vec_madd` / `vec_dot` (handanropad SIMD) → göm
+
+## Saknas
+
+- [ ] **`set`** - `contains` på en lista är O(n), och det är därför folk missbrukar en table som mängd
+- [ ] `table` med icke-`text`-nycklar
+- [ ] Typade fel: `Result<T, E>` med strukturellt E
+- [ ] Unicode: `upper` / `lower` / `reverse` / `index_of` är byte-baserade
+- [ ] Lazy iterators - allt `loop` samlar eagert
+- [ ] Nätverk: `net` är en stub. Sockets → TLS/HTTP
+- [ ] Datum/tid-typer
+- [ ] Float-formattering i interpolation
+
+## Effekter hela vägen (identiteten)
+
+Routa IO/rand/tid/nät genom effektsystemet i stället för builtins. Låser upp tre saker
+inget mainstream har: test utan mocks (byt handler), capability-säkerhet, record/replay.
+Tids-systemen måste unifieras först.
+
+- [ ] rand + tid
+- [ ] nät
+- [ ] file + print
+
+## Resurser och samtidighet (design låst, bygg när net landar)
+
+- [ ] Handtag ägs av sitt `handle`-block - scope-utträde stänger, strukturellt i stället för defer
+- [ ] `scope:` med cancellation och timeout som scope-egenskaper (`scope timeout 100:`)
+- [ ] Fibrer, aldrig futures. Streams = lazy fusion + kanaler. Actors: nej
+
+---
+
+# Regler vi håller
+
+1. **Ytan säger hela ordet.** Inga förkortningar, inget CPU-tänk. Verb, inte kryptik.
+2. **En stavning per sak.** Två stavningar är sämre än vilken som helst av dem ensam:
+   läsaren måste kunna båda och kan aldrig lita på att den ena betyder något särskilt.
+   En omdöpning är inte klar förrän korpusen är omskriven.
+3. **Docs kan inte ljuga.** `example`-rader körs av bygget, fältguidens exempel kompileras
+   av `docs_check`, referenssidan genereras ur `orbs/`.
+4. **Tyst fel är det värsta utfallet.** Hellre ett kompileringsfel som säger vad man ska
+   skriva i stället, än ett svar som råkar bli fel.
+5. **Fel är data.** Inga exceptions, ingen panic, inga dolda hopp.
+6. **Värde-semantik.** Inga pekargrafer, inget delas i smyg. Kompilatorn äger layouten.
+
+---
+
+Omskrivningsverktyget för en stavningsmigration: `tools/migrate/respell.py`.
+Det maskar varje rad i kod / sträng / kommentar innan det rör något, och interpolation räknas som kod.

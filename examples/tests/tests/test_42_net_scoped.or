@@ -2,7 +2,7 @@
 # the handle and close it on every exit path (defer), so no leak is possible.
 use net
 
-define serve_once(s: int) -> int:
+define serve_once(s: number) -> number:
     c = connect("127.0.0.1", 58423)
     if not ok(c):
         return 0
@@ -13,5 +13,5 @@ define serve_once(s: int) -> int:
     close(c)
     if got is "hej" then 42 else 1
 
-define main() -> int:
+define main() -> number:
     with_listener(58423, serve_once)

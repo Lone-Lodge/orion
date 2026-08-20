@@ -24,7 +24,7 @@ type request:
     body: text
 
 type response:
-    status: int
+    status: number
     mime: text
     body: text
 
@@ -70,16 +70,16 @@ public define parse_request(raw: text) -> request:
     example parse_request("GET /x?a=1 HTTP/1.1").path is "/x"
     example parse_request("GET /x?a=1 HTTP/1.1").query is "a=1"
     example parse_request("").method is ""
-    first = at(lines(raw), 0)
+    first = lines(raw)[0]
     parts = split(trim(first), " ")
     if length(parts) < 2:
         return request{method: "", path: "", query: "", body: ""}
-    target = at(parts, 1)
+    target = parts[1]
     halves = split(target, "?")
-    q = if length(halves) > 1 then at(halves, 1) else ""
-    request{method: at(parts, 0), path: at(halves, 0), query: q, body: ""}
+    q = if length(halves) > 1 then halves[1] else ""
+    request{method: parts[0], path: halves[0], query: q, body: ""}
 
-define status_line(code: int) -> text:
+define status_line(code: number) -> text:
     choose:
         code is 200 then "HTTP/1.0 200 OK"
         code is 404 then "HTTP/1.0 404 Not Found"
@@ -110,7 +110,7 @@ public define mime_of(path: text) -> text:
         else "application/octet-stream"
 
 # The nibble value of a hex digit byte, or -1 if it is not one.
-define nibble(b: int) -> int:
+define nibble(b: number) -> number:
     choose:
         b >= 48 and b <= 57 then b - 48
         b >= 97 and b <= 102 then b - 87
@@ -170,18 +170,18 @@ public define dispatch(req: request, routes: [route]) -> response:
 
 # The declared body length, 0 when none - what a POST promises to send.
 # no example: private - proven by folio's paste path (byte-true PNG upload)
-define header_length(head: text) -> int:
+define header_length(head: text) -> number:
     edit n = 0
     loop line in lines(head):
         kv = split(line, ":")
-        if length(kv) > 1 and (at(kv, 0) is "Content-Length" or at(kv, 0) is "content-length"):
-            n = int_from_text(trim(at(kv, 1)))
+        if length(kv) > 1 and (kv[0] is "Content-Length" or kv[0] is "content-length"):
+            n = int_from_text(trim(kv[1]))
     n
 
 # Serve one accepted connection: read the head, then as much body as the
 # head promised (bodies are TEXT - a page sends binary as base64), dispatch,
 # answer, close.
-define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files, clock:
+define serve_conn(conn: number, routes: [route], static_dir: text) uses net, files, clock:
     deadline = monotonic_ms() + 5000
     edit raw = ""
     loop:
@@ -196,8 +196,8 @@ define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files,
             if contains(raw, "\r\n\r\n"):
                 break
     halves = split(raw, "\r\n\r\n")
-    head = at(halves, 0)
-    edit body = if length(halves) > 1 then at(halves, 1) else ""
+    head = halves[0]
+    edit body = if length(halves) > 1 then halves[1] else ""
     want = header_length(head)
     loop:
         if length(body) >= want:
@@ -248,7 +248,7 @@ define serve_conn(conn: int, routes: [route], static_dir: text) uses net, files,
 
 # A static file, streamed in binary chunks so a large image never has to
 # fit one send.
-define serve_static(conn: int, req: request, static_dir: text) uses net, files:
+define serve_static(conn: number, req: request, static_dir: text) uses net, files:
     rel = if req.path is "/" then "/index.html" else percent_decode(req.path)
     if req.method is not "GET" or not safe_path(rel):
         r404 = not_found()
@@ -280,7 +280,7 @@ define serve_static(conn: int, req: request, static_dir: text) uses net, files:
 # Open a listener on 127.0.0.1. Returns the socket; ask local_port(srv) for
 # the port when 0 picked one.
 # no example: opens a socket - proven by folio
-public define serve(port: int) -> int uses net = listen(port)
+public define serve(port: number) -> number uses net = listen(port)
 
 # The whole serve-and-run dance as ONE call, so main() stays wiring:
 #
@@ -295,10 +295,10 @@ public define serve(port: int) -> int uses net = listen(port)
 #
 #     app_start("scribe", 7374, [on_get("/api/list", list_chapters)])
 #
-public define app_start(title: text, port: int, routes: [route]) -> int uses net, files, clock, console:
+public define app_start(title: text, port: number, routes: [route]) -> number uses net, files, clock, console:
     app_run(title, port, 1240, 860, routes, path_parent(asset("ui/index.html")))
 
-public define app_run(title: text, port: int, w: int, h: int, routes: [route], static_dir: text) -> int uses net, files, clock, console:
+public define app_run(title: text, port: number, w: number, h: number, routes: [route], static_dir: text) -> number uses net, files, clock, console:
     edit srv = serve(port)
     if not ok(srv):
         srv = serve(0)
@@ -307,7 +307,12 @@ public define app_run(title: text, port: int, w: int, h: int, routes: [route], s
         return 1
     got = local_port(srv)
     print_line("{title} at http://127.0.0.1:{got}/  (Ctrl+C stops)")
-    win = open_app_window("http://127.0.0.1:{got}/", title, w, h)
+    # APP_HEADLESS=1: ingen fönsteröppning och appen lever tills Ctrl+C -
+    # för servrar man når från en vanlig flik (dev-loopar, fjärrbruk).
+    # Annars: appen lever så länge sitt fönster (bye + window-gone nedan).
+    headless = env_get("APP_HEADLESS") is "1"
+    slot_set("app:headless", if headless then "1" else "0")
+    win = if headless then 0 else open_app_window("http://127.0.0.1:{got}/", title, w, h)
     # The bar's server side rides along by itself - /api/window is part of
     # the shell, not something every app should have to list. An app's own
     # route on the same path wins: dispatch takes the first match.
@@ -315,31 +320,49 @@ public define app_run(title: text, port: int, w: int, h: int, routes: [route], s
     run_until_interrupted(srv, all_routes, static_dir)
     0
 
-# Accept + serve until interrupted() (Ctrl+C). Connections serve one at a
-# time - honest and plenty on loopback for one user; the browser queues.
+# Accept + serve until interrupted() (Ctrl+C). Every connection gets its
+# own task: a slow handler (a compile, a long child process waited on with
+# finished_within) parks only ITS task - fast requests keep landing.
+# Cooperative and single-threaded, so handler code between IO points still
+# runs unsliced. If the task table is full we serve inline as before.
 # no example: runs a server loop - proven by folio
-public define run_until_interrupted(srv: int, routes: [route], static_dir: text) uses net, files, clock, console:
+public define run_until_interrupted(srv: number, routes: [route], static_dir: text) uses net, files, clock, console:
     slot_set("app:bye", "0")
+    slot_set("app:routes", routes)
+    slot_set("app:static", static_dir)
     loop:
         if interrupted():
             break
-        conn = accept_within(srv, 250)
+        # Kort accept-fönster + en pump-tur: spawnade anslutningar får sina
+        # skivor här, parkerade (kompilerande) väcks när barnet är klart.
+        conn = accept_within(srv, 10)
         if ok(conn):
-            t = spawn_conn(conn, routes, static_dir)
+            t = spawn(conn_task, conn)
+            if t < 0:
+                t2 = spawn_conn(conn, routes, static_dir)
+        pumped = pump()
         # an app lives as long as its window: the page said goodbye and
-        # nothing came after it, so there is nobody left to serve
+        # nothing came after it, so there is nobody left to serve.
+        # Headless (APP_HEADLESS=1) has no window to live by - only Ctrl+C.
+        headless = slot_get("app:headless") is "1"
         said = int_from_text(slot_get("app:bye"))
-        if said > 0 and monotonic_ms() - said > 2500:
+        if not headless and said > 0 and monotonic_ms() - said > 2500:
             break
         # our own window closing says it even more plainly
-        if own_window_gone() is 1:
+        if not headless and own_window_gone() is 1:
             break
     closed = close(srv)
     print_line("app: stopped cleanly")
 
 # One connection, handled to completion.
-define spawn_conn(conn: int, routes: [route], static_dir: text) -> int uses net, files, clock:
+define spawn_conn(conn: number, routes: [route], static_dir: text) -> number uses net, files, clock:
     serve_conn(conn, routes, static_dir)
+    0
+
+# Task-formen av samma sak: spawn tar (funktion, ett int-argument), så
+# rutterna och static-mappen hämtas ur slottarna som app_run satte.
+define conn_task(conn: number) -> number uses net, files, clock:
+    serve_conn(conn, slot_get("app:routes"), slot_get("app:static"))
     0
 
 # The OS's app window at `url`: Edge's --app mode - no address bar, no tabs,
@@ -349,7 +372,7 @@ define spawn_conn(conn: int, routes: [route], static_dir: text) -> int uses net,
 # which frameless can only clip into a see-through band - open_app_window is
 # the real thing when the WebView2 pieces are on the machine.
 # no example: opens a window - proven by folio
-public define open_window(url: text) -> int uses net:
+public define open_window(url: text) -> number uses net:
     a = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
     b = "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
     exe = if file_exists(a) then a else b
@@ -365,7 +388,7 @@ external define own_window_gone() -> int
 # pieces are missing it falls back to the borrowed Edge window, so a caller
 # needs no plan B. One own window per program.
 # no example: opens a window - proven by folio
-public define open_app_window(url: text, title: text, w: int, h: int) -> int uses net:
+public define open_app_window(url: text, title: text, w: number, h: number) -> number uses net:
     # #own-window är markören som säger åt bar.js att detta fönster är
     # appens eget - bara där ritas fönsterkromen.
     marked = "{url}#own-window"
@@ -380,8 +403,8 @@ public define query_of(req: request, key: text) -> text:
     edit found = ""
     loop pair in split(req.query, "&"):
         kv = split(pair, "=")
-        if length(kv) is 2 and at(kv, 0) is key and found is "":
-            found = percent_decode(replace(at(kv, 1), "+", " "))
+        if length(kv) is 2 and kv[0] is key and found is "":
+            found = percent_decode(replace(kv[1], "+", " "))
     found
 
 # An app's own file, wherever the app was started from. Shipped, `ui/x.html`
@@ -418,7 +441,7 @@ public define window_on_top(title: text, on: truth) -> truth uses console = win_
 
 # How solid the window is, 10..100. 100 is fully opaque and costs nothing.
 # no example: window state - proven by folio's opacity slider
-public define window_opacity(title: text, percent: int) -> truth uses console = win_set_opacity(title, percent) is 0
+public define window_opacity(title: text, percent: number) -> truth uses console = win_set_opacity(title, percent) is 0
 
 # Take the frame off, so the page IS the window - the modern app look. The
 # browser paints its title strip inside the window, so this clips it away at
@@ -428,7 +451,7 @@ public define window_opacity(title: text, percent: int) -> truth uses console = 
 # window_move/minimize/maximize/close from it, and re-ask on every resize -
 # the region is fixed to a size.
 # no example: window state - proven by folio's own top bar
-public define window_frameless(title: text, on: truth, view_h: int) -> truth uses console = win_set_frameless(title, if on then 1 else 0, view_h) is 0
+public define window_frameless(title: text, on: truth, view_h: number) -> truth uses console = win_set_frameless(title, if on then 1 else 0, view_h) is 0
 
 # Let the mouse fall through the window to whatever is under it: a reference
 # board you can paint and click straight through. The keyboard still arrives,
@@ -447,13 +470,13 @@ public define clicks_through(title: text) -> truth uses console = win_click_thro
 # will not let us hand the drag to the OS move loop, so the page follows its
 # own pointer and says where the window should be.
 # no example: window state - proven by folio's own top bar
-public define window_move(title: text, x: int, y: int) -> truth uses console = win_move(title, x, y) is 0
+public define window_move(title: text, x: number, y: number) -> truth uses console = win_move(title, x, y) is 0
 # Give the window a size (device pixels) and center it on its monitor. The
 # one window verb that starts from the OUTSIDE: a browser app window opens at
 # whatever size its profile last had, and only the OS side can correct that -
 # an installer's first move.
 # no example: window state - proven by the setup stub
-public define window_size(title: text, w: int, h: int) -> truth uses console = win_resize(title, w, h) is 0
+public define window_size(title: text, w: number, h: number) -> truth uses console = win_resize(title, w, h) is 0
 
 # Ghost mode, own windows only: the page hands over the rectangles that stay
 # INTERACTIVE ("x,y,w,h;..." in device pixels, client coords) - everything
@@ -483,7 +506,7 @@ external define icon_base64(path: text, size: int) -> text
 # Shellet får avgöra vilken ikon en genväg har - den kan peka på målets, på
 # en egen, på en mapps. Base64 och inte bytes: en returnerad sträng kopieras
 # ut vid sin NUL, och pixlar är fulla av dem. "" när det inte finns någon.
-public define icon_pixels(path: text, size: int) -> text uses files = icon_base64(path, size)
+public define icon_pixels(path: text, size: number) -> text uses files = icon_base64(path, size)
 
 # Ur aktivitetsfältet, ur alt-tab, ur fönsterlistan. Ett fönster som ropas
 # fram ska finnas när det kallas på och inte annars - det ska inte gå att
@@ -495,7 +518,7 @@ public define window_toolwindow(title: text, on: truth) -> truth uses console = 
 # virtual key code (space is 32). The window raises ITSELF when it fires -
 # only the window's own message handler is allowed the foreground - so the
 # program learns about it afterwards, by asking.
-public define window_hotkey(title: text, mods: int, key: int) -> truth uses console = win_hotkey(title, mods, key) is 0
+public define window_hotkey(title: text, mods: number, key: number) -> truth uses console = win_hotkey(title, mods, key) is 0
 # True once per press. Ask on your own schedule; the answer is never repeated.
 public define hotkey_taken() -> truth uses console = win_hotkey_taken() is 1
 # Är tangenten vår just nu? Registreringen misslyckas tyst när någon annan
@@ -536,8 +559,12 @@ define bar_js() -> text:
     js = js + "if (location.hash !== '#own-window') return;\n"
     js = js + "if (document.getElementById('bar')) return;\n"
     js = js + "const css = '#bar\{position:fixed;top:0;left:var(--bar-left,0);right:0;height:36px;display:flex;align-items:center;gap:10px;padding:0 6px 0 14px;z-index:2147483647;color:var(--bar-ink,inherit);opacity:0;transition:opacity .18s;user-select:none;-webkit-user-select:none\}' +\n"
-    js = js + "'#bar:hover\{opacity:1;background:var(--bar-bg,rgba(0,0,0,.28));backdrop-filter:blur(16px)\}' +\n"
-    js = js + "'#bar .bar-title\{font:12px/1 system-ui,sans-serif;letter-spacing:.4px;opacity:.65\}' +\n"
+    js = js + "// Skuggan är ett eget helbreddslager UNDER baren: baren själv börjar\n"
+    js = js + "// vid --bar-left (appens egna topbar-yta är klickbar), men skuggan ska\n"
+    js = js + "// gå från kant till kant så remsan läses som EN bar.\n"
+    js = js + "'#bar-shade\{position:fixed;top:0;left:0;right:0;height:36px;z-index:2147483645;opacity:0;transition:opacity .18s;pointer-events:none;background:var(--bar-bg,rgba(0,0,0,.28));backdrop-filter:blur(16px)\}' +\n"
+    js = js + "'#bar:hover\{opacity:1\}' +\n"
+    js = js + "'#bar:hover + #bar-shade\{opacity:1\}' +\n"
     js = js + "'#bar-tools\{display:flex;align-items:center;gap:6px;margin-left:auto\}' +\n"
     js = js + "'#bar button\{all:unset;width:36px;height:26px;display:grid;place-items:center;border-radius:6px;font:13px/1 system-ui,sans-serif;opacity:.75\}' +\n"
     js = js + "'#bar button:hover\{background:var(--bar-btn,rgba(255,255,255,.14));opacity:1\}' +\n"
@@ -547,13 +574,13 @@ define bar_js() -> text:
     js = js + "const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);\n"
     js = js + "const bar = document.createElement('div'); bar.id = 'bar';\n"
     js = js + "const ic = d => '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" width=\"15\" height=\"15\">' + d + '</svg>';\n"
-    js = js + "bar.innerHTML = '<span class=bar-title></span><span id=bar-tools></span><button id=bar-pin title=\"alltid överst\"></button><button id=bar-min></button><button id=bar-max></button><button id=bar-close></button>';\n"
+    js = js + "bar.innerHTML = '<span id=bar-tools></span><button id=bar-pin title=\"alltid överst\"></button><button id=bar-min></button><button id=bar-max></button><button id=bar-close></button>';\n"
     js = js + "bar.querySelector('#bar-pin').innerHTML = ic('<path d=\"M5 3h14\"/><path d=\"m18 13-6-6-6 6\"/><path d=\"M12 7v14\"/>');\n"
     js = js + "bar.querySelector('#bar-min').innerHTML = ic('<path d=\"M5 12h14\"/>');\n"
     js = js + "bar.querySelector('#bar-max').innerHTML = ic('<rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/>');\n"
     js = js + "bar.querySelector('#bar-close').innerHTML = ic('<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>');\n"
     js = js + "document.body.appendChild(bar);\n"
-    js = js + "bar.querySelector('.bar-title').textContent = document.title;\n"
+    js = js + "const shade = document.createElement('div'); shade.id = 'bar-shade'; bar.after(shade);\n"
     js = js + "const win = (what, v) => fetch('/api/window?do=' + what + (v === undefined ? '' : '&v=' + v) + '&t=' + Math.round(innerHeight * devicePixelRatio) + '&title=' + encodeURIComponent(document.title));\n"
     js = js + "const reclip = async () => \{\n"
     js = js + "for (let i = 0; i < 15; i++) \{\n"
@@ -596,7 +623,7 @@ define bar_js() -> text:
 # scribe became its second consumer.
 #
 #     route{method: "GET", path: "/api/window", handler: window_api}
-define do_window(title: text, what: text, v: int, t: int) -> truth:
+define do_window(title: text, what: text, v: number, t: number) -> truth:
     choose:
         what is "top" then window_on_top(title, v is 1)
         what is "frameless" then window_frameless(title, v is 1, t)

@@ -1,9 +1,9 @@
-type Item: name: text, value: int
+type Item: name: text, value: number
 
 define describe(item: Item) -> text:
     "{item.name}: {item.value}"
 
-define main() -> int:
+define main() -> number:
     a = Item{name: "x", value: 21}
     msg = describe(a)
     # describe should produce "x: 21"

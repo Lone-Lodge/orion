@@ -2,8 +2,8 @@
 # an opaque pointer-sized slot (i64) instead of being mistaken for a struct
 # type `struct:T`, so a generic function type-checks and passes values through.
 define first<T>(xs: [T]) -> T:
-    at(xs, 0)
+    xs[0]
 
-define main() -> int:
+define main() -> number:
     nums = [11, 22, 33]
     first(nums)   # 11

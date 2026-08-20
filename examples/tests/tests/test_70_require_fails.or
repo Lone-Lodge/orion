@@ -1,7 +1,7 @@
 # A failed `require` traps loudly: prints `orion: requirement failed` and
 # exits 70, instead of silently continuing with a broken precondition.
-define checked(x: int) -> int:
+define checked(x: number) -> number:
     require x > 0
     x * 2
-define main() -> int:
+define main() -> number:
     checked(0 - 5)     # precondition violated -> trap

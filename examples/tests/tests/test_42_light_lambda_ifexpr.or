@@ -3,7 +3,7 @@
 #   block-if as an EXPRESSION: x = if c: ... else: ...
 use iter
 
-define main() -> int:
+define main() -> number:
     k = 10
     add_k = (n): n + k
     doubled = each([1, 2, 3], (x): x * 2)     # [2, 4, 6]

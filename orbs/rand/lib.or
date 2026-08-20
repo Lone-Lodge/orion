@@ -18,24 +18,24 @@ RAND_C = 1442695040888963407       # LCG increment (both wrap in i64)
 RAND_DEFAULT = 88172645463325252   # fixed nonzero default seed
 
 # Current state, or the default if unseeded.
-define rand_state() -> int:
+define rand_state() -> number:
     if slot_has("rand:state") then slot_get_int("rand:state") else RAND_DEFAULT
 
 # Fix the sequence. Any int works (0 included - the increment keeps it moving).
-public define srand(seed: int) -> int uses random:
+public define srand(seed: number) -> number uses random:
     example srand(42) is 42
     slot_set("rand:state", seed)
     seed
 
 # Advance the generator and return a non-negative pseudo-random int.
-public define rand() -> int uses random:
+public define rand() -> number uses random:
     example rand() >= 0
     next = rand_state() * RAND_A + RAND_C
     slot_set("rand:state", next)
     next & 0x7FFFFFFFFFFFFFFF
 
 # A pseudo-random int in [lo, hi). Returns lo when the range is empty.
-public define rand_range(lo: int, hi: int) -> int uses random:
+public define rand_range(lo: number, hi: number) -> number uses random:
     example rand_range(5, 6) is 5
     if hi <= lo then lo else lo + (rand() % (hi - lo))
 
@@ -45,7 +45,7 @@ public define rand_float() -> float uses random:
     (rand() % 1000000000) as float / 1000000000.0
 
 # true with probability 1/n (rand_chance(2) is a coin flip). n <= 1 is always true.
-public define rand_chance(n: int) -> truth uses random:
+public define rand_chance(n: number) -> truth uses random:
     example rand_chance(1)
     if n <= 1 then true else rand_range(0, n) is 0
 
@@ -56,19 +56,19 @@ public define rand_chance(n: int) -> truth uses random:
 external define entropy_bytes(n: int) -> [int]
 
 # `n` unpredictable bytes (0..255 each) from the OS.
-public define secure_bytes(n: int) -> [int] uses random:
+public define secure_bytes(n: number) -> [number] uses random:
     example length(secure_bytes(8)) is 8
     entropy_bytes(n)
 
 # An unpredictable hex token of `n` bytes (2n characters), for session ids
 # and API keys.
-public define secure_token(n: int) -> text uses random:
+public define secure_token(n: number) -> text uses random:
     example length(secure_token(8)) is 16
     digits = "0123456789abcdef"
     bs = entropy_bytes(n)
     edit out = ""
     loop i in 0 until length(bs):
-        b = at(bs, i)
+        b = bs[i]
         hi = part(digits, b // 16, b // 16 + 1)
         lo = part(digits, b % 16, b % 16 + 1)
         out = "{out}{hi}{lo}"

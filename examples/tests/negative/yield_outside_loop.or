@@ -1,6 +1,6 @@
 # expect: yield` outside a collecting loop
-# `yield` only means something inside `x = loop v in seq:` with an indented
+# `collect` only means something inside `x = loop v in seq:` with an indented
 # body. On its own it must fail loud, not silently vanish.
-define main() -> int:
+define main() -> number:
     collect 5
     0

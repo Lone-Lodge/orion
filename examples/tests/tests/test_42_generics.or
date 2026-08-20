@@ -4,7 +4,7 @@ define id<T>(x: T) -> T:
 define pair_first<A, B>(a: A, b: B) -> A:
     a
 
-define main() -> int:
+define main() -> number:
     a = id(20)
     b = pair_first(22, 99)
     a + b

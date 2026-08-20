@@ -23,18 +23,18 @@ external define file_mtime(path: text) -> int
 
 # Milliseconds between now() and an earlier now() - timing metric.
 # no example: wall-clock dependent - proven by tools/compile_bench.sh
-public define elapsed(start: int) -> int uses clock = now() - start
+public define elapsed(start: number) -> number uses clock = now() - start
 
 # orion-self builtins under orbit's names (file_read/argv/argc live in the
 # compiler, not an orb - callable directly).
 # no example: needs a file on disk - proven by test_42_file_stream.or
 public define read_file(p: text) -> text uses files = file_read(p)
 # no example: depends on the process command line - proven by orbit
-public define arg(i: int) -> text = argv(i)
+public define arg(i: number) -> text = argv(i)
 # no example: depends on the process command line - proven by orbit
-public define arg_count() -> int = argc()
+public define arg_count() -> number = argc()
 
-public define write_file(p: text, c: text) -> int uses files:
+public define write_file(p: text, c: text) -> number uses files:
     # no example: writes to disk - proven by test_42_file_stream.or
     file_write(p, c)
     0
@@ -43,17 +43,17 @@ public define write_file(p: text, c: text) -> int uses files:
 # meaningful (the epoch is host-specific). -1 for a missing file - a
 # watcher treats that as "changed".
 # no example: depends on the filesystem - proven by tools/orbwatch.or
-public define modified_at(p: text) -> int uses files = file_mtime(p)
+public define modified_at(p: text) -> number uses files = file_mtime(p)
 
 # Join a command + its args into one line. Each arg is double-quoted so
 # paths with spaces (e.g. "C:/Program Files/LLVM/...") survive.
 define os_quote(a: text) -> text = "\"{a}\""
 
-define os_join(acc: text, args: [text], i: int) -> text:
+define os_join(acc: text, args: [text], i: number) -> text:
     if i >= length(args):
         acc
     else:
-        os_join("{acc} {os_quote(at(args, i))}", args, i + 1)
+        os_join("{acc} {os_quote(args[i])}", args, i + 1)
 
 # CreateProcessA resolves a forward-slash *relative* command (e.g.
 # "build/app.exe") by searching the CALLER exe's directory, not the cwd - so a
@@ -66,23 +66,33 @@ external define host_os() -> int
 # Public wrapper so other orbs can branch on the host without re-declaring the
 # extern (a second `declare` in the bundle is an LLVM redefinition error).
 # 0 = Windows, 1 = Linux, 2 = macOS.
-public define os_kind() -> int:
+public define os_kind() -> number:
     example os_kind() >= 0
     host_os()
 define win_path(p: text) -> text = if host_os() is 0 then replace(p, "/", "\\") else p
 
 # no example: runs a child process - proven by orbit itself (build_orbit.sh)
-public define run_command(cmd: text, args: [text]) -> int = sys_run(os_join(os_quote(win_path(cmd)), args, 0))
+public define run_command(cmd: text, args: [text]) -> number = sys_run(os_join(os_quote(win_path(cmd)), args, 0))
 
 # Same, but the child's stdout/stderr are discarded. For running a program when
 # you only care about its exit code and want its output kept off your console.
 external define sys_run_quiet(cmd: text) -> int
 # no example: runs a child process - proven by orbit itself
-public define run_command_quiet(cmd: text, args: [text]) -> int = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))
+public define run_command_quiet(cmd: text, args: [text]) -> number = sys_run_quiet(os_join(os_quote(win_path(cmd)), args, 0))
 
 external define capture(cmd: text) -> text
 # no example: runs a child process - proven by tools/lsp_test.sh
 public define capture_stdout(cmd: text, args: [text]) -> text = capture(os_join(os_quote(cmd), args, 0))
+
+# Terminal-style capture: the child runs with `dir` as working directory
+# (the caller's cwd is untouched - the cd happens in the child's shell) and
+# BOTH streams come back interleaved, the way a console would show them
+# (git and crash trails print to stderr). `/d` lets Windows cd cross drives.
+external define capture_all(cmd: text) -> text
+# no example: runs a child process - proven by dots' terminal/debug views
+public define capture_output_in(dir: text, cmd: text, args: [text]) -> text:
+    cd = if os_kind() is 0 then "cd /d {os_quote(win_path(dir))} && " else "cd {os_quote(dir)} && "
+    capture_all("{cd}{os_join(os_quote(cmd), args, 0)}")
 
 # ---- commands that run WHILE your tasks keep going ----
 # run_command waits for the child before returning, which inside a task parks
@@ -99,6 +109,12 @@ public define capture_stdout(cmd: text, args: [text]) -> text = capture(os_join(
 # Same bargain as the net orb's readable_within, one level up the stack.
 external define proc_start(cmd: text) -> int
 external define proc_start_to_file(cmd: text, path: text) -> int
+external define proc_start_pipe_to_file(cmd: text, path: text) -> int
+external define proc_start_pty(cmd: text, dir: text, cols: int, rows: int) -> int
+external define proc_read_out(id: int, max: int) -> text
+external define proc_pty_resize(id: int, cols: int, rows: int) -> int
+external define proc_write(id: int, data: text) -> int
+external define proc_stdin_close(id: int) -> int
 external define proc_wait_ready(id: int, ms: int) -> int
 external define proc_result(id: int) -> int
 external define proc_stop(id: int) -> int
@@ -107,27 +123,82 @@ external define proc_stop(id: int) -> int
 # start. The child's output goes to your console, interleaved with everyone
 # else's - use start_command_to_file when more than one runs at a time.
 # no example: runs a child process - proven by test_42_proc_parallel.or
-public define start_command(cmd: text, args: [text]) -> int = proc_start(os_join(os_quote(win_path(cmd)), args, 0))
+public define start_command(cmd: text, args: [text]) -> number = proc_start(os_join(os_quote(win_path(cmd)), args, 0))
 
 # Same, but the child's stdout+stderr are written to `out_path` (truncated).
 # Read the file after `finished_within` says true.
 # no example: runs a child process - proven by test_42_proc_parallel.or
-public define start_command_to_file(cmd: text, args: [text], out_path: text) -> int = proc_start_to_file(os_join(os_quote(win_path(cmd)), args, 0), out_path)
+public define start_command_to_file(cmd: text, args: [text], out_path: text) -> number = proc_start_to_file(os_join(os_quote(win_path(cmd)), args, 0), out_path)
+
+# Background variant of capture_output_in: start the command in `dir` with
+# stdout+stderr going to `out_path`, return the job id at once. Goes through
+# the platform shell (a bare CreateProcess has no `cd`); POSIX sh -c already.
+# no example: runs a child process - proven by dots' jobs view
+public define start_command_to_file_in(dir: text, cmd: text, args: [text], out_path: text) -> number:
+    cd = if os_kind() is 0 then "cd /d {os_quote(win_path(dir))} && " else "cd {os_quote(dir)} && "
+    full = "{cd}{os_join(os_quote(cmd), args, 0)}"
+    proc_start_to_file(if os_kind() is 0 then "cmd /c \"{full}\"" else full, out_path)
+
+# Interactive variant: the child gets a PIPED stdin - feed it with
+# `command_write`, send EOF with `command_stdin_close`. Output still goes to
+# `out_path`, so a tailing reader plus these two is a line-based terminal or
+# a language-server channel. Runs in `dir` via the platform shell.
+# no example: runs a child process - proven by dots' terminal
+public define start_command_pipe_to_file_in(dir: text, cmd: text, args: [text], out_path: text) -> number:
+    cd = if os_kind() is 0 then "cd /d {os_quote(win_path(dir))} && " else "cd {os_quote(dir)} && "
+    full = "{cd}{os_join(os_quote(cmd), args, 0)}"
+    proc_start_pipe_to_file(if os_kind() is 0 then "cmd /c \"{full}\"" else full, out_path)
+
+# Full terminal (Windows ConPTY): barnet får en riktig pseudokonsol -
+# promptar, färger, markörstyrning, fullskärms-TUI fungerar. Läs rå VT-ström
+# med command_read_out, skriv tangenter med command_write, följ vyns storlek
+# med command_pty_resize. -1 där plattformen saknar pty-stöd.
+# no example: runs a child process - proven by dots' terminal
+public define start_command_pty_in(dir: text, cmd: text, args: [text], cols: number, rows: number) -> number:
+    # Ingen cd-kedja: pty-barnet startas direkt med arbetskatalogen satt
+    # (CreateProcess lpCurrentDirectory) - skalet ÄR processen vi håller i.
+    full = os_join(os_quote(cmd), args, 0)
+    proc_start_pty(full, win_path(dir), cols, rows)
+
+# Tillgänglig pty-utskrift just nu ("" när inget väntar) - blockerar aldrig.
+# no example: runs a child process - proven by dots' terminal
+public define command_read_out(id: number, max: number) -> text = proc_read_out(id, max)
+
+# no example: runs a child process - proven by dots' terminal
+public define command_pty_resize(id: number, cols: number, rows: number) -> number = proc_pty_resize(id, cols, rows)
+
+# Som start_command_pipe_to_file_in men med en env-prefix i skalkedjan
+# ("set A=1&& " på Windows, "A=1 " på POSIX) - för barn som ska läsa
+# miljöflaggor (spårloggar, debug-väntan) utan att processen ärver dem.
+# no example: runs a child process - proven by dots' debugger
+public define start_command_pipe_env_in(dir: text, env_prefix: text, cmd: text, args: [text], out_path: text) -> number:
+    cd = if os_kind() is 0 then "cd /d {os_quote(win_path(dir))} && " else "cd {os_quote(dir)} && "
+    full = "{cd}{env_prefix}{os_join(os_quote(cmd), args, 0)}"
+    proc_start_pipe_to_file(if os_kind() is 0 then "cmd /c \"{full}\"" else full, out_path)
+
+# Write to an interactive job's stdin (include the newline yourself).
+# Bytes written, -1 = pipe closed or not an interactive job.
+# no example: runs a child process - proven by dots' terminal
+public define command_write(id: number, data: text) -> number = proc_write(id, data)
+
+# Close the interactive job's stdin - EOF is how line tools are told "done".
+# no example: runs a child process - proven by dots' terminal
+public define command_stdin_close(id: number) -> number = proc_stdin_close(id)
 
 # Did job `id` finish within `ms`? Inside a task this parks the task and lets
 # the others run; outside it is an ordinary wait. false = still running.
 # no example: runs a child process - proven by test_42_proc_parallel.or
-public define finished_within(id: int, ms: int) -> truth = proc_wait_ready(id, ms) is 1
+public define finished_within(id: number, ms: number) -> truth = proc_wait_ready(id, ms) is 1
 
 # Exit code of a finished job, taken ONCE (the job id is dead afterwards).
 # -1 while the job still runs or for an unknown id.
 # no example: runs a child process - proven by test_42_proc_parallel.or
-public define command_result(id: int) -> int = proc_result(id)
+public define command_result(id: number) -> number = proc_result(id)
 
 # Kill a running job. Its command_result becomes the kill status the OS
 # reports, not the program's own exit code.
 # no example: runs a child process - proven by test_42_proc_parallel.or
-public define stop_command(id: int) -> truth = proc_stop(id) is 1
+public define stop_command(id: number) -> truth = proc_stop(id) is 1
 
 # (`orion_`-prefixed externs are assumed runtime-internal and skip the
 # emitter's auto-declare, so this one is named like host_os above.)
@@ -148,7 +219,7 @@ public define env(name: text) -> text = env_get(name)
 public define interrupted() -> truth = interrupt_seen() is 1
 
 # Hardware threads on this machine - what to size a worker pool by.
-public define cpu_count() -> int:
+public define cpu_count() -> number:
     example cpu_count() >= 1
     host_cpus()
 
@@ -168,7 +239,7 @@ public define path_parent(p: text) -> text:
     n = length(bs)
     edit last_sep = 0 - 1
     loop i in 0 until n:
-        c = at(bs, i)
+        c = bs[i]
         if c is 47 or c is 92:
             last_sep = i
     if last_sep < 0:
@@ -201,12 +272,12 @@ external define fs_remove_tree(path: text) -> int
 # something survived. Clears read-only bits on the way (a git checkout
 # marks its object files read-only).
 # no example: deletes from disk - proven by tools/package_test.sh
-public define remove_tree(p: text) -> int uses files = fs_remove_tree(p)
+public define remove_tree(p: text) -> number uses files = fs_remove_tree(p)
 
 # Delete ONE file. 0 when it is gone. (remove_tree is the recursive big
 # brother; this one refuses to be pointed at a directory by construction.)
 # no example: deletes from disk - proven by dots' tree context menu
-public define delete_file(p: text) -> int uses files = remove_file(p)
+public define delete_file(p: text) -> number uses files = remove_file(p)
 # no example: depends on the filesystem - proven by tools/orbstat.or
 public define list_dir(dir: text) -> [text] uses files = split(orion_dir_list(dir), "\n")
 # no example: depends on the filesystem - proven by tools/orbstat.or
@@ -229,11 +300,11 @@ external define fs_cwd() -> text
 # Move or rename a file (or directory). 0 on success. On Windows the target
 # must not already exist - remove it first when you mean replace.
 # no example: moves files on disk - proven by test_42_general_floor.or
-public define move_path(from: text, to: text) -> int uses files = fs_rename(from, to)
+public define move_path(from: text, to: text) -> number uses files = fs_rename(from, to)
 
 # Byte-for-byte file copy (binary-safe). 0 on success.
 # no example: writes to disk - proven by test_42_general_floor.or
-public define copy_file(from: text, to: text) -> int uses files = fs_copy_file(from, to)
+public define copy_file(from: text, to: text) -> number uses files = fs_copy_file(from, to)
 
 # The current working directory, "" if the OS cannot say.
 # no example: depends on where the process runs - proven by test_42_general_floor.or
@@ -250,7 +321,7 @@ external define setup_extract(dest: text) -> int
 
 # Sew stub + app zip + manifest + ui html into one setup exe. 0 when written.
 # no example: writes an exe - proven by tools/setup_test.sh
-public define stitch_setup(base: text, zip: text, manifest: text, html: text, out: text) -> int uses files = setup_stitch(base, zip, manifest, html, out)
+public define stitch_setup(base: text, zip: text, manifest: text, html: text, out: text) -> number uses files = setup_stitch(base, zip, manifest, html, out)
 
 # The manifest this exe carries ("" when it carries none - a bare stub).
 # no example: reads the running exe - proven by tools/setup_test.sh
@@ -262,7 +333,7 @@ public define setup_page() -> text uses files = setup_section(1)
 
 # Write the app zip this exe carries to `dest`. 0 when written, -1 when bare.
 # no example: reads the running exe - proven by tools/setup_test.sh
-public define unpack_setup(dest: text) -> int uses files = setup_extract(dest)
+public define unpack_setup(dest: text) -> number uses files = setup_extract(dest)
 
 # The per-user registry (HKCU), just enough for an app to announce itself in
 # Apps & features and take it back. No admin, no machine state - uninstall is
@@ -272,8 +343,8 @@ external define reg_user_set_number(subkey: text, name: text, value: int) -> int
 external define reg_user_delete(subkey: text) -> int
 
 # no example: writes the user registry - proven by tools/setup_test.sh
-public define registry_write_text(key: text, name: text, value: text) -> int uses files = reg_user_set_text(key, name, value)
+public define registry_write_text(key: text, name: text, value: text) -> number uses files = reg_user_set_text(key, name, value)
 # no example: writes the user registry - proven by tools/setup_test.sh
-public define registry_write_number(key: text, name: text, value: int) -> int uses files = reg_user_set_number(key, name, value)
+public define registry_write_number(key: text, name: text, value: number) -> number uses files = reg_user_set_number(key, name, value)
 # no example: writes the user registry - proven by tools/setup_test.sh
-public define registry_remove(key: text) -> int uses files = reg_user_delete(key)
+public define registry_remove(key: text) -> number uses files = reg_user_delete(key)

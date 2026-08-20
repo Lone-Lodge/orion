@@ -2,7 +2,7 @@
 # assert_eq / assert_text_eq trio collapsed into it.
 use assert
 
-define main() -> int:
+define main() -> number:
     edit passes = 0
     passes = passes + assert(true, "trivially true")
     passes = passes + assert(42 is 42, "equal ints")

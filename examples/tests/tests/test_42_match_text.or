@@ -1,12 +1,12 @@
-define main() -> int:
+define main() -> number:
     kind_val = 2
     # Match with int patterns + text branches in expression position.
     # Both bugs (match-as-expr + match-int-text) now fixed.
     kind_text = choose kind_val:
-        1 -> "one"
-        2 -> "two"
-        _ -> "other"
-    if kind_text == "two":
+        1 then "one"
+        2 then "two"
+        _ then "other"
+    if kind_text is "two":
         42
     else:
         0

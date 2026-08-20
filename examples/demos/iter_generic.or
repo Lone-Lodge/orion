@@ -6,7 +6,7 @@
 # Build: orion.exe examples/demos/iter_generic.or out.ll orbs
 use iter
 
-define main() -> int:
+define main() -> number:
     words = ["hi", "world", "x", "abcd", "no"]
 
     # map Text -> int: the length of every word.
@@ -17,11 +17,11 @@ define main() -> int:
 
     # count / any / all - all predicate-driven over Text.
     long_words = count(words, function(s: text): if length(s) >= 4 then 1 else 0)  # 2
-    has_tiny   = any(words,   function(s: text): if length(s) == 1 then 1 else 0)  # 1
+    has_tiny   = any(words,   function(s: text): if length(s) is 1 then 1 else 0)  # 1
     all_short  = all(words,   function(s: text): if length(s) <= 5 then 1 else 0)  # 1
 
     # find_index: first word of length >= 4.
     first_long = find_index(words, function(s: text): if length(s) >= 4 then 1 else 0)  # 1
 
-    print_line("chars={total_chars} long={long_words} tiny?={has_tiny} allshort?={all_short} firstlong@{first_long} len0={at(lengths,0)}")
+    print_line("chars={total_chars} long={long_words} tiny?={has_tiny} allshort?={all_short} firstlong@{first_long} len0={lengths[0]}")
     total_chars + long_words + first_long                        # 14 + 2 + 1 = 17

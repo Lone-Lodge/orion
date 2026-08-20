@@ -1,0 +1,18 @@
+# `is` reads the word after it as part of the operator - `is not`, `is less
+# than`, `is at most`. A STRING token carries its content as its value, so
+# `x is "not"` read the phrase and compiled to `x is not ` with nothing on the
+# right. Every one of these has to be an ordinary equality test.
+define main() -> number:
+    word = "not"
+    a = if word is "not" then 8 else 0
+    b = if word is not "less" then 8 else 0
+    c = if "at" is "at" then 8 else 0
+    d = if "than" is not "most" then 8 else 0
+
+    # the real operator forms still read as operators
+    n = 5
+    e = if n is not 6 then 6 else 0
+    f = if n is less than 9 then 6 else 0
+    g = if n is at least 5 then 6 else 0
+
+    a + b + c + d + e + f + g - 6   # 8*4 + 6*3 - 6 is 44

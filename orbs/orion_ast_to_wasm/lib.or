@@ -24,18 +24,18 @@ use orion_ir
 # one, host import or local fn, during body compilation.
 # A 32-bit value as 4 little-endian bytes - the in-memory word layout for
 # lengths, the bump pointer, and every i32 field or list element.
-define le32(v: int) -> [int]:
+define le32(v: number) -> [number]:
     [v % 256, (v // 256) % 256, (v // 65536) % 256, (v // 16777216) % 256]
 
 # Length-prefixed bytes for a string literal in linear memory: 4-byte
 # little-endian length, then the UTF-8 bytes. A host reads the length at the
 # pointer, then that many bytes at pointer + 4.
-define str_data_bytes(text: text) -> [int]:
+define str_data_bytes(text: text) -> [number]:
     bs = bytes_of(text)
     n = length(bs)
     edit out = le32(n)
-    loop i in 0..<n:
-        out = append(out, at(bs, i))
+    loop i in 0 until n:
+        out = append(out, bs[i])
     out
 
 public define compile_program(decls: [table]) -> WModule:
@@ -55,35 +55,35 @@ public define compile_program(decls: [table]) -> WModule:
     edit field_owners = []
     edit field_names = []
     loop decl in decls:
-        if get(decl, "kind") == "Data":
+        if get(decl, "kind") is "Data":
             loop fdef in get_list(decl, "fields"):
                 field_owners = append(field_owners, get(decl, "name"))
                 field_names = append(field_names, get(fdef, "name"))
                 fty = wtype_of(get_map(fdef, "type"))
                 fname = get(fdef, "name")
                 if slot_has("ftype:{fname}"):
-                    if slot_get("ftype:{fname}") != fty:
+                    if slot_get("ftype:{fname}") is not fty:
                         compile_error("orion: ERROR - the wasm backend lays struct fields out by name, and `{fname}` is declared with two different value kinds across types; rename one of the fields")
                 else:
                     slot_set("ftype:{fname}", fty)
     field_total = list_count(field_names)
-    loop i in 0..<field_total:
-        fname = at(field_names, i)
+    loop i in 0 until field_total:
+        fname = field_names[i]
         if not slot_has("fld:{fname}"):
-            width = if slot_get("ftype:{fname}") == "f" then 8 else 4
+            width = if slot_get("ftype:{fname}") is "f" then 8 else 4
             edit cand = 0
             edit placed = false
             loop:
                 if placed:
                     break
                 edit fits = true
-                loop j in 0..<field_total:
-                    if at(field_names, j) == fname:
-                        loop k in 0..<field_total:
-                            other = at(field_names, k)
-                            if at(field_owners, k) == at(field_owners, j) and other != fname and slot_has("fld:{other}"):
+                loop j in 0 until field_total:
+                    if field_names[j] is fname:
+                        loop k in 0 until field_total:
+                            other = field_names[k]
+                            if field_owners[k] is field_owners[j] and other is not fname and slot_has("fld:{other}"):
                                 other_off = slot_get_int("fld:{other}")
-                                other_width = if slot_get("ftype:{other}") == "f" then 8 else 4
+                                other_width = if slot_get("ftype:{other}") is "f" then 8 else 4
                                 if cand < other_off + other_width and other_off < cand + width:
                                     fits = false
                 if fits:
@@ -92,18 +92,18 @@ public define compile_program(decls: [table]) -> WModule:
                 else:
                     cand = cand + 4
     loop decl in decls:
-        if get(decl, "kind") == "Data":
+        if get(decl, "kind") is "Data":
             edit ssize = 0
             loop fdef in get_list(decl, "fields"):
                 fname = get(fdef, "name")
-                fend = slot_get_int("fld:{fname}") + (if slot_get("ftype:{fname}") == "f" then 8 else 4)
+                fend = slot_get_int("fld:{fname}") + (if slot_get("ftype:{fname}") is "f" then 8 else 4)
                 if fend > ssize:
                     ssize = fend
             slot_set("ssize:{get(decl, \"name\")}", ssize)
     # Sum types: each variant gets a tag (its index) and a payload arity. A
     # value is [tag][payload0, ...]. Constructor calls and match dispatch on tag.
     loop decl in decls:
-        if get(decl, "kind") == "Enum":
+        if get(decl, "kind") is "Enum":
             edit vtag = 0
             # An enum with any payload variant is BOXED: every value is a pointer
             # to [tag, payload...]. An all-zero-payload enum (Color: Red, Green)
@@ -112,7 +112,17 @@ public define compile_program(decls: [table]) -> WModule:
             loop variant in get_list(decl, "variants"):
                 if list_count(get_list(variant, "payload")) > 0:
                     boxed = true
+            # `orbs/core` declares Option and Result in every program, so its
+            # four variant names arrive without anyone asking. They must never
+            # take a name away: a name already registered by an enum of yours
+            # keeps its tag, and `vcore:` marks the ones that came from core so
+            # a call can prefer your function over them.
+            en_is_core = get(decl, "name") is "Option" or get(decl, "name") is "Result"
             loop variant in get_list(decl, "variants"):
+                v_taken = slot_has("vtag:{get(variant, \"name\")}") and not slot_has("vcore:{get(variant, \"name\")}")
+                if en_is_core and v_taken:
+                    slot_set("vskip:{get(variant, \"name\")}", 1)
+                slot_set("vcore:{get(variant, \"name\")}", if en_is_core then 1 else 0)
                 slot_set("vtag:{get(variant, \"name\")}", vtag)
                 slot_set("varity:{get(variant, \"name\")}", list_count(get_list(variant, "payload")))
                 slot_set("vboxed:{get(variant, \"name\")}", if boxed then 1 else 0)
@@ -133,18 +143,18 @@ public define compile_program(decls: [table]) -> WModule:
     # refused loudly instead of silently miscompiled. (That silence was
     # real: `pi` was 0 in every wasm build until this saw it.)
     loop decl in decls:
-        if get(decl, "kind") == "Const":
+        if get(decl, "kind") is "Const":
             cval = get_map(decl, "value")
             cname = get(decl, "name")
-            if get(cval, "kind") == "Int":
+            if get(cval, "kind") is "Int":
                 slot_set("constint:{cname}", parse_decimal(get(cval, "value")))
-            else if get(cval, "kind") == "Float":
+            else if get(cval, "kind") is "Float":
                 slot_set("constfloat:{cname}", get(cval, "value"))
-            else if get(cval, "kind") == "Str":
+            else if get(cval, "kind") is "Str":
                 slot_set("conststr:{cname}", get(cval, "value"))
-            else if get(cval, "kind") == "Unary" and get(cval, "op") == "neg" and get(get_map(cval, "operand"), "kind") == "Float":
+            else if get(cval, "kind") is "Unary" and get(cval, "op") is "neg" and get(get_map(cval, "operand"), "kind") is "Float":
                 slot_set("constfloat:{cname}", "-" + get(get_map(cval, "operand"), "value"))
-            else if get(cval, "kind") == "Unary" and get(cval, "op") == "neg" and get(get_map(cval, "operand"), "kind") == "Int":
+            else if get(cval, "kind") is "Unary" and get(cval, "op") is "neg" and get(get_map(cval, "operand"), "kind") is "Int":
                 slot_set("constint:{cname}", 0 - parse_decimal(get(get_map(cval, "operand"), "value")))
             else:
                 compile_error("orion: ERROR - the wasm backend inlines `const {cname}` at every read site, so it must be a whole or decimal literal (this one is a {get(cval, \"kind\")})")
@@ -152,9 +162,10 @@ public define compile_program(decls: [table]) -> WModule:
     slot_set("uses:print", 0)
     slot_set("uses:io", 0)
     slot_set("uses:math", 0)
+    slot_set("uses:state", 0)
     scan_program_hostcalls(decls)
     # __print host import (text ptr, newline flag) for print_line/print.
-    if slot_get_int("uses:print") == 1:
+    if slot_get_int("uses:print") is 1:
         module = add_import(module, new_import("env", "__print", 2, 0))
         slot_set("wfn:__print", idx)
         slot_set("wsig:__print", "ti")
@@ -164,7 +175,7 @@ public define compile_program(decls: [table]) -> WModule:
     # OS-IO host imports (stubbed by the playground with an in-memory sandbox):
     # argc/argv, and file_read/file_write. Returned Text is a heap pointer the
     # host writes via the bump allocator at mem[0].
-    if slot_get_int("uses:io") == 1:
+    if slot_get_int("uses:io") is 1:
         module = add_import(module, new_import("env", "__argc", 0, 1))
         slot_set("wfn:__argc", idx)
         slot_set("wsig:__argc", "")
@@ -189,9 +200,57 @@ public define compile_program(decls: [table]) -> WModule:
         slot_set("wret:__file_write", "i")
         slot_set("fret:__file_write", "i")
         idx = idx + 1
+    # The slot store and the clock. Both are HOST state by nature - a value
+    # that outlives one call, and a reading of the world - so here they are
+    # exactly what they are everywhere else: a call out. The host keeps a
+    # map and a clock; wasm keeps neither.
+    #
+    # This is what a UI framework needs to run in a page at all: the layout
+    # cache, the motion store and every "how long has this been hovered"
+    # live in slots.
+    if slot_get_int("uses:state") is 1:
+        # An int back, like the native one: `define stamp(now) -> int:
+        # slot_set(...)` returns what the store answers, and a void import
+        # left that function with nothing to give.
+        module = add_import(module, new_import("env", "__slot_set", 2, 1))
+        slot_set("wfn:__slot_set", idx)
+        slot_set("wsig:__slot_set", "ti")
+        slot_set("wret:__slot_set", "i")
+        slot_set("fret:__slot_set", "i")
+        idx = idx + 1
+        module = add_import(module, new_import("env", "__slot_set_text", 2, 1))
+        slot_set("wfn:__slot_set_text", idx)
+        slot_set("wsig:__slot_set_text", "tt")
+        slot_set("wret:__slot_set_text", "i")
+        slot_set("fret:__slot_set_text", "i")
+        idx = idx + 1
+        module = add_import(module, new_import("env", "__slot_get_int", 1, 1))
+        slot_set("wfn:__slot_get_int", idx)
+        slot_set("wsig:__slot_get_int", "t")
+        slot_set("wret:__slot_get_int", "i")
+        slot_set("fret:__slot_get_int", "i")
+        idx = idx + 1
+        module = add_import(module, new_import("env", "__slot_get", 1, 1))
+        slot_set("wfn:__slot_get", idx)
+        slot_set("wsig:__slot_get", "t")
+        slot_set("wret:__slot_get", "t")
+        slot_set("fret:__slot_get", "t")
+        idx = idx + 1
+        module = add_import(module, new_import("env", "__slot_has", 1, 1))
+        slot_set("wfn:__slot_has", idx)
+        slot_set("wsig:__slot_has", "t")
+        slot_set("wret:__slot_has", "i")
+        slot_set("fret:__slot_has", "i")
+        idx = idx + 1
+        module = add_import(module, new_import("env", "__now", 0, 1))
+        slot_set("wfn:__now", idx)
+        slot_set("wsig:__now", "")
+        slot_set("wret:__now", "i")
+        slot_set("fret:__now", "i")
+        idx = idx + 1
     # Transcendental math host imports (JS Math.*). Per the determinism
     # doctrine these are view-side operations; sim code never calls them.
-    if slot_get_int("uses:math") == 1:
+    if slot_get_int("uses:math") is 1:
         one_arg_math = ["sin", "cos", "tan", "sqrt", "exp", "log"]
         loop math_name in one_arg_math:
             module = add_import(module, new_import("env", "host_{math_name}", 1, 1))
@@ -211,7 +270,7 @@ public define compile_program(decls: [table]) -> WModule:
             slot_set("fret:{math_name}", "f")
             idx = idx + 1
     loop decl in decls:
-        if get(decl, "kind") == "ExternFn":
+        if get(decl, "kind") is "ExternFn":
             ename = get(decl, "name")
             eparams = get_list(decl, "params")
             pc = list_count(eparams)
@@ -221,7 +280,7 @@ public define compile_program(decls: [table]) -> WModule:
                 esig = "{esig}{wtype_of(get_map(p, \"type\"))}"
             slot_set("wsig:{ename}", esig)
             rnode = get_map(decl, "ret")
-            rcount = if get(rnode, "name") == "Unit" then 0 else 1
+            rcount = if get(rnode, "name") is "Unit" then 0 else 1
             erett = wtype_of(rnode)
             slot_set("wret:{ename}", erett)
             slot_set("fret:{ename}", erett)
@@ -229,7 +288,7 @@ public define compile_program(decls: [table]) -> WModule:
             slot_set("wfn:{ename}", idx)
             idx = idx + 1
     loop decl in decls:
-        if get(decl, "kind") == "Fn":
+        if get(decl, "kind") is "Fn":
             fname = get(decl, "name")
             slot_set("wfn:{fname}", idx)
             idx = idx + 1
@@ -242,9 +301,16 @@ public define compile_program(decls: [table]) -> WModule:
             # A Unit return means no wasm result (void); "" leaves the result
             # slot empty in the signature.
             rnode2 = get_map(decl, "ret")
-            rett = if get(rnode2, "name") == "Unit" then "" else wtype_of(rnode2)
+            rett = if get(rnode2, "name") is "Unit" then "" else wtype_of(rnode2)
             slot_set("wret:{fname}", rett)
             slot_set("fret:{fname}", rett)
+            # What a function that answers with a LIST has in it. Without
+            # this a `loop w in tab_names():` had no idea `w` was text, so
+            # the binding it fed looked like a second variable of another
+            # type and got its own uninitialised slot - a text read out of
+            # a local that was never set. The declared type knew all along.
+            if get(rnode2, "kind") is "List":
+                slot_set("frel:{fname}", wtype_of(get_map(rnode2, "elem")))
     # Reserve the __push runtime helpers' indices (appended after all user fns),
     # so append() call sites resolve. __push appends an i32/pointer element (4-byte
     # stride); __push_f appends an f64 (8-byte stride). Both have 3 i32 locals.
@@ -282,6 +348,11 @@ public define compile_program(decls: [table]) -> WModule:
     slot_set("wsig:__streq", "tt")
     slot_set("wret:__streq", "i")
     slot_set("wloc:__streq", "iii")
+    idx = idx + 1
+    slot_set("wfn:__slot_key", idx)
+    slot_set("wsig:__slot_key", "t")
+    slot_set("wret:__slot_key", "i")
+    slot_set("wloc:__slot_key", "iii")
     idx = idx + 1
     slot_set("wfn:__map_get", idx)
     slot_set("wsig:__map_get", "it")
@@ -384,12 +455,12 @@ public define compile_program(decls: [table]) -> WModule:
     edit lam_nodes = []
     edit lam_names = []
     loop decl in decls:
-        if get(decl, "kind") == "Fn":
+        if get(decl, "kind") is "Fn":
             loop lstmt in get_list(get_map(decl, "body"), "stmts"):
                 lsk = get(lstmt, "kind")
-                if lsk == "MutLet" or lsk == "LetOrAssign":
+                if lsk is "MutLet" or lsk is "LetOrAssign":
                     lval = get_map(lstmt, "value")
-                    if get(lval, "kind") == "Lambda":
+                    if get(lval, "kind") is "Lambda":
                         lnm = "__lam_{get_int(lval, \"line\")}_{get_int(lval, \"col\")}"
                         slot_set("wfn:{lnm}", idx)
                         edit lpsig = ""
@@ -401,7 +472,7 @@ public define compile_program(decls: [table]) -> WModule:
                         lam_nodes = append(lam_nodes, lval)
                         lam_names = append(lam_names, lnm)
     loop decl in decls:
-        if get(decl, "kind") == "Fn":
+        if get(decl, "kind") is "Fn":
             module = add_fn(module, compile_fn_ast(decl))
     module = add_fn(module, build_push_fn())
     module = add_fn(module, build_push_f_fn())
@@ -409,6 +480,7 @@ public define compile_program(decls: [table]) -> WModule:
     module = add_fn(module, build_text_concat_fn())
     module = add_fn(module, build_f64_to_text_fn())
     module = add_fn(module, build_streq_fn())
+    module = add_fn(module, build_slot_key_fn())
     module = add_fn(module, build_map_get_fn())
     module = add_fn(module, build_sum_fn())
     module = add_fn(module, build_split_fn())
@@ -433,11 +505,11 @@ public define compile_program(decls: [table]) -> WModule:
     loop:
         if lai >= list_count(lam_nodes):
             break
-        module = add_fn(module, compile_lambda_fn(at(lam_nodes, lai), at(lam_names, lai)))
+        module = add_fn(module, compile_lambda_fn(lam_nodes[lai], lam_names[lai]))
         lai = lai + 1
     # Emit the string literals collected during compilation as data segments.
     scount = slot_get_int("str:count")
-    loop si in 0..<scount:
+    loop si in 0 until scount:
         soff = slot_get_int("str:{si}:off")
         stext = slot_get("str:{si}:text")
         module = add_data(module, soff, str_data_bytes(stext))
@@ -446,7 +518,7 @@ public define compile_program(decls: [table]) -> WModule:
     # data, word-aligned. alloc() reads mem[0], returns it, writes back the
     # advanced value. Every list/aggregate carves its memory from here.
     edit heap_start = slot_get_int("str:next")
-    if heap_start % 4 != 0:
+    if heap_start % 4 is not 0:
         heap_start = heap_start + (4 - heap_start % 4)
     module = add_data(module, 0, le32(heap_start))
     module
@@ -461,6 +533,12 @@ public define compile_fn_ast(fn_node: table) -> WFn:
     # Record each param's type so f64 params get f64 ops in the body.
     loop p in params:
         slot_set("ltype:{get(p, \"name\")}", wtype_of(get_map(p, "type")))
+        # And a LIST param's element type, or a loop over it read with the
+        # wrong stride. Only bindings recorded this, so `xs: [float]` arriving
+        # as a parameter was walked four bytes at a time and answered with
+        # half of each number.
+        if get(get_map(p, "type"), "kind") is "List":
+            slot_set("eltype:{get(p, \"name\")}", wtype_of(get_map(get_map(p, "type"), "elem")))
     edit f0 = new_fn(fn_name, param_count)
     # wloc:cur accumulates one type char per declared local, in index order,
     # so the encoder can declare each wasm local with the right type.
@@ -471,7 +549,7 @@ public define compile_fn_ast(fn_node: table) -> WFn:
     # first keeps later let-bindings at their correct (shifted) indices. Temps
     # hold pointers, so i32.
     max_depth = block_agg_depth(body)
-    loop d in 0..<max_depth:
+    loop d in 0 until max_depth:
         locals = append(locals, "__t{d}")
         f0 = add_local(f0)
         note_local("i")
@@ -487,13 +565,13 @@ public define compile_fn_ast(fn_node: table) -> WFn:
     # a whole-number tail in a function declared f64 converts up; a
     # number tail in an integer function truncates exactly.
     ret_node = get_map(fn_node, "ret")
-    ret_is_unit = get(ret_node, "name") == "Unit"
+    ret_is_unit = get(ret_node, "name") is "Unit"
     declared_ret = wtype_of(ret_node)
     tail_ty = block_tail_type(body)
     if not ret_is_unit:
-        if declared_ret == "f" and tail_ty == "i":
+        if declared_ret is "f" and tail_ty is "i":
             f1 = emit_op(f1, op_f64_convert_i32_s())
-        if declared_ret == "i" and tail_ty == "f":
+        if declared_ret is "i" and tail_ty is "f":
             f1 = emit_op(f1, op_i32_trunc_f64_s())
     emit_end(f1)
 
@@ -502,13 +580,13 @@ public define compile_fn_ast(fn_node: table) -> WFn:
 define block_tail_type(block: table) -> text:
     stmts = get_list(block, "stmts")
     n = list_count(stmts)
-    if n == 0:
+    if n is 0:
         return "v"
-    last = at(stmts, n - 1)
+    last = stmts[n - 1]
     k = get(last, "kind")
-    if k == "ExprStmt":
+    if k is "ExprStmt":
         type_of(get_map(last, "expr"))
-    else if k == "If" or k == "Match":
+    else if k is "If" or k is "Match":
         type_of(last)
     else:
         "v"
@@ -530,6 +608,51 @@ define build_push_fn() -> WFn:
     f = emit_local_get(f, 0)
     f = emit_load(f, 0)
     f = emit_local_set(f, 3)
+    # If this list is the LAST thing allocated - its end is exactly where the
+    # bump pointer stands - the new element can be written where it already
+    # is, and only the pointer moves. That is the shape `xs = append(xs, v)`
+    # in a loop makes, and without this every round copied the whole list
+    # again: building a list of n cost n-squared bytes and the layout's three
+    # arrays were most of a frame's allocation.
+    #
+    # A list is four bytes of length and then its elements, so it ends at
+    # list + 4 + len*4.
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_const(f, 0)
+    f = emit_load(f, 0)
+    f = emit_op(f, op_i32_eq())
+    f = emit_op(f, op_if())
+    f = emit_bytes(f, [blocktype_void()])
+    # bump += 4
+    f = emit_const(f, 0)
+    f = emit_const(f, 0)
+    f = emit_load(f, 0)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    # list[0] = oldlen + 1
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_store(f, 0)
+    # list[4 + oldlen*4] = val
+    f = emit_local_get(f, 0)
+    f = emit_local_get(f, 3)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_mul())
+    f = emit_op(f, op_i32_add())
+    f = emit_local_get(f, 1)
+    f = emit_store(f, 4)
+    f = emit_local_get(f, 0)
+    f = emit_op(f, op_return())
+    f = emit_op(f, op_end())
     # newptr = bump ; bump += 8 + oldlen*4
     f = emit_const(f, 0)
     f = emit_const(f, 0)
@@ -691,7 +814,7 @@ define build_int_to_text_fn() -> WFn:
     f = emit_op(f, op_i32_sub())
     f = emit_local_set(f, 0)
     f = emit_op(f, op_end())
-    # count digits (>=1): t = n ; len = 0 ; do { len++; t/=10 } while t != 0
+    # count digits (>=1): t = n ; len = 0 ; do { len++; t/=10 } while t is not 0
     f = emit_local_get(f, 0)
     f = emit_local_set(f, 3)
     f = emit_const(f, 0)
@@ -1211,6 +1334,73 @@ define build_f64_to_text_fn() -> WFn:
 
 # __streq(a, b) -> 1 if the two texts are byte-equal, else 0.
 # Locals: 0=a, 1=b, 2=la, 3=lb, 4=i.
+# __slot_key(key) -> hash
+#
+# A slot lookup crosses to the host, and MOST of what it costs there is
+# working out which entry the key names: the host had to read the key's
+# bytes and hash them, and before that it built a whole JS string to do it
+# with. Measured: a bare crossing is 0.056 microseconds, a lookup 0.178.
+#
+# So the hash is worked out HERE, in a dozen wasm instructions over the
+# bytes where they already lie, and the host is handed the answer. The key's
+# address is left at mem[8] - inside the low scratch region nothing else
+# uses - so the host can still compare the bytes and be exact about a
+# collision rather than trusting the hash.
+#
+# FNV-1a, because it is four instructions per byte and its bit-mixing is
+# good enough for a few hundred keys.
+define build_slot_key_fn() -> WFn:
+    edit f = new_fn("__slot_key", 1)
+    f = add_local(f)                       # 1: walking pointer
+    f = add_local(f)                       # 2: one past the last byte
+    f = add_local(f)                       # 3: the hash so far
+    # mem[8] = key, so the host can find the bytes it may need to compare.
+    f = emit_const(f, 8)
+    f = emit_local_get(f, 0)
+    f = emit_store(f, 0)
+    # end = key + 4 + length
+    f = emit_local_get(f, 0)
+    f = emit_load(f, 0)
+    f = emit_local_get(f, 0)
+    f = emit_op(f, op_i32_add())
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 2)
+    # at = key + 4
+    f = emit_local_get(f, 0)
+    f = emit_const(f, 4)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 1)
+    # h = 2166136261, which is this as a signed 32-bit word
+    f = emit_const(f, 0 - 2128831035)
+    f = emit_local_set(f, 3)
+    f = emit_op(f, op_block())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_op(f, op_loop())
+    f = emit_bytes(f, [blocktype_void()])
+    f = emit_local_get(f, 1)
+    f = emit_local_get(f, 2)
+    f = emit_op(f, op_i32_ge_s())
+    f = emit_op(f, op_br_if())
+    f = emit_bytes(f, [1])
+    f = emit_local_get(f, 3)
+    f = emit_local_get(f, 1)
+    f = emit_load8u(f, 0)
+    f = emit_op(f, op_i32_xor())
+    f = emit_const(f, 16777619)
+    f = emit_op(f, op_i32_mul())
+    f = emit_local_set(f, 3)
+    f = emit_local_get(f, 1)
+    f = emit_const(f, 1)
+    f = emit_op(f, op_i32_add())
+    f = emit_local_set(f, 1)
+    f = emit_op(f, op_br())
+    f = emit_bytes(f, [0])
+    f = emit_op(f, op_end())
+    f = emit_op(f, op_end())
+    f = emit_local_get(f, 3)
+    emit_end(f)
+
 define build_streq_fn() -> WFn:
     edit f = new_fn("__streq", 2)
     f = add_local(f)
@@ -1222,7 +1412,7 @@ define build_streq_fn() -> WFn:
     f = emit_local_get(f, 1)
     f = emit_load(f, 0)
     f = emit_local_set(f, 3)
-    # if la != lb: return 0
+    # if la is not lb: return 0
     f = emit_local_get(f, 2)
     f = emit_local_get(f, 3)
     f = emit_op(f, op_i32_ne())
@@ -1416,7 +1606,7 @@ define build_index_of_fn() -> WFn:
     f = emit_local_get(f, 4)
     f = emit_op(f, op_return())
     f = emit_op(f, op_end())
-    # if s[i+j] != sub[j]: mismatch -> break inner (br to inner block)
+    # if s[i+j] is not sub[j]: mismatch -> break inner (br to inner block)
     f = emit_local_get(f, 0)
     f = emit_local_get(f, 4)
     f = emit_op(f, op_i32_add())
@@ -1629,7 +1819,7 @@ define build_map_set_fn() -> WFn:
     f = emit_bytes(f, [0])
     f = emit_op(f, op_end())
     f = emit_op(f, op_end())
-    # newcount = count + (found == count ? 1 : 0)
+    # newcount = count + (found is count ? 1 : 0)
     f = emit_local_get(f, 3)
     f = emit_local_get(f, 4)
     f = emit_local_get(f, 3)
@@ -1695,7 +1885,7 @@ define build_map_set_fn() -> WFn:
     f = emit_bytes(f, [0])
     f = emit_op(f, op_end())
     f = emit_op(f, op_end())
-    # write the target pair (updated slot, or the appended one at `found`==count)
+    # write the target pair (updated slot, or the appended one at `found` is count)
     f = emit_local_get(f, 5)
     f = emit_local_get(f, 4)
     f = emit_const(f, 8)
@@ -2140,7 +2330,7 @@ define build_split_fn() -> WFn:
     f = emit_op(f, op_i32_gt_s())
     f = emit_op(f, op_br_if())
     f = emit_bytes(f, [1])
-    # boundary = (i >= tlen) or (mem8[text+i] == sepbyte)
+    # boundary = (i >= tlen) or (mem8[text+i] is sepbyte)
     f = emit_local_get(f, 5)
     f = emit_local_get(f, 2)
     f = emit_op(f, op_i32_ge_s())
@@ -2170,7 +2360,7 @@ define build_split_fn() -> WFn:
     f = emit_local_get(f, 10)
     f = emit_local_get(f, 9)
     f = emit_store(f, 0)
-    # copy j in 0..<slen: mem8[sptr+4+j] = mem8[text+4+start+j]  (reuse local 5? no)
+    # copy j in 0 until slen: mem8[sptr+4+j] = mem8[text+4+start+j]  (reuse local 5? no)
     # use local 4 (count, no longer needed) as the copy counter j
     f = emit_const(f, 0)
     f = emit_local_set(f, 4)
@@ -2230,7 +2420,7 @@ define build_split_fn() -> WFn:
     f = emit_local_get(f, 6)
     emit_end(f)
 
-define list_count(items: [table]) -> int:
+define list_count(items: [table]) -> number:
     edit count = 0
     loop _item in items:
         count = count + 1
@@ -2245,43 +2435,43 @@ define list_count(items: [table]) -> int:
 define collect_idents(node: table, acc: [text]) -> [text]:
     k = get(node, "kind")
     edit a = acc
-    if k == "Ident":
+    if k is "Ident":
         a = append(a, get(node, "name"))
-    else if k == "Binary":
+    else if k is "Binary":
         a = collect_idents(get_map(node, "left"), a)
         a = collect_idents(get_map(node, "right"), a)
-    else if k == "Unary":
+    else if k is "Unary":
         a = collect_idents(get_map(node, "operand"), a)
-    else if k == "Call" or k == "Perform":
+    else if k is "Call" or k is "Perform":
         loop arg in get_list(node, "args"):
             a = collect_idents(arg, a)
-    else if k == "MethodCall":
+    else if k is "MethodCall":
         a = collect_idents(get_map(node, "receiver"), a)
         loop arg in get_list(node, "args"):
             a = collect_idents(arg, a)
-    else if k == "If":
+    else if k is "If":
         a = collect_idents(get_map(node, "cond"), a)
         a = collect_idents(get_map(node, "then"), a)
         a = collect_idents(get_map(node, "else"), a)
-    else if k == "Field":
+    else if k is "Field":
         a = collect_idents(get_map(node, "object"), a)
-    else if k == "Index":
+    else if k is "Index":
         a = collect_idents(get_map(node, "object"), a)
         a = collect_idents(get_map(node, "index"), a)
-    else if k == "Question":
+    else if k is "Question":
         a = collect_idents(get_map(node, "inner"), a)
-    else if k == "Match":
+    else if k is "Match":
         a = collect_idents(get_map(node, "scrutinee"), a)
         loop arm in get_list(node, "arms"):
             a = collect_idents(get_map(arm, "body"), a)
-    else if k == "Block":
+    else if k is "Block":
         loop s in get_list(node, "stmts"):
             a = collect_idents(s, a)
-    else if k == "ExprStmt":
+    else if k is "ExprStmt":
         a = collect_idents(get_map(node, "expr"), a)
-    else if k == "MutLet" or k == "LetOrAssign":
+    else if k is "MutLet" or k is "LetOrAssign":
         a = collect_idents(get_map(node, "value"), a)
-    else if k == "Return":
+    else if k is "Return":
         a = collect_idents(get_map(node, "expr"), a)
     a
 
@@ -2291,7 +2481,7 @@ define compile_lambda_fn(lam: table, lname: text) -> WFn:
     # Captured variables (recorded at the binding site) become leading params.
     capn = if slot_has("lamcapn:{lname}") then slot_get_int("lamcapn:{lname}") else 0
     edit pnames = []
-    loop ci in 0..<capn:
+    loop ci in 0 until capn:
         pnames = append(pnames, slot_get("lamcap:{lname}:{ci}"))
     loop p in pnames0:
         pnames = append(pnames, p)
@@ -2299,12 +2489,12 @@ define compile_lambda_fn(lam: table, lname: text) -> WFn:
     edit locals = pnames
     # Original params get their declared types; captures keep the type recorded
     # globally at their definition (ltype slots are not scoped).
-    loop pi in 0..<length(pnames0):
-        slot_set("ltype:{at(pnames0, pi)}", wtype_of(at(ptypes, pi)))
+    loop pi in 0 until length(pnames0):
+        slot_set("ltype:{pnames0[pi]}", wtype_of(ptypes[pi]))
     edit f0 = new_fn(lname, pc)
     slot_set("wloc:cur", "")
     max_depth = expr_agg_depth(get_map(lam, "body"))
-    loop d in 0..<max_depth:
+    loop d in 0 until max_depth:
         locals = append(locals, "__t{d}")
         f0 = add_local(f0)
         note_local("i")
@@ -2322,72 +2512,81 @@ define compile_lambda_fn(lam: table, lname: text) -> WFn:
 # nested as each other's elements. `[[1],[2]]` needs 2 (outer pointer live
 # while the inner list allocates); a flat `[1,2,3]` needs 1; no literal, 0.
 # These walkers mirror the compile_* shapes so the reserved count is exact.
-define max2(a: int, b: int) -> int:
+define max2(a: number, b: number) -> number:
     if a > b then a else b
 
-define expr_agg_depth(node: table) -> int:
+define expr_agg_depth(node: table) -> number:
     kind = get(node, "kind")
-    if kind == "ListLit" or kind == "Tuple":
+    if kind is "ListLit" or kind is "Tuple":
         edit m = 0
         loop item in get_list(node, "items"):
             m = max2(m, expr_agg_depth(item))
         1 + m
-    else if kind == "StructCons":
+    else if kind is "StructCons":
         edit m = 0
         loop fdef in get_list(node, "fields"):
             m = max2(m, expr_agg_depth(get_map(fdef, "value")))
-        if has(node, "spread") and get(get_map(node, "spread"), "kind") != "Int":
+        if has(node, "spread") and get(get_map(node, "spread"), "kind") is not "Int":
             # a spread reserves a second temp for the source pointer.
             2 + max2(m, expr_agg_depth(get_map(node, "spread")))
         else:
             1 + m
-    else if kind == "MapLit":
+    else if kind is "MapLit":
         edit m = 0
         loop pr in get_list(node, "pairs"):
             m = max2(m, expr_agg_depth(get_map(pr, "value")))
         1 + m
-    else if kind == "Field":
+    else if kind is "Field":
         # a boxed zero-payload variant value (Opt.None) allocates a [tag] block;
         # a C-like one (Color.Red) is just a constant.
-        if slot_has("vtag:{get(node, \"field\")}") and slot_get_int("vboxed:{get(node, \"field\")}") == 1 then 1 else expr_agg_depth(get_map(node, "object"))
-    else if kind == "Binary":
+        if slot_has("vtag:{get(node, \"field\")}") and slot_get_int("vboxed:{get(node, \"field\")}") is 1 then 1 else expr_agg_depth(get_map(node, "object"))
+    else if kind is "Binary":
         max2(expr_agg_depth(get_map(node, "left")), expr_agg_depth(get_map(node, "right")))
-    else if kind == "Index":
+    else if kind is "Index":
         # a list index reserves two temps (pointer, index) for the bounds check.
         2 + max2(expr_agg_depth(get_map(node, "object")), expr_agg_depth(get_map(node, "index")))
-    else if kind == "Unary":
+    else if kind is "Ident":
+        # A bare spoken constructor (`none`) allocates a [tag] block, the same
+        # as the `Option.None` it compiles to. The count has to agree with the
+        # emit site or the block lands in a slot nothing reserved.
+        if w_spoken_variant(get(node, "name")) is not get(node, "name") then 1 else 0
+    else if kind is "Unary":
         expr_agg_depth(get_map(node, "operand"))
-    else if kind == "Call":
+    else if kind is "Call":
         edit m = 0
         loop a in get_list(node, "args"):
             m = max2(m, expr_agg_depth(a))
         # A variant constructor allocates a tagged value, so it needs a temp.
         # A list set() holds its container in a temp (the container may be a
         # call - it must be evaluated exactly once).
-        if slot_has("vtag:{get(node, \"callee\")}") or get(node, "callee") == "set" then 1 + m else m
-    else if kind == "Question":
+        # The SPOKEN name too. This decides how many scratch locals the
+        # function reserves, and a constructor written `some(5)` reserved none
+        # - it then allocated into a slot nothing had set aside and answered
+        # 1049 where 9 belonged. The emit site translates; so must the count.
+        if slot_has("vtag:{w_spoken_variant(get(node, \"callee\"))}") or get(node, "callee") is "set" then 1 + m else m
+    else if kind is "Question":
         1 + expr_agg_depth(get_map(node, "inner"))
-    else if kind == "MethodCall":
+    else if kind is "MethodCall":
         edit m = expr_agg_depth(get_map(node, "receiver"))
         loop a in get_list(node, "args"):
             m = max2(m, expr_agg_depth(a))
         if slot_has("vtag:{get(node, \"method\")}") then 1 + m else m
-    else if kind == "Match":
+    else if kind is "Match":
         edit m = expr_agg_depth(get_map(node, "scrutinee"))
         loop arm in get_list(node, "arms"):
             m = max2(m, expr_agg_depth(get_map(arm, "body")))
         1 + m
-    else if kind == "If":
+    else if kind is "If":
         c = expr_agg_depth(get_map(node, "cond"))
         t = expr_agg_depth(get_map(node, "then"))
         o = expr_agg_depth(get_map(node, "else"))
         max2(c, max2(t, o))
-    else if kind == "Block":
+    else if kind is "Block":
         edit m = 0
         loop s in get_list(node, "stmts"):
             m = max2(m, stmt_agg_depth(s))
         m
-    else if kind == "Perform":
+    else if kind is "Perform":
         edit m = 0
         loop a in get_list(node, "args"):
             m = max2(m, expr_agg_depth(a))
@@ -2395,39 +2594,39 @@ define expr_agg_depth(node: table) -> int:
     else:
         0
 
-define stmt_agg_depth(stmt: table) -> int:
+define stmt_agg_depth(stmt: table) -> number:
     kind = get(stmt, "kind")
-    if kind == "ExprStmt":
+    if kind is "ExprStmt":
         expr_agg_depth(get_map(stmt, "expr"))
-    else if kind == "MutLet" or kind == "LetOrAssign":
+    else if kind is "MutLet" or kind is "LetOrAssign":
         expr_agg_depth(get_map(stmt, "value"))
-    else if kind == "Return":
+    else if kind is "Return":
         expr_agg_depth(get_map(stmt, "expr"))
-    else if kind == "Require" or kind == "Ensure":
+    else if kind is "Require" or kind is "Ensure":
         # require's condition is a full expression - a list literal or
         # constructor inside it needs its temps counted like anywhere
         # else (uncounted, its temp aimed past the local table).
         expr_agg_depth(get_map(stmt, "expr"))
-    else if kind == "IfBlock":
+    else if kind is "IfBlock":
         c = expr_agg_depth(get_map(stmt, "cond"))
         t = block_agg_depth(get_map(stmt, "then"))
         e = block_agg_depth(get_map(stmt, "else"))
         max2(c, max2(t, e))
-    else if kind == "Loop":
+    else if kind is "Loop":
         block_agg_depth(get_map(stmt, "body"))
-    else if kind == "ForRange":
+    else if kind is "ForRange":
         lo = expr_agg_depth(get_map(stmt, "low"))
         hi = expr_agg_depth(get_map(stmt, "high"))
         max2(max2(lo, hi), block_agg_depth(get_map(stmt, "body")))
-    else if kind == "ForIn":
+    else if kind is "ForIn":
         max2(expr_agg_depth(get_map(stmt, "iter")), block_agg_depth(get_map(stmt, "body")))
-    else if kind == "If" or kind == "Match":
+    else if kind is "If" or kind is "Match":
         # An if/match used as a statement is an expression; count its temps.
         expr_agg_depth(stmt)
     else:
         0
 
-define block_agg_depth(block: table) -> int:
+define block_agg_depth(block: table) -> number:
     edit m = 0
     loop s in get_list(block, "stmts"):
         m = max2(m, stmt_agg_depth(s))
@@ -2441,72 +2640,74 @@ define block_agg_depth(block: table) -> int:
 # the slots uses:print / uses:io.
 define scan_hostcalls(node: table):
     kind = get(node, "kind")
-    if kind == "Call":
+    if kind is "Call":
         c = get(node, "callee")
-        if c == "print_line" or c == "print":
+        if c is "print_line" or c is "print":
             slot_set("uses:print", 1)
-        if c == "argc" or c == "argv" or c == "file_read" or c == "file_write":
+        if c is "argc" or c is "argv" or c is "file_read" or c is "file_write":
             slot_set("uses:io", 1)
-        if c == "sin" or c == "cos" or c == "tan" or c == "sqrt" or c == "exp" or c == "log" or c == "pow" or c == "atan2":
+        if c is "sin" or c is "cos" or c is "tan" or c is "sqrt" or c is "exp" or c is "log" or c is "pow" or c is "atan2":
             slot_set("uses:math", 1)
+        if c is "slot_set" or c is "slot_get" or c is "slot_get_int" or c is "slot_has" or c is "monotonic_ms" or c is "text_hash":
+            slot_set("uses:state", 1)
         loop a in get_list(node, "args"):
             scan_hostcalls(a)
-    else if kind == "Binary":
+    else if kind is "Binary":
         scan_hostcalls(get_map(node, "left"))
         scan_hostcalls(get_map(node, "right"))
-    else if kind == "Unary":
+    else if kind is "Unary":
         scan_hostcalls(get_map(node, "operand"))
-    else if kind == "Index":
+    else if kind is "Index":
         scan_hostcalls(get_map(node, "object"))
         scan_hostcalls(get_map(node, "index"))
-    else if kind == "Field":
+    else if kind is "Field":
         scan_hostcalls(get_map(node, "object"))
-    else if kind == "If":
+    else if kind is "If":
         scan_hostcalls(get_map(node, "cond"))
         scan_hostcalls(get_map(node, "then"))
         scan_hostcalls(get_map(node, "else"))
-    else if kind == "ListLit":
+    else if kind is "ListLit":
         loop it in get_list(node, "items"):
             scan_hostcalls(it)
-    else if kind == "MapLit":
+    else if kind is "MapLit":
         loop pr in get_list(node, "pairs"):
             scan_hostcalls(get_map(pr, "value"))
-    else if kind == "StructCons":
+    else if kind is "StructCons":
         loop fd in get_list(node, "fields"):
             scan_hostcalls(get_map(fd, "value"))
-    else if kind == "Block":
+    else if kind is "Block":
         loop s in get_list(node, "stmts"):
             scan_hostcalls(s)
-    else if kind == "ExprStmt":
+    else if kind is "ExprStmt":
         scan_hostcalls(get_map(node, "expr"))
-    else if kind == "MutLet" or kind == "LetOrAssign":
+    else if kind is "MutLet" or kind is "LetOrAssign":
         scan_hostcalls(get_map(node, "value"))
-    else if kind == "Return":
+    else if kind is "Return":
         scan_hostcalls(get_map(node, "expr"))
-    else if kind == "IfBlock":
+    else if kind is "IfBlock":
         scan_hostcalls(get_map(node, "cond"))
         scan_block_hostcalls(get_map(node, "then"))
         scan_block_hostcalls(get_map(node, "else"))
-    else if kind == "Loop":
+    else if kind is "Loop":
         scan_block_hostcalls(get_map(node, "body"))
-    else if kind == "ForRange":
+    else if kind is "ForRange":
         scan_block_hostcalls(get_map(node, "body"))
-    else if kind == "ForIn":
+    else if kind is "ForIn":
         scan_block_hostcalls(get_map(node, "body"))
-    else if kind == "MethodCall":
+    else if kind is "MethodCall":
         scan_hostcalls(get_map(node, "receiver"))
         loop a in get_list(node, "args"):
             scan_hostcalls(a)
-    else if kind == "Match":
+    else if kind is "Match":
         scan_hostcalls(get_map(node, "scrutinee"))
         loop arm in get_list(node, "arms"):
             scan_hostcalls(get_map(arm, "body"))
-    else if kind == "Question":
+    else if kind is "Question":
         scan_hostcalls(get_map(node, "inner"))
-    else if kind == "Perform":
+    else if kind is "Perform":
         loop a in get_list(node, "args"):
             scan_hostcalls(a)
-    else if kind == "Defer" or kind == "Require" or kind == "Ensure" or kind == "Example":
+    else if kind is "Defer" or kind is "Require" or kind is "Ensure" or kind is "Example":
         scan_hostcalls(get_map(node, "expr"))
 
 define scan_block_hostcalls(block: table):
@@ -2515,7 +2716,7 @@ define scan_block_hostcalls(block: table):
 
 define scan_program_hostcalls(decls: [table]):
     loop d in decls:
-        if get(d, "kind") == "Fn":
+        if get(d, "kind") is "Fn":
             scan_block_hostcalls(get_map(d, "body"))
 
 # Locals table is a flat list of names - index into the list IS the
@@ -2528,11 +2729,11 @@ define build_locals(params: [table]) -> [text]:
 
 # Find a local's wasm index. Returns -1 if not found - caller emits
 # an error-shaped placeholder so the rest of the body compiles.
-define lookup_local(locals: [text], name: text) -> int:
+define lookup_local(locals: [text], name: text) -> number:
     edit found = 0 - 1
     edit index = 0
     loop entry in locals:
-        if entry == name:
+        if entry is name:
             found = index
         index = index + 1
     found
@@ -2548,18 +2749,18 @@ define lookup_local(locals: [text], name: text) -> int:
 define block_last_is_value(block: table) -> truth:
     stmts = get_list(block, "stmts")
     n = list_count(stmts)
-    if n == 0:
+    if n is 0:
         false
     else:
-        last = at(stmts, n - 1)
+        last = stmts[n - 1]
         sk = get(last, "kind")
-        if sk == "ExprStmt":
+        if sk is "ExprStmt":
             not expr_is_void(get_map(last, "expr"))
-        else if sk == "Match":
+        else if sk is "Match":
             not match_is_void(last)
-        else if sk == "If":
+        else if sk is "If":
             true
-        else if sk == "IfBlock":
+        else if sk is "IfBlock":
             block_last_is_value(get_map(last, "then")) and block_last_is_value(get_map(last, "else"))
         else:
             false
@@ -2567,15 +2768,15 @@ define block_last_is_value(block: table) -> truth:
 # True if the expression leaves nothing on the wasm stack (a void call). Used
 # to decide whether a non-final expression statement needs a `drop`.
 define expr_is_void(node: table) -> truth:
-    if get(node, "kind") == "Call":
+    if get(node, "kind") is "Call":
         c = get(node, "callee")
-        if c == "print_line" or c == "print":
+        if c is "print_line" or c is "print":
             true
-        else if slot_has("wret:{c}") and slot_get("wret:{c}") == "":
+        else if slot_has("wret:{c}") and slot_get("wret:{c}") is "":
             true
         else:
             false
-    else if get(node, "kind") == "Match":
+    else if get(node, "kind") is "Match":
         match_is_void(node)
     else:
         false
@@ -2585,9 +2786,9 @@ define expr_is_void(node: table) -> truth:
 # nothing; since every arm must leave one i32, the caller pushes a 0 for those.
 define arm_produces_value(body: table) -> truth:
     bk = get(body, "kind")
-    if bk == "Block":
+    if bk is "Block":
         block_last_is_value(body)
-    else if bk == "IfBlock":
+    else if bk is "IfBlock":
         block_last_is_value(get_map(body, "then")) and block_last_is_value(get_map(body, "else"))
     else:
         not expr_is_void(body)
@@ -2609,7 +2810,7 @@ define w_is_nested_binding(enc: text) -> truth:
     b = bytes_of(enc)
     edit nested = false
     if length(b) > 0:
-        if at(b, 0) == 64:
+        if b[0] is 64:
             nested = true
     nested
 
@@ -2624,9 +2825,9 @@ define w_nested_binding_variant(enc: text) -> text:
     n = length(b)
     edit out = ""
     edit done = false
-    loop i in 1..<n:
-        c = at(b, i)
-        if c == 58:
+    loop i in 1 until n:
+        c = b[i]
+        if c is 58:
             done = true
         if not done:
             piece = text_of([c])
@@ -2638,12 +2839,12 @@ define w_nested_binding_names(enc: text) -> [text]:
     n = length(b)
     edit rest = ""
     edit past = false
-    loop i in 1..<n:
-        c = at(b, i)
+    loop i in 1 until n:
+        c = b[i]
         if past:
             piece = text_of([c])
             rest = "{rest}{piece}"
-        if c == 58:
+        if c is 58:
             past = true
     w_split_csv(rest)
 
@@ -2652,11 +2853,11 @@ define w_split_csv(csv: text) -> [text]:
     n = length(bs)
     edit parts = []
     edit current = ""
-    if n == 0:
+    if n is 0:
         return parts
-    loop i in 0..<n:
-        b = at(bs, i)
-        if b == 44:
+    loop i in 0 until n:
+        b = bs[i]
+        if b is 44:
             parts = append(parts, current)
             current = ""
         else:
@@ -2671,7 +2872,7 @@ define compile_block(fn_value: WFn, block: table, locals: [text]) -> table:
     edit last_normal = 0 - 1
     edit ti = 0
     loop stmt in statements:
-        if get(stmt, "kind") != "Defer":
+        if get(stmt, "kind") is not "Defer":
             last_normal = ti
         ti = ti + 1
     edit current_fn = fn_value
@@ -2680,7 +2881,7 @@ define compile_block(fn_value: WFn, block: table, locals: [text]) -> table:
     edit si = 0
     loop stmt in statements:
         sk = get(stmt, "kind")
-        if sk == "Defer":
+        if sk is "Defer":
             # Deferred expressions run at block end, in reverse (see below).
             deferred = append(deferred, get_map(stmt, "expr"))
         else:
@@ -2690,8 +2891,8 @@ define compile_block(fn_value: WFn, block: table, locals: [text]) -> table:
             # A non-final statement that leaves a value must drop it; the final
             # statement's value is the block's value (implicit return). Expression
             # statements (unless void) and if/match used as statements produce values.
-            produces = (sk == "ExprStmt" and not expr_is_void(get_map(stmt, "expr"))) or sk == "If" or (sk == "Match" and not match_is_void(stmt)) or (sk == "IfBlock" and block_last_is_value(get_map(stmt, "then")) and block_last_is_value(get_map(stmt, "else")))
-            if si != last_normal and produces:
+            produces = (sk is "ExprStmt" and not expr_is_void(get_map(stmt, "expr"))) or sk is "If" or (sk is "Match" and not match_is_void(stmt)) or (sk is "IfBlock" and block_last_is_value(get_map(stmt, "then")) and block_last_is_value(get_map(stmt, "else")))
+            if si is not last_normal and produces:
                 current_fn = emit_op(current_fn, op_drop())
         si = si + 1
     # Run deferred expressions LIFO, dropping any value they leave. They come
@@ -2701,7 +2902,7 @@ define compile_block(fn_value: WFn, block: table, locals: [text]) -> table:
     loop:
         if di >= ndef:
             break
-        dexpr = at(deferred, ndef - 1 - di)
+        dexpr = deferred[ndef - 1 - di]
         current_fn = compile_expr(current_fn, dexpr, current_locals)
         if not expr_is_void(dexpr):
             current_fn = emit_op(current_fn, op_drop())
@@ -2710,12 +2911,12 @@ define compile_block(fn_value: WFn, block: table, locals: [text]) -> table:
 
 define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
     kind = get(stmt, "kind")
-    if kind == "ExprStmt":
+    if kind is "ExprStmt":
         expr_node = get(stmt, "expr")
         new_fn = compile_expr(fn_value, expr_node, locals)
         {"fn": new_fn, "locals": locals}
     else:
-        if kind == "MutLet" or kind == "LetOrAssign":
+        if kind is "MutLet" or kind is "LetOrAssign":
             edit value_node = get(stmt, "value")
             # A numeric type annotation (`x: u8 = 300`) coerces the value to that
             # type WITHOUT a cast: treat it as `x = (value as T)` so the width
@@ -2723,13 +2924,13 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
             # types trigger this; a list/text/struct annotation is left alone.
             if has(stmt, "decl_type"):
                 dtn = get_map(stmt, "decl_type")
-                dtname = if get(dtn, "kind") == "Named" then get(dtn, "name") else ""
-                is_numeric_anno = dtname == "i8" or dtname == "i16" or dtname == "i32" or dtname == "i64" or dtname == "u8" or dtname == "u16" or dtname == "u32" or dtname == "u64" or dtname == "int" or dtname == "f32" or dtname == "f64" or dtname == "float"
-                if is_numeric_anno and get(value_node, "kind") != "Lambda":
+                dtname = if get(dtn, "kind") is "Named" then get(dtn, "name") else ""
+                is_numeric_anno = dtname is "i8" or dtname is "i16" or dtname is "i32" or dtname is "i64" or dtname is "u8" or dtname is "u16" or dtname is "u32" or dtname is "u64" or dtname is "int" or dtname is "f32" or dtname is "f64" or dtname is "float"
+                if is_numeric_anno and get(value_node, "kind") is not "Lambda":
                     # A LITERAL that does not fit its declared sized type is a
                     # compile error, not a silent wrap (`x: u8 = 300` is a bug).
                     # `300 as u8` stays the deliberate-wrap escape hatch.
-                    if get(value_node, "kind") == "Int":
+                    if get(value_node, "kind") is "Int":
                         litv = parse_decimal(get(value_node, "value"))
                         if not w_int_fits(litv, dtname):
                             compile_error("orion: ERROR - the literal {litv} does not fit `{dtname}` (write `{litv} as {dtname}` to wrap it deliberately)")
@@ -2737,7 +2938,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
             # A lambda binding names a synthesized top-level fn; the local holds a
             # placeholder int (calls dispatch via lam:<name>).
             edit after_value = fn_value
-            if get(value_node, "kind") == "Lambda":
+            if get(value_node, "kind") is "Lambda":
                 lamfn = "__lam_{get_int(value_node, \"line\")}_{get_int(value_node, \"col\")}"
                 slot_set("lam:{get(stmt, \"name\")}", lamfn)
                 # Captures: body idents that are locals HERE but not the lambda's
@@ -2776,13 +2977,24 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
             existing = lookup_local(base_locals, name)
             # Record the binding's type so later reads pick i32 vs f64 ops.
             btype = type_of(value_node)
+            # A name bound TWICE with different types is two variables that
+            # happen to be spelled alike - paint_one has a `side` that is a
+            # number in one branch and a whole number in another. One wasm
+            # local cannot be both, and reusing the slot stored an i32 into an
+            # f64 local, which the validator rejects with the function number
+            # and nothing else. A new shape gets a new slot; the reader finds
+            # the LAST one, so the later binding shadows the earlier exactly
+            # the way the source reads.
+            was_type = if slot_has("ltype:{name}") then slot_get("ltype:{name}") else ""
             slot_set("ltype:{name}", btype)
             # If the value is a list, remember its element type for at()/for-in.
             slot_set("eltype:{name}", w_elem_type(value_node))
+            # Same for a map's VALUE type, so `loop k, v in m:` types v.
+            slot_set("mvaltype:{name}", w_map_val_type(value_node))
             new_locals = base_locals
             edit current_locals = new_locals
             edit fn_after = after_value
-            if existing < 0:
+            if existing < 0 or was_type is not btype:
                 current_locals = append(base_locals, name)
                 # A new binding needs a declared wasm local, not just an index.
                 fn_after = add_local(after_value)
@@ -2791,26 +3003,26 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
             with_set = emit_local_set(fn_after, new_index)
             {"fn": with_set, "locals": current_locals}
         else:
-            if kind == "Return":
+            if kind is "Return":
                 expr_node = get(stmt, "expr")
                 with_value = compile_expr(fn_value, expr_node, locals)
                 # wasm `return` opcode is 0x0F
                 {"fn": emit_op(with_value, 15), "locals": locals}
             else:
-                if kind == "Break":
+                if kind is "Break":
                     # Break out of the innermost loop. The target is the outer
                     # `block` wrapping the loop; `wbrk` holds the branch depth to
                     # it, which grows by one for each `if`/loop nested in between.
                     with_br = emit_op(fn_value, op_br())
                     {"fn": emit_bytes(with_br, [slot_get_int("wbrk")]), "locals": locals}
-                else if kind == "Continue":
+                else if kind is "Continue":
                     # Jump to the inner `block` around the body; control then falls
                     # through to the increment (if any) and repeats. `wcont` is the
                     # branch depth to that inner block.
                     with_brc = emit_op(fn_value, op_br())
                     {"fn": emit_bytes(with_brc, [slot_get_int("wcont")]), "locals": locals}
                 else:
-                    if kind == "Loop":
+                    if kind is "Loop":
                         loop_body = get(stmt, "body")
                         # block { loop { block { body } br 0 } }: the outer block is
                         # the break target, the inner block the continue target, the
@@ -2841,7 +3053,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                         with_end_block = emit_op(with_end_loop, op_end())
                         {"fn": with_end_block, "locals": loop_out_locals}
                     else:
-                        if kind == "IfBlock":
+                        if kind is "IfBlock":
                             with_cond = compile_expr(fn_value, get(stmt, "cond"), locals)
                             with_if = emit_op(with_cond, op_if())
                             # A block-form if whose branches both end in a value is
@@ -2858,20 +3070,31 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             then_res = compile_block(with_bt, get(stmt, "then"), locals)
                             edit then_fn = with_bt
                             then_fn = get(then_res, "fn")
+                            # A VOID if whose branch happens to end in something
+                            # that leaves a value has to drop it: wasm checks
+                            # that a void frame falls through with an empty
+                            # stack. `if was_on is 1: orion_arena_off()` is the
+                            # whole shape - one arm, no else, and a call that
+                            # answers with an int nobody wants. It rejected the
+                            # entire module for one unspent value.
+                            if not ifval and block_last_is_value(get_map(stmt, "then")):
+                                then_fn = emit_op(then_fn, op_drop())
                             edit mid_locals = locals
                             mid_locals = get(then_res, "locals")
                             with_else = emit_op(then_fn, op_else())
                             else_res = compile_block(with_else, get(stmt, "else"), mid_locals)
                             edit else_fn = with_else
                             else_fn = get(else_res, "fn")
+                            if not ifval and block_last_is_value(get_map(stmt, "else")):
+                                else_fn = emit_op(else_fn, op_drop())
                             edit if_out_locals = locals
                             if_out_locals = get(else_res, "locals")
                             slot_set("wbrk", prev_brk)
                             slot_set("wcont", prev_cont)
                             with_end_if = emit_op(else_fn, op_end())
                             {"fn": with_end_if, "locals": if_out_locals}
-                        else if kind == "ForRange":
-                            # `loop v in low..<high:` - counter loop lowered to
+                        else if kind is "ForRange":
+                            # `loop v in low until high:` - counter loop lowered to
                             # block { loop { br_if exit when done; body; v++ } }.
                             var_name = get(stmt, "var")
                             existing = lookup_local(locals, var_name)
@@ -2885,7 +3108,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             vidx = lookup_local(cur_locals, var_name)
                             # v = low
                             f = compile_expr(f, get_map(stmt, "low"), cur_locals)
-                            if type_of(get_map(stmt, "low")) == "f":
+                            if type_of(get_map(stmt, "low")) is "f":
                                 f = emit_op(f, op_i32_trunc_f64_s())
                             f = emit_local_set(f, vidx)
                             f = emit_op(f, op_block())
@@ -2895,9 +3118,9 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             # Exit test: v >= high (or v > high when inclusive).
                             f = emit_local_get(f, vidx)
                             f = compile_expr(f, get_map(stmt, "high"), cur_locals)
-                            if type_of(get_map(stmt, "high")) == "f":
+                            if type_of(get_map(stmt, "high")) is "f":
                                 f = emit_op(f, op_i32_trunc_f64_s())
-                            if get(stmt, "inclusive") == 1:
+                            if get(stmt, "inclusive") is 1:
                                 f = emit_op(f, op_i32_gt_s())
                             else:
                                 f = emit_op(f, op_i32_ge_s())
@@ -2928,7 +3151,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             f = emit_op(f, op_end())
                             f = emit_op(f, op_end())
                             {"fn": f, "locals": cur_locals}
-                        else if kind == "ForIn":
+                        else if kind is "ForIn":
                             # `loop x in xs:` - iterate a list. Evaluate xs once
                             # into a hidden pointer local, walk a hidden index from
                             # 0 to len, bind the element (and optional index var)
@@ -2948,12 +3171,20 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             cur_locals = append(cur_locals, "__fi{k}")
                             f = add_local(f)
                             note_local("i")
+                            # A MAP walks its KEYS: `loop k in m:` binds the
+                            # key, `loop k, v in m:` binds key and value. Same
+                            # rule the native backend follows, so a program
+                            # means one thing on both.
+                            fin_is_map = type_of(get_map(stmt, "iter")) is "m"
                             # Element type of the iterated list drives the loop
-                            # variable's type and the element stride.
-                            iter_et = w_elem_type(get_map(stmt, "iter"))
-                            in_stride = if iter_et == "f" then 8 else 4
+                            # variable's type and the element stride. A map's
+                            # key list is text.
+                            iter_et = if fin_is_map then "t" else w_elem_type(get_map(stmt, "iter"))
+                            in_stride = if iter_et is "f" then 8 else 4
                             # The loop variable - reuse its slot if already bound.
-                            var_name = get(stmt, "var")
+                            # Over a map with two names the FIRST names the key,
+                            # so the element slot belongs to the index var.
+                            var_name = if fin_is_map and get(stmt, "index_var") is not "" then get(stmt, "index_var") else get(stmt, "var")
                             slot_set("ltype:{var_name}", iter_et)
                             edit var_idx = lookup_local(cur_locals, var_name)
                             if var_idx < 0:
@@ -2961,20 +3192,35 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                                 cur_locals = append(cur_locals, var_name)
                                 f = add_local(f)
                                 note_local(iter_et)
-                            index_var = get(stmt, "index_var")
+                            # Over a list the second local is the INDEX (i32);
+                            # over a map it is the VALUE looked up by key.
+                            index_var = if fin_is_map then get(stmt, "var") else get(stmt, "index_var")
+                            has_second = if fin_is_map then get(stmt, "index_var") is not "" else index_var is not ""
                             edit has_index = false
                             edit iv_idx = 0
-                            if index_var != "":
+                            if has_second:
                                 has_index = true
-                                slot_set("ltype:{index_var}", "i")
+                                iv_type = if fin_is_map then w_map_val_type(get_map(stmt, "iter")) else "i"
+                                slot_set("ltype:{index_var}", iv_type)
                                 iv_idx = lookup_local(cur_locals, index_var)
                                 if iv_idx < 0:
                                     iv_idx = length(cur_locals)
                                     cur_locals = append(cur_locals, index_var)
                                     f = add_local(f)
-                                    note_local("i")
-                            # __fl = xs ; __fi = 0
-                            f = compile_expr(f, get_map(stmt, "iter"), cur_locals)
+                                    note_local(iv_type)
+                            # __fl = xs ; __fi = 0. A map becomes its key list,
+                            # and the map itself is kept for the value lookup.
+                            edit map_idx = 0
+                            if fin_is_map:
+                                map_idx = length(cur_locals)
+                                cur_locals = append(cur_locals, "__fm{k}")
+                                f = add_local(f)
+                                note_local("i")
+                                f = compile_expr(f, get_map(stmt, "iter"), cur_locals)
+                                f = emit_local_tee(f, map_idx)
+                                f = emit_call(f, slot_get_int("wfn:__map_keys"))
+                            if not fin_is_map:
+                                f = compile_expr(f, get_map(stmt, "iter"), cur_locals)
                             f = emit_local_set(f, lst_idx)
                             f = emit_const(f, 0)
                             f = emit_local_set(f, idx_idx)
@@ -2989,16 +3235,22 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             f = emit_op(f, op_i32_ge_s())
                             f = emit_op(f, op_br_if())
                             f = emit_bytes(f, [1])
-                            # var = at(__fl, __fi) = mem[__fl + 4 + __fi*stride]
+                            # var = __fl[__fi] = mem[__fl + 4 + __fi*stride]
                             f = emit_local_get(f, lst_idx)
                             f = emit_local_get(f, idx_idx)
                             f = emit_const(f, in_stride)
                             f = emit_op(f, op_i32_mul())
                             f = emit_op(f, op_i32_add())
-                            f = if iter_et == "f" then emit_f64_load(f, 4) else emit_load(f, 4)
+                            f = if iter_et is "f" then emit_f64_load(f, 4) else emit_load(f, 4)
                             f = emit_local_set(f, var_idx)
-                            if has_index:
+                            if has_index and (not fin_is_map):
                                 f = emit_local_get(f, idx_idx)
+                                f = emit_local_set(f, iv_idx)
+                            if has_index and fin_is_map:
+                                # value = __map_get(__fm, key)
+                                f = emit_local_get(f, map_idx)
+                                f = emit_local_get(f, var_idx)
+                                f = emit_call(f, slot_get_int("wfn:__map_get"))
                                 f = emit_local_set(f, iv_idx)
                             # Inner continue block: continue lands after it so __fi++
                             # still runs. break=br 2, continue=br 0 from the body.
@@ -3024,13 +3276,13 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             f = emit_op(f, op_end())
                             f = emit_op(f, op_end())
                             {"fn": f, "locals": cur_locals}
-                        else if kind == "If" or kind == "Match":
+                        else if kind is "If" or kind is "Match":
                             # An if/match expression used as a statement (a
-                            # conditionless `match:` or `match s:` at the block's
+                            # conditionless `choose:` or `choose s:` at the block's
                             # tail). Compile as an expression; its value stays on
                             # the stack as the block's value.
                             {"fn": compile_expr(fn_value, stmt, locals), "locals": locals}
-                        else if kind == "Require":
+                        else if kind is "Require":
                             # require cond: trap (unreachable) if the condition is false.
                             rq1 = compile_expr(fn_value, get_map(stmt, "expr"), locals)
                             rq2 = emit_op(rq1, op_i32_eqz())
@@ -3039,7 +3291,7 @@ define compile_stmt(fn_value: WFn, stmt: table, locals: [text]) -> table:
                             rq5 = emit_op(rq4, op_unreachable())
                             rq6 = emit_op(rq5, op_end())
                             {"fn": rq6, "locals": locals}
-                        else if kind == "Example":
+                        else if kind is "Example":
                             # `example` lines are documentation the BUILD runs
                             # (tools/example_check.sh), not code - they lower
                             # to nothing here exactly as they do natively.
@@ -3060,11 +3312,11 @@ define emit_float_text(fn_value: WFn, ftext: text) -> WFn:
     edit fden = 1
     edit seen_dot = false
     edit fneg = false
-    loop fi in 0..<flen:
-        fc = at(fb, fi)
-        if fc == 45:
+    loop fi in 0 until flen:
+        fc = fb[fi]
+        if fc is 45:
             fneg = true
-        else if fc == 46:
+        else if fc is 46:
             seen_dot = true
         else if fc >= 48 and fc <= 57:
             fnum = fnum * 10 + (fc - 48)
@@ -3081,7 +3333,7 @@ define emit_float_text(fn_value: WFn, ftext: text) -> WFn:
 # Compile an expression - pushes its result on the wasm stack.
 define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
     kind = get(expr_node, "kind")
-    if kind == "Int":
+    if kind is "Int":
         value_text = get(expr_node, "value")
         iv = parse_decimal(value_text)
         # A literal that does not fit i32 is an i64 (polymorphic literal: it takes
@@ -3090,10 +3342,10 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
             emit_i64_const(fn_value, iv)
         else:
             emit_const(fn_value, iv)
-    else if kind == "Float":
+    else if kind is "Float":
         emit_float_text(fn_value, get(expr_node, "value"))
     else:
-        if kind == "Ident":
+        if kind is "Ident":
             name = get(expr_node, "name")
             index = lookup_local(locals, name)
             if slot_has("lam:{name}"):
@@ -3103,7 +3355,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                 # has no way to carry its env through an indirect call.
                 vlfn = slot_get("lam:{name}")
                 vcapn = if slot_has("lamcapn:{vlfn}") then slot_get_int("lamcapn:{vlfn}") else 0
-                if vcapn == 0:
+                if vcapn is 0:
                     emit_const(fn_value, slot_get_int("wfn:{vlfn}"))
                 else:
                     compile_error("orion: ERROR - the wasm backend does not support passing the capturing closure `{name}` as a value (only non-capturing lambdas and top-level fns)")
@@ -3122,22 +3374,28 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
             else if slot_has("wfn:{name}"):
                 # A bare function name used as a value: its identity-table index.
                 emit_const(fn_value, slot_get_int("wfn:{name}"))
+            else if w_spoken_variant(name) is not name:
+                # `none` - the one spoken constructor that carries nothing and
+                # so is written as a bare name. Compiled as what it means.
+                # Without this it fell through to the 0 below, and a `maybe`
+                # that was empty matched the `some` arm.
+                compile_expr(fn_value, {"kind": "Field", "object": {"kind": "Ident", "name": "Option"}, "field": w_spoken_variant(name)}, locals)
             else:
                 # Unknown identifier - push 0 as placeholder
                 emit_const(fn_value, 0)
         else:
-            if kind == "Binary":
+            if kind is "Binary":
                 left = get_map(expr_node, "left")
                 right = get_map(expr_node, "right")
                 op = get(expr_node, "op")
                 lt = type_of(left)
                 rt = type_of(right)
-                if op == "+" and (lt == "t" or rt == "t"):
+                if op is "+" and (lt is "t" or rt is "t"):
                     # text concatenation: coerce each side to text, then join.
                     wl = compile_as_text(fn_value, left, lt, locals)
                     wr = compile_as_text(wl, right, rt, locals)
                     emit_call(wr, slot_get_int("wfn:__text_concat"))
-                else if (op == "==" or op == "!=") and (lt == "t" or rt == "t"):
+                else if (op is "==" or op is "!=") and (lt is "t" or rt is "t"):
                     # text equality is by CONTENT (__streq), not pointer: two
                     # separate "hi" literals live at different addresses. A side
                     # typed 'i' here is a text POINTER (e.g. a map value read by
@@ -3145,20 +3403,20 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                     wl = compile_as_text(fn_value, left, "t", locals)
                     wr = compile_as_text(wl, right, "t", locals)
                     weq = emit_call(wr, slot_get_int("wfn:__streq"))
-                    if op == "!=" then emit_op(weq, op_i32_eqz()) else weq
-                else if lt == "f" or rt == "f" or op == "/":
+                    if op is "!=" then emit_op(weq, op_i32_eqz()) else weq
+                else if lt is "f" or rt is "f" or op is "/":
                     # f64 op: promote each side (int / i64 / f32) to f64 first.
                     # `/` ALWAYS routes here - real division whatever the
                     # operands (the flip); integer division is `//`.
                     wl = w_to_f64(compile_expr(fn_value, left, locals), lt)
                     wr = w_to_f64(compile_expr(wl, right, locals), rt)
                     emit_f64_binop(wr, op)
-                else if lt == "g" or rt == "g":
+                else if lt is "g" or rt is "g":
                     # f32 op: promote an i32 operand to f32.
                     wl = compile_expr(fn_value, left, locals)
-                    wl2 = if lt == "g" then wl else emit_op(wl, op_f32_convert_i32_s())
+                    wl2 = if lt is "g" then wl else emit_op(wl, op_f32_convert_i32_s())
                     wr = compile_expr(wl2, right, locals)
-                    wr2 = if rt == "g" then wr else emit_op(wr, op_f32_convert_i32_s())
+                    wr2 = if rt is "g" then wr else emit_op(wr, op_f32_convert_i32_s())
                     emit_f32_binop(wr2, op)
                 else:
                     # integer op of any width/signedness. Peer type picks the
@@ -3175,123 +3433,141 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                     wop = if use64 then emit_i64_binop(wr2, op) else emit_i32_binop_u(wr2, op, uns)
                     if w_is_cmp(op) then wop else w_emit_mask(wop, rc)
             else:
-                if kind == "Call":
+                if kind is "Call":
                     # Calling a host fn or another local fn - for now assume host index 0.
                     args = get_list(expr_node, "args")
                     callee = get(expr_node, "callee")
-                    if callee == "length":
+                    if callee is "length":
                         # length(x) reads the 4-byte length header at the pointer.
                         # Same layout as a string literal, so length("hi") works too.
-                        with_ptr = compile_expr(fn_value, at(args, 0), locals)
+                        with_ptr = compile_expr(fn_value, args[0], locals)
                         emit_load(with_ptr, 0)
-                    else if callee == "at":
-                        # at(x, i) loads element i: mem[ptr + 4 + i*stride].
-                        aet = w_elem_type(at(args, 0))
-                        astride = if aet == "f" then 8 else 4
-                        with_ptr = compile_expr(fn_value, at(args, 0), locals)
-                        edit with_idx = compile_expr(with_ptr, at(args, 1), locals)
-                        if type_of(at(args, 1)) == "f":
+                    else if callee is "at":
+                        # x[i] loads element i: mem[ptr + 4 + i*stride].
+                        aet = w_elem_type(args[0])
+                        astride = if aet is "f" then 8 else 4
+                        with_ptr = compile_expr(fn_value, args[0], locals)
+                        edit with_idx = compile_expr(with_ptr, args[1], locals)
+                        if type_of(args[1]) is "f":
                             with_idx = emit_op(with_idx, op_i32_trunc_f64_s())
                         s1 = emit_const(with_idx, astride)
                         s2 = emit_op(s1, op_i32_mul())
                         s3 = emit_op(s2, op_i32_add())
-                        if aet == "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
-                    else if callee == "set" and type_of(at(args, 1)) == "t":
-                        # set(map, key, v) with a text key: copy-on-write update
-                        # (m[k] = v desugars to m = set(m, k, v)).
-                        wms0 = compile_expr(fn_value, at(args, 0), locals)
-                        wms1 = compile_as_text(wms0, at(args, 1), "t", locals)
-                        wms2 = compile_expr(wms1, at(args, 2), locals)
+                        if aet is "f" then emit_f64_load(s3, 4) else emit_load(s3, 4)
+                    else if callee is "set" and (type_of(args[1]) is "t" or type_of(args[0]) is "m"):
+                        # set(map, key, v): copy-on-write update (m[k] = v
+                        # desugars to m = set(m, k, v)). Keyed by the MAP, not by
+                        # the key's type - a table takes any key, and reading it
+                        # off the key alone sent every non-text key into list
+                        # indexing.
+                        wms0 = compile_expr(fn_value, args[0], locals)
+                        wms1 = compile_as_text(wms0, args[1], type_of(args[1]), locals)
+                        wms2 = compile_expr(wms1, args[2], locals)
                         emit_call(wms2, slot_get_int("wfn:__map_set"))
-                    else if callee == "set":
+                    else if callee is "set":
                         # set(x, i, v) stores element i in place and returns the
                         # container pointer (so `x[i] = v` = `x = set(x, i, v)`
                         # works). The container is evaluated exactly ONCE into a
                         # temp - it may be a call (set(pad(xs, i), i, v)), and
                         # recompiling it stored into one list and returned a
                         # different one.
-                        target = at(args, 0)
+                        target = args[0]
                         set_et = w_elem_type(target)
-                        set_stride = if set_et == "f" then 8 else 4
+                        set_stride = if set_et is "f" then 8 else 4
                         set_depth = slot_get_int("wtmp:depth")
                         set_tidx = slot_get_int("wtmp:pbase") + set_depth
                         slot_set("wtmp:depth", set_depth + 1)
                         s0 = compile_expr(fn_value, target, locals)
                         s1 = emit_local_tee(s0, set_tidx)
-                        edit s2 = compile_expr(s1, at(args, 1), locals)
-                        if type_of(at(args, 1)) == "f":
+                        edit s2 = compile_expr(s1, args[1], locals)
+                        if type_of(args[1]) is "f":
                             s2 = emit_op(s2, op_i32_trunc_f64_s())
                         s3 = emit_const(s2, set_stride)
                         s4 = emit_op(s3, op_i32_mul())
                         s5 = emit_op(s4, op_i32_add())
-                        s6 = compile_expr(s5, at(args, 2), locals)
-                        s7 = if set_et == "f" then emit_f64_store(s6, 4) else emit_store(s6, 4)
+                        s6 = compile_expr(s5, args[2], locals)
+                        s7 = if set_et is "f" then emit_f64_store(s6, 4) else emit_store(s6, 4)
                         s8 = emit_local_get(s7, set_tidx)
                         slot_set("wtmp:depth", set_depth)
                         s8
-                    else if callee == "to_real":
-                        # int -> f64
-                        wv = compile_expr(fn_value, at(args, 0), locals)
-                        emit_op(wv, op_f64_convert_i32_s())
-                    else if callee == "to_whole":
-                        # f64 -> int (truncate toward zero)
-                        wv = compile_expr(fn_value, at(args, 0), locals)
-                        emit_op(wv, op_i32_trunc_f64_s())
-                    else if (callee == "get" or callee == "get_int") and list_count(args) == 2:
-                        # get(map, key) / get_int(map, key) -> the stored value (an
-                        # i32 word: an int, or a pointer for a text/list value).
-                        wm = compile_expr(fn_value, at(args, 0), locals)
-                        wk = compile_as_text(wm, at(args, 1), type_of(at(args, 1)), locals)
+                    else if callee is "to_real":
+                        # int -> f64, and NOTHING when it already is one. Asking
+                        # for a real of a real is ordinary in code that does not
+                        # want to know which it has (Size.wide is a number, and
+                        # to_real around it reads as "make sure"), and converting
+                        # regardless fed an f64 to an i32 opcode.
+                        wv = compile_expr(fn_value, args[0], locals)
+                        if type_of(args[0]) is "f" then wv else emit_op(wv, op_f64_convert_i32_s())
+                    else if callee is "to_whole":
+                        # f64 -> int (truncate toward zero), and nothing when it
+                        # already is whole.
+                        # A text still has to be PARSED - only a value already
+                        # whole may skip the conversion.
+                        wv = compile_expr(fn_value, args[0], locals)
+                        if w_is_whole(type_of(args[0])) then wv else emit_op(wv, op_i32_trunc_f64_s())
+                    else if (callee is "get" or callee is "get_int" or callee is "get_list") and list_count(args) is 2:
+                        # get(map, key) / get_int / get_list -> the stored value
+                        # (an i32 word: an int, or a pointer for a text or list
+                        # value). The three differ only in what the READER
+                        # promises the word is; the load is the same word.
+                        wm = compile_expr(fn_value, args[0], locals)
+                        wk = compile_as_text(wm, args[1], type_of(args[1]), locals)
                         emit_call(wk, slot_get_int("wfn:__map_get"))
-                    else if callee == "has" and list_count(args) == 2:
+                    else if callee is "has" and list_count(args) is 2:
                         # has(map, key) -> 1/0 (presence, distinct from a 0 value).
-                        whm = compile_expr(fn_value, at(args, 0), locals)
-                        whk = compile_as_text(whm, at(args, 1), type_of(at(args, 1)), locals)
+                        whm = compile_expr(fn_value, args[0], locals)
+                        whk = compile_as_text(whm, args[1], type_of(args[1]), locals)
                         emit_call(whk, slot_get_int("wfn:__map_has"))
-                    else if (callee == "sin" or callee == "cos" or callee == "tan" or callee == "sqrt" or callee == "exp" or callee == "log") and list_count(args) == 1:
-                        wm1 = compile_expr(fn_value, at(args, 0), locals)
-                        wm1b = if type_of(at(args, 0)) == "f" then wm1 else emit_op(wm1, op_f64_convert_i32_s())
+                    else if (callee is "sin" or callee is "cos" or callee is "tan" or callee is "sqrt" or callee is "exp" or callee is "log") and list_count(args) is 1:
+                        wm1 = compile_expr(fn_value, args[0], locals)
+                        wm1b = if type_of(args[0]) is "f" then wm1 else emit_op(wm1, op_f64_convert_i32_s())
                         emit_call(wm1b, slot_get_int("wfn:host_{callee}"))
-                    else if (callee == "pow" or callee == "atan2") and list_count(args) == 2:
-                        wp1 = compile_expr(fn_value, at(args, 0), locals)
-                        wp1b = if type_of(at(args, 0)) == "f" then wp1 else emit_op(wp1, op_f64_convert_i32_s())
-                        wp2 = compile_expr(wp1b, at(args, 1), locals)
-                        wp2b = if type_of(at(args, 1)) == "f" then wp2 else emit_op(wp2, op_f64_convert_i32_s())
+                    else if (callee is "pow" or callee is "atan2") and list_count(args) is 2:
+                        wp1 = compile_expr(fn_value, args[0], locals)
+                        wp1b = if type_of(args[0]) is "f" then wp1 else emit_op(wp1, op_f64_convert_i32_s())
+                        wp2 = compile_expr(wp1b, args[1], locals)
+                        wp2b = if type_of(args[1]) is "f" then wp2 else emit_op(wp2, op_f64_convert_i32_s())
                         emit_call(wp2b, slot_get_int("wfn:host_{callee}"))
-                    else if callee == "filled" and list_count(args) == 2:
-                        wlf0 = compile_expr(fn_value, at(args, 0), locals)
-                        wlf1 = compile_expr(wlf0, at(args, 1), locals)
+                    else if callee is "filled" and list_count(args) is 2:
+                        wlf0 = compile_expr(fn_value, args[0], locals)
+                        wlf1 = compile_expr(wlf0, args[1], locals)
                         emit_call(wlf1, slot_get_int("wfn:__list_filled"))
-                    else if callee == "filled_number" and list_count(args) == 2:
-                        wff0 = compile_expr(fn_value, at(args, 0), locals)
-                        edit wff1 = compile_expr(wff0, at(args, 1), locals)
-                        if type_of(at(args, 1)) is not "f":
+                    else if callee is "filled_number" and list_count(args) is 2:
+                        wff0 = compile_expr(fn_value, args[0], locals)
+                        edit wff1 = compile_expr(wff0, args[1], locals)
+                        if type_of(args[1]) is not "f":
                             wff1 = emit_op(wff1, op_f64_convert_i32_s())
                         emit_call(wff1, slot_get_int("wfn:__list_filled_f"))
-                    else if callee == "map_keys" and list_count(args) == 1:
-                        wmk = compile_expr(fn_value, at(args, 0), locals)
+                    else if callee is "map_keys" and list_count(args) is 1:
+                        wmk = compile_expr(fn_value, args[0], locals)
                         emit_call(wmk, slot_get_int("wfn:__map_keys"))
-                    else if callee == "map_values" and list_count(args) == 1:
-                        wmv = compile_expr(fn_value, at(args, 0), locals)
+                    else if callee is "map_values" and list_count(args) is 1:
+                        wmv = compile_expr(fn_value, args[0], locals)
                         emit_call(wmv, slot_get_int("wfn:__map_values"))
-                    else if callee == "split" and list_count(args) == 2:
+                    else if callee is "split" and list_count(args) is 2:
                         # split(text, sep) -> list of text segments.
-                        wsp0 = compile_expr(fn_value, at(args, 0), locals)
-                        wsp1 = compile_expr(wsp0, at(args, 1), locals)
+                        wsp0 = compile_expr(fn_value, args[0], locals)
+                        wsp1 = compile_expr(wsp0, args[1], locals)
                         emit_call(wsp1, slot_get_int("wfn:__split"))
-                    else if callee == "sum" and list_count(args) == 1:
+                    else if callee is "sum" and list_count(args) is 1:
                         # sum(list) -> total of its i32 elements.
-                        wsm = compile_expr(fn_value, at(args, 0), locals)
+                        wsm = compile_expr(fn_value, args[0], locals)
                         emit_call(wsm, slot_get_int("wfn:__sum"))
-                    else if callee == "index_of" and list_count(args) == 2:
+                    else if callee is "index_of" and list_count(args) is 2:
                         # index_of(s, sub) -> first byte index, or -1.
-                        wi0 = compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
-                        wi1 = compile_as_text(wi0, at(args, 1), type_of(at(args, 1)), locals)
+                        wi0 = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
+                        wi1 = compile_as_text(wi0, args[1], type_of(args[1]), locals)
                         emit_call(wi1, slot_get_int("wfn:__index_of"))
-                    else if callee == "contains" and list_count(args) == 2 and type_of(at(args, 0)) == "t":
+                    else if callee is "contains" and list_count(args) is 2 and type_of(args[0]) is "m":
+                        # contains(m, k) -> is the KEY present. Same question
+                        # `has` answers; native lowers it the same way.
+                        wcm = compile_expr(fn_value, args[0], locals)
+                        wck = compile_as_text(wcm, args[1], type_of(args[1]), locals)
+                        emit_call(wck, slot_get_int("wfn:__map_has"))
+                    else if callee is "contains" and list_count(args) is 2 and type_of(args[0]) is "t":
                         # contains(s, sub) -> 1 if sub occurs in s (index_of >= 0).
-                        wc0 = compile_as_text(fn_value, at(args, 0), "t", locals)
-                        wc1 = compile_as_text(wc0, at(args, 1), type_of(at(args, 1)), locals)
+                        wc0 = compile_as_text(fn_value, args[0], "t", locals)
+                        wc1 = compile_as_text(wc0, args[1], type_of(args[1]), locals)
                         wc2 = emit_call(wc1, slot_get_int("wfn:__index_of"))
                         wc3 = emit_const(wc2, 0)
                         emit_op(wc3, op_i32_ge_s())
@@ -3302,64 +3578,64 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                     # was the whole "wasm bytes are different" gap, and it made
                     # any code that BUILT bytes from computed ints (encoding,
                     # text case mapping) read the wrong layout.
-                    else if callee == "bytes_of":
-                        wbft = compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
+                    else if callee is "bytes_of":
+                        wbft = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
                         emit_call(wbft, slot_get_int("wfn:__text_to_ints"))
-                    else if callee == "text_of":
-                        wbtt = compile_expr(fn_value, at(args, 0), locals)
+                    else if callee is "text_of":
+                        wbtt = compile_expr(fn_value, args[0], locals)
                         emit_call(wbtt, slot_get_int("wfn:__ints_to_text"))
-                    else if callee == "bytes_count":
-                        wbl = compile_expr(fn_value, at(args, 0), locals)
+                    else if callee is "bytes_count":
+                        wbl = compile_expr(fn_value, args[0], locals)
                         emit_load(wbl, 0)
-                    else if callee == "byte_at" and list_count(args) == 2:
-                        # byte_at(b, i) -> mem[b + 4 + 4i], same as at(b, i).
-                        wba = compile_expr(fn_value, at(args, 0), locals)
-                        wbi = compile_expr(wba, at(args, 1), locals)
+                    else if callee is "byte_at" and list_count(args) is 2:
+                        # byte_at(b, i) -> mem[b + 4 + 4i], same as b[i].
+                        wba = compile_expr(fn_value, args[0], locals)
+                        wbi = compile_expr(wba, args[1], locals)
                         wb4 = emit_const(wbi, 4)
                         wbm = emit_op(wb4, op_i32_mul())
                         wbs = emit_op(wbm, op_i32_add())
                         emit_load(wbs, 4)
-                    else if callee == "bytes_zeros":
-                        wbz = compile_expr(fn_value, at(args, 0), locals)
+                    else if callee is "bytes_zeros":
+                        wbz = compile_expr(fn_value, args[0], locals)
                         emit_call(wbz, slot_get_int("wfn:__bytes_zeros"))
-                    else if callee == "bytes_part" and list_count(args) == 3:
-                        wbsl0 = compile_expr(fn_value, at(args, 0), locals)
-                        wbsl1 = compile_expr(wbsl0, at(args, 1), locals)
-                        wbsl2 = compile_expr(wbsl1, at(args, 2), locals)
+                    else if callee is "bytes_part" and list_count(args) is 3:
+                        wbsl0 = compile_expr(fn_value, args[0], locals)
+                        wbsl1 = compile_expr(wbsl0, args[1], locals)
+                        wbsl2 = compile_expr(wbsl1, args[2], locals)
                         emit_call(wbsl2, slot_get_int("wfn:__slice_list"))
-                    else if callee == "bytes_concat" and list_count(args) == 2:
-                        wbc0 = compile_expr(fn_value, at(args, 0), locals)
-                        wbc1 = compile_expr(wbc0, at(args, 1), locals)
+                    else if callee is "bytes_concat" and list_count(args) is 2:
+                        wbc0 = compile_expr(fn_value, args[0], locals)
+                        wbc1 = compile_expr(wbc0, args[1], locals)
                         emit_call(wbc1, slot_get_int("wfn:__list_concat"))
-                    else if callee == "part" and list_count(args) == 3:
+                    else if callee is "part" and list_count(args) is 3:
                         # part(x, i, j): substring for text, sublist for a list.
-                        if type_of(at(args, 0)) == "t":
-                            ws0 = compile_as_text(fn_value, at(args, 0), "t", locals)
-                            ws1 = compile_expr(ws0, at(args, 1), locals)
-                            ws2 = compile_expr(ws1, at(args, 2), locals)
+                        if type_of(args[0]) is "t":
+                            ws0 = compile_as_text(fn_value, args[0], "t", locals)
+                            ws1 = compile_expr(ws0, args[1], locals)
+                            ws2 = compile_expr(ws1, args[2], locals)
                             emit_call(ws2, slot_get_int("wfn:__slice_text"))
                         else:
-                            wl0 = compile_expr(fn_value, at(args, 0), locals)
-                            edit wl1 = compile_expr(wl0, at(args, 1), locals)
-                            if type_of(at(args, 1)) == "f":
+                            wl0 = compile_expr(fn_value, args[0], locals)
+                            edit wl1 = compile_expr(wl0, args[1], locals)
+                            if type_of(args[1]) is "f":
                                 wl1 = emit_op(wl1, op_i32_trunc_f64_s())
-                            edit wl2 = compile_expr(wl1, at(args, 2), locals)
-                            if type_of(at(args, 2)) == "f":
+                            edit wl2 = compile_expr(wl1, args[2], locals)
+                            if type_of(args[2]) is "f":
                                 wl2 = emit_op(wl2, op_i32_trunc_f64_s())
                             emit_call(wl2, slot_get_int("wfn:__slice_list"))
-                    else if callee == "par_run" and list_count(args) == 2:
+                    else if callee is "par_run" and list_count(args) is 2:
                         # par_run(fns, arg): call each function value with arg and
                         # sum. Sequential in the browser; the result is the same.
-                        wpr0 = compile_expr(fn_value, at(args, 0), locals)
-                        wpr1 = compile_expr(wpr0, at(args, 1), locals)
+                        wpr0 = compile_expr(fn_value, args[0], locals)
+                        wpr1 = compile_expr(wpr0, args[1], locals)
                         emit_call(wpr1, slot_get_int("wfn:__par_run"))
-                    else if callee == "resume" and list_count(args) == 1:
+                    else if callee is "resume" and list_count(args) is 1:
                         # resume(v): the handler returns v, which becomes the value
                         # of the enclosing `perform`. Matches the native setjmp path
                         # where resume does not return (it abandons the rest of the
                         # handler). `return` makes the trailing handler code
                         # unreachable, exactly like the longjmp did.
-                        rv = compile_expr(fn_value, at(args, 0), locals)
+                        rv = compile_expr(fn_value, args[0], locals)
                         emit_op(rv, op_return())
                     else if slot_has("lam:{callee}"):
                         # Closure call: push the captured values (from this scope)
@@ -3367,58 +3643,90 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         lfn = slot_get("lam:{callee}")
                         edit lc = fn_value
                         lcapn = if slot_has("lamcapn:{lfn}") then slot_get_int("lamcapn:{lfn}") else 0
-                        loop ci in 0..<lcapn:
+                        loop ci in 0 until lcapn:
                             lc = compile_expr(lc, {"kind": "Ident", "name": slot_get("lamcap:{lfn}:{ci}")}, locals)
                         loop larg in args:
                             lc = compile_expr(lc, larg, locals)
                         emit_call(lc, slot_get_int("wfn:{lfn}"))
-                    else if callee == "push" or callee == "append":
+                    else if callee is "push" or callee is "append":
                         # append(list, val) -> new list. f64 value -> __push_f
                         # (8-byte elements); otherwise __push (4-byte).
-                        pet = type_of(at(args, 1))
-                        wl = compile_expr(fn_value, at(args, 0), locals)
-                        wv = compile_expr(wl, at(args, 1), locals)
-                        pfn = if pet == "f" then slot_get_int("wfn:__push_f") else slot_get_int("wfn:__push")
+                        pet = type_of(args[1])
+                        wl = compile_expr(fn_value, args[0], locals)
+                        wv = compile_expr(wl, args[1], locals)
+                        pfn = if pet is "f" then slot_get_int("wfn:__push_f") else slot_get_int("wfn:__push")
                         emit_call(wv, pfn)
-                    else if callee == "print_line" or callee == "print":
+                    else if callee is "print_line" or callee is "print":
                         # Lower to the __print host import: text pointer + newline
                         # flag (1 for the line variants, 0 for print). print_line()
                         # with no argument is just a newline (empty text).
-                        wt = if list_count(args) >= 1 then compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals) else compile_expr(fn_value, {"kind": "Str", "value": ""}, locals)
-                        nl = if callee == "print" then 0 else 1
+                        wt = if list_count(args) >= 1 then compile_as_text(fn_value, args[0], type_of(args[0]), locals) else compile_expr(fn_value, {"kind": "Str", "value": ""}, locals)
+                        nl = if callee is "print" then 0 else 1
                         wn = emit_const(wt, nl)
                         emit_call(wn, slot_get_int("wfn:__print"))
-                    else if callee == "argc":
+                    else if callee is "slot_set":
+                        # One name, two kinds of value. `type_of` says which
+                        # in ONE letter - it is not a type node, and feeding
+                        # it to wtype_of crashes the compiler.
+                        wk0 = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
+                        wk = emit_call(wk0, slot_get_int("wfn:__slot_key"))
+                        if type_of(args[1]) is "t":
+                            wv = compile_as_text(wk, args[1], type_of(args[1]), locals)
+                            emit_call(wv, slot_get_int("wfn:__slot_set_text"))
+                        else:
+                            wv2 = compile_expr(wk, args[1], locals)
+                            emit_call(wv2, slot_get_int("wfn:__slot_set"))
+                    else if callee is "text_hash":
+                        # The same thirteen instructions a slot key is hashed
+                        # with. It leaves the text's address at mem[8] on the
+                        # way past, which nothing here minds.
+                        wth = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
+                        emit_call(wth, slot_get_int("wfn:__slot_key"))
+                    else if callee is "slot_get_int":
+                        wk2 = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
+                        emit_call(emit_call(wk2, slot_get_int("wfn:__slot_key")), slot_get_int("wfn:__slot_get_int"))
+                    else if callee is "slot_get":
+                        wk3 = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
+                        emit_call(emit_call(wk3, slot_get_int("wfn:__slot_key")), slot_get_int("wfn:__slot_get"))
+                    else if callee is "slot_has":
+                        wk4 = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
+                        emit_call(emit_call(wk4, slot_get_int("wfn:__slot_key")), slot_get_int("wfn:__slot_has"))
+                    else if callee is "monotonic_ms":
+                        emit_call(fn_value, slot_get_int("wfn:__now"))
+                    else if callee is "argc":
                         emit_call(fn_value, slot_get_int("wfn:__argc"))
-                    else if callee == "argv":
-                        wa = compile_expr(fn_value, at(args, 0), locals)
+                    else if callee is "argv":
+                        wa = compile_expr(fn_value, args[0], locals)
                         emit_call(wa, slot_get_int("wfn:__argv"))
-                    else if callee == "file_read":
-                        wp = compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
+                    else if callee is "file_read":
+                        wp = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
                         emit_call(wp, slot_get_int("wfn:__file_read"))
-                    else if callee == "file_write":
-                        wp = compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
-                        wc = compile_as_text(wp, at(args, 1), type_of(at(args, 1)), locals)
+                    else if callee is "file_write":
+                        wp = compile_as_text(fn_value, args[0], type_of(args[0]), locals)
+                        wc = compile_as_text(wp, args[1], type_of(args[1]), locals)
                         emit_call(wc, slot_get_int("wfn:__file_write"))
-                    else if callee == "to_text":
+                    else if callee is "to_text":
                         # int/f64 -> text; text passes through unchanged.
-                        compile_as_text(fn_value, at(args, 0), type_of(at(args, 0)), locals)
-                    else if callee == "__interp_join":
+                        compile_as_text(fn_value, args[0], type_of(args[0]), locals)
+                    else if callee is "__interp_join":
                         # Interpolation with 3+ parts: fold text concat over the
                         # parts (each is a Str or a to_text call, already text).
-                        edit cur = compile_expr(fn_value, at(args, 0), locals)
+                        edit cur = compile_expr(fn_value, args[0], locals)
                         edit j = 1
                         loop:
                             if j >= list_count(args):
                                 break
-                            cur = compile_expr(cur, at(args, j), locals)
+                            cur = compile_expr(cur, args[j], locals)
                             cur = emit_call(cur, slot_get_int("wfn:__text_concat"))
                             j = j + 1
                         cur
-                    else if slot_has("vtag:{callee}"):
+                    else if slot_has("vtag:{w_spoken_variant(callee)}") and not (slot_get_int("vcore:{w_spoken_variant(callee)}") is 1 and slot_has("wfn:{callee}")):
                         # Sum-type constructor: allocate [tag][payload...] and
-                        # leave the pointer on the stack.
-                        ctag = slot_get_int("vtag:{callee}")
+                        # leave the pointer on the stack. A CORE variant loses
+                        # to a function of yours by that name - `define Ok(v)`
+                        # in your own file used to build a core Result instead
+                        # of being called, and answered a wrong number.
+                        ctag = slot_get_int("vtag:{w_spoken_variant(callee)}")
                         cn = list_count(args)
                         cdepth = slot_get_int("wtmp:depth")
                         ctidx = slot_get_int("wtmp:pbase") + cdepth
@@ -3455,14 +3763,14 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             current_fn = compile_expr(current_fn, arg, locals)
                             edit want_f = false
                             if ai < sig_n:
-                                if at(sig_b, ai) == 102:
+                                if sig_b[ai] is 102:
                                     want_f = true
-                            if want_f and type_of(arg) == "i":
+                            if want_f and type_of(arg) is "i":
                                 current_fn = emit_op(current_fn, op_f64_convert_i32_s())
                             # ...and the demotion twin: a number argument
                             # into an integer parameter truncates exactly
                             # for whole values.
-                            if (not want_f) and ai < sig_n and type_of(arg) == "f":
+                            if (not want_f) and ai < sig_n and type_of(arg) is "f":
                                 current_fn = emit_op(current_fn, op_i32_trunc_f64_s())
                             ai = ai + 1
                         # Resolve the callee to its function index. The driver records
@@ -3480,19 +3788,19 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             if arg_total > 6:
                                 compile_error("orion: ERROR - the wasm backend calls function values with at most 6 arguments (got {arg_total})")
                             with_fidx = emit_local_get(current_fn, lookup_local(locals, callee))
-                            emit_call_indirect(with_fidx, if arg_total == 0 then 6 else arg_total - 1)
+                            emit_call_indirect(with_fidx, if arg_total is 0 then 6 else arg_total - 1)
                         else:
                             compile_error("orion: ERROR - the wasm backend does not support calling `{callee}` (unknown function or unsupported builtin)")
                             current_fn
                 else:
-                    if kind == "If":
+                    if kind is "If":
                         # if-as-expression: cond, then push result, else push
                         # result. The blocktype follows the branches' type -
                         # a number if yields f64; a whole-number branch
                         # meeting a number branch promotes to match.
                         then_ty = type_of(get(expr_node, "then"))
                         else_ty = type_of(get_map(expr_node, "else"))
-                        wants_f = then_ty == "f" or else_ty == "f"
+                        wants_f = then_ty is "f" or else_ty is "f"
                         with_cond = compile_expr(fn_value, get(expr_node, "cond"), locals)
                         with_if = emit_op(with_cond, op_if())
                         with_bt = emit_bytes(with_if, [if wants_f then ty_f64() else ty_i32()])
@@ -3504,71 +3812,71 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         if wants_f and else_ty is not "f":
                             with_otherwise = emit_op(with_otherwise, op_f64_convert_i32_s())
                         emit_op(with_otherwise, op_end())
-                    else if kind == "Unary":
+                    else if kind is "Unary":
                         uop = get(expr_node, "op")
                         operand = get_map(expr_node, "operand")
-                        if uop == "neg":
-                            if type_of(operand) == "f":
+                        if uop is "neg":
+                            if type_of(operand) is "f":
                                 with_f = compile_expr(fn_value, operand, locals)
                                 emit_op(with_f, op_f64_neg())
                             else:
-                                # -x == 0 - x (i32 has no negate opcode)
+                                # -x is 0 - x (i32 has no negate opcode)
                                 with_zero = emit_const(fn_value, 0)
                                 with_operand = compile_expr(with_zero, operand, locals)
                                 emit_op(with_operand, op_i32_sub())
-                        else if uop == "not":
+                        else if uop is "not":
                             with_operand = compile_expr(fn_value, operand, locals)
                             emit_op(with_operand, op_i32_eqz())
-                        else if uop == "bnot":
-                            # ~x == x ^ -1
+                        else if uop is "bnot":
+                            # ~x is x ^ -1
                             with_operand = compile_expr(fn_value, operand, locals)
                             with_neg1 = emit_const(with_operand, 0 - 1)
                             emit_op(with_neg1, op_i32_xor())
                         else:
                             compile_expr(fn_value, operand, locals)
-                    else if kind == "Cast":
+                    else if kind is "Cast":
                         # x as T. Phase 1: int<->float works (both types exist);
                         # sized integer types (i8/i16/i64/u*) await the sized-types
                         # backend work and refuse cleanly for now.
                         ctype = get(get_map(expr_node, "type"), "name")
                         cexpr = get_map(expr_node, "expr")
-                        tc = if ctype == "int" or ctype == "Int" then "i" else wtype_of(get_map(expr_node, "type"))
+                        tc = if ctype is "int" or ctype is "Int" then "i" else wtype_of(get_map(expr_node, "type"))
                         csrc = type_of(cexpr)
-                        if tc == "f":
+                        if tc is "f":
                             # to f64: promote whatever the source is.
                             w_to_f64(compile_expr(fn_value, cexpr, locals), csrc)
-                        else if tc == "g":
+                        else if tc is "g":
                             # to f32: from f64 demote, from f32 keep, from int convert.
                             wcv = compile_expr(fn_value, cexpr, locals)
-                            if csrc == "g" then wcv
-                            else if csrc == "f" then emit_op(wcv, op_f32_demote_f64())
+                            if csrc is "g" then wcv
+                            else if csrc is "f" then emit_op(wcv, op_f32_demote_f64())
                             else if w_is_i64rep(csrc) then emit_op(emit_op(wcv, op_i32_wrap_i64()), op_f32_convert_i32_s())
                             else emit_op(wcv, op_f32_convert_i32_s())
                         else if w_is_i64rep(tc):
                             # An int literal cast to i64/u64 becomes an i64.const so
                             # values beyond i32 survive; otherwise extend/trunc.
-                            if get(cexpr, "kind") == "Int":
+                            if get(cexpr, "kind") is "Int":
                                 emit_i64_const(fn_value, parse_decimal(get(cexpr, "value")))
                             else:
                                 wcv = compile_expr(fn_value, cexpr, locals)
                                 if w_is_i64rep(csrc) then wcv
-                                else if csrc == "f" then emit_op(wcv, op_i64_trunc_f64_s())
-                                else if csrc == "g" then emit_op(emit_op(wcv, op_f64_promote_f32()), op_i64_trunc_f64_s())
+                                else if csrc is "f" then emit_op(wcv, op_i64_trunc_f64_s())
+                                else if csrc is "g" then emit_op(emit_op(wcv, op_f64_promote_f32()), op_i64_trunc_f64_s())
                                 else if w_is_unsigned(csrc) then emit_op(wcv, op_i64_extend_i32_u())
                                 else emit_op(wcv, op_i64_extend_i32_s())
                         else if w_int_width(tc) > 0:
                             # An i32-rep int target (i8/i16/i32/u8/u16/u32): produce
                             # an i32, then mask to the target width.
                             wcv = compile_expr(fn_value, cexpr, locals)
-                            wi = if csrc == "f" then emit_op(wcv, op_i32_trunc_f64_s())
-                                 else if csrc == "g" then emit_op(wcv, op_i32_trunc_f32_s())
+                            wi = if csrc is "f" then emit_op(wcv, op_i32_trunc_f64_s())
+                                 else if csrc is "g" then emit_op(wcv, op_i32_trunc_f32_s())
                                  else if w_is_i64rep(csrc) then emit_op(wcv, op_i32_wrap_i64())
                                  else wcv
                             w_emit_mask(wi, tc)
                         else:
                             compile_error("orion: ERROR - the wasm backend does not support `as {ctype}` yet")
                             emit_const(fn_value, 0)
-                    else if kind == "Str":
+                    else if kind is "Str":
                         # Record the literal for a data segment; push its pointer.
                         # The bytes live in linear memory (length-prefixed); a host
                         # reads the length there, then the bytes at pointer + 4.
@@ -3581,15 +3889,15 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         sblen = length(bytes_of(stext))
                         slot_set("str:next", soff + sblen + 4)
                         emit_const(fn_value, soff)
-                    else if kind == "ListLit" or kind == "Tuple":
+                    else if kind is "ListLit" or kind is "Tuple":
                         # Heap-allocate [length, elem0, elem1, ...] via the bump
                         # allocator, fill it, and leave the pointer on the stack.
                         # f64 elements take 8 bytes (stride 8), i32/pointers 4.
                         # A tuple (a, b) is just a (homogeneous) list literal.
                         items = get_list(expr_node, "items")
                         n = list_count(items)
-                        et = if n > 0 then type_of(at(items, 0)) else "i"
-                        stride = if et == "f" then 8 else 4
+                        et = if n > 0 then type_of(items[0]) else "i"
+                        stride = if et is "f" then 8 else 4
                         depth = slot_get_int("wtmp:depth")
                         tidx = slot_get_int("wtmp:pbase") + depth
                         slot_set("wtmp:depth", depth + 1)
@@ -3613,12 +3921,12 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         loop item in items:
                             cur = emit_local_get(cur, tidx)
                             cur = compile_expr(cur, item, locals)
-                            cur = if et == "f" then emit_f64_store(cur, 4 + i * stride) else emit_store(cur, 4 + i * stride)
+                            cur = if et is "f" then emit_f64_store(cur, 4 + i * stride) else emit_store(cur, 4 + i * stride)
                             i = i + 1
                         result = emit_local_get(cur, tidx)
                         slot_set("wtmp:depth", depth)
                         result
-                    else if kind == "StructCons":
+                    else if kind is "StructCons":
                         # Like a list, minus the length header: allocate the
                         # struct's total size and store each value at its declared
                         # offset, with an f64 store for f64 fields. Leaves the
@@ -3629,7 +3937,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         # `Point{..p, x: 7}` spreads p: copy its words, then the
                         # explicit fields below override. A struct value is never
                         # an Int, so an Int spread node is the "no spread" marker.
-                        has_spread = has(expr_node, "spread") and get(get_map(expr_node, "spread"), "kind") != "Int"
+                        has_spread = has(expr_node, "spread") and get(get_map(expr_node, "spread"), "kind") is not "Int"
                         slot_set("wtmp:depth", sdepth + (if has_spread then 2 else 1))
                         sname = get(expr_node, "name")
                         ssize = if slot_has("ssize:{sname}") then slot_get_int("ssize:{sname}") else list_count(sfields) * 4
@@ -3646,7 +3954,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             spidx = stidx + 1
                             scur = compile_expr(scur, get_map(expr_node, "spread"), locals)
                             scur = emit_local_set(scur, spidx)
-                            loop wcopy in 0..<(ssize // 4):
+                            loop wcopy in 0 until (ssize // 4):
                                 scur = emit_local_get(scur, stidx)
                                 scur = emit_local_get(scur, spidx)
                                 scur = emit_load(scur, wcopy * 4)
@@ -3660,15 +3968,15 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             # A whole value meets a number field (or the
                             # reverse): convert, mirroring the native rule.
                             vty = type_of(get_map(fdef, "value"))
-                            if fty == "f" and vty == "i":
+                            if fty is "f" and vty is "i":
                                 scur = emit_op(scur, op_f64_convert_i32_s())
-                            if fty == "i" and vty == "f":
+                            if fty is "i" and vty is "f":
                                 scur = emit_op(scur, op_i32_trunc_f64_s())
-                            scur = if fty == "f" then emit_f64_store(scur, foff) else emit_store(scur, foff)
+                            scur = if fty is "f" then emit_f64_store(scur, foff) else emit_store(scur, foff)
                         sresult = emit_local_get(scur, stidx)
                         slot_set("wtmp:depth", sdepth)
                         sresult
-                    else if kind == "MapLit":
+                    else if kind is "MapLit":
                         # Association list [count][key_ptr, value, ...] (8 bytes
                         # per entry). String keys become text literals; values are
                         # i32. get(m, key) linear-searches via __map_get.
@@ -3703,21 +4011,21 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         mresult = emit_local_get(mcur, mtidx)
                         slot_set("wtmp:depth", mdepth)
                         mresult
-                    else if kind == "Field":
+                    else if kind is "Field":
                         # p.field loads mem[ptr + offset]; f64 field -> f64.load.
                         # A field named _0/_1/... is a tuple element (a tuple is a
                         # list, so element i lives at 4 + i*stride).
                         fld = get(expr_node, "field")
                         flb = bytes_of(fld)
-                        is_tup_fld = length(flb) >= 2 and at(flb, 0) == 95 and at(flb, 1) >= 48 and at(flb, 1) <= 57
+                        is_tup_fld = length(flb) >= 2 and flb[0] is 95 and flb[1] >= 48 and flb[1] <= 57
                         if slot_has("vtag:{fld}"):
-                            if slot_get_int("vboxed:{fld}") == 0:
+                            if slot_get_int("vboxed:{fld}") is 0:
                                 # C-like enum (Color.Red): the value IS the tag.
                                 emit_const(fn_value, slot_get_int("vtag:{fld}"))
                             else:
                                 # Boxed enum, zero-payload variant (Opt.None):
                                 # allocate a one-word [tag] block and return the
-                                # pointer, so `match` reads the tag like any
+                                # pointer, so `choose` reads the tag like any
                                 # variant. Payload variants go through the Call path.
                                 vdepth = slot_get_int("wtmp:depth")
                                 vtidx = slot_get_int("wtmp:pbase") + vdepth
@@ -3738,17 +4046,17 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         else if is_tup_fld:
                             teidx = parse_decimal(fld)
                             tet = w_elem_type(get_map(expr_node, "object"))
-                            tstr = if tet == "f" then 8 else 4
+                            tstr = if tet is "f" then 8 else 4
                             wobj = compile_expr(fn_value, get_map(expr_node, "object"), locals)
-                            if tet == "f" then emit_f64_load(wobj, 4 + teidx * tstr) else emit_load(wobj, 4 + teidx * tstr)
+                            if tet is "f" then emit_f64_load(wobj, 4 + teidx * tstr) else emit_load(wobj, 4 + teidx * tstr)
                         else:
                             foff2 = if slot_has("fld:{fld}") then slot_get_int("fld:{fld}") else 0
                             fty2 = if slot_has("ftype:{fld}") then slot_get("ftype:{fld}") else "i"
                             with_obj = compile_expr(fn_value, get_map(expr_node, "object"), locals)
-                            if fty2 == "f" then emit_f64_load(with_obj, foff2) else emit_load(with_obj, foff2)
-                    else if kind == "Index":
+                            if fty2 is "f" then emit_f64_load(with_obj, foff2) else emit_load(with_obj, foff2)
+                    else if kind is "Index":
                         idxnode = get_map(expr_node, "index")
-                        if type_of(idxnode) == "t":
+                        if type_of(idxnode) is "t":
                             # m["key"] - a text index means a map lookup by key.
                             wmp = compile_expr(fn_value, get_map(expr_node, "object"), locals)
                             wky = compile_as_text(wmp, idxnode, "t", locals)
@@ -3759,7 +4067,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             # (unreachable) rather than reading adjacent memory, the
                             # same loud failure the native backend gives.
                             iet = w_elem_type(get_map(expr_node, "object"))
-                            istride = if iet == "f" then 8 else 4
+                            istride = if iet is "f" then 8 else 4
                             idepth = slot_get_int("wtmp:depth")
                             iptr = slot_get_int("wtmp:pbase") + idepth
                             iidx = iptr + 1
@@ -3767,7 +4075,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             edit wpt = compile_expr(fn_value, get_map(expr_node, "object"), locals)
                             wpt = emit_local_set(wpt, iptr)
                             wpt = compile_expr(wpt, idxnode, locals)
-                            if type_of(idxnode) == "f":
+                            if type_of(idxnode) is "f":
                                 wpt = emit_op(wpt, op_i32_trunc_f64_s())
                             wpt = emit_local_set(wpt, iidx)
                             # if idx < 0 or idx >= len: trap
@@ -3785,8 +4093,8 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             wpt = emit_op(wpt, op_i32_mul())
                             wpt = emit_op(wpt, op_i32_add())
                             slot_set("wtmp:depth", idepth)
-                            if iet == "f" then emit_f64_load(wpt, 4) else emit_load(wpt, 4)
-                    else if kind == "Block":
+                            if iet is "f" then emit_f64_load(wpt, 4) else emit_load(wpt, 4)
+                    else if kind is "Block":
                         # A block used as a value (e.g. a list comprehension
                         # `loop x in xs: e`): run its statements; the last one
                         # leaves the block's value on the stack. The locals it
@@ -3798,9 +4106,9 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             bf = get(br, "fn")
                             blk_locals = get(br, "locals")
                         bf
-                    else if kind == "Question":
+                    else if kind is "Question":
                         # e? : the value is a tagged Result/Option. If it is an
-                        # error (tag != 0, i.e. not the first/success variant),
+                        # error (tag is not 0, i.e. not the first/success variant),
                         # early-return it; otherwise unwrap the payload.
                         qdepth = slot_get_int("wtmp:depth")
                         qtidx = slot_get_int("wtmp:pbase") + qdepth
@@ -3819,7 +4127,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         qres = emit_load(q11, 4)
                         slot_set("wtmp:depth", qdepth)
                         qres
-                    else if kind == "MethodCall":
+                    else if kind is "MethodCall":
                         # Enum.Variant(a) is a qualified constructor (ignore the
                         # receiver); otherwise UFCS: recv.m(a) -> m(recv, a).
                         mmethod = get(expr_node, "method")
@@ -3831,7 +4139,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                             loop ma in margs:
                                 newargs = append(newargs, ma)
                             compile_expr(fn_value, {"kind": "Call", "callee": mmethod, "args": newargs}, locals)
-                    else if kind == "Match":
+                    else if kind is "Match":
                         # match s: Variant(binds) -> body ... : store the scrutinee
                         # in a temp, then a tag-dispatch chain of if-expressions.
                         # Each arm binds its payload to fresh locals (shared across
@@ -3856,10 +4164,10 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         # non-matching arm is harmless.
                         loop arm in marms:
                             pk = get(arm, "pat_kind")
-                            pat = get(arm, "pattern")
-                            is_variant = pk == "ident" and slot_has("vtag:{pat}")
-                            is_wild = pk == "ident" and (pat == "_" or pat == "else")
-                            is_binding = pk == "ident" and (not is_variant) and (not is_wild)
+                            pat = if get(arm, "pat_kind") is "ident" then w_spoken_variant(get(arm, "pattern")) else get(arm, "pattern")
+                            is_variant = pk is "ident" and slot_has("vtag:{pat}")
+                            is_wild = pk is "ident" and (pat is "_" or pat is "else")
+                            is_binding = pk is "ident" and (not is_variant) and (not is_wild)
                             edit arm_locals = locals
                             edit nested_specs = []
                             if is_binding:
@@ -3880,7 +4188,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                                         mf = add_local(mf)
                                         note_local("i")
                                         maxbind = maxbind + 1
-                                    if bname != "":
+                                    if bname is not "":
                                         mf = emit_local_get(mf, scrut_idx)
                                         mf = emit_load(mf, 4 + bj * 4)
                                         mf = emit_local_set(mf, length(locals) + bj)
@@ -3895,7 +4203,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                                         # The bound name carries the payload
                                         # slot's declared type (text stays
                                         # text in interpolation/concat).
-                                        if bname != "" and slot_has("vptype:{pat}:{bj}"):
+                                        if bname is not "" and slot_has("vptype:{pat}:{bj}"):
                                             slot_set(w_ltype_key(bname), slot_get("vptype:{pat}:{bj}"))
                                         arm_locals = append(arm_locals, bname)
                                     bj = bj + 1
@@ -3910,7 +4218,7 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                                             mf = add_local(mf)
                                             note_local("i")
                                             maxbind = maxbind + 1
-                                        if sub != "":
+                                        if sub is not "":
                                             mf = emit_local_get(mf, inner_idx)
                                             mf = emit_load(mf, 4 + sk * 4)
                                             mf = emit_local_set(mf, length(locals) + nextl)
@@ -3922,15 +4230,15 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                                 mf = emit_local_get(mf, scrut_idx)
                                 # boxed enum: the scrutinee is a pointer, load its
                                 # tag. C-like enum: the scrutinee IS the tag.
-                                if slot_get_int("vboxed:{pat}") == 1:
+                                if slot_get_int("vboxed:{pat}") is 1:
                                     mf = emit_load(mf, 0)
                                 mf = emit_const(mf, slot_get_int("vtag:{pat}"))
                                 mf = emit_op(mf, op_i32_eq())
-                            else if pk == "int":
+                            else if pk is "int":
                                 mf = emit_local_get(mf, scrut_idx)
                                 mf = emit_const(mf, parse_decimal(pat))
                                 mf = emit_op(mf, op_i32_eq())
-                            else if pk == "str":
+                            else if pk is "str":
                                 # text patterns compare by content, not pointer.
                                 mf = emit_local_get(mf, scrut_idx)
                                 mf = compile_expr(mf, {"kind": "Str", "value": pat}, locals)
@@ -3973,11 +4281,11 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
                         # no arm matched: a value match falls through to 0.
                         if not mvoid:
                             mf = emit_const(mf, 0)
-                        loop _c in 0..<open_ifs:
+                        loop _c in 0 until open_ifs:
                             mf = emit_op(mf, op_end())
                         slot_set("wtmp:depth", mdepth)
                         mf
-                    else if kind == "Perform":
+                    else if kind is "Perform":
                         # perform Effect.op(args) calls the synthesized handler fn
                         # __handler_Effect_op (the parser turns `handle` into a
                         # plain Fn with that name). Its return value is what perform
@@ -4007,27 +4315,32 @@ define compile_expr(fn_value: WFn, expr_node: table, locals: [text]) -> WFn:
 # i16 "h". f64 "f", text/pointer "t". All the <=32-bit ints represent as wasm
 # i32 (masked to width); i64/u64 use wasm i64.
 define wtype_of(tnode: table) -> text:
-    if get(tnode, "kind") == "Named":
+    if get(tnode, "kind") is "Named":
         nm = get(tnode, "name")
-        if nm == "f64" or nm == "float" or nm == "number":
+        if nm is "f64" or nm is "float" or nm is "number":
             "f"
-        else if nm == "f32":
+        else if nm is "f32":
             "g"
-        else if nm == "Text" or nm == "text":
+        else if nm is "Text" or nm is "text":
             "t"
-        else if nm == "i64":
+        else if nm is "table" or nm is "Table" or nm is "Map":
+            # A declared table, so a field or a parameter can say it is one -
+            # `set(f.cache, key, v)` reads its map-ness off the STRUCT, not off
+            # a literal it never sees.
+            "m"
+        else if nm is "i64":
             "l"
-        else if nm == "u64":
+        else if nm is "u64":
             "L"
-        else if nm == "i8":
+        else if nm is "i8":
             "b"
-        else if nm == "i16":
+        else if nm is "i16":
             "h"
-        else if nm == "u8":
+        else if nm is "u8":
             "B"
-        else if nm == "u16":
+        else if nm is "u16":
             "H"
-        else if nm == "u32":
+        else if nm is "u32":
             "I"
         else:
             "i"
@@ -4039,23 +4352,23 @@ define wtype_of(tnode: table) -> text:
 # Comparisons/logical always yield an i32 bool. Aggregates are pointers ('i').
 define type_of(node: table) -> text:
     kind = get(node, "kind")
-    if kind == "Float":
+    if kind is "Float":
         "f"
-    else if kind == "Int":
+    else if kind is "Int":
         iv = parse_decimal(get(node, "value"))
         if iv > 2147483647 or iv < (0 - 2147483648) then "l" else "i"
-    else if kind == "Str":
+    else if kind is "Str":
         "t"
-    else if kind == "Ident":
+    else if kind is "Ident":
         nm = get(node, "name")
         # A local wins over a const of the same name, exactly as it does
         # at the emit site.
         if slot_has("ltype:{nm}") then slot_get("ltype:{nm}") else if slot_has("constfloat:{nm}") then "f" else if slot_has("conststr:{nm}") then "t" else "i"
-    else if kind == "Binary":
+    else if kind is "Binary":
         op = get(node, "op")
-        if op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">=" or op == "and" or op == "or":
+        if op is "==" or op is "!=" or op is "<" or op is ">" or op is "<=" or op is ">=" or op is "and" or op is "or":
             "i"
-        else if op == "/":
+        else if op is "/":
             # Real division always yields f64 (the flip).
             "f"
         else:
@@ -4064,58 +4377,66 @@ define type_of(node: table) -> text:
             # compiler on a 20-term sum.
             lt = type_of(get_map(node, "left"))
             rt = type_of(get_map(node, "right"))
-            if lt == "t" or rt == "t":
+            if lt is "t" or rt is "t":
                 "t"
-            else if lt == "f" or rt == "f":
+            else if lt is "f" or rt is "f":
                 "f"
-            else if lt == "g" or rt == "g":
+            else if lt is "g" or rt is "g":
                 "g"
             else:
                 w_peer(lt, rt)
-    else if kind == "Unary":
+    else if kind is "MapLit":
+        # A table says what it is. Nothing else could: the type alphabet had a
+        # letter for a list's elements and none for a map, so `set(m, k, v)`
+        # with a key that was not text fell into the LIST path and multiplied
+        # the key by a stride. With an int key that quietly wrote to the wrong
+        # address; with a 64-bit key wasm caught it and refused the module.
+        # "m" is a pointer like "t" everywhere that does not ask.
+        "m"
+    else if kind is "Unary":
         type_of(get_map(node, "operand"))
-    else if kind == "Call":
+    else if kind is "Call":
         callee = get(node, "callee")
-        if callee == "to_real":
+        if callee is "to_real":
             "f"
-        else if callee == "to_whole":
+        else if callee is "to_whole":
             "i"
-        else if callee == "to_text" or callee == "__interp_join" or callee == "argv" or callee == "file_read" or callee == "text_of":
+        else if callee is "to_text" or callee is "__interp_join" or callee is "argv" or callee is "file_read" or callee is "text_of":
             "t"
-        else if callee == "part":
+        else if callee is "part":
             # substring stays text; a sublist stays a pointer.
-            type_of(at(get_list(node, "args"), 0))
-        else if callee == "at":
-            w_elem_type(at(get_list(node, "args"), 0))
+            type_of(get_list(node, "args")[0])
+        else if callee is "at":
+            w_elem_type(get_list(node, "args")[0])
         else if slot_has("fret:{callee}"):
             slot_get("fret:{callee}")
         else:
             "i"
-    else if kind == "Index":
+    else if kind is "Index":
         w_elem_type(get_map(node, "object"))
-    else if kind == "Field":
+    else if kind is "Field":
         fld = get(node, "field")
         flb = bytes_of(fld)
-        if length(flb) >= 2 and at(flb, 0) == 95 and at(flb, 1) >= 48 and at(flb, 1) <= 57:
+        if length(flb) >= 2 and flb[0] is 95 and flb[1] >= 48 and flb[1] <= 57:
             w_elem_type(get_map(node, "object"))
         else:
             if slot_has("ftype:{fld}") then slot_get("ftype:{fld}") else "i"
-    else if kind == "If":
-        if type_of(get_map(node, "then")) == "f" or type_of(get_map(node, "else")) == "f":
+    else if kind is "If":
+        if type_of(get_map(node, "then")) is "f" or type_of(get_map(node, "else")) is "f":
             "f"
         else:
             type_of(get_map(node, "then"))
-    else if kind == "Match":
-        type_of(get_map(at(get_list(node, "arms"), 0), "body"))
-    else if kind == "Cast":
+    else if kind is "Match":
+        type_of(get_map(get_list(node, "arms")[0], "body"))
+    else if kind is "Cast":
         wtype_of(get_map(node, "type"))
-    else if kind == "Perform":
+    else if kind is "Perform":
         hn = "__handler_{get(node, \"effect\")}_{get(node, \"op\")}"
         if slot_has("fret:{hn}") then slot_get("fret:{hn}") else "i"
-    else if kind == "MethodCall":
+    else if kind is "MethodCall":
         mm = get(node, "method")
         if slot_has("vtag:{mm}") then "i" else (if slot_has("fret:{mm}") then slot_get("fret:{mm}") else "i")
-    else if kind == "Block":
+    else if kind is "Block":
         "i"
     else:
         "i"
@@ -4125,38 +4446,94 @@ define type_of(node: table) -> text:
 # to pick element stride (4 vs 8 bytes) and i32 vs f64 loads/stores.
 define w_elem_type(node: table) -> text:
     kind = get(node, "kind")
-    if kind == "ListLit" or kind == "Tuple":
+    if kind is "ListLit" or kind is "Tuple":
         items = get_list(node, "items")
-        if list_count(items) > 0 then type_of(at(items, 0)) else "i"
-    else if kind == "Ident":
+        if list_count(items) > 0 then type_of(items[0]) else "i"
+    else if kind is "Ident":
         nm = get(node, "name")
         if slot_has("eltype:{nm}") then slot_get("eltype:{nm}") else "i"
-    else if kind == "Call":
+    else if kind is "Call":
         c = get(node, "callee")
-        if c == "push" or c == "append":
-            type_of(at(get_list(node, "args"), 1))
-        else if c == "set":
-            w_elem_type(at(get_list(node, "args"), 0))
-        else if c == "filled_number":
+        if c is "push" or c is "append":
+            type_of(get_list(node, "args")[1])
+        else if c is "set":
+            w_elem_type(get_list(node, "args")[0])
+        else if c is "filled_number":
             "f"
-        else if c == "keys" or c == "map_keys" or c == "split":
+        else if c is "keys" or c is "map_keys" or c is "split":
             # keys are text by definition; split yields text segments.
             "t"
+        else if slot_has("frel:{c}"):
+            # A function that declared `-> [text]` or `-> [number]` said what
+            # its list holds; that is both the loop variable's type and the
+            # element stride.
+            slot_get("frel:{c}")
         else:
             "i"
+    else:
+        "i"
+
+# The spoken constructor names. NOT wired in: translating them here made this
+# backend answer 1110 where the native one answers 58 - the boxed-enum
+# representation leaks through a core variant reached by a spoken name, and a
+# wrong number is worse than a refusal. Left as a refusal ("does not support
+# `some`") until that is understood. The declared spellings work.
+define w_spoken_variant(name: text) -> text:
+    edit declared = ""
+    if name is "some":
+        declared = "Some"
+    if name is "none":
+        declared = "None"
+    if name is "ok":
+        declared = "Ok"
+    if name is "error":
+        declared = "Err"
+    if declared is "":
+        return name
+    if slot_has("vtag:{name}"):
+        return name
+    if slot_has("wfn:{name}"):
+        return name
+    if not slot_has("vtag:{declared}"):
+        return name
+    declared
+
+# The VALUE type of a map, the same way w_elem_type reads a list's element
+# type: straight off a literal, or off the slot recorded when it was bound.
+# "i" is the honest default - an unannotated map value is one i32 word.
+define w_map_val_type(node: table) -> text:
+    kind = get(node, "kind")
+    if kind is "MapLit":
+        # Values that disagree have no single type. "i" - a raw word - is the
+        # honest answer then; claiming the first pair's type would read an int
+        # as a text pointer, which is the native backend's old crash.
+        pairs = get_list(node, "pairs")
+        edit mv = if list_count(pairs) > 0 then type_of(get_map(pairs[0], "value")) else "i"
+        loop mvi in 1 until list_count(pairs):
+            if type_of(get_map(pairs[mvi], "value")) is not mv:
+                mv = "i"
+        mv
+    else if kind is "Ident":
+        nm = get(node, "name")
+        if slot_has("mvaltype:{nm}") then slot_get("mvaltype:{nm}") else "i"
     else:
         "i"
 
 # Compile `node` and leave a text pointer on the stack, converting from its
 # static type: text passes through, int -> __int_to_text, f64 -> truncate then
 # __int_to_text (the fraction is dropped; f64 formatting is a later step).
+# Is this type code already a whole number in an i32? Everything <= 32 bits
+# represents as wasm i32; f64 and a text pointer do not.
+define w_is_whole(t: text) -> truth:
+    t is "i" or t is "b" or t is "h" or t is "B" or t is "H" or t is "I"
+
 define compile_as_text(fn_value: WFn, node: table, ntype: text, locals: [text]) -> WFn:
-    if ntype == "t":
+    if ntype is "t":
         compile_expr(fn_value, node, locals)
-    else if ntype == "f":
+    else if ntype is "f":
         w1 = compile_expr(fn_value, node, locals)
         emit_call(w1, slot_get_int("wfn:__f64_to_text"))
-    else if ntype == "l" or ntype == "L":
+    else if ntype is "l" or ntype is "L":
         w1 = compile_expr(fn_value, node, locals)
         emit_call(w1, slot_get_int("wfn:__i64_to_text"))
     else:
@@ -4181,7 +4558,7 @@ define build_f64_rem_fn() -> WFn:
 # __map_keys / __map_values: copy a map's key (offset 4) or value
 # (offset 8) column into a fresh [count][items...] list. Locals:
 # 0=map, 1=count, 2=out, 3=cursor.
-define build_map_list_fn(name: text, column_offset: int) -> WFn:
+define build_map_list_fn(name: text, column_offset: number) -> WFn:
     edit f = new_fn(name, 1)
     f = add_local(f)
     f = add_local(f)
@@ -4240,7 +4617,7 @@ define build_map_list_fn(name: text, column_offset: int) -> WFn:
 # __list_filled / __list_filled_f: one allocation, count elements all
 # set to value (stride 4 int / 8 f64). Locals: 0=count, 1=value,
 # 2=out, 3=cursor.
-define build_list_filled_fn(name: text, stride: int) -> WFn:
+define build_list_filled_fn(name: text, stride: number) -> WFn:
     edit f = new_fn(name, 2)
     f = add_local(f)
     f = add_local(f)
@@ -4275,7 +4652,7 @@ define build_list_filled_fn(name: text, stride: int) -> WFn:
     f = emit_op(f, op_i32_mul())
     f = emit_op(f, op_i32_add())
     f = emit_local_get(f, 1)
-    f = if stride == 8 then emit_f64_store(f, 4) else emit_store(f, 4)
+    f = if stride is 8 then emit_f64_store(f, 4) else emit_store(f, 4)
     f = emit_local_get(f, 3)
     f = emit_const(f, 1)
     f = emit_op(f, op_i32_add())
@@ -4289,140 +4666,140 @@ define build_list_filled_fn(name: text, stride: int) -> WFn:
 
 # f64 binary op -> opcode. Arithmetic returns f64; comparisons return i32.
 define emit_f64_binop(fn_value: WFn, op: text) -> WFn:
-    if op == "+":
+    if op is "+":
         emit_op(fn_value, op_f64_add())
-    else if op == "-":
+    else if op is "-":
         emit_op(fn_value, op_f64_sub())
-    else if op == "*":
+    else if op is "*":
         emit_op(fn_value, op_f64_mul())
-    else if op == "/":
+    else if op is "/":
         emit_op(fn_value, op_f64_div())
-    else if op == "//":
+    else if op is "//":
         # float floor division: divide, then f64.floor.
         emit_op(emit_op(fn_value, op_f64_div()), op_f64_floor())
-    else if op == "%":
+    else if op is "%":
         emit_call(fn_value, slot_get_int("wfn:__f64_rem"))
-    else if op == "==":
+    else if op is "==":
         emit_op(fn_value, op_f64_eq())
-    else if op == "!=":
+    else if op is "!=":
         emit_op(fn_value, op_f64_ne())
-    else if op == "<":
+    else if op is "<":
         emit_op(fn_value, op_f64_lt())
-    else if op == ">":
+    else if op is ">":
         emit_op(fn_value, op_f64_gt())
-    else if op == "<=":
+    else if op is "<=":
         emit_op(fn_value, op_f64_le())
-    else if op == ">=":
+    else if op is ">=":
         emit_op(fn_value, op_f64_ge())
     else:
         emit_op(fn_value, op_f64_add())
 
 # Map an Orion binary op string to the corresponding wasm i64 opcode (signed).
 define emit_i64_binop(fn_value: WFn, op: text) -> WFn:
-    if op == "+":
+    if op is "+":
         emit_op(fn_value, op_i64_add())
-    else if op == "-":
+    else if op is "-":
         emit_op(fn_value, op_i64_sub())
-    else if op == "*":
+    else if op is "*":
         emit_op(fn_value, op_i64_mul())
-    else if op == "/" or op == "//":
+    else if op is "/" or op is "//":
         emit_op(fn_value, op_i64_div_s())
-    else if op == "%":
+    else if op is "%":
         emit_op(fn_value, op_i64_rem_s())
-    else if op == "==":
+    else if op is "==":
         emit_op(fn_value, op_i64_eq())
-    else if op == "!=":
+    else if op is "!=":
         emit_op(fn_value, op_i64_ne())
-    else if op == "<":
+    else if op is "<":
         emit_op(fn_value, op_i64_lt_s())
-    else if op == ">":
+    else if op is ">":
         emit_op(fn_value, op_i64_gt_s())
-    else if op == "<=":
+    else if op is "<=":
         emit_op(fn_value, op_i64_le_s())
-    else if op == ">=":
+    else if op is ">=":
         emit_op(fn_value, op_i64_ge_s())
-    else if op == "&":
+    else if op is "&":
         emit_op(fn_value, op_i64_and())
-    else if op == "|":
+    else if op is "|":
         emit_op(fn_value, op_i64_or())
-    else if op == "^":
+    else if op is "^":
         emit_op(fn_value, op_i64_xor())
-    else if op == "<<":
+    else if op is "<<":
         emit_op(fn_value, op_i64_shl())
-    else if op == ">>":
+    else if op is ">>":
         emit_op(fn_value, op_i64_shr_s())
     else:
         emit_op(fn_value, op_i64_add())
 
 # f32 binary op (a distinct 32-bit float).
 define emit_f32_binop(fn_value: WFn, op: text) -> WFn:
-    if op == "+":
+    if op is "+":
         emit_op(fn_value, op_f32_add())
-    else if op == "-":
+    else if op is "-":
         emit_op(fn_value, op_f32_sub())
-    else if op == "*":
+    else if op is "*":
         emit_op(fn_value, op_f32_mul())
-    else if op == "/":
+    else if op is "/":
         emit_op(fn_value, op_f32_div())
-    else if op == "==":
+    else if op is "==":
         emit_op(fn_value, op_f32_eq())
-    else if op == "!=":
+    else if op is "!=":
         emit_op(fn_value, op_f32_ne())
-    else if op == "<":
+    else if op is "<":
         emit_op(fn_value, op_f32_lt())
-    else if op == ">":
+    else if op is ">":
         emit_op(fn_value, op_f32_gt())
-    else if op == "<=":
+    else if op is "<=":
         emit_op(fn_value, op_f32_le())
-    else if op == ">=":
+    else if op is ">=":
         emit_op(fn_value, op_f32_ge())
     else:
         emit_op(fn_value, op_f32_add())
 
 # --- sized-integer helpers ---
 define w_is_i64rep(c: text) -> truth:
-    c == "l" or c == "L"
+    c is "l" or c is "L"
 
 # Promote a value of type code `c` (on the stack) to f64.
 define w_to_f64(fn_value: WFn, c: text) -> WFn:
-    if c == "f":
+    if c is "f":
         fn_value
-    else if c == "g":
+    else if c is "g":
         emit_op(fn_value, op_f64_promote_f32())
-    else if c == "l" or c == "L":
+    else if c is "l" or c is "L":
         emit_op(fn_value, op_f64_convert_i64_s())
     else:
         emit_op(fn_value, op_f64_convert_i32_s())
 
 define w_is_unsigned(c: text) -> truth:
-    c == "B" or c == "H" or c == "I" or c == "L"
+    c is "B" or c is "H" or c is "I" or c is "L"
 
 # True if literal value v fits a sized integer type NAME (i8/u8/.../u32). i64/
 # u64/int and floats always "fit" here (no narrow check).
-define w_int_fits(v: int, t: text) -> truth:
-    if t == "u8":
+define w_int_fits(v: number, t: text) -> truth:
+    if t is "u8":
         v >= 0 and v <= 255
-    else if t == "u16":
+    else if t is "u16":
         v >= 0 and v <= 65535
-    else if t == "u32":
+    else if t is "u32":
         v >= 0 and v <= 4294967295
-    else if t == "i8":
+    else if t is "i8":
         v >= (0 - 128) and v <= 127
-    else if t == "i16":
+    else if t is "i16":
         v >= (0 - 32768) and v <= 32767
-    else if t == "i32":
+    else if t is "i32":
         v >= (0 - 2147483648) and v <= 2147483647
     else:
         true
 
-define w_int_width(c: text) -> int:
-    if c == "b" or c == "B":
+define w_int_width(c: text) -> number:
+    if c is "b" or c is "B":
         8
-    else if c == "h" or c == "H":
+    else if c is "h" or c is "H":
         16
-    else if c == "i" or c == "I":
+    else if c is "i" or c is "I":
         32
-    else if c == "l" or c == "L":
+    else if c is "l" or c is "L":
         64
     else:
         0
@@ -4434,11 +4811,11 @@ define w_int_width(c: text) -> int:
 define w_peer(a: text, b: text) -> text:
     wa = w_int_width(a)
     wb = w_int_width(b)
-    a_default = a == "i" or a == "l"
-    b_default = b == "i" or b == "l"
-    if wa == 0:
+    a_default = a is "i" or a is "l"
+    b_default = b is "i" or b is "l"
+    if wa is 0:
         b
-    else if wb == 0:
+    else if wb is 0:
         a
     else if a_default and not b_default:
         b
@@ -4448,7 +4825,7 @@ define w_peer(a: text, b: text) -> text:
         b
     else if wa > wb:
         a
-    else if a == "i":
+    else if a is "i":
         b
     else:
         a
@@ -4457,14 +4834,14 @@ define w_peer(a: text, b: text) -> text:
 # i8/i16 sign-extend from their width, u8/u16 zero-extend by masking. i32/u32
 # and i64/u64 are already full width.
 define w_emit_mask(fn_value: WFn, c: text) -> WFn:
-    if c == "b":
+    if c is "b":
         emit_op(fn_value, op_i32_extend8_s())
-    else if c == "h":
+    else if c is "h":
         emit_op(fn_value, op_i32_extend16_s())
-    else if c == "B":
+    else if c is "B":
         m1 = emit_const(fn_value, 255)
         emit_op(m1, op_i32_and())
-    else if c == "H":
+    else if c is "H":
         m1 = emit_const(fn_value, 65535)
         emit_op(m1, op_i32_and())
     else:
@@ -4473,60 +4850,60 @@ define w_emit_mask(fn_value: WFn, c: text) -> WFn:
 # i32 binary op with a signedness flag: div/rem/shr and comparisons pick the
 # unsigned variant when `uns`; add/sub/mul/and/or/xor/shl are signedness-free.
 define emit_i32_binop_u(fn_value: WFn, op: text, uns: truth) -> WFn:
-    if op == "/" or op == "//":
+    if op is "/" or op is "//":
         emit_op(fn_value, if uns then op_i32_div_u() else op_i32_div_s())
-    else if op == "%":
+    else if op is "%":
         emit_op(fn_value, if uns then op_i32_rem_u() else op_i32_rem_s())
-    else if op == ">>":
+    else if op is ">>":
         emit_op(fn_value, if uns then op_i32_shr_u() else op_i32_shr_s())
-    else if op == "<":
+    else if op is "<":
         emit_op(fn_value, if uns then op_i32_lt_u() else op_i32_lt_s())
-    else if op == ">":
+    else if op is ">":
         emit_op(fn_value, if uns then op_i32_gt_u() else op_i32_gt_s())
-    else if op == "<=":
+    else if op is "<=":
         emit_op(fn_value, if uns then op_i32_le_u() else op_i32_le_s())
-    else if op == ">=":
+    else if op is ">=":
         emit_op(fn_value, if uns then op_i32_ge_u() else op_i32_ge_s())
     else:
         emit_binop(fn_value, op)
 
 # True for the comparison/logical ops whose result is a 0/1 bool (never masked).
 define w_is_cmp(op: text) -> truth:
-    op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">=" or op == "and" or op == "or"
+    op is "==" or op is "!=" or op is "<" or op is ">" or op is "<=" or op is ">=" or op is "and" or op is "or"
 
 # Map an Orion binary op string to the corresponding wasm i32 opcode.
 define emit_binop(fn_value: WFn, op: text) -> WFn:
-    if op == "+":
+    if op is "+":
         emit_op(fn_value, op_i32_add())
-    else if op == "-":
+    else if op is "-":
         emit_op(fn_value, op_i32_sub())
-    else if op == "*":
+    else if op is "*":
         emit_op(fn_value, op_i32_mul())
-    else if op == "/" or op == "//":
+    else if op is "/" or op is "//":
         emit_op(fn_value, op_i32_div_s())
-    else if op == "==":
+    else if op is "==":
         emit_op(fn_value, op_i32_eq())
-    else if op == "!=":
+    else if op is "!=":
         emit_op(fn_value, op_i32_ne())
-    else if op == "<":
+    else if op is "<":
         emit_op(fn_value, op_i32_lt_s())
-    else if op == ">":
+    else if op is ">":
         emit_op(fn_value, op_i32_gt_s())
-    else if op == "<=":
+    else if op is "<=":
         emit_op(fn_value, op_i32_le_s())
-    else if op == ">=":
+    else if op is ">=":
         emit_op(fn_value, op_i32_ge_s())
-    else if op == "%":
+    else if op is "%":
         emit_op(fn_value, op_i32_rem_s())
-    else if op == "and" or op == "&":
+    else if op is "and" or op is "&":
         emit_op(fn_value, op_i32_and())
-    else if op == "or" or op == "|":
+    else if op is "or" or op is "|":
         emit_op(fn_value, op_i32_or())
-    else if op == "^":
+    else if op is "^":
         emit_op(fn_value, op_i32_xor())
-    else if op == "<<":
+    else if op is "<<":
         emit_op(fn_value, op_i32_shl())
-    else if op == ">>":
+    else if op is ">>":
         emit_op(fn_value, op_i32_shr_s())
     else:
         # Unknown op: add, so the stack stays balanced.
@@ -4534,14 +4911,14 @@ define emit_binop(fn_value: WFn, op: text) -> WFn:
 
 # Parse a decimal integer string (no error handling - invalid input
 # returns 0). The Orion `str_to_int` builtin handles edge cases.
-define parse_decimal(text: text) -> int:
+define parse_decimal(text: text) -> number:
     bs = bytes_of(text)
     n = length(bs)
     edit v = 0
     edit neg = false
-    loop i in 0..<n:
-        c = at(bs, i)
-        if c == 45:
+    loop i in 0 until n:
+        c = bs[i]
+        if c is 45:
             neg = true
         else if c >= 48 and c <= 57:
             v = v * 10 + (c - 48)

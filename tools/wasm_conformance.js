@@ -73,9 +73,15 @@ if (cats.UNSUPPORTED.length && filter) {
 // must be no MISMATCH (wrong answer) or FAIL (compile/link crash). Expected
 // runtime aborts (divide-by-zero, out-of-range, require) land in TRAP and are
 // tolerated. Bump BASELINE_OK when real coverage rises.
+// 154 -> 156 on 2026-08-19: a LIST parameter records its element type here
+// too, so a `[float]` argument is walked eight bytes at a time rather than
+// four. That was a standing gap; `number` on a list is what walked into it.
+// 141 -> 154 on 2026-08-19: the spoken maybe/result surface reaches this
+// backend, and the four tests for it pass here too. Thirteen tests of slack
+// in the number is not a baseline, it is a place for a regression to hide.
 // 142 -> 141 on 2026-08-04: test_42_general_floor gained copy/move/cwd and
 // moved OK -> UNSUPPORTED (honestly native-only). Not a lost capability.
-const BASELINE_OK = 141;
+const BASELINE_OK = 156;
 // Tests that are correct natively but rely on an idiom the wasm backend does
 // not share, each with a tracked reason. They must NOT silently count as
 // regressions, but they are listed loudly so the set cannot grow unnoticed.

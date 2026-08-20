@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     nums = [1, 2, 3, 4]
     edit sum = 0
     loop idx, x in nums:

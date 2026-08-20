@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     # Inline lambda - `function(params): body`. Lifted to a synthesized fn at
     # compile time.
     double = function(x): x * 2

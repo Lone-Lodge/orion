@@ -10,21 +10,21 @@ use os
 external define dlopen(path: text, flag: int) -> int
 external define dlsym(handle: int, name: text) -> int
 
-define build_and_load(gen: int) -> int:
+define build_and_load(gen: number) -> number:
     target = "plugin_gen{gen}.so"
     run_command("bash", ["build_so.sh", "plugin.or", target])   # recompile
     h = dlopen("./{target}", 2)                                 # load fresh code
     dlsym(h, "tick")
 
-define main() -> int:
+define main() -> number:
     edit state = 0
     edit last_src = read_file("plugin.or")
     edit gen = 0
     edit tick = build_and_load(gen)
     print_line("watching plugin.or ... (edit it and the running program follows)")
-    loop i in 0..<10:
+    loop i in 0 until 10:
         cur = read_file("plugin.or")
-        if cur != last_src:
+        if cur is not last_src:
             last_src = cur
             gen = gen + 1
             tick = build_and_load(gen)

@@ -1,0 +1,19 @@
+# The syntax reference calls these builtins, so they are builtins: not one
+# `use` line in this file. `iter` and `assert` are visible from everywhere,
+# and `arguments` is the program's argv as a `list of text` - argc/argv were
+# the C names for the same thing. A `use` costs nothing to add and everything
+# to have to know about.
+define main() -> number:
+    xs = [1, 2, 3, 4]
+    ys: [number] = each(xs, (n): n * 2)
+    big: [number] = keep(xs, (n): n > 2)
+    tot = combine(xs, 0, (a, b): a + b)
+
+    # assert takes the condition alone; the label is optional
+    ok_a = assert(tot is 10)
+    ok_b = assert(length(ys) is 4, "each keeps the length")
+
+    # arguments is a value, not a call - the program name is always there
+    ok_c = if length(arguments) >= 1 then 1 else 0
+
+    ys[3] * 4 + length(big) * 8 + ok_a * 5 + ok_b * 5 + ok_c * 3   # 32+16+5+5+3

@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     a = 10
     b = 5
     if a > b then 42 else 99

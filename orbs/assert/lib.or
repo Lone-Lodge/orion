@@ -4,15 +4,16 @@
 # prints the label and returns a sentinel so tests can detect failures.
 #
 # Usage:
-#   assert(x is 42, "x should be 42")
-#   assert(is_some(opt), "opt was None")
+#   assert(x is 42)                      # the condition IS the message
+#   assert(is_some(opt), "opt was None")  # a label when the condition is not enough
 #
 # Convention: success returns 1, failure returns 0. A test fn can count
 # assertion results and return 0 if any failed. Comparisons read as words:
 # `assert(a is b, ...)` replaced the old assert_eq/assert_true/assert_text_eq
 # trio - one word, any condition.
 
-public define assert(cond: truth, label: text) -> int:
+public define assert(cond: truth, label = "") -> number:
+    example assert(true) is 1
     example assert(true, "holds") is 1
     if cond:
         1

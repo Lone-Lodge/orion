@@ -17,7 +17,7 @@ external define host_subdirs(dir: text) -> text
 # self-path is unavailable (or a toml can still override explicitly).
 define self_dist_dir() -> text:
     exe = host_self_exe()
-    if length(exe) == 0 then "" else path_parent(exe)
+    if length(exe) is 0 then "" else path_parent(exe)
 
 define default_compiler() -> text:
     d = self_dist_dir()
@@ -40,7 +40,7 @@ define default_orbs() -> text:
 define path_drop_or(p: text) -> text:
     bs = bytes_of(p)
     n = length(bs)
-    if n > 3 and at(bs, n - 3) == 46 and at(bs, n - 2) == 111 and at(bs, n - 1) == 114:
+    if n > 3 and bs[n - 3] is 46 and bs[n - 2] is 111 and bs[n - 1] is 114:
         text_of(bytes_part(bs, 0, n - 3))
     else:
         p
@@ -48,7 +48,7 @@ define path_drop_or(p: text) -> text:
 # ---------- console style (ANSI, tty-gated) ----------
 
 define sty(code: text, s: text) -> text:
-    if orion_console_color() == 1:
+    if orion_console_color() is 1:
         e = text_of(append([], 27))
         "{e}[{code}m{s}{e}[0m"
     else:
@@ -68,10 +68,10 @@ define c_red(s: text) -> text:
 
 # ---------- args helpers ----------
 
-define args_after(start_index: int) -> [text]:
+define args_after(start_index: number) -> [text]:
     total = arg_count()
     edit collected = []
-    loop index in start_index..<total:
+    loop index in start_index until total:
         collected = append(collected, arg(index))
     collected
 
@@ -85,8 +85,8 @@ define first_param() -> text:
 define second_param() -> text:
     if arg_count() < 4 then "" else arg(3)
 
-define nb_int(t: text, fallback: int) -> int:
-    if t == "" then fallback else int_from_text(t)
+define nb_int(t: text, fallback: number) -> number:
+    if t is "" then fallback else int_from_text(t)
 
 # ---------- usage / die ----------
 
@@ -137,8 +137,8 @@ define die(message: text):
 define list_contains(haystack: [text], needle: text) -> truth:
     total = length(haystack)
     edit found = false
-    loop index in 0..<total:
-        if at(haystack, index) == needle:
+    loop index in 0 until total:
+        if haystack[index] is needle:
             found = true
     found
 
@@ -148,16 +148,16 @@ define list_contains(haystack: [text], needle: text) -> truth:
 # `./../atlas/templates/app`. Orbit knows nothing about atlas: it looks
 # for a `templates/<kind>` dir the same way it looks for `orbs/`, so an
 # engine ships its own project shape and orion stays generic.
-define scan_template_dirs(dir: text, depth: int, acc: [text]) -> [text]:
+define scan_template_dirs(dir: text, depth: number, acc: [text]) -> [text]:
     if depth > 3:
         return acc
     subs = split(host_subdirs(dir), "\n")
     edit out = acc
-    loop i in 0..<length(subs):
-        name = at(subs, i)
+    loop i in 0 until length(subs):
+        name = subs[i]
         if length(name) > 0 and not scan_noise(name):
             child = dir + "/" + name
-            if name == "templates":
+            if name is "templates":
                 if not list_contains(out, child):
                     out = append(out, child)
             else:
@@ -166,11 +166,11 @@ define scan_template_dirs(dir: text, depth: int, acc: [text]) -> [text]:
 
 define find_template(kind: text) -> text:
     root = find_workspace_root()
-    if length(root) == 0:
+    if length(root) is 0:
         return ""
     dirs = scan_template_dirs(root, 0, [])
-    loop i in 0..<length(dirs):
-        candidate = at(dirs, i) + "/" + kind
+    loop i in 0 until length(dirs):
+        candidate = dirs[i] + "/" + kind
         if is_dir(candidate):
             return candidate
     ""
@@ -185,16 +185,16 @@ define copy_template(src_dir: text, dst_dir: text, name: text, packages: text):
     # scan_orb_dirs relies on, since list_dir does not report subdirs.
     entries = list_dir(src_dir)
     entry_count = length(entries)
-    loop index in 0..<entry_count:
-        entry = at(entries, index)
+    loop index in 0 until entry_count:
+        entry = entries[index]
         src = path_join(src_dir, entry)
         dst = path_join(dst_dir, replace(entry, "__NAME__", name))
         if not is_dir(src):
             copy_template_file(src, dst, name, packages)
     subs = split(host_subdirs(src_dir), "\n")
     sub_count = length(subs)
-    loop sub_index in 0..<sub_count:
-        sub = at(subs, sub_index)
+    loop sub_index in 0 until sub_count:
+        sub = subs[sub_index]
         if length(sub) > 0:
             copy_template(src_dir + "/" + sub, path_join(dst_dir, replace(sub, "__NAME__", name)), name, packages)
 
@@ -207,19 +207,19 @@ define copy_template_file(src: text, dst: text, name: text, packages: text):
 # workspace root, so `packages` resolves wherever the project is made.
 define packages_path() -> text:
     root = find_workspace_root()
-    if length(root) == 0:
+    if length(root) is 0:
         return "../atlas/packages"
     # root is ".", "./..", "./../.." … and the project sits one level
     # deeper than the cwd, so prepend one more hop. Trim the leading "./"
     # so the common case reads "../atlas/packages", not ".././atlas/…".
-    if root == ".":
+    if root is ".":
         "../atlas/packages"
     else:
         "../" + replace(root, "./", "") + "/atlas/packages"
 
 define cmd_new_app(name: text):
     template = find_template("app")
-    if template == "":
+    if template is "":
         die("orbit: no `templates/app` found in this workspace - is the engine present?")
     copy_template(template, name, name, packages_path())
     print_line("created `" + name + "` (atlas app)")
@@ -237,11 +237,11 @@ define cmd_new_app(name: text):
 
 define cmd_new():
     name = first_param()
-    if name == "":
+    if name is "":
         die("usage: orbit new <name> [app]")
     if is_dir(name) or is_file(name):
         die("orbit: `" + name + "` already exists")
-    if second_param() == "app":
+    if second_param() is "app":
         cmd_new_app(name)
     else:
         cmd_new_orb(name)
@@ -250,7 +250,7 @@ define cmd_new_orb(name: text):
     mkdir_all(name + "/src")
     toml_body = "[package]\nname = \"" + name + "\"\nversion = \"0.0.1\"\n\n[orbs]\n"
     write_file(name + "/Orbit.toml", toml_body)
-    main_body = "define add(left: int, right: int) -> int = left + right\n\n# `orbit test` runs every function named test_*.\ndefine test_add():\n    require add(2, 3) == 5\n"
+    main_body = "define add(left: number, right: number) -> number = left + right\n\n# `orbit test` runs every function named test_*.\ndefine test_add():\n    require add(2, 3) == 5\n"
     write_file(name + "/src/main.or", main_body)
     print_line("created `" + name + "`")
     print_line("  " + name + "/Orbit.toml")
@@ -273,7 +273,7 @@ define insert_orb_line(existing: text, orb_name: text) -> text:
 
 define cmd_add():
     orb_name = first_param()
-    if orb_name == "":
+    if orb_name is "":
         die("usage: orbit add <orb>")
     known = __os_orbit_stdlib_orbs()
     if not list_contains(known, orb_name):
@@ -295,7 +295,7 @@ define cmd_add():
 define resolve_path() -> text:
     candidate = first_param()
     edit path = candidate
-    if candidate == "":
+    if candidate is "":
         path = "src/main.or"
         # Zero-glue projects have no src/main.or - synthesize the
         # entry here too, so check/build/test match native/play.
@@ -307,7 +307,7 @@ define resolve_path() -> text:
 define cmd_build():
     path = resolve_path()
     exe = cli_build(path)
-    if exe == "":
+    if exe is "":
         exit_with(1)
     else:
         # Say what was produced and where. "built with no errors" left you to
@@ -323,7 +323,7 @@ define cmd_run():
     # the link with permission denied - free the exe first, like `orbit dev`.
     if file_exists("Orbit.toml"):
         proj = nb_setting(nb_lines(read_file("Orbit.toml")), "name", "")
-        if proj != "":
+        if proj is not "":
             kill_running(proj + "_cli")
     second = first_param()
     has_path = ends_with(second, ".or")
@@ -362,27 +362,27 @@ define cmd_debug():
 define copy_tree(src: text, dst: text):
     mkdir_all(dst)
     entries = list_dir(src)
-    loop index in 0..<length(entries):
-        entry = at(entries, index)
+    loop index in 0 until length(entries):
+        entry = entries[index]
         if length(entry) > 0:
             file_copy_or_die(path_join(src, entry), path_join(dst, entry))
     subs = split(host_subdirs(src), "\n")
-    loop sub_index in 0..<length(subs):
-        sub = at(subs, sub_index)
+    loop sub_index in 0 until length(subs):
+        sub = subs[sub_index]
         if length(sub) > 0:
             copy_tree(src + "/" + sub, path_join(dst, sub))
 
 define file_copy_or_die(src: text, dst: text):
-    if copy_file(src, dst) != 0:
+    if copy_file(src, dst) is not 0:
         die("orbit: could not copy `" + src + "`")
 
 define os_tag() -> text:
-    if os_kind() == 0 then "win" else if os_kind() == 2 then "macos" else "linux"
+    if os_kind() is 0 then "win" else if os_kind() is 2 then "macos" else "linux"
 
 # `icon = "assets/app.ico"` becomes a linked resource. llvm-rc ships beside
 # clang, so if we can compile the program we can compile this.
 define build_icon(icon: text) -> text:
-    if icon == "" or os_kind() != 0:
+    if icon is "" or os_kind() is not 0:
         return ""
     if not file_exists(icon):
         die("orbit: no such icon `" + icon + "`")
@@ -393,7 +393,7 @@ define build_icon(icon: text) -> text:
     if not file_exists(rc_tool):
         print_line(c_dim("(no llvm-rc beside clang - the exe keeps the default icon)"))
         return ""
-    if run_command_quiet(rc_tool, ["/fo", res_path, rc_path]) != 0:
+    if run_command_quiet(rc_tool, ["/fo", res_path, rc_path]) is not 0:
         print_line(c_dim("(llvm-rc could not compile the icon - keeping the default)"))
         return ""
     res_path
@@ -405,8 +405,8 @@ define webview_project() -> truth:
         return false
     lines = nb_lines(read_file("Orbit.toml"))
     edit found = false
-    loop w_index in 0..<length(lines):
-        line = trim(at(lines, w_index))
+    loop w_index in 0 until length(lines):
+        line = trim(lines[w_index])
         if starts_with(line, "app ") or starts_with(line, "app="):
             found = true
     found
@@ -423,22 +423,22 @@ define cmd_package():
     mkdir_all(out)
     mkdir_all("build")
     res = build_icon(nb_setting(lines, "icon", ""))
-    if res != "":
+    if res is not "":
         slot_set("orbit:res", res)
     # No console window for a shipped app - see cli_build.
     slot_set("orbit:windowless", 1)
     built = cli_build(resolve_path())
-    if built == "":
+    if built is "":
         exit_with(1)
-    shipped = out + "/" + name + (if os_kind() == 0 then ".exe" else "")
+    shipped = out + "/" + name + (if os_kind() is 0 then ".exe" else "")
     file_copy_or_die(built, shipped)
     # The console-less build must not linger in build/ pretending to be the
     # one `orbit build` makes - running that from a terminal would print
     # nothing and look broken.
     remove_file(built)
     parts = split(assets, " ")
-    loop a_index in 0..<length(parts):
-        asset_path = at(parts, a_index)
+    loop a_index in 0 until length(parts):
+        asset_path = parts[a_index]
         if length(asset_path) > 0:
             if is_dir(asset_path):
                 copy_tree(asset_path, path_join(out, asset_path))
@@ -450,7 +450,7 @@ define cmd_package():
     # there first, and falls back to the borrowed Edge window without it.
     # A project that never opens a webview ships clean.
     loader = default_runtime() + "/WebView2Loader.dll"
-    if os_kind() == 0 and file_exists(loader) and webview_project():
+    if os_kind() is 0 and file_exists(loader) and webview_project():
         loader_copied = copy_file(loader, path_join(out, "WebView2Loader.dll"))
     print_line(c_bold(shipped) + " " + c_green("ok"))
     # The archive is a convenience, not the deliverable: if the system has no
@@ -472,7 +472,7 @@ define cmd_package():
 # file that is both installer and cargo. The stub installs per user (folder,
 # Start-menu shortcut, Apps & features row) and carries its own uninstall.
 define build_setup(name: text, version: text, publisher: text, res: text, zipped: text, path_sub: text, exe_rel: text) -> text:
-    if os_kind() != 0:
+    if os_kind() is not 0:
         return ""
     root = path_parent(self_dist_dir())
     stub_src = root + "/tools/setup_stub.or"
@@ -482,11 +482,11 @@ define build_setup(name: text, version: text, publisher: text, res: text, zipped
     runtime = default_runtime()
     ll = "build/setup_stub.ll"
     stub_exe = "build/setup_stub.exe"
-    if run_command(default_compiler(), [stub_src, ll, default_orbs(), "--quiet"]) != 0:
+    if run_command(default_compiler(), [stub_src, ll, default_orbs(), "--quiet"]) is not 0:
         return ""
     # Same link line a packaged app gets: windowless, the app's icon, UTF-8.
     edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2"]
-    if res != "":
+    if res is not "":
         link_args = append(link_args, res)
     link_args = append(link_args, "-Xlinker")
     link_args = append(link_args, "/SUBSYSTEM:WINDOWS")
@@ -500,19 +500,19 @@ define build_setup(name: text, version: text, publisher: text, res: text, zipped
     link_args = append(link_args, "-MANIFESTINPUT:" + runtime + "/orion.manifest")
     link_args = append(link_args, "-o")
     link_args = append(link_args, stub_exe)
-    if run_command(nb_clang(), link_args) != 0:
+    if run_command(nb_clang(), link_args) is not 0:
         return ""
     remove_file(ll)
-    exe_line = if exe_rel == "" then name + ".exe" else exe_rel
+    exe_line = if exe_rel is "" then name + ".exe" else exe_rel
     edit manifest = "name=" + name + "\nversion=" + version + "\npublisher=" + publisher + "\nexe=" + exe_line + "\n"
     # `path=` asks the stub to put <install-dir>/<path_sub> on the user
     # PATH (and take it off again at uninstall) - a CLI toolchain's whole
     # reason to have an installer.
-    if path_sub != "":
+    if path_sub is not "":
         manifest = manifest + "path=" + path_sub + "\n"
     out = "dist/" + name + "-" + version + "-setup.exe"
     remove_file(out)
-    if stitch_setup(stub_exe, zipped, manifest, ui_html, out) != 0:
+    if stitch_setup(stub_exe, zipped, manifest, ui_html, out) is not 0:
         return ""
     out
 
@@ -528,7 +528,7 @@ define cmd_setup():
     zip_path = if arg_count() < 5 then "" else arg(4)
     path_sub = if arg_count() < 6 then "" else arg(5)
     exe_rel = if arg_count() < 7 then "" else arg(6)
-    if name == "" or version == "" or zip_path == "":
+    if name is "" or version is "" or zip_path is "":
         die("usage: orbit setup <name> <version> <zip> [path-subdir] [exe-rel]")
     if not file_exists(zip_path):
         die("orbit setup: no such zip `" + zip_path + "`")
@@ -545,21 +545,21 @@ define pack_archive(name: text, version: text) -> text:
     # Windows ships bsdtar, which writes a real zip from -a; elsewhere the
     # native format is a tar.gz. Full path on Windows: a GNU tar earlier in
     # PATH does not understand -a.
-    if os_kind() == 0:
+    if os_kind() is 0:
         zip_path = stem + ".zip"
         remove_file(zip_path)
-        if run_command_quiet("C:/Windows/System32/tar.exe", ["-a", "-c", "-f", zip_path, "-C", "dist", name]) != 0:
+        if run_command_quiet("C:/Windows/System32/tar.exe", ["-a", "-c", "-f", zip_path, "-C", "dist", name]) is not 0:
             return ""
         return zip_path
     tgz = stem + ".tar.gz"
     remove_file(tgz)
-    if run_command_quiet("tar", ["-c", "-z", "-f", tgz, "-C", "dist", name]) != 0:
+    if run_command_quiet("tar", ["-c", "-z", "-f", tgz, "-C", "dist", name]) is not 0:
         return ""
     tgz
 
 define cmd_test():
     path = resolve_path()
-    failures = __os_orbit_test_keeping(path, first_param() == "--keep")
+    failures = __os_orbit_test_keeping(path, first_param() is "--keep")
     if failures > 0:
         exit_with(1)
 
@@ -574,12 +574,12 @@ define cmd_test():
 define fmt_walk(directory: text):
     entries = list_dir(directory)
     entry_count = length(entries)
-    loop index in 0..<entry_count:
-        entry_name = at(entries, index)
+    loop index in 0 until entry_count:
+        entry_name = entries[index]
         full_path = path_join(directory, entry_name)
         is_directory_entry = is_dir(full_path)
         # Skip target/ - generated output we don't want to rewrite.
-        should_recurse = is_directory_entry and entry_name != "target"
+        should_recurse = is_directory_entry and entry_name is not "target"
         should_format = (not is_directory_entry) and ends_with(entry_name, ".or")
         if should_recurse:
             fmt_walk(full_path)
@@ -589,7 +589,7 @@ define fmt_walk(directory: text):
 define fmt_one_file(file_path: text):
     original = read_file(file_path)
     normalized = fmt_normalize(original)
-    if normalized == original:
+    if normalized is original:
         # No-op file - don't even rewrite. Keeps mtimes stable.
         print_line("  unchanged " + file_path)
     else:
@@ -599,7 +599,7 @@ define fmt_one_file(file_path: text):
 define cmd_fmt():
     # Optional path argument; default is the current project.
     target = first_param()
-    start_dir = if target == "" then "." else target
+    start_dir = if target is "" then "." else target
     if is_file(start_dir):
         fmt_one_file(start_dir)
     else:
@@ -625,14 +625,14 @@ define nb_lines(text: text) -> [text]:
 
 define nb_quoted(line: text) -> text:
     pieces = split(line, "\"")
-    if length(pieces) >= 2 then at(pieces, 1) else ""
+    if length(pieces) >= 2 then pieces[1] else ""
 
 define nb_setting(lines: [text], key: text, fallback: text) -> text:
     total = length(lines)
     edit found = fallback
     edit taken = false
-    loop index in 0..<total:
-        line = trim(at(lines, index))
+    loop index in 0 until total:
+        line = trim(lines[index])
         if not taken and starts_with(line, key + " ="):
             found = nb_quoted(line)
             taken = true
@@ -645,11 +645,11 @@ define nb_setting(lines: [text], key: text, fallback: text) -> text:
 define nb_dep_dirs(lines: [text], base: text) -> [text]:
     total = length(lines)
     edit out = []
-    loop index in 0..<total:
-        line = at(lines, index)
+    loop index in 0 until total:
+        line = lines[index]
         if contains(line, "\"path:"):
             rel = replace(nb_quoted(line), "path:", "")
-            dir = if base == "" then rel else base + "/" + rel
+            dir = if base is "" then rel else base + "/" + rel
             if not list_contains(out, dir):
                 out = append(out, dir)
         if contains(line, "\"git:"):
@@ -679,7 +679,7 @@ define nb_dep_dirs(lines: [text], base: text) -> [text]:
 # version solving: a name, a repo, a ref, a pinned commit.
 
 define dep_key(line: text) -> text:
-    trim(at(split(line, "="), 0))
+    trim(split(line, "=")[0])
 
 # "url@ref" -> [url, ref]. The separator is the LAST `@` after the last
 # `/`, so ssh remotes (git@host:...) keep their `@`.
@@ -688,11 +688,11 @@ define spec_split_ref(spec: text) -> [text]:
     n = length(bs)
     edit last_slash = 0 - 1
     edit cut = 0 - 1
-    loop i in 0..<n:
-        if at(bs, i) == 47:
+    loop i in 0 until n:
+        if bs[i] is 47:
             last_slash = i
-    loop j in 0..<n:
-        if at(bs, j) == 64 and j > last_slash:
+    loop j in 0 until n:
+        if bs[j] is 64 and j > last_slash:
             cut = j
     if cut < 0:
         return [spec, ""]
@@ -702,12 +702,12 @@ define spec_split_ref(spec: text) -> [text]:
 define nb_git_deps(lines: [text]) -> [text]:
     total = length(lines)
     edit out = []
-    loop index in 0..<total:
-        line = at(lines, index)
+    loop index in 0 until total:
+        line = lines[index]
         if contains(line, "\"git:"):
             spec = replace(nb_quoted(line), "git:", "")
             parts = spec_split_ref(spec)
-            out = append(out, dep_key(line) + "|" + at(parts, 0) + "|" + at(parts, 1))
+            out = append(out, dep_key(line) + "|" + parts[0] + "|" + parts[1])
     out
 
 define lock_rows() -> [text]:
@@ -715,9 +715,9 @@ define lock_rows() -> [text]:
         return []
     all_lines = nb_lines(read_file("Orbit.lock"))
     edit out = []
-    loop i in 0..<length(all_lines):
-        line = trim(at(all_lines, i))
-        if line != "" and not starts_with(line, "#"):
+    loop i in 0 until length(all_lines):
+        line = trim(all_lines[i])
+        if line is not "" and not starts_with(line, "#"):
             out = append(out, line)
     out
 
@@ -725,10 +725,10 @@ define lock_rows() -> [text]:
 define lock_commit(name: text) -> text:
     rows = lock_rows()
     edit found = ""
-    loop i in 0..<length(rows):
-        parts = split(at(rows, i), " ")
-        if length(parts) >= 2 and at(parts, 0) == name:
-            found = at(parts, 1)
+    loop i in 0 until length(rows):
+        parts = split(rows[i], " ")
+        if length(parts) >= 2 and parts[0] is name:
+            found = parts[1]
     found
 
 define pkg_head(dir: text) -> text:
@@ -745,19 +745,19 @@ define pkg_fetch(name: text, url: text, ref: text) -> text:
         return pkg_head(dir)
     mkdir_all("orbs_pkg")
     locked = lock_commit(name)
-    if locked != "":
-        if run_command("git", ["clone", "--quiet", url, dir]) != 0:
+    if locked is not "":
+        if run_command("git", ["clone", "--quiet", url, dir]) is not 0:
             return ""
-        if run_command("git", ["-C", dir, "-c", "advice.detachedHead=false", "checkout", "--quiet", locked]) != 0:
+        if run_command("git", ["-C", dir, "-c", "advice.detachedHead=false", "checkout", "--quiet", locked]) is not 0:
             return ""
     else:
         edit cargs = ["clone", "--quiet", "--depth", "1"]
-        if ref != "":
+        if ref is not "":
             cargs = append(cargs, "--branch")
             cargs = append(cargs, ref)
         cargs = append(cargs, url)
         cargs = append(cargs, dir)
-        if run_command("git", cargs) != 0:
+        if run_command("git", cargs) is not 0:
             return ""
     pkg_head(dir)
 
@@ -769,7 +769,7 @@ define cmd_get():
     if not file_exists("Orbit.toml"):
         die("orbit: no Orbit.toml in this directory")
     edit queue = nb_git_deps(nb_lines(read_file("Orbit.toml")))
-    if length(queue) == 0:
+    if length(queue) is 0:
         print_line("orbit: no git deps in Orbit.toml")
         return
     edit seen = []
@@ -780,26 +780,26 @@ define cmd_get():
     loop:
         if idx >= length(queue):
             break
-        parts = split(at(queue, idx), "|")
+        parts = split(queue[idx], "|")
         idx = idx + 1
-        name = at(parts, 0)
-        url = at(parts, 1)
-        ref = at(parts, 2)
+        name = parts[0]
+        url = parts[1]
+        ref = parts[2]
         if not list_contains(seen, name):
             seen = append(seen, name)
             commit = pkg_fetch(name, url, ref)
-            if commit == "":
+            if commit is "":
                 eprint(c_red("orbit: could not fetch `" + name + "` from " + url))
                 failures = failures + 1
             else:
-                shown = if ref == "" then url else url + "@" + ref
+                shown = if ref is "" then url else url + "@" + ref
                 print_line("  " + name + " @ " + short_commit(commit) + "  " + c_dim(shown))
                 lock_out = append(lock_out, name + " " + commit + " " + shown)
                 sub_toml = "orbs_pkg/" + name + "/Orbit.toml"
                 if file_exists(sub_toml):
                     more = nb_git_deps(nb_lines(read_file(sub_toml)))
-                    loop m_index in 0..<length(more):
-                        queue = append(queue, at(more, m_index))
+                    loop m_index in 0 until length(more):
+                        queue = append(queue, more[m_index])
     write_file("Orbit.lock", join(lock_out, "\n") + "\n")
     if failures > 0:
         exit_with(1)
@@ -813,13 +813,13 @@ define cmd_update():
     rows = lock_rows()
     edit kept = ["# orbit lock - the exact commit of every fetched package."]
     kept = append(kept, "# `orbit get` reproduces these; `orbit update [name]` moves them.")
-    loop i in 0..<length(rows):
-        parts = split(at(rows, i), " ")
-        name = at(parts, 0)
-        if target == "" or name == target:
+    loop i in 0 until length(rows):
+        parts = split(rows[i], " ")
+        name = parts[0]
+        if target is "" or name is target:
             fs_junk = remove_tree("orbs_pkg/" + name)
         else:
-            kept = append(kept, at(rows, i))
+            kept = append(kept, rows[i])
     write_file("Orbit.lock", join(kept, "\n") + "\n")
     cmd_get()
 
@@ -835,8 +835,8 @@ define nb_expand_orb(orb_dir: text, acc: [text]) -> [text]:
         if file_exists(toml):
             deps = nb_dep_dirs(nb_lines(read_file(toml)), orb_dir)
             dep_total = length(deps)
-            loop d_index in 0..<dep_total:
-                out = nb_expand_orb(at(deps, d_index), out)
+            loop d_index in 0 until dep_total:
+                out = nb_expand_orb(deps[d_index], out)
         out
 
 # Orb search dirs for the native compiler. It resolves `use X` by scanning
@@ -863,21 +863,21 @@ define find_workspace_root() -> text:
     ""
 
 define scan_noise(name: text) -> truth:
-    name == "build" or name == "dist" or name == "target" or name == ".git" or name == "node_modules" or name == "assets" or name == "saves" or name == "docs" or name == "examples"
+    name is "build" or name is "dist" or name is "target" or name is ".git" or name is "node_modules" or name is "assets" or name is "saves" or name is "docs" or name is "examples"
 
 # Every `orbs` / `orbs_native` directory under `root` (depth-bounded) - the
 # exact search dirs the compiler needs to resolve `use X` by name, so a
 # project's [orbs] can list names with no paths.
-define scan_orb_dirs(dir: text, depth: int, acc: [text]) -> [text]:
+define scan_orb_dirs(dir: text, depth: number, acc: [text]) -> [text]:
     if depth > 3:
         return acc
     subs = split(host_subdirs(dir), "\n")
     edit out = acc
-    loop i in 0..<length(subs):
-        name = at(subs, i)
+    loop i in 0 until length(subs):
+        name = subs[i]
         if length(name) > 0 and not scan_noise(name):
             child = dir + "/" + name
-            if name == "orbs" or name == "orbs_native":
+            if name is "orbs" or name is "orbs_native":
                 if not list_contains(out, child):
                     out = append(out, child)
             else:
@@ -888,23 +888,23 @@ define nb_orb_dirs(lines: [text]) -> [text]:
     direct = nb_dep_dirs(lines, "")
     direct_total = length(direct)
     edit all_orbs = []
-    loop i in 0..<direct_total:
-        all_orbs = nb_expand_orb(at(direct, i), all_orbs)
+    loop i in 0 until direct_total:
+        all_orbs = nb_expand_orb(direct[i], all_orbs)
     edit parents = []
     orb_total = length(all_orbs)
-    loop j in 0..<orb_total:
-        parent = path_parent(at(all_orbs, j))
+    loop j in 0 until orb_total:
+        parent = path_parent(all_orbs[j])
         if not list_contains(parents, parent):
             parents = append(parents, parent)
     edit dirs = []
     parent_total = length(parents)
-    loop p_index in 0..<parent_total:
-        parent = at(parents, p_index)
+    loop p_index in 0 until parent_total:
+        parent = parents[p_index]
         native_sibling = path_parent(parent) + "/orbs_native"
         if is_dir(native_sibling) and not list_contains(dirs, native_sibling):
             dirs = append(dirs, native_sibling)
-    loop p2_index in 0..<parent_total:
-        dirs = append(dirs, at(parents, p2_index))
+    loop p2_index in 0 until parent_total:
+        dirs = append(dirs, parents[p2_index])
     # Layout-free resolution: when a `.orbit` workspace root is found, add
     # every orbs dir under it so name-only deps (`atlas_app = "*"`) resolve
     # regardless of where the project or the orbs live. Explicit path: deps
@@ -915,12 +915,12 @@ define nb_orb_dirs(lines: [text]) -> [text]:
         # Native backends win name clashes (a game wants orbs_native/atlas_render,
         # not the wgpu orbs/atlas_render), so add every orbs_native search dir
         # BEFORE the plain orbs ones - mirroring the path-based order above.
-        loop n_index in 0..<length(scanned):
-            nd = at(scanned, n_index)
+        loop n_index in 0 until length(scanned):
+            nd = scanned[n_index]
             if contains(nd, "orbs_native") and not list_contains(dirs, nd):
                 dirs = append(dirs, nd)
-        loop s_index in 0..<length(scanned):
-            sd = at(scanned, s_index)
+        loop s_index in 0 until length(scanned):
+            sd = scanned[s_index]
             if not contains(sd, "orbs_native") and not list_contains(dirs, sd):
                 dirs = append(dirs, sd)
     dirs
@@ -929,9 +929,9 @@ define nb_clang() -> text:
     # POSIX: clang is on PATH. Windows: prefer PATH, else the default LLVM dir
     # (`where` is a Windows builtin - it doesn't exist on Linux/Mac, so the
     # probe must be Windows-gated or it returns the wrong fallback).
-    if os_kind() != 0:
+    if os_kind() is not 0:
         return "clang"
-    if capture_stdout("where", ["clang"]) == "":
+    if capture_stdout("where", ["clang"]) is "":
         return "C:\\Program Files\\LLVM\\bin\\clang.exe"
     "clang"
 
@@ -945,8 +945,8 @@ define nb_add_astra(joined: text, dir: text) -> text:
     if is_dir(dir):
         files = list_dir(dir)
         total = length(files)
-        loop index in 0..<total:
-            file = at(files, index)
+        loop index in 0 until total:
+            file = files[index]
             if ends_with(file, ".astra"):
                 out = out + "," + dir + "/" + file
     out
@@ -955,9 +955,9 @@ define nb_split_spaces(joined: text) -> [text]:
     pieces = split(joined, " ")
     total = length(pieces)
     edit out = []
-    loop index in 0..<total:
-        piece = at(pieces, index)
-        if piece != "":
+    loop index in 0 until total:
+        piece = pieces[index]
+        if piece is not "":
             out = append(out, piece)
     out
 
@@ -967,22 +967,22 @@ define nb_ship_files(name: text) -> text:
     if is_dir("features"):
         subs = list_dir("features")
         sub_total = length(subs)
-        loop s_index in 0..<sub_total:
-            sub = at(subs, s_index)
+        loop s_index in 0 until sub_total:
+            sub = subs[s_index]
             if is_dir("features/" + sub):
                 joined = nb_add_astra(joined, "features/" + sub)
     game_lines = nb_lines(read_file(name + ".toml"))
     pkgs = nb_setting(game_lines, "packages", "")
-    if pkgs != "":
+    if pkgs is not "":
         roots = nb_split_spaces(pkgs)
         root_total = length(roots)
-        loop r_index in 0..<root_total:
-            joined = nb_add_astra(joined, at(roots, r_index))
+        loop r_index in 0 until root_total:
+            joined = nb_add_astra(joined, roots[r_index])
     if is_dir("sounds"):
         wavs = list_dir("sounds")
         wav_total = length(wavs)
-        loop w_index in 0..<wav_total:
-            wav = at(wavs, w_index)
+        loop w_index in 0 until wav_total:
+            wav = wavs[w_index]
             if ends_with(wav, ".wav"):
                 joined = joined + ",sounds/" + wav
     joined
@@ -996,7 +996,7 @@ define entry_path(name: text) -> text:
         "src/main.or"
     else:
         q = text_of(append([], 34))
-        src = "use atlas_project\n\nfn main() -> int:\n    project_run(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")\n"
+        src = "use atlas_project\n\nfn main() -> number:\n    project_run(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")\n"
         mkdir_all("target")
         write_file("target/main_gen.or", src)
         "target/main_gen.or"
@@ -1007,13 +1007,13 @@ define entry_path(name: text) -> text:
 # platform = adding its row here + its *_min.c backends under runtime/. An
 # empty c-file set means that platform has no GUI backend yet, and
 # build_native_entry stops with a clear message instead of a link error.
-define target_name(target: int) -> text:
-    if target == 0 then "windows" else if target == 1 then "linux" else "macos"
+define target_name(target: number) -> text:
+    if target is 0 then "windows" else if target is 1 then "linux" else "macos"
 
-define platform_c_files(runtime: text, target: int) -> [text]:
-    if target == 0:
+define platform_c_files(runtime: text, target: number) -> [text]:
+    if target is 0:
         [runtime + "/win32_min.c", runtime + "/wasapi_min.c", runtime + "/ogpu_min.c", runtime + "/gdi_min.c", runtime + "/d3d12_min.c"]
-    else if target == 1:
+    else if target is 1:
         # Linux: X11 window + software renderer in one file (linux_min.c);
         # ogpu_min.c's d3d12 stubs stay weak no-ops so og_init picks software.
         # No audio backend yet. UNVERIFIED until built on a Linux host.
@@ -1024,7 +1024,7 @@ define platform_c_files(runtime: text, target: int) -> [text]:
 define build_native(variant: text) -> text:
     build_native_entry(variant, "")
 
-# entry_override != "" compiles a custom entry (soak harness) instead
+# entry_override is not "" compiles a custom entry (soak harness) instead
 # of the game's own main.
 define build_native_entry(variant: text, entry_override: text) -> text:
     if not file_exists("Orbit.toml"):
@@ -1036,16 +1036,16 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     if not file_exists(compiler):
         die("orbit: native compiler not found at `" + compiler + "` - set [native] compiler in Orbit.toml")
     mkdir_all("build")
-    suffix = if variant == "" then "" else "_" + variant
+    suffix = if variant is "" then "" else "_" + variant
     exe = "build/" + name + suffix + ".exe"
     ll = "build/" + name + ".ll"
-    entry = if entry_override == "" then entry_path(name) else entry_override
+    entry = if entry_override is "" then entry_path(name) else entry_override
     edit compile_args = [entry, ll]
     dirs = nb_orb_dirs(lines)
     dir_total = length(dirs)
-    loop d_index in 0..<dir_total:
-        compile_args = append(compile_args, at(dirs, d_index))
-    if run_command(compiler, compile_args) != 0:
+    loop d_index in 0 until dir_total:
+        compile_args = append(compile_args, dirs[d_index])
+    if run_command(compiler, compile_args) is not 0:
         die("orbit: native compile failed")
     # Both renderers always link; ogpu_min.c dispatches at og_init from the
     # game toml's `renderer = auto|gdi|gpu` (default auto). The backend C set
@@ -1053,32 +1053,32 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     # once those *_min.c land - no cross-compile flag, you build on-target.
     target = os_kind()
     cfiles = platform_c_files(runtime, target)
-    if length(cfiles) == 0:
+    if length(cfiles) is 0:
         die("orbit: no GUI backend for " + target_name(target) + " yet - build on Windows, or add runtime/*_min.c backends for " + target_name(target) + " (see BUILD.md)")
     edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/net_min.c"]
-    loop cf_index in 0..<length(cfiles):
-        link_args = append(link_args, at(cfiles, cf_index))
+    loop cf_index in 0 until length(cfiles):
+        link_args = append(link_args, cfiles[cf_index])
     # The package's `link = "..."` rides here too - the same key
     # cli_build honors, so an app orb's runtime needs (say
     # runtime/orion_cli.c for serve + own_window) name themselves in
     # the toml instead of failing at the linker.
     extra_link = nb_setting(lines, "link", "")
-    if extra_link != "":
+    if extra_link is not "":
         extras = split(extra_link, " ")
-        loop x_index in 0..<length(extras):
-            xf = at(extras, x_index)
-            if xf != "":
+        loop x_index in 0 until length(extras):
+            xf = extras[x_index]
+            if xf is not "":
                 link_args = append(link_args, xf)
-    if variant == "ship":
+    if variant is "ship":
         embed_rc = run_command("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", runtime + "/tools/embed_assets.ps1", "-Out", "build/scripts_embed.c", "-Files", nb_ship_files(name)])
-        if embed_rc != 0:
+        if embed_rc is not 0:
             die("orbit: asset embed failed")
         link_args = append(link_args, "build/scripts_embed.c")
         # Icon + version block: a <name>.rc beside the toml compiles
         # via llvm-rc and links in; absent = plain exe, no error.
         if file_exists(name + ".rc"):
             rc_rc = run_command("C:\\Program Files\\LLVM\\bin\\llvm-rc.exe", ["/FO", "build/" + name + ".res", name + ".rc"])
-            if rc_rc == 0:
+            if rc_rc is 0:
                 link_args = append(link_args, "build/" + name + ".res")
             else:
                 print_line(c_dim("orbit: llvm-rc failed - shipping without icon"))
@@ -1089,7 +1089,7 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     # "writing address 0x0" fault in a function prologue). cli_build already
     # does this for the compiler; the game needs it just as much. Windows
     # only: POSIX raises the stack via ulimit at run time.
-    if target == 0:
+    if target is 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/STACK:67108864")
         # UTF-8 as the process code page - see runtime/orion.manifest for why.
@@ -1099,7 +1099,7 @@ define build_native_entry(variant: text, entry_override: text) -> text:
         link_args = append(link_args, "-MANIFESTINPUT:" + runtime + "/orion.manifest")
     link_args = append(link_args, "-o")
     link_args = append(link_args, exe)
-    if target == 0:
+    if target is 0:
         # System libs + link map are Windows-specific (the crash filter's
         # module-relative offsets resolve against the .map). POSIX backends
         # add their own libs here when they land.
@@ -1109,20 +1109,20 @@ define build_native_entry(variant: text, entry_override: text) -> text:
         link_args = append(link_args, "-Wl,/MAP:build/" + name + ".map")
         link_args = append(link_args, "-ld3d12")
         link_args = append(link_args, "-ldxgi")
-    if target == 1:
+    if target is 1:
         # Linux windowed build links Xlib. (POSIX raises the stack via ulimit
         # at run time, so no /STACK flag here.)
         link_args = append(link_args, "-lX11")
-    if run_command(nb_clang(), link_args) != 0:
+    if run_command(nb_clang(), link_args) is not 0:
         die("orbit: link failed")
     remove_file(ll)
-    if variant == "ship":
+    if variant is "ship":
         remove_file("build/scripts_embed.c")
         # Stage under build/ship/ as <name>.exe (never clobbers the
         # dev exe) and zip it - the artifact you drag to itch.
         mkdir_all("build/ship")
         zip_rc = run_command("powershell", ["-NoProfile", "-Command", "Copy-Item build/" + name + "_ship.exe build/ship/" + name + ".exe -Force; Compress-Archive -Force -Path build/ship/" + name + ".exe -DestinationPath build/" + name + "-win64.zip"])
-        if zip_rc == 0:
+        if zip_rc is 0:
             print_line(c_bold("build/" + name + "-win64.zip") + " " + c_green("ready"))
     print_line(c_bold(exe) + " " + c_green("ok"))
     exe
@@ -1131,7 +1131,7 @@ define build_native_entry(variant: text, entry_override: text) -> text:
 #
 # Compile `path` with orion.exe - CLI runtime only (orion_rt.c + orion_cli.c),
 # no window/gpu/audio - link, and return the exe path (or "" on failure).
-# The file's own `main` is the entry, so callers pass fname == "main" (test.sh,
+# The file's own `main` is the entry, so callers pass fname is "main" (test.sh,
 # cubsy, the bundle smoke all do). 64MB stack: `orbit run` on the compiler
 # bundle recurses deep; harmless for small programs.
 define cli_build(path: text) -> text:
@@ -1165,9 +1165,9 @@ define cli_build(path: text) -> text:
         # reported as not found. `./hello` becomes `.\hello.exe`, which is
         # plainly cwd-relative. os/lib.or documents the same trap.
         bare = path_drop_or(path)
-        stem = if path_parent(bare) == "." then "./" + bare else bare
+        stem = if path_parent(bare) is "." then "./" + bare else bare
         ll = stem + ".ll"
-        exe = stem + if os_kind() == 0 then ".exe" else ""
+        exe = stem + if os_kind() is 0 then ".exe" else ""
         dirs = [default_orbs()]
     else:
         lines = nb_lines(read_file("Orbit.toml"))
@@ -1186,22 +1186,22 @@ define cli_build(path: text) -> text:
         die("orbit: compiler not found at `" + compiler + "` - set [native] compiler in Orbit.toml")
     edit compile_args = [path, ll]
     dir_total = length(dirs)
-    loop d_index in 0..<dir_total:
-        compile_args = append(compile_args, at(dirs, d_index))
+    loop d_index in 0 until dir_total:
+        compile_args = append(compile_args, dirs[d_index])
     # Running one file should show the PROGRAM's output, not three lines about
     # how its compilation went. Diagnostics and failures still print.
     if standalone:
         compile_args = append(compile_args, "--quiet")
     # `orbit debug` builds with the call trail (see cmd_debug).
-    if slot_has("orbit:trace") and slot_get_int("orbit:trace") == 1:
+    if slot_has("orbit:trace") and slot_get_int("orbit:trace") is 1:
         compile_args = append(compile_args, "--trace")
-    if run_command(compiler, compile_args) != 0:
+    if run_command(compiler, compile_args) is not 0:
         return ""
     # The compiler always emits a Windows triple (effect ABI). Off Windows,
     # retarget the .ll to the host before clang, else it won't link.
-    if os_kind() != 0:
-        mangle = if os_kind() == 2 then "o" else "e"
-        triple = if os_kind() == 2 then "arm64-apple-macosx" else "x86_64-unknown-linux-gnu"
+    if os_kind() is not 0:
+        mangle = if os_kind() is 2 then "o" else "e"
+        triple = if os_kind() is 2 then "arm64-apple-macosx" else "x86_64-unknown-linux-gnu"
         edit txt = read_file(ll)
         # Anchor to the header context so we never rewrite a same-looking
         # substring inside a program string constant (that would desync the
@@ -1213,26 +1213,29 @@ define cli_build(path: text) -> text:
     # /STACK is a Windows PE linker flag; POSIX raises the stack via ulimit
     # (Linux) or a link-time flag (macOS - main-thread stack is capped there).
     # -Wno-override-module silences the retargeted-triple note (no-op on Win).
-    edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module"]
-    if extra_link != "":
+    # -ffunction-sections + /OPT:REF strippar OANVAND runtimekod ur exe:n
+    # (mindre binarer, och farre antivirus-heuristiktraffar: en testbinar
+    # bar inte langre med sig process-spawn/nat/fs den aldrig anropar).
+    edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module", "-ffunction-sections", "-fdata-sections", "-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF"]
+    if extra_link is not "":
         extras = split(extra_link, " ")
-        loop x_index in 0..<length(extras):
-            xf = at(extras, x_index)
-            if xf != "":
+        loop x_index in 0 until length(extras):
+            xf = extras[x_index]
+            if xf is not "":
                 link_args = append(link_args, xf)
     # `orbit package` gives the exe its icon: a compiled resource, linked in
     # like any other object.
-    if slot_has("orbit:res") and os_kind() == 0:
+    if slot_has("orbit:res") and os_kind() is 0:
         link_args = append(link_args, slot_get("orbit:res"))
     # `orbit package` links a shipped app without a console window. The entry
     # point stays main() - /SUBSYSTEM:WINDOWS alone would send the linker
     # looking for WinMain.
-    if slot_has("orbit:windowless") and slot_get_int("orbit:windowless") == 1 and os_kind() == 0:
+    if slot_has("orbit:windowless") and slot_get_int("orbit:windowless") is 1 and os_kind() is 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/SUBSYSTEM:WINDOWS")
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/ENTRY:mainCRTStartup")
-    if os_kind() == 0:
+    if os_kind() is 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/STACK:67108864")
         # UTF-8 as the process code page - see runtime/orion.manifest for why.
@@ -1242,13 +1245,13 @@ define cli_build(path: text) -> text:
         link_args = append(link_args, "-MANIFESTINPUT:" + runtime + "/orion.manifest")
     link_args = append(link_args, "-o")
     link_args = append(link_args, exe)
-    if run_command(nb_clang(), link_args) != 0:
+    if run_command(nb_clang(), link_args) is not 0:
         return ""
     remove_file(ll)
     # A project build gets the webview loader beside its exe, so a dev run's
     # open_app_window finds it the same way a shipped one does. Projects
     # that never open a webview stay clean.
-    if not standalone and os_kind() == 0 and webview_project():
+    if not standalone and os_kind() is 0 and webview_project():
         loader = runtime + "/WebView2Loader.dll"
         if file_exists(loader):
             loader_beside = copy_file(loader, "build/WebView2Loader.dll")
@@ -1259,9 +1262,9 @@ define cli_build(path: text) -> text:
 # collapsed anything non-zero to 1, so the one promise the language makes about
 # main stopped being true the moment you ran it through the tool. 1 stays
 # reserved for "the build itself failed".
-define __os_orbit_run(path: text, fname: text, args: [text]) -> int:
+define __os_orbit_run(path: text, fname: text, args: [text]) -> number:
     exe = cli_build(path)
-    if exe == "":
+    if exe is "":
         return 1
     run_command(exe, args)
 
@@ -1272,22 +1275,22 @@ define __os_orbit_run(path: text, fname: text, args: [text]) -> int:
 # calling each test appended. A project with no test functions anywhere
 # falls back to the old behavior (the program itself is the test).
 # Zero-arg tests only - a test that needs input is a program, not a test.
-define __os_orbit_test(path: text) -> int:
+define __os_orbit_test(path: text) -> number:
     __os_orbit_test_keeping(path, false)
 
 # `orbit test --keep` leaves each generated driver on disk. The wasm
 # gate compiles ONE of them as its second platform, and it used to read
 # whatever stale copy an older run had left behind - a green light for a
 # file nobody wrote that day.
-define __os_orbit_test_keeping(path: text, keep: truth) -> int:
+define __os_orbit_test_keeping(path: text, keep: truth) -> number:
     edit targets = [path]
     orb_files = ot_orb_libs()
-    loop i in 0..<length(orb_files):
-        targets = append(targets, at(orb_files, i))
+    loop i in 0 until length(orb_files):
+        targets = append(targets, orb_files[i])
     edit total = 0
     edit failed = 0
-    loop i in 0..<length(targets):
-        f = at(targets, i)
+    loop i in 0 until length(targets):
+        f = targets[i]
         if file_exists(f):
             src = read_file(f)
             names = ot_test_names(src)
@@ -1302,13 +1305,13 @@ define __os_orbit_test_keeping(path: text, keep: truth) -> int:
                 write_file(driver, ot_driver(src, names))
                 print_line(c_dim(f))
                 exe = cli_build(driver)
-                if exe == "" or run_command(exe, []) != 0:
+                if exe is "" or run_command(exe, []) is not 0:
                     failed = failed + 1
                 if not keep:
                     remove_file(driver)
-    if total == 0:
+    if total is 0:
         exe2 = cli_build(path)
-        if exe2 == "":
+        if exe2 is "":
             return 1
         return run_command(exe2, [])
     failed
@@ -1321,17 +1324,17 @@ define ot_orb_libs() -> [text]:
     edit out = []
     if file_exists("Orbit.toml"):
         lines = nb_lines(read_file("Orbit.toml"))
-        loop i in 0..<length(lines):
-            parts = split(at(lines, i), "\"path:")
-            if length(parts) == 2:
-                rest = split(at(parts, 1), "\"")
-                if length(rest) >= 1 and at(rest, 0) != "":
-                    out = append(out, at(rest, 0) + "/lib.or")
+        loop i in 0 until length(lines):
+            parts = split(lines[i], "\"path:")
+            if length(parts) is 2:
+                rest = split(parts[1], "\"")
+                if length(rest) >= 1 and rest[0] is not "":
+                    out = append(out, rest[0] + "/lib.or")
     if is_dir("orbs"):
         subs = split(host_subdirs("orbs"), "\n")
-        loop i in 0..<length(subs):
-            e = at(subs, i)
-            if e != "" and not list_contains(out, "orbs/" + e + "/lib.or"):
+        loop i in 0 until length(subs):
+            e = subs[i]
+            if e is not "" and not list_contains(out, "orbs/" + e + "/lib.or"):
                 out = append(out, "orbs/" + e + "/lib.or")
     out
 
@@ -1342,20 +1345,20 @@ define ot_dirname(f: text) -> text:
     if length(segs) < 2:
         return ""
     edit out = ""
-    loop i in 0..<(length(segs) - 1):
-        out = out + at(segs, i) + "/"
+    loop i in 0 until (length(segs) - 1):
+        out = out + segs[i] + "/"
     out
 
 # A file-name-safe tag for a target: the last directory segment, or the
 # file stem for the entry ("src/main.or" -> "main").
 define ot_target_tag(f: text) -> text:
     segs = split(replace(f, "\\", "/"), "/")
-    if length(segs) >= 2 and at(segs, length(segs) - 1) == "lib.or":
-        at(segs, length(segs) - 2)
+    if length(segs) >= 2 and segs[length(segs) - 1] is "lib.or":
+        segs[length(segs) - 2]
     else:
-        at(split(at(segs, length(segs) - 1), "."), 0)
+        split(segs[length(segs) - 1], ".")[0]
 
-define ot_after(s: text, n: int) -> text:
+define ot_after(s: text, n: number) -> text:
     bs = bytes_of(s)
     text_of(bytes_part(bs, n, length(bs)))
 
@@ -1369,7 +1372,7 @@ define ot_line_name(line: text) -> text:
     edit off = 0
     if starts_with(r, "define test_"):
         off = 7
-    if off == 0:
+    if off is 0:
         return ""
     bs = bytes_of(r)
     n = length(bs)
@@ -1377,37 +1380,37 @@ define ot_line_name(line: text) -> text:
     loop:
         if p >= n:
             break
-        if byte_at(bs, p) == '(':
+        if byte_at(bs, p) is '(':
             break
         p = p + 1
     if p + 1 >= n:
         return ""
-    if byte_at(bs, p + 1) != ')':
+    if byte_at(bs, p + 1) is not ')':
         return ""
     text_of(bytes_part(bs, off, p))
 
 define ot_test_names(src: text) -> [text]:
     edit out = []
     lines = nb_lines(src)
-    loop i in 0..<length(lines):
-        nm = ot_line_name(at(lines, i))
-        if nm != "":
+    loop i in 0 until length(lines):
+        nm = ot_line_name(lines[i])
+        if nm is not "":
             out = append(out, nm)
     out
 
 define ot_driver(src: text, names: [text]) -> text:
     lines = nb_lines(src)
     edit out = ""
-    loop i in 0..<length(lines):
-        line = at(lines, i)
+    loop i in 0 until length(lines):
+        line = lines[i]
         edit kept = line
         if starts_with(line, "define main("):
             kept = "define __app_main" + ot_after(line, 11)
         out = out + kept + "\n"
     out = out + "\n# generated by `orbit test` - runs every test_* in the entry file\n"
     out = out + "define main():\n"
-    loop i in 0..<length(names):
-        nm = at(names, i)
+    loop i in 0 until length(names):
+        nm = names[i]
         # The name goes out BEFORE the test runs, the verdict after -
         # so a failed `require` aborts mid-line and the line itself
         # says which test died: `test_x ... orion: requirement failed`.
@@ -1424,18 +1427,18 @@ define __os_orbit_stdlib_orbs() -> [text]:
         lines = nb_lines(read_file("Orbit.toml"))
         dirs = nb_orb_dirs(lines)
         dir_total = length(dirs)
-        loop i in 0..<dir_total:
-            entries = list_dir(at(dirs, i))
+        loop i in 0 until dir_total:
+            entries = list_dir(dirs[i])
             ent_total = length(entries)
-            loop j in 0..<ent_total:
-                nm = at(entries, j)
-                if nm != "":
+            loop j in 0 until ent_total:
+                nm = entries[j]
+                if nm is not "":
                     out = append(out, nm)
     out
 
 define cmd_native():
     variant = first_param()
-    if variant != "" and variant != "gpu" and variant != "ship":
+    if variant is not "" and variant is not "gpu" and variant is not "ship":
         die("usage: orbit native [gpu|ship]")
     build_native(variant)
 
@@ -1444,7 +1447,7 @@ define cmd_native():
 # by image name, POSIX by command match.
 # Quiet on purpose: "no such process" is the NORMAL case, not news.
 define kill_running(name: text):
-    if os_kind() == 0:
+    if os_kind() is 0:
         killed_w = run_command_quiet("taskkill", ["/F", "/IM", name + ".exe"])
     else:
         killed_p = run_command_quiet("pkill", ["-f", name])
@@ -1464,12 +1467,12 @@ define cmd_dev():
     name = nb_setting(lines, "name", "game")
     kill_running(name)
     exe = build_native("")
-    if nb_setting(lines, "check", "1") != "0":
+    if nb_setting(lines, "check", "1") is not "0":
         # A broken show/bind/parent fails HERE, before a window opens.
-        if run_command(exe, ["check"]) != 0:
+        if run_command(exe, ["check"]) is not 0:
             die("orbit dev: reference check failed - fix the above, not launched")
     edit launch = []
-    if mode != "":
+    if mode is not "":
         launch = append(launch, mode)
     exit_with(run_command(exe, launch))
 
@@ -1482,7 +1485,7 @@ define cmd_shot():
     if not file_exists("Orbit.toml"):
         die("orbit shot: no Orbit.toml in this directory")
     exe = build_native("")
-    out = if first_param() == "" then "build/shot.bmp" else first_param()
+    out = if first_param() is "" then "build/shot.bmp" else first_param()
     exit_with(run_command(exe, ["shot", out]))
 
 # The game as a queryable surface: every rule's reads/writes/
@@ -1503,8 +1506,8 @@ define cmd_memfacts():
         die("orbit memfacts: compiler not found at `" + compiler + "`")
     edit args = [resolve_path(), "memfacts"]
     dirs = nb_orb_dirs(lines)
-    loop i in 0..<length(dirs):
-        args = append(args, at(dirs, i))
+    loop i in 0 until length(dirs):
+        args = append(args, dirs[i])
     exit_with(run_command(compiler, args))
 
 define cmd_facts():
@@ -1512,7 +1515,7 @@ define cmd_facts():
     name = nb_setting(lines, "name", "game")
     filter = first_param()
     q = text_of(append([], 34))
-    src = "use atlas_project\n\nfn main() -> int:\n    project_facts(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + filter + q + ")\n"
+    src = "use atlas_project\n\nfn main() -> number:\n    project_facts(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + filter + q + ")\n"
     mkdir_all("target")
     write_file("target/facts_gen.or", src)
     exe = build_native_entry("facts", "target/facts_gen.or")
@@ -1526,8 +1529,8 @@ define synth_analysis(fn_name: text, gen: text, arg: text):
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
     q = text_of(append([], 34))
-    call = if arg == "" then fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")" else fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + arg + q + ")"
-    src = "use atlas_project\n\nfn main() -> int:\n    " + call + "\n"
+    call = if arg is "" then fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")" else fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + arg + q + ")"
+    src = "use atlas_project\n\nfn main() -> number:\n    " + call + "\n"
     mkdir_all("target")
     write_file("target/" + gen + "_gen.or", src)
     exe = build_native_entry(gen, "target/" + gen + "_gen.or")
@@ -1554,7 +1557,7 @@ define cmd_liveness():
 # The "*" sentinel keeps the no-filter case on synth_analysis's 3-arg path.
 define cmd_doc():
     p = first_param()
-    synth_analysis("project_doc", "doc", if p == "" then "*" else p)
+    synth_analysis("project_doc", "doc", if p is "" then "*" else p)
 
 define cmd_bisect():
     synth_analysis("project_bisect", "bisect", first_param())
@@ -1568,7 +1571,7 @@ define cmd_try():
     ticks = nb_int(first_param(), 8000)
     seed = nb_int(second_param(), 42)
     q = text_of(append([], 34))
-    src = "use atlas_project\n\nfn main() -> int:\n    project_try(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
+    src = "use atlas_project\n\nfn main() -> number:\n    project_try(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
     mkdir_all("target")
     write_file("target/try_gen.or", src)
     exe = build_native_entry("try", "target/try_gen.or")
@@ -1585,7 +1588,7 @@ define cmd_soak():
     ticks = nb_int(t_param, 20000)
     seed = nb_int(s_param, 42)
     q = text_of(append([], 34))
-    src = "use atlas_project\n\nfn main() -> int:\n    project_soak(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
+    src = "use atlas_project\n\nfn main() -> number:\n    project_soak(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
     mkdir_all("target")
     write_file("target/soak_gen.or", src)
     exe = build_native_entry("soak", "target/soak_gen.or")
@@ -1595,21 +1598,21 @@ define cmd_soak():
 # one (interp parser dangling-else).
 define cmd_play():
     mode = first_param()
-    if mode == "interp":
+    if mode is "interp":
         play_interp()
-    if mode != "interp":
+    if mode is not "interp":
         play_native(mode)
 
 define play_interp():
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
-    if __os_orbit_run(entry_path(name), "main", []) != 0:
+    if __os_orbit_run(entry_path(name), "main", []) is not 0:
         exit_with(1)
 
 define play_native(mode: text):
     exe = build_native("")
     edit game_args = []
-    if mode != "":
+    if mode is not "":
         game_args = append(game_args, mode)
     exit_with(run_command(exe, game_args))
 
@@ -1617,73 +1620,73 @@ define play_native(mode: text):
 
 public define main():
     command = verb()
-    if command == "new":
+    if command is "new":
         cmd_new()
     else:
-        if command == "add":
+        if command is "add":
             cmd_add()
-        else if command == "get":
+        else if command is "get":
             cmd_get()
-        else if command == "update":
+        else if command is "update":
             cmd_update()
-        else if command == "package":
+        else if command is "package":
             cmd_package()
-        else if command == "setup":
+        else if command is "setup":
             cmd_setup()
-        else if command == "debug":
+        else if command is "debug":
             cmd_debug()
         else:
-            if command == "build" or command == "check":
+            if command is "build" or command is "check":
                 cmd_build()
             else:
-                if command == "run":
+                if command is "run":
                     cmd_run()
                 else:
-                    if command == "test":
+                    if command is "test":
                         cmd_test()
                     else:
-                        if command == "fmt":
+                        if command is "fmt":
                             cmd_fmt()
                         else:
-                            if command == "native":
+                            if command is "native":
                                 cmd_native()
                             else:
-                                if command == "dev":
+                                if command is "dev":
                                     cmd_dev()
                                 else:
-                                    if command == "shot":
+                                    if command is "shot":
                                         cmd_shot()
                                     else:
-                                        if command == "play":
+                                        if command is "play":
                                             cmd_play()
                                         else:
-                                            if command == "soak":
+                                            if command is "soak":
                                                 cmd_soak()
                                             else:
-                                                if command == "try":
+                                                if command is "try":
                                                     cmd_try()
                                                 else:
-                                                    if command == "memfacts":
+                                                    if command is "memfacts":
                                                         cmd_memfacts()
-                                                    else if command == "facts":
+                                                    else if command is "facts":
                                                         cmd_facts()
                                                     else:
-                                                        if command == "why":
+                                                        if command is "why":
                                                             cmd_why()
                                                         else:
-                                                            if command == "affects":
+                                                            if command is "affects":
                                                                 cmd_affects()
                                                             else:
-                                                                if command == "schedule":
+                                                                if command is "schedule":
                                                                     cmd_schedule()
                                                                 else:
-                                                                    if command == "liveness":
+                                                                    if command is "liveness":
                                                                         cmd_liveness()
                                                                     else:
-                                                                        if command == "doc":
+                                                                        if command is "doc":
                                                                             cmd_doc()
                                                                         else:
-                                                                            if command == "bisect":
+                                                                            if command is "bisect":
                                                                                 cmd_bisect()
                                                                             else:
                                                                                 usage()

@@ -16,7 +16,7 @@ public define is_empty(t: text) -> truth:
     example not is_empty("x")
     length(t) is 0
 
-public define byte_count(t: text) -> int:
+public define byte_count(t: text) -> number:
     example byte_count("åsa") is 4
     bytes_count(bytes_of(t))
 
@@ -48,7 +48,7 @@ public define ends_with(t: text, suffix: text) -> truth:
     true
 
 # Repeat `t` `n` times. Returns "" if n <= 0.
-public define repeat(t: text, n: int) -> text:
+public define repeat(t: text, n: number) -> text:
     example repeat("ab", 3) is "ababab"
     edit result = ""
     if n > 0:
@@ -101,7 +101,7 @@ public define reverse(t: text) -> text:
 #     Turkish text survives a round trip through the wrong direction.
 
 # How many bytes the UTF-8 sequence with this lead byte occupies.
-define cp_size(lead: int) -> int:
+define cp_size(lead: number) -> number:
     if lead < 0x80:
         1
     else if lead < 0xE0:
@@ -113,23 +113,23 @@ define cp_size(lead: int) -> int:
 
 # Decode the code point starting at byte `i`. A truncated or ill-formed
 # sequence decodes as its lead byte, so decoding never fails.
-define cp_at(b: [int], i: int) -> int:
+define cp_at(b: [number], i: number) -> number:
     n = length(b)
-    lead = at(b, i)
+    lead = b[i]
     size = cp_size(lead)
     if i + size > n:
         lead
     else if size is 1:
         lead
     else if size is 2:
-        ((lead & 0x1F) << 6) | (at(b, i + 1) & 0x3F)
+        ((lead & 0x1F) << 6) | (b[i + 1] & 0x3F)
     else if size is 3:
-        ((lead & 0x0F) << 12) | ((at(b, i + 1) & 0x3F) << 6) | (at(b, i + 2) & 0x3F)
+        ((lead & 0x0F) << 12) | ((b[i + 1] & 0x3F) << 6) | (b[i + 2] & 0x3F)
     else:
-        ((lead & 0x07) << 18) | ((at(b, i + 1) & 0x3F) << 12) | ((at(b, i + 2) & 0x3F) << 6) | (at(b, i + 3) & 0x3F)
+        ((lead & 0x07) << 18) | ((b[i + 1] & 0x3F) << 12) | ((b[i + 2] & 0x3F) << 6) | (b[i + 3] & 0x3F)
 
 # Encode a code point back to UTF-8 bytes.
-define cp_bytes(cp: int) -> [int]:
+define cp_bytes(cp: number) -> [number]:
     if cp < 0x80:
         [cp]
     else if cp < 0x800:
@@ -143,22 +143,22 @@ define cp_bytes(cp: int) -> [int]:
 # twice: 0x100..0x137 and 0x14A..0x177 have the capital on even, 0x139..0x148
 # and 0x179..0x17E have it on odd. These two answer "is this the capital of
 # its pair" for the block.
-define latin_a_pair_even(cp: int) -> truth:
+define latin_a_pair_even(cp: number) -> truth:
     (cp >= 0x100 and cp <= 0x137) or (cp >= 0x14A and cp <= 0x177)
 
-define latin_a_pair_odd(cp: int) -> truth:
+define latin_a_pair_odd(cp: number) -> truth:
     (cp >= 0x139 and cp <= 0x148) or (cp >= 0x179 and cp <= 0x17E)
 
 # Cyrillic beyond the main alphabet (0x460..0x52F) is the same pair scheme:
 # capital on even, except the 0x4C1..0x4CE run where it is on odd.
-define cyrillic_pair_even(cp: int) -> truth:
+define cyrillic_pair_even(cp: number) -> truth:
     (cp >= 0x460 and cp <= 0x481) or (cp >= 0x48A and cp <= 0x4BF) or (cp >= 0x4D0 and cp <= 0x52F)
 
-define cyrillic_pair_odd(cp: int) -> truth:
+define cyrillic_pair_odd(cp: number) -> truth:
     cp >= 0x4C1 and cp <= 0x4CE
 
 # The capital of `cp`, or `cp` itself when it has none.
-define upper_cp(cp: int) -> int:
+define upper_cp(cp: number) -> number:
     if cp >= 0x61 and cp <= 0x7A:
         cp - 0x20
     else if cp is 0xB5:
@@ -201,7 +201,7 @@ define upper_cp(cp: int) -> int:
         cp
 
 # The small letter of `cp`, or `cp` itself when it has none.
-define lower_cp(cp: int) -> int:
+define lower_cp(cp: number) -> number:
     if cp >= 0x41 and cp <= 0x5A:
         cp + 0x20
     else if cp >= 0xC0 and cp <= 0xDE and cp is not 0xD7:
@@ -238,18 +238,31 @@ define lower_cp(cp: int) -> int:
         cp
 
 # Walk `t` code point by code point and rebuild it through `mapper`.
+# Chunkad uppsamling + EN join: bytes_concat per tecken var KVADRATISK
+# (varje concat kopierar allt dittills) - lower() pa en filkropp hangde
+# processen i minuter. Chunkarna ar sma nog att deras interna concat ar
+# billig, och join over chunklistan ar linjar.
 define map_case(t: text, mapper: function) -> text:
     b = bytes_of(t)
     n = length(b)
-    edit out = bytes_zeros(0)
+    edit parts = []
+    edit chunk = bytes_zeros(0)
+    edit ccount = 0
     edit i = 0
     loop:
         if i >= n:
             break
         cp = cp_at(b, i)
-        out = bytes_concat(out, cp_bytes(mapper(cp)))
-        i = i + cp_size(at(b, i))
-    text_of(out)
+        chunk = bytes_concat(chunk, cp_bytes(mapper(cp)))
+        ccount = ccount + 1
+        if ccount >= 256:
+            parts = append(parts, text_of(chunk))
+            chunk = bytes_zeros(0)
+            ccount = 0
+        i = i + cp_size(b[i])
+    if ccount > 0:
+        parts = append(parts, text_of(chunk))
+    join(parts, "")
 
 # Upper-case, code point by code point.
 public define upper(t: text) -> text:
@@ -270,7 +283,7 @@ public define lower(t: text) -> text:
 # How many CHARACTERS (Unicode code points) the text holds - `len` counts
 # bytes, and "åsa" is 4 bytes but 3 characters. Counts every byte that is
 # not a UTF-8 continuation byte (0x80-0xBF).
-public define characters(t: text) -> int:
+public define characters(t: text) -> number:
     example characters("åsa") is 3
     example characters("abc") is 3
     t_bytes = bytes_of(t)
@@ -310,15 +323,37 @@ public define trim(t: text) -> text:
 
 # Join a list of pieces with `sep` between them.
 #   join(["a", "b", "c"], "-")  ->  "a-b-c"
+# Joined by halves, not one at a time. Adding a piece to the end of a
+# growing text copies everything already in it, so a thousand pieces copy
+# the whole result a thousand times - the cost grows with the SQUARE of
+# how many there are, which is why building one big text out of many small
+# ones was always the slow part of anything that serialises.
+#
+# Pairing them up instead means each byte is copied about log2(n) times:
+# a display list of a hundred and fifty pieces went from copying a
+# megabyte to copying a hundred kilobytes.
 public define join(parts: [text], sep: text) -> text:
     example join(["a", "b", "c"], "-") is "a-b-c"
-    edit out = ""
-    n = length(parts)
-    loop i in 0 until n:
-        if i > 0:
-            out = "{out}{sep}"
-        out = "{out}{at(parts, i)}"
-    out
+    example join([], "-") is ""
+    example join(["only"], "-") is "only"
+    if length(parts) is 0:
+        return ""
+    edit row = parts
+    loop:
+        if length(row) <= 1:
+            break
+        edit paired = []
+        edit i = 0
+        loop:
+            if i >= length(row):
+                break
+            if i + 1 < length(row):
+                paired = append(paired, "{row[i]}{sep}{row[i + 1]}")
+            else:
+                paired = append(paired, row[i])
+            i = i + 2
+        row = paired
+    row[0]
 
 # Split `t` on every occurrence of `sep`, returning the pieces.
 #   split("a,b,c", ",")  ->  ["a", "b", "c"]
@@ -359,7 +394,7 @@ public define replace(t: text, from: text, to: text) -> text:
     join(split(t, from), to)
 
 # First byte index of `sub` in `t`, or -1 if absent. Empty `sub` -> 0.
-public define index_of(t: text, sub: text) -> int:
+public define index_of(t: text, sub: text) -> number:
     example index_of("hello", "ll") is 2
     example index_of("hello", "zz") is 0 - 1
     tb = bytes_of(t)
@@ -384,7 +419,7 @@ public define index_of(t: text, sub: text) -> int:
     found
 
 # Pad `t` on the left with `pad` until it is at least `width` bytes wide.
-public define pad_left(t: text, width: int, pad: text) -> text:
+public define pad_left(t: text, width: number, pad: text) -> text:
     example pad_left("7", 3, "0") is "007"
     edit out = t
     edit k = length(t)
@@ -396,7 +431,7 @@ public define pad_left(t: text, width: int, pad: text) -> text:
     out
 
 # Pad `t` on the right with `pad` until it is at least `width` bytes wide.
-public define pad_right(t: text, width: int, pad: text) -> text:
+public define pad_right(t: text, width: number, pad: text) -> text:
     example pad_right("7", 3, "0") is "700"
     edit out = t
     edit k = length(t)
@@ -415,7 +450,7 @@ public define lines(t: text) -> [text]:
 # The integer written at the start of `t`: an optional `-`, then digits.
 # Stops at the first non-digit; no digits at all is 0. For CLI arguments
 # and simple protocols - not a validator.
-public define int_from_text(t: text) -> int:
+public define int_from_text(t: text) -> number:
     example int_from_text("42") is 42
     example int_from_text("-7") is 0 - 7
     example int_from_text("12ab") is 12
@@ -424,14 +459,14 @@ public define int_from_text(t: text) -> int:
     n = length(bs)
     edit i = 0
     edit neg = false
-    if n > 0 and at(bs, 0) is 45:
+    if n > 0 and bs[0] is 45:
         neg = true
         i = 1
     edit value = 0
     edit done = false
     loop k in i until n:
         if not done:
-            c = at(bs, k)
+            c = bs[k]
             if c >= 48 and c <= 57:
                 value = value * 10 + (c - 48)
             else:

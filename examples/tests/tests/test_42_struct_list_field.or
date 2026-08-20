@@ -1,10 +1,10 @@
-type Item: name: text, value: int
+type Item: name: text, value: number
 type Bag: items: [Item]
 
-define main() -> int:
+define main() -> number:
     a = Item{name: "alpha", value: 21}
     b = Item{name: "beta", value: 21}
     bag = Bag{items: [a, b]}
-    first = at(bag.items, 0)
-    second = at(bag.items, 1)
+    first = bag.items[0]
+    second = bag.items[1]
     first.value + second.value

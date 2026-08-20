@@ -16,7 +16,7 @@ use typeface
 use ori_scene
 
 # "#RRGGBB" (or "#RGB") to a whole color; anything else is 0.
-public define color_of(colour: text) -> int:
+public define color_of(colour: text) -> number:
     bytes = bytes_of(colour)
     if bytes_count(bytes) is 0 or byte_at(bytes, 0) is not 35:
         return 0
@@ -51,27 +51,27 @@ public define color_of(colour: text) -> int:
 # assets (a declared game embeds them at build time), the compositor
 # only asks. A name it does not know answers with the 1x1 key texture
 # and nothing is drawn.
-public define draw_over(pixels: list of int, width: int, height: int, commands: list of DrawCmd, scale: number, types: Typeset, texture_of: function) -> list of int:
+public define draw_over(pixels: list of number, width: number, height: number, commands: list of DrawCmd, scale: number, types: Typeset, texture_of: function) -> list of number:
     edit out = pixels
     loop command in commands:
         out = drawn(out, width, height, command, scale, types, texture_of)
     out
 
-define drawn(pixels: list of int, width: int, height: int, command: DrawCmd, scale: number, types: Typeset, texture_of: function) -> list of int:
+define drawn(pixels: list of number, width: number, height: number, command: DrawCmd, scale: number, types: Typeset, texture_of: function) -> list of number:
     choose command:
-        DrawRect(rect, colour, tag) -> fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), 0)
-        DrawRoundRect(rect, colour, radius, tag) -> fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), to_whole(radius * scale + 0.5))
-        DrawText(point, content, colour, size, tag) -> fill_text(pixels, width, height, point, content, color_of(colour), size, scale, types)
-        DrawIcon(point, icon_name, size, tag) -> pixels
-        DrawPath(path_data, colour, tag) -> pixels
-        DrawSprite(point, image_path, sprite_scale, tag) -> pixels
-        DrawImage(point, image_path, image_wide, image_high, tint, blend, tag) -> blit_image(pixels, width, height, scaled(Rect{x: point.x, y: point.y, wide: (image_wide), high: (image_high)}, scale), texture_of(image_path))
+        DrawRect(rect, colour, tag) then fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), 0)
+        DrawRoundRect(rect, colour, radius, tag) then fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), to_whole(radius * scale + 0.5))
+        DrawText(point, content, colour, size, tag) then fill_text(pixels, width, height, point, content, color_of(colour), size, scale, types)
+        DrawIcon(point, icon_name, size, tag) then pixels
+        DrawPath(path_data, colour, tag) then pixels
+        DrawSprite(point, image_path, sprite_scale, tag) then pixels
+        DrawImage(point, image_path, image_wide, image_high, tint, blend, tag) then blit_image(pixels, width, height, scaled(Rect{x: point.x, y: point.y, wide: (image_wide), high: (image_high)}, scale), texture_of(image_path))
 
 # An image into a box: each destination pixel samples the texture,
 # nearest when magnified (pixel art stays crisp) and 2x2 blended when
 # minified (a big picture in a small box glides). The magenta key is
 # transparent, so art keeps its shape over whatever is beneath.
-define blit_image(pixels: list of int, width: int, height: int, rect: Rect, texture: Texture) -> list of int:
+define blit_image(pixels: list of number, width: number, height: number, rect: Rect, texture: Texture) -> list of number:
     key = 16711935
     left = clamp_px(to_whole(rect.x), width)
     top = clamp_px(to_whole(rect.y), height)
@@ -90,15 +90,15 @@ define blit_image(pixels: list of int, width: int, height: int, rect: Rect, text
                 out = set(out, y * width + x, sampled)
     out
 
-define texel_at(texture: Texture, u: int, v: int) -> int:
+define texel_at(texture: Texture, u: number, v: number) -> number:
     x = if u is less than 0 then 0 else if u is at least texture.width then texture.width - 1 else u
     y = if v is less than 0 then 0 else if v is at least texture.height then texture.height - 1 else v
-    texel = at(texture.pixels, y * texture.width + x)
+    texel = texture.pixels[y * texture.width + x]
     if texel is 16711935 then -1 else texel
 
 # Four texels blended by subpixel position; key texels carry no color
 # and no coverage, and under half coverage nothing is drawn.
-define texel_blend(texture: Texture, u: number, v: number) -> int:
+define texel_blend(texture: Texture, u: number, v: number) -> number:
     u0 = floor_i(u)
     v0 = floor_i(v)
     fu = u - (u0)
@@ -121,7 +121,7 @@ define texel_blend(texture: Texture, u: number, v: number) -> int:
         return -1
     to_whole(red / coverage) * 65536 + to_whole(green / coverage) * 256 + to_whole(blue / coverage)
 
-define floor_i(value: number) -> int:
+define floor_i(value: number) -> number:
     truncated = to_whole(value)
     if value is less than (truncated) then truncated - 1 else truncated
 
@@ -130,7 +130,7 @@ define scaled(rect: Rect, scale: number) -> Rect:
 
 # Reborn via slice: the set() loop stays in place (see draw_over).
 # radius > 0 insets the corners along a quarter circle.
-define fill_round_rect(pixels: list of int, width: int, height: int, rect: Rect, color: int, radius: int) -> list of int:
+define fill_round_rect(pixels: list of number, width: number, height: number, rect: Rect, color: number, radius: number) -> list of number:
     edit out = part(pixels, 0, length(pixels))
     left = clamp_px(to_whole(rect.x), width)
     top = clamp_px(to_whole(rect.y), height)
@@ -157,7 +157,7 @@ define fill_round_rect(pixels: list of int, width: int, height: int, rect: Rect,
             out = set(out, y * width + x, color)
     out
 
-define isqrt(value: int) -> int:
+define isqrt(value: number) -> number:
     edit root = 0
     loop candidate in 0 until value + 1:
         if candidate * candidate is at most value:
@@ -167,13 +167,13 @@ define isqrt(value: int) -> int:
 # Text through typeface's blitter: the command's point and size arrive
 # in list units and scale to this frame's pixels. Body face - a HUD
 # speaks the body voice; titles are the game's own words.
-define fill_text(pixels: list of int, width: int, height: int, point: Point, content: text, color: int, size: int, scale: number, types: Typeset) -> list of int:
+define fill_text(pixels: list of number, width: number, height: number, point: Point, content: text, color: number, size: number, scale: number, types: Typeset) -> list of number:
     em_px = to_whole(size * scale + 0.5)
     if em_px is at most 0 or content is "":
         return pixels
     blit_line(pixels, width, height, point.x * scale, point.y * scale, content, false, em_px, color, types)
 
-define clamp_px(value: int, limit: int) -> int:
+define clamp_px(value: number, limit: number) -> number:
     if value is less than 0 then 0 else if value is more than limit then limit else value
 
 define blank_texture(name: text) -> Texture:
@@ -185,28 +185,28 @@ define test_rect_lands_and_clips():
     types = cold_typeset()
     blank = blank_texture
     frame = draw_over(filled(100, 1), 10, 10, [DrawRect(Rect{x: 2, y: 2, wide: 3, high: 2}, "#FF0000", 0)], 1.0, types, blank)
-    require at(frame, 2 * 10 + 2) is 16711680
-    require at(frame, 3 * 10 + 4) is 16711680
-    require at(frame, 0) is 1
+    require frame[2 * 10 + 2] is 16711680
+    require frame[3 * 10 + 4] is 16711680
+    require frame[0] is 1
     clipped = draw_over(filled(100, 1), 10, 10, [DrawRect(Rect{x: 8, y: 8, wide: 9, high: 9}, "#00FF00", 0)], 1.0, types, blank)
-    require at(clipped, 9 * 10 + 9) is 65280
+    require clipped[9 * 10 + 9] is 65280
 
 # A rect in list units lands scaled: 2..5 at scale 2 covers 4..10.
 define test_scale_maps_units_to_pixels():
     types = cold_typeset()
     blank = blank_texture
     frame = draw_over(filled(400, 1), 20, 20, [DrawRect(Rect{x: 2, y: 2, wide: 3, high: 2}, "#FF0000", 0)], 2.0, types, blank)
-    require at(frame, 4 * 20 + 4) is 16711680
-    require at(frame, 7 * 20 + 9) is 16711680
-    require at(frame, 3 * 20 + 3) is 1
+    require frame[4 * 20 + 4] is 16711680
+    require frame[7 * 20 + 9] is 16711680
+    require frame[3 * 20 + 3] is 1
 
 define test_round_rect_insets_corners():
     types = cold_typeset()
     blank = blank_texture
     frame = draw_over(filled(400, 1), 20, 20, [DrawRoundRect(Rect{x: 2, y: 2, wide: 12, high: 12}, "#00FF00", 4, 0)], 1.0, types, blank)
     # The extreme corner pixel stays background; the middle fills.
-    require at(frame, 2 * 20 + 2) is 1
-    require at(frame, 8 * 20 + 8) is 65280
+    require frame[2 * 20 + 2] is 1
+    require frame[8 * 20 + 8] is 65280
 
 define test_text_draws_typeface_pixels():
     types = cold_typeset()

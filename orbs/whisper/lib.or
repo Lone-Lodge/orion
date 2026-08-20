@@ -31,22 +31,22 @@ external define wh_hear(h: int, wav: text, lang: text) -> text
 # ggml model. Loading costs about half a second and a lot of memory, so
 # open ONCE and keep the handle - never per clip.
 # no example: needs a model file on disk - proven by tools/whisper_test.sh
-public define hear_open(model: text) -> int uses files = wh_open(model)
+public define hear_open(model: text) -> number uses files = wh_open(model)
 
 # no example: releases a model - proven by tools/whisper_test.sh
-public define hear_close(ear: int) -> int uses files = wh_close(ear)
+public define hear_close(ear: number) -> number uses files = wh_close(ear)
 
 # What was said in `wav`, in language `lang` ("sv", "en", ...). Empty text
 # means nothing was recognised OR something failed - ask hear_error(ear)
 # to tell those apart.
 # no example: reads a wav and a model from disk - proven by tools/whisper_test.sh
-public define hear(ear: int, wav: text, lang: text) -> text uses files = wh_hear(ear, wav, lang)
+public define hear(ear: number, wav: text, lang: text) -> text uses files = wh_hear(ear, wav, lang)
 
 # Same, letting whisper detect the language itself. Slower and worse than
 # naming it - only reach for this when you genuinely do not know.
 # no example: reads a wav and a model from disk - proven by tools/whisper_test.sh
-public define hear_any(ear: int, wav: text) -> text uses files = wh_hear(ear, wav, "")
+public define hear_any(ear: number, wav: text) -> text uses files = wh_hear(ear, wav, "")
 
 # Why the last hear() on this handle came back empty. "" when it was fine.
 # no example: reports state from a live handle - proven by tools/whisper_test.sh
-public define hear_error(ear: int) -> text = wh_error(ear)
+public define hear_error(ear: number) -> text = wh_error(ear)

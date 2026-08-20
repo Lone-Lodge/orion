@@ -7,7 +7,7 @@
 #   - a recursive-descent parser/evaluator with correct precedence
 #     (`+ -` bind looser than `* /`), parentheses, and unary minus
 #   - mutual recursion (expr -> term -> factor -> expr)
-#   - `match` to dispatch on the operator, `data` structs to thread state
+#   - `choose` to dispatch on the operator, `data` structs to thread state
 #   - graceful divide-by-zero handling (the program CHOOSES to report it
 #     instead of trapping)
 #
@@ -22,15 +22,15 @@ use text
 
 # A token is a map {"kind": text, "val": int}. `val` is only meaningful
 # for numbers; operators carry 0.
-define tok(kind: text, val: int) -> table:
+define tok(kind: text, val: number) -> table:
     {"kind": kind, "val": val}
 
 # The result of parsing a sub-expression: its value and the index of the
 # next unconsumed token. Threading `next` is how recursive descent walks
 # the token list without a mutable cursor shared across functions.
-type Parsed: val: int, next: int
+type Parsed: val: number, next: number
 
-define is_digit(b: int) -> int:
+define is_digit(b: number) -> number:
     if b >= '0' and b <= '9' then 1 else 0
 
 # ---- Tokenizer -------------------------------------------------------
@@ -43,65 +43,65 @@ define tokenize(src: text) -> [table]:
     loop:
         if i >= n:
             break
-        b = at(bs, i)
-        if b == ' ':                        # space - skip
+        b = bs[i]
+        if b is ' ':                        # space - skip
             i = i + 1
         else:
-            if is_digit(b) == 1:            # a run of digits -> one number
+            if is_digit(b) is 1:            # a run of digits -> one number
                 edit num = 0
                 loop:
                     if i >= n:
                         break
-                    d = at(bs, i)
-                    if is_digit(d) == 0:
+                    d = bs[i]
+                    if is_digit(d) is 0:
                         break
                     num = num * 10 + (d - '0')
                     i = i + 1
                 toks = append(toks, tok("num", num))
             else:
                 kind = choose b:
-                    '+' -> "plus"
-                    '-' -> "minus"
-                    '*' -> "star"
-                    '/' -> "slash"
-                    '(' -> "lparen"
-                    ')' -> "rparen"
-                    _ -> "bad"
+                    '+' then "plus"
+                    '-' then "minus"
+                    '*' then "star"
+                    '/' then "slash"
+                    '(' then "lparen"
+                    ')' then "rparen"
+                    _ then "bad"
                 toks = append(toks, tok(kind, 0))
                 i = i + 1
     toks
 
 # ---- Recursive-descent parser + evaluator ----------------------------
 
-define parse_factor(toks: [table], pos: int) -> Parsed:
-    t = at(toks, pos)
+define parse_factor(toks: [table], pos: number) -> Parsed:
+    t = toks[pos]
     k = get(t, "kind")
-    if k == "lparen":
+    if k is "lparen":
         inner = parse_expr(toks, pos + 1)
         # inner.next points at the ')' - step over it
         Parsed{val: inner.val, next: inner.next + 1}
     else:
-        if k == "minus":                    # unary minus: -factor
+        if k is "minus":                    # unary minus: -factor
             f = parse_factor(toks, pos + 1)
             Parsed{val: 0 - f.val, next: f.next}
         else:                               # a number
             Parsed{val: get(t, "val"), next: pos + 1}
 
-define parse_term(toks: [table], pos: int) -> Parsed:
+define parse_term(toks: [table], pos: number) -> Parsed:
     left = parse_factor(toks, pos)
     edit val = left.val
     edit i = left.next
     loop:
         if i >= length(toks):
             break
-        k = get(at(toks, i), "kind")
-        if k != "star" and k != "slash":
+        k = get(toks[i], "kind")
+        if k is not "star" and k is not "slash":
             break
         r = parse_factor(toks, i + 1)
-        if k == "star":
+        if k is "star":
             val = val * r.val
         else:
-            if r.val == 0:                  # handle it, don't trap
+            if r.val is 0:                  # handle it, don't trap
                 print_line("  (calculator: divide by zero - using 0)")
                 val = 0
             else:
@@ -109,29 +109,29 @@ define parse_term(toks: [table], pos: int) -> Parsed:
         i = r.next
     Parsed{val: val, next: i}
 
-define parse_expr(toks: [table], pos: int) -> Parsed:
+define parse_expr(toks: [table], pos: number) -> Parsed:
     left = parse_term(toks, pos)
     edit val = left.val
     edit i = left.next
     loop:
         if i >= length(toks):
             break
-        k = get(at(toks, i), "kind")
-        if k != "plus" and k != "minus":
+        k = get(toks[i], "kind")
+        if k is not "plus" and k is not "minus":
             break
         r = parse_term(toks, i + 1)
-        val = if k == "plus" then val + r.val else val - r.val
+        val = if k is "plus" then val + r.val else val - r.val
         i = r.next
     Parsed{val: val, next: i}
 
-define eval(src: text) -> int:
+define eval(src: text) -> number:
     toks = tokenize(src)
     result = parse_expr(toks, 0)
     result.val
 
 # ---- Main ------------------------------------------------------------
 
-define main() -> int:
+define main() -> number:
     a = eval("3 + 4 * 2")               # precedence:      = 11
     b = eval("(3 + 4) * 2")             # parens:          = 14
     c = eval("2 * (3 + 4) - 10 / 2")    # mixed:           = 9

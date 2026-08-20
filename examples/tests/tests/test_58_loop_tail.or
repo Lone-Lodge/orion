@@ -1,14 +1,14 @@
 # A collecting loop's block yields its TAIL expression, the same rule the
-# one-liner uses. Explicit `yield` collects additional values on top. A block
+# one-liner uses. Explicit `collect` collects additional values on top. A block
 # ending in a statement (an `if`) collects only what it yields.
 
-define sum(xs: [int]) -> int:
+define sum(xs: [number]) -> number:
     edit s = 0
     loop v in xs:
         s = s + v
     s
 
-define main() -> int:
+define main() -> number:
     a = loop x in [1, 2, 3]:
         d = x * 2
         d + 1                      # tail expr yielded -> [3, 5, 7]     -> 15

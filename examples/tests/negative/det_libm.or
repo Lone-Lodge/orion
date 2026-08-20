@@ -2,5 +2,5 @@
 deterministic define wobble(x: float) -> float:
     sin(x) * 2.0
 
-define main() -> int:
+define main() -> number:
     wobble(1.0) as int

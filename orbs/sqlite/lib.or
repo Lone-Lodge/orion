@@ -39,30 +39,30 @@ define join_params(params: [text]) -> text:
 # Open (or create) the database file. A handle, or -1 - ask db_error(-1)
 # for nothing; a failed open names its reason on the handle it tried.
 # no example: opens a file on disk - proven by tools/sqlite_test.sh
-public define db_open(path: text) -> int uses files = sq_open(path)
+public define db_open(path: text) -> number uses files = sq_open(path)
 
 # no example: closes a handle - proven by tools/sqlite_test.sh
-public define db_close(db: int) -> int uses files = sq_close(db)
+public define db_close(db: number) -> number uses files = sq_close(db)
 
 # Run SQL that yields no rows (CREATE, INSERT, UPDATE, DELETE). false on
 # error - db_error(db) says why.
 # no example: writes to a database file - proven by tools/sqlite_test.sh
-public define db_run(db: int, sql: text) -> truth uses files = sq_exec(db, sql, "") is 0
+public define db_run(db: number, sql: text) -> truth uses files = sq_exec(db, sql, "") is 0
 
 # Same, with `?` placeholders bound from `params`, in order. The ONLY way
 # user input should ever reach SQL.
 # no example: writes to a database file - proven by tools/sqlite_test.sh
-public define db_run_with(db: int, sql: text, params: [text]) -> truth uses files = sq_exec(db, sql, join_params(params)) is 0
+public define db_run_with(db: number, sql: text, params: [text]) -> truth uses files = sq_exec(db, sql, join_params(params)) is 0
 
 # All result rows, one text per row. Split a row's cells with columns().
 # Empty result is []; on error it is also [] and db_error(db) says why.
 # no example: reads a database file - proven by tools/sqlite_test.sh
-public define db_rows(db: int, sql: text) -> [text] uses files:
+public define db_rows(db: number, sql: text) -> [text] uses files:
     raw = sq_query(db, sql, "")
     if raw is "" then [] else split(raw, "\n")
 
 # no example: reads a database file - proven by tools/sqlite_test.sh
-public define db_rows_with(db: int, sql: text, params: [text]) -> [text] uses files:
+public define db_rows_with(db: number, sql: text, params: [text]) -> [text] uses files:
     raw = sq_query(db, sql, join_params(params))
     if raw is "" then [] else split(raw, "\n")
 
@@ -74,18 +74,18 @@ public define columns(row: text) -> [text]:
 # The first cell of the first row - the shape of COUNT(*) and friends.
 # "" when the query gave nothing.
 # no example: reads a database file - proven by tools/sqlite_test.sh
-public define db_one(db: int, sql: text) -> text uses files:
+public define db_one(db: number, sql: text) -> text uses files:
     rows = db_rows(db, sql)
-    if length(rows) is 0 then "" else at(columns(at(rows, 0)), 0)
+    if length(rows) is 0 then "" else columns(rows[0])[0]
 
 # Why the last call on this handle failed, "" when it did not.
 # no example: database state - proven by tools/sqlite_test.sh
-public define db_error(db: int) -> text uses files = sq_error(db)
+public define db_error(db: number) -> text uses files = sq_error(db)
 
 # Rows changed by the last INSERT/UPDATE/DELETE.
 # no example: database state - proven by tools/sqlite_test.sh
-public define db_changes(db: int) -> int uses files = sq_changes(db)
+public define db_changes(db: number) -> number uses files = sq_changes(db)
 
 # The rowid the last INSERT got.
 # no example: database state - proven by tools/sqlite_test.sh
-public define db_last_id(db: int) -> int uses files = sq_last_id(db)
+public define db_last_id(db: number) -> number uses files = sq_last_id(db)

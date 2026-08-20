@@ -1,17 +1,17 @@
 type Effect:
     Spawn(table)
-    SetResource(text, int)
-    Relate(int, text, int)
+    SetResource(text, number)
+    Relate(number, text, number)
     Nop
 
-define apply(e: Effect) -> int:
+define apply(e: Effect) -> number:
     choose e:
-        Spawn(comps) -> get_int(comps, "hp")
-        SetResource(key, value) -> length(key) + value
-        Relate(a, kind, b) -> a + length(kind) + b
-        Nop -> 7
+        Spawn(comps) then get_int(comps, "hp")
+        SetResource(key, value) then length(key) + value
+        Relate(a, kind, b) then a + length(kind) + b
+        Nop then 7
 
-define main() -> int:
+define main() -> number:
     s = apply(Spawn({"hp": 10}))
     r = apply(SetResource("score", 100))
     l = apply(Relate(3, "owns", 4))

@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     edit x = 10
     x = x + 32
     x

@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     a = ["x"]
     b = part(a, 0, 0)
     length(b)

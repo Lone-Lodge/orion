@@ -39,7 +39,7 @@ public define field_scale(field_h: number) -> number:
 # Where a screen pixel lands on the field. Outside the field is a real
 # answer (negative, or past field_w/field_h) - the letterbox is a place
 # too, and a hit test says no all by itself.
-public define field_of_pixel(pixel_x: int, pixel_y: int, width: int, height: int, field_w: number, field_h: number) -> Point:
+public define field_of_pixel(pixel_x: number, pixel_y: number, width: number, height: number, field_w: number, field_h: number) -> Point:
     pixels_per_unit = (1.0 / tan(game_fov / 2.0)) * (1.0 / (0.0 - game_plane)) * ((height) / 2.0)
     scale = field_scale(field_h)
     world_x = ((pixel_x) + 0.5 - (width) / 2.0) / pixels_per_unit
@@ -70,7 +70,7 @@ define rot_x(point: V3, angle: number) -> V3:
 # ----- mesh building -----
 
 # Two triangles from four corners, wound a-b-c / a-c-d.
-public define quad(a: V3, b: V3, c: V3, d: V3, color: int) -> list of Tri:
+public define quad(a: V3, b: V3, c: V3, d: V3, color: number) -> list of Tri:
     [Tri{a: a, b: b, c: c, color: color}, Tri{a: a, b: c, c: d, color: color}]
 
 public define add_triangles(triangles: list of Tri, more: list of Tri) -> list of Tri:
@@ -84,7 +84,7 @@ public define add_triangles(triangles: list of Tri, more: list of Tri) -> list o
 # (the same trick the stat bars use). left_x/top_y in field units,
 # cell = one glyph pixel in field units (a character is 5x7 cells with
 # a 1-cell gap), field_w/field_h = the game's declared field.
-public define text_triangles(content: text, left_x: number, top_y: number, cell: number, depth: number, color: int, field_w: number, field_h: number) -> list of Tri:
+public define text_triangles(content: text, left_x: number, top_y: number, cell: number, depth: number, color: number, field_w: number, field_h: number) -> list of Tri:
     scale = field_scale(field_h)
     half_w = field_w / 2.0
     half_h = field_h / 2.0
@@ -95,7 +95,7 @@ public define text_triangles(content: text, left_x: number, top_y: number, cell:
         rows = glyph_rows(byte_at(letters, index))
         pen = left_x + index * cell * 6.0
         loop row in 0 until 7:
-            bits = at(rows, row)
+            bits = rows[row]
             loop column in 0 until 5:
                 if (bits // column_bit(4 - column)) % 2 is 1:
                     center_x = pen + column * cell + cell / 2.0
@@ -105,7 +105,7 @@ public define text_triangles(content: text, left_x: number, top_y: number, cell:
                     marks = add_triangles(marks, quad(v3(x - half_cell, y - half_cell, depth), v3(x + half_cell, y - half_cell, depth), v3(x + half_cell, y + half_cell, depth), v3(x - half_cell, y + half_cell, depth), color))
     marks
 
-define column_bit(power: int) -> int:
+define column_bit(power: number) -> number:
     edit value = 1
     loop index in 0 until power:
         value = value * 2
@@ -130,7 +130,7 @@ define to_view(point: V3, camera: Camera) -> V3:
     rot_x(rot_y(sub(point, camera.eye), -camera.yaw), -camera.pitch)
 
 # Screen position: x, y in pixels, z kept for the depth test.
-define project(point: V3, camera: Camera, width: int, height: int) -> V3:
+define project(point: V3, camera: Camera, width: number, height: number) -> V3:
     focal = 1.0 / tan(camera.fov / 2.0)
     inverse_depth = 1.0 / -point.z
     half_height = (height) / 2.0
@@ -138,7 +138,7 @@ define project(point: V3, camera: Camera, width: int, height: int) -> V3:
 
 # ----- shading -----
 
-define shade(color: int, surface_normal: V3) -> int:
+define shade(color: number, surface_normal: V3) -> number:
     light = norm(v3(0.45, 0.8, 0.35))
     facing = dot(surface_normal, light)
     strength = 0.35 + (if facing is more than 0.0 then facing else 0.0) * 0.65
@@ -164,7 +164,7 @@ const transparent_key = 16711935
 # helpers it degrades to copy-on-write, and a 230k-element frame copied
 # per pixel write is a render measured in minutes instead of
 # milliseconds. Measured, not assumed.
-public define render(camera: Camera, triangles: list of Tri, sprites: list of Sprite, width: int, height: int, sky: int) -> list of int:
+public define render(camera: Camera, triangles: list of Tri, sprites: list of Sprite, width: number, height: number, sky: number) -> list of number:
     pixel_count = width * height
     edit pixels = filled(pixel_count, sky)
     edit depths = filled_number(pixel_count, 1000000.0)
@@ -202,7 +202,7 @@ public define render(camera: Camera, triangles: list of Tri, sprites: list of Sp
                     u_high = clamp(u_low + 1, 0, texture.width - 1)
                     u_mix = clamp_mix(sample_u - u_low)
                     blended = if magnified then nearest_texel(texture, sample_u, sample_v) else blend_texels(texture, u_low, u_high, v_low, v_high, u_mix, v_mix)
-                    if blended is at least 0 and depth is less than at(depths, y * width + x):
+                    if blended is at least 0 and depth is less than depths[y * width + x]:
                         depths = set(depths, y * width + x, depth)
                         pixels = set(pixels, y * width + x, blended)
     loop triangle in triangles:
@@ -230,12 +230,12 @@ public define render(camera: Camera, triangles: list of Tri, sprites: list of Sp
                         inside = (weight_a is at least 0.0 and weight_b is at least 0.0 and weight_c is at least 0.0) or (weight_a is at most 0.0 and weight_b is at most 0.0 and weight_c is at most 0.0)
                         if inside:
                             depth = -(weight_a * screen_a.z + weight_b * screen_b.z + weight_c * screen_c.z)
-                            if depth is less than at(depths, y * width + x):
+                            if depth is less than depths[y * width + x]:
                                 depths = set(depths, y * width + x, depth)
                                 pixels = set(pixels, y * width + x, color)
     pixels
 
-define floor_int(value: number) -> int:
+define floor_int(value: number) -> number:
     truncated = to_whole(value)
     if value is less than truncated then truncated - 1 else truncated
 
@@ -243,16 +243,16 @@ define clamp_mix(mix: number) -> number:
     if mix is less than 0.0 then 0.0 else if mix is more than 1.0 then 1.0 else mix
 
 # The magnification sample: the one nearest texel, square and crisp.
-define nearest_texel(texture: Texture, sample_u: number, sample_v: number) -> int:
+define nearest_texel(texture: Texture, sample_u: number, sample_v: number) -> number:
     u = clamp(floor_int(sample_u + 0.5), 0, texture.width - 1)
     v = clamp(floor_int(sample_v + 0.5), 0, texture.height - 1)
-    texel = at(texture.pixels, v * texture.width + u)
+    texel = texture.pixels[v * texture.width + u]
     if texel is transparent_key then -1 else texel
 
 # The four-texel blend, key-aware: transparent texels contribute no
 # color and no coverage; under half coverage the sample is not drawn
 # (returned as -1, an impossible color).
-define blend_texels(texture: Texture, u_low: int, u_high: int, v_low: int, v_high: int, u_mix: number, v_mix: number) -> int:
+define blend_texels(texture: Texture, u_low: number, u_high: number, v_low: number, v_high: number, u_mix: number, v_mix: number) -> number:
     edit red = 0.0
     edit green = 0.0
     edit blue = 0.0
@@ -263,7 +263,7 @@ define blend_texels(texture: Texture, u_low: int, u_high: int, v_low: int, v_hig
         weight_u = if corner % 2 is 0 then 1.0 - u_mix else u_mix
         weight_v = if corner // 2 is 0 then 1.0 - v_mix else v_mix
         weight = weight_u * weight_v
-        texel = at(texture.pixels, v * texture.width + u)
+        texel = texture.pixels[v * texture.width + u]
         if texel is not transparent_key:
             red = red + ((texel // 65536) % 256) * weight
             green = green + ((texel // 256) % 256) * weight
@@ -293,7 +293,7 @@ define max3(a: number, b: number, c: number) -> number:
 # another function's return it degrades to copy-per-push, which at
 # ~700k bytes is minutes of copying and an arena crash.
 
-public define bmp_header(width: int, height: int) -> list of int:
+public define bmp_header(width: number, height: number) -> list of number:
     padding = (4 - (width * 3) % 4) % 4
     file_size = 54 + (width * 3 + padding) * height
     edit bytes = [66, 77]
@@ -314,7 +314,7 @@ public define bmp_header(width: int, height: int) -> list of int:
     bytes = u32(bytes, 0)
     u32(bytes, 0)
 
-public define bmp_body(pixels: list of int, width: int, height: int) -> list of int:
+public define bmp_body(pixels: list of number, width: number, height: number) -> list of number:
     padding = (4 - (width * 3) % 4) % 4
     edit bytes = []
     edit y = height - 1
@@ -322,7 +322,7 @@ public define bmp_body(pixels: list of int, width: int, height: int) -> list of 
         if y is less than 0:
             break
         loop x in 0 until width:
-            pixel = at(pixels, y * width + x)
+            pixel = pixels[y * width + x]
             bytes = push(bytes, pixel % 256)
             bytes = push(bytes, (pixel // 256) % 256)
             bytes = push(bytes, (pixel // 65536) % 256)
@@ -343,7 +343,7 @@ public define bmp_body(pixels: list of int, width: int, height: int) -> list of 
 # frame ever needs to be small, that is the day to write the encoder,
 # not before.
 
-define be32(bytes: list of int, value: int) -> list of int:
+define be32(bytes: list of number, value: number) -> list of number:
     edit grown = bytes
     grown = push(grown, (value // 16777216) % 256)
     grown = push(grown, (value // 65536) % 256)
@@ -355,12 +355,12 @@ define be32(bytes: list of int, value: int) -> list of int:
 # compile error, and CRC needs a LOGICAL shift right that a signed
 # divide does not give. Halves keep every value under 65536, where both
 # problems stop existing.
-type Crc: hi: int, lo: int
+type Crc: hi: number, lo: number
 
 define crc_start() -> Crc:
     Crc{hi: 65535, lo: 65535}
 
-define crc_byte(crc: Crc, value: int) -> Crc:
+define crc_byte(crc: Crc, value: number) -> Crc:
     edit hi = crc.hi
     edit lo = crc.lo ^ value
     loop bit in 0 until 8:
@@ -376,7 +376,7 @@ define crc_done(crc: Crc) -> Crc:
     Crc{hi: crc.hi ^ 65535, lo: crc.lo ^ 65535}
 
 # zlib around stored DEFLATE blocks, each at most 65535 bytes.
-define zlib_stored(raw: list of int) -> list of int:
+define zlib_stored(raw: list of number) -> list of number:
     edit out = [120, 1]
     total = length(raw)
     edit start = 0
@@ -391,7 +391,7 @@ define zlib_stored(raw: list of int) -> list of int:
         out = push(out, (65535 - span) % 256)
         out = push(out, (65535 - span) // 256)
         loop index in start until start + span:
-            out = push(out, at(raw, index))
+            out = push(out, raw[index])
         start = start + span
     # adler32 of the uncompressed bytes, big-endian, closes the stream.
     # Emitted as four bytes rather than one number: b * 65536 + a can
@@ -413,12 +413,12 @@ define zlib_stored(raw: list of int) -> list of int:
 # unique, and a 220 KB byte list handed to a chunk-writing helper copies
 # itself once per byte. That is not slow, it is a segfault - measured,
 # not assumed.
-public define png_bytes(pixels: list of int, width: int, height: int) -> list of int:
+public define png_bytes(pixels: list of number, width: number, height: number) -> list of number:
     edit raw = []
     loop y in 0 until height:
         raw = push(raw, 0)
         loop x in 0 until width:
-            pixel = at(pixels, y * width + x)
+            pixel = pixels[y * width + x]
             raw = push(raw, (pixel // 65536) % 256)
             raw = push(raw, (pixel // 256) % 256)
             raw = push(raw, pixel % 256)
@@ -436,7 +436,7 @@ public define png_bytes(pixels: list of int, width: int, height: int) -> list of
     loop code in bytes_of("IDAT"):
         running = crc_byte(running, code)
     loop index in 0 until stream_length:
-        running = crc_byte(running, at(stream, index))
+        running = crc_byte(running, stream[index])
     idat_crc = crc_done(running)
     iend_crc = crc_of_chunk("IEND", [])
     edit out = [137, 80, 78, 71, 13, 10, 26, 10]
@@ -459,7 +459,7 @@ public define png_bytes(pixels: list of int, width: int, height: int) -> list of
     loop code in bytes_of("IDAT"):
         out = push(out, code)
     loop index in 0 until stream_length:
-        out = push(out, at(stream, index))
+        out = push(out, stream[index])
     out = push(out, idat_crc.hi // 256)
     out = push(out, idat_crc.hi % 256)
     out = push(out, idat_crc.lo // 256)
@@ -477,19 +477,19 @@ public define png_bytes(pixels: list of int, width: int, height: int) -> list of
 
 # Read back what png_bytes wrote: stored blocks, filter 0, 8-bit RGB,
 # one IDAT at the fixed offset the encoder emits. NOT a general PNG
-# reader - it decodes our own goldens (probe's `match`) and nothing
+# reader - it decodes our own goldens (probe's `choose`) and nothing
 # else, which is exactly as much PNG as the engine needs. The caller
 # passes the size it expects; the IHDR is its own to check.
-public define png_pixels(bytes: list of int, width: int, height: int) -> list of int:
+public define png_pixels(bytes: list of number, width: number, height: number) -> list of number:
     # magic 8 + IHDR 25 + IDAT length/type 8 + zlib header 2 = the first
     # stored-block header lives at 43.
     edit raw = []
     edit cursor = 43
     loop:
-        last = at(bytes, cursor)
-        span = at(bytes, cursor + 1) + at(bytes, cursor + 2) * 256
+        last = bytes[cursor]
+        span = bytes[cursor + 1] + bytes[cursor + 2] * 256
         loop index in cursor + 5 until cursor + 5 + span:
-            raw = push(raw, at(bytes, index))
+            raw = push(raw, bytes[index])
         cursor = cursor + 5 + span
         if last is 1:
             break
@@ -498,7 +498,7 @@ public define png_pixels(bytes: list of int, width: int, height: int) -> list of
         row_start = y * (width * 3 + 1) + 1
         loop x in 0 until width:
             base = row_start + x * 3
-            pixels = push(pixels, at(raw, base) * 65536 + at(raw, base + 1) * 256 + at(raw, base + 2))
+            pixels = push(pixels, raw[base] * 65536 + raw[base + 1] * 256 + raw[base + 2])
     pixels
 
 define test_png_roundtrips_through_its_own_reader():
@@ -506,10 +506,10 @@ define test_png_roundtrips_through_its_own_reader():
     decoded = png_pixels(png_bytes(source, 3, 2), 3, 2)
     require length(decoded) is 6
     loop index in 0 until 6:
-        require at(decoded, index) is at(source, index)
+        require decoded[index] is source[index]
 
 # CRC32 over a chunk's type and its (small) data.
-define crc_of_chunk(kind: text, data: list of int) -> Crc:
+define crc_of_chunk(kind: text, data: list of number) -> Crc:
     edit crc = crc_start()
     loop code in bytes_of(kind):
         crc = crc_byte(crc, code)
@@ -521,26 +521,26 @@ define test_png_is_a_png():
     # A 2x1 red/green image: magic, one IHDR of 13 bytes, and the last
     # four bytes of the file are IEND's CRC.
     bytes = png_bytes([16711680, 65280], 2, 1)
-    require at(bytes, 0) is 137
-    require at(bytes, 1) is 80
-    require at(bytes, 12) is 73
-    require at(bytes, 13) is 72
-    require at(bytes, 14) is 68
-    require at(bytes, 15) is 82
-    require at(bytes, 19) is 2
-    require at(bytes, 23) is 1
-    require at(bytes, 24) is 8
-    require at(bytes, 25) is 2
+    require bytes[0] is 137
+    require bytes[1] is 80
+    require bytes[12] is 73
+    require bytes[13] is 72
+    require bytes[14] is 68
+    require bytes[15] is 82
+    require bytes[19] is 2
+    require bytes[23] is 1
+    require bytes[24] is 8
+    require bytes[25] is 2
     require length(bytes) is more than 40
     # IEND's CRC is a fixed, published number: 0xAE426082. If the CRC
     # halves are wrong, THIS is what says so - a viewer would just shrug.
     total = length(bytes)
-    require at(bytes, total - 4) is 174
-    require at(bytes, total - 3) is 66
-    require at(bytes, total - 2) is 96
-    require at(bytes, total - 1) is 130
+    require bytes[total - 4] is 174
+    require bytes[total - 3] is 66
+    require bytes[total - 2] is 96
+    require bytes[total - 1] is 130
 
-define u32(bytes: list of int, value: int) -> list of int:
+define u32(bytes: list of number, value: number) -> list of number:
     edit grown = bytes
     grown = push(grown, value % 256)
     grown = push(grown, (value // 256) % 256)
@@ -557,8 +557,8 @@ define test_expand_places_and_tints():
     mesh = [Tri{a: v3(0.0, 0.0, 0.0), b: v3(1.0, 0.0, 0.0), c: v3(0.0, 1.0, 0.0), color: 5}]
     placed = expand(Instance{mesh: 0, at: v3(2.0, 0.0, 0.0), yaw: 0.0, scale: 2.0, tint: 9}, mesh)
     require length(placed) is 1
-    require at(placed, 0).color is 9
-    require at(placed, 0).b.x is more than 3.9
+    require placed[0].color is 9
+    require placed[0].b.x is more than 3.9
 
 define test_text_becomes_field_quads():
     # "1" lights 10 font pixels -> 20 triangles; drawn at the field's
@@ -589,7 +589,7 @@ define test_a_click_finds_what_was_drawn():
     pixels = render(camera, patch, [], 320, 180, 3)
     edit hits = 0
     loop index in 0 until length(pixels):
-        if at(pixels, index) is not 3:
+        if pixels[index] is not 3:
             hits = hits + 1
             point = field_of_pixel(index % 320, index // 320, 320, 180, 6400.0, 3600.0)
             require point.x is more than 1575.0
@@ -608,8 +608,8 @@ define test_render_smoke():
     camera = Camera{eye: v3(0.0, 0.0, 0.0), yaw: 0.0, pitch: 0.0, fov: 1.05}
     pixels = render(camera, [triangle], [], 16, 16, 3)
     require length(pixels) is 256
-    require at(pixels, 0) is 3
-    require at(pixels, 8 * 16 + 8) is not 3
+    require pixels[0] is 3
+    require pixels[8 * 16 + 8] is not 3
 
 # A 2x2 texture centered on screen: its texels land untouched, the
 # transparent key does not, and a nearer triangle wins the z-test.
@@ -618,11 +618,11 @@ define test_sprites_sample_and_respect_depth():
     texture = Texture{width: 2, height: 2, pixels: [111, 222, 16711935, 444]}
     sprite = Sprite{at: v3(0.0, 0.0, -3.0), wide: 2.0, high: 2.0, texture: texture}
     pixels = render(camera, [], [sprite], 16, 16, 3)
-    require at(pixels, 4 * 16 + 4) is 111
-    require at(pixels, 4 * 16 + 11) is 222
-    require at(pixels, 11 * 16 + 4) is 3
-    require at(pixels, 11 * 16 + 11) is 444
+    require pixels[4 * 16 + 4] is 111
+    require pixels[4 * 16 + 11] is 222
+    require pixels[11 * 16 + 4] is 3
+    require pixels[11 * 16 + 11] is 444
     near_triangle = Tri{a: v3(-2.0, -2.0, -1.5), b: v3(2.0, -2.0, -1.5), c: v3(0.0, 2.0, -1.5), color: 16711680}
     covered = render(camera, [near_triangle], [sprite], 16, 16, 3)
-    require at(covered, 8 * 16 + 8) is not 444
-    require at(covered, 8 * 16 + 8) is not 111
+    require covered[8 * 16 + 8] is not 444
+    require covered[8 * 16 + 8] is not 111

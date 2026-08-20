@@ -1,7 +1,7 @@
 # Anonymous fn / lambda in expression position: `function(params): body`.
-# A newcomer who can read `fn add(n): ...` can read this. Same node as |n|.
-define apply(f: function, x: int) -> int:
+# A newcomer who can read `define add(n): ...` can read this. Same node as |n|.
+define apply(f: function, x: number) -> number:
     f(x)
-define main() -> int:
+define main() -> number:
     add1 = function(n): n + 1
     apply(add1, 41)

@@ -51,8 +51,8 @@ public define first_change(old: text, new: text) -> text:
     if length(a) is not length(b):
         return "(file added or removed)"
     loop i in 0 until length(a):
-        la = at(a, i)
-        lb = at(b, i)
+        la = a[i]
+        lb = b[i]
         if la is not lb:
             line = if length(lb) > 0 then lb else la
             sp = index_of(line, " ")

@@ -41,10 +41,10 @@ define lsp_read_message() -> text:
     edit eof = false
     loop:
         line = orion_stdin_line()
-        if line == "":
+        if line is "":
             eof = true
             break
-        if line == "\n":
+        if line is "\n":
             break
         if starts_with(line, "Content-Length:"):
             rest = trim(slice_from(line, 15))
@@ -54,7 +54,7 @@ define lsp_read_message() -> text:
     else:
         orion_stdin_read(content_len)
 
-define slice_from(t: text, from: int) -> text:
+define slice_from(t: text, from: number) -> text:
     b = bytes_of(t)
     n = length(b)
     if from >= n:
@@ -62,19 +62,19 @@ define slice_from(t: text, from: int) -> text:
     else:
         text_of(bytes_part(b, from, n))
 
-define lsp_send(body: text) -> int:
+define lsp_send(body: text) -> number:
     n = length(body)
     orion_stdout_write("Content-Length: {n}\r\n\r\n{body}")
 
-define lsp_respond(id: int, result_json: text) -> int:
+define lsp_respond(id: number, result_json: text) -> number:
     lsp_send("\{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":{result_json}\}")
 
-define lsp_notify(method: text, params_json: text) -> int:
+define lsp_notify(method: text, params_json: text) -> number:
     lsp_send("\{\"jsonrpc\":\"2.0\",\"method\":\"{method}\",\"params\":{params_json}\}")
 
 # ---- uri <-> path ----
 
-define hexv(c: int) -> int:
+define hexv(c: number) -> number:
     if c >= 48 and c <= 57:
         c - 48
     else:
@@ -95,7 +95,7 @@ public define uri_to_path(uri: text) -> text:
     # file somewhere that did not exist and reported no diagnostics at all.
     after_scheme = if starts_with(uri, "file://") then slice_from(uri, 7) else uri
     ab = bytes_of(after_scheme)
-    drive_form = length(ab) >= 3 and at(ab, 0) == 47 and (at(ab, 2) == 58 or (length(ab) >= 5 and at(ab, 2) == 37))
+    drive_form = length(ab) >= 3 and ab[0] is 47 and (ab[2] is 58 or (length(ab) >= 5 and ab[2] is 37))
     stripped = if drive_form then slice_from(after_scheme, 1) else after_scheme
     b = bytes_of(stripped)
     n = length(b)
@@ -104,9 +104,9 @@ public define uri_to_path(uri: text) -> text:
     loop:
         if i >= n:
             break
-        c = at(b, i)
-        if c == 37 and i + 2 < n:
-            out = append(out, hexv(at(b, i + 1)) * 16 + hexv(at(b, i + 2)))
+        c = b[i]
+        if c is 37 and i + 2 < n:
+            out = append(out, hexv(b[i + 1]) * 16 + hexv(b[i + 2]))
             i = i + 3
         else:
             out = append(out, c)
@@ -117,9 +117,9 @@ define dirname_of(path: text) -> text:
     b = bytes_of(path)
     n = length(b)
     edit cut = 0 - 1
-    loop i in 0..<n:
-        c = at(b, i)
-        if c == 47 or c == 92:
+    loop i in 0 until n:
+        c = b[i]
+        if c is 47 or c is 92:
             cut = i
     if cut < 0:
         "."
@@ -155,11 +155,11 @@ define lsp_orbs() -> text:
 define lsp_orb_roots() -> list of text:
     edit roots = []
     loop root in split(lsp_orbs(), ";"):
-        if root != "":
+        if root is not "":
             roots = push(roots, root)
     roots
 
-define diag_json_of(line_no: int, col: int, msg: text) -> text:
+define diag_json_of(line_no: number, col: number, msg: text) -> text:
     zero_line = if line_no > 0 then line_no - 1 else 0
     "\{\"range\":\{\"start\":\{\"line\":{zero_line},\"character\":{col}\},\"end\":\{\"line\":{zero_line},\"character\":{col + 1}\}\},\"severity\":1,\"source\":\"orion\",\"message\":\"{json_escape(msg)}\"\}"
 
@@ -186,8 +186,8 @@ define diag_parse(raw: text, want_file: text) -> table:
             else:
                 # A Windows path carries its own colon (`C:/…`), so the LINE and
                 # COLUMN are always the last two fields, never fields 1 and 2.
-                col_txt = at(parts, np - 1)
-                line_txt = at(parts, np - 2)
+                col_txt = parts[np - 1]
+                line_txt = parts[np - 2]
                 file_txt = join(part(parts, 0, np - 2), ":")
                 same = ends_with(file_txt, want_file)
                 if same:
@@ -222,12 +222,12 @@ public define lsp_diagnose(uri: text):
     rows = lines(out)
     edit diags = ""
     edit count = 0
-    loop ri in 0..<length(rows):
-        row = at(rows, ri)
+    loop ri in 0 until length(rows):
+        row = rows[ri]
         if index_of(row, " ERROR at ") >= 0:
             d = diag_parse(row, check_name)
             if get_int(d, "line") > 0:
-                sep2 = if count == 0 then "" else ","
+                sep2 = if count is 0 then "" else ","
                 diags = diags + sep2 + diag_json_of(get_int(d, "line"), get_int(d, "col"), get(d, "msg"))
                 count = count + 1
     lsp_publish(uri, diags)
@@ -259,7 +259,7 @@ define sym_of_line(row: text) -> table:
     if starts_with(body, "handle "):
         kind = 12
         skip = 7
-    if kind == 0:
+    if kind is 0:
         {"name": "", "kind": 0}
     else:
         rest = slice_from(body, skip)
@@ -269,8 +269,8 @@ define sym_of_line(row: text) -> table:
         loop:
             if i >= length(rb):
                 break
-            c = at(rb, i)
-            ok = (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 95 or c == 46
+            c = rb[i]
+            ok = (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c is 95 or c is 46
             if not ok:
                 break
             i = i + 1
@@ -289,15 +289,15 @@ define sym_of_line(row: text) -> table:
 public define is_astra(uri: text) -> truth:
     ends_with(uri, ".astra")
 
-define first_word_after(row: text, skip: int) -> text:
+define first_word_after(row: text, skip: number) -> text:
     rest = slice_from(trim(row), skip)
     b = bytes_of(rest)
     edit i = 0
     loop:
         if i >= length(b):
             break
-        c = at(b, i)
-        if (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 95:
+        c = b[i]
+        if (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c is 95:
             i = i + 1
         else:
             break
@@ -312,30 +312,30 @@ define astra_sym_of_line(row: text) -> table:
         {"name": first_word_after(t, 10), "kind": 23}
     else if starts_with(t, "game "):
         {"name": first_word_after(t, 5), "kind": 2}
-    else if t == "view:":
+    else if t is "view:":
         # A section header, not a name.
         {"name": "", "kind": 0}
     else if ends_with(t, ":") and not contains(t, " ") and not starts_with(t, "#"):
         # `room:` - an entity block. `paddle left:` names the instance.
         {"name": first_word_after(t, 0), "kind": 23}
-    else if ends_with(t, ":") and starts_with(t, "action ") is false and starts_with(t, "rule ") is false and count_spaces(t) == 1:
+    else if ends_with(t, ":") and starts_with(t, "action ") is false and starts_with(t, "rule ") is false and count_spaces(t) is 1:
         {"name": first_word_after(t, len_of_first_word(t) + 1), "kind": 23}
     else:
         {"name": "", "kind": 0}
 
-define count_spaces(t: text) -> int:
+define count_spaces(t: text) -> number:
     b = bytes_of(t)
     edit n = 0
-    loop i in 0..<length(b):
-        if at(b, i) == 32:
+    loop i in 0 until length(b):
+        if b[i] is 32:
             n = n + 1
     n
 
-define len_of_first_word(t: text) -> int:
+define len_of_first_word(t: text) -> number:
     b = bytes_of(t)
     edit i = 0
     loop:
-        if i >= length(b) or at(b, i) == 32:
+        if i >= length(b) or b[i] is 32:
             break
         i = i + 1
     i
@@ -347,37 +347,37 @@ public define lsp_symbols_json(uri: text) -> text:
     rows = lines(doc_get(uri))
     edit out = ""
     edit count = 0
-    loop ri in 0..<length(rows):
-        s = sym_of_row(at(rows, ri), is_astra(uri))
+    loop ri in 0 until length(rows):
+        s = sym_of_row(rows[ri], is_astra(uri))
         nm = get(s, "name")
-        if nm != "":
+        if nm is not "":
             k = get_int(s, "kind")
-            sep = if count == 0 then "" else ","
+            sep = if count is 0 then "" else ","
             out = out + sep + "\{\"name\":\"{json_escape(nm)}\",\"kind\":{k},\"range\":\{\"start\":\{\"line\":{ri},\"character\":0\},\"end\":\{\"line\":{ri},\"character\":1\}\},\"selectionRange\":\{\"start\":\{\"line\":{ri},\"character\":0\},\"end\":\{\"line\":{ri},\"character\":1\}\}\}"
             count = count + 1
     "[{out}]"
 
 # ---- word under cursor, definition, hover ----
 
-define is_word_byte(c: int) -> truth:
-    (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 95
+define is_word_byte(c: number) -> truth:
+    (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c is 95
 
-public define word_at(uri: text, line_no: int, character: int) -> text:
+public define word_at(uri: text, line_no: number, character: number) -> text:
     rows = lines(doc_get(uri))
     if line_no >= length(rows):
         ""
     else:
-        row = at(rows, line_no)
+        row = rows[line_no]
         b = bytes_of(row)
         n = length(b)
-        if n == 0 or character > n:
+        if n is 0 or character > n:
             ""
         else:
             edit lo = if character >= n then n - 1 else character
             loop:
                 if lo <= 0:
                     break
-                if is_word_byte(at(b, lo - 1)):
+                if is_word_byte(b[lo - 1]):
                     lo = lo - 1
                 else:
                     break
@@ -385,20 +385,20 @@ public define word_at(uri: text, line_no: int, character: int) -> text:
             loop:
                 if hi >= n:
                     break
-                if is_word_byte(at(b, hi)):
+                if is_word_byte(b[hi]):
                     hi = hi + 1
                 else:
                     break
             text_of(bytes_part(b, lo, hi))
 
 # Line index of `NAME`'s declaration in `body`, or -1.
-define decl_line_in(body: text, name: text, astra: truth) -> int:
+define decl_line_in(body: text, name: text, astra: truth) -> number:
     rows = lines(body)
     edit found = 0 - 1
-    loop ri in 0..<length(rows):
+    loop ri in 0 until length(rows):
         if found < 0:
-            s = sym_of_row(at(rows, ri), astra)
-            if get(s, "name") == name:
+            s = sym_of_row(rows[ri], astra)
+            if get(s, "name") is name:
                 found = ri
     found
 
@@ -417,19 +417,19 @@ define find_decl(uri: text, name: text) -> table:
         loop root in lsp_orb_roots():
             names = split(orion_dir_subdirs(root), "\n")
             loop orb in names:
-                if r_line < 0 and orb != "":
+                if r_line < 0 and orb is not "":
                     cand = "{root}/{orb}/lib.or"
                     src = file_read(cand)
-                    if src != "":
+                    if src is not "":
                         ln = decl_line_in(src, name, false)
                         if ln >= 0:
                             r_line = ln
                             r_uri = "file:///{cand}"
         {"uri": r_uri, "line": r_line}
 
-public define lsp_definition_json(uri: text, line_no: int, character: int) -> text:
+public define lsp_definition_json(uri: text, line_no: number, character: number) -> text:
     name = word_at(uri, line_no, character)
-    if name == "":
+    if name is "":
         "null"
     else:
         d = find_decl(uri, name)
@@ -440,9 +440,9 @@ public define lsp_definition_json(uri: text, line_no: int, character: int) -> te
             dl = get_int(d, "line")
             "\{\"uri\":\"{json_escape(du)}\",\"range\":\{\"start\":\{\"line\":{dl},\"character\":0\},\"end\":\{\"line\":{dl},\"character\":1\}\}\}"
 
-public define lsp_hover_json(uri: text, line_no: int, character: int) -> text:
+public define lsp_hover_json(uri: text, line_no: number, character: number) -> text:
     name = word_at(uri, line_no, character)
-    if name == "":
+    if name is "":
         "null"
     else:
         d = find_decl(uri, name)
@@ -450,9 +450,9 @@ public define lsp_hover_json(uri: text, line_no: int, character: int) -> text:
         if dl < 0:
             "null"
         else:
-            src = if get(d, "uri") == uri then doc_get(uri) else file_read(uri_to_path(get(d, "uri")))
+            src = if get(d, "uri") is uri then doc_get(uri) else file_read(uri_to_path(get(d, "uri")))
             rows = lines(src)
-            decl = if dl < length(rows) then trim(at(rows, dl)) else name
+            decl = if dl < length(rows) then trim(rows[dl]) else name
             fence = if is_astra(uri) then "astra" else "orion"
             "\{\"contents\":\{\"kind\":\"markdown\",\"value\":\"```{fence}\\n{json_escape(decl)}\\n```\"\}\}"
 
@@ -465,7 +465,7 @@ public define lsp_hover_json(uri: text, line_no: int, character: int) -> text:
 define lsp_formatting_json(uri: text) -> text:
     src = doc_get(uri)
     formatted = fmt_normalize(src)
-    if formatted == src:
+    if formatted is src:
         return "[]"
     end_line = length(lines(src))
     "[\{\"range\":\{\"start\":\{\"line\":0,\"character\":0\},\"end\":\{\"line\":{end_line},\"character\":0\}\},\"newText\":\"{json_escape(formatted)}\"\}]"
@@ -485,17 +485,17 @@ define caps_json() -> text:
 # actually write beat a shorter list that pretends to be smarter.
 #
 # CompletionItemKind: 3 Function, 22 Struct, 8 Interface, 21 Constant, 14 Keyword.
-define compl_item(name: text, kind: int, detail: text) -> text:
+define compl_item(name: text, kind: number, detail: text) -> text:
     "\{\"label\":\"{json_escape(name)}\",\"kind\":{kind},\"detail\":\"{json_escape(detail)}\"\}"
 
-define compl_kind_of(sym_kind: int) -> int:
-    if sym_kind == 12:
+define compl_kind_of(sym_kind: number) -> number:
+    if sym_kind is 12:
         3
     else:
-        if sym_kind == 23:
+        if sym_kind is 23:
             22
         else:
-            if sym_kind == 11:
+            if sym_kind is 11:
                 8
             else:
                 21
@@ -504,14 +504,14 @@ define compl_from_source(src: text, origin: text, seen: text, out: text) -> tabl
     rows = lines(src)
     edit acc = out
     edit mark = seen
-    loop ri in 0..<length(rows):
-        s = sym_of_row(at(rows, ri), origin == "this sketch")
+    loop ri in 0 until length(rows):
+        s = sym_of_row(rows[ri], origin is "this sketch")
         nm = get(s, "name")
-        if nm != "":
+        if nm is not "":
             key = "|{nm}|"
             if index_of(mark, key) < 0:
                 mark = mark + key
-                sep = if acc == "" then "" else ","
+                sep = if acc is "" then "" else ","
                 acc = acc + sep + compl_item(nm, compl_kind_of(get_int(s, "kind")), origin)
     {"out": acc, "seen": mark}
 
@@ -542,26 +542,26 @@ define sym_rows(uri: text) -> [text]:
     lines(out)
 
 # The word immediately before a trailing `.` on this line, or "".
-public define receiver_before_dot(uri: text, line_no: int, character: int) -> text:
+public define receiver_before_dot(uri: text, line_no: number, character: number) -> text:
     rows = lines(doc_get(uri))
     if line_no >= length(rows):
         ""
     else:
-        row = at(rows, line_no)
+        row = rows[line_no]
         b = bytes_of(row)
         n = length(b)
         cut = if character > n then n else character
         if cut < 1:
             ""
         else:
-            if at(b, cut - 1) != 46:
+            if b[cut - 1] is not 46:
                 ""
             else:
                 edit lo = cut - 1
                 loop:
                     if lo <= 0:
                         break
-                    if is_word_byte(at(b, lo - 1)):
+                    if is_word_byte(b[lo - 1]):
                         lo = lo - 1
                     else:
                         break
@@ -569,16 +569,16 @@ public define receiver_before_dot(uri: text, line_no: int, character: int) -> te
 
 # Declared type of `name` as seen from `line_no`: a parameter of the enclosing
 # function, a `name: Type =` binding, or `name = Type{…}`.
-public define type_of_local(uri: text, name: text, line_no: int) -> text:
+public define type_of_local(uri: text, name: text, line_no: number) -> text:
     rows = lines(doc_get(uri))
     edit found = ""
     # Walk UP from the cursor: the nearest binding wins, and the enclosing `fn`
     # line ends the search (its parameter list is the last place to look).
     edit i = if line_no >= length(rows) then length(rows) - 1 else line_no
     loop:
-        if i < 0 or found != "":
+        if i < 0 or found is not "":
             break
-        row = at(rows, i)
+        row = rows[i]
         t = trim(row)
         # `name: Type = …`
         pat_ann = "{name}: "
@@ -588,13 +588,13 @@ public define type_of_local(uri: text, name: text, line_no: int) -> text:
             found = trim(text_of(bytes_part(bytes_of(rest), 0, eq)))
         # `name = Type{…}`
         pat_cons = "{name} = "
-        if found == "" and starts_with(t, pat_cons):
+        if found is "" and starts_with(t, pat_cons):
             rhs = slice_from(t, length(pat_cons))
             brace = index_of(rhs, "\{")
             if brace > 0:
                 found = trim(text_of(bytes_part(bytes_of(rhs), 0, brace)))
         # A parameter of the enclosing fn: `define f(name: Type, …)` (v1 `fn` too)
-        if found == "" and starts_with(t, "fn ") or starts_with(t, "pub fn ") or starts_with(t, "define ") or starts_with(t, "public define "):
+        if found is "" and starts_with(t, "fn ") or starts_with(t, "pub fn ") or starts_with(t, "define ") or starts_with(t, "public define "):
             marker = "{name}: "
             at_p = index_of(t, marker)
             if at_p > 0:
@@ -604,8 +604,8 @@ public define type_of_local(uri: text, name: text, line_no: int) -> text:
                 loop:
                     if e >= length(ab):
                         break
-                    c = at(ab, e)
-                    stop = c == 44 or c == 41 or c == 32
+                    c = ab[e]
+                    stop = c is 44 or c is 41 or c is 32
                     if stop:
                         break
                     e = e + 1
@@ -617,36 +617,36 @@ public define type_of_local(uri: text, name: text, line_no: int) -> text:
 # Fields of `type_name` + every fn whose FIRST parameter is that type.
 define members_of(rows: [text], type_name: text) -> text:
     edit acc = ""
-    loop ri in 0..<length(rows):
-        row = at(rows, ri)
+    loop ri in 0 until length(rows):
+        row = rows[ri]
         parts = split(row, "|")
         if length(parts) >= 3:
-            head = at(parts, 0)
+            head = parts[0]
             if starts_with(head, "TYPE "):
-                if slice_from(head, 5) == type_name:
-                    fields = split(at(parts, 1), ",")
-                    loop fi in 0..<length(fields):
-                        f = at(fields, fi)
+                if slice_from(head, 5) is type_name:
+                    fields = split(parts[1], ",")
+                    loop fi in 0 until length(fields):
+                        f = fields[fi]
                         colon = index_of(f, ":")
                         if colon > 0:
                             fname = text_of(bytes_part(bytes_of(f), 0, colon))
                             fty = slice_from(f, colon + 1)
-                            sep = if acc == "" then "" else ","
+                            sep = if acc is "" then "" else ","
                             acc = acc + sep + compl_item(fname, 5, "field: {fty}")
             if starts_with(head, "FN "):
-                ps = at(parts, 1)
+                ps = parts[1]
                 first_colon = index_of(ps, ":")
                 if first_colon > 0:
                     rest = slice_from(ps, first_colon + 1)
                     comma = index_of(rest, ",")
                     p1ty = if comma > 0 then text_of(bytes_part(bytes_of(rest), 0, comma)) else rest
-                    if p1ty == type_name:
+                    if p1ty is type_name:
                         fname2 = slice_from(head, 3)
-                        sep2 = if acc == "" then "" else ","
-                        acc = acc + sep2 + compl_item(fname2, 2, "{type_name}.{fname2}() -> {at(parts, 2)}")
+                        sep2 = if acc is "" then "" else ","
+                        acc = acc + sep2 + compl_item(fname2, 2, "{type_name}.{fname2}() -> {parts[2]}")
     acc
 
-public define lsp_completion_json(uri: text, line_no: int, character: int) -> text:
+public define lsp_completion_json(uri: text, line_no: number, character: number) -> text:
     # A sketch is not orion: its own declared names plus the words the
     # astra compiler actually holds. Offering `define` and `handle` here
     # would describe a language the file is not written in.
@@ -654,19 +654,19 @@ public define lsp_completion_json(uri: text, line_no: int, character: int) -> te
         ra = compl_from_source(doc_get(uri), "this sketch", "", "")
         edit sacc = get(ra, "out")
         awords = ["game", "field", "view", "companion", "starts", "unlocked", "stat", "of", "rule", "every", "seconds", "ticks", "action", "click", "position", "size", "center", "input", "speed", "velocity", "clamp", "free", "mirror", "along", "hits", "leaves", "bounce", "destroy", "reset", "score", "background", "draw", "asset", "color", "bar", "label", "at", "when", "is", "less", "more", "than", "up", "down"]
-        loop ai in 0..<length(awords):
-            sep3 = if sacc == "" then "" else ","
-            sacc = sacc + sep3 + compl_item(at(awords, ai), 14, "astra")
+        loop ai in 0 until length(awords):
+            sep3 = if sacc is "" then "" else ","
+            sacc = sacc + sep3 + compl_item(awords[ai], 14, "astra")
         return "\{\"isIncomplete\":false,\"items\":[{sacc}]\}"
     # After `x.` the answer is exact, so give THAT and nothing else: the fields
     # of x's type plus the functions that take it first. Returning the whole
     # program's names here would bury the four that apply.
     recv = receiver_before_dot(uri, line_no, character)
-    if recv != "":
+    if recv is not "":
         rty = type_of_local(uri, recv, line_no)
-        if rty != "":
+        if rty is not "":
             members = members_of(sym_rows(uri), rty)
-            if members != "":
+            if members is not "":
                 return "\{\"isIncomplete\":false,\"items\":[{members}]\}"
     # The document first (its own names are the likeliest), then the orbs.
     r1 = compl_from_source(doc_get(uri), "this file", "", "")
@@ -675,22 +675,22 @@ public define lsp_completion_json(uri: text, line_no: int, character: int) -> te
     loop root in lsp_orb_roots():
         names = split(orion_dir_subdirs(root), "\n")
         loop orb in names:
-            if orb != "":
+            if orb is not "":
                 src = file_read("{root}/{orb}/lib.or")
-                if src != "":
+                if src is not "":
                     r2 = compl_from_source(src, "orb {orb}", seen, acc)
                     acc = get(r2, "out")
                     seen = get(r2, "seen")
     # Keywords last: short, always valid, and they should not push declarations
     # out of the top of the list.
     kws = ["define", "public", "type", "edit", "if", "then", "else", "choose", "loop", "parallel", "break", "continue", "return", "require", "ensure", "defer", "collect", "effect", "handle", "perform", "resume", "use", "external", "deterministic", "and", "or", "not", "in", "where", "is", "to", "until", "try", "given", "true", "false", "none"]
-    loop ki in 0..<length(kws):
-        kw = at(kws, ki)
-        sep2 = if acc == "" then "" else ","
+    loop ki in 0 until length(kws):
+        kw = kws[ki]
+        sep2 = if acc is "" then "" else ","
         acc = acc + sep2 + compl_item(kw, 14, "keyword")
     "\{\"isIncomplete\":false,\"items\":[{acc}]\}"
 
-define handle(msg: text) -> int:
+define handle(msg: text) -> number:
     root = json_parse(msg)
     method = json_text(root, "method")
     id = json_int(root, "id")
@@ -698,49 +698,49 @@ define handle(msg: text) -> int:
     td = json_obj(params, "textDocument")
     uri = json_text(td, "uri")
     edit done = 0
-    if method == "initialize":
+    if method is "initialize":
         # The client may pass the compiler + orbs root through initializationOptions.
         opts = json_obj(params, "initializationOptions")
-        if json_text(opts, "compiler") != "":
+        if json_text(opts, "compiler") is not "":
             slot_set("lsp:orion", orion_persist_text(json_text(opts, "compiler")))
-        if json_text(opts, "orbs") != "":
+        if json_text(opts, "orbs") is not "":
             slot_set("lsp:orbs", orion_persist_text(json_text(opts, "orbs")))
         lsp_respond(id, caps_json())
-    if method == "shutdown":
+    if method is "shutdown":
         lsp_respond(id, "null")
-    if method == "exit":
+    if method is "exit":
         done = 1
-    if method == "textDocument/didOpen":
+    if method is "textDocument/didOpen":
         doc_set(uri, json_text(td, "text"))
         lsp_diagnose(uri)
-    if method == "textDocument/didChange":
+    if method is "textDocument/didChange":
         changes = json_list(params, "contentChanges")
         if length(changes) > 0:
-            last = at(changes, length(changes) - 1)
+            last = changes[length(changes) - 1]
             doc_set(uri, json_text(last, "text"))
             lsp_diagnose(uri)
-    if method == "textDocument/didSave":
-        if json_text(params, "text") != "":
+    if method is "textDocument/didSave":
+        if json_text(params, "text") is not "":
             doc_set(uri, json_text(params, "text"))
         lsp_diagnose(uri)
-    if method == "textDocument/didClose":
+    if method is "textDocument/didClose":
         lsp_publish(uri, "")
-    if method == "textDocument/documentSymbol":
+    if method is "textDocument/documentSymbol":
         lsp_respond(id, lsp_symbols_json(uri))
-    if method == "textDocument/definition":
+    if method is "textDocument/definition":
         pos = json_obj(params, "position")
         lsp_respond(id, lsp_definition_json(uri, json_int(pos, "line"), json_int(pos, "character")))
-    if method == "textDocument/hover":
+    if method is "textDocument/hover":
         pos2 = json_obj(params, "position")
         lsp_respond(id, lsp_hover_json(uri, json_int(pos2, "line"), json_int(pos2, "character")))
-    if method == "textDocument/completion":
+    if method is "textDocument/completion":
         pos3 = json_obj(params, "position")
         lsp_respond(id, lsp_completion_json(uri, json_int(pos3, "line"), json_int(pos3, "character")))
-    if method == "textDocument/formatting":
+    if method is "textDocument/formatting":
         lsp_respond(id, lsp_formatting_json(uri))
     done
 
-public define lsp_serve() -> int:
+public define lsp_serve() -> number:
     # argv: [exe, orion-compiler-path, orbs-root]. Both are optional; the client
     # can also send them in initializationOptions.
     if argc() >= 2:
@@ -750,8 +750,8 @@ public define lsp_serve() -> int:
     orion_stderr_line("orion-lsp: ready")
     loop:
         msg = lsp_read_message()
-        if msg == "":
+        if msg is "":
             break
-        if handle(msg) == 1:
+        if handle(msg) is 1:
             break
     0

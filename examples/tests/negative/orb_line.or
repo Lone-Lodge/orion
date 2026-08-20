@@ -4,5 +4,5 @@
 # error inside an orb must name the ORB's file and the orb's own line.
 use trasigorb
 
-define main() -> int:
+define main() -> number:
     helper(1)

@@ -1,0 +1,39 @@
+# A function stored in a FIELD carries its answer too - a trait dictionary is
+# a struct of functions, and calling one goes through the same closure ABI a
+# bound lambda does.
+#
+# Two things had to meet for this. The layout spec writes a fn-typed field as
+# just `fn`, so the signature is erased and the call went out over an i64 ABI;
+# and a lambda written into such a field has no annotation of its own, so its
+# parameters defaulted to whole and a real argument landed in an i64 slot.
+
+type halver: run: function(number) -> number
+type doubler: run2: function(number) -> number
+type exact: runf: function(float) -> float
+
+define twice(n: number) -> number:
+    n * 2
+
+define main() -> int:
+    # a real lambda in a field
+    h = halver{run: (m): m / 2}
+    a = h.run(9)                    # 4.5
+
+    # a whole one stays whole
+    d = doubler{run2: (m): m * 2}
+    b = d.run2(21)                  # 42
+
+    # a NAMED function in a field carries its own answer
+    d2 = doubler{run2: twice}
+    c = d2.run2(10)                 # 20
+
+    # and a field declared `float` outright
+    e = exact{runf: (m): m / 2.0}
+    f = e.runf(9.0)                 # 4.5
+
+    ok_a = if a > 4.4 and a < 4.6 then 8 else 0
+    ok_b = if b is 42 then 8 else 0
+    ok_c = if c is 20 then 8 else 0
+    ok_f = if f > 4.4 and f < 4.6 then 7 else 0
+
+    ok_a + ok_b + ok_c + ok_f   # 8*3 + 7

@@ -1,18 +1,9 @@
-# Line endings, pinned.
-#
-# With core.autocrlf=true and no rules here, Git rewrites line endings on
-# checkout. For files the toolchain itself writes and reads that is pure noise:
-# `git status` listed all 151 generated .ll files as modified while `git diff`
-# showed their content was identical. A status that is always dirty is a status
-# nobody reads, which is how a genuinely stale artifact hides in plain sight.
-
-# Generated LLVM IR. The compiler always writes LF, and CI diffs the committed
-# copy against a fresh build on both Linux and Windows -- same bytes, always.
-*.ll    text eol=lf
-
-# Bash on every host, including Git Bash on Windows.
-*.sh    text eol=lf
-
-# Orion source. The negative suite pins diagnostics down to line:col, and the
-# fuzzer mutates by byte offset.
-*.or    text eol=lf
+# LF overallt - CRLF-konvertering vid checkout smittade editorn en gang
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.exe binary
+*.dll binary
+*.wasm binary

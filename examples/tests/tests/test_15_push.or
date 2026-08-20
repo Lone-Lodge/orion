@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     edit xs = [10, 20]
     xs = append(xs, 30)
     xs = append(xs, 40)

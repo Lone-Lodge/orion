@@ -1,25 +1,25 @@
-type Result: Ok(int), Err(text)
+type Result: Ok(number), Err(text)
 
-define safe_div(a: int, b: int) -> Result:
-    if b == 0:
+define safe_div(a: number, b: number) -> Result:
+    if b is 0:
         Result.Err("div by zero")
     else:
         Result.Ok(a // b)
 
-define calc(x: int) -> Result:
+define calc(x: number) -> Result:
     a = safe_div(100, x)?
     Result.Ok(a * 2)
 
-define main() -> int:
+define main() -> number:
     good = calc(2)
     bad = calc(0)
     # Payload is read via match (enums have no field accessor); .tag is the
     # discriminant. `?` must unwrap good and short-circuit bad to Err.
     good_val = choose good:
-        Ok(v) -> v
-        Err(_) -> 0
-    if good.tag == 0 and bad.tag == 1:
-        if good_val == 100:
+        Ok(v) then v
+        Err(_) then 0
+    if good.tag is 0 and bad.tag is 1:
+        if good_val is 100:
             42
         else:
             0

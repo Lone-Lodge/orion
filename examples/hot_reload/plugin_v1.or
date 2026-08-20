@@ -1,3 +1,3 @@
 # Gameplay code, version 1. Compiled to plugin_v1.so and loaded at runtime.
-define tick(state: int) -> int:
+define tick(state: number) -> number:
     state + 1

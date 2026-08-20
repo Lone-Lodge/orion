@@ -17,20 +17,20 @@
 # parked that fiber at.
 use async
 
-define decide(seed: int) -> int:
+define decide(seed: number) -> number:
     answer = resume_with(seed + 3)   # rest of the task runs with x = 4
     answer + 2                       # gets 40 back -> the whole thing is 42
 
-define body(seed: int) -> int:
+define body(seed: number) -> number:
     x = ask(decide, seed)
     x * 10                           # the continuation
 
 # A handler that never resumes: its value is what the perform site yields, and
 # the rest of the task still runs from there.
-define refuse(seed: int) -> int:
+define refuse(seed: number) -> number:
     7
 
-define quiet(seed: int) -> int:
+define quiet(seed: number) -> number:
     x = ask(refuse, seed)
     x + 1                            # 8
 
@@ -39,14 +39,14 @@ define quiet(seed: int) -> int:
 # So this pins BOTH contracts. The refusal is a promise too - before this, the
 # test simply demanded the Windows numbers everywhere and went red on Linux
 # while the runtime was behaving exactly as documented.
-define main() -> int:
+define main() -> number:
     a = await(spawn(body, 1))
     b = await(spawn(quiet, 0))
     print_line("resumed={a} not_resumed={b} supported={resumable_ok()}")
     # Supported: resume_with hands 40 back, the handler adds 2 -> 42; the
     # non-resuming handler yields 7 and the task adds 1 -> 8.
     # Refused: ask is -1, so body gives -1 * 10 and quiet gives -1 + 1.
-    want_a = if resumable_ok() == 1 then 42 else 0 - 10
-    want_b = if resumable_ok() == 1 then 8 else 0
-    ok = if a == want_a and b == want_b then 1 else 0
+    want_a = if resumable_ok() is 1 then 42 else 0 - 10
+    want_b = if resumable_ok() is 1 then 8 else 0
+    ok = if a is want_a and b is want_b then 1 else 0
     ok * 42

@@ -1,8 +1,8 @@
-define main() -> int:
+define main() -> number:
     vals = [10, 20, 30, 5]
     edit sum = 0
     loop idx, v in vals:
-        if idx == 3:
+        if idx is 3:
             sum = sum + v
         else:
             sum = sum + v - idx

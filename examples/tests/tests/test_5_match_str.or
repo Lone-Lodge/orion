@@ -1,8 +1,8 @@
-define day_score(day: text) -> int:
+define day_score(day: text) -> number:
     choose day:
-        "mon" -> 1
-        "fri" -> 5
-        _ -> 0
+        "mon" then 1
+        "fri" then 5
+        _ then 0
 
-define main() -> int:
+define main() -> number:
     day_score("fri")

@@ -8,7 +8,7 @@
 #   orbit run tools/orbstat.or text list    # only these
 #
 # Reports per orb: public defines, example assertions, capability contracts,
-# and whether the orb still speaks v1 idiom (== / != / 0..<n).
+# and whether the orb still speaks v1 idiom ( is / is not / 0 until n).
 use os
 use text
 use iter
@@ -16,10 +16,10 @@ use list
 
 type orbstat:
     name: text
-    publics: int
-    examples: int
-    contracts: int
-    old_idiom: int
+    publics: number
+    examples: number
+    contracts: number
+    old_idiom: number
 
 # One line of a source file counts toward at most one bucket.
 define classify(line: text) -> text:
@@ -35,7 +35,7 @@ define has_contract(line: text) -> truth:
     example not has_contract("public define f():")
     contains(line, " uses ")
 
-# `==`, `!=` and `0..<n` are the retired spellings - this is the measure of
+# ` is `, ` is not ` and `0 until n` are the retired spellings - this is the measure of
 # how much of an orb still reads like v1.
 define is_old_idiom(line: text) -> truth:
     example is_old_idiom("if a == b:")
@@ -61,7 +61,7 @@ define scan(name: text, src: text) -> orbstat:
             old = old + 1
     orbstat{name: name, publics: publics, examples: examples, contracts: contracts, old_idiom: old}
 
-define pct(part: int, whole: int) -> int:
+define pct(part: number, whole: number) -> number:
     if whole is 0 then 100 else part * 100 // whole
 
 define report(s: orbstat) uses console:
@@ -98,7 +98,7 @@ define wanted(name: text, picks: list of text) -> truth:
 
 define main() uses files, console:
     args = arguments()
-    picks = loop i in 1 until length(args): collect at(args, i)
+    picks = loop i in 1 until length(args): collect args[i]
     names = list_dirs("orbs")
     edit stats = []
     loop name in names where name is not "" and wanted(name, picks):

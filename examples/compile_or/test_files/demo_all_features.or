@@ -11,7 +11,7 @@ define id<T>(value: T) -> T:
 define pair_first<A, B>(left: A, right: B) -> A:
     left
 
-define main() -> int:
+define main() -> number:
     # Generics - type vars erased to int/ptr.
     a = id(20)
     b = pair_first(22, 999)
@@ -29,7 +29,7 @@ define main() -> int:
     print_line("simd dot:")
     print_line(dot)
     print_line("simd vec_add[0]:")
-    print_line(at(sum, 0))
+    print_line(sum[0])
 
     # Combine: a (20) + b (22) = 42
     a + b

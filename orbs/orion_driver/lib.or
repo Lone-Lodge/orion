@@ -30,9 +30,9 @@ define drv_dirname(path: text) -> text:
     bs = bytes_of(path)
     n = length(bs)
     edit last_sep = 0 - 1
-    loop i in 0..<n:
-        c = at(bs, i)
-        if c == 47 or c == 92:
+    loop i in 0 until n:
+        c = bs[i]
+        if c is 47 or c is 92:
             last_sep = i
     if last_sep < 0:
         "."
@@ -42,15 +42,15 @@ define drv_dirname(path: text) -> text:
 # "use foo" → "foo"; anything else → "".
 define drv_use_name(line: text) -> text:
     bs0 = bytes_of(line)
-    # `pub use X` (a facade RE-EXPORTING X) loads X exactly like `use X` does -
+    # `public use X` (a facade RE-EXPORTING X) loads X exactly like `use X` does -
     # the visibility difference is the compiler's business, not the loader's.
     # Missing this made a facade orb stop pulling in the orbs it re-exports.
-    is_pub_use = length(bs0) > 4 and at(bs0, 0) == 112 and at(bs0, 1) == 117 and at(bs0, 2) == 98 and at(bs0, 3) == 32
+    is_pub_use = length(bs0) > 4 and bs0[0] is 112 and bs0[1] is 117 and bs0[2] is 98 and bs0[3] is 32
     bs = if is_pub_use then bytes_part(bs0, 4, length(bs0)) else bs0
     n = length(bs)
     if n < 5:
         return ""
-    is_use = at(bs, 0) == 117 and at(bs, 1) == 115 and at(bs, 2) == 101 and at(bs, 3) == 32
+    is_use = bs[0] is 117 and bs[1] is 115 and bs[2] is 101 and bs[3] is 32
     if not is_use:
         return ""
     edit name = ""
@@ -58,10 +58,10 @@ define drv_use_name(line: text) -> text:
     loop:
         if i >= n:
             break
-        c = at(bs, i)
+        c = bs[i]
         # 40 = `(`: `use text (trim)` and `use text(trim)` both name the orb
         # `text` - the selective list is the parser's business, not the loader's.
-        if c == 32 or c == 13 or c == 10 or c == 35 or c == 40:
+        if c is 32 or c is 13 or c is 10 or c is 35 or c is 40:
             break
         single = text_of(bytes_part(bs, i, i + 1))
         name = "{name}{single}"
@@ -78,12 +78,12 @@ define drv_uses_of(src: text) -> [text]:
     loop:
         if i > n:
             break
-        at_end = i == n
+        at_end = i is n
         edit is_nl = false
         if not at_end:
-            is_nl = at(bs, i) == 10
+            is_nl = bs[i] is 10
         if at_end or is_nl:
-            # A `use` / `pub use` line begins with `u` (117) or `p` (112) at
+            # A `use` / `public use` line begins with `u` (117) or `p` (112) at
             # column 0 - that is exactly what drv_use_name requires. Peek that
             # one byte straight out of `bs` and only materialise a Text (a slice
             # + a to_text, and a third byte list inside drv_use_name) for the
@@ -91,11 +91,11 @@ define drv_uses_of(src: text) -> [text]:
             # entry allocated three times just to be told it wasn't a `use`,
             # which exhausted the heap on a multi-megabyte source and crashed
             # the compiler before it printed a single diagnostic.
-            first = if line_start < i then at(bs, line_start) else -1
-            if first == 117 or first == 112:
+            first = if line_start < i then bs[line_start] else -1
+            if first is 117 or first is 112:
                 line = text_of(bytes_part(bs, line_start, i))
                 name = drv_use_name(line)
-                if name != "":
+                if name is not "":
                     names = append(names, name)
             line_start = i + 1
         if at_end:
@@ -103,11 +103,18 @@ define drv_uses_of(src: text) -> [text]:
         i = i + 1
     names
 
+# True when the entry file IS the orb named. Pulling an orb in on top of
+# itself would define every one of its functions twice, and orbs/iter is
+# exactly the file that would hit it. Both separators, because the path
+# reaches here as the platform wrote it.
+define drv_entry_is_orb(entry_path: text, orb: text) -> truth:
+    contains(entry_path, "/{orb}/lib.or") or contains(entry_path, "{orb}" + "\\" + "lib.or")
+
 define drv_list_has(items: [text], needle: text) -> truth:
     n = length(items)
     edit found = false
-    loop i in 0..<n:
-        if at(items, i) == needle:
+    loop i in 0 until n:
+        if items[i] is needle:
             found = true
     found
 
@@ -116,12 +123,12 @@ define drv_list_has(items: [text], needle: text) -> truth:
 define drv_resolve(name: text, roots: [text]) -> text:
     n = length(roots)
     edit src = ""
-    loop i in 0..<n:
-        if src == "":
-            root = at(roots, i)
+    loop i in 0 until n:
+        if src is "":
+            root = roots[i]
             candidate = "{root}{name}/lib.or"
             attempt = file_read(candidate)
-            if attempt != "":
+            if attempt is not "":
                 src = attempt
     src
 
@@ -132,27 +139,27 @@ define drv_resolve(name: text, roots: [text]) -> text:
 define drv_resolve_path(name: text, roots: [text]) -> text:
     n = length(roots)
     edit path = ""
-    loop i in 0..<n:
-        if path == "":
-            root = at(roots, i)
+    loop i in 0 until n:
+        if path is "":
+            root = roots[i]
             candidate = "{root}{name}/lib.or"
-            if file_read(candidate) != "":
+            if file_read(candidate) is not "":
                 path = candidate
     path
 
-define drv_count_lines(s: text) -> int:
+define drv_count_lines(s: text) -> number:
     b = bytes_of(s)
     n = length(b)
     edit count = 0
-    loop i in 0..<n:
-        if at(b, i) == 10:
+    loop i in 0 until n:
+        if b[i] is 10:
             count = count + 1
     count
 
 # Record one chunk of the concatenated program: the bundle line its `orb`
 # marker sits on, and the file it came from. `otir_where` (orion_ast_to_ir)
 # reads these back to turn a bundle line into `file:line:col`.
-define drv_map_chunk(index: int, marker_line: int, path: text):
+define drv_map_chunk(index: number, marker_line: number, path: text):
     slot_set("src:map:{index}:at", marker_line)
     slot_set("src:map:{index}:path", orion_persist_text(path))
     slot_set("src:map:n", index + 1)
@@ -167,8 +174,8 @@ external define orion_os_private_kb() -> int
 # print the human line only.
 define drv_want_perf() -> truth:
     edit want = false
-    loop ai in 1..<argc():
-        if argv(ai) == "--perf":
+    loop ai in 1 until argc():
+        if argv(ai) is "--perf":
             want = true
     want
 
@@ -179,12 +186,12 @@ define drv_want_perf() -> truth:
 # its compilation went.
 define drv_want_quiet() -> truth:
     edit want = false
-    loop ai in 1..<argc():
-        if argv(ai) == "--quiet":
+    loop ai in 1 until argc():
+        if argv(ai) is "--quiet":
             want = true
     # A caller compiling in-process (the test runner) can silence the chatter
     # via this slot without touching argv.
-    if slot_has("drv:quiet") and slot_get_int("drv:quiet") == 1:
+    if slot_has("drv:quiet") and slot_get_int("drv:quiet") is 1:
         want = true
     want
 
@@ -193,17 +200,17 @@ define drv_want_quiet() -> truth:
 # never resolve. Harmless by luck, wrong by construction.
 define drv_is_flag(a: text) -> truth:
     bs = bytes_of(a)
-    length(bs) >= 2 and at(bs, 0) == 45 and at(bs, 1) == 45
+    length(bs) >= 2 and bs[0] is 45 and bs[1] is 45
 
-define drv_total_insts(m: IRModule) -> int:
+define drv_total_insts(m: IRModule) -> number:
     edit total = 0
-    loop fi in 0..<length(m.functions):
-        f = at(m.functions, fi)
+    loop fi in 0 until length(m.functions):
+        f = m.functions[fi]
         total = total + length(f.instructions)
     total
 
 define drv_sty(code: text, s: text) -> text:
-    if orion_console_color() == 1:
+    if orion_console_color() is 1:
         e = text_of(append([], 27))
         "{e}[{code}m{s}{e}[0m"
     else:
@@ -236,62 +243,62 @@ define drv_green(s: text) -> text:
 
 define drv_type_name(t: table) -> text:
     kind = get(t, "kind")
-    if kind == "List":
+    if kind is "List":
         inner = drv_type_name(get_map(t, "elem"))
         "[{inner}]"
     else:
-        if kind == "Named":
+        if kind is "Named":
             base = get(t, "name")
             targs = if has(t, "args") then get_list(t, "args") else []
-            if length(targs) == 0:
+            if length(targs) is 0:
                 base
             else:
                 edit acc = ""
-                loop ai in 0..<length(targs):
-                    sep = if ai == 0 then "" else ","
-                    acc = "{acc}{sep}{drv_type_name(at(targs, ai))}"
+                loop ai in 0 until length(targs):
+                    sep = if ai is 0 then "" else ","
+                    acc = "{acc}{sep}{drv_type_name(targs[ai])}"
                 "{base}<{acc}>"
         else:
-            if kind == "FnType":
+            if kind is "FnType":
                 "fn"
             else:
                 "?"
 
-define drv_symbols(ast: table) -> int:
+define drv_symbols(ast: table) -> number:
     decls = get_list(ast, "decls")
     edit orb_now = ""
-    loop di in 0..<length(decls):
-        d = at(decls, di)
+    loop di in 0 until length(decls):
+        d = decls[di]
         k = get(d, "kind")
-        if k == "OrbMark":
+        if k is "OrbMark":
             orb_now = get(d, "name")
-        if k == "Fn":
+        if k is "Fn":
             params = get_list(d, "params")
             edit psig = ""
-            loop pi in 0..<length(params):
-                p = at(params, pi)
-                sep = if pi == 0 then "" else ","
+            loop pi in 0 until length(params):
+                p = params[pi]
+                sep = if pi is 0 then "" else ","
                 pty = if has(p, "type") then drv_type_name(get_map(p, "type")) else "int"
                 psig = "{psig}{sep}{get(p, \"name\")}:{pty}"
             rty = if has(d, "ret") then drv_type_name(get_map(d, "ret")) else "?"
             print_line("FN {get(d, \"name\")}|{psig}|{rty}|{orb_now}")
-        if k == "Data":
+        if k is "Data":
             fields = get_list(d, "fields")
             edit fsig = ""
-            loop fi in 0..<length(fields):
-                f = at(fields, fi)
-                sep2 = if fi == 0 then "" else ","
+            loop fi in 0 until length(fields):
+                f = fields[fi]
+                sep2 = if fi is 0 then "" else ","
                 fty = if has(f, "type") then drv_type_name(get_map(f, "type")) else "?"
                 fsig = "{fsig}{sep2}{get(f, \"name\")}:{fty}"
             print_line("TYPE {get(d, \"name\")}|{fsig}|{orb_now}")
-        if k == "Enum":
+        if k is "Enum":
             variants = get_list(d, "variants")
             edit vsig = ""
-            loop vi in 0..<length(variants):
-                sep3 = if vi == 0 then "" else ","
-                vsig = "{vsig}{sep3}{get(at(variants, vi), \"name\")}"
+            loop vi in 0 until length(variants):
+                sep3 = if vi is 0 then "" else ","
+                vsig = "{vsig}{sep3}{get(variants[vi], \"name\")}"
             print_line("SUM {get(d, \"name\")}|{vsig}|{orb_now}")
-        if k == "Const":
+        if k is "Const":
             print_line("CONST {get(d, \"name\")}||{orb_now}")
     0
 
@@ -299,9 +306,306 @@ define drv_symbols(ast: table) -> int:
 # combined program text (orbs in discovery order, entry last).
 # Quiet by design: one dim summary line instead of a line per orb -
 # unresolved `use` means builtin, which is the normal case, not news.
+# Orbs every program gets without asking. `each` / `keep` / `combine` and
+# `assert` are what the syntax reference calls builtins, and a reader who has
+# to be told to write `use iter` first has been handed a rule that explains
+# nothing. Costs nothing: unused orb functions are already stripped, so a
+# hello-world compiles to the same bytes with and without them.
+#
+# `core` is the two types - `maybe` and `result` - and nothing else. The
+# syntax reference lists them among the types, next to `text` and `table`,
+# and a type you have to import first is not one of those. Their variants
+# resolve LAST (see otir_core_enum), so a program that declares a `Some` or
+# an `Ok` of its own keeps it.
+#
+# The FUNCTIONS over those types (`unwrap_or`, `is_some`, `err_msg`) stay in
+# `option` and `result` behind a `use`. Those two share the name `unwrap_or`,
+# so making both visible everywhere would make that one name ambiguous in
+# every program in the language.
+define drv_always_used() -> [text]:
+    ["core", "iter", "assert"]
+
+# The one-level subdirectory names of `dir`, newline-joined. Same call the LSP
+# uses to find orbs on a root.
+external define orion_dir_subdirs(dir: text) -> text
+
+# ---- Auto-use: the compiler already knew the answer ----
+#
+# `trim(s)` without a `use text` used to say "`trim` needs a `use`; it is
+# exported by `text`" - a diagnostic that names the exact line it wants you to
+# type. A tool that can write the answer should not make you copy it.
+#
+# So: a name that resolves to EXACTLY ONE orb on the search path pulls that orb
+# in. Two orbs exporting it is still an error naming both, and `use` is what
+# answers it - which is the job `use` was always doing, now the only one. Of
+# 647 public names across the 45 orbs here, 5 are exported twice.
+#
+# Free at runtime: unused orb functions are already stripped, so a program
+# compiles to the same bytes whether an orb was pulled in or not.
+#
+# The index is built once per compile and cached in slots:
+#   expby:<name> -> orb, or "?" when more than one exports it.
+define drv_build_export_index(roots: [text]):
+    if slot_has("drv:idx"):
+        return
+    slot_set("drv:idx", 1)
+    # The FIRST root only. The search path also carries fallbacks and sibling
+    # projects, and indexing those made the compiler's own build import
+    # `atlas_ecs` because a name matched - two `Param` layouts in one program
+    # and a build that would not link. What the compiler imports for you is
+    # the standard library it was pointed at; anything further away you name
+    # yourself, which is a rule you can hold in your head.
+    if length(roots) > 0:
+        listing = orion_dir_subdirs(roots[0])
+        drv_index_root(roots[0], listing)
+
+# One root: the newline-joined subdirectory names, walked byte by byte. No
+# `split` - the driver has no `use text`, and adding one to reach a helper
+# this file already has a shape for would be the wrong trade.
+define drv_index_root(root: text, listing: text):
+    b = bytes_of(listing)
+    n = length(b)
+    edit start = 0
+    edit i = 0
+    loop:
+        if i > n:
+            break
+        at_end = i is n
+        is_nl = if at_end then false else b[i] is 10
+        if at_end or is_nl:
+            if i > start:
+                drv_index_orb(root, text_of(bytes_part(b, start, i)))
+            start = i + 1
+        if at_end:
+            break
+        i = i + 1
+
+# Record every `public define NAME` in one orb. A second orb claiming a name
+# marks it "?" - ambiguous, and the caller must say which.
+define drv_index_orb(root: text, orb: text):
+    src = file_read("{root}{orb}/lib.or")
+    if src is "":
+        return
+    b = bytes_of(src)
+    n = length(b)
+    edit start = 0
+    edit i = 0
+    loop:
+        if i > n:
+            break
+        at_end = i is n
+        is_nl = if at_end then false else b[i] is 10
+        if at_end or is_nl:
+            # Only a line starting with `p` can be `public define`.
+            first = if start < i then b[start] else 0 - 1
+            if first is 112:
+                drv_note_export(text_of(bytes_part(b, start, i)), orb)
+            start = i + 1
+        if at_end:
+            break
+        i = i + 1
+
+# `expby:<name>` holds every orb that exports it, space-joined. The LIST and
+# not a yes/no, because the one job left for `use` is answering WHICH - and an
+# error that cannot name the candidates does not let you answer it.
+define drv_note_export(line: text, orb: text):
+    name = drv_public_name(line)
+    if name is not "":
+        key = "expby:{name}"
+        seen = if slot_has(key) then slot_get(key) else ""
+        if seen is "":
+            slot_set(key, orb)
+        if seen is not "" and not drv_word_in(seen, orb):
+            slot_set(key, "{seen} {orb}")
+
+# Is `word` one of the space-separated words in `list`?
+define drv_word_in(list: text, word: text) -> truth:
+    b = bytes_of(list)
+    n = length(b)
+    edit start = 0
+    edit hit = false
+    edit i = 0
+    loop:
+        if i > n:
+            break
+        at_end = i is n
+        is_sp = if at_end then false else b[i] is 32
+        if at_end or is_sp:
+            if text_of(bytes_part(b, start, i)) is word:
+                hit = true
+            start = i + 1
+        if at_end:
+            break
+        i = i + 1
+    hit
+
+# The one orb that exports `name`, or "" when none or more than one does.
+define drv_sole_exporter(name: text) -> text:
+    key = "expby:{name}"
+    if not slot_has(key):
+        return ""
+    listed = slot_get(key)
+    if contains(listed, " "):
+        return ""
+    listed
+
+define drv_public_name(line: text) -> text:
+    b = bytes_of(line)
+    n = length(b)
+    if n < 15:
+        return ""
+    head = text_of(bytes_part(b, 0, 14))
+    if head is not "public define ":
+        return ""
+    edit i = 14
+    edit stop = 14
+    loop:
+        if i >= n:
+            break
+        c = b[i]
+        is_word = (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c is 95
+        if not is_word:
+            break
+        i = i + 1
+        stop = i
+    if stop <= 14:
+        return ""
+    text_of(bytes_part(b, 14, stop))
+
+# Which orbs this source reaches for without importing them. Lexed, not
+# pattern-matched: a name in a comment or a string is not a dependency, and
+# guessing from raw bytes would pull orbs in for mentioning them.
+# Every name this source DECLARES, remembered so auto-use never reaches for
+# an orb over a name that is already answered here. Without it the compiler's
+# own bundle pulled in a pile of orbs for mentioning `split`, `trim` and
+# `ok` - names it defines itself - and its emit phase took twice as long.
+define drv_note_defines(src: text):
+    b = bytes_of(src)
+    n = length(b)
+    edit start = 0
+    edit i = 0
+    loop:
+        if i > n:
+            break
+        at_end = i is n
+        is_nl = if at_end then false else b[i] is 10
+        if at_end or is_nl:
+            first = if start < i then b[start] else 0 - 1
+            # `define f(` at column 0, or `public define f(`.
+            if first is 100 or first is 112:
+                nm = drv_declared_name(text_of(bytes_part(b, start, i)))
+                if nm is not "":
+                    slot_set("drvdef:{slot_get_int(\"drv:cnum\")}:{nm}", 1)
+            start = i + 1
+        if at_end:
+            break
+        i = i + 1
+
+# `define foo(` / `public define foo(` -> "foo"; anything else -> "".
+define drv_declared_name(line: text) -> text:
+    b = bytes_of(line)
+    n = length(b)
+    edit at = 0
+    if n >= 14 and text_of(bytes_part(b, 0, 14)) is "public define ":
+        at = 14
+    if at is 0 and n >= 7 and text_of(bytes_part(b, 0, 7)) is "define ":
+        at = 7
+    if at is 0:
+        return ""
+    edit i = at
+    edit stop = at
+    loop:
+        if i >= n:
+            break
+        c = b[i]
+        is_word = (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c is 95
+        if not is_word:
+            break
+        i = i + 1
+        stop = i
+    if stop <= at:
+        return ""
+    text_of(bytes_part(b, at, stop))
+
+define drv_auto_uses(src: text, already: [text]) -> [text]:
+    edit found = []
+    toks = self_lex(src)
+    n_toks = length(toks)
+    # Only a name in CALL position - an ident with a `(` right after it. A
+    # bare ident is usually a local: `first = xs[0]` pulled in the `list` orb
+    # for the word `first`, and one test dragged five orbs in that way. What
+    # gets imported has to be what gets called.
+    loop ti in 0 until n_toks:
+        tok = toks[ti]
+        nxt = if ti + 1 < n_toks then toks[ti + 1] else tok
+        is_call = ti + 1 < n_toks and get(nxt, "kind") is "symbol" and get(nxt, "value") is "("
+        if get(tok, "kind") is "ident" and is_call:
+            name = get(tok, "value")
+            # A name is looked up ONCE per compile. The compiler's own bundle
+            # is 200k ident tokens over a few thousand distinct names, and
+            # building a key plus two linear list scans for every occurrence
+            # is what made the self-compile take twice as long as it used to.
+            # The four core words never reach for an orb. `ok` is a function
+            # in `file` and `net`, `error` is one in `log`, and a function
+            # that resolves beats the spoken constructor - so importing one of
+            # those orbs on sight would quietly take `ok(v)` and `error(m)`
+            # away from every program that writes them. Say `use log` and you
+            # get log's; say nothing and you get the core's.
+            is_core_word = name is "some" or name is "none" or name is "ok" or name is "error"
+            cn = slot_get_int("drv:cnum")
+            seen_key = "drvseen:{cn}:{name}"
+            if (not is_core_word) and (not slot_has(seen_key)) and (not slot_has("drvdef:{cn}:{name}")):
+                slot_set(seen_key, 1)
+                orb = drv_sole_exporter(name)
+                if orb is not "":
+                    if not drv_list_has(already, orb):
+                        if not drv_list_has(found, orb):
+                            found = append(found, orb)
+    found
+
+# One auto-use round over everything loaded so far plus the entry. Returns the
+# queue, longer by whatever was still missing. Same list back means done.
+define drv_auto_round(queue: [text], loaded_names: [text], owners: [text], sources: [text], entry_src: text, entry_path: text) -> [text]:
+    edit q = queue
+    loop si in 0 until length(sources):
+        owner = owners[si]
+        loop auto_dep in drv_auto_uses(sources[si], q):
+            if auto_dep is not owner:
+                slot_set("drv:autouse:{slot_get_int(\"drv:cnum\")}:{owner}:{auto_dep}", 1)
+                if not drv_list_has(loaded_names, auto_dep):
+                    q = append(q, auto_dep)
+    loop auto in drv_auto_uses(entry_src, q):
+        if not drv_entry_is_orb(entry_path, auto):
+            # Loading the source is only half of it - a name still has to be
+            # VISIBLE, and visibility comes from a `use`. The driver records
+            # the import it just decided on where the resolver looks. The entry
+            # program's own orb name is "".
+            slot_set("drv:autouse:{slot_get_int(\"drv:cnum\")}::{auto}", 1)
+            if not drv_list_has(loaded_names, auto):
+                q = append(q, auto)
+    q
+
 public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> text:
+    drv_build_export_index(roots)
+    # Everything below is per COMPILE, not per process. One test runner
+    # compiles two hundred files in a single process, and a `drvseen:` or
+    # `drvdef:` left over from the last file silenced the next one - the
+    # second program to call `trim` was told it did not exist. The export
+    # index is the only thing that survives: it is read off disk and does
+    # not change.
+    slot_set("drv:cnum", slot_get_int("drv:cnum") + 1)
+    drv_note_defines(entry_src)
     edit queue = drv_uses_of(entry_src)
+    # An orb never implicitly uses ITSELF - that is a cycle, and orbs/iter is
+    # where `each` lives, so it is exactly the file that would hit it.
+    loop implicit in drv_always_used():
+        already = drv_list_has(queue, implicit)
+        is_self = drv_entry_is_orb(entry_path, implicit)
+        if (not already) and (not is_self):
+            queue = append(queue, implicit)
     edit loaded_names = []
+    edit owners = []
+    edit sources = []
     edit chunks = []
     edit qi = 0
     edit orb_count = 0
@@ -312,15 +616,26 @@ public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> t
     edit map_n = 0
     loop:
         if qi >= length(queue):
+            # Everything WRITTEN is loaded. Only NOW does auto-use look at what
+            # is still missing - an orb you imported yourself has to be the one
+            # that answers a name. Scanning the entry first pulled `raster` into
+            # veil for the word `render`, which `veil_web` already exports, and
+            # turned a program that built into an ambiguity about an orb nobody
+            # named.
+            grown = drv_auto_round(queue, loaded_names, owners, sources, entry_src, entry_path)
+            if length(grown) is length(queue):
+                break
+            queue = grown
+        if qi >= length(queue):
             break
-        name = at(queue, qi)
+        name = queue[qi]
         qi = qi + 1
         if drv_list_has(loaded_names, name):
             continue
         loaded_names = append(loaded_names, name)
         path = drv_resolve_path(name, roots)
-        src = if path == "" then "" else file_read(path)
-        if src == "":
+        src = if path is "" then "" else file_read(path)
+        if src is "":
             continue
         drv_map_chunk(map_n, line_at, path)
         map_n = map_n + 1
@@ -336,10 +651,13 @@ public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> t
         chunks = append(chunks, "orb " + q + name + q + "\n")
         chunks = append(chunks, src)
         chunks = append(chunks, "\n")
+        drv_note_defines(src)
+        owners = append(owners, name)
+        sources = append(sources, src)
         deps = drv_uses_of(src)
         n_deps = length(deps)
-        loop di in 0..<n_deps:
-            queue = append(queue, at(deps, di))
+        loop di in 0 until n_deps:
+            queue = append(queue, deps[di])
     okb = orb_bytes // 1024
     if not drv_want_quiet():
         print_line(drv_dim("  orbs {orb_count} ({okb} KB)"))
@@ -384,9 +702,9 @@ public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> t
 # than closing ("entry only ensures the arena is ON"), so open and close counts
 # are not meant to match and demanding they do produces noise, not findings.
 define drv_mode_stem(callee: text) -> text:
-    if callee == "orion_persist_on" or callee == "orion_persist_off":
+    if callee is "orion_persist_on" or callee is "orion_persist_off":
         "persist"
-    else if callee == "orion_pool_on" or callee == "orion_pool_off":
+    else if callee is "orion_pool_on" or callee is "orion_pool_off":
         "pool"
     else if drv_ends(callee, "state_alloc_on") or drv_ends(callee, "state_alloc_off"):
         "state_alloc"
@@ -410,8 +728,8 @@ define drv_ends(t: text, suffix: text) -> truth:
         false
     else:
         edit same = true
-        loop i in 0..<m:
-            if at(bt, n - m + i) != at(bs, i):
+        loop i in 0 until m:
+            if bt[n - m + i] is not bs[i]:
                 same = false
         same
 
@@ -421,10 +739,10 @@ define drv_is_close(callee: text) -> truth:
     drv_ends(callee, "_off")
 
 # One line per unbalanced (function, mode). Returns how many it found.
-define drv_scope_check(module: IRModule, verbose: int) -> int:
+define drv_scope_check(module: IRModule, verbose: number) -> number:
     fns = module.functions
     edit bad = 0
-    loop fi in 0..<length(fns):
+    loop fi in 0 until length(fns):
         f = drv_fn_at(fns, fi)
         if drv_is_scope_primitive(f.name):
             continue
@@ -432,11 +750,11 @@ define drv_scope_check(module: IRModule, verbose: int) -> int:
         edit opens = part([0], 0, 0)
         edit closes = part([0], 0, 0)
         edit depth = part([0], 0, 0)      # running open-minus-close, in order
-        loop ii in 0..<length(f.instructions):
+        loop ii in 0 until length(f.instructions):
             inst = drv_inst_at(f.instructions, ii)
-            if inst.op == "call":
+            if inst.op is "call":
                 stem = drv_mode_stem(inst.name)
-                if stem != "":
+                if stem is not "":
                     edit idx = drv_name_idx(stems, stem)
                     if idx < 0:
                         stems = append(stems, stem)
@@ -451,34 +769,34 @@ define drv_scope_check(module: IRModule, verbose: int) -> int:
                         opens = set(opens, idx, drv_int_at(opens, idx) + 1)
                         depth = set(depth, idx, drv_int_at(depth, idx) + 1)
             # A return reached with a scope still open leaks it on THAT path -
-            # the exact case a whole-function open==close count cannot see (an
+            # the exact case a whole-function open is close count cannot see (an
             # early `return` between the open and the matching close). The
             # final return has depth 0 in a balanced function, so only an early
             # one trips this.
-            if inst.op == "return":
-                loop si in 0..<length(stems):
+            if inst.op is "return":
+                loop si in 0 until length(stems):
                     if drv_int_at(depth, si) > 0:
                         bad = bad + 1
-                        if verbose == 1:
+                        if verbose is 1:
                             print_line("    {f.name}: returns with {text_at_drv(stems, si)} still open (early return between open and close)")
-        loop si in 0..<length(stems):
+        loop si in 0 until length(stems):
             o = drv_int_at(opens, si)
             c = drv_int_at(closes, si)
-            if o != c:
+            if o is not c:
                 bad = bad + 1
-                if verbose == 1:
+                if verbose is 1:
                     st = text_at_drv(stems, si)
                     print_line("    {f.name}: {st} opened {o}x, closed {c}x")
     bad
 
-define text_at_drv(xs: [text], i: int) -> text:
-    at(xs, i)
+define text_at_drv(xs: [text], i: number) -> text:
+    xs[i]
 
-define drv_fn_at(fs: [IRFn], i: int) -> IRFn:
-    at(fs, i)
+define drv_fn_at(fs: [IRFn], i: number) -> IRFn:
+    fs[i]
 
-define drv_inst_at(xs: [Inst], i: int) -> Inst:
-    at(xs, i)
+define drv_inst_at(xs: [Inst], i: number) -> Inst:
+    xs[i]
 
 define drv_starts(t: text, p: text) -> truth:
     tb = bytes_of(t)
@@ -486,34 +804,34 @@ define drv_starts(t: text, p: text) -> truth:
     pn = length(pb)
     if length(tb) < pn:
         return false
-    loop i in 0..<pn:
-        if at(tb, i) != at(pb, i):
+    loop i in 0 until pn:
+        if tb[i] is not pb[i]:
             return false
     true
 
-define drv_flag(x: int, f: int) -> truth:
-    (x // f) - (x // (f * 2)) * 2 == 1
+define drv_flag(x: number, f: number) -> truth:
+    (x // f) - (x // (f * 2)) * 2 is 1
 
-define drv_or(a: int, b: int) -> int:
+define drv_or(a: number, b: number) -> number:
     edit out = a
     edit f = 1
-    loop i in 0..<8:
+    loop i in 0 until 8:
         if drv_flag(b, f) and not drv_flag(out, f):
             out = out + f
         f = f * 2
     out
 
-define drv_name_idx(names: [text], name: text) -> int:
+define drv_name_idx(names: [text], name: text) -> number:
     n = length(names)
-    loop i in 0..<n:
-        if at(names, i) == name:
+    loop i in 0 until n:
+        if names[i] is name:
             return i
     0 - 1
 
-define drv_int_at(xs: [int], i: int) -> int:
-    at(xs, i)
+define drv_int_at(xs: [number], i: number) -> number:
+    xs[i]
 
-define drv_call_bits(callee: text, names: [text]) -> int:
+define drv_call_bits(callee: text, names: [text]) -> number:
     # Effect prefixes are checked FIRST, before the "is it a user fn?"
     # short-circuit. Externs are added to the module as body-less IRFns, so an
     # effectful extern like `__orion_monotonic_ms` is IN `names` - and the old
@@ -536,33 +854,33 @@ define drv_call_bits(callee: text, names: [text]) -> int:
     # differently). Basic ops, sqrt, floor/ceil/round ARE exact per IEEE-754
     # on every target we emit for, so `number` needs no fixed-point type -
     # determinism is guaranteed by forbidding exactly this list.
-    if callee == "sin" or callee == "cos" or callee == "tan" or callee == "exp" or callee == "log" or callee == "pow" or callee == "atan2":
+    if callee is "sin" or callee is "cos" or callee is "tan" or callee is "exp" or callee is "log" or callee is "pow" or callee is "atan2":
         return 128
     # A user fn contributes its effects through the closure, not here.
     if drv_name_idx(names, callee) >= 0:
         return 0
     16
 
-define drv_direct_bits(f: IRFn, names: [text]) -> int:
+define drv_direct_bits(f: IRFn, names: [text]) -> number:
     edit bits = 0
     n = length(f.instructions)
-    loop i in 0..<n:
+    loop i in 0 until n:
         inst = drv_inst_at(f.instructions, i)
         op = inst.op
-        if op == "slot_set" or op == "slot_get" or op == "slot_has" or op == "slot_get_int":
+        if op is "slot_set" or op is "slot_get" or op is "slot_has" or op is "slot_get_int":
             bits = drv_or(bits, 1)
-        if op == "print_int" or op == "print_str" or op == "print_float" or op == "file_read" or op == "file_write":
+        if op is "print_int" or op is "print_str" or op is "print_float" or op is "file_read" or op is "file_write":
             bits = drv_or(bits, 2)
-        if op == "call":
+        if op is "call":
             bits = drv_or(bits, drv_call_bits(inst.name, names))
         # Transcendentals lower to their OWN op (fmath1/fmath2), not "call" -
         # they were invisible to this walk, so `deterministic` never saw them.
-        if op == "fmath1" or op == "fmath2":
+        if op is "fmath1" or op is "fmath2":
             bits = drv_or(bits, drv_call_bits(inst.name, names))
     bits
 
-define drv_flags_text(bits: int) -> text:
-    if bits == 0:
+define drv_flags_text(bits: number) -> text:
+    if bits is 0:
         return "pure"
     edit out = ""
     if drv_flag(bits, 1):
@@ -600,7 +918,7 @@ define drv_flags_text(bits: int) -> text:
 # `fn_ref`, and par_run/call_ptr call through the pointer). Those show up as
 # `fn_ref` instructions, so the walk seeds from them too. Conservative by
 # construction: a name we cannot prove unreachable stays.
-define drv_reachable(module: IRModule) -> [int]:
+define drv_reachable(module: IRModule) -> [number]:
     fns = module.functions
     n = length(fns)
     edit names = []
@@ -608,7 +926,7 @@ define drv_reachable(module: IRModule) -> [int]:
         names = append(names, drv_fn_at(fns, i).name)
     edit live = []
     loop i in 0 until n:
-        nm = at(names, i)
+        nm = names[i]
         # main and handlers are entry points; a handler is reached by the
         # runtime, never by a call instruction.
         root = drv_ends(nm, "main") or drv_ends(nm, "_handler") or contains(nm, "__handler_") or drv_starts(nm, "__orion_handler")
@@ -625,7 +943,7 @@ define drv_reachable(module: IRModule) -> [int]:
                     inst = drv_inst_at(f.instructions, j)
                     # A call names its callee; fn_ref names a function whose
                     # address is taken (closures, par_run workers, call_ptr).
-                    if inst.op == "call" or inst.op == "fn_ref" or inst.op == "make_closure" or inst.op == "closure_call":
+                    if inst.op is "call" or inst.op is "fn_ref" or inst.op is "make_closure" or inst.op is "closure_call":
                         idx = drv_name_idx(names, inst.name)
                         if idx >= 0:
                             if drv_int_at(live, idx) is 0:
@@ -646,11 +964,11 @@ define drv_prune(module: IRModule) -> IRModule:
             kept = append(kept, drv_fn_at(fns, i))
     IRModule{functions: kept}
 
-define drv_effect_closure(module: IRModule, names: [text]) -> [int]:
+define drv_effect_closure(module: IRModule, names: [text]) -> [number]:
     fns = module.functions
     n = length(fns)
     edit bits = []
-    loop i in 0..<n:
+    loop i in 0 until n:
         bits = append(bits, drv_direct_bits(drv_fn_at(fns, i), names))
     edit pass = 0
     loop:
@@ -658,30 +976,30 @@ define drv_effect_closure(module: IRModule, names: [text]) -> [int]:
             break
         edit changed = 0
         edit next = []
-        loop i in 0..<n:
+        loop i in 0 until n:
             f2 = drv_fn_at(fns, i)
             cur = drv_int_at(bits, i)
             edit acc = cur
             ni = length(f2.instructions)
-            loop j in 0..<ni:
+            loop j in 0 until ni:
                 inst = drv_inst_at(f2.instructions, j)
-                if inst.op == "call":
+                if inst.op is "call":
                     idx = drv_name_idx(names, inst.name)
                     if idx >= 0:
                         acc = drv_or(acc, drv_int_at(bits, idx))
-            if acc != cur:
+            if acc is not cur:
                 changed = 1
             next = append(next, acc)
         bits = next
         pass = pass + 1
-        if changed == 0:
+        if changed is 0:
             break
     bits
 
 define drv_module_names(module: IRModule) -> [text]:
     fns = module.functions
     edit names = []
-    loop i in 0..<length(fns):
+    loop i in 0 until length(fns):
         names = append(names, drv_fn_at(fns, i).name)
     names
 
@@ -692,22 +1010,22 @@ define drv_module_names(module: IRModule) -> [text]:
 # RNG is deterministic (wall-clock time, bit 64, is what breaks a replay). This
 # is the compile-time guarantee a deterministic simulation, and rollback
 # netcode, rests on: the compiler proves the fn is replayable.
-define drv_check_deterministic(module: IRModule) -> int:
+define drv_check_deterministic(module: IRModule) -> number:
     marked = deterministic_fn_names()
-    if length(marked) == 0:
+    if length(marked) is 0:
         return 0
     names = drv_module_names(module)
     bits = drv_effect_closure(module, names)
     nd_mask = drv_or(drv_or(drv_or(2, 4), drv_or(8, 64)), 128)
     edit bad = 0
-    loop i in 0..<length(marked):
-        idx = drv_name_idx(names, at(marked, i))
+    loop i in 0 until length(marked):
+        idx = drv_name_idx(names, marked[i])
         if idx >= 0:
             eff = drv_int_at(bits, idx)
             hit = drv_flag_and(eff, nd_mask)
-            if hit != 0:
+            if hit is not 0:
                 bad = bad + 1
-                compile_error("orion: ERROR - `deterministic fn` " + drv_deterministic_label(at(marked, i)) + " is not deterministic: it (transitively) performs " + drv_flags_text(hit))
+                compile_error("orion: ERROR - `deterministic fn` " + drv_deterministic_label(marked[i]) + " is not deterministic: it (transitively) performs " + drv_flags_text(hit))
     bad
 
 # `orb__name` -> a readable `name` for the error; leaves already-plain names be.
@@ -715,35 +1033,35 @@ define drv_deterministic_label(mangled: text) -> text:
     bs = bytes_of(mangled)
     n = length(bs)
     edit cut = 0 - 1
-    loop i in 0..<n - 1:
-        if at(bs, i) == 95 and at(bs, i + 1) == 95:
+    loop i in 0 until n - 1:
+        if bs[i] is 95 and bs[i + 1] is 95:
             cut = i + 2
     if cut < 0 then mangled else text_of(bytes_part(bs, cut, n))
 
-define drv_flag_and(a: int, b: int) -> int:
+define drv_flag_and(a: number, b: number) -> number:
     edit r = 0
     edit bit = 1
-    loop i in 0..<40:
+    loop i in 0 until 40:
         av = (a // bit) - ((a // bit) // 2) * 2
         bv = (b // bit) - ((b // bit) // 2) * 2
-        if av == 1 and bv == 1:
+        if av is 1 and bv is 1:
             r = r + bit
         bit = bit * 2
     r
 
-define drv_facts(module: IRModule) -> int:
+define drv_facts(module: IRModule) -> number:
     fns = module.functions
     n = length(fns)
     names = drv_module_names(module)
     bits = drv_effect_closure(module, names)
     edit pure_count = 0
-    loop i in 0..<n:
+    loop i in 0 until n:
         b = drv_int_at(bits, i)
-        if b == 0:
+        if b is 0:
             pure_count = pure_count + 1
         else:
             fl = drv_flags_text(b)
-            fname = at(names, i)
+            fname = names[i]
             print_line("{fname}:{fl}")
     print_line("facts: {n} function(s), {pure_count} pure")
     0
@@ -754,14 +1072,19 @@ define drv_wants_wasm(p: text) -> truth:
     n = length(b)
     if n < 5:
         return false
-    at(b, n - 5) == 46 and at(b, n - 4) == 119 and at(b, n - 3) == 97 and at(b, n - 2) == 115 and at(b, n - 1) == 109
+    b[n - 5] is 46 and b[n - 4] is 119 and b[n - 3] is 97 and b[n - 2] is 115 and b[n - 1] is 109
 
 # Compile the AST straight to a .wasm module (bump-allocated linear memory,
 # i32 + f64, structs, lists, extern host imports) and write the bytes. A Text
 # is length-prefixed, so binary survives file_write untouched.
-define drv_emit_wasm(ast: table, out_path: text) -> int:
+define drv_emit_wasm(ast: table, out_path: text) -> number:
     errs_before = compile_errors()
-    wmodule = compile_program(get_list(ast, "decls"))
+    # `number` picks its representation here too. The pass lived inside the
+    # LLVM lowering, so this backend saw the word raw and did not know it -
+    # the whole conformance suite went to zero the moment the stdlib started
+    # writing it. One decision, both backends, or the word means two things.
+    wast = num_pass(ast)
+    wmodule = compile_program(get_list(wast, "decls"))
     wbytes = encode_module(wmodule)
     # Refuse to write invalid wasm: unsupported constructs report a compile
     # error during compile_program, same contract as the LLVM path.
@@ -773,7 +1096,7 @@ define drv_emit_wasm(ast: table, out_path: text) -> int:
         print_line(drv_green("  ok") + drv_dim("  {out_path}"))
     0
 
-public define driver_main() -> int:
+public define driver_main() -> number:
     if argc() < 2:
         print_line("usage: orion_self <input.or> [output.ll] [orb-root...]")
         0 - 1
@@ -781,12 +1104,12 @@ public define driver_main() -> int:
         in_path = argv(1)
         out_path = if argc() >= 3 then argv(2) else "out.ll"
         entry_src = file_read(in_path)
-        if entry_src == "":
+        if entry_src is "":
             print_line("orion: cannot read `{in_path}`")
             return 0 - 1
         base = drv_dirname(in_path)
         edit roots = []
-        loop ai in 3..<argc():
+        loop ai in 3 until argc():
             extra = argv(ai)
             if not drv_is_flag(extra):
                 roots = append(roots, "{extra}/")
@@ -798,9 +1121,17 @@ public define driver_main() -> int:
         src = drv_collect(entry_src, roots, in_path)
         # `--trace` (orbit debug): ast_fn_to_ir prefixes every define with a
         # call-trail entry. Communicated by slot, like drv:quiet.
-        loop flag_i in 1..<argc():
-            if argv(flag_i) == "--trace":
+        loop flag_i in 1 until argc():
+            if argv(flag_i) is "--trace":
                 slot_set("drv:trace", 1)
+        # `types`-laget: lowering skriver TYPEHINT rad:namn:typ for varje
+        # let utan typannotation - editorns spok-typer (code vision).
+        if out_path is "types":
+            slot_set("drv:typehints", 1)
+        # `refs`-laget: lowering skriver REF plats:namn:upplost for varje
+        # anrop - kompilatorbackade referenser (usages/rename-precision).
+        if out_path is "refs":
+            slot_set("drv:refs", 1)
         t0 = monotonic_ms()
         tokens = self_lex(src)
         t1 = monotonic_ms()
@@ -809,7 +1140,7 @@ public define driver_main() -> int:
         # (`area` -> `prog__area`) and drops the const declarations once it has
         # folded them, so asking it afterwards gives a tool the compiler's
         # internal names instead of the ones the user typed.
-        if out_path == "symbols":
+        if out_path is "symbols":
             return drv_symbols(ast)
         # `.wasm` output: compile straight to WebAssembly (own pipeline, no LLVM).
         if drv_wants_wasm(out_path):
@@ -817,7 +1148,7 @@ public define driver_main() -> int:
         t2 = monotonic_ms()
         module = ast_program_to_ir(ast)
         t3 = monotonic_ms()
-        if out_path == "facts":
+        if out_path is "facts":
             return drv_facts(module)
         # Enforce `deterministic fn` before emit: a violation is a compile
         # error, so the existing "no output on error" path below refuses to
@@ -851,12 +1182,14 @@ public define driver_main() -> int:
         # boundary decides evacuate-or-abort from a statically derived type
         # code, so the set of sites that CAN abort is a compile-time fact -
         # worth stating next to the timings rather than meeting in a crash.
-        if out_path == "memfacts":
+        if out_path is "types" or out_path is "refs":
+            return 0
+        if out_path is "memfacts":
             memfacts_list()
             print_line("  region scopes: opened and closed in the same function")
             print_line("")
             n_bad = drv_scope_check(module, 1)
-            if n_bad == 0:
+            if n_bad is 0:
                 print_line("    every region scope in this build is balanced")
             print_line("")
             return 0
@@ -872,7 +1205,7 @@ public define driver_main() -> int:
             0 - 1
         else:
             ok = file_write(out_path, llvm_text)
-            if ok == 1:
+            if ok is 1:
                 if not drv_want_quiet():
                     print_line(drv_green("  ok") + drv_dim("  {out_path}"))
                 0

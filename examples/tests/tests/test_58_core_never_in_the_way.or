@@ -1,0 +1,26 @@
+# `orbs/core` is in every program, so `Option`, `Result` and their four
+# variant names arrive without anyone asking. That is only acceptable if they
+# never take a name away. Three ways a program can claim one of them, and all
+# three win.
+type Maybe: Some(number), None(number)          # an enum of your own, same names
+type status: ok, busy                     # a lowercase variant `ok`
+
+define Err(msg: text) -> number:             # a function named like a variant
+    length(msg)
+
+define pick(m: Maybe) -> number:
+    choose m:
+        Some(v) then v                    # ours: carries one value
+        None(z) then z                    # ours: None carries one too
+
+define main() -> number:
+    a = pick(Maybe.Some(20))              # 20
+    b = pick(Maybe.None(2))               # 2
+    c = choose status.ok:
+        ok then 8                         # ours, not the core Ok
+        busy then 0
+    d = Err("abcdefg")                    # our function, not Result.Err
+    e = choose (if true then some(5) else none):
+        some(v) then v                    # the core ones, as a last resort
+        none then 0
+    a + b + c + d + e * 4 + 1             # 20+2+8+7+20+1 is 58

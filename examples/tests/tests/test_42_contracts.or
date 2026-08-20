@@ -1,10 +1,10 @@
 # require / ensure are runtime-checked. When the condition holds, execution
 # continues; a false condition traps (see test_70_require_fails). Previously
 # these parsed but were dropped silently - now they're enforced.
-define twice(x: int) -> int:
+define twice(x: number) -> number:
     require x > 0
     r = x * 2
     ensure r > x
     r
-define main() -> int:
+define main() -> number:
     twice(21)          # 42

@@ -1,0 +1,20 @@
+# `f32` is a REAL number, not a narrow one. Nothing in this backend is narrow -
+# every whole number is an i64 and every real one an f64 - and `f32` used to
+# fall through to the integer default, which made it a silent integer:
+# `a / 2.0` on an `f32` answered 4 for four and a half.
+#
+# Wider than asked is a value kept. Whole where a fraction belongs is a value
+# lost, and that is the difference this test holds.
+define half32(a: f32) -> f32:
+    a / 2.0
+
+define half64(a: f64) -> f64:
+    a / 2.0
+
+define main() -> number:
+    a = half32(9.0)     # 4.5, not 4
+    b = half64(9.0)     # 4.5
+
+    ok_a = if a > 4.4 and a < 4.6 then 22 else 0
+    ok_b = if b > 4.4 and b < 4.6 then 23 else 0
+    ok_a + ok_b

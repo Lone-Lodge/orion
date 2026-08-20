@@ -7,7 +7,7 @@
 use os
 use watch
 
-define main() -> int:
+define main() -> number:
     mkdir_all("dist/.watch/sub")
     mkdir_all("dist/.watch/build")
     # A previous run may have left the "new file" step behind - start clean.

@@ -2,51 +2,51 @@
 # a left-associative chain of text_concat (one allocation, not one per link).
 # Same bytes out - that is what this pins. It also covers the hand-rolled
 # int_to_text: zero, a negative sign, and a long multi-digit value.
-define main() -> int:
+define main() -> number:
     x = 1
     y = 2
     name = "orion"
     edit score = 0
 
     a = "a{x}b{y}c"
-    if a == "a1b2c":
+    if a is "a1b2c":
         score = score + 1
 
     b = "{name}-{name}-{name}"
-    if b == "orion-orion-orion":
+    if b is "orion-orion-orion":
         score = score + 1
 
     n = 0 - 7
     c = "n={n}!"
-    if c == "n=-7!":
+    if c is "n=-7!":
         score = score + 1
 
     z = 0
     d = "[{z}][{z}][{z}]"
-    if d == "[0][0][0]":
+    if d is "[0][0][0]":
         score = score + 1
 
     big = 1234567890123456789
     e = "v{big}v"
-    if e == "v1234567890123456789v":
+    if e is "v1234567890123456789v":
         score = score + 1
 
     # Escaped braces stay literal and still split the parts correctly.
     f = "\{{x}\}-{y}"
-    if f == "\{1\}-2":
+    if f is "\{1\}-2":
         score = score + 1
 
     # A bare hole is one part: still the same text, no join.
     g = "{name}"
-    if g == "orion":
+    if g is "orion":
         score = score + 1
 
     # A hole holding an expression, not just a name.
     h = "sum={x + y}/{x * y}."
-    if h == "sum=3/2.":
+    if h is "sum=3/2.":
         score = score + 1
 
-    if length(a) + length(c) == 5 + 5:
+    if length(a) + length(c) is 5 + 5:
         score = score + 1
 
-    if score == 9 then 42 else score
+    if score is 9 then 42 else score

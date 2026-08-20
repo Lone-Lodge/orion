@@ -32,29 +32,33 @@ external define orion_mic_close()
 # Start capturing at `rate` samples a second, mono. false means there is
 # no capture device - run silent rather than refusing to start.
 # no example: needs a live capture device - proven by tools/mic_test.sh
-public define mic_open(rate: int) -> truth = orion_mic_open(rate) is 1
+public define mic_open(rate: number) -> truth = orion_mic_open(rate) is 1
 
-# Loudness right now, 0 to 1000 (rms). Quiet room sits near 0, speech
-# lands well above 20. This is the cheap way to ask "is anyone talking"
-# without touching a single sample.
+# Loudness right now, 0 to 1000, scaled for VOICE rather than full scale.
+#
+# Speech into a desktop mic is around 0.01-0.1 rms and a quiet room around
+# 0.0005, so 0.1 rms maps to 1000: normal talking lands in the hundreds and
+# room noise sits near 5. Scaling full-scale to 1000 instead would truncate
+# every real signal to zero. This is the cheap way to ask "is anyone
+# talking" without touching a single sample.
 # no example: reads a live device - proven by tools/mic_test.sh
-public define mic_level() -> int = orion_mic_level()
+public define mic_level() -> number = orion_mic_level()
 
 # no example: reads a live device - proven by tools/mic_test.sh
-public define mic_hearing(threshold: int) -> truth = orion_mic_level() > threshold
+public define mic_hearing(threshold: number) -> truth = orion_mic_level() > threshold
 
 # Frames waiting in the ring. Divide by mic_rate() for seconds.
 # no example: reads a live device - proven by tools/mic_test.sh
-public define mic_buffered() -> int = orion_mic_buffered()
+public define mic_buffered() -> number = orion_mic_buffered()
 
 # The rate capture actually runs at, or 0 when closed.
 # no example: reads a live device - proven by tools/mic_test.sh
-public define mic_rate() -> int = orion_mic_rate()
+public define mic_rate() -> number = orion_mic_rate()
 
 # How many seconds are waiting. Whole seconds - for a VAD you want
 # mic_buffered() and the rate, not this.
 # no example: reads a live device - proven by tools/mic_test.sh
-public define mic_seconds() -> int:
+public define mic_seconds() -> number:
     rate = orion_mic_rate()
     if rate is 0 then 0 else orion_mic_buffered() // rate
 
@@ -67,7 +71,7 @@ public define mic_seconds() -> int:
 # wav anyway, orion_audio_load included - which is what lets a test
 # record and then play back what it recorded.
 # no example: writes a file from a live device - proven by tools/mic_test.sh
-public define mic_take_wav(path: text) -> int uses files = orion_mic_take_wav(path)
+public define mic_take_wav(path: text) -> number uses files = orion_mic_take_wav(path)
 
 # no example: releases a live device - proven by tools/mic_test.sh
 public define mic_close():

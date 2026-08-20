@@ -1,12 +1,21 @@
-// Subset a TrueType font to ASCII 32..126 (plus .notdef and every
-// composite component those letters pull in). The engine embeds its
-// faces into every game binary, and the wasm backend pays per byte -
-// a full family ships thousands of glyphs the sketches can never say.
+// Subset a TrueType font to the letters a UI actually says (plus .notdef
+// and every composite component those letters pull in). The engine embeds
+// its faces into every game binary, and the wasm backend pays per byte - a
+// full family ships thousands of glyphs the sketches can never say.
 //
 //   node subset_font.js <in.ttf> <out.ttf>
 //
-// Keeps exactly the tables the typeface orb reads (head, maxp, cmap,
-// loca, glyf, hhea, hmtx), long loca, one format-4 cmap subtable.
+// ASCII is not enough. A subset that stops at 126 measures "Innehåll" with
+// three missing glyphs, and then the layout is wrong in every language but
+// English - quietly, because a missing glyph still has a width. Latin-1 and
+// a handful of typographic marks cover every language this UI is written
+// in today and cost about three kilobytes.
+//
+// Keeps the tables the typeface orb reads (head, maxp, cmap, loca, glyf,
+// hhea, hmtx) AND the three a browser insists on before it will load a
+// face at all (OS/2, name, post). Without them Chrome says "OTS parsing
+// error: OS/2: missing required table" and silently draws in some other
+// face - so the layout is measured in one face and painted in another.
 'use strict';
 const fs = require('fs');
 const src = fs.readFileSync(process.argv[2]);
@@ -49,9 +58,23 @@ function gidOf(cp) {
 const locaOff = g => locFmt === 1 ? u32(src, loca + g * 4) : u16(src, loca + g * 2) * 2;
 
 // Glyph set: .notdef, every ASCII glyph, and composite components (recursively).
+const RANGES = [
+  [0x20, 0x7E],      // ASCII
+  [0xA0, 0xFF],      // Latin-1: åäöÅÄÖ, the accents, the degree and the times sign
+  [0x2013, 0x2014],  // en dash, em dash
+  [0x2018, 0x201D],  // the curly quotes
+  [0x2022, 0x2022],  // bullet
+  [0x2026, 0x2026],  // ellipsis
+];
 const keep = new Set([0]);
 const cpToGid = {};
-for (let cp = 32; cp <= 126; cp++) { const g = gidOf(cp); cpToGid[cp] = g; keep.add(g); }
+const cps = [];
+for (const [lo, hi] of RANGES)
+  for (let cp = lo; cp <= hi; cp++) {
+    const g = gidOf(cp);
+    if (!g) continue;                 // the face does not have it; nothing to keep
+    cpToGid[cp] = g; keep.add(g); cps.push(cp);
+  }
 const queue = [...keep];
 while (queue.length) {
   const g = queue.pop();
@@ -110,25 +133,48 @@ oldGids.forEach((g, i) => {
   hmtxOut.writeInt16BE(g < nH ? i16(src, hmtx + g * 4 + 2) : i16(src, hmtx + nH * 4 + (g - nH) * 2), i * 4 + 2);
 });
 
-// cmap: one format-4 subtable, one segment 32..126 via glyphIdArray, plus 0xFFFF.
-const segs = 2, glyphIds = [];
-for (let cp = 32; cp <= 126; cp++) glyphIds.push(newGid.get(cpToGid[cp]));
+// cmap: one format-4 subtable. Runs of consecutive codepoints become
+// segments; every segment reads its glyphs out of one shared glyphIdArray,
+// so a gap in the face costs a segment and nothing else.
+const runs = [];
+for (const cp of cps) {
+  const back = runs[runs.length - 1];
+  if (back && cp === back[1] + 1) back[1] = cp; else runs.push([cp, cp]);
+}
+const glyphIds = [];
+const bases = runs.map(([lo, hi]) => {
+  const at = glyphIds.length;
+  for (let cp = lo; cp <= hi; cp++) glyphIds.push(newGid.get(cpToGid[cp]));
+  return at;
+});
+const segs = runs.length + 1;                      // plus the 0xFFFF sentinel
 const subLen = 16 + segs * 8 + glyphIds.length * 2;
 const cmapOut = Buffer.alloc(12 + subLen);
 cmapOut.writeUInt16BE(0, 0); cmapOut.writeUInt16BE(1, 2);
 cmapOut.writeUInt16BE(3, 4); cmapOut.writeUInt16BE(1, 6); cmapOut.writeUInt32BE(12, 8);
-let o = 12;
+const o = 12;
 cmapOut.writeUInt16BE(4, o); cmapOut.writeUInt16BE(subLen, o + 2); cmapOut.writeUInt16BE(0, o + 4);
 const segX2 = segs * 2;
 cmapOut.writeUInt16BE(segX2, o + 6);
-cmapOut.writeUInt16BE(2, o + 8); cmapOut.writeUInt16BE(0, o + 10); cmapOut.writeUInt16BE(0, o + 12);
+const pow2 = 2 ** Math.floor(Math.log2(segs));
+cmapOut.writeUInt16BE(pow2 * 2, o + 8);
+cmapOut.writeUInt16BE(Math.log2(pow2), o + 10);
+cmapOut.writeUInt16BE(segX2 - pow2 * 2, o + 12);
 const endBase = o + 14, startBase = endBase + segX2 + 2, deltaBase = startBase + segX2, roBase = deltaBase + segX2;
-cmapOut.writeUInt16BE(126, endBase); cmapOut.writeUInt16BE(0xFFFF, endBase + 2);
-cmapOut.writeUInt16BE(32, startBase); cmapOut.writeUInt16BE(0xFFFF, startBase + 2);
-cmapOut.writeInt16BE(0, deltaBase); cmapOut.writeInt16BE(1, deltaBase + 2);
-cmapOut.writeUInt16BE(4, roBase); // to glyphIdArray right after the two ro slots
-cmapOut.writeUInt16BE(0, roBase + 2);
-glyphIds.forEach((g, i) => cmapOut.writeUInt16BE(g, roBase + 4 + i * 2));
+runs.forEach(([lo, hi], i) => {
+  cmapOut.writeUInt16BE(hi, endBase + i * 2);
+  cmapOut.writeUInt16BE(lo, startBase + i * 2);
+  cmapOut.writeInt16BE(0, deltaBase + i * 2);
+  // Where this segment's glyph ids sit, measured from this very slot -
+  // which is what makes idRangeOffset the one field nobody gets right.
+  cmapOut.writeUInt16BE(2 * (segs - i + bases[i]), roBase + i * 2);
+});
+const last = runs.length;
+cmapOut.writeUInt16BE(0xFFFF, endBase + last * 2);
+cmapOut.writeUInt16BE(0xFFFF, startBase + last * 2);
+cmapOut.writeInt16BE(1, deltaBase + last * 2);
+cmapOut.writeUInt16BE(0, roBase + last * 2);
+glyphIds.forEach((g, i) => cmapOut.writeUInt16BE(g, roBase + segs * 2 + i * 2));
 
 // head/maxp/hhea: patched copies.
 const headOut = Buffer.from(src.subarray(head, head + tables.head.len));
@@ -139,8 +185,31 @@ maxpOut.writeUInt16BE(oldGids.length, 4);
 const hheaOut = Buffer.from(src.subarray(hhea, hhea + tables.hhea.len));
 hheaOut.writeUInt16BE(oldGids.length, 34);
 
-// sfnt assembly: 7 tables, directory + padded bodies, plain checksums.
-const out = [['cmap', cmapOut], ['glyf', glyfOut], ['head', headOut], ['hhea', hheaOut], ['hmtx', hmtxOut], ['loca', locaOut], ['maxp', maxpOut]];
+// The three a browser insists on. OS/2 and name are the source's own - it
+// is the same face, so its own metrics and its own name are the honest
+// answer. post is written fresh as version 3.0: thirty-two bytes that say
+// "no glyph names", instead of the thirty-two kilobytes of names nobody
+// here reads.
+const os2Out = tables['OS/2'] ? Buffer.from(src.subarray(tables['OS/2'].off, tables['OS/2'].off + tables['OS/2'].len)) : null;
+if (os2Out) {
+  os2Out.writeUInt16BE(cps[0], 64);                       // usFirstCharIndex
+  os2Out.writeUInt16BE(Math.min(0xFFFF, cps[cps.length - 1]), 66);  // usLastCharIndex
+}
+const nameOut = tables.name ? Buffer.from(src.subarray(tables.name.off, tables.name.off + tables.name.len)) : null;
+const postOut = Buffer.alloc(32);
+postOut.writeUInt32BE(0x00030000, 0);
+if (tables.post) {
+  postOut.writeInt32BE(src.readInt32BE(tables.post.off + 4), 4);    // italicAngle
+  postOut.writeInt16BE(i16(src, tables.post.off + 8), 8);           // underlinePosition
+  postOut.writeInt16BE(i16(src, tables.post.off + 10), 10);         // underlineThickness
+}
+
+// sfnt assembly: directory + padded bodies, plain checksums. The directory
+// is sorted by tag, which is what the format asks for and what a browser
+// checks.
+const out = [['OS/2', os2Out], ['cmap', cmapOut], ['glyf', glyfOut], ['head', headOut], ['hhea', hheaOut],
+             ['hmtx', hmtxOut], ['loca', locaOut], ['maxp', maxpOut], ['name', nameOut], ['post', postOut]]
+            .filter(([, buf]) => buf).sort((a, b) => (a[0] < b[0] ? -1 : 1));
 const dir = Buffer.alloc(12 + out.length * 16);
 dir.writeUInt32BE(0x00010000, 0);
 dir.writeUInt16BE(out.length, 4);

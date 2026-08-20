@@ -2,16 +2,16 @@
 # Exercises every syntactic construct used in orbs/.
 # DO NOT hand-edit - regenerate with the script.
 
-type SumStatus: Ok(int), Err(int)
-type CovObj: field: int, name: text
+type SumStatus: Ok(number), Err(number)
+type CovObj: field: number, name: text
 
-define double_int(x: int) -> int:
+define double_int(x: number) -> number:
     x + x
 
 define label_for(name: text) -> text:
     "n={name}"
 
-define main() -> int:
+define main() -> number:
     obj = CovObj{field: 21, name: "alpha"}
     val = 21
     edit total = 0
@@ -31,36 +31,36 @@ define main() -> int:
 
     # ─── control flow ───────────────────────────────────────────────
     edit sum_range = 0
-    loop index in 0..<5:
+    loop index in 0 until 5:
         sum_range = sum_range + index
-    if sum_range == 10: total = total + 1
+    if sum_range is 10: total = total + 1
 
     items = [1, 2, 3, 4]
     edit sum_list = 0
     loop item in items:
         sum_list = sum_list + item
-    if sum_list == 10: total = total + 1
+    if sum_list is 10: total = total + 1
 
     # inline if-then-else
     parity = if val > 0 then 1 else 0
-    if parity == 1: total = total + 1
+    if parity is 1: total = total + 1
 
     # match expression - int patterns + int branches.
     # (text-branch match has a known bug; tracked separately.)
     kind_val = 2
     kind_num = choose kind_val:
-        1 -> 100
-        2 -> 200
-        _ -> 0
-    if kind_num == 200: total = total + 1
+        1 then 100
+        2 then 200
+        _ then 0
+    if kind_num is 200: total = total + 1
 
     # loop + break
     edit counter = 0
     loop:
         counter = counter + 1
-        if counter == 3:
+        if counter is 3:
             break
-    if counter == 3: total = total + 1
+    if counter is 3: total = total + 1
 
     # neg literal + unary
     neg_val = -7
@@ -71,38 +71,38 @@ define main() -> int:
     pt1 = CovObj{field: 5, name: "p"}
     pt2 = CovObj{field: 7, name: "p"}
     pair_a = pt1.field + pt2.field
-    if pair_a == 12: total = total + 1
+    if pair_a is 12: total = total + 1
 
     # multi-arg call w/ mixed types
     label_mix = label_for("bob")
-    if label_mix == "n=bob": total = total + 1
+    if label_mix is "n=bob": total = total + 1
 
     # text concat via interp
     s = "hi"
     msg_concat = "{s}-{s}"
-    if msg_concat == "hi-hi": total = total + 1
+    if msg_concat is "hi-hi": total = total + 1
 
     # compound assign +=
     edit counter = 0
     counter += 3
     counter += 4
-    if counter == 7: total = total + 1
+    if counter is 7: total = total + 1
 
     # match as expression w/ TEXT branches (was a bug we just fixed)
     sig = choose neg_val:
-        0 -> "zero"
-        _ -> "nonzero"
-    if sig == "nonzero": total = total + 1
+        0 then "zero"
+        _ then "nonzero"
+    if sig is "nonzero": total = total + 1
 
     # Sum types with payloads - constructor + match destructuring
     res = SumStatus.Ok(99)
     sum_val = choose res:
-        Ok(v) -> v
-        Err(_) -> 0
-    if sum_val == 99: total = total + 1
+        Ok(v) then v
+        Err(_) then 0
+    if sum_val is 99: total = total + 1
 
     # 17 categories - must ALL pass.
-    if total == 17:
+    if total is 17:
         42
     else:
         0 - total

@@ -2,7 +2,7 @@
 # `type Tile: Empty, Wall` is the sum form now.
 enum Tile: Empty, Wall
 
-define main() -> int:
+define main() -> number:
     choose Tile.Wall:
-        Empty -> 0
-        Wall -> 1
+        Empty then 0
+        Wall then 1

@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     # set on maps (returns the map, value-semantics call style)
     edit m = {"a": 1}
     m = set(m, "b", 2)
@@ -13,13 +13,13 @@ define main() -> int:
     # map_keys / map_values
     ks = map_keys(m)
     print_line(length(ks))
-    print_line(at(ks, 0))
+    print_line(ks[0])
     vs = map_values(m)
-    print_line(at(vs, 1))
+    print_line(vs[1])
     # set on lists
     edit xs = [1, 2, 3]
     xs = set(xs, 1, 42)
-    print_line(at(xs, 1))
+    print_line(xs[1])
     # float interpolation + to_text(float)
     speed = 2.5
     print_line("speed is {speed} units")

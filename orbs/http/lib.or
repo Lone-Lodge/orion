@@ -12,7 +12,7 @@ use os
 use text
 
 type response:
-    status: int
+    status: number
     body: text
 
 # The scratch file curl writes the body to. Per-call unique via the slot
@@ -26,17 +26,17 @@ define scratch_path() -> text:
 # dump is a file of its own, so a stray stderr line can never corrupt it.
 # With redirects (-L) the dump holds one block per hop - the LAST status
 # line is the answer.
-public define status_from_headers(header_dump: text) -> int:
+public define status_from_headers(header_dump: text) -> number:
     example status_from_headers("HTTP/1.1 200 OK") is 200
     example status_from_headers("garbage") is 0
     rows = lines(header_dump)
     edit status = 0
     loop i in 0 until length(rows):
-        row = trim(at(rows, i))
+        row = trim(rows[i])
         if starts_with(row, "HTTP/"):
             parts = split(row, " ")
             if length(parts) >= 2:
-                status = int_from_text(at(parts, 1))
+                status = int_from_text(parts[1])
     status
 
 # Run curl with `args`, reading the body from `body_file`. Status 0 means
@@ -46,7 +46,7 @@ define run_curl(args: [text], body_file: text) -> response:
     log_file = "{body_file}.log"
     edit all_args = ["-sS", "--max-time", "60", "-L", "-o", body_file, "-D", hdr_file]
     loop i in 0 until length(args):
-        all_args = append(all_args, at(args, i))
+        all_args = append(all_args, args[i])
     job = start_command_to_file("curl", all_args, log_file)
     if job < 0:
         return response{status: 0, body: ""}

@@ -20,5 +20,5 @@ handle Log.msg(text: text) -> text:
 handle Log.msg(text: text) -> text:
     resume("ok")
 
-define main() -> int:
+define main() -> number:
     1

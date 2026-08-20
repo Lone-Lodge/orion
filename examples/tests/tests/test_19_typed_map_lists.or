@@ -1,6 +1,6 @@
 # Reading a list out of a Map, with its element type intact.
 #
-# A `Map` holds anything, so `get_list(m, k)` has to assume ONE element type and
+# A `table` holds anything, so `get_list(m, k)` has to assume ONE element type and
 # it assumes `map` - right for walking an AST, silently wrong for a list of
 # texts: `len` on an element lowered to a MAP length and returned a wrong number
 # with no error. The annotation `ys: [text] = get_list(m, k)` fixes it, but the
@@ -9,21 +9,21 @@
 # `get_text_list` / `get_int_list` are the same lowering with the element type
 # stated. Nothing changes at runtime (every slot is a 64-bit word); the compiler
 # just stops guessing.
-define main() -> int:
+define main() -> number:
     m = {"words": ["ab", "cdef"], "nums": [7, 8, 9]}
 
     w = get_text_list(m, "words")
-    first_len = length(at(w, 0))        # 2 - a text, so text length
-    second_len = length(at(w, 1))       # 4
+    first_len = length(w[0])        # 2 - a text, so text length
+    second_len = length(w[1])       # 4
 
     n = get_int_list(m, "nums")
-    third = at(n, 2)                 # 9 - an int stays an int
+    third = n[2]                 # 9 - an int stays an int
 
     # The annotation route still works, and agrees.
     ann: [text] = get_list(m, "words")
-    ann_len = length(at(ann, 1))        # 4
+    ann_len = length(ann[1])        # 4
 
     # A missing key is an empty list, not a crash.
     missing = length(get_text_list(m, "nope"))
 
-    first_len + second_len + third + ann_len - missing   # 2 + 4 + 9 + 4 - 0 == 19
+    first_len + second_len + third + ann_len - missing   # 2 + 4 + 9 + 4 - 0 is 19

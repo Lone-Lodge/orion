@@ -21,43 +21,43 @@ define parse_grid(csv: text) -> [[text]]:
     grid
 
 # Width of each column = the widest cell in it.
-define column_widths(grid: [[text]], ncols: int) -> [int]:
+define column_widths(grid: [[text]], ncols: number) -> [number]:
     edit widths = []
-    loop ci in 0..<ncols:
+    loop ci in 0 until ncols:
         edit w = 0
         loop row in grid:
-            cw = byte_count(at(row, ci))
+            cw = byte_count(row[ci])
             if cw > w:
                 w = cw
         widths = append(widths, w)
     widths
 
-define main() -> int:
+define main() -> number:
     csv = "fruit, qty, price\napple, 15, 30\nbanana, 20, 10\ncherry, 7, 100"
 
     grid = parse_grid(csv)
-    ncols = length(at(grid, 0))
+    ncols = length(grid[0])
     widths = column_widths(grid, ncols)
 
     # Print every row with each cell padded to its column width.
     edit ri = 0
     loop row in grid:
         edit parts = []
-        loop ci in 0..<ncols:
-            parts = append(parts, pad_right(at(row, ci), at(widths, ci), " "))
+        loop ci in 0 until ncols:
+            parts = append(parts, pad_right(row[ci], widths[ci], " "))
         print_line(join(parts, " | "))
         # a rule under the header
-        if ri == 0:
+        if ri is 0:
             edit rule = []
-            loop ci in 0..<ncols:
-                rule = append(rule, repeat("-", at(widths, ci)))
+            loop ci in 0 until ncols:
+                rule = append(rule, repeat("-", widths[ci]))
             print_line(join(rule, "-+-"))
         ri = ri + 1
 
     # Total the `qty` column (index 1), skipping the header row.
     edit total = 0
-    loop di in 1..<length(grid):
-        total = total + parse(at(at(grid, di), 1))
+    loop di in 1 until length(grid):
+        total = total + parse(grid[di][1])
     print_line("")
     print_line("total qty = {total}")
 

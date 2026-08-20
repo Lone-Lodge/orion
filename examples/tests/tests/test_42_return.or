@@ -1,9 +1,9 @@
-define find_first(target: int) -> int:
+define find_first(target: number) -> number:
     nums = [10, 42, 99, 7]
     loop x in nums:
-        if x == target:
+        if x is target:
             return x
     return 0 - 1
 
-define main() -> int:
+define main() -> number:
     find_first(42)

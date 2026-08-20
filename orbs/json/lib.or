@@ -1,8 +1,8 @@
 # json - parse and build JSON. Written for the language server, which speaks
 # JSON-RPC over a pipe, but there is nothing LSP-specific here.
 #
-# Values map onto Orion's own dynamic shapes: an object is a `Map`, an array is
-# a list, a string is `Text`, a number and a bool are ints, null is 0. That is
+# Values map onto Orion's own dynamic shapes: an object is a `table`, an array is
+# a list, a string is `text`, a number and a bool are ints, null is 0. That is
 # exactly how the compiler's own AST is carried around, so nothing new is
 # needed to hold a parsed document.
 #
@@ -15,13 +15,13 @@
 
 # --- scanning helpers ---
 
-define jsn_ws(b: [int], start: int) -> int:
+define jsn_ws(b: [number], start: number) -> number:
     n = length(b)
     edit i = start
     loop:
         if i >= n:
             break
-        c = at(b, i)
+        c = b[i]
         # space, tab, newline, carriage return
         if c is 32 or c is 9 or c is 10 or c is 13:
             i = i + 1
@@ -30,13 +30,13 @@ define jsn_ws(b: [int], start: int) -> int:
     i
 
 # Index just past the string that starts at the opening quote `start`.
-define jsn_str_end(b: [int], start: int) -> int:
+define jsn_str_end(b: [number], start: number) -> number:
     n = length(b)
     edit i = start + 1
     loop:
         if i >= n:
             break
-        c = at(b, i)
+        c = b[i]
         if c is 92:
             i = i + 2
         else:
@@ -46,19 +46,19 @@ define jsn_str_end(b: [int], start: int) -> int:
             i = i + 1
     i
 
-define jsn_has_escape(b: [int], from: int, to: int) -> truth:
+define jsn_has_escape(b: [number], from: number, to: number) -> truth:
     edit found = false
     edit i = from
     loop:
         if i >= to:
             break
-        if at(b, i) is 92:
+        if b[i] is 92:
             found = true
             break
         i = i + 1
     found
 
-define jsn_hex_val(c: int) -> int:
+define jsn_hex_val(c: number) -> number:
     if c >= 48 and c <= 57:
         c - 48
     else:
@@ -73,13 +73,13 @@ define jsn_hex_val(c: int) -> int:
 # The bytes between the quotes, with escapes resolved. `\uXXXX` is encoded as
 # UTF-8 (the BMP range; a surrogate pair is passed through as replacement
 # bytes rather than silently truncating the document).
-define jsn_unescape(b: [int], from: int, to: int) -> text:
+define jsn_unescape(b: [number], from: number, to: number) -> text:
     edit out = part([0], 0, 0)
     edit i = from
     loop:
         if i >= to:
             break
-        c = at(b, i)
+        c = b[i]
         if c is not 92:
             out = append(out, c)
             i = i + 1
@@ -87,7 +87,7 @@ define jsn_unescape(b: [int], from: int, to: int) -> text:
             if i + 1 >= to:
                 i = i + 1
             else:
-                e = at(b, i + 1)
+                e = b[i + 1]
                 i = i + 2
                 if e is 110:
                     out = append(out, 10)
@@ -107,7 +107,7 @@ define jsn_unescape(b: [int], from: int, to: int) -> text:
                     out = append(out, 47)
                 if e is 117:
                     if i + 3 < to:
-                        cp = jsn_hex_val(at(b, i)) * 4096 + jsn_hex_val(at(b, i + 1)) * 256 + jsn_hex_val(at(b, i + 2)) * 16 + jsn_hex_val(at(b, i + 3))
+                        cp = jsn_hex_val(b[i]) * 4096 + jsn_hex_val(b[i + 1]) * 256 + jsn_hex_val(b[i + 2]) * 16 + jsn_hex_val(b[i + 3])
                         i = i + 4
                         if cp < 128:
                             out = append(out, cp)
@@ -128,13 +128,13 @@ define jsn_unescape(b: [int], from: int, to: int) -> text:
 # Every parser returns {"v": value, "i": index-just-past}. The caller knows
 # which shape it asked for and reads "v" with the matching typed getter.
 
-define jsn_value(b: [int], start: int) -> table:
+define jsn_value(b: [number], start: number) -> table:
     i = jsn_ws(b, start)
     n = length(b)
     if i >= n:
         {"v": 0, "i": i}
     else:
-        c = at(b, i)
+        c = b[i]
         if c is 123:
             jsn_object(b, i)
         else:
@@ -159,18 +159,18 @@ define jsn_value(b: [int], start: int) -> table:
                             else:
                                 jsn_number(b, i)
 
-define jsn_number(b: [int], start: int) -> table:
+define jsn_number(b: [number], start: number) -> table:
     n = length(b)
     edit i = start
     edit neg = false
-    if at(b, i) is 45:
+    if b[i] is 45:
         neg = true
         i = i + 1
     edit v = 0
     loop:
         if i >= n:
             break
-        c = at(b, i)
+        c = b[i]
         if c >= 48 and c <= 57:
             v = v * 10 + (c - 48)
             i = i + 1
@@ -182,7 +182,7 @@ define jsn_number(b: [int], start: int) -> table:
     loop:
         if i >= n:
             break
-        c2 = at(b, i)
+        c2 = b[i]
         if c2 is 46 or c2 is 101 or c2 is 69 or c2 is 43 or (c2 >= 48 and c2 <= 57):
             i = i + 1
         else:
@@ -192,7 +192,7 @@ define jsn_number(b: [int], start: int) -> table:
                 break
     {"v": if neg then 0 - v else v, "i": i}
 
-define jsn_object(b: [int], start: int) -> table:
+define jsn_object(b: [number], start: number) -> table:
     n = length(b)
     edit out = {}
     edit i = start + 1
@@ -200,7 +200,7 @@ define jsn_object(b: [int], start: int) -> table:
         i = jsn_ws(b, i)
         if i >= n:
             break
-        c = at(b, i)
+        c = b[i]
         if c is 125:
             i = i + 1
             break
@@ -214,14 +214,14 @@ define jsn_object(b: [int], start: int) -> table:
         key = text_of(bytes_part(b, i + 1, key_end - 1))
         i = jsn_ws(b, key_end)
         if i < n:
-            if at(b, i) is 58:
+            if b[i] is 58:
                 i = i + 1
         vr = jsn_value(b, i)
         out = set(out, key, get(vr, "v"))
         i = get_int(vr, "i")
     {"v": out, "i": i}
 
-define jsn_array(b: [int], start: int) -> table:
+define jsn_array(b: [number], start: number) -> table:
     n = length(b)
     edit items = []
     edit i = start + 1
@@ -229,7 +229,7 @@ define jsn_array(b: [int], start: int) -> table:
         i = jsn_ws(b, i)
         if i >= n:
             break
-        c = at(b, i)
+        c = b[i]
         if c is 93:
             i = i + 1
             break
@@ -257,7 +257,7 @@ public define json_text(o: table, key: text) -> text:
     example json_text(json_parse("\{\"s\": \"hi\"\}"), "s") is "hi"
     if has(o, key) then get(o, key) else ""
 
-public define json_int(o: table, key: text) -> int:
+public define json_int(o: table, key: text) -> number:
     example json_int(json_parse("\{\"n\": 7\}"), "n") is 7
     if has(o, key) then get_int(o, key) else 0
 
@@ -277,7 +277,7 @@ public define json_escape(s: text) -> text:
     n = length(b)
     edit out = part([0], 0, 0)
     loop i in 0 until n:
-        c = at(b, i)
+        c = b[i]
         if c is 34:
             out = append(out, 92)
             out = append(out, 34)
@@ -306,8 +306,8 @@ public define json_escape(s: text) -> text:
                                 out = append(out, 117)
                                 out = append(out, 48)
                                 out = append(out, 48)
-                                out = append(out, at(hb, c // 16))
-                                out = append(out, at(hb, c - (c // 16) * 16))
+                                out = append(out, hb[c // 16])
+                                out = append(out, hb[c - (c // 16) * 16])
                             else:
                                 out = append(out, c)
     text_of(out)
@@ -321,8 +321,8 @@ public define json_escape(s: text) -> text:
 
 type Json:
     JNull
-    JBool(int)                 # 0 = false, anything else = true
-    JInt(int)
+    JBool(number)                 # 0 = false, anything else = true
+    JInt(number)
     JFloat(float)
     JStr(text)
     JArr([Json])
@@ -331,10 +331,10 @@ type Json:
 public define jnull() -> Json:
     example json_stringify(jnull()) is "null"
     Json.JNull
-public define jbool(b: int) -> Json:
+public define jbool(b: number) -> Json:
     example json_stringify(jbool(1)) is "true"
     Json.JBool(b)
-public define jint(n: int) -> Json:
+public define jint(n: number) -> Json:
     example json_stringify(jint(0 - 5)) is "-5"
     Json.JInt(n)
 public define jfloat(x: float) -> Json:
@@ -355,13 +355,13 @@ public define json_stringify(j: Json) -> text:
     example json_stringify(jint(42)) is "42"
     example json_stringify(jarr([jint(1), jint(2)])) is "[1,2]"
     choose j:
-        JNull -> "null"
-        JBool(b) -> if b is 0 then "false" else "true"
-        JInt(n) -> "{n}"
-        JFloat(x) -> "{x}"
-        JStr(s) -> jsn_quote(s)
-        JArr(items) -> jsn_arr_text(items)
-        JObj(keys, vals) -> jsn_obj_text(keys, vals)
+        JNull then "null"
+        JBool(b) then if b is 0 then "false" else "true"
+        JInt(n) then "{n}"
+        JFloat(x) then "{x}"
+        JStr(s) then jsn_quote(s)
+        JArr(items) then jsn_arr_text(items)
+        JObj(keys, vals) then jsn_obj_text(keys, vals)
 
 # A JSON string literal: escaped and wrapped in double quotes.
 define jsn_quote(s: text) -> text:
@@ -373,7 +373,7 @@ define jsn_arr_text(items: [Json]) -> text:
     loop i in 0 until length(items):
         if i > 0:
             out = "{out},"
-        out = "{out}{json_stringify(at(items, i))}"
+        out = "{out}{json_stringify(items[i])}"
     "{out}]"
 
 define jsn_obj_text(keys: [text], vals: [Json]) -> text:
@@ -384,5 +384,5 @@ define jsn_obj_text(keys: [text], vals: [Json]) -> text:
     loop i in 0 until n:
         if i > 0:
             out = "{out},"
-        out = "{out}{jsn_quote(at(keys, i))}:{json_stringify(at(vals, i))}"
+        out = "{out}{jsn_quote(keys[i])}:{json_stringify(vals[i])}"
     "{out}{rb}"

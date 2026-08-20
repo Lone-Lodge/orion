@@ -11,7 +11,7 @@ use async
 
 # A child that sleeps about `seconds`, output to `log`. ping is the portable
 # Windows sleep (n pings a second apart); POSIX has a real one.
-define sleep_job(log: text, seconds: int) -> int:
+define sleep_job(log: text, seconds: number) -> number:
     if os_kind() is 0:
         return start_command_to_file("ping", ["-n", "{seconds + 1}", "127.0.0.1"], log)
     start_command_to_file("sleep", ["{seconds}"], log)
@@ -19,13 +19,13 @@ define sleep_job(log: text, seconds: int) -> int:
 # A child whose only job is to exit with `code`. On Windows a tiny batch
 # file, because a QUOTED `cmd /c "exit 7"` trips cmd's quote-stripping rule
 # (the same trap capture() documents) - a .bat runs clean via CreateProcess.
-define exit_job(code: int) -> int:
+define exit_job(code: number) -> number:
     if os_kind() is 0:
         wrote = write_file(".proc_exit.bat", "@exit /b {code}")
         return start_command("./.proc_exit.bat", [])
     start_command("sh", ["-c", "exit {code}"])
 
-define sleeper(n: int) -> int:
+define sleeper(n: number) -> number:
     job = sleep_job(".proc_sleep_{n}.txt", 1)
     if job < 0:
         return 0 - 1
@@ -33,7 +33,7 @@ define sleeper(n: int) -> int:
         return 0 - 2
     command_result(job)
 
-define main() -> int:
+define main() -> number:
     start = monotonic_ms()
     t1 = spawn(sleeper, 1)
     t2 = spawn(sleeper, 2)

@@ -1,7 +1,7 @@
 # A closure capturing a NON-int value (a Text). The env list is i64, so the
 # capture is stored ptr-as-int; its type-code is recorded at make_closure and
 # the prologue re-types it on read, so length() works. length("hello") + 3 = 8.
-define main() -> int:
+define main() -> number:
     s = "hello"
     f = function(n): length(s) + n
     f(3)

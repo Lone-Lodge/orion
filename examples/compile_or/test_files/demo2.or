@@ -1,9 +1,9 @@
-define double(x: int) -> int:
+define double(x: number) -> number:
     x + x
 
 define id<T>(x: T) -> T:
     x
 
-define main() -> int:
+define main() -> number:
     a = id(21)
     double(a)

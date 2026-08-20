@@ -8,13 +8,13 @@ effect Random:
 effect Log:
     msg: function(text: text) -> text
 
-handle Random.roll(max: int) -> int:
+handle Random.roll(max: number) -> number:
     resume(max // 5)
 
 handle Log.msg(message: text) -> text:
     resume("ok")
 
-define main() -> int:
+define main() -> number:
     r = perform Random.roll(100)     # 20
     s = perform Log.msg("hello")     # "ok"
-    r + length(s) * 11                  # 20 + 2*11 == 42
+    r + length(s) * 11                  # 20 + 2*11 is 42

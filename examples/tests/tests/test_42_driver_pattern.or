@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     # Mirror what orion_driver.or does, except hardcoded paths.
     if argc() < 1:
         99
@@ -12,9 +12,9 @@ define main() -> int:
         # is always there by the time a test runs.
         out_path = "dist/driver_roundtrip.tmp"
         ok = file_write(out_path, "marker-42")
-        if ok == 1:
+        if ok is 1:
             content = file_read(out_path)
-            if content == "marker-42":
+            if content is "marker-42":
                 42
             else:
                 88

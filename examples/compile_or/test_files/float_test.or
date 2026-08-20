@@ -1,7 +1,7 @@
 define scale(v: float, factor: float) -> float:
     v * factor
 
-define main() -> int:
+define main() -> number:
     a = 0.1
     b = 0.2
     sum = a + b
@@ -15,7 +15,7 @@ define main() -> int:
     big = to_real(7)
     print_line(big)
     edit acc = 0.0
-    loop i in 0..<4:
+    loop i in 0 until 4:
         acc = acc + 0.25
     print_line(acc)
     if sum > 0.3 or sum < 0.3:

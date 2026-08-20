@@ -1,4 +1,4 @@
-define main() -> int:
+define main() -> number:
     s = "hello world"
     edit score = 0
     if contains(s, "world"):
@@ -6,6 +6,6 @@ define main() -> int:
     if not contains(s, "xyz"):
         score = score + 1
     sub = part(s, 6, 11)
-    if sub == "world":
+    if sub is "world":
         score = score + 1
     score

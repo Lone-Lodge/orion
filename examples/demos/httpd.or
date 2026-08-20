@@ -24,19 +24,19 @@ type request:
     path: text
 
 define parse_request(raw: text) -> request:
-    first = at(lines(raw), 0)
+    first = lines(raw)[0]
     parts = split(trim(first), " ")
     if length(parts) < 2:
         return request{method: "", path: ""}
-    request{method: at(parts, 0), path: at(parts, 1)}
+    request{method: parts[0], path: parts[1]}
 
-define status_line(code: int) -> text:
+define status_line(code: number) -> text:
     choose:
         code is 200 then "HTTP/1.0 200 OK"
         code is 404 then "HTTP/1.0 404 Not Found"
         else "HTTP/1.0 500 Internal Server Error"
 
-define respond(code: int, body: text) -> text:
+define respond(code: number, body: text) -> text:
     n = length(body)
     "{status_line(code)}\r\nContent-Type: text/plain\r\nContent-Length: {n}\r\nConnection: close\r\n\r\n{body}"
 
@@ -50,7 +50,7 @@ define route(r: request) -> text:
 
 # Who finished when. The order IS the result of this demo, so it is recorded
 # rather than printed as it happens.
-define note(what: text) -> int:
+define note(what: text) -> number:
     prev = if slot_has("trace") then slot_get("trace") else ""
     slot_set("trace", "{prev}{what} ")
     0
@@ -62,7 +62,7 @@ define note(what: text) -> int:
 # socket at once. Polling instead - `recv` with a 5 ms timeout, retried -
 # looks the same and costs (waiting tasks x 5 ms) per round; at 80
 # connections that was 400 ms of the process doing nothing per round.
-define read_head(sock: int, deadline: int) -> text uses net, clock:
+define read_head(sock: number, deadline: number) -> text uses net, clock:
     edit raw = ""
     loop:
         left = deadline - monotonic_ms()
@@ -79,7 +79,7 @@ define read_head(sock: int, deadline: int) -> text uses net, clock:
     raw
 
 # One connection, start to finish, on its own task and its own stack.
-define handle(conn: int) -> int uses net, clock:
+define handle(conn: number) -> number uses net, clock:
     # No recv timeout needed: `read_head` only reads a socket it was told is
     # readable, so a read never blocks on a quiet peer.
     raw = read_head(conn, monotonic_ms() + 2000)
@@ -96,7 +96,7 @@ define handle(conn: int) -> int uses net, clock:
 # works and reads almost the same, but it takes one turn of the scheduler per
 # connection - at 300 clients the backlog drained slower than the clients
 # gave up.
-define acceptor(listener: int) -> int uses net:
+define acceptor(listener: number) -> number uses net:
     want = slot_get_int("want")
     edit got = 0
     loop:
@@ -120,7 +120,7 @@ define acceptor(listener: int) -> int uses net:
 # blocks the PROCESS, so a client that has to wait (the listen backlog is
 # full, the server has not accepted yet) freezes the acceptor it is waiting
 # for. Giving up after 200 ms and parking the task breaks that knot.
-define dial() -> int uses net, clock:
+define dial() -> number uses net, clock:
     edit tries = 0
     loop:
         c = connect_within("127.0.0.1", 58480, 200)
@@ -135,7 +135,7 @@ define dial() -> int uses net, clock:
 # Connects first and asks last: sends a request head WITHOUT its blank line,
 # dawdles 60 ms, then finishes it. A one-client-at-a-time server answers this
 # one first and makes everybody wait for it.
-define slow_client(id: int) -> int uses net, clock:
+define slow_client(id: number) -> number uses net, clock:
     c = dial()
     if not ok(c):
         return 0
@@ -148,7 +148,7 @@ define slow_client(id: int) -> int uses net, clock:
     if length(reply) > 0 then 1 else 0
 
 # Asks immediately and should be answered immediately.
-define fast_client(id: int) -> int uses net, clock:
+define fast_client(id: number) -> number uses net, clock:
     c = dial()
     if not ok(c):
         return 0

@@ -1,12 +1,12 @@
-type Tree: value: int, left_count: int, right_count: int
+type Tree: value: number, left_count: number, right_count: number
 
-define sum_tree(t: Tree) -> int:
-    if t.value == 0:
+define sum_tree(t: Tree) -> number:
+    if t.value is 0:
         0
     else:
         t.value + sum_tree(Tree{value: t.value - 1, left_count: 0, right_count: 0})
 
-define main() -> int:
+define main() -> number:
     # 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 = 36
     t = Tree{value: 8, left_count: 0, right_count: 0}
     sum_tree(t) + 6

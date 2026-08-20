@@ -4,20 +4,20 @@
 # 1..20: multiples of 3 -> "Fizz", of 5 -> "Buzz", of both -> "FizzBuzz",
 # otherwise the number. Returns how many were "FizzBuzz" (exit code).
 
-define line(n: int) -> text:
+define line(n: number) -> text:
     edit s = ""
-    if n % 3 == 0:
+    if n % 3 is 0:
         s = "{s}Fizz"
-    if n % 5 == 0:
+    if n % 5 is 0:
         s = "{s}Buzz"
-    if s == "":
+    if s is "":
         s = "{n}"
     s
 
-define main() -> int:
+define main() -> number:
     edit both = 0
     loop n in 1..=20:
         print_line("{n}: {line(n)}")
-        if n % 15 == 0:
+        if n % 15 is 0:
             both = both + 1
     both                                      # 15 is the only FizzBuzz in 1..20 -> 1

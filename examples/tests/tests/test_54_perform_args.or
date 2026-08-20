@@ -18,17 +18,17 @@ effect Mix:
 effect Log:
     msg: function(text: text) -> text
 
-handle Math.add(a: int, b: int) -> int:
+handle Math.add(a: number, b: number) -> number:
     resume(a + b)
 
-handle Mix.at(name: text, n: int) -> int:
+handle Mix.at(name: text, n: number) -> number:
     resume(length(name) + n)
 
 handle Log.msg(text: text) -> text:
     resume("ok")
 
-define main() -> int:
+define main() -> number:
     a = perform Math.add(40, 2)      # 42
     b = perform Mix.at("abc", 7)     # 3 + 7 = 10
     c = length(perform Log.msg("hi"))   # 2, the single-arg path is unchanged
-    a + b + c                        # 42 + 10 + 2 == 54
+    a + b + c                        # 42 + 10 + 2 is 54

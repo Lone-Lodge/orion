@@ -1,0 +1,22 @@
+# A table whose values disagree has no single value type. `m[k]` has to name
+# one to read the word as, and any guess is a wrong pointer some of the time -
+# an access violation at run time with nothing said at compile time. So a
+# mixed table is `dyn` and `m[k]` refuses; the typed readers say what the word
+# is. A table whose values DO agree still indexes.
+define main() -> number:
+    names = {"a": "Ada", "b": "Bob"}
+    nums = {"x": 4, "y": 5}
+    mixed = {"kind": "Int", "count": 7}
+
+    # homogeneous: `[]` carries the type through
+    ok_text = if names["a"] is "Ada" then 1 else 0
+    ok_int = if nums["x"] + nums["y"] is 9 then 1 else 0
+
+    # mixed: only the typed readers, and they still work
+    ok_mixed = if get(mixed, "kind") is "Int" and get_int(mixed, "count") is 7 then 1 else 0
+
+    # nested maps keep their type through the index
+    tree = {"inner": {"v": 3}}
+    ok_nested = if tree["inner"]["v"] is 3 then 1 else 0
+
+    ok_text * 8 + ok_int * 8 + ok_mixed * 8 + ok_nested * 5   # 29

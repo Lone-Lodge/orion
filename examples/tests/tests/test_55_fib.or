@@ -1,5 +1,5 @@
-define fib(n: int) -> int:
+define fib(n: number) -> number:
     if n < 2 then n else fib(n - 1) + fib(n - 2)
 
-define main() -> int:
+define main() -> number:
     fib(10)

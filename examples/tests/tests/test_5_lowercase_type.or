@@ -1,9 +1,9 @@
 # The built-in type names accept their lowercase spelling: `text` works
-# like `Text`, `map` like `Map`. Before, a lowercase `text` annotation was
+# like `text`, `map` like `table`. Before, a lowercase `text` annotation was
 # an unknown name that silently became i64 - so `length(x)` later failed with
 # a confusing "untyped value" error.
-define slen(x: text) -> int:
+define slen(x: text) -> number:
     length(x)
 
-define main() -> int:
+define main() -> number:
     slen("hello")

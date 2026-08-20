@@ -1,20 +1,20 @@
 # An enum variant whose payload is itself an enum: the binding keeps the
 # payload's real (struct) type, so it can be matched on in turn.
 type Res:
-    Ok(int)
+    Ok(number)
     Bad(text)
 
 type Opt:
     Some(Res)
     None
 
-define unwrap(r: Res) -> int:
+define unwrap(r: Res) -> number:
     choose r:
-        Ok(n) -> n
-        Bad(m) -> 0 - length(m)
+        Ok(n) then n
+        Bad(m) then 0 - length(m)
 
-define main() -> int:
+define main() -> number:
     v = Opt.Some(Res.Ok(42))
     choose v:
-        Some(r) -> unwrap(r)
-        None -> 0
+        Some(r) then unwrap(r)
+        None then 0

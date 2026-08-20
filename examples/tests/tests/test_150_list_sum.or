@@ -1,6 +1,6 @@
-define main() -> int:
+define main() -> number:
     nums = [10, 20, 30, 40, 50]
     edit total = 0
-    loop i in 0..<length(nums):
-        total = total + at(nums, i)
+    loop i in 0 until length(nums):
+        total = total + nums[i]
     total

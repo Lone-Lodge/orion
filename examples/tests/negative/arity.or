@@ -1,7 +1,7 @@
 # expect: arity.or:7:4 - `add` takes 2 argument(s), got 1
-define add(a: int, b: int) -> int:
+define add(a: number, b: number) -> number:
     a + b
 
-define main() -> int:
+define main() -> number:
     # one argument short: a silent zero here would be a miscompile
     add(1)

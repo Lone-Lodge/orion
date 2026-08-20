@@ -1,7 +1,7 @@
-define double(x: int) -> int:
+define double(x: number) -> number:
     x + x
 
-define main() -> int:
+define main() -> number:
     # Interpolation with fn call
     msg = "double of 21 is {double(21)}"
     if contains(msg, "is 42"):

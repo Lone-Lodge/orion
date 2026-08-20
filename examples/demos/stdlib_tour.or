@@ -7,7 +7,7 @@ use num
 use list
 use iter
 
-define main() -> int:
+define main() -> number:
     raw = " 40, 75, 88, 12, 95, 60 "
 
     # text: normalise, then split into fields.

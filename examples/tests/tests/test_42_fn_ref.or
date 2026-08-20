@@ -1,8 +1,8 @@
-define double(x: int) -> int:
+define double(x: number) -> number:
     x * 2
 
 # First-class fn ref: bind a global fn to a local var, call indirectly.
 # Foundation for closures (no captures yet).
-define main() -> int:
+define main() -> number:
     f = double
     f(21)

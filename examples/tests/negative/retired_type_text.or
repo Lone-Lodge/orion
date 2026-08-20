@@ -1,6 +1,6 @@
-# expect: `Text` was retired
-define greet(name: Text) -> int:
+# expect: `text` was retired
+define greet(name: Text) -> number:
     length(name)
 
-define main() -> int:
+define main() -> number:
     greet("hi")

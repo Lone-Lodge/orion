@@ -1,7 +1,7 @@
-define double_it(x: int) -> int:
+define double_it(x: number) -> number:
     x + x
 
-define main() -> int:
+define main() -> number:
     # User fn via method-call syntax
     a = 21
     a_doubled = a.double_it()
@@ -16,7 +16,7 @@ define main() -> int:
     # List push via method-call
     edit items = [1, 2]
     items = items.append(3)
-    sum_items = at(items, 0) + at(items, 1) + at(items, 2)
+    sum_items = items[0] + items[1] + items[2]
 
     # 42 + 5 + 1 + 6 - 12 = 42
     a_doubled + msg_len + has_lo + sum_items - 12

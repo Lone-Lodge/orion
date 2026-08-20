@@ -1,5 +1,5 @@
-define main() -> int:
+define main() -> number:
     edit total = 0
-    loop i in 0..<10:
+    loop i in 0 until 10:
         total = total + i
     total

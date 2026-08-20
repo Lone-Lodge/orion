@@ -79,7 +79,7 @@ define build_complex() -> IRFn:
     s = ir_fn_push(f7, ir_return(v_result))
     s.function
 
-define main() -> int:
+define main() -> number:
     print_line("=== Stage 1: IR builder demo ===")
     print_line("")
 

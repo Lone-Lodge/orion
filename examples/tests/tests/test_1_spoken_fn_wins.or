@@ -1,0 +1,12 @@
+# `ok` is also a real function in `file` and `net` (is this handle open?).
+# A function that resolves wins over the spoken `Result.Ok` constructor - only
+# a name that would otherwise be an error becomes one. So inside a file that
+# says `use file`, `ok` means file's, everywhere in it.
+use file
+
+define main() -> number:
+    closed = if ok(0 - 1) then 9 else 0     # file.ok(-1) is false -> 0
+    present = choose (if true then some(1) else none):
+        some(v) then v                      # some/none have no rival here -> 1
+        none then 0
+    closed + present                        # 0 + 1
