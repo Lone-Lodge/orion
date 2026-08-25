@@ -167,16 +167,17 @@ awk '
     END {
         check("light body",      light["fg"],   light["bg"],      4.5)
         check("light code",      light["fg"],   light["code-bg"], 4.5)
-        check("light comment",   light["dim"],  light["code-bg"], 4.5)
+        check("light dim",       light["dim"],  light["bg"],      4.5)
         check("light accent",    light["link"], light["bg"],      3)
         check("dark body",       dark["fg"],    dark["bg"],       4.5)
         check("dark code",       dark["fg"],    dark["code-bg"],  4.5)
-        check("dark comment",    dark["dim"],   dark["code-bg"],  4.5)
+        check("dark dim",        dark["dim"],   dark["bg"],       4.5)
         check("dark accent",     dark["link"],  dark["bg"],       3)
-        # Syntax highlighting: a token hue paints words that are already
-        # readable as shapes, so it is held to 3:1 - the accent itself is
-        # 4.3:1 on the card and dots ships exactly that.
-        split("tok-k tok-t tok-s tok-n tok-f tok-x", toks, " ")
+        # Syntax highlighting: the editor hues from dots, held to 3:1 on the
+        # card. Same values ui/style.css paints ::highlight(hue-*) with, so a
+        # hue retuned there should be retuned here too. No apostrophes in this
+        # block: it lives inside a single-quoted awk program.
+        split("tok-c tok-k tok-t tok-s tok-n tok-f tok-x", toks, " ")
         for (t in toks) {
             check("light " toks[t], light[toks[t]], light["code-bg"], 3)
             check("dark "  toks[t], dark[toks[t]],  dark["code-bg"],  3)
