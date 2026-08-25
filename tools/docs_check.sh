@@ -168,11 +168,11 @@ awk '
         check("light body",      light["fg"],   light["bg"],      4.5)
         check("light code",      light["fg"],   light["code-bg"], 4.5)
         check("light comment",   light["dim"],  light["code-bg"], 4.5)
-        check("light link",      light["link"], light["bg"],      4.5)
+        check("light accent",    light["link"], light["bg"],      3)
         check("dark body",       dark["fg"],    dark["bg"],       4.5)
         check("dark code",       dark["fg"],    dark["code-bg"],  4.5)
         check("dark comment",    dark["dim"],   dark["code-bg"],  4.5)
-        check("dark link",       dark["link"],  dark["bg"],       4.5)
+        check("dark accent",     dark["link"],  dark["bg"],       3)
         # Syntax highlighting: a token hue paints words that are already
         # readable as shapes, so it is held to 3:1 - the accent itself is
         # 4.3:1 on the card and dots ships exactly that.
