@@ -1,0 +1,6 @@
+name = "pads"
+version = "0.1.0"
+
+[orbs]
+input = "path:../../orbs/input"
+window = "path:../../orbs/window"

@@ -1,4 +1,4 @@
-# tonumber.py - migrate scalar `int` annotations to `number`.
+# tonumber.py - migrate written `int` / `float` annotations to `number`.
 #
 #   python tools/migrate/tonumber.py [--dry] <paths...>
 #
@@ -14,10 +14,11 @@
 #   [int]                      - a list ELEMENT. The pass tracks sites, not
 #                                what flows through a list, so it cannot say
 #                                whether the elements are whole.
-#   x as int                   - a cast. `as number` means something else: the
-#                                pass over-approximates a cast to real.
+#   x as int                   - a cast. Retired outright now: the parser says
+#                                `to_whole(x)` / `to_real(x)` instead, so there
+#                                is nothing left here to rewrite.
 #
-# Verified, not assumed: examples/tests/dist/*.ll is committed reference IR for
+# Verified, not assumed: tests/suite/dist/*.ll is committed reference IR for
 # every test. Re-running the suite after this must leave that diff EMPTY - the
 # same machine code from the new word is the whole claim.
 import sys, os, re
@@ -115,9 +116,8 @@ def main():
     changed = hits = 0
     for p in sorted(files):
         src = open(p, encoding="utf-8", errors="replace").read()
-        # A file may opt out. `ori_display` does: one enum gets one answer
-        # for its `number` payloads, so a single fraction would widen every
-        # coordinate in a draw list, and that seam is not covered by tests.
+        # A file may opt out with `tonumber: skip`. Nothing does any more:
+        # `ori_display` needed it and now names the sized type outright.
         if "tonumber: skip" in src:
             continue
         old_lines = src.split("\n")

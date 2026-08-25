@@ -1,4 +1,3 @@
-use orion_lex
 
 # orion_parse - the parser: tokens in, an AST out. Recursive descent, one pass,
 # each node tagged with a source line for later diagnostics. Stage two of the
@@ -18,16 +17,11 @@ external define psr_depth_drop() -> int
 # expressions, on the 64 MB linked stack). One obvious cliff, not a guess.
 const PSR_MAX_DEPTH = 1000
 
-# orion_self_parse - Orion parser written in Orion. STEP 4 PROOF.
+# orion_parse - the Orion parser, written in Orion.
 #
-# Consumes the token list produced by `self_lex` and produces an AST as
-# a Map tree. This is a *proof of concept* - it parses fn declarations
-# with typed params, return types, and tail-expression bodies. The full
-# Orion grammar (data decls, if/else, for/loop, mut, multi-statement
-# bodies, generics, ownership annotations) is another ~800 lines of
-# similar machinery.
+# Consumes the token list from orion_lex and produces an AST as a Map tree.
 #
-# AST shape this proof emits:
+# AST shape:
 #   { "kind": "Program", "decls": [<Fn>...] }
 #   Fn:    { "kind": "Fn", "name": text, "params": [Param], "ret": Type, "body": Expr }
 #   Param: { "name": text, "type": Type }
@@ -189,6 +183,14 @@ define psr_parse_type(tokens: [table], position: number) -> table:
     if is_list_of:
         lo_inner = psr_parse_type(tokens, position + 2)
         return {"node": {"kind": "List", "elem": get_map(lo_inner, "node")}, "next": get_int(lo_inner, "next")}
+    # `table of T` - the VALUE type, the same way `list of T` is the element
+    # type. The IR has understood `map:T` all along and `table<T>` could say
+    # it; there was no spoken spelling, so every table was written bare and
+    # `t[k]` had to guess.
+    is_table_of = psr_peek_kind(tokens, position) is "ident" and psr_peek_value(tokens, position) is "table" and psr_peek_kind(tokens, position + 1) is "ident" and psr_peek_value(tokens, position + 1) is "of"
+    if is_table_of:
+        to_inner = psr_parse_type(tokens, position + 2)
+        return {"node": {"kind": "Named", "name": "table", "args": append([], get_map(to_inner, "node"))}, "next": get_int(to_inner, "next")}
     # `[ inner ]` → list type, `name` → named type, `LOW...HIGH` → range type.
     if psr_peek_kind(tokens, position) is "symbol" and psr_peek_value(tokens, position) is "[":
         inner_result = psr_parse_type(tokens, position + 1)
@@ -221,10 +223,18 @@ define psr_parse_type(tokens: [table], position: number) -> table:
                 {"node": {"kind": "Named", "name": low_text}, "next": position + 1}
         else:
             name_text = psr_spoken_type(psr_peek_value(tokens, position))
+            # `int` is retired on the surface: the spelling is `number`. Marked
+            # rather than reported here, so lowering can point at the place -
+            # and so the compiler's own synthesized `int` nodes, which carry no
+            # mark, are untouched. Inside `external define` it names a C type
+            # and is left alone.
+            said_int = (name_text is "int" or name_text is "Int") and (if slot_has("psr:extern_sig") then slot_get_number("psr:extern_sig") else 0) is 0
+            if said_int:
+                {"node": {"kind": "Named", "name": name_text, "said_int": 1, "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": position + 1}
             # `Name<T, E>` - generic type application. The args are recorded but
             # erased at lowering (all instantiations share one representation).
             # Bare `Name` (no `<`) is unchanged.
-            if psr_peek_kind(tokens, position + 1) is "symbol" and psr_peek_value(tokens, position + 1) is "<":
+            else if psr_peek_kind(tokens, position + 1) is "symbol" and psr_peek_value(tokens, position + 1) is "<":
                 edit ga_cursor = position + 2
                 ga_args = part([{"kind": "Named", "name": "int"}], 0, 0)
                 edit ga_list = ga_args
@@ -260,6 +270,15 @@ define psr_parse_fn_type(tokens: [table], position: number) -> table:
             break
         if pk is "eof":
             break
+        # `function(max: number)` - a NAME in front of the type. It reads as
+        # documentation and is worth having; the type is what matters here, so
+        # the name is stepped over. Without this the name parsed as a type of
+        # its own and `function(max: number) -> number` became a TWO-parameter
+        # signature, so calling it said "expects 3 argument(s) but got 1"
+        # about a function that takes one.
+        named_param = pk is "ident" and psr_peek_kind(tokens, cursor + 1) is "symbol" and psr_peek_value(tokens, cursor + 1) is ":"
+        if named_param:
+            cursor = cursor + 2
         pt_r = psr_parse_type(tokens, cursor)
         pt_list = append(pt_list, get_map(pt_r, "node"))
         cursor = get_int(pt_r, "next")
@@ -692,11 +711,11 @@ define psr_parse_par_loop(tokens: [table], position: number) -> table:
 # diagnostics walk. "" when there is no map (an already-bundled text): an
 # embed path is then relative to the working directory.
 define psr_embed_dir(line: number) -> text:
-    total = if slot_has("src:map:n") then slot_get_int("src:map:n") else 0
+    total = if slot_has("src:map:n") then slot_get_number("src:map:n") else 0
     edit best_at = 0
     edit best_path = ""
     loop i in 0 until total:
-        chunk_at = slot_get_int("src:map:{i}:at")
+        chunk_at = slot_get_number("src:map:{i}:at")
         if chunk_at <= line and chunk_at > best_at:
             best_at = chunk_at
             best_path = slot_get("src:map:{i}:path")
@@ -881,10 +900,14 @@ define psr_parse_primary(tokens: [table], position: number) -> table:
             result = {"node": {"kind": "Ident", "name": value, "line": ident_line, "col": ident_col}, "next": position + 1}
     # Boolean literals → Int(1) / Int(0). Lets `if cond` and `not x`
     # work uniformly, and avoids requiring a dedicated BoolLit emit.
+    # `true` and `false` are ones and zeroes in the machine, and the `truth`
+    # marker is what keeps them from BEING ones and zeroes to the reader. It
+    # rides on the Int node rather than getting a node kind of its own, so
+    # every place that already handles a literal keeps working.
     if is_true:
-        result = {"node": {"kind": "Int", "value": "1"}, "next": position + 1}
+        result = {"node": {"kind": "Int", "value": "1", "truth": 1}, "next": position + 1}
     if is_false:
-        result = {"node": {"kind": "Int", "value": "0"}, "next": position + 1}
+        result = {"node": {"kind": "Int", "value": "0", "truth": 1}, "next": position + 1}
     if is_int:
         result = {"node": {"kind": "Int", "value": value}, "next": position + 1}
     if is_float:
@@ -1399,6 +1422,22 @@ define psr_parse_call(tokens: [table], position: number, callee_name: text) -> t
             cursor += 1
         if cursor is before_arg:
             break
+    # One spelling per job. A cast converts a TYPE - `as text`, `as number`,
+    # `as u8`. A function picks a REPRESENTATION - `to_whole`, `to_real`. So
+    # `to_text` is the odd one out and it goes. Rejected HERE, where a name was
+    # read out of the source: interpolation lowers `"{x}"` to a `to_text` call
+    # of its own, and that node is built, never parsed.
+    if callee_name is "to_text":
+        compile_error("orion: ERROR at {callee_line}:{callee_col} - `to_text(x)` is retired; write `x as text`")
+    # `length` counts CHARACTERS now, so `characters` was a second word for a
+    # thing the language already had a word for. `bytes_count` is the other
+    # question and keeps its own name.
+    # A slot holds a `number` - which machine type is the compiler's answer,
+    # decided from the write, exactly as everywhere else.
+    if callee_name is "slot_get_int":
+        compile_error("orion: ERROR at {callee_line}:{callee_col} - `slot_get_int` is retired; write `slot_get_number` (a slot carries a real too, as its bits)")
+    if callee_name is "characters":
+        compile_error("orion: ERROR at {callee_line}:{callee_col} - `characters(t)` is retired; `length(t)` counts characters (and `bytes_count(t)` counts bytes)")
     {"node": {"kind": "Call", "callee": psr_spoken_builtin(callee_name), "args": args, "line": callee_line, "col": callee_col}, "next": cursor}
 
 # The surface word a builtin is SPOKEN as, mapped to the one the
@@ -1529,7 +1568,19 @@ define psr_parse_postfix(tokens: [table], position: number, current_node: table)
             as_line = psr_peek_line(tokens, cursor)
             as_col = psr_peek_col(tokens, cursor)
             as_type = psr_parse_type(tokens, cursor + 1)
-            node = {"kind": "Cast", "expr": node, "type": get_map(as_type, "node"), "line": as_line, "col": as_col}
+            as_named = get_map(as_type, "node")
+            # `int` and `float` are retired as things a person writes. The word
+            # is `number`, and which machine type it becomes is the compiler's
+            # answer, not yours. Caught HERE and not after lowering, because by
+            # then the `number` pass has already rewritten every `number` into
+            # one of those two and the two spellings are indistinguishable.
+            # The sized types (`i32`, `u8`, `f32`) stay: those pick a WIDTH and
+            # a wrap, which is a different question from whole-or-real.
+            if get(as_named, "kind") is "Named":
+                as_word = get(as_named, "name")
+                if as_word is "int" or as_word is "float":
+                    compile_error("orion: ERROR at {as_line}:{as_col} - `as {as_word}` is retired; write `to_whole(x)` for a whole, `to_real(x)` for a real, `x as number` to read a number out of a text")
+            node = {"kind": "Cast", "expr": node, "type": as_named, "line": as_line, "col": as_col}
             cursor = get_int(as_type, "next")
         if not is_dot and not is_lbracket and not is_question and not is_as:
             break
@@ -2355,8 +2406,8 @@ define psr_parse_data(tokens: [table], position: number) -> table:
     # Skip `:`
     if psr_peek_kind(tokens, cursor) is "symbol" and psr_peek_value(tokens, cursor) is ":":
         cursor += 1
-    # Two layouts, one field list. Inline (`type P: x: int, y: int`) ends at the
-    # newline. Indented (`type P:` then one `x: int` per line) has to KEEP
+    # Two layouts, one field list. Inline (`type P: x: number, y: number`) ends
+    # at the newline. Indented (`type P:` then one `x: number` per line) has to KEEP
     # reading past newlines, bounded by the body's column - breaking at the
     # first newline is what used to give a multi-line struct zero fields.
     indented = psr_peek_kind(tokens, cursor) is "newline"
@@ -2459,7 +2510,7 @@ define psr_parse_enum(tokens: [table], position: number) -> table:
     {"node": {"kind": "Enum", "name": name, "generics": enum_gen_list, "variants": variant_list}, "next": cursor}
 
 define psr_parse_fn(tokens: [table], position: number) -> table:
-    # We're sitting on `fn`. Advance past it.
+    # Sitting on the declaring keyword. Advance past it.
     edit cursor = position + 1
     name = psr_peek_value(tokens, cursor)
     # Where this declaration starts. The whole-program checks (empty body,
@@ -2685,6 +2736,7 @@ define psr_skip_effect(tokens: [table], position: number) -> number:
 # and emit declares the real LLVM signature.
 define psr_parse_extern_fn(tokens: [table], position: number) -> table:
     # Already past `extern fn`; sitting on the name.
+    slot_set("psr:extern_sig", 1)
     edit cursor = position
     name = psr_peek_value(tokens, cursor)
     cursor = cursor + 1
@@ -2698,6 +2750,7 @@ define psr_parse_extern_fn(tokens: [table], position: number) -> table:
         ret_result = psr_parse_type(tokens, cursor)
         return_node = get_map(ret_result, "node")
         cursor = get_int(ret_result, "next")
+    slot_set("psr:extern_sig", 0)
     {"node": {"kind": "ExternFn", "name": name, "params": get_map(params_result, "node"), "ret": return_node}, "next": cursor}
 
 # Skip `use NAME` - one line.
@@ -2761,6 +2814,12 @@ public define self_parse(tokens: [table]) -> table:
         # as an unknown decl and resurfacing as "unknown type" further down.
         is_data = kind_here is "ident" and value_here is "data" and psr_peek_kind(tokens, cursor + 1) is "ident"
         is_enum = kind_here is "ident" and value_here is "enum" and psr_peek_kind(tokens, cursor + 1) is "ident"
+        # `fn NAME(` is the retired declaration form. Same treatment: consume it
+        # with the real parser and report it, so it fails loudly instead of
+        # being skipped as an unknown decl - which left `fn main()` compiling to
+        # a program with no main at all. `fn(` is untouched: that is the lambda
+        # and the function-pointer type, both of which are current.
+        is_fn_retired = kind_here is "ident" and value_here is "fn" and psr_peek_kind(tokens, cursor + 1) is "ident"
         # Reserved but NOT implemented. Docs promised "a clear not supported yet
         # error"; what actually happened was the decl fell through as unknown,
         # got skipped a token at a time, and the FUNCTION AFTER it was reported
@@ -2778,7 +2837,7 @@ public define self_parse(tokens: [table]) -> table:
         # A bare top-level `NAME = expr` IS a compile-time constant, no keyword
         # needed (top level has no other `ident =` form, so it's unambiguous).
         # Same machinery as `const`.
-        is_top_const = kind_here is "ident" and psr_peek_kind(tokens, cursor + 1) is "symbol" and psr_peek_value(tokens, cursor + 1) is "=" and (not is_fn) and (not is_data) and (not is_enum) and (not is_extern) and (not is_use)
+        is_top_const = kind_here is "ident" and psr_peek_kind(tokens, cursor + 1) is "symbol" and psr_peek_value(tokens, cursor + 1) is "=" and (not is_fn) and (not is_fn_retired) and (not is_data) and (not is_enum) and (not is_extern) and (not is_use)
         # `orb "name"` - an ORIGIN MARKER the driver injects ahead of each orb's
         # source when it concatenates the program (drv_collect). It is not user
         # syntax: the string form means a bare identifier `orb` can never be
@@ -2835,6 +2894,10 @@ public define self_parse(tokens: [table]) -> table:
         if is_enum:
             decl_result = psr_parse_enum(tokens, cursor)
             decls = append(decls, {"kind": "Retired", "word": "enum", "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
+            cursor = get_int(decl_result, "next")
+        if is_fn_retired:
+            decl_result = psr_parse_fn(tokens, cursor)
+            decls = append(decls, {"kind": "Retired", "word": "fn", "name": psr_peek_value(tokens, cursor + 1), "line": psr_peek_line(tokens, cursor), "col": psr_peek_col(tokens, cursor)})
             cursor = get_int(decl_result, "next")
         if is_extern:
             cursor = cursor + 1
@@ -2920,7 +2983,7 @@ public define self_parse(tokens: [table]) -> table:
             handle_result = psr_parse_handle(tokens, cursor)
             decls = append(decls, set(get_map(handle_result, "node"), "pub", if is_pub then 1 else 0))
             cursor = get_int(handle_result, "next")
-        not_recognized = not (is_fn or is_data or is_enum or is_unsupported_decl or is_extern or is_use or is_orbmark or is_type_decl or is_const or is_top_const or is_effect or is_handle)
+        not_recognized = not (is_fn or is_fn_retired or is_data or is_enum or is_unsupported_decl or is_extern or is_use or is_orbmark or is_type_decl or is_const or is_top_const or is_effect or is_handle)
         if not_recognized:
             cursor = cursor + 1
         cursor = psr_skip_newlines(tokens, cursor)

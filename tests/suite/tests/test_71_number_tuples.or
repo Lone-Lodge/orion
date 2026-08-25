@@ -1,0 +1,27 @@
+# `number` reaches a TUPLE position. Each position keeps its OWN answer,
+# unlike a list whose elements share one - destructuring lowers to `temp[i]`
+# with a literal i, so the position is known on both sides.
+#
+# `(1.5, 2)` answered 1.5 and 9.88e-324 before: the second slot is read as a
+# double, and an i64 bit pattern read that way is not the number two.
+
+define mixed() -> (number, number):
+    (1.5, 2)
+
+define whole() -> (number, number):
+    (20, 22)
+
+define real() -> (number, number):
+    (0.5, 0.25)
+
+define main() -> number:
+    m1, m2 = mixed()        # 1.5 real, 2 whole - each keeps its own
+    w1, w2 = whole()        # both whole
+    r1, r2 = real()         # both real
+
+    a = if m1 > 1.4 and m1 < 1.6 then 18 else 0
+    b = if m2 is 2 then 18 else 0
+    c = if w1 + w2 is 42 then 18 else 0
+    d = if r1 + r2 > 0.7 and r1 + r2 < 0.8 then 17 else 0
+
+    a + b + c + d   # 18*3 + 17

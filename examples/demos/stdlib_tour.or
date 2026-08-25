@@ -2,10 +2,6 @@
 # Build: orion.exe examples/demos/stdlib_tour.or out.ll orbs
 #
 # Take a CSV-ish line of numbers, clean it up, parse it, and report.
-use text
-use num
-use list
-use iter
 
 define main() -> number:
     raw = " 40, 75, 88, 12, 95, 60 "

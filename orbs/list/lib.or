@@ -130,13 +130,13 @@ public define drop(xs: [number], n: number) -> [number]:
 # A list of `count` copies of one value - THE way to born a big buffer
 # (a per-element push is a copy per element on backends without
 # in-place growth; this is one allocation everywhere).
+# `filled_number` stood next to this with the SAME four lines - it was the
+# float version back when the two number words were separate. `number` picks,
+# so one is enough.
 public define filled(count: number, value: number) -> list of number:
-    edit out = []
-    loop index in 0 until count:
-        out = push(out, value)
-    out
-
-public define filled_number(count: number, value: number) -> list of number:
+    example length(filled(3, 0)) is 3
+    example filled(3, 7)[2] is 7
+    example filled(2, 1.5)[0] is 1.5
     edit out = []
     loop index in 0 until count:
         out = push(out, value)

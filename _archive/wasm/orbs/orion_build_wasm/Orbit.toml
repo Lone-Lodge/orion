@@ -1,8 +1,0 @@
-name = "orion_build_wasm"
-version = "0.0.1"
-description = "One-call wasm build driver — module + html shell + JS runtime into dist/"
-
-[orbs]
-orion_emit_wasm = "path:../orion_emit_wasm"
-io = "*"
-fs = "*"

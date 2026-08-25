@@ -18,7 +18,6 @@
 # Parameters ALWAYS bind through `?` placeholders (never paste values into
 # the SQL text - that is how injection happens). They bind as text; the
 # column's declared type converts numbers on the way in.
-use text
 
 external define sq_open(path: text) -> int
 external define sq_close(h: int) -> int

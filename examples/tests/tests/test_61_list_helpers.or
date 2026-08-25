@@ -1,9 +1,0 @@
-# list's structural helpers: concat, unique, take, drop.
-use list
-
-define main() -> number:
-    ok_concat = if length(concat([1, 2, 3], [4, 5])) is 5 and last(concat([1, 2], [9])) is 9 then 1 else 0
-    ok_unique = if length(unique([1, 1, 2, 3, 3, 3])) is 3 then 1 else 0
-    ok_take = if length(take([10, 20, 30, 40], 2)) is 2 and last(take([10, 20, 30], 2)) is 20 then 1 else 0
-    ok_drop = if length(drop([10, 20, 30, 40], 2)) is 2 and first(drop([10, 20, 30, 40], 2)) is 30 then 1 else 0
-    ok_concat * 20 + ok_unique * 20 + ok_take * 11 + ok_drop * 10   # 61

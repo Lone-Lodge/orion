@@ -1,0 +1,79 @@
+# Child processes the scheduler can wait on: start_command / finished_within.
+#
+# Three children that each take about a second run through three TASKS. With
+# the old run_command the first wait would park the whole process and they
+# would serialize to ~3 s; `finished_within` parks only the task, the children
+# run as the OS processes they are, and the batch takes about as long as one
+# child. The other arms prove the exit code travels and that a job that blows
+# its deadline can be stopped and reaped.
+
+# A child that sleeps about `seconds`, output to `log`. ping is the portable
+# Windows sleep (n pings a second apart); POSIX has a real one.
+define sleep_job(log: text, seconds: number) -> number:
+    if os_kind() is 0:
+        return start_command_to_file("ping", ["-n", "{seconds + 1}", "127.0.0.1"], log)
+    start_command_to_file("sleep", ["{seconds}"], log)
+
+# A child whose only job is to exit with `code`. On Windows a tiny batch
+# file, because a QUOTED `cmd /c "exit 7"` trips cmd's quote-stripping rule
+# (the same trap capture() documents) - a .bat runs clean via CreateProcess.
+define exit_job(code: number) -> number:
+    if os_kind() is 0:
+        wrote = write_file(".proc_exit.bat", "@exit /b {code}")
+        return start_command("./.proc_exit.bat", [])
+    start_command("sh", ["-c", "exit {code}"])
+
+# The scratch the arms above wrote, gone again. delete_file on a name that is
+# not there is not an error, so the POSIX run sweeps the .bat too.
+define sweep() -> number:
+    edit gone = 0
+    gone = gone + delete_file(".proc_exit.bat")
+    loop n in 1 to 3:
+        gone = gone + delete_file(".proc_sleep_{n}.txt")
+    gone + delete_file(".proc_slow.txt")
+
+define sleeper(n: number) -> number:
+    job = sleep_job(".proc_sleep_{n}.txt", 1)
+    if job < 0:
+        return 0 - 1
+    if not finished_within(job, 10000):
+        return 0 - 2
+    command_result(job)
+
+define main() -> number:
+    start = monotonic_ms()
+    t1 = spawn(sleeper, 1)
+    t2 = spawn(sleeper, 2)
+    t3 = spawn(sleeper, 3)
+    a = await(t1)
+    b = await(t2)
+    c = await(t3)
+    took = monotonic_ms() - start
+    all_ok = a is 0 and b is 0 and c is 0
+    ran_parallel = took < 2500
+
+    # The exit code travels: a child that exits 7 reports 7.
+    seven = exit_job(7)
+    seven_done = finished_within(seven, 5000)
+    seven_code = command_result(seven)
+    got_seven = seven_done and seven_code is 7
+
+    # The timeout arm: a ~5 s child is NOT finished within 200 ms, is
+    # stopped, and its (kill) status is reaped - not the code it never
+    # got to exit with.
+    slow = sleep_job(".proc_slow.txt", 5)
+    still_going = not finished_within(slow, 200)
+    stopped = stop_command(slow)
+    reaped = finished_within(slow, 3000)
+    kill_code = command_result(slow)
+    killed = still_going and stopped and reaped and kill_code is not 0
+
+    # Every child is reaped by now, so the scratch it wrote can go. A test
+    # that leaves files behind teaches the repo to ignore its own droppings.
+    swept = sweep()
+
+    print_line("took={took}ms codes={a},{b},{c} seven={seven_code} kill={kill_code} swept={swept}")
+    p1 = if ran_parallel and all_ok then 20 else 0
+    p2 = if got_seven then 15 else 0
+    p3 = if killed then 7 else 0
+    p1 + p2 + p3

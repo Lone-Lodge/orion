@@ -176,9 +176,9 @@ define jsn_number(b: [number], start: number) -> table:
             i = i + 1
         else:
             break
-    # A fraction or exponent is consumed and dropped: LSP integers (line,
-    # character, id) are what this is for, and silently keeping a truncated
-    # float would be worse than not carrying one.
+    # A fraction or exponent is consumed and DROPPED - `1.5` reads back as
+    # `1`. That is why the getter is called `json_whole`: the name is where a
+    # reader finds this out, not a comment down here.
     loop:
         if i >= n:
             break
@@ -257,8 +257,17 @@ public define json_text(o: table, key: text) -> text:
     example json_text(json_parse("\{\"s\": \"hi\"\}"), "s") is "hi"
     if has(o, key) then get(o, key) else ""
 
-public define json_int(o: table, key: text) -> number:
-    example json_int(json_parse("\{\"n\": 7\}"), "n") is 7
+# A WHOLE number out of the dynamic reader, and the name says so: a table
+# slot is one machine word, and this side of the orb puts a whole number in
+# it. `1.5` in the source reads back as `1` - the scanner consumes the
+# fraction and drops it, which is what the LSP wants (ids, lines, characters
+# are all whole) and what nothing else should rely on.
+#
+# The WRITING side has no such limit: `jnum(1.5)` is a JSON number and
+# serializes as one.
+public define json_whole(o: table, key: text) -> number:
+    example json_whole(json_parse("\{\"n\": 7\}"), "n") is 7
+    example json_whole(json_parse("\{\"x\": 1.5\}"), "x") is 1
     if has(o, key) then get_int(o, key) else 0
 
 public define json_list(o: table, key: text) -> [table]:
@@ -321,9 +330,14 @@ public define json_escape(s: text) -> text:
 
 type Json:
     JNull
-    JBool(number)                 # 0 = false, anything else = true
-    JInt(number)
-    JFloat(float)
+    JBool(truth)
+    # JSON has ONE number type and so does this. `JInt` and `JFloat` were two
+    # variants for one thing, and an enum gets one answer for its `number`
+    # payloads anyway - so it is a real one, which is what a JSON number is
+    # everywhere it lands. Whole values print whole: the formatter gives the
+    # shortest decimal that reads back, so 1 is "1" and 0.5 is "0.5".
+    # The edge is 2^53, past which a whole number is no longer exact.
+    JNum(number)
     JStr(text)
     JArr([Json])
     JObj([text], [Json])       # parallel keys and values
@@ -331,15 +345,13 @@ type Json:
 public define jnull() -> Json:
     example json_stringify(jnull()) is "null"
     Json.JNull
-public define jbool(b: number) -> Json:
-    example json_stringify(jbool(1)) is "true"
+public define jbool(b: truth) -> Json:
+    example json_stringify(jbool(true)) is "true"
     Json.JBool(b)
-public define jint(n: number) -> Json:
-    example json_stringify(jint(0 - 5)) is "-5"
-    Json.JInt(n)
-public define jfloat(x: float) -> Json:
-    example json_stringify(jfloat(1.5)) is "1.5"
-    Json.JFloat(x)
+public define jnum(n: number) -> Json:
+    example json_stringify(jnum(0 - 5)) is "-5"
+    example json_stringify(jnum(1.5)) is "1.5"
+    Json.JNum(n)
 public define jstr(s: text) -> Json:
     example json_stringify(jstr("hi")) is "\"hi\""
     Json.JStr(s)
@@ -352,13 +364,12 @@ public define jobj(keys: [text], vals: [Json]) -> Json:
 
 # Serialize a Json value to compact JSON text.
 public define json_stringify(j: Json) -> text:
-    example json_stringify(jint(42)) is "42"
-    example json_stringify(jarr([jint(1), jint(2)])) is "[1,2]"
+    example json_stringify(jnum(42)) is "42"
+    example json_stringify(jarr([jnum(1), jnum(2)])) is "[1,2]"
     choose j:
         JNull then "null"
-        JBool(b) then if b is 0 then "false" else "true"
-        JInt(n) then "{n}"
-        JFloat(x) then "{x}"
+        JBool(b) then "{b}"
+        JNum(n) then "{n}"
         JStr(s) then jsn_quote(s)
         JArr(items) then jsn_arr_text(items)
         JObj(keys, vals) then jsn_obj_text(keys, vals)

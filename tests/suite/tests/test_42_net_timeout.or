@@ -1,0 +1,25 @@
+# Socket deadlines: a server that cannot give up cannot do anything else.
+# `accept_within` returns -1 when nobody came; `recv` returns "" on timeout.
+
+define wait_briefly(listener: number) -> number:
+    conn = accept_within(listener, 150)      # nobody will connect
+    if ok(conn) then 0 else 20
+
+define talk_then_wait(listener: number) -> number:
+    client = connect("127.0.0.1", 58493)
+    if not ok(client):
+        return 0
+    srv = accept_within(listener, 500)       # this one DOES arrive
+    if not ok(srv):
+        close(client)
+        return 0
+    set_timeout(srv, 150)
+    quiet = recv(srv, 64)                    # client sent nothing
+    close(srv)
+    close(client)
+    if timed_out(quiet) then 22 else 0
+
+define main() -> number:
+    a = with_listener(58492, wait_briefly)
+    b = with_listener(58493, talk_then_wait)
+    a + b

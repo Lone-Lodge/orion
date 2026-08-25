@@ -1,0 +1,21 @@
+# A call written inside a `"{...}"` hole is a call, and auto-use has to see it.
+#
+# The lexer hands back ONE `str` token for `"{min(3, 7)}"` - the holes are
+# parsed much later - so the scanner that decides which orbs to fetch never saw
+# the name. `m = min(3, 7)` imported `num`; `"{min(3, 7)}"` said the function
+# did not exist. The same line, one written with a hole and one without, gave
+# two different answers about whether a function exists.
+#
+# The holes are lexed too now. Their bytes go into a LIST and become one text
+# at the end: built with `out = out + byte` it was quadratic, and the
+# compiler's own bundle - a megabyte with thousands of holes - stopped
+# finishing.
+
+define main() -> number:
+    # `min`, `max` and `abs` live in `num` and nothing here imports it
+    a = if "{min(3, 7)}" is "3" and "{max(3, 7)}" is "7" then 30 else 0
+    b = if "{abs(0 - 5)}" is "5" then 20 else 0
+    # the same names outside a hole, which always worked
+    m = min(4, 9)
+    c = if m is 4 then 16 else 0
+    a + b + c   # 30 + 20 + 16

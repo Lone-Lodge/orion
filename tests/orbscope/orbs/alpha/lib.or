@@ -6,13 +6,13 @@
 define label() -> text:
     "alpha"
 
-define run(n: int) -> int:
+define run(n: number) -> number:
     n * 2
 
 public define alpha_label() -> text:
     label()
 
-public define alpha_run(n: int) -> int:
+public define alpha_run(n: number) -> number:
     run(n)
 
 # Deliberately the SAME pub name beta exports. Two orbs may now both offer it;

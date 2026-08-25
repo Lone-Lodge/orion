@@ -280,21 +280,6 @@ public define lower(t: text) -> text:
     example lower("ПРИВЕТ") is "привет"
     map_case(t, lower_cp)
 
-# How many CHARACTERS (Unicode code points) the text holds - `len` counts
-# bytes, and "åsa" is 4 bytes but 3 characters. Counts every byte that is
-# not a UTF-8 continuation byte (0x80-0xBF).
-public define characters(t: text) -> number:
-    example characters("åsa") is 3
-    example characters("abc") is 3
-    t_bytes = bytes_of(t)
-    n = bytes_count(t_bytes)
-    edit count = 0
-    loop ci in 0 until n:
-        b = byte_at(t_bytes, ci)
-        if b < 128 or b >= 192:
-            count = count + 1
-    count
-
 # Remove leading and trailing ASCII whitespace (space, tab, newline, CR).
 #   trim("  hi  ")  ->  "hi"
 public define trim(t: text) -> text:
@@ -394,13 +379,19 @@ public define replace(t: text, from: text, to: text) -> text:
     join(split(t, from), to)
 
 # First byte index of `sub` in `t`, or -1 if absent. Empty `sub` -> 0.
+# Where `sub` starts, counted in CHARACTERS, or -1. The search itself walks
+# BYTES - UTF-8 is self-synchronising, so a well-formed needle can only match
+# at a character boundary - and the byte offset is converted at the end.
+#
+# It reads the text where it lies. `bytes_of` would copy every byte into an
+# eight-byte slot first, which for a megabyte of source is eight megabytes to
+# find one word.
 public define index_of(t: text, sub: text) -> number:
     example index_of("hello", "ll") is 2
     example index_of("hello", "zz") is 0 - 1
-    tb = bytes_of(t)
-    sb = bytes_of(sub)
-    tlen = bytes_count(tb)
-    slen = bytes_count(sb)
+    example index_of("räksmörgås", "ö") is 5
+    tlen = bytes_count(t)
+    slen = bytes_count(sub)
     edit found = 0 - 1
     if slen is 0:
         found = 0
@@ -411,12 +402,19 @@ public define index_of(t: text, sub: text) -> number:
                 break
             edit matched = true
             loop j in 0 until slen:
-                if byte_at(tb, i + j) is not byte_at(sb, j):
+                if byte_at(t, i + j) is not byte_at(sub, j):
                     matched = false
             if matched:
                 found = i
             i = i + 1
-    found
+    if found <= 0:
+        return found
+    edit chars = 0
+    loop ci in 0 until found:
+        b = byte_at(t, ci)
+        if b < 128 or b >= 192:
+            chars = chars + 1
+    chars
 
 # Pad `t` on the left with `pad` until it is at least `width` bytes wide.
 public define pad_left(t: text, width: number, pad: text) -> text:

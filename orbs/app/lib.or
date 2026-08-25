@@ -11,11 +11,7 @@
 # One task per connection (the httpd pattern); static files stream in binary
 # through send_raw, so images and fonts survive. HTTP/1.0, close per request:
 # boring, debuggable, plenty for loopback.
-use net
-use os
-use text
 use file (open_read, read_chunk, close_file)
-use async
 
 type request:
     method: text
@@ -88,7 +84,9 @@ define status_line(code: number) -> text:
 # no-cache överallt: appen bor på loopback och utvecklas i sekundtakt -
 # en cachad shell.js mot en ny server är ett spöke ingen ska behöva jaga.
 define head_of(r: response) -> text:
-    n = length(r.body)
+    # HTTP raknar BYTES - length(text) ar kodpunkter, och ett svar med
+    # aao skulle huggas av med fel Content-Length.
+    n = bytes_count(bytes_of(r.body))
     "{status_line(r.status)}\r\nContent-Type: {r.mime}\r\nContent-Length: {n}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n"
 
 # Content type from the filename - the handful a local app meets.
@@ -200,7 +198,8 @@ define serve_conn(conn: number, routes: [route], static_dir: text) uses net, fil
     edit body = if length(halves) > 1 then halves[1] else ""
     want = header_length(head)
     loop:
-        if length(body) >= want:
+        # want ar Content-Length i BYTES - jamfor bytes, inte kodpunkter
+        if bytes_count(bytes_of(body)) >= want:
             break
         left2 = deadline - monotonic_ms()
         if left2 <= 0:
@@ -431,6 +430,8 @@ external define win_set_frameless(needle: text, on: int, view_h: int) -> int
 external define win_set_click_through(needle: text, on: int) -> int
 external define win_click_through_on(needle: text) -> int
 external define win_move(needle: text, x: int, y: int) -> int
+external define win_drag(needle: text, phase: int, dx: int, dy: int) -> int
+external define win_drag_room(needle: text, payload: text, url: text, whole: int) -> int
 external define win_command(needle: text, what: text) -> int
 external define win_resize(needle: text, w: int, h: int) -> int
 external define win_ghost(needle: text, rects: text) -> int
@@ -471,6 +472,10 @@ public define clicks_through(title: text) -> truth uses console = win_click_thro
 # own pointer and says where the window should be.
 # no example: window state - proven by folio's own top bar
 public define window_move(title: text, x: number, y: number) -> truth uses console = win_move(title, x, y) is 0
+# Drag by deltas from where the window was when the drag began (phase 0 =
+# begin, 1 = move). Reads the window's own rect, so it works where the
+# page's screenX does not (hwnd-hosted extra windows).
+public define window_drag(title: text, phase: number, dx: number, dy: number) -> truth uses console = win_drag(title, phase, dx, dy) is 0
 # Give the window a size (device pixels) and center it on its monitor. The
 # one window verb that starts from the OUTSIDE: a browser app window opens at
 # whatever size its profile last had, and only the OS side can correct that -
@@ -602,12 +607,13 @@ define bar_js() -> text:
     js = js + "let flying = false;\n"
     js = js + "bar.addEventListener('pointerdown', e => \{\n"
     js = js + "if (e.target.closest('button')) return;\n"
-    js = js + "const d = devicePixelRatio, wx = screenX, wy = screenY, px = e.screenX, py = e.screenY;\n"
+    js = js + "const d = devicePixelRatio, px = e.screenX, py = e.screenY, who = '&title=' + encodeURIComponent(document.title);\n"
     js = js + "bar.setPointerCapture(e.pointerId);\n"
+    js = js + "fetch('/api/window?do=dragstart' + who);\n"
     js = js + "const move = ev => \{\n"
     js = js + "if (flying) return;\n"
     js = js + "flying = true;\n"
-    js = js + "fetch('/api/window?do=moveto&v=' + Math.round((wx + ev.screenX - px) * d) + '&t=' + Math.round((wy + ev.screenY - py) * d) + '&title=' + encodeURIComponent(document.title)).finally(() => flying = false);\n"
+    js = js + "fetch('/api/window?do=dragto&v=' + Math.round((ev.screenX - px) * d) + '&t=' + Math.round((ev.screenY - py) * d) + who).finally(() => flying = false);\n"
     js = js + "\};\n"
     js = js + "const up = () => \{ bar.removeEventListener('pointermove', move); bar.removeEventListener('pointerup', up); \};\n"
     js = js + "bar.addEventListener('pointermove', move);\n"
@@ -630,6 +636,8 @@ define do_window(title: text, what: text, v: number, t: number) -> truth:
         what is "opacity" then window_opacity(title, v)
         what is "through" then window_click_through(title, v is 1)
         what is "moveto" then window_move(title, v, t)
+        what is "dragstart" then window_drag(title, 0, 0, 0)
+        what is "dragto" then window_drag(title, 1, v, t)
         what is "min" then window_minimize(title)
         what is "hide" then window_hide(title)
         what is "show" then window_show(title)
@@ -647,6 +655,10 @@ public define window_api(req: request) -> response:
     if what is "ghost":
         # the rects that stay interactive; "" ends the mode
         return if window_ghost(title, query_of(req, "r")) then json_of("\{\"ok\":true\}") else json_of("\{\"ok\":false\}")
+    if what is "dragroom":
+        # a room is dragged between our windows: the runtime follows the
+        # pointer from here on (see win_drag_room in the runtime)
+        return if win_drag_room(title, query_of(req, "p"), query_of(req, "u"), int_from_text(query_of(req, "w"))) is 0 then json_of("\{\"ok\":true\}") else json_of("\{\"ok\":false\}")
     if what is "state":
         # the one question the page cannot answer itself: while the window is
         # clicking through, it is the keyboard that turns it off, not the page

@@ -1,0 +1,30 @@
+# A text is a run of CHARACTERS. `length` counts them, `bytes_count` counts
+# bytes, and `part` cuts between characters at both ends.
+#
+# It used to be bytes all the way: `length("rasmorgas")` with the right letters
+# answered 13 for ten characters, `part(s, 1, 2)` handed back half of an `a`,
+# and `index_of` pointed at a byte nobody could index with. Three answers that
+# were each correct about the machine and wrong about the language.
+#
+# `bytes_count`, `byte_at` and `bytes_part` are the byte questions and they
+# read the text where it lies - no copy.
+
+
+define main() -> number:
+    s = "räksmörgås"
+
+    a = if length(s) is 10 and bytes_count(s) is 13 then 40 else 0
+
+    # cutting at character boundaries: the whole text back, and one letter out
+    b = if part(s, 0, length(s)) is s and part(s, 1, 2) is "ä" then 12 else 0
+
+    # a position from `index_of` is a position `part` can use. That round trip
+    # is the whole point: two functions that count differently do not compose.
+    at = index_of(s, "ö")
+    c = if at is 5 and part(s, at, at + 1) is "ö" then 6 else 0
+
+    # ASCII is unchanged - the two counts agree there, which is why this went
+    # unnoticed for as long as it did.
+    d = if length("abc") is 3 and bytes_count("abc") is 3 then 4 else 0
+
+    a + b + c + d   # 40 + 12 + 6 + 4

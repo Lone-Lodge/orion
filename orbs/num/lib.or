@@ -8,8 +8,8 @@
 #
 # Floats: the language already gives you f64 arithmetic and the math builtins
 # `sqrt sin cos tan exp log log2 floor ceil round atan2 pow` directly (no import
-# needed). This orb adds what those leave out: `pi`, `e` (real consts), the f* min/max/abs
-# helpers, and `parse_float` (the int-only `parse` above cannot read a decimal).
+# needed). This orb adds what those leave out: `pi`, `e` (real consts), `abs` / `min` /
+# `max` / `clamp`, and `parse_float` (the int-only `parse` above cannot read a decimal).
 
 # Absolute value.
 public define abs(x: number) -> number:
@@ -101,24 +101,15 @@ public define is_odd(n: number) -> truth:
 public const pi = 3.141592653589793
 public const e = 2.718281828459045
 
-# Absolute value of a float.
-public define fabs(x: float) -> float:
-    example fabs(0.0 - 2.5) is 2.5
-    if x < 0.0 then 0.0 - x else x
-
-# The smaller / larger of two floats.
-public define fmin(a: float, b: float) -> float:
-    example fmin(1.5, 2.5) is 1.5
-    if a < b then a else b
-
-public define fmax(a: float, b: float) -> float:
-    example fmax(1.5, 2.5) is 2.5
-    if a > b then a else b
-
-# Constrain a float to [lo, hi].
-public define fclamp(x: float, lo: float, hi: float) -> float:
-    example fclamp(5.0, 0.0, 1.0) is 1.0
-    if x < lo then lo else (if x > hi then hi else x)
+# `fabs` / `fmin` / `fmax` / `fclamp` are gone. Their bodies were the same
+# four lines as `abs` / `min` / `max` / `clamp` above - `if a < b then a else b`
+# - and they existed only because the type words were split. `number` picks,
+# so one word does both.
+#
+# The catch, stated once: a `number` site gets ONE answer for the whole
+# program. A `min` reached by a fraction anywhere is real everywhere, and a
+# whole number in a double is exact up to 2^53. That is the deal `number`
+# makes; it is not new here.
 
 # Parse a float out of text: optional '-', integer part, optional '.fraction',
 # optional 'e'/'E' exponent (with optional sign). Non-numeric tails stop the
@@ -139,7 +130,7 @@ public define parse_float(t: text) -> float:
         if i >= n: break
         d = byte_at(b, i)
         if d < 48 or d > 57: break
-        val = val * 10.0 + ((d - 48) as float)
+        val = val * 10.0 + to_real(d - 48)
         i = i + 1
     if i < n and byte_at(b, i) is 46:              # '.'
         i = i + 1
@@ -148,7 +139,7 @@ public define parse_float(t: text) -> float:
             if i >= n: break
             d = byte_at(b, i)
             if d < 48 or d > 57: break
-            val = val + ((d - 48) as float) * scale
+            val = val + to_real(d - 48) * scale
             scale = scale * 0.1
             i = i + 1
     if i < n and (byte_at(b, i) is 101 or byte_at(b, i) is 69):   # 'e' / 'E'
@@ -166,7 +157,7 @@ public define parse_float(t: text) -> float:
             if d < 48 or d > 57: break
             exp = exp * 10 + (d - 48)
             i = i + 1
-        factor = pow(10.0, exp as float)
+        factor = pow(10.0, to_real(exp))
         val = if eneg then val / factor else val * factor
     if neg then 0.0 - val else val
 

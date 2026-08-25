@@ -7,8 +7,6 @@
 # widths, `pad_right` to align, `join` to glue a row back together, and
 # `num.parse` to total a numeric column. Data lives in a `[[text]]` grid.
 
-use text
-use num
 
 # Parse the raw CSV into a grid of trimmed cells.
 define parse_grid(csv: text) -> [[text]]:

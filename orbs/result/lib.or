@@ -6,7 +6,7 @@
 #
 #   use result
 #
-#   define safe_div(a: int, b: int) -> Result<int>:
+#   define safe_div(a: number, b: number) -> Result<number>:
 #       if b is 0 then Result.Err("divide by zero") else Result.Ok(a / b)
 #
 #   choose safe_div(10, 0):

@@ -1,0 +1,38 @@
+# A slot holds a `number`. Which machine type is the compiler's answer, and it
+# takes it from the WRITE: a real goes in as its bits and the read is turned
+# into the one that reads them back. One word is written.
+#
+# `slot_get_int` is retired. It was the last builtin whose NAME said `int`,
+# and it was also the wall veil hit: `veil_motion.smooth` keeps its value in a
+# slot between frames, so veil could not be `number` while a slot could only
+# hold a whole one.
+#
+# The key is remembered by how it is WRITTEN - the local holding it, or the
+# literal - per function. `kv` is a name half the corpus uses, and a mark that
+# crossed functions would answer for somebody else's slot.
+
+define smooth(key: text, target: number) -> number:
+    kv = "t38:{key}"
+    if not slot_has(kv):
+        put = slot_set(kv, target)
+        return target
+    at_now = slot_get_number(kv)
+    now = at_now + (target - at_now) * 0.5
+    again = slot_set(kv, now)
+    now
+
+define counter(k: text) -> number:
+    n = slot_get_number(k)
+    bump = slot_set(k, n + 1)
+    n + 1
+
+define main() -> number:
+    a0 = smooth("x", 10.0)          # first call: stores and answers the target
+    a1 = smooth("x", 0.0)           # halfway down from 10
+    a2 = smooth("x", 0.0)           # halfway again
+    a = if a0 is 10.0 and a1 is 5.0 and a2 is 2.5 then 20 else 0
+    # a WHOLE slot in the same program is untouched by any of it
+    b = if counter("c") is 1 and counter("c") is 2 and counter("c") is 3 then 12 else 0
+    # and the words come out as words
+    c = if "{a2}" is "2.5" and "{10.0}" is "10" then 6 else 0
+    a + b + c   # 20 + 12 + 6

@@ -1,16 +1,4 @@
 [workspace]
-name = "orion-self"
+name = "orion"
 version = "0.1.0"
 description = "Orion compiler in Orion. LLVM backend. Pure Orion compiles pure Orion."
-
-# Members live in:
-#   orbs/        - compiler stages as reusable libraries
-#   examples/    - drivers + test suite
-#
-# Run the test suite:
-#   cd examples/tests
-#   orbit run src/main.or main
-#
-# Compile a single .or file to native .exe:
-#   cd examples/compile_or
-#   orbit run src/main.or main   # reads test_files/demo.or, writes dist/demo.exe

@@ -645,6 +645,7 @@ static HWND ow_hwnd;
 static volatile LONG ow_ready;
 static volatile LONG ow_abandoned;
 static void *win_target(const char *needle);
+static void *ow_x_front(void);   /* the extra window in front, or NULL - own-window block */
 
 /* The window itself, or NULL. Loads user32 on the first call. */
 static void *win_by_title(const char *needle) {
@@ -693,6 +694,10 @@ static void *win_target(const char *needle) {
      * or an abandoned attempt) must not swallow verbs meant for the
      * borrowed-Edge fallback. */
     void *found = win_by_title(needle);
+    void *front = ow_x_front();
+    /* a verb from a page in an extra window means THAT window - the one in
+       front when the bar was clicked */
+    if (front) return front;
     if (ow_hwnd && ow_ready == 1) return ow_hwnd;
     return found;
 }
@@ -793,6 +798,9 @@ static void win_pseudo_max(void *h, int clip) {
 static int ow_is_own_window(void *h);   /* defined with the own-window block below */
 static void ow_set_visible(void *h, int on);   /* likewise */
 static void ow_take_foreground(void *h);
+static void ow_xwindow_watch(void *webview);   /* extra windows, with the own-window block */
+static void *ow_x_front(void);                 /* the extra window in front, or NULL */
+static void ow_place_save(HWND h);             /* window placement memory, with the own-window block */
 long long win_set_frameless(const char *needle, long long on, long long view_h) {
     void *h = win_target(needle);
     RECT r, c;
@@ -837,6 +845,28 @@ long long win_move(const char *needle, long long x, long long y) {
     void *h = win_target(needle);
     if (!h) return -1;
     wt_SetWindowPos(h, NULL, (int)x, (int)y, 0, 0,
+                    0x0001 | 0x0004 /* SWP_NOSIZE|SWP_NOZORDER */);
+    return 0;
+}
+/* A drag the OS cannot see: the page reports pointer deltas, the window
+ * follows from where it WAS at the start (the page's screenX lies under
+ * hwnd hosting, so the rect is read here, not there). */
+static RECT win_drag_start;
+static void *win_drag_h;
+long long win_drag(const char *needle, long long phase, long long dx, long long dy) {
+    static int (__stdcall *get_rect)(void *, RECT *);
+    if (!get_rect) {
+        HMODULE u = LoadLibraryA("user32.dll");
+        if (u) get_rect = (int (__stdcall *)(void *, RECT *))(void *)GetProcAddress(u, "GetWindowRect");
+        if (!get_rect) return -1;
+    }
+    if (phase == 0) {
+        win_drag_h = win_target(needle);
+        if (!win_drag_h || !get_rect(win_drag_h, &win_drag_start)) { win_drag_h = NULL; return -1; }
+        return 0;
+    }
+    if (!win_drag_h || !wt_SetWindowPos) return -1;
+    wt_SetWindowPos(win_drag_h, NULL, (int)(win_drag_start.left + dx), (int)(win_drag_start.top + dy), 0, 0,
                     0x0001 | 0x0004 /* SWP_NOSIZE|SWP_NOZORDER */);
     return 0;
 }
@@ -1110,6 +1140,8 @@ long long win_set_frameless(const char *needle, long long on, long long view_h) 
 long long win_set_click_through(const char *needle, long long on) { (void)needle; (void)on; return -1; }
 long long win_click_through_on(const char *needle) { (void)needle; return -1; }
 long long win_move(const char *needle, long long x, long long y) { (void)needle; (void)x; (void)y; return -1; }
+long long win_drag(const char *needle, long long phase, long long dx, long long dy) { (void)needle; (void)phase; (void)dx; (void)dy; return -1; }
+long long win_drag_room(const char *needle, const char *payload, const char *url, long long whole) { (void)needle; (void)payload; (void)url; (void)whole; return -1; }
 long long win_command(const char *needle, const char *what) { (void)needle; (void)what; return -1; }
 long long win_resize(const char *needle, long long w, long long h) { (void)needle; (void)w; (void)h; return -1; }
 long long win_hotkey(const char *needle, long long mods, long long key) { (void)needle; (void)mods; (void)key; return -1; }
@@ -1457,10 +1489,352 @@ static HRESULT __stdcall ow_controller_done(ow_handler *self, void *hr, void *co
     ow_on_title.vtbl = ow_handler_vtbl;
     ow_on_title.invoke = ow_title_changed;
     ((ow_fn3)ow_vt(ow_webview, 46 /* add_DocumentTitleChanged */))(ow_webview, &ow_on_title, token);
+    ow_xwindow_watch(ow_webview);
     ow_log("navigate hr", (long long)((ow_fn2)ow_vt(ow_webview, 5 /* Navigate */))(ow_webview, ow_url));
     ((HRESULT (__stdcall *)(void *, int))ow_vt(ow_controller, 12 /* MoveFocus */))(ow_controller, 0);
     InterlockedExchange(&ow_ready, 1);
     return 0;
+}
+
+/* ---- extra windows: what window.open becomes ----
+ * A page that opens a window (a room popped out, a second view of the same
+ * app) gets a real window of ours, not WebView2's default popup with its
+ * browser frame and no focus. Each extra is a plain hwnd-hosted webview on
+ * its own top-level window - no visual hosting, no ghost mode, the frame the
+ * OS gives it - living on the same thread and environment as the main
+ * window. The main window still owns the process: when it closes, the app
+ * ends and the extras go with it. Fixed slots, eight is plenty for rooms.
+ * ICoreWebView2: 44 add_NewWindowRequested. NewWindowRequestedEventArgs:
+ * 3 get_Uri, 6 put_Handled. */
+#define OW_EXTRA_MAX 8
+typedef struct { ow_handler h; int slot; } ow_xhandler;
+typedef struct {
+    HWND hwnd;
+    void *controller, *webview;
+    wchar_t url[2048];
+    ow_xhandler on_env, on_controller, on_title, on_newwin;
+    int used;
+} ow_extra;
+static ow_extra ow_x[OW_EXTRA_MAX];
+static void *ow_env;                    /* kept from env_done (unused by the extras now) */
+static HRESULT (__stdcall *ow_create_env)(const wchar_t *, const wchar_t *, void *, void *);
+static wchar_t ow_data_dir[1024];
+static ow_xhandler ow_main_newwin;
+static void ow_xwindow_open(const wchar_t *url);
+static void ow_xwindow_open_at(const wchar_t *url, int x, int y);
+
+static void *ow_x_front(void) {
+    static HWND (__stdcall *get_front)(void);
+    HWND f;
+    int i;
+    if (!get_front) {
+        HMODULE u = LoadLibraryA("user32.dll");
+        if (u) get_front = (HWND (__stdcall *)(void))(void *)GetProcAddress(u, "GetForegroundWindow");
+        if (!get_front) return NULL;
+    }
+    f = get_front();
+    for (i = 0; i < OW_EXTRA_MAX; i++) if (ow_x[i].used && ow_x[i].hwnd && ow_x[i].hwnd == f) return f;
+    return NULL;
+}
+static ow_extra *ow_x_of(HWND h) {
+    int i;
+    for (i = 0; i < OW_EXTRA_MAX; i++) if (ow_x[i].used && ow_x[i].hwnd == h) return &ow_x[i];
+    return NULL;
+}
+#define OW_X_RIM 4   /* px of our own dark frame around the webview: the resize handle */
+static void ow_x_fit(ow_extra *x) {
+    RECT c;
+    if (!x->controller || !x->hwnd) return;
+    owu_GetClientRect(x->hwnd, &c);
+    c.left += OW_X_RIM; c.top += OW_X_RIM; c.right -= OW_X_RIM; c.bottom -= OW_X_RIM;
+    ((ow_bounds_fn)ow_vt(x->controller, 6 /* put_Bounds */))(x->controller, c);
+}
+static HRESULT __stdcall ow_x_title_changed(ow_handler *self, void *sender, void *args) {
+    ow_extra *x = &ow_x[((ow_xhandler *)self)->slot];
+    wchar_t *title = NULL;
+    (void)args;
+    if (((ow_fn2)ow_vt(sender, 48 /* get_DocumentTitle */))(sender, (void *)&title) == 0 && title) {
+        if (x->hwnd) owu_SetWindowTextW(x->hwnd, title);
+        owu_CoTaskMemFree(title);
+    }
+    return 0;
+}
+/* Any window of ours may open another: take the request, open our kind.
+ * Not here, though - a controller asked for INSIDE the event handler fails
+ * with ERROR_INVALID_STATE (the browser is mid-event). The url is posted to
+ * the main window and the opening happens on the next message. */
+#define OW_MSG_XOPEN (0x8000 + 44)     /* WM_APP + 44, lparam = malloc'd wide url */
+static HRESULT __stdcall ow_new_window(ow_handler *self, void *sender, void *args) {
+    wchar_t *uri = NULL;
+    (void)self; (void)sender;
+    if (((ow_fn2)ow_vt(args, 3 /* get_Uri */))(args, (void *)&uri) == 0 && uri) {
+        wchar_t *copy = _wcsdup(uri);
+        ((ow_flag_fn)ow_vt(args, 6 /* put_Handled */))(args, 1);
+        if (copy && ow_hwnd && wt_PostMessageW) wt_PostMessageW(ow_hwnd, OW_MSG_XOPEN, 0, (LPARAM)copy);
+        else free(copy);
+        owu_CoTaskMemFree(uri);
+    }
+    return 0;
+}
+static void ow_xwindow_watch(void *webview) {
+    long long token[2] = {0, 0};
+    ow_main_newwin.h.vtbl = ow_handler_vtbl;
+    ow_main_newwin.h.invoke = ow_new_window;
+    ((ow_fn3)ow_vt(webview, 44 /* add_NewWindowRequested */))(webview, &ow_main_newwin, token);
+}
+static HRESULT __stdcall ow_x_env_done(ow_handler *self, void *hr, void *env) {
+    ow_extra *x = &ow_x[((ow_xhandler *)self)->slot];
+    ow_log("extra env_done hr", (long long)(intptr_t)hr);
+    if ((int)(intptr_t)hr != 0 || !env || !x->hwnd) return 0;
+    ow_log("extra controller create hr", (long long)((ow_fn3)ow_vt(env, 3 /* CreateCoreWebView2Controller */))(env, x->hwnd, &x->on_controller));
+    return 0;
+}
+/* ---- dragging a room between windows ----
+ * The page cannot see the pointer once it leaves its window, and two of our
+ * windows cannot see each other at all - so the runtime follows the mouse:
+ * a timer on the main window's thread reads the cursor and the button, finds
+ * which of OUR windows is under it, and posts to that page where the pointer
+ * is (chrome.webview message, JSON). On release: over one of ours -> that
+ * page gets "drop" (with the payload the page that started the drag gave),
+ * the starting page gets "done"; over nothing -> a new window opens at the
+ * pointer on the payload's url, and the starting page gets "done" too.
+ * ICoreWebView2: 33 PostWebMessageAsString. */
+#define OW_DRAG_TIMER 7
+#define OW_MSG_DRAGROOM (0x8000 + 45)  /* WM_APP + 45: start the timer on the window thread */
+static struct { volatile int on; char payload[4096]; wchar_t url[2048]; HWND src, over; int whole; } ow_drag;
+static HWND (__stdcall *owu_WindowFromPoint)(POINT);
+static HWND (__stdcall *owu_GetAncestor)(HWND, UINT);
+static short (__stdcall *owu_GetAsyncKeyState)(int);
+static void *ow_webview_of(HWND h) {
+    int i;
+    if (h && h == ow_hwnd) return ow_webview;
+    for (i = 0; i < OW_EXTRA_MAX; i++) if (ow_x[i].used && ow_x[i].hwnd == h) return ow_x[i].webview;
+    return NULL;
+}
+static void ow_post(HWND h, const char *json) {
+    void *wv = ow_webview_of(h);
+    static wchar_t buf[8192];
+    if (!wv) return;
+    MultiByteToWideChar(CP_UTF8, 0, json, -1, buf, 8192);
+    ((ow_fn2)ow_vt(wv, 33 /* PostWebMessageAsString */))(wv, buf);
+}
+static void ow_drag_tick(void) {
+    POINT pt, c;
+    HWND h, root = NULL;
+    int down;
+    char msg[5000];
+    if (!ow_drag.on || !owu_GetCursorPos) return;
+    owu_GetCursorPos(&pt);
+    down = owu_GetAsyncKeyState ? (owu_GetAsyncKeyState(1 /* VK_LBUTTON */) & 0x8000) : 0;
+    h = owu_WindowFromPoint ? owu_WindowFromPoint(pt) : NULL;
+    if (h && owu_GetAncestor) h = owu_GetAncestor(h, 2 /* GA_ROOT */);
+    if (ow_webview_of(h)) root = h;
+    if (ow_drag.over && ow_drag.over != root) ow_post(ow_drag.over, "{\"dots\":\"roomdrag\",\"phase\":\"leave\"}");
+    ow_drag.over = root;
+    c = pt;
+    if (root) {
+        owu_ScreenToClient(root, &c);
+        if (root != ow_hwnd) { c.x -= OW_X_RIM; c.y -= OW_X_RIM; }
+    }
+    if (down) {
+        if (root) { snprintf(msg, sizeof msg, "{\"dots\":\"roomdrag\",\"phase\":\"move\",\"x\":%ld,\"y\":%ld}", (long)c.x, (long)c.y); ow_post(root, msg); }
+        return;
+    }
+    /* released */
+    ow_drag.on = 0;
+    owu_KillTimer(ow_hwnd, OW_DRAG_TIMER);
+    if (root) {
+        snprintf(msg, sizeof msg, "{\"dots\":\"roomdrag\",\"phase\":\"drop\",\"x\":%ld,\"y\":%ld,\"payload\":%s}", (long)c.x, (long)c.y, ow_drag.payload);
+        ow_post(root, msg);
+    } else {
+        ow_xwindow_open_at(ow_drag.url, pt.x - 120, pt.y - 16);
+    }
+    snprintf(msg, sizeof msg, "{\"dots\":\"roomdrag\",\"phase\":\"done\",\"target\":\"%s\",\"payload\":%s}", root ? "window" : "new", ow_drag.payload);
+    ow_post(ow_drag.src, msg);
+    /* a whole popped-out window dragged away: its old window goes */
+    if (ow_drag.whole && ow_drag.src && ow_drag.src != ow_hwnd && owu_DestroyWindow) owu_DestroyWindow(ow_drag.src);
+}
+/* From the server thread (the page asked): remember what is dragged and
+ * from where, then let the window thread start the timer. payload = the
+ * page's JSON {url, title, room, whole}; url is read out of it for the
+ * tear-off case. */
+long long win_drag_room(const char *needle, const char *payload, const char *url, long long whole) {
+    HWND src = (HWND)win_target(needle);
+    if (!src || !ow_hwnd) return -1;
+    if (!owu_WindowFromPoint) {
+        HMODULE u = LoadLibraryA("user32.dll");
+        if (u) {
+            owu_WindowFromPoint = (HWND (__stdcall *)(POINT))(void *)GetProcAddress(u, "WindowFromPoint");
+            owu_GetAncestor = (HWND (__stdcall *)(HWND, UINT))(void *)GetProcAddress(u, "GetAncestor");
+            owu_GetAsyncKeyState = (short (__stdcall *)(int))(void *)GetProcAddress(u, "GetAsyncKeyState");
+        }
+    }
+    strncpy(ow_drag.payload, payload, sizeof ow_drag.payload - 1);
+    MultiByteToWideChar(CP_UTF8, 0, url, -1, ow_drag.url, 2048);
+    ow_drag.src = src;
+    ow_drag.over = NULL;
+    ow_drag.whole = (int)whole;
+    ow_drag.on = 1;
+    if (wt_PostMessageW) wt_PostMessageW(ow_hwnd, OW_MSG_DRAGROOM, 0, 0);
+    return 0;
+}
+static HRESULT __stdcall ow_x_controller_done(ow_handler *self, void *hr, void *controller) {
+    ow_extra *x = &ow_x[((ow_xhandler *)self)->slot];
+    long long token[2] = {0, 0};
+    ow_log("extra controller hr", (long long)(intptr_t)hr);
+    if ((int)(intptr_t)hr != 0 || !controller || !x->hwnd) return 0;
+    ((ow_fn1)ow_vt(controller, 1 /* AddRef */))(controller);
+    x->controller = controller;
+    ((ow_fn2)ow_vt(controller, 25 /* get_CoreWebView2 */))(controller, (void *)&x->webview);
+    if (!x->webview) return 0;
+    ((ow_fn1)ow_vt(x->webview, 1 /* AddRef */))(x->webview);
+    ow_x_fit(x);
+    x->on_title.h.vtbl = ow_handler_vtbl;
+    x->on_title.h.invoke = ow_x_title_changed;
+    ((ow_fn3)ow_vt(x->webview, 46 /* add_DocumentTitleChanged */))(x->webview, &x->on_title, token);
+    x->on_newwin.h.vtbl = ow_handler_vtbl;
+    x->on_newwin.h.invoke = ow_new_window;
+    ((ow_fn3)ow_vt(x->webview, 44 /* add_NewWindowRequested */))(x->webview, &x->on_newwin, token);
+    ((ow_fn2)ow_vt(x->webview, 5 /* Navigate */))(x->webview, x->url);
+    ((HRESULT (__stdcall *)(void *, int))ow_vt(controller, 12 /* MoveFocus */))(controller, 0);
+    return 0;
+}
+static LRESULT __stdcall ow_x_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+    ow_extra *x = ow_x_of(h);
+    switch (m) {
+    case WM_SIZE:
+        if (x) ow_x_fit(x);
+        return 0;
+    case WM_SETFOCUS:
+        if (x && x->controller)
+            ((HRESULT (__stdcall *)(void *, int))ow_vt(x->controller, 12 /* MoveFocus */))(x->controller, 0);
+        return 0;
+    case WM_NCCALCSIZE:
+        /* no OS frame at all (it paints a light line no attribute removes):
+           the client is the whole window, our rim below is the frame */
+        if (wp) return 0;
+        break;
+    case WM_NCHITTEST: {
+        /* the rim resizes; the page's bar drags (through /api/window) */
+        POINT pt; RECT c;
+        int l, r, t, b;
+        pt.x = (int)(short)(lp & 0xFFFF); pt.y = (int)(short)((lp >> 16) & 0xFFFF);
+        owu_ScreenToClient(h, &pt);
+        owu_GetClientRect(h, &c);
+        l = pt.x < OW_X_RIM; r = pt.x >= c.right - OW_X_RIM; t = pt.y < OW_X_RIM; b = pt.y >= c.bottom - OW_X_RIM;
+        if (t && l) return 13; if (t && r) return 14; if (b && l) return 16; if (b && r) return 17;
+        if (l) return 10; if (r) return 11; if (t) return 12; if (b) return 15;
+        return 1 /* HTCLIENT */;
+    }
+    case WM_NCLBUTTONDOWN:
+        /* a press on the rim starts the OS size loop in that direction
+           (SC_SIZE + WMSZ_*: the hit codes 10..17 map straight onto 1..8) */
+        if (wp >= 10 && wp <= 17) { owu_DefWindowProcW(h, 0x0112 /* WM_SYSCOMMAND */, 0xF000 + (wp - 9), lp); return 0; }
+        break;
+    case WM_GETMINMAXINFO: {
+        MONITORINFO mi;
+        HMONITOR mon = owu_MonitorFromWindow(h, 2 /* MONITOR_DEFAULTTONEAREST */);
+        mi.cbSize = sizeof mi;
+        if (mon && owu_GetMonitorInfoW(mon, &mi)) {
+            MINMAXINFO *mm = (MINMAXINFO *)lp;
+            mm->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
+            mm->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
+            mm->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
+            mm->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+            mm->ptMinTrackSize.x = 320;
+            mm->ptMinTrackSize.y = 200;
+            return 0;
+        }
+        break;
+    }
+    case WM_DESTROY:
+        if (x) {
+            if (x->controller) ((ow_fn1)ow_vt(x->controller, 24 /* Close */))(x->controller);
+            x->controller = NULL; x->webview = NULL; x->hwnd = NULL; x->used = 0;
+        }
+        return 0;
+    }
+    return owu_DefWindowProcW(h, m, wp, lp);
+}
+/* On the window thread (the event handlers run there): a free slot, a
+ * window a little smaller than the main one, offset so it does not hide it,
+ * shown and brought forward, then a controller asked for on it. */
+static void ow_xwindow_open(const wchar_t *url) { ow_xwindow_open_at(url, -1, -1); }
+static void ow_xwindow_open_at(const wchar_t *url, int px, int py) {
+    static int registered;
+    int i, w, h, x0, y0;
+    ow_extra *x = NULL;
+    ow_xhandler *oc;
+    for (i = 0; i < OW_EXTRA_MAX; i++) if (!ow_x[i].used) { x = &ow_x[i]; break; }
+    if (!x || !ow_create_env) { ow_log("extra window: no slot or env", -1); return; }
+    if (!registered) {
+        WNDCLASSW wc;
+        memset(&wc, 0, sizeof wc);
+        wc.lpfnWndProc = (WNDPROC)ow_x_wndproc;
+        wc.hInstance = GetModuleHandleW(NULL);
+        wc.hCursor = owu_LoadCursorW(NULL, (const wchar_t *)(uintptr_t)32512 /* IDC_ARROW */);
+        wc.hIcon = owu_LoadIconA(GetModuleHandleA(NULL), (const char *)(uintptr_t)1);
+        if (!wc.hIcon) wc.hIcon = owu_LoadIconW(NULL, (const wchar_t *)(uintptr_t)32512);
+        wc.lpszClassName = L"OrionExtraWindow";
+        {   /* the rim's colour: the paper's dark tone, painted by the class */
+            HMODULE g = LoadLibraryA("gdi32.dll");
+            HBRUSH (__stdcall *brush)(DWORD) = g ? (HBRUSH (__stdcall *)(DWORD))(void *)GetProcAddress(g, "CreateSolidBrush") : NULL;
+            if (brush) wc.hbrBackground = brush(0x00161616);   /* dots body in the dark theme - the rim vanishes into it */
+        }
+        owu_RegisterClassW(&wc);
+        registered = 1;
+    }
+    memset(x, 0, sizeof *x);
+    x->used = 1;
+    wcsncpy(x->url, url, 2047);
+    w = ow_w > 200 ? ow_w - 120 : 1000;
+    h = ow_h > 200 ? ow_h - 80 : 740;
+    /* stepped down-right of the screen's centre so the extras stack visibly */
+    x0 = (owu_GetSystemMetrics(0) - w) / 2 + 40 + (int)(x - ow_x) * 24;
+    y0 = (owu_GetSystemMetrics(1) - h) / 2 + 40 + (int)(x - ow_x) * 24;
+    if (px >= 0) { x0 = px; y0 = py; }   /* a torn-off room lands under the pointer */
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    /* no WS_THICKFRAME: that is what makes Windows paint a frame line no
+       matter what - resizing is ours, through the rim (see NCLBUTTONDOWN) */
+    x->hwnd = owu_CreateWindowExW(0, L"OrionExtraWindow", ow_title, WS_POPUP | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CLIPCHILDREN,
+                                  x0, y0, w, h, NULL, NULL, GetModuleHandleW(NULL), NULL);
+    if (!x->hwnd) { x->used = 0; return; }
+    if (owu_SetWindowPos)   /* re-run the frame calc the TRUE way, as for the main window */
+        owu_SetWindowPos(x->hwnd, NULL, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0020);
+    {   /* the thin DWM border: dark, so the frame does not read as a white line */
+        HMODULE dwm = LoadLibraryA("dwmapi.dll");
+        HRESULT (__stdcall *set_attr)(HWND, DWORD, const void *, DWORD) = dwm
+            ? (HRESULT (__stdcall *)(HWND, DWORD, const void *, DWORD))(void *)GetProcAddress(dwm, "DwmSetWindowAttribute") : NULL;
+        if (set_attr) {
+            DWORD border = 0xFFFFFFFE;   /* DWMWA_COLOR_NONE: no border line at all */
+            DWORD dark = 1;
+            set_attr(x->hwnd, 34 /* DWMWA_BORDER_COLOR */, &border, sizeof border);
+            set_attr(x->hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof dark);
+        }
+    }
+    owu_ShowWindow(x->hwnd, 1 /* SW_SHOWNORMAL */);
+    if (owu_SetForegroundWindow) owu_SetForegroundWindow(x->hwnd);
+    oc = &x->on_controller;
+    oc->h.vtbl = ow_handler_vtbl;
+    oc->h.invoke = ow_x_controller_done;
+    oc->slot = (int)(x - ow_x);
+    x->on_title.slot = oc->slot;
+    x->on_newwin.slot = oc->slot;
+    /* its own environment, made the way the main window's was: the shared
+       one answers ERROR_INVALID_STATE to a second controller */
+    x->on_env.h.vtbl = ow_handler_vtbl;
+    x->on_env.h.invoke = ow_x_env_done;
+    x->on_env.slot = oc->slot;
+    /* a browser process hosts ONE kind of webview: the main window is
+       visual-hosted, so an hwnd-hosted extra in the same process answers
+       ERROR_INVALID_STATE. A profile of its own gives the extras their own
+       browser process (same server, same files; only web storage differs). */
+    {
+        static wchar_t xdir[1100];
+        _snwprintf(xdir, 1100, L"%s-extra", ow_data_dir);
+        ow_log("extra env hr", (long long)ow_create_env(NULL, ow_data_dir[0] ? xdir : NULL, NULL, &x->on_env));
+    }
 }
 /* environment arrived: ask it for a controller on our window - the visual
  * kind when DComp is up and the runtime speaks Environment3, else the
@@ -1470,6 +1844,8 @@ static HRESULT __stdcall ow_env_done(ow_handler *self, void *hr, void *env) {
     (void)self;
     ow_log("env_done hr", (long long)(intptr_t)hr);
     if ((int)(intptr_t)hr != 0 || !env) { InterlockedExchange(&ow_ready, -1); return 0; }
+    ((ow_fn1)ow_vt(env, 1 /* AddRef */))(env);
+    ow_env = env;                       /* the extras are made from it later */
     ow_on_controller.vtbl = ow_handler_vtbl;
     ow_on_controller.invoke = ow_controller_done;
     if (ow_dcvisual && ow_qi(env, &OW_IID_ENV3, &env3) == 0 && env3) {
@@ -1539,6 +1915,7 @@ static LRESULT __stdcall ow_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
         return 0;
     case WM_TIMER:
         if (wp == OW_GHOST_TIMER) { ow_ghost_tick(h); return 0; }
+        if (wp == OW_DRAG_TIMER) { ow_drag_tick(); return 0; }
         break;
     case OW_MSG_GHOST: {
         char *csv = (char *)lp;
@@ -1579,6 +1956,14 @@ static LRESULT __stdcall ow_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
         if (ow_controller)
             ((ow_fn1)ow_vt(ow_controller, 23 /* NotifyParentWindowPositionChanged */))(ow_controller);
         return 0;
+    case OW_MSG_DRAGROOM:
+        if (owu_SetTimer) owu_SetTimer(h, OW_DRAG_TIMER, 16, NULL);
+        return 0;
+    case OW_MSG_XOPEN: {
+        wchar_t *url = (wchar_t *)lp;
+        if (url) { ow_xwindow_open(url); free(url); }
+        return 0;
+    }
     case OW_MSG_THROUGH:
         if (owu_RegisterHotKey && owu_UnregisterHotKey) {
             if (wp) ow_log("hotkey reg", owu_RegisterHotKey(h, 1, 0x0002 | 0x0001 /* MOD_CONTROL|MOD_ALT */, 'C'));
@@ -1627,6 +2012,7 @@ static LRESULT __stdcall ow_wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
         }
         return 0;
     case WM_CLOSE:
+        ow_place_save(h);   /* where it was - read back next start */
         owu_DestroyWindow(h);
         return 0;
     case WM_DESTROY:
@@ -1666,6 +2052,50 @@ static HMODULE ow_loader(void) {
     return lib;
 }
 
+/* Where the window was last time: a WINDOWPLACEMENT per app title under
+ * %LOCALAPPDATA%\orion-webview\<title>.place. Read before the first show,
+ * written when the message loop ends. A placement is validated by the OS
+ * (an off-screen rect snaps back), so a moved monitor is harmless. */
+static void ow_place_path(char *out, size_t n) {
+    const char *local = getenv("LOCALAPPDATA");
+    char t[256];
+    int i;
+    WideCharToMultiByte(CP_UTF8, 0, ow_title, -1, t, sizeof t, NULL, NULL);
+    for (i = 0; t[i]; i++) if (t[i] == '\\' || t[i] == '/' || t[i] == ':' || t[i] == ' ') t[i] = '_';
+    snprintf(out, n, "%s\\orion-webview\\%s.place", local ? local : ".", t);
+}
+static void ow_place_load(HWND h) {
+    static int (__stdcall *set_place)(HWND, const WINDOWPLACEMENT *);
+    WINDOWPLACEMENT wp;
+    char path[1024];
+    FILE *f;
+    if (!set_place) { HMODULE u = LoadLibraryA("user32.dll"); if (u) set_place = (int (__stdcall *)(HWND, const WINDOWPLACEMENT *))(void *)GetProcAddress(u, "SetWindowPlacement"); }
+    if (!set_place) return;
+    ow_place_path(path, sizeof path);
+    f = fopen(path, "rb");
+    if (!f) return;
+    if (fread(&wp, sizeof wp, 1, f) == 1 && wp.length == sizeof wp) {
+        if (wp.showCmd == 2 /* SW_SHOWMINIMIZED */) wp.showCmd = 1;
+        set_place(h, &wp);
+    }
+    fclose(f);
+}
+static void ow_place_save(HWND h) {
+    static int (__stdcall *get_place)(HWND, WINDOWPLACEMENT *);
+    WINDOWPLACEMENT wp;
+    char path[1024];
+    FILE *f;
+    if (!h) return;
+    if (!get_place) { HMODULE u = LoadLibraryA("user32.dll"); if (u) get_place = (int (__stdcall *)(HWND, WINDOWPLACEMENT *))(void *)GetProcAddress(u, "GetWindowPlacement"); }
+    if (!get_place) return;
+    wp.length = sizeof wp;
+    if (!get_place(h, &wp)) return;
+    ow_place_path(path, sizeof path);
+    f = fopen(path, "wb");
+    if (!f) return;
+    fwrite(&wp, sizeof wp, 1, f);
+    fclose(f);
+}
 static DWORD __stdcall ow_thread(LPVOID unused) {
     WNDCLASSW wc;
     MSG msg;
@@ -1706,6 +2136,7 @@ static DWORD __stdcall ow_thread(LPVOID unused) {
     if (owu_SetWindowPos)
         owu_SetWindowPos(ow_hwnd, NULL, 0, 0, 0, 0,
                          0x0001 | 0x0002 | 0x0004 | 0x0020 /* NOSIZE|NOMOVE|NOZORDER|FRAMECHANGED */);
+    ow_place_load(ow_hwnd);
     owu_ShowWindow(ow_hwnd, 1 /* SW_SHOWNORMAL */);
     /* the profile lives per user, shared by every orion app window */
     local = getenv("LOCALAPPDATA");
@@ -1717,6 +2148,8 @@ static DWORD __stdcall ow_thread(LPVOID unused) {
     }
     ow_on_env.vtbl = ow_handler_vtbl;
     ow_on_env.invoke = ow_env_done;
+    ow_create_env = create_env;
+    wcsncpy(ow_data_dir, data_dir, 1023);
     {
         HRESULT ce = create_env(NULL, data_dir[0] ? data_dir : NULL, NULL, &ow_on_env);
         ow_log("create_env hr", (long long)ce);
@@ -1732,6 +2165,11 @@ static DWORD __stdcall ow_thread(LPVOID unused) {
         owu_DispatchMessageW(&msg);
     }
     if (ow_controller) ((ow_fn1)ow_vt(ow_controller, 24 /* Close */))(ow_controller);
+    {
+        int i;
+        for (i = 0; i < OW_EXTRA_MAX; i++)
+            if (ow_x[i].used && ow_x[i].hwnd) owu_DestroyWindow(ow_x[i].hwnd);
+    }
     return 0;
 }
 

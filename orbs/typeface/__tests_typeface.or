@@ -457,8 +457,8 @@ public define polygon_fill_spans(px: [f64], py: [f64], ends: [number], scale: f6
                 ymin = ay
                 ymax = ay
                 seen = 1
-            ymin = fmin(ymin, ay)
-            ymax = fmax(ymax, ay)
+            ymin = min(ymin, ay)
+            ymax = max(ymax, ay)
             if ay is not by:
                 ex0 = append(ex0, ax)
                 ey0 = append(ey0, ay)
@@ -475,8 +475,8 @@ public define polygon_fill_spans(px: [f64], py: [f64], ends: [number], scale: f6
         edit cx = part([0.0], 0, 0)
         edit cd = []
         loop e in 0 until ne:
-            elo = fmin(ey0[e], ey1[e])
-            ehi = fmax(ey0[e], ey1[e])
+            elo = min(ey0[e], ey1[e])
+            ehi = max(ey0[e], ey1[e])
             if elo <= yc and ehi > yc:
                 cx = append(cx, edge_x_at(ex0[e], ey0[e], ex1[e], ey1[e], yc))
                 cd = append(cd, edir[e])
@@ -623,7 +623,7 @@ define size_block(types: Typeset, em_px: number) -> number:
 # only warm_typeset (outside the pools) fills the cache.
 define mask_of(types: Typeset, titled: truth, cp: number, em_px: number) -> [number]:
     block = size_block(types, em_px)
-    slot = if block < 0 then 0 else types.slots[block + (if titled then 256 else 0) + cp]
+    slot = if block < 0 or cp >= 256 then 0 else types.slots[block + (if titled then 256 else 0) + cp]
     if block >= 0 and slot > 0:
         return types.stash[slot - 1]
     glyph_mask(if titled then types.heading else types.body, cp, em_px)
@@ -650,10 +650,16 @@ public define warm_typeset(book: list of Word, height: number, field_h: number) 
             loop _s in 0 until 512:
                 slots = append(slots, 0)
         letters = bytes_of(word.content)
-        loop i in 0 until bytes_count(letters):
-            cp = byte_at(letters, i)
+        edit i = 0
+        loop:
+            if i >= bytes_count(letters):
+                break
+            cp = cp_at(letters, i)
+            i = i + cp_step(letters, i)
+            # cachen ar 256 platser per block - kodpunkter over Latin-1
+            # gar direktvagen i mask_of i stallet
             slot = block + (if word.titled then 256 else 0) + cp
-            if slots[slot] is 0:
+            if cp < 256 and slots[slot] is 0:
                 stash = push(stash, glyph_mask(if word.titled then heading else body, cp, em_px))
                 slots = set(slots, slot, length(stash))
     Typeset{body: body, heading: heading, sizes: sizes, slots: slots, stash: stash}
@@ -678,8 +684,12 @@ public define blit_line(pixels: [number], width: number, height: number, left_px
     edit out = pixels
     edit penx = left_px
     letters = bytes_of(content)
-    loop i in 0 until bytes_count(letters):
-        cp = byte_at(letters, i)
+    edit i = 0
+    loop:
+        if i >= bytes_count(letters):
+            break
+        cp = cp_at(letters, i)
+        i = i + cp_step(letters, i)
         mask = mask_of(types, titled, cp, em_px)
         mask_w = mask[0]
         mask_h = mask[1]
@@ -703,8 +713,12 @@ public define line_width_px(content: text, titled: truth, em_px: number, types: 
     scale = to_real(em_px) / to_real(f.upm)
     edit wide = 0.0
     letters = bytes_of(content)
-    loop i in 0 until bytes_count(letters):
-        wide = wide + to_real(advance_width(f, glyph_id(f, byte_at(letters, i)))) * scale
+    edit i = 0
+    loop:
+        if i >= bytes_count(letters):
+            break
+        wide = wide + to_real(advance_width(f, glyph_id(f, cp_at(letters, i)))) * scale
+        i = i + cp_step(letters, i)
     wide
 
 # Draw every word over the rendered frame, letters placed on the pen

@@ -1,0 +1,14 @@
+# A local binding SHADOWS a same-named const from an imported orb. The num orb
+# exports `e = 2.718...`; before the fix, const inlining substituted that value
+# into this body's `e`, so `e = e + 1` became "cannot reassign: number vs float".
+# pi stays reachable in the same body: only the shadowed NAME is excluded.
+use num
+
+define main() -> number:
+    edit e = 0
+    loop:
+        if e >= 40:
+            break
+        e = e + 1
+    pi_ok = if pi > 3.0 then 2 else 0
+    e + pi_ok

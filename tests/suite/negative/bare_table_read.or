@@ -1,0 +1,8 @@
+# expect: this table's values are not known to be one type
+# A bare `table` refuses `t[k]`: its values are not known to be one type.
+define pack(n: number) -> table:
+    {"inner": {"a": 1}, "next": n}
+
+define main() -> number:
+    t = pack(7)
+    t["next"]

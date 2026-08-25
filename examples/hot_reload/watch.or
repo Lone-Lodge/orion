@@ -5,7 +5,6 @@
 # This is the whole "less editor, more live" loop in ~25 lines: the running
 # program invokes the self-hosting compiler on the changed file and rebinds the
 # result, without stopping.
-use os
 
 external define dlopen(path: text, flag: int) -> int
 external define dlsym(handle: int, name: text) -> int

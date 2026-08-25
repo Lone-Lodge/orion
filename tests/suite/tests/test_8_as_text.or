@@ -1,0 +1,8 @@
+# `as text` has to CONVERT, not relabel. It used to fall through to the sized
+# integer path, so the value stayed an i64: length() refused it as an int and
+# `3.5 as text` answered "3". 2 + 3 + 3 = 8.
+define main() -> number:
+    whole = length(42 as text)
+    real = length(3.5 as text)
+    already = length("abc" as text)
+    whole + real + already

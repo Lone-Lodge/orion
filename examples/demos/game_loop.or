@@ -20,7 +20,7 @@ type Outcome: Ok, Err
 # ---- Effects ---------------------------------------------------------
 
 effect Random:
-    roll: function(max: int) -> int
+    roll: function(max: number) -> number
 
 effect Log:
     msg: function(text: text) -> text

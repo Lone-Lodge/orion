@@ -4,7 +4,6 @@
 #
 # Shows map / filter / reduce / count taking `function(...)` closures, including
 # a closure that captures a local (`bonus`).
-use iter
 
 define main() -> number:
     scores = [40, 75, 88, 12, 95, 60]

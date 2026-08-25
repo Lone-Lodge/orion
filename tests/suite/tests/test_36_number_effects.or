@@ -1,0 +1,28 @@
+# An effect ANSWERS over a carrier, and there are three of them now: whole,
+# text, and real. Routed through the whole one, `resume(m / 2)` came back as
+# the number that went in - 9 for four and a half, silently.
+#
+# A `handle` block is an ordinary `Fn` by the time the pass runs, so `number`
+# there was already settled. What was missing was the carrier under it, and
+# the one thing the pass could not see: `resume(v)` IS the handler's answer,
+# not a call whose value goes to whoever called the handler.
+
+effect halving:
+    half: function(max: number) -> number
+
+effect doubling:
+    twice: function(max: number) -> number
+
+handle halving.half(m: number) -> number:
+    resume(m / 2)
+
+handle doubling.twice(m: number) -> number:
+    resume(m * 2)
+
+define main() -> number:
+    real = perform halving.half(9)      # 4.5, over the real carrier
+    whole = perform doubling.twice(15)  # 30, over the whole one
+
+    a = if real > 4.4 and real < 4.6 then 6 else 0
+    b = if whole is 30 then 30 else 0
+    a + b   # 36

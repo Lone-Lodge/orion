@@ -1,5 +1,3 @@
-use orion_ir
-use bytes
 
 # orion_ast_to_ir - lowering: the AST in, typed IR (orion_ir) out. The
 # compiler's largest stage. Names resolve, types are checked, and the
@@ -53,11 +51,11 @@ define th_surface(t: text) -> text:
     else t
 
 define otir_where(line: number, col: number) -> text:
-    total = if slot_has("src:map:n") then slot_get_int("src:map:n") else 0
+    total = if slot_has("src:map:n") then slot_get_number("src:map:n") else 0
     edit best_at = 0
     edit best_path = ""
     loop i in 0 until total:
-        chunk_at = slot_get_int("src:map:{i}:at")
+        chunk_at = slot_get_number("src:map:{i}:at")
         if chunk_at <= line and chunk_at > best_at:
             best_at = chunk_at
             best_path = slot_get("src:map:{i}:path")
@@ -711,7 +709,7 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             current_scope = er.scope
             # types-laget (drv:typehints): saga den inferade typen for
             # bindningar UTAN annotation - editorns spok-typer.
-            if slot_get_int("drv:typehints") is 1 and not has(stmt, "decl_type"):
+            if slot_get_number("drv:typehints") is 1 and not has(stmt, "decl_type"):
                 th_line = if has(stmt, "line") then get_int(stmt, "line") else 0
                 print_line("TYPEHINT {otir_where(th_line, 1)}:{name}:{th_surface(friendly_type(get_value_type(current_fn, er.id)))}")
             # --trace: tilldelningen rapporterar sitt varde (watch v1) -
@@ -885,9 +883,20 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 def_r = ast_expr_to_ir(current_fn, current_scope, def_expr)
                 current_fn = def_r.function
                 current_scope = def_r.scope
-            pr_ret = ir_fn_push(current_fn, ir_return(er.id))
+            # An EARLY return has to meet the declared return type too. Only
+            # the body's tail was converted, so a whole-number expression
+            # returned from inside an `if` in a real-answering function emitted
+            # `ret double %v` on an i64 - a module clang refuses. It never came
+            # up while the corpus wrote `int`: the annotation kept both ends
+            # whole. Migrating veil to `number` walked straight into it.
+            edit ret_id = er.id
+            if current_fn.return_type is "f64" and is_whole_ir(get_value_type(current_fn, er.id)):
+                pr_rf = ir_fn_push(current_fn, ir_sitofp(er.id))
+                current_fn = pr_rf.function
+                ret_id = pr_rf.id
+            pr_ret = ir_fn_push(current_fn, ir_return(ret_id))
             current_fn = pr_ret.function
-            last_id = er.id
+            last_id = ret_id
         if already_done is 0 and is_match_stmt:
             er = ast_match_to_ir(current_fn, current_scope, stmt)
             current_fn = er.function
@@ -1144,7 +1153,7 @@ define ast_for_range_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvRes
 
 define ast_int_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     value_text = get(node, "value")
-    pr = ir_fn_push(fn_value, ir_iconst(parse_int(value_text)))
+    pr = ir_fn_push(fn_value, ir_iconst_typed(parse_int(value_text), if has(node, "truth") then "truth" else "i64"))
     ConvResult{function: pr.function, scope: scope, id: pr.id}
 
 # True if literal value v fits sized integer type NAME (mirrors the wasm
@@ -1180,7 +1189,7 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     # Scope is per-function, so keying the count by fn name + var is safe.
     if found_id >= 0 and scope_is_linear(scope, name) is 1:
         move_key = "otir:move:" + fn_value.name + ":" + name
-        move_reads = slot_get_int(move_key)
+        move_reads = slot_get_number(move_key)
         if move_reads >= 1:
             line = if has(node, "line") then get_int(node, "line") else 0
             col = if has(node, "col") then get_int(node, "col") else 0
@@ -1266,10 +1275,10 @@ define ast_ident_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
 # demotion; an unknown element class leaves the value alone.
 define coerce_to_elem(prior: ConvResult, elem_class: text) -> ConvResult:
     value_type = get_value_type(prior.function, prior.id)
-    if elem_class is "f64" and (value_type is "i64" or is_sized_int_name(value_type)):
+    if elem_class is "f64" and is_whole_ir(value_type):
         pr_pe = ir_fn_push(prior.function, ir_sitofp(prior.id))
         return ConvResult{function: pr_pe.function, scope: prior.scope, id: pr_pe.id}
-    if (elem_class is "i64" or is_sized_int_name(elem_class)) and value_type is "f64":
+    if is_whole_ir(elem_class) and value_type is "f64":
         pr_de = ir_fn_push(prior.function, ir_fptosi(prior.id))
         return ConvResult{function: pr_de.function, scope: prior.scope, id: pr_de.id}
     prior
@@ -1347,6 +1356,9 @@ define ast_float_binop_to_ir(fn_in: IRFn, scope: Scope, op: text, left_id: numbe
 define sc_int(v: text) -> table:
     {"kind": "Int", "value": v}
 
+define sc_truth(v: text) -> table:
+    {"kind": "Int", "value": v, "truth": 1}
+
 define sc_if(cond: table, then_e: table, else_e: table) -> table:
     {"kind": "If", "cond": cond, "then": then_e, "else": else_e}
 
@@ -1362,7 +1374,10 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             dz_col = if has(node, "col") then get_int(node, "col") else 0
             compile_error("orion: ERROR at {otir_where(dz_line, dz_col)} - division by zero (the divisor is the literal `0`)")
     if op is "and":
-        return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "right"), sc_int("0")))
+        # The short-circuit `false` is a TRUTH, not the number zero. Written as
+        # a bare `0` it made `a and b` an if whose branches disagreed the
+        # moment comparisons started answering `truth`.
+        return ast_if_to_ir(fn_value, scope, sc_if(get(node, "left"), get(node, "right"), sc_truth("0")))
     if op is "or":
         # `x or default` - value-preserving fallback: the left value if it is
         # truthy/present, else the right (was `sc_int("1")` = boolean or).
@@ -1400,8 +1415,8 @@ define ast_binop_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     # catches the common self-hosting case where the compiler lost the
     # explicit text tag (list_at from an untyped list, get from a map)
     # but the source is comparing two text values by content.
-    left_ll = if left_type is "i64" then "i64" else "ptr"
-    right_ll = if right_type is "i64" then "i64" else "ptr"
+    left_ll = if is_whole_ir(left_type) then "i64" else "ptr"
+    right_ll = if is_whole_ir(right_type) then "i64" else "ptr"
     both_ptr = left_ll is "ptr" and right_ll is "ptr"
     is_text_cmp = is_eq_op and (both_text or both_ptr)
     is_text_concat = op is "+" and either_text
@@ -1580,8 +1595,8 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # and the other is ptr-shaped. Skip when either is void -
             # statement-form `if` legitimately has void/i64 mismatch and the
             # value isn't used downstream.
-            then_ll = if then_type is "i64" then "i64" else "ptr"
-            else_ll = if else_type is "i64" then "i64" else "ptr"
+            then_ll = if is_whole_ir(then_type) then "i64" else "ptr"
+            else_ll = if is_whole_ir(else_type) then "i64" else "ptr"
             # Only i64-vs-ptr is a reliable mismatch. Two DIFFERENT concrete ptr
             # categories (text vs list) look ill-typed but are NOT safely
             # flaggable: generic getters like slot_get return "text" for what is
@@ -1594,8 +1609,8 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             # re-lower this if from the untouched entry state with that
             # branch wrapped in to_float (IRFn is a value, so the
             # half-built attempt simply drops).
-            then_is_whole = then_type is "i64" or is_sized_int_name(then_type)
-            else_is_whole = else_type is "i64" or is_sized_int_name(else_type)
+            then_is_whole = is_whole_ir(then_type)
+            else_is_whole = is_whole_ir(else_type)
             if type_mismatch and ((then_type is "f64" and else_is_whole) or (else_type is "f64" and then_is_whole)):
                 wrap_then = else_type is "f64"
                 then_node0 = get_map(node, "then")
@@ -1613,7 +1628,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                 ift_f = friendly_type(then_type)
                 ife_f = friendly_type(else_type)
                 if (ift_f is "int" and ife_f is "float") or (ift_f is "float" and ife_f is "int"):
-                    ifm_hint = ". Choose one: make both branches whole numbers (`//` is integer division; `/` is real division and gives a float), or make both floats (`as float`)"
+                    ifm_hint = ". Choose one: make both branches whole (`//` divides whole, `/` divides real), or make both real with `to_real(x)`"
                 compile_error("orion: ERROR in fn {bad_fn} (line {line}:{col}) - if/else branches have different types ({ift_f} vs {ife_f}){ifm_hint}")
             pr_phi = ir_fn_push(result_fn, ir_phi(then_r.id, then_end_block, else_r.id, else_end_block, then_type))
             result_id = pr_phi.id
@@ -1631,8 +1646,7 @@ define ast_if_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     ConvResult{function: result_fn, scope: scope_truncate(else_r.scope, scope_before), id: result_id}
 
 # Bare enum-variant constructor: `KeyPress(x)` without the EnumName
-# prefix - mirror lodge-orion's variant probe. Returns the enum name
-# or "" when the callee is no variant.
+# prefix. Returns the enum name, or "" when the callee is no variant.
 # Float math builtins → libm calls; ln maps to C's log.
 define math_libm_name(callee: text) -> text:
     if callee is "sqrt" then "sqrt"
@@ -1781,7 +1795,7 @@ define find_variant_enum(scope: Scope, callee: text) -> text:
 # else is invisible outside its own orb, so it can neither collide with nor be
 # called from another one. `main` is exempt (the emitter looks it up by name).
 define slot_int_or_zero(key: text) -> number:
-    if slot_has(key) then slot_get_int(key) else 0
+    if slot_has(key) then slot_get_number(key) else 0
 
 # All these registries are keyed by compilation EPOCH (see ast_program_to_ir),
 # so a stale entry from an earlier compile in the same process can never bind.
@@ -1873,7 +1887,7 @@ define otir_sees(orb: text, target: text) -> truth:
     # exactly one orb on the path exports. Recorded there, honoured here, so
     # an auto-use means exactly what a written `use` means - including that a
     # name two orbs export is still an error naming both.
-    if slot_has("drv:autouse:{slot_get_int(\"drv:cnum\")}:{orb}:{target}"):
+    if slot_has("drv:autouse:{slot_get_number(\"drv:cnum\")}:{orb}:{target}"):
         return true
     edit hit = false
     loop i in 0 until slot_int_or_zero(otir_k1("usen", orb)):
@@ -1952,11 +1966,11 @@ define otir_resolve(name: text) -> text:
 define is_builtin_name(n: text) -> truth:
     a = n is "length" or n is "at" or n is "get" or n is "get_int" or n is "get_map" or n is "get_list" or n is "get_text_list" or n is "get_int_list" or n is "get_or" or n is "has" or n is "set" or n is "part" or n is "contains" or n is "push" or n is "append" or n is "__push_inplace" or n is "map_keys" or n is "map_values" or n is "map_remove"
     b = n is "print" or n is "print_line" or n is "print_raw" or n is "to_text" or n is "to_whole" or n is "to_real" or n is "pow" or n is "atan2" or n is "resume" or n is "call_ptr" or n is "breakpoint" or n is "argc" or n is "argv" or n is "struct_field_int" or n is "struct_field_text" or n is "__interp_join"
-    c = n is "bytes_of" or n is "text_of" or n is "bytes_count" or n is "bytes_part" or n is "bytes_concat" or n is "bytes_zeros" or n is "byte_at" or n is "slot_get" or n is "slot_set" or n is "slot_has" or n is "slot_get_int" or n is "file_read" or n is "file_write" or n is "time_now_ms" or n is "monotonic_ms" or n is "sleep_ms" or n is "par_run" or n is "par_madd" or n is "vec_add" or n is "vec_sub" or n is "vec_mul" or n is "vec_dot" or n is "vec_madd" or n is "vec_addi"
+    c = n is "bytes_of" or n is "text_of" or n is "bytes_count" or n is "bytes_part" or n is "bytes_concat" or n is "bytes_zeros" or n is "byte_at" or n is "slot_get" or n is "slot_set" or n is "slot_has" or n is "slot_get_int" or n is "slot_get_number" or n is "slot_get_real" or n is "file_read" or n is "file_write" or n is "time_now_ms" or n is "monotonic_ms" or n is "sleep_ms" or n is "par_run" or n is "par_madd" or n is "vec_add" or n is "vec_sub" or n is "vec_mul" or n is "vec_dot" or n is "vec_madd" or n is "vec_addi"
     a or b or c
 
 define builtin_min_args(callee: text) -> number:
-    one = callee is "length" or callee is "print_line" or callee is "print" or callee is "print_raw" or callee is "to_text" or callee is "to_whole" or callee is "to_real" or callee is "bytes_of" or callee is "text_of" or callee is "bytes_zeros" or callee is "bytes_count" or callee is "map_keys" or callee is "map_values" or callee is "slot_get" or callee is "slot_has" or callee is "slot_get_int" or callee is "text_hash" or callee is "file_read" or callee is "argv" or callee is "resume" or callee is "parse_int"
+    one = callee is "length" or callee is "print_line" or callee is "print" or callee is "print_raw" or callee is "to_text" or callee is "to_whole" or callee is "to_real" or callee is "bytes_of" or callee is "text_of" or callee is "bytes_zeros" or callee is "bytes_count" or callee is "map_keys" or callee is "map_values" or callee is "slot_get" or callee is "slot_has" or callee is "slot_get_int" or callee is "slot_get_number" or callee is "slot_get_real" or callee is "text_hash" or callee is "file_read" or callee is "argv" or callee is "resume" or callee is "parse_int"
     two = callee is "at" or callee is "get" or callee is "get_int" or callee is "get_map" or callee is "get_list" or callee is "get_text_list" or callee is "get_int_list" or callee is "has" or callee is "push" or callee is "append" or callee is "__push_inplace" or callee is "contains" or callee is "map_remove" or callee is "byte_at" or callee is "bytes_concat" or callee is "slot_set" or callee is "file_write" or callee is "call_ptr" or callee is "par_run" or callee is "vec_add" or callee is "vec_sub" or callee is "vec_mul" or callee is "vec_dot"
     three = callee is "set" or callee is "part" or callee is "get_or" or callee is "bytes_part" or callee is "vec_madd" or callee is "vec_addi"
     if three:
@@ -1993,7 +2007,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     loop na_i in 0 until length(args):
         if get(args[na_i], "kind") is "NamedArg":
             na_has = 1
-    na_want = if slot_has("otir:arity:" + callee_g) then slot_get_int("otir:arity:" + callee_g) else length(args)
+    na_want = if slot_has("otir:arity:" + callee_g) then slot_get_number("otir:arity:" + callee_g) else length(args)
     if na_has is 1 or (na_want > length(args) and slot_has("otir:pdefault:{callee_g}:{length(args)}")):
         na_total = if na_want > length(args) then na_want else length(args)
         na_seed = []
@@ -2006,7 +2020,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         loop na_k in 0 until length(args):
             na_a = args[na_k]
             if get(na_a, "kind") is "NamedArg":
-                na_slot = slot_get_int("otir:param:" + callee_g + ":" + get(na_a, "name"))
+                na_slot = slot_get_number("otir:param:" + callee_g + ":" + get(na_a, "name"))
                 na_pos = set(na_pos, na_slot, get_map(na_a, "value"))
                 na_filled = set(na_filled, na_slot, 1)
             else:
@@ -2176,6 +2190,11 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             if arg_type is "f64":
                 pr = ir_fn_push(arg_r.function, ir_f64_to_text(arg_r.id))
                 result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
+            else if arg_type is "truth":
+                # The whole point of the type. `"{3 > 2}"` said `1` before,
+                # which is what the machine holds and not what the program said.
+                pr = ir_fn_push(arg_r.function, ir_truth_text(arg_r.id))
+                result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
             else:
                 pr = ir_fn_push(arg_r.function, ir_int_to_text(arg_r.id))
                 result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
@@ -2221,7 +2240,8 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_slot_get = callee is "slot_get"
     is_slot_set = callee is "slot_set"
     is_slot_has = callee is "slot_has"
-    is_slot_get_int = callee is "slot_get_int"
+    is_slot_get_int = callee is "slot_get_int" or callee is "slot_get_number"
+    is_slot_get_real = callee is "slot_get_real"
     is_text_hash = callee is "text_hash"
     # Typed map-get variants - explicit types where inference can't reach.
     is_get_int = callee is "get_int"
@@ -2246,7 +2266,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         edit cap_code = 0
         if get(list_node, "kind") is "Ident" and get(list_node, "name") is "__env" and get(idx_node, "kind") is "Int":
             slot_j = parse_int(get(idx_node, "value")) - 2
-            cap_code = slot_get_int("clos:{fn_value.name}:capty:{slot_j}")
+            cap_code = slot_get_number("clos:{fn_value.name}:capty:{slot_j}")
             if cap_code is not 0:
                 is_env_cap = true
         if is_env_cap:
@@ -2271,7 +2291,9 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # Untyped args are an ERROR: static dispatch would silently pick
         # the wrong length (strlen on a list header etc).
         if arg_type is "text":
-            pr = ir_fn_push(arg_r.function, ir_text_len(arg_r.id))
+            # CHARACTERS. `bytes_count(s)` is the byte count, and the two
+            # differ the moment the text leaves ASCII.
+            pr = ir_fn_push(arg_r.function, ir_text_chars(arg_r.id))
             result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
         else:
             if is_map_type(arg_type):
@@ -2318,7 +2340,8 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # survives mut slots, set-results and copies - unlike the old peek at
         # the producing map_lit, which defaulted to `text` for any indirection
         # and made `get(m,a) + get(m,b)` concat int values as pointers (crash).
-        get_type = extract_map_val(get_value_type(map_r.function, map_r.id))
+        get_map_type = get_value_type(map_r.function, map_r.id)
+        get_type = extract_map_val(get_map_type)
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, get_type))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
     if is_has:
@@ -2331,7 +2354,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     if is_set_call:
         # set(target, key/idx, val) - map when the target types as a map
         # or the key is text; list when the target types as a list or the
-        # key is an int index. Mirrors lodge-orion's dynamic dispatch.
+        # key is an int index.
         sc_tgt = ast_expr_to_ir(fn_value, scope, args[0])
         sc_key = demote_number_index(ast_expr_to_ir(sc_tgt.function, sc_tgt.scope, args[1]))
         sc_val = ast_expr_to_ir(sc_key.function, sc_key.scope, args[2])
@@ -2494,7 +2517,12 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # any text-typed arg.
         sl_type = get_value_type(hi_r.function, text_r.id)
         if sl_type is "text":
-            pr = ir_fn_push(hi_r.function, ir_text_slice(text_r.id, lo_r.id, hi_r.id))
+            # CHARACTERS at both ends, like `length`. The byte offsets come
+            # from walking the text; `bytes_part` is the one that takes byte
+            # offsets, and it is right there when you want them.
+            lo_b = ir_fn_push(hi_r.function, ir_text_cpoff(text_r.id, lo_r.id))
+            hi_b = ir_fn_push(lo_b.function, ir_text_cpoff(text_r.id, hi_r.id))
+            pr = ir_fn_push(hi_b.function, ir_text_slice(text_r.id, lo_b.id, hi_b.id))
             result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
         else:
             pr = ir_fn_push(hi_r.function, ir_list_slice(text_r.id, lo_r.id, hi_r.id, sl_type))
@@ -2556,8 +2584,12 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         lo_node = args[1]
         hi_node = args[2]
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
-        lo_r = ast_expr_to_ir(list_r.function, list_r.scope, lo_node)
-        hi_r = ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node)
+        # Byte offsets are whole. `part` already demotes its two; these were
+        # left out, and after `int` became `number` an ordinary subtraction
+        # is a real - so every caller had to say `to_whole` or the build
+        # would not link.
+        lo_r = demote_number_index(ast_expr_to_ir(list_r.function, list_r.scope, lo_node))
+        hi_r = demote_number_index(ast_expr_to_ir(lo_r.function, lo_r.scope, hi_node))
         pr = ir_fn_push(hi_r.function, ir_bytes_slice(list_r.id, lo_r.id, hi_r.id))
         result = ConvResult{function: pr.function, scope: hi_r.scope, id: pr.id}
     if is_b_concat:
@@ -2569,7 +2601,8 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         result = ConvResult{function: pr.function, scope: b_r.scope, id: pr.id}
     if is_b_zeros:
         n_node = args[0]
-        n_r = ast_expr_to_ir(fn_value, scope, n_node)
+        # How many bytes is a count, and a count is whole.
+        n_r = demote_number_index(ast_expr_to_ir(fn_value, scope, n_node))
         pr = ir_fn_push(n_r.function, ir_bytes_zeros(n_r.id))
         result = ConvResult{function: pr.function, scope: n_r.scope, id: pr.id}
     if is_byte_at:
@@ -2577,13 +2610,27 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         idx_node = args[1]
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
         idx_r = demote_number_index(ast_expr_to_ir(list_r.function, list_r.scope, idx_node))
-        pr = ir_fn_push(idx_r.function, ir_list_at(list_r.id, idx_r.id))
-        result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
+        # A TEXT is already the packed form, so read the byte where it lies.
+        # Handed one, this used to read a text pointer as a list header and
+        # answer 5381 for the letter A - no error, just a number from the
+        # wrong place. And the way around it, `bytes_of` first, copies the
+        # whole text into a list at eight bytes per byte.
+        if get_value_type(idx_r.function, list_r.id) is "text":
+            pr_tb = ir_fn_push(idx_r.function, ir_text_byte_at(list_r.id, idx_r.id))
+            result = ConvResult{function: pr_tb.function, scope: idx_r.scope, id: pr_tb.id}
+        else:
+            pr = ir_fn_push(idx_r.function, ir_list_at(list_r.id, idx_r.id))
+            result = ConvResult{function: pr.function, scope: idx_r.scope, id: pr.id}
     if is_b_length:
         list_node = args[0]
         list_r = ast_expr_to_ir(fn_value, scope, list_node)
-        pr = ir_fn_push(list_r.function, ir_list_len(list_r.id))
-        result = ConvResult{function: pr.function, scope: list_r.scope, id: pr.id}
+        # Same for the count: a text knows its own length.
+        if get_value_type(list_r.function, list_r.id) is "text":
+            pr_tl = ir_fn_push(list_r.function, ir_text_len(list_r.id))
+            result = ConvResult{function: pr_tl.function, scope: list_r.scope, id: pr_tl.id}
+        else:
+            pr = ir_fn_push(list_r.function, ir_list_len(list_r.id))
+            result = ConvResult{function: pr.function, scope: list_r.scope, id: pr.id}
     if is_slot_get:
         key_node = args[0]
         key_r = ast_expr_to_ir(fn_value, scope, key_node)
@@ -2597,10 +2644,17 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         # --trace: databrytpunkt - runtimen pausar om nyckeln matchar
         # ORION_BREAK_SLOT ("vem skrev den har sloten?").
         edit sw_fn = val_r.function
-        if slot_get_int("drv:trace") is 1:
+        if slot_get_number("drv:trace") is 1:
             sw = ir_fn_push(sw_fn, ir_call("orion_slot_watch", [key_r.id], "i64"))
             sw_fn = sw.function
-        pr = ir_fn_push(sw_fn, ir_slot_set(key_r.id, val_r.id))
+        # A REAL value goes in as its bits: the slot is one 64-bit word and so
+        # is a double. `slot_get_number` reads it back the same way round.
+        edit sv_id = val_r.id
+        if get_value_type(sw_fn, val_r.id) is "f64":
+            pr_sb = ir_fn_push(sw_fn, ir_bits_of_real(val_r.id))
+            sw_fn = pr_sb.function
+            sv_id = pr_sb.id
+        pr = ir_fn_push(sw_fn, ir_slot_set(key_r.id, sv_id))
         result = ConvResult{function: pr.function, scope: val_r.scope, id: pr.id}
     if is_slot_has:
         sh_r = ast_expr_to_ir(fn_value, scope, args[0])
@@ -2614,6 +2668,12 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         sgi_r = ast_expr_to_ir(fn_value, scope, args[0])
         pr_sgi = ir_fn_push(sgi_r.function, ir_slot_get_int(sgi_r.id))
         result = ConvResult{function: pr_sgi.function, scope: sgi_r.scope, id: pr_sgi.id}
+    if is_slot_get_real:
+        # The pass rewrites `slot_get_number` into this where the binding it
+        # feeds came out real. Nobody writes it.
+        sgr_r = ast_expr_to_ir(fn_value, scope, args[0])
+        pr_sgr = ir_fn_push(sgr_r.function, ir_slot_get_real(sgr_r.id))
+        result = ConvResult{function: pr_sgr.function, scope: sgr_r.scope, id: pr_sgr.id}
     if is_get_int:
         map_node = args[0]
         key_node = args[1]
@@ -2640,13 +2700,13 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         gl_elem = if is_get_text_list then "list:text" else (if is_get_int_list then "list:i64" else (if is_list_type(gl_declared) then gl_declared else "list:dyn"))
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, gl_elem))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line is false) and (is_print_raw is false) and (is_to_text is false) and (is_to_float is false) and (is_to_int is false) and (is_resume is false) and (is_call_ptr is false) and (is_at is false) and (is_len is false) and (is_get is false) and (is_has is false) and (is_push is false) and (is_push_inplace is false) and (is_struct_field_int is false) and (is_struct_field_text is false) and (is_map_remove is false) and (is_set_call is false) and (is_map_keys is false) and (is_map_values is false) and (is_get_or is false) and (is_slice is false) and (is_contains is false) and (is_file_read is false) and (is_file_write is false) and (is_argc is false) and (is_argv is false) and (is_b_from_t is false) and (is_b_to_t is false) and (is_b_slice is false) and (is_b_concat is false) and (is_b_zeros is false) and (is_byte_at is false) and (is_b_length is false) and (is_slot_get is false) and (is_slot_set is false) and (is_slot_has is false) and (is_slot_get_int is false) and (is_text_hash is false) and (is_get_int is false) and (is_get_map is false) and (is_get_list is false) and (is_get_text_list is false) and (is_get_int_list is false) and (is_vec_add is false) and (is_vec_addi is false) and (is_vec_madd is false) and (is_par_madd is false) and (is_par_run is false) and (is_breakpoint is false) and (is_vec_sub is false) and (is_vec_mul is false) and (is_vec_dot is false) and (is_time_now_ms is false) and (is_monotonic_ms is false) and (is_sleep_ms is false) and (is_fmath1 is false) and (is_fmath2 is false)
+    is_user_fn = (is_print_line is false) and (is_print_raw is false) and (is_to_text is false) and (is_to_float is false) and (is_to_int is false) and (is_resume is false) and (is_call_ptr is false) and (is_at is false) and (is_len is false) and (is_get is false) and (is_has is false) and (is_push is false) and (is_push_inplace is false) and (is_struct_field_int is false) and (is_struct_field_text is false) and (is_map_remove is false) and (is_set_call is false) and (is_map_keys is false) and (is_map_values is false) and (is_get_or is false) and (is_slice is false) and (is_contains is false) and (is_file_read is false) and (is_file_write is false) and (is_argc is false) and (is_argv is false) and (is_b_from_t is false) and (is_b_to_t is false) and (is_b_slice is false) and (is_b_concat is false) and (is_b_zeros is false) and (is_byte_at is false) and (is_b_length is false) and (is_slot_get is false) and (is_slot_set is false) and (is_slot_has is false) and (is_slot_get_int is false) and (is_slot_get_real is false) and (is_text_hash is false) and (is_get_int is false) and (is_get_map is false) and (is_get_list is false) and (is_get_text_list is false) and (is_get_int_list is false) and (is_vec_add is false) and (is_vec_addi is false) and (is_vec_madd is false) and (is_par_madd is false) and (is_par_run is false) and (is_breakpoint is false) and (is_vec_sub is false) and (is_vec_mul is false) and (is_vec_dot is false) and (is_time_now_ms is false) and (is_monotonic_ms is false) and (is_sleep_ms is false) and (is_fmath1 is false) and (is_fmath2 is false)
     if is_resume:
         # One `resume(v)` - pick the int vs text runtime call from the value's
         # type. (There is intentionally no resume_int / resume_text; one way.)
         arg_r = ast_expr_to_ir(fn_value, scope, args[0])
         rt = get_value_type(arg_r.function, arg_r.id)
-        rfn = if rt is "text" then "__orion_resume_text" else "__orion_resume_int"
+        rfn = if rt is "text" then "__orion_resume_text" else (if rt is "f64" then "__orion_resume_real" else "__orion_resume_int")
         pr = ir_fn_push(arg_r.function, ir_call(rfn, [arg_r.id], "void"))
         result = ConvResult{function: pr.function, scope: arg_r.scope, id: pr.id}
     if is_call_ptr:
@@ -2666,7 +2726,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         is_local_callee = bound_id >= 0
         # refs-laget: varje ANROP rapporterar plats, skrivet namn och det
         # UPPLOSTA globala namnet - orb-precisionen som use-grafen saknar.
-        if slot_get_int("drv:refs") is 1 and has(node, "line"):
+        if slot_get_number("drv:refs") is 1 and has(node, "line"):
             ref_g = if is_local_callee then "lokal" else callee_g
             ref_ln = get_int(node, "line")
             print_line("REF {otir_where(ref_ln, 1)}:{callee}:{ref_g}")
@@ -2699,13 +2759,13 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     # surface, exact for every whole value below 2^53.
                     # Without this the callee read raw int bits as a double
                     # and answered garbage, silently.
-                    if decl_pt_ca is "f64" and (arg_ty_ca is "i64" or is_sized_int_name(arg_ty_ca)):
+                    if decl_pt_ca is "f64" and is_whole_ir(arg_ty_ca):
                         pr_ca = ir_fn_push(current_fn, ir_sitofp(arg_r.id))
                         current_fn = pr_ca.function
                         arg_id_final = pr_ca.id
                     # ...and the demotion twin: a number where the parameter
                     # is an integer slot truncates exactly for whole values.
-                    if arg_ty_ca is "f64" and (decl_pt_ca is "i64" or is_sized_int_name(decl_pt_ca)):
+                    if arg_ty_ca is "f64" and is_whole_ir(decl_pt_ca):
                         de_ca = ir_fn_push(current_fn, ir_fptosi(arg_r.id))
                         current_fn = de_ca.function
                         arg_id_final = de_ca.id
@@ -2735,8 +2795,8 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             cl_key = "otir:closret:" + current_fn.name + ":" + callee
             if slot_has(cl_key):
                 hoc_ret = slot_get(cl_key)
-            if slot_has(fnp_gen_key) and slot_get_int(fnp_gen_key) is slot_int_or_zero("otir:tvgen"):
-                want_arity = slot_get_int("otir:fnparam_arity:" + callee)
+            if slot_has(fnp_gen_key) and slot_get_number(fnp_gen_key) is slot_int_or_zero("otir:tvgen"):
+                want_arity = slot_get_number("otir:fnparam_arity:" + callee)
                 hoc_line = if has(node, "line") then get_int(node, "line") else 0
                 hoc_col = if has(node, "col") then get_int(node, "col") else 0
                 if length(arg_ids) is not want_arity:
@@ -2803,7 +2863,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                         compile_error("orion: ERROR at {otir_where(cml, cmc)} - `{callee}` declares `uses {ccal}`; the caller must cover `{cmiss}` in its own uses clause")
             arity_key = "otir:arity:" + callee_g
             if slot_has(arity_key):
-                want = slot_get_int(arity_key)
+                want = slot_get_number(arity_key)
                 got = length(arg_ids)
                 if got is not want:
                     a_line = if has(node, "line") then get_int(node, "line") else 0
@@ -3484,11 +3544,11 @@ define ast_struct_cons_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                 fld_val_ty = get_value_type(current_fn, matched_id)
                 # The `number` boundary, field side: a whole-number value
                 # into an f64-declared field is promoted like an argument.
-                if decl_field_type is "f64" and (fld_val_ty is "i64" or is_sized_int_name(fld_val_ty)):
+                if decl_field_type is "f64" and is_whole_ir(fld_val_ty):
                     pr_fp = ir_fn_push(current_fn, ir_sitofp(matched_id))
                     current_fn = pr_fp.function
                     matched_id = pr_fp.id
-                if fld_val_ty is "f64" and (decl_field_type is "i64" or is_sized_int_name(decl_field_type)):
+                if fld_val_ty is "f64" and is_whole_ir(decl_field_type):
                     de_fp = ir_fn_push(current_fn, ir_fptosi(matched_id))
                     current_fn = de_fp.function
                     matched_id = de_fp.id
@@ -3612,7 +3672,11 @@ define ast_map_lit_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResul
     # So a map whose values disagree is `dyn` - the type this compiler
     # already uses for "the values are not knowable". Reads through the
     # typed readers keep working; `m[k]` and bare `get` refuse and say so.
-    edit map_val_type = "i64"
+    # An EMPTY literal says nothing about its values, so it must not claim
+    # they are numbers. It used to, and a text read back out of one printed as
+    # its pointer - `get(m, 7)` on `{}` answered 140695995932688.
+    # `dyn` is the word for "not knowable", and `table of T` is how you say it.
+    edit map_val_type = "dyn"
     if n_pairs > 0:
         map_val_type = get_value_type(current_fn, pair_ids[1])
         loop mixed_i in 1 until n_pairs:
@@ -3674,29 +3738,47 @@ define otir_mask_to(fn_in: IRFn, id: number, tname: text) -> PushResult:
         pc2 = ir_fn_push(ps.function, ir_iconst(sh))
         ir_fn_push(pc2.function, Inst{op: "shr", type_text: tname, value: 0, lhs: ps.id, rhs: pc2.id, name: "", args: []})
 
+# `x as text` has to CONVERT. It used to fall through to the sized-integer
+# mask below, which left an i64 that merely PRINTED like text: `length(i as
+# text)` was refused as an int, and `3.5 as text` answered "3".
+define ast_cast_to_text(inner: ConvResult) -> ConvResult:
+    src = get_value_type(inner.function, inner.id)
+    if src is "text":
+        inner
+    else:
+        if src is "f64":
+            pt = ir_fn_push(inner.function, ir_f64_to_text(inner.id))
+            ConvResult{function: pt.function, scope: inner.scope, id: pt.id}
+        else:
+            pt = ir_fn_push(inner.function, ir_int_to_text(inner.id))
+            ConvResult{function: pt.function, scope: inner.scope, id: pt.id}
+
 define ast_cast_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     inner = ast_expr_to_ir(fn_value, scope, get_map(node, "expr"))
     tn = get_map(node, "type")
     tname = if get(tn, "kind") is "Named" then get(tn, "name") else "i64"
     to_float = tname is "f64" or tname is "float" or tname is "f32"
     src = get_value_type(inner.function, inner.id)
-    if to_float:
-        if src is "f64":
-            inner
-        else:
-            pr = ir_fn_push(inner.function, ir_sitofp(inner.id))
-            ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+    if tname is "text":
+        ast_cast_to_text(inner)
     else:
-        # First get an i64 value (fptosi if the source is a float).
-        edit base = inner
-        if src is "f64":
-            pr = ir_fn_push(inner.function, ir_fptosi(inner.id))
-            base = ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
-        # Then narrow to a sized target's width (native ints are i64) - the
-        # shared wrap path, which also TYPES the result as the target so
-        # later arithmetic keeps wrapping.
-        pm = otir_mask_to(base.function, base.id, tname)
-        ConvResult{function: pm.function, scope: base.scope, id: pm.id}
+        if to_float:
+            if src is "f64":
+                inner
+            else:
+                pr = ir_fn_push(inner.function, ir_sitofp(inner.id))
+                ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+        else:
+            # First get an i64 value (fptosi if the source is a float).
+            edit base = inner
+            if src is "f64":
+                pr = ir_fn_push(inner.function, ir_fptosi(inner.id))
+                base = ConvResult{function: pr.function, scope: inner.scope, id: pr.id}
+            # Then narrow to a sized target's width (native ints are i64) - the
+            # shared wrap path, which also TYPES the result as the target so
+            # later arithmetic keeps wrapping.
+            pm = otir_mask_to(base.function, base.id, tname)
+            ConvResult{function: pm.function, scope: base.scope, id: pm.id}
 
 public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     kind = get(node, "kind")
@@ -3717,14 +3799,22 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         obj_r = ast_expr_to_ir(fn_value, scope, idx_obj)
         key_r = ast_expr_to_ir(obj_r.function, obj_r.scope, idx_key)
         obj_type = get_value_type(key_r.function, obj_r.id)
-        if obj_type is "dyn" or (is_map_type(obj_type) and extract_map_val(obj_type) is "dyn"):
+        # A BARE `table` joins `dyn` here. It used to guess `text`, so
+        # `based["next"]` on `{"token": <table>, "next": <number>}` read a
+        # number as a pointer and the program died at 0xffffffffffffffff. A
+        # guess that is right for one of four types is not a read.
+        if obj_type is "dyn" or obj_type is "map" or (is_map_type(obj_type) and extract_map_val(obj_type) is "dyn"):
             # A map whose values are not all one type. `m[k]` has to name a
             # type to read the word as, and any guess is a wrong pointer some
             # of the time - which is a run-time access violation, not an
             # answer. The typed readers say what the word is.
             ix_line = if has(node, "line") then get_int(node, "line") else 0
             ix_col = if has(node, "col") then get_int(node, "col") else 0
-            compile_error("orion: ERROR at {otir_where(ix_line, ix_col)} - this map's values are not all the same type, so `m[k]` cannot know what it reads - use `get_int` / `get_map` / `get_list` / `get` to say which")
+            # The `table of T` hint belongs on BOTH ways in. An empty literal
+            # is `dyn` - it says nothing about its values - and that is the
+            # commonest way to get here: `edit counts = {}` then `counts[w]`.
+            ix_bare = " (say it at the binding: `edit m: table of number = \{\}`, or `table of text` / `table of table`)"
+            compile_error("orion: ERROR at {otir_where(ix_line, ix_col)} - this table's values are not known to be one type, so `t[k]` cannot know what it reads - use `get_int` / `get_map` / `get_list` / `get` to say which{ix_bare}")
         if is_map_type(obj_type):
             get_type = extract_map_val(obj_type)
             pr = ir_fn_push(key_r.function, ir_map_get(obj_r.id, key_r.id, get_type))
@@ -3877,6 +3967,14 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
                     wants_real = pfi < length(pl_types) and pl_types[pfi] is "f64"
                     if wants_real and pfi < n_cargs:
                         pf_val = {"kind": "Cast", "expr": pf_val, "type": {"kind": "Named", "name": "float"}}
+                    # And the other way, which is the one `number` made
+                    # common: a real into a slot declared whole stored the
+                    # DOUBLE'S BITS. `DrawText(point, words, ink, size, src)`
+                    # with a size of 20.0 came back as 4626885667169763328,
+                    # and the painter tried to raster a letter that big.
+                    wants_whole = pfi < length(pl_types) and pl_types[pfi] is "i64"
+                    if wants_whole and pfi < n_cargs:
+                        pf_val = {"kind": "Cast", "expr": pf_val, "type": {"kind": "Named", "name": "int"}}
                     cons_fields = append(cons_fields, {"name": "p{pfi}", "value": pf_val})
                 cons_node = {"kind": "StructCons", "name": enum_name, "fields": cons_fields}
                 result = ast_struct_cons_to_ir(fn_value, scope, cons_node)
@@ -4007,16 +4105,27 @@ public define ast_expr_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvR
         # was never passed), and the registry is already there for calls.
         pf_arity_key = "otir:arity:" + handler_g
         if slot_has(pf_arity_key):
-            pf_want = slot_get_int(pf_arity_key)
+            pf_want = slot_get_number(pf_arity_key)
             if n_pa is not pf_want:
                 pfa_line = if has(node, "line") then get_int(node, "line") else 0
                 pfa_col = if has(node, "col") then get_int(node, "col") else 0
                 compile_error("orion: ERROR at {otir_where(pfa_line, pfa_col)} - `{effect_name}.{op_name}` is handled with {pf_want} parameter(s), got {n_pa}")
+        # An effect's ARGUMENTS ride in 64-bit word slots, all four of them.
+        # A real one fits exactly: it goes in as its BITS and the handler reads
+        # it back (`param_bits`). Both sides are 64 bits, so nothing is lost.
+
+        # Which carrier the effect answers over, from what the HANDLER is
+        # declared to answer with. A `handle` block is an ordinary `Fn` by the
+        # time this runs, so `number` there was already settled by the pass.
         use_text = handler_ret is "text"
+        use_real = handler_ret is "f64"
         if use_text:
             pr_perf = ir_fn_push(cur_fn, ir_perform_text(handler_g, perf_arg_ids))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
-        else:
+        if use_real:
+            pr_perf = ir_fn_push(cur_fn, ir_perform_real(handler_g, perf_arg_ids))
+            result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
+        if (not use_text) and (not use_real):
             pr_perf = ir_fn_push(cur_fn, ir_perform_int(handler_g, perf_arg_ids))
             result = ConvResult{function: pr_perf.function, scope: cur_scope, id: pr_perf.id}
     any_match = is_block or is_int or is_float_lit or is_str or is_binary or is_ident or is_call or is_if or is_unary or is_cast or is_list_lit or is_tuple or is_map_lit or is_match or is_struct_cons or is_field or is_method_call or is_question or is_perform or is_make_closure
@@ -4187,6 +4296,20 @@ define tv_subst(src: text, gens: [text], binds: [text]) -> text:
 # Is this IR type pointer-shaped in the emitted module? (An i64 slot holding a
 # refined pointer type needs an explicit re-type; a refined `int`/`f64` does not
 # and must not get one.)
+# A whole number in a machine register. `truth` is one of these: it is stored
+# as an i64 and travels like one, and every place that asks this question means
+# "a scalar I can widen, demote or branch on", never "the integer type".
+define is_whole_ir(t: text) -> truth:
+    t is "i64" or t is "truth" or is_sized_int_name(t)
+
+# Is this the synthesized function behind a `handle` block? The name is the
+# marker: `__handler_<Effect>_<op>`, made in the parser.
+define otir_is_handler(n: text) -> truth:
+    # CONTAINS, not starts-with: by the time a function is being lowered its
+    # name carries the orb it came from - `prog____handler_drawing_line`. The
+    # same stamp that made the closure ABI look broken for three rounds.
+    contains(n, "__handler_")
+
 define is_ptr_ir_type(t: text) -> truth:
     if t is "text" or t is "fn":
         true
@@ -4338,7 +4461,9 @@ define friendly_fn_name(n: text) -> text:
         text_of(bytes_part(b, cut, total))
 
 define friendly_type(t: text) -> text:
-    if t is "i64":
+    if t is "truth":
+        "truth"
+    else if t is "i64":
         "int"
     else if t is "f64":
         "float"
@@ -4409,7 +4534,18 @@ define ast_type_to_ir(type_node: table) -> text:
             compile_error("orion: ERROR - the type is written `text` now (`Text` was retired)")
         if name is "bool" or name is "Bool":
             compile_error("orion: ERROR - the truth type is written `truth` now (`bool` was retired)")
-        if name is "text":
+        # `int` WRITTEN IN SOURCE (the parser marks those; the compiler's own
+        # synthesized int nodes carry no mark, and `external define` names a C
+        # type, so neither is touched).
+        if has(type_node, "said_int"):
+            compile_error("orion: ERROR at {otir_where(get_int(type_node, \"line\"), get_int(type_node, \"col\"))} - the whole-number type is written `number` now (`int` was retired)")
+        # `truth` is its own IR type. It IS an i64 in the machine - every type
+        # `llvm_type_of` does not recognise lands there - but a function that
+        # answers `truth` and one that answers a number are now different, and
+        # that difference is what lets the surface print `true`.
+        if name is "truth":
+            "truth"
+        else if name is "text":
             "text"
         else:
             if name is "Map":
@@ -4502,7 +4638,18 @@ define ast_type_to_ir_with_scope(type_node: table, scope: Scope) -> text:
             compile_error("orion: ERROR - the type is written `text` now (`Text` was retired)")
         if name is "bool" or name is "Bool":
             compile_error("orion: ERROR - the truth type is written `truth` now (`bool` was retired)")
-        if name is "text":
+        # `int` WRITTEN IN SOURCE (the parser marks those; the compiler's own
+        # synthesized int nodes carry no mark, and `external define` names a C
+        # type, so neither is touched).
+        if has(type_node, "said_int"):
+            compile_error("orion: ERROR at {otir_where(get_int(type_node, \"line\"), get_int(type_node, \"col\"))} - the whole-number type is written `number` now (`int` was retired)")
+        # `truth` is its own IR type. It IS an i64 in the machine - every type
+        # `llvm_type_of` does not recognise lands there - but a function that
+        # answers `truth` and one that answers a number are now different, and
+        # that difference is what lets the surface print `true`.
+        if name is "truth":
+            "truth"
+        else if name is "text":
             "text"
         else:
             if name is "Map":
@@ -4574,10 +4721,16 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
         # types-laget: parametrar utan annotation defaultar tyst - saga den
         # antagna typen som spoke pa define-raden (samma TYPEHINT-protokoll
         # som let-bindningarna; klienten placerar vid namnet).
-        if slot_get_int("drv:typehints") is 1 and get(param_type_node, "kind") is "Unknown":
+        if slot_get_number("drv:typehints") is 1 and get(param_type_node, "kind") is "Unknown":
             print_line("TYPEHINT {otir_where(fn_at_line, 1)}:{param_name}:{th_surface(friendly_type(param_type))}")
-        fn_value = ir_fn_add_param(fn_value, param_name, param_type)
-        pr = ir_fn_push(fn_value, ir_param(index, param_type))
+        # A HANDLER's real parameter arrives as a word. The runtime casts a
+        # handler to an all-i64 signature - it knows the arity and nothing
+        # else - so the function declares i64 there and reads the double back
+        # out of the bits. Everything after this sees an ordinary f64.
+        hp_bits = param_type is "f64" and otir_is_handler(fn_value.name)
+        wire_type = if hp_bits then "i64" else param_type
+        fn_value = ir_fn_add_param(fn_value, param_name, wire_type)
+        pr = ir_fn_push(fn_value, if hp_bits then ir_param_bits(index) else ir_param(index, param_type))
         fn_value = pr.function
         scope = scope_bind(scope, param_name, pr.id)
         # A `f: function(A, B) -> R` param carries a real signature the checker can
@@ -4615,7 +4768,7 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
         compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} - function `{friendly_fn_name(name)}` has an empty body (add a body, or check for a keyword used as a variable name)")
     body_result = ast_expr_to_ir(fn_value, scope, body)
     # Return-type guard: the tail expression's storage shape (i64 vs pointer)
-    # must match the declared return type. Catches `define f() -> int: "hello"`
+    # must match the declared return type. Catches `define f() -> number: "hello"`
     # (returns text) instead of silently returning garbage. Only compares the
     # i64/ptr bucket, like the reassignment check - text/list/map/struct all
     # share ptr storage, so no false positive between them. `fn`, `f64` and
@@ -4648,11 +4801,11 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
         # function declared f64 is promoted, mirroring the argument rule.
         edit tail_id = body_result.id
         edit tail_fn = body_result.function
-        if ret_type is "f64" and (rt_body is "i64" or is_sized_int_name(rt_body)):
+        if ret_type is "f64" and is_whole_ir(rt_body):
             pr_rt = ir_fn_push(tail_fn, ir_sitofp(tail_id))
             tail_fn = pr_rt.function
             tail_id = pr_rt.id
-        if rt_body is "f64" and (ret_type is "i64" or is_sized_int_name(ret_type)):
+        if rt_body is "f64" and is_whole_ir(ret_type):
             de_rt = ir_fn_push(tail_fn, ir_fptosi(tail_id))
             tail_fn = de_rt.function
             tail_id = de_rt.id
@@ -4670,7 +4823,7 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
 # a top-level return - but a `return` inside an `if` or a loop is lowered by its
 # own nested statement loop, which knew nothing about the outer list. So
 #
-#     define f(x: int) -> int:
+#     define f(x: number) -> number:
 #         defer cleanup()
 #         if x > 0:
 #             return 1        # cleanup() never ran
@@ -4735,7 +4888,7 @@ define defer_tmp_name() -> text:
 # save-then-run treatment, so `defer f()` before a tail match appended the
 # defers AFTER it and the deferred call's value became the block's value --
 #
-#     define main() -> int:
+#     define main() -> number:
 #         defer print_line("bye")
 #         choose 1:
 #             1 then 84        # returned 0
@@ -5371,7 +5524,7 @@ define nlam_synth(lam: table) -> table:
         if has(lam, "param_types"):
             p_ty = get_list(lam, "param_types")[pi]
         typed_params = append(typed_params, {"name": lam_params[pi], "type": p_ty})
-    ctr = slot_get_int("otir:nlam_ctr")
+    ctr = slot_get_number("otir:nlam_ctr")
     slot_set("otir:nlam_ctr", ctr + 1)
     synth_name = "__nlambda_{ctr}"
     edit synth_stmts = part([lam_body], 0, 0)
@@ -5450,6 +5603,49 @@ define nlam_lift(node: table) -> table:
         navs = get_list(nav, "synths")
         loop naj in 0 until length(navs):
             synths = append(synths, navs[naj])
+    # An if-EXPRESSION, in all three places. `if length(keep(xs, (x): x > 2))
+    # is 2 then ...` died as "unhandled AST node kind Lambda": the lift walked
+    # calls and operators but never went into an `if`, so the lambda in the
+    # condition was still a lambda when the lowering met it. Every `example`
+    # line the checker wraps is `if <claim> then 0 else 1`, which is how three
+    # of `iter`'s own examples had been failing.
+    if kind is "If":
+        ifc = nlam_lift(get_map(node, "cond"))
+        ift = nlam_lift(get_map(node, "then"))
+        ife = nlam_lift(get_map(node, "else"))
+        out = set(set(set(out, "cond", get(ifc, "node")), "then", get(ift, "node")), "else", get(ife, "node"))
+        loop ifj in 0 until length(get_list(ifc, "synths")):
+            synths = append(synths, get_list(ifc, "synths")[ifj])
+        loop ifj2 in 0 until length(get_list(ift, "synths")):
+            synths = append(synths, get_list(ift, "synths")[ifj2])
+        loop ifj3 in 0 until length(get_list(ife, "synths")):
+            synths = append(synths, get_list(ife, "synths")[ifj3])
+    # And a lambda handed to an effect, or sitting in a list literal.
+    if kind is "Index":
+        ixo = nlam_lift(get_map(node, "object"))
+        ixi = nlam_lift(get_map(node, "index"))
+        out = set(set(out, "object", get(ixo, "node")), "index", get(ixi, "node"))
+        loop ixj in 0 until length(get_list(ixo, "synths")):
+            synths = append(synths, get_list(ixo, "synths")[ixj])
+        loop ixj2 in 0 until length(get_list(ixi, "synths")):
+            synths = append(synths, get_list(ixi, "synths")[ixj2])
+    if kind is "Field" or kind is "Question":
+        qk = if kind is "Field" then "object" else "inner"
+        qr = nlam_lift(get_map(node, qk))
+        out = set(out, qk, get(qr, "node"))
+        loop qj in 0 until length(get_list(qr, "synths")):
+            synths = append(synths, get_list(qr, "synths")[qj])
+    if kind is "Perform" or kind is "ListLit" or kind is "Tuple":
+        lk = if kind is "Perform" then "args" else "items"
+        lsrc = get_list(node, lk)
+        edit new_l = part(lsrc, 0, 0)
+        loop li in 0 until length(lsrc):
+            lr2 = nlam_lift(lsrc[li])
+            new_l = append(new_l, get(lr2, "node"))
+            lrs = get_list(lr2, "synths")
+            loop lj in 0 until length(lrs):
+                synths = append(synths, lrs[lj])
+        out = set(out, lk, new_l)
     {"node": out, "synths": synths}
 
 # Lift lambdas in a statement's expression field. Returns {stmt, synths}.
@@ -5466,6 +5662,15 @@ define nlam_lift_stmt(stmt: table) -> table:
         r = nlam_lift(get(stmt, fld))
         out = set(out, fld, get(r, "node"))
         synths = get_list(r, "synths")
+    # A bare if-EXPRESSION as a statement - which is what a function's tail is
+    # when it ends `if cond then a else b`. It has no `expr` field to reach
+    # through; the statement IS the expression. Every `example` line the
+    # checker wraps looks exactly like this, which is how three of `iter`'s own
+    # examples had been failing.
+    if kind is "If" or kind is "Match":
+        ir2 = nlam_lift(stmt)
+        out = get_map(ir2, "node")
+        synths = get_list(ir2, "synths")
     # Recurse into nested block bodies so a lambda inside a for/loop/if body
     # (e.g. `for i in ...: g = function(n): n + i`) is lifted too.
     if kind is "Loop" or kind is "ForRange" or kind is "ForIn":
@@ -5557,6 +5762,36 @@ define nlam_has(node: table) -> truth:
                 found = true
     if kind is "NamedArg":
         if nlam_has(get_map(node, "value")):
+            found = true
+    # The same three shapes the LIFT walks. This is the gate in front of it:
+    # the lift can know how to go into an `if` and never be asked to, which is
+    # exactly what happened - `nlam_lift` grew the case and nothing changed
+    # until this one did too. Two lists of node kinds that have to agree, and
+    # the only sign they disagree is a lambda reaching the lowering.
+    if kind is "If":
+        if nlam_has(get_map(node, "cond")):
+            found = true
+        if nlam_has(get_map(node, "then")):
+            found = true
+        if nlam_has(get_map(node, "else")):
+            found = true
+    if kind is "Perform" or kind is "ListLit" or kind is "Tuple":
+        hk = if kind is "Perform" then "args" else "items"
+        loop hn in get_list(node, hk):
+            if nlam_has(hn):
+                found = true
+    # `each(xs, (x): ...)[1]` - the lambda is under an INDEX. Same for a field
+    # read and a `?`.
+    if kind is "Index":
+        if nlam_has(get_map(node, "object")):
+            found = true
+        if nlam_has(get_map(node, "index")):
+            found = true
+    if kind is "Field":
+        if nlam_has(get_map(node, "object")):
+            found = true
+    if kind is "Question":
+        if nlam_has(get_map(node, "inner")):
             found = true
     found
 
@@ -5690,7 +5925,19 @@ define upp_bad_expr(node: table, name: text) -> number:
     else if kind is "Field":
         upp_bad_expr(get_map(node, "object"), name)
     else if kind is "Index":
-        upp_bad_expr(get_map(node, "object"), name) + upp_bad_expr(get_map(node, "index"), name)
+        # Reading `xs[i]` is a READ, exactly like `at(xs, i)` which is already
+        # counted safe. It cannot alias anything: an element comes out by
+        # value and the list stays where it was.
+        #
+        # Counting it as an ordinary use is what turned every loop that both
+        # FILLS an accumulator and reads back out of it into a copy of the
+        # whole list per append. Quadratic, and invisible - the same loop
+        # written with at() was linear. Veil's placement spent 709 of its 746
+        # milliseconds there with twenty thousand children, and three
+        # reproductions of the loop outside it all came out linear because
+        # they happened to use at().
+        indexed = get_map(node, "object")
+        upp_bad_expr(get_map(node, "index"), name) + (if upp_is_ident(indexed, name) then 0 else upp_bad_expr(indexed, name))
     else if kind is "Question":
         upp_bad_expr(get_map(node, "inner"), name)
     else if kind is "If":
@@ -5891,30 +6138,126 @@ define upp_block_has_self_push(block: table, name: text) -> truth:
 #     loop x in xs: acc = append(acc, f(x))
 #     ListV(acc)                      <- escape AFTER the pushes: fine
 define upp_safe_ordered(body: table, name: text) -> truth:
-    stmts = get_list(body, "stmts")
+    if not upp_block_has_self_push(body, name):
+        return false
+    upp_ordered_block(body, name)
+
+# The same rule inside a block that is not a loop.
+#
+# A function body runs once, so "everything up to the last push must be safe"
+# is sound there. It is sound in an `if` too, for the same reason - but the
+# rule only ever looked at the function's own top level, so the single
+# commonest shape in this compiler lost its promotion:
+#
+#     if is_alias:
+#         ""
+#     else:
+#         edit chunks = []
+#         loop ...: chunks = append(chunks, ...)
+#         orion_text_join(chunks)          <- after the pushes, and still bad
+#
+# The join is a use of the whole list, and being inside the same `else` as the
+# pushes made it count. Now the branch is read in order like anything else.
+#
+# A LOOP is different and stays strict: what comes after the last push on one
+# turn comes BEFORE the pushes on the next, so order says nothing there.
+define upp_ordered_block(block: table, name: text) -> truth:
+    stmts = get_list(block, "stmts")
     n = length(stmts)
     edit last_push = 0 - 1
     loop i in 0 until n:
         if upp_stmt_has_self_push(stmts[i], name):
             last_push = i
     if last_push < 0:
-        false
+        return upp_bad_block(block, name) is 0
+    edit ok = true
+    loop i in 0 until n:
+        if i <= last_push:
+            if not upp_ordered_stmt(stmts[i], name):
+                ok = false
+    ok
+
+define upp_ordered_stmt(s: table, name: text) -> truth:
+    kind = get(s, "kind")
+    if kind is "IfBlock":
+        # Only the branches, and each in order. The condition still counts.
+        if upp_bad_expr(get_map(s, "cond"), name) is not 0:
+            return false
+        edit fine = upp_ordered_block(get_map(s, "then"), name)
+        els = get_map(s, "else")
+        if get(els, "kind") is "Block":
+            if not upp_ordered_block(els, name):
+                fine = false
+        else if get(els, "kind") is "IfBlock":
+            if not upp_ordered_stmt(els, name):
+                fine = false
+        fine
     else:
-        edit ok = true
-        loop i in 0 until n:
-            if i <= last_push:
-                if upp_bad_stmt(stmts[i], name) is not 0:
-                    ok = false
-        ok
+        upp_bad_stmt(s, name) is 0
+
+# --- a list that is copied on every append -----------------------------------
+#
+# A list only grows where it stands while the compiler can see that nobody
+# else holds it. When it cannot, every `append` copies the whole list, and a
+# loop that fills ten thousand entries does fifty million element copies
+# instead of ten thousand. Nothing says so: the program is correct, the loop
+# looks the same, and it is quadratic.
+#
+# That is exactly what happened to veil's layout - 739 milliseconds to place
+# twenty thousand children, and three attempts to reproduce it in isolation
+# all came out linear because they happened to be written slightly
+# differently. So the compiler says it now, in one line, the way it already
+# says how many slot stores have no copier.
+define slowfact_get(what: text) -> number:
+    if slot_has("upp:{what}") then slot_get_number("upp:{what}") else 0
+
+define slowfact_note(fn_name: text, var_name: text):
+    n = slowfact_get("copies")
+    slot_set("upp:copies", n + 1)
+    slot_set("upp:where:{n}", "{var_name} in {fn_name}")
+
+# What was counted, in one line next to the timings. Anything longer is noise
+# on a build that is fine, and noise is how a real warning gets missed.
+public define slowfacts_report():
+    n = slowfact_get("copies")
+    if n is 0:
+        return 0
+    first = if slot_has("upp:where:0") then slot_get("upp:where:0") else ""
+    if n is 1:
+        print_line("  speed: 1 list is copied on every append ({first})")
+    else:
+        print_line("  speed: {n} lists are copied on every append, first {first} (`orion <file> slowfacts` to list)")
+    0
+
+public define slowfacts_list() -> number:
+    n = slowfact_get("copies")
+    print_line("")
+    print_line("Lists copied on every append - each one is a loop that is")
+    print_line("quadratic in how much it collects. A list grows where it stands")
+    print_line("only while nothing else can be holding it, so the fix is one of:")
+    print_line("  - read it with xs[i] or at(xs, i), never hand the whole list")
+    print_line("    to another function while it is still being filled")
+    print_line("  - if something must read all of it, sum or scan in the same")
+    print_line("    loop that fills it")
+    print_line("")
+    loop i in 0 until n:
+        where = if slot_has("upp:where:{i}") then slot_get("upp:where:{i}") else ""
+        print_line("  {where}")
+    n
 
 # Per-function: keep the mut locals proven unique, rewrite their self-pushes.
-define upp_promote_fn(body: table) -> table:
+define upp_promote_fn(body: table, fn_name: text) -> table:
     cands = upp_mut_names(body, part([""], 0, 0))
     edit uniq = part([""], 0, 0)
     loop i in 0 until length(cands):
         nm = cands[i]
         if (not upp_contains_name(uniq, nm)) and upp_safe_ordered(body, nm):
             uniq = append(uniq, nm)
+        else:
+            # It pushes to itself and could not be promoted: that is the
+            # quadratic, and it is worth a word.
+            if (not upp_contains_name(uniq, nm)) and upp_block_has_self_push(body, nm):
+                slowfact_note(fn_name, nm)
     if length(uniq) is 0:
         body
     else:
@@ -5966,6 +6309,26 @@ define num_k_field(field: text) -> text:
 
 # The ELEMENT site of a list. `xs: [number]` is two questions - what the
 # binding is, and what it holds - and only the second one has an answer here.
+# Which SLOT KEY was written with a real number. A slot holds one 64-bit word
+# and takes a double as its bits, so the read has to know which way to look at
+# it - and the only thing that says so is the write.
+#
+# Keyed by the key EXPRESSION as written: the local that holds it, or the
+# literal itself. Per function, because `kv` is a name half the corpus uses and
+# a mark that crossed functions would answer for somebody else's slot.
+define num_k_slot(fn_name: text, key_name: text) -> text:
+    "num:{slot_int_or_zero(\"otir:ep\")}:slot:{fn_name}:{key_name}"
+
+# The key as a name to remember it by, or "" when it is neither a local nor a
+# literal - an interpolation built inline, say, which nothing can match up.
+define num_slot_key(node: table) -> text:
+    if get(node, "kind") is "Ident":
+        get(node, "name")
+    else if get(node, "kind") is "Str":
+        "lit:" + get(node, "value")
+    else:
+        ""
+
 define num_k_elem(fn_name: text, name: text) -> text:
     "num:{slot_int_or_zero(\"otir:ep\")}:e:{fn_name}:{name}"
 
@@ -6022,12 +6385,27 @@ define num_k_ftpar(fn_name: text, pname: text, j: number) -> text:
     "num:{slot_int_or_zero(\"otir:ep\")}:ftp:{fn_name}:{pname}:{j}"
 
 # Is parameter `i` of `fn_name` a function type carrying `number`?
+# A tuple-typed parameter: "this parameter is a tuple", by index.
+define num_k_tpnum(fn_name: text, i: number) -> text:
+    "num:tpnum:{fn_name}:{i}"
+
 define num_k_fpnum(fn_name: text, i: number) -> text:
     "num:{slot_int_or_zero(\"otir:ep\")}:fp:{fn_name}:{i}"
 
 # `[number]` / `list of number` - the parser builds one node for both.
 define num_is_number_list(t: table) -> truth:
     get(t, "kind") is "List" and num_is_number(get(t, "elem"))
+
+# `table of number`. A table's VALUES are the same question a list's elements
+# are - what does this thing hold - so they share the site, and `set(m, k, v)`
+# was already marking it.
+define num_is_number_table(t: table) -> truth:
+    if get(t, "kind") is not "Named":
+        return false
+    if get(t, "name") is not "table" and get(t, "name") is not "map":
+        return false
+    ta = if has(t, "args") then get_list(t, "args") else []
+    length(ta) is 1 and num_is_number(ta[0])
 
 # Does this expression denote a list whose elements are real? A literal says
 # so outright, a name and a call carry the answer their site got.
@@ -6037,6 +6415,10 @@ define num_elem_real(node: table, fn_name: text) -> truth:
     if kind is "ListLit":
         loop it in get_list(node, "items"):
             if num_expr_real(it, fn_name):
+                real = true
+    if kind is "MapLit":
+        loop pr in get_list(node, "pairs"):
+            if num_expr_real(get(pr, "value"), fn_name):
                 real = true
     if kind is "Ident":
         real = slot_has(num_k_elem(fn_name, get(node, "name")))
@@ -6049,7 +6431,19 @@ define num_k_pname(fn_name: text, i: number) -> text:
 
 # Is this type node the word `number`?
 define num_is_number(t: table) -> truth:
-    get(t, "kind") is "Named" and get(t, "name") is "number"
+    if get(t, "kind") is not "Named":
+        false
+    else:
+        nm = get(t, "name")
+        if nm is "number":
+            true
+        else:
+            # `type M = number`. The alias pass runs before this one and keeps
+            # the source word, so a site spelled `M` asks the same question a
+            # site spelled `number` does - otherwise `edit d: M = 5` froze the
+            # slot as f64 and stored a whole 5 into it as raw bits.
+            src_key = otir_k1("tyaliassrc", nm)
+            slot_has(src_key) and slot_get(src_key) is "number"
 
 # Mark a site real, and note that this round changed something.
 define num_mark(key: text):
@@ -6191,6 +6585,24 @@ define num_scan_block(block: table, fn_name: text):
 # the parameter it lands on real, everywhere in the program.
 define num_scan_expr(node: table, fn_name: text):
     kind = get(node, "kind")
+    # `perform E.op(a, b)` is a CALL to the handler, spelled differently. It
+    # was not wired here, so a real argument reached a handler whose parameter
+    # had settled whole - the bits went in and came out as an integer near
+    # 4.6e18. The two are one site, the same way a call and its callee are.
+    if kind is "Perform":
+        pf_h = "__handler_{get(node, \"effect\")}_{get(node, \"op\")}"
+        pf_args = get_list(node, "args")
+        loop pfi in 0 until length(pf_args):
+            num_scan_expr(pf_args[pfi], fn_name)
+            if slot_has(num_k_pnum(pf_h, pfi)):
+                pf_pname = slot_get(num_k_pname(pf_h, pfi))
+                if num_expr_real(pf_args[pfi], fn_name):
+                    num_mark(num_k_var(pf_h, pf_pname))
+                # and the other way: a parameter already known real widens the
+                # argument written at this perform, so a whole literal is BUILT
+                # real rather than handed over as a whole-number bit pattern.
+                if slot_has(num_k_var(pf_h, pf_pname)) and get(pf_args[pfi], "kind") is "Ident":
+                    num_mark(num_k_var(fn_name, get(pf_args[pfi], "name")))
     if kind is "Call":
         callee = get(node, "callee")
         args = get_list(node, "args")
@@ -6204,6 +6616,15 @@ define num_scan_expr(node: table, fn_name: text):
             # whole numbers into a list of real ones. So the two are one site:
             # real anywhere is real along the whole chain, and a literal
             # written at such a call is BUILT real (see num_rewrite_call).
+            # A TUPLE argument: each field is its own site. Without this the
+            # parameter's number fields never heard that a real was handed in,
+            # settled whole, and read the double's bits back as an integer.
+            if slot_has(num_k_tpnum(callee, ai)) and get(args[ai], "kind") is "Tuple":
+                t_pname = slot_get(num_k_pname(callee, ai))
+                t_items = get_list(args[ai], "items")
+                loop tii in 0 until length(t_items):
+                    if num_expr_real(t_items[tii], fn_name):
+                        num_mark(num_k_tvar(callee, t_pname, tii))
             if slot_has(num_k_lpnum(callee, ai)):
                 p_elem = num_k_elem(callee, slot_get(num_k_pname(callee, ai)))
                 if num_elem_real(args[ai], fn_name):
@@ -6235,10 +6656,23 @@ define num_scan_expr(node: table, fn_name: text):
         loop vi in 0 until length(args):
             if slot_has(num_k_vpnum(callee, vi)) and num_expr_real(args[vi], fn_name):
                 num_mark(num_k_vpay(callee, vi))
+        # `resume(v)` IS the handler's answer - the value goes back to the
+        # `perform` site, not to whoever called the handler. A handler whose
+        # body is only a resume looked like it answered nothing, so a resumed
+        # fraction travelled over the whole-number carrier and came back as
+        # the number that went in.
+        if callee is "resume" and length(args) >= 1:
+            if num_expr_real(args[0], fn_name):
+                num_mark(num_k_ret(fn_name))
         # Storing into a list. Every way a value gets into one is a call by
         # the time this runs: `xs[i] = v` is parsed as `set(xs, i, v)` and
         # `collect e` as `append(acc, e)`. So these three are the whole set,
         # and a real stored through any of them makes the list real.
+        # `slot_set(k, <real>)` - the write is what tells the read.
+        if callee is "slot_set" and length(args) >= 2:
+            sk = num_slot_key(args[0])
+            if sk is not "" and num_expr_real(args[1], fn_name):
+                num_mark(num_k_slot(fn_name, sk))
         stores_at_2 = callee is "append" or callee is "push"
         if stores_at_2 and length(args) >= 2:
             if num_expr_real(args[1], fn_name) and get(args[0], "kind") is "Ident":
@@ -6317,9 +6751,23 @@ define num_register(decls: [table]):
                 if has(p, "type") and num_is_number(get(p, "type")):
                     slot_set(num_k_pnum(fname, pi), 1)
                     slot_set(num_k_pname(fname, pi), get(p, "name"))
-                if has(p, "type") and num_is_number_list(get(p, "type")):
+                # `table of number` rides the LIST parameter path: both are
+                # "the site holds numbers", both have to AGREE with the
+                # argument rather than promote it, and both build a literal
+                # written at the call real.
+                if has(p, "type") and (num_is_number_list(get(p, "type")) or num_is_number_table(get(p, "type"))):
                     slot_set(num_k_lpnum(fname, pi), 1)
                     slot_set(num_k_pname(fname, pi), get(p, "name"))
+                # A TUPLE parameter is one site per field, the same way a
+                # tuple return already was. Registering it here is what lets a
+                # call mark the fields its argument actually fills.
+                if has(p, "type") and get(get(p, "type"), "kind") is "TupleType":
+                    slot_set(num_k_tpnum(fname, pi), 1)
+                    slot_set(num_k_pname(fname, pi), get(p, "name"))
+                    tp_els = get_list(get(p, "type"), "elems")
+                    loop tpj in 0 until length(tp_els):
+                        if num_is_declared_real(get(tp_els[tpj], "name")):
+                            slot_set(num_k_tvar(fname, get(p, "name"), tpj), 1)
                 if has(p, "type") and get(get(p, "type"), "kind") is "FnType":
                     slot_set(num_k_fpnum(fname, pi), 1)
                     slot_set(num_k_pname(fname, pi), get(p, "name"))
@@ -6433,6 +6881,8 @@ define num_resolve_type(t: table, key: text) -> table:
 define num_resolve_site(t: table, key: text, elem_key: text) -> table:
     if num_is_number_list(t):
         return set(t, "elem", num_resolve_type(get(t, "elem"), elem_key))
+    if num_is_number_table(t):
+        return set(t, "args", append([], num_resolve_type(get_list(t, "args")[0], elem_key)))
     num_resolve_type(t, key)
 
 # A function-typed parameter: each part takes the answer its own site got.
@@ -6450,8 +6900,39 @@ define num_rewrite_stmt(stmt: table, fn_name: text) -> table:
     edit out = stmt
     if kind is "LetOrAssign" or kind is "MutLet":
         out = set(out, "value", num_rewrite_call(get(stmt, "value"), fn_name))
+        # Not inside the "this binding is already real" guard: the whole point
+        # is that the binding does NOT know yet. The slot's WRITE is what says
+        # so, and the read has to be turned before anyone asks its type.
+        out = set(out, "value", num_real_slotread(get(out, "value"), fn_name))
         if slot_has(num_k_elem(fn_name, get(stmt, "name"))):
-            out = set(out, "value", num_real_listlit(get(out, "value")))
+            out = set(out, "value", num_real_maplit(num_real_listlit(get(out, "value"))))
+        # A binding whose site came out REAL, started from a whole literal:
+        # `edit line_w = 0` followed by a real somewhere later. The slot was
+        # made whole and the later assignment could not fit in it. The literal
+        # is built real instead - the same rule a list, a table, a tuple and a
+        # perform argument already followed; a plain binding was the one shape
+        # left out, and it only showed when a corpus migration walked into it.
+        if slot_has(num_k_var(fn_name, get(stmt, "name"))):
+            # NOT a truth. `true` and `false` are Int nodes carrying a marker,
+            # so without this guard `still = false` was rebuilt as `0.0` and
+            # the binding was told a truth had become a real.
+            if get(get(out, "value"), "kind") is "Int" and not has(get(out, "value"), "truth"):
+                out = set(out, "value", {"kind": "Float", "value": "{get(get(out, \"value\"), \"value\")}.0"})
+            else:
+                # Not only literals. `edit width = the_game.width` followed by
+                # `width = event.x` - a whole FIELD read into a slot a real
+                # later lands in. The mark is only ever set because a real was
+                # assigned somewhere, so the binding is a number; widening the
+                # first value is what makes the slot fit the rest.
+                wv = get(out, "value")
+                wk = get(wv, "kind")
+                if (not num_expr_real(wv, fn_name)) and (wk is "Ident" or wk is "Field" or wk is "Index" or wk is "Call" or wk is "Unary" or wk is "Binary"):
+                    out = set(out, "value", {"kind": "Call", "callee": "to_real", "args": [wv]})
+            # `x = slot_get_number(k)` where x came out real: the word in the
+            # slot is a double's bits, so read it as one. The user writes ONE
+            # name; which read it becomes is the same question `number` always
+            # answers.
+
         if has(stmt, "decl_type"):
             out = set(out, "decl_type", num_resolve_site(get(stmt, "decl_type"), num_k_var(fn_name, get(stmt, "name")), num_k_elem(fn_name, get(stmt, "name"))))
     if kind is "IfBlock":
@@ -6483,6 +6964,36 @@ define num_real_listlit(node: table) -> table:
         items = append(items, it2)
     set(node, "items", items)
 
+# The same for a table literal: `{"a": 1}` handed to a `table of number` whose
+# site came out real stores an i64 bit pattern in a slot that is read as a
+# double, and the answer is 9.2e18 rather than one.
+# `slot_get_number(k)` becomes the REAL read when that key was written with a
+# real. One name is written; which read it becomes is the same question
+# `number` answers everywhere else.
+define num_real_slotread(node: table, fn_name: text) -> table:
+    if get(node, "kind") is not "Call":
+        return node
+    if get(node, "callee") is not "slot_get_number":
+        return node
+    ka = get_list(node, "args")
+    if length(ka) < 1:
+        return node
+    sk = num_slot_key(ka[0])
+    if sk is not "" and slot_has(num_k_slot(fn_name, sk)):
+        return set(node, "callee", "slot_get_real")
+    node
+
+define num_real_maplit(node: table) -> table:
+    if get(node, "kind") is not "MapLit":
+        return node
+    edit pairs = []
+    loop pr in get_list(node, "pairs"):
+        edit pr2 = pr
+        if get(get(pr, "value"), "kind") is "Int":
+            pr2 = set(pr, "value", {"kind": "Float", "value": "{get(get(pr, \"value\"), \"value\")}.0"})
+        pairs = append(pairs, pr2)
+    set(node, "pairs", pairs)
+
 # Every call in an expression: a list literal handed to a real-element
 # parameter is built real.
 # `(1.5, 2)` answered from a function whose second position is real has to
@@ -6500,6 +7011,23 @@ define num_real_tuple(node: table, fn_name: text, key_fn: text) -> table:
         items = append(items, it2)
     set(node, "items", items)
 
+# A condition needs ONE thing from the rewriter: a `perform` whose handler
+# takes a real must get its whole literals built real. Running the full
+# rewriter over a condition also reached the lambdas inside `each` / `keep`,
+# and a lambda that goes through the fn-typed-parameter path stops being the
+# node the lifting pass recorded - the lowering then met a raw `Lambda` with
+# no case for it. So: performs, and nothing else.
+define num_rewrite_perform(node: table, fn_name: text) -> table:
+    kind = get(node, "kind")
+    if kind is "Perform":
+        return num_rewrite_call(node, fn_name)
+    edit out = node
+    if kind is "Binary":
+        out = set(set(out, "left", num_rewrite_perform(get(node, "left"), fn_name)), "right", num_rewrite_perform(get(node, "right"), fn_name))
+    if kind is "Unary":
+        out = set(out, "operand", num_rewrite_perform(get(node, "operand"), fn_name))
+    out
+
 define num_rewrite_call(node: table, fn_name: text) -> table:
     kind = get(node, "kind")
     edit out = node
@@ -6512,6 +7040,20 @@ define num_rewrite_call(node: table, fn_name: text) -> table:
             v2 = num_typed_lambda(v2, "num:ffpn:{slot_int_or_zero(\"otir:ep\")}:{get(fd, \"name\")}")
             fs2 = append(fs2, set(fd, "value", v2))
         out = set(out, "fields", fs2)
+    # A whole literal written at a perform whose handler takes a real is BUILT
+    # real. Handed over as a whole number it would be a bit pattern read as a
+    # double: `perform line(2, 3)` answered 2.5e-323.
+    if kind is "Perform":
+        pf_h = "__handler_{get(node, \"effect\")}_{get(node, \"op\")}"
+        pf_args = get_list(node, "args")
+        edit pf2 = []
+        loop pfi in 0 until length(pf_args):
+            edit pa2 = num_rewrite_call(pf_args[pfi], fn_name)
+            if slot_has(num_k_pnum(pf_h, pfi)) and slot_has(num_k_var(pf_h, slot_get(num_k_pname(pf_h, pfi)))):
+                if get(pa2, "kind") is "Int":
+                    pa2 = {"kind": "Float", "value": "{get(pa2, \"value\")}.0"}
+            pf2 = append(pf2, pa2)
+        out = set(out, "args", pf2)
     if kind is "Call":
         callee = get(node, "callee")
         args = get_list(node, "args")
@@ -6520,7 +7062,7 @@ define num_rewrite_call(node: table, fn_name: text) -> table:
             edit a2 = num_rewrite_call(args[ai], fn_name)
             if slot_has(num_k_lpnum(callee, ai)):
                 if slot_has(num_k_elem(callee, slot_get(num_k_pname(callee, ai)))):
-                    a2 = num_real_listlit(a2)
+                    a2 = num_real_maplit(num_real_listlit(a2))
             # And one handed to a fn-typed PARAMETER takes that one's.
             if slot_has(num_k_fpnum(callee, ai)):
                 a2 = num_typed_lambda(a2, "num:ftpn:{slot_int_or_zero(\"otir:ep\")}:{callee}:{slot_get(num_k_pname(callee, ai))}")
@@ -6529,7 +7071,29 @@ define num_rewrite_call(node: table, fn_name: text) -> table:
     if kind is "Binary":
         out = set(set(out, "left", num_rewrite_call(get(node, "left"), fn_name)), "right", num_rewrite_call(get(node, "right"), fn_name))
     if kind is "If":
+        # The CONDITION too. It was skipped, so a literal written at a real
+        # site inside `if f(2) is 5.0 then ...` was never rebuilt - and the
+        # branches, which were rewritten, made it look like the rule worked.
+        out = set(out, "cond", num_rewrite_perform(get(node, "cond"), fn_name))
         out = set(set(out, "then", num_rewrite_call(get(node, "then"), fn_name)), "else", num_rewrite_call(get(node, "else"), fn_name))
+        # One branch real and the other whole: widen the whole one HERE, in the
+        # pass, before anything is emitted.
+        #
+        # The lowering knows how to do this and does it by re-lowering the
+        # whole `if` from the state it started in - which works only if the
+        # half-built attempt is dropped, and it is NOT: the compiler mutates
+        # uniquely-owned values in place, so both attempts ended up in the
+        # function. The first one's `br` pointed at an `else` label that was
+        # never emitted, and clang refused the module. Deciding it here means
+        # there is nothing to undo.
+        if_t = get(out, "then")
+        if_e = get(out, "else")
+        t_real = num_expr_real(if_t, fn_name)
+        e_real = num_expr_real(if_e, fn_name)
+        if t_real and not e_real:
+            out = set(out, "else", {"kind": "Call", "callee": "to_real", "args": [if_e]})
+        if e_real and not t_real:
+            out = set(out, "then", {"kind": "Call", "callee": "to_real", "args": [if_t]})
     out
 
 define num_rewrite_block(block: table, fn_name: text) -> table:
@@ -6547,6 +7111,16 @@ define num_rewrite_fn(d: table) -> table:
         if has(p, "type"):
             if get(get(p, "type"), "kind") is "FnType":
                 p2 = set(p, "type", num_resolve_fntype(get(p, "type"), fname, get(p, "name")))
+            else if get(get(p, "type"), "kind") is "TupleType":
+                # Each field asks its own question, the same way a tuple RETURN
+                # already did. Without this a `(number, text)` parameter froze
+                # every number field as the f64 default, so a whole 37 handed in
+                # was read back as its own bits: 1.83e-322.
+                edit ptel = []
+                ptels = get_list(get(p, "type"), "elems")
+                loop pti in 0 until length(ptels):
+                    ptel = append(ptel, num_resolve_type(ptels[pti], num_k_tvar(fname, get(p, "name"), pti)))
+                p2 = set(p, "type", set(get(p, "type"), "elems", ptel))
             else:
                 p2 = set(p, "type", num_resolve_site(get(p, "type"), num_k_var(fname, get(p, "name")), num_k_elem(fname, get(p, "name"))))
         ps = append(ps, p2)
@@ -6697,7 +7271,7 @@ public define num_pass(program: table) -> table:
         # The lattice has two points and marks only ever go one way, so this
         # settles. The bound is a guard against a shape nobody thought of, not
         # a real limit.
-        if slot_get_int("num:changed") is 0 or rounds > 32:
+        if slot_get_number("num:changed") is 0 or rounds > 32:
             break
     num_settle_fnsigs(decls)
     edit out = []
@@ -6750,6 +7324,9 @@ public define ast_program_to_ir(program: table) -> IRModule:
         # stash it. A later `x: Name` looks this up in ast_type_to_ir_with_scope.
         if pk is "TypeAlias":
             slot_set(otir_k1("tyalias", get(pd, "name")), ast_type_to_ir(get(pd, "target")))
+            pd_target = get_map(pd, "target")
+            if get(pd_target, "kind") is "Named":
+                slot_set(otir_k1("tyaliassrc", get(pd, "name")), get(pd_target, "name"))
         if pk is "UseDecl":
             target = get(pd, "name")
             slot_set(otir_k2("uses", orb_pre, target), 1)
@@ -6907,7 +7484,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
     loop upi in 0 until length(upp_decls):
         edit upd = upp_decls[upi]
         if get(upd, "kind") is "Fn":
-            upd = set(upd, "body", upp_promote_fn(get_map(upd, "body")))
+            upd = set(upd, "body", upp_promote_fn(get_map(upd, "body"), get(upd, "name")))
         upp_out = append(upp_out, upd)
     program_const = set(program_const, "decls", upp_out)
 
@@ -7335,7 +7912,20 @@ public define ast_program_to_ir(program: table) -> IRModule:
             ext_name = get(decl, "name")
             ext_ret = ast_type_to_ir_with_scope(get(decl, "ret"), sig_scope)
             sig_scope = scope_add_fn_sig(sig_scope, ext_name, ext_ret)
-            slot_set("otir:arity:" + ext_name, length(get_list(decl, "params")))
+            ext_params = get_list(decl, "params")
+            slot_set("otir:arity:" + ext_name, length(ext_params))
+            # The same parameter-TYPE registry an ordinary function gets, and
+            # for the same reason: a call site crosses the `number` boundary
+            # from what the callee DECLARES. An external got none, so a real
+            # handed to a slot declared whole went across as the double's raw
+            # bits - `og_round_rect(..., radius, ...)` with a radius parsed
+            # out of text (which answers `number`) drew every panel as a
+            # lozenge, and a C function reading it as an int64 is the same
+            # class of wrong as any other.
+            loop ep_i in 0 until length(ext_params):
+                ep = ext_params[ep_i]
+                ep_ty = if has(ep, "type") then ast_type_to_ir_with_scope(get(ep, "type"), sig_scope) else "int"
+                slot_set("otir:paramtype:" + ext_name + ":{ep_i}", ep_ty)
 
     # Pass 2: build each fn's body with the signature scope available.
     # ExternFn becomes a body-less IRFn (params + ret, zero instructions);
@@ -7352,7 +7942,11 @@ public define ast_program_to_ir(program: table) -> IRModule:
             rt_word = get(decl, "word")
             rt_line = get_int(decl, "line")
             rt_col = get_int(decl, "col")
-            compile_error("orion: ERROR at {otir_where(rt_line, rt_col)} - `{rt_word}` was retired; `type` declares every type now (`type Name: field: T` for a product, `type Name:` + indented variants for a sum)")
+            rt_name = if has(decl, "name") then get(decl, "name") else "name"
+            if rt_word is "fn":
+                compile_error("orion: ERROR at {otir_where(rt_line, rt_col)} - `fn` no longer declares a function; write `define {rt_name}(...)`")
+            else:
+                compile_error("orion: ERROR at {otir_where(rt_line, rt_col)} - `{rt_word}` was retired; `type` declares every type now (`type Name: field: T` for a product, `type Name:` + indented variants for a sum)")
         if kind is "Unsupported":
             us_word = get(decl, "word")
             us_line = get_int(decl, "line")

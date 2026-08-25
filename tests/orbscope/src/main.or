@@ -28,10 +28,10 @@ use alpha (alpha_label, alpha_run, shared_label)
 define label() -> text:
     "program"
 
-define run(n: int) -> int:
+define run(n: number) -> number:
     n - 1
 
-define check_text(name: text, expected: text, actual: text) -> int:
+define check_text(name: text, expected: text, actual: text) -> number:
     if actual == expected:
         print_line("    ok    {name}")
         0
@@ -39,7 +39,7 @@ define check_text(name: text, expected: text, actual: text) -> int:
         print_line("    FAIL  {name} -> expected `{expected}`, got `{actual}`")
         1
 
-define check(name: text, expected: int, actual: int) -> int:
+define check(name: text, expected: number, actual: number) -> number:
     if actual == expected:
         print_line("    ok    {name}")
         0
@@ -47,7 +47,7 @@ define check(name: text, expected: int, actual: int) -> int:
         print_line("    FAIL  {name} -> expected {expected}, got {actual}")
         1
 
-define main() -> int:
+define main() -> number:
     print_line("")
     print_line("  gate: orb visibility (private functions are orb-local)")
     print_line("")

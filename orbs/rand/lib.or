@@ -19,7 +19,7 @@ RAND_DEFAULT = 88172645463325252   # fixed nonzero default seed
 
 # Current state, or the default if unseeded.
 define rand_state() -> number:
-    if slot_has("rand:state") then slot_get_int("rand:state") else RAND_DEFAULT
+    if slot_has("rand:state") then slot_get_number("rand:state") else RAND_DEFAULT
 
 # Fix the sequence. Any int works (0 included - the increment keeps it moving).
 public define srand(seed: number) -> number uses random:
@@ -42,7 +42,7 @@ public define rand_range(lo: number, hi: number) -> number uses random:
 # A pseudo-random float in [0.0, 1.0).
 public define rand_float() -> float uses random:
     example rand_float() >= 0.0
-    (rand() % 1000000000) as float / 1000000000.0
+    to_real(rand() % 1000000000) / 1000000000.0
 
 # true with probability 1/n (rand_chance(2) is a coin flip). n <= 1 is always true.
 public define rand_chance(n: number) -> truth uses random:

@@ -17,6 +17,9 @@ use ori_scene
 
 # "#RRGGBB" (or "#RGB") to a whole color; anything else is 0.
 public define color_of(colour: text) -> number:
+    example color_of("#ff0000") is 16711680
+    example color_of("#000000") is 0
+    example color_of("rod") is 0
     bytes = bytes_of(colour)
     if bytes_count(bytes) is 0 or byte_at(bytes, 0) is not 35:
         return 0
@@ -62,8 +65,18 @@ define drawn(pixels: list of number, width: number, height: number, command: Dra
         DrawRect(rect, colour, tag) then fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), 0)
         DrawRoundRect(rect, colour, radius, tag) then fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), to_whole(radius * scale + 0.5))
         DrawText(point, content, colour, size, tag) then fill_text(pixels, width, height, point, content, color_of(colour), size, scale, types)
-        DrawIcon(point, icon_name, size, tag) then pixels
+        DrawIcon(point, icon_name, size, icon_colour, tag) then pixels
         DrawPath(path_data, colour, tag) then pixels
+        # The four the gpu work added while this dispatch stood still. They
+        # pass through: this is the CPU overlay, and a shadow, an arc or a
+        # nine-slice it cannot soften is better left undrawn than drawn as a
+        # hard block. `SetClip` needs a clip stack the span filler does not
+        # have. Named rather than swept up by a wildcard, so the next variant
+        # stops the build here instead of vanishing quietly.
+        SetClip(clip_rect, clip_radius, clip_tag) then pixels
+        DrawShadow(shadow_rect, shadow_colour, shadow_radius, shadow_blur, shadow_tag) then pixels
+        DrawArc(arc_at, arc_outer, arc_thick, arc_from, arc_span, arc_colour, arc_tag) then pixels
+        DrawNine(nine_rect, nine_pic, nine_corner, nine_tint, nine_blend, nine_tag) then pixels
         DrawSprite(point, image_path, sprite_scale, tag) then pixels
         DrawImage(point, image_path, image_wide, image_high, tint, blend, tag) then blit_image(pixels, width, height, scaled(Rect{x: point.x, y: point.y, wide: (image_wide), high: (image_high)}, scale), texture_of(image_path))
 

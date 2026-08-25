@@ -48,7 +48,7 @@ define main() -> number:
     t6 = monotonic_ms()
     edit i_acc = 0
     loop i in 0 until itt_reps:
-        i_acc = i_acc + length(to_text(i))
+        i_acc = i_acc + length(i as text)
     t7 = monotonic_ms()
 
     # --- concat of two texts ---

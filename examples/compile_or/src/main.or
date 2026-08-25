@@ -17,7 +17,7 @@ define int_to_text(value: number) -> text:
             if n > 0:
                 d = digits[n % 10]
                 chars = "{d}{chars}"
-                n = n / 10
+                n = n // 10
         if value < 0 then "-{chars}" else chars
 
 

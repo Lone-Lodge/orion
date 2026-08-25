@@ -1,5 +1,5 @@
 #!/bin/bash
-# WebAssembly conformance gate: compile every smoke test (examples/tests/tests)
+# WebAssembly conformance gate: compile every smoke test (tests/suite/tests)
 # through the wasm backend, run each in node, and compare the answer to the
 # native expectation encoded in the filename. Categories: OK, MISMATCH (wrong
 # answer), UNSUPPORTED (backend refuses to lower), TRAP, HANG (infinite loop,

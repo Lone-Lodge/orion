@@ -23,7 +23,7 @@ case "$(uname -s 2>/dev/null || echo Windows)" in
     *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
 esac
 ORION="$ROOT/dist/orion.exe"
-DIR="$ROOT/examples/tests/negative"
+DIR="$ROOT/tests/suite/negative"
 [ -x "$ORION" ] || { echo "no dist/orion.exe - bash tools/bootstrap.sh"; exit 1; }
 
 TMP="$(mktemp -d)"

@@ -5,13 +5,13 @@
 define label() -> text:
     "beta"
 
-define run(n: int) -> int:
+define run(n: number) -> number:
     n + 100
 
 public define beta_label() -> text:
     label()
 
-public define beta_run(n: int) -> int:
+public define beta_run(n: number) -> number:
     run(n)
 
 public define shared_label() -> text:

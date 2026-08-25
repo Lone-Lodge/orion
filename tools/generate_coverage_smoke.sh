@@ -2,13 +2,13 @@
 # Auto-generate a smoke test that exercises EVERY unique syntactic construct
 # found in orbs/. If something compiles in orbs/, it must compile in this smoke.
 #
-# Output: examples/tests/tests/test_42_auto_coverage.or
+# Output: tests/suite/tests/test_42_auto_coverage.or
 #
 # This is how we stop missing bugs. The bundle uses pattern X → smoke tests it.
 
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-OUT="$ROOT/examples/tests/tests/test_42_auto_coverage.or"
+OUT="$ROOT/tests/suite/tests/test_42_auto_coverage.or"
 
 cd "$ROOT"
 
@@ -145,4 +145,4 @@ HEADER
 
 echo "Generated: $OUT"
 echo ""
-echo "Run smoke: cd examples/tests && rm -rf target dist && orbit run src/main.or main"
+echo "Run smoke: cd tests/suite && rm -rf target dist && orbit run src/main.or main"

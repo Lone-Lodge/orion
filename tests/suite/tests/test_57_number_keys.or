@@ -1,0 +1,30 @@
+# A table takes a NUMBER as its key. The runtime always had the family for it
+# (`orion_map_set_ik` and friends, keys compared by value); what was missing
+# was a way to say what the table holds, and an empty literal claiming to know.
+#
+# `edit m = {}` used to type itself as a table of NUMBERS. Put a text in it and
+# read it back and you got the pointer, printed as an integer near 1.4e14. An
+# empty literal says nothing about its values, so it says `dyn` now - and
+# `table of text` is how you say it instead.
+#
+# Also here: the predicates answer in words. `has(m, k)` printed `1`, which is
+# the machine's answer to a question the program asked in words.
+
+
+define main() -> number:
+    edit m: table of text = {}
+    m = set(m, 7, "sju")
+    m = set(m, 42, "fyrtiotvå")
+    a = if m[7] is "sju" and m[42] is "fyrtiotvå" then 30 else 0
+
+    # a key that is not there, and one that is
+    b = if has(m, 7) and not has(m, 9) then 15 else 0
+
+    # the predicates say it in words, not in ones
+    xs = [1, 2, 3]
+    w1 = "{has(m, 7)}"
+    w2 = "{includes(xs, 9)}"
+    w3 = "{contains(\"hej\", \"ej\")}"
+    c = if w1 is "true" and w2 is "false" and w3 is "true" then 12 else 0
+
+    a + b + c   # 30 + 15 + 12

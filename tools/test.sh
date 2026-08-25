@@ -1,5 +1,5 @@
 #!/bin/bash
-# orbit test - run the smoke suite. Builds on examples/tests runner.
+# orbit test - run the smoke suite. Builds on tests/suite runner.
 # Filter via first arg: `tools/test.sh sum_types` runs only matching tests.
 
 set -e
@@ -16,7 +16,7 @@ case "$(uname -s 2>/dev/null || echo unknown)" in
     *) ulimit -s unlimited 2>/dev/null || true ;;
 esac
 
-cd "$ROOT/examples/tests"
+cd "$ROOT/tests/suite"
 
 if [ -n "$FILTER" ]; then
     echo "Filter: $FILTER (only matching test files run)"

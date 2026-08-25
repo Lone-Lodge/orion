@@ -20,9 +20,9 @@ define main() -> number:
     edit xs = [1, 2, 3]
     xs = set(xs, 1, 42)
     print_line(xs[1])
-    # float interpolation + to_text(float)
+    # float interpolation + `as text` on a real
     speed = 2.5
     print_line("speed is {speed} units")
-    t = to_text(1.25)
+    t = 1.25 as text
     print_line(t)
     0

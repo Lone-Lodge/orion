@@ -1,0 +1,40 @@
+# Publish docs/ so the Field Guide and the library reference open in a browser.
+#
+# A .html file linked from a README on GitHub shows its source, not the page.
+# Pages serves the same folder as a site, so the links in the README point at
+# something a reader can actually read. Nothing is generated here: docs/ is
+# committed, and tools/docs_check.sh already proves it is not stale.
+#
+# One-time setup: Settings -> Pages -> Source: GitHub Actions.
+
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4

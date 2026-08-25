@@ -1,8 +1,0 @@
-type Vec2: x: number, y: number
-
-define len_sq(v: Vec2) -> number:
-    v.x * v.x + v.y * v.y
-
-define main() -> number:
-    v = Vec2{x: 3, y: 4}
-    len_sq(v)

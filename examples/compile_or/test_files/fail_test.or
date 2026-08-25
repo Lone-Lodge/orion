@@ -1,3 +1,0 @@
-define main() -> number:
-    undefined_fn_xyz(1)
-    0

@@ -15,10 +15,7 @@
 # Uninstall is the same window in reverse: uninstall.exe relaunches itself
 # from TEMP (a program cannot delete the folder it runs from), takes the
 # three things above away, and the person's own files are never touched.
-use app
 use net
-use os
-use text
 
 # The manifest is flat "key=value" lines - read one.
 define setting(manifest: text, key: text) -> text:
@@ -110,6 +107,27 @@ define path_remove() -> truth uses console:
     script = "$d='" + d + "'; $c=[Environment]::GetEnvironmentVariable('Path','User'); $n=(($c -split ';') | Where-Object \{ $_ -ne $d -and $_ -ne '' \}) -join ';'; [Environment]::SetEnvironmentVariable('Path', $n, 'User')"
     run_command_quiet("powershell", ["-NoProfile", "-Command", script]) is 0
 
+# A shortcut on the desktop too, when asked for.
+define step_desktop() -> response uses files, net, console:
+    exe = win_dir() + "\\" + slot_get("setup:exe")
+    lnk = env("USERPROFILE") + "\\Desktop\\" + slot_get("setup:name") + ".lnk"
+    script = "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('" + lnk + "'); $s.TargetPath='" + exe + "'; $s.WorkingDirectory='" + win_dir() + "'; $s.Save()"
+    ran = run_command_quiet("powershell", ["-NoProfile", "-Command", script])
+    ok_json()
+
+# The folder dialog, and the chosen dir - the page asks before installing.
+define pick(req: request) -> response uses files, console:
+    script = "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Var ska appen bo?'; if ($d.ShowDialog() -eq 'OK') \{ $d.SelectedPath \}"
+    out = trim(capture_stdout("powershell", ["-NoProfile", "-STA", "-Command", script]))
+    json_of("\{\"path\":\"" + replace(replace(out, "\\", "/"), "\"", "") + "\"\}")
+
+define setdir(req: request) -> response uses files:
+    p = replace(trim(query_of(req, "path")), "\\", "/")
+    if p is "" or index_of(p, ":/") < 0:
+        return err_json("ange en hel sokvag, t.ex. C:/Program/dots")
+    slot_set("setup:dir", p)
+    ok_json()
+
 define step_register() -> response uses files, net, console:
     key = registry_key()
     name = slot_get("setup:name")
@@ -138,6 +156,8 @@ define step_remove() -> response uses files, net, console:
     ok_json()
 
 define step(req: request) -> response uses files, net, console:
+    if query_of(req, "do") is "desktop":
+        return step_desktop()
     what = query_of(req, "do")
     choose:
         what is "unpack" then step_unpack()
@@ -188,7 +208,7 @@ define main() -> number:
     else:
         slot_set("setup:mode", "install")
         slot_set("setup:dir", env("LOCALAPPDATA") + "/Programs/" + name)
-    routes = [route{method: "GET", path: "/", handler: ui}, route{method: "GET", path: "/api/info", handler: info}, route{method: "GET", path: "/api/step", handler: step}, route{method: "GET", path: "/api/launch", handler: launch}, route{method: "GET", path: "/api/window", handler: window_api}]
+    routes = [route{method: "GET", path: "/", handler: ui}, route{method: "GET", path: "/api/info", handler: info}, route{method: "GET", path: "/api/step", handler: step}, route{method: "GET", path: "/api/launch", handler: launch}, route{method: "GET", path: "/api/window", handler: window_api}, route{method: "GET", path: "/api/pick", handler: pick}, route{method: "GET", path: "/api/setdir", handler: setdir}]
     edit srv = serve(0)
     if not ok(srv):
         return 1

@@ -1,0 +1,7 @@
+# expect: `fn` no longer declares a function
+# `fn NAME(` used to be SKIPPED as an unknown declaration: the program built,
+# exited 0, and ran nothing at all. The anonymous `function(x)` form and the
+# `fn(A) -> B` pointer type are current and must keep working.
+fn main() -> number:
+    print_line("this never ran")
+    0

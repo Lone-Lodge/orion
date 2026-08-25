@@ -4,10 +4,6 @@
 # Ties the standard library together: text.split + num.parse to read the
 # numbers, iter.sum and list.min_of / max_of / avg to summarize. Returns
 # the integer mean.
-use text
-use num
-use iter
-use list
 
 define main() -> number:
     raw = split("40 75 88 12 95 60", " ")

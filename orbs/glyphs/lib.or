@@ -8,6 +8,8 @@
 # not skipped. Lowercase maps onto uppercase.
 
 public define glyph_rows(code: number) -> list of number:
+    example length(glyph_rows(48)) is 7
+    example glyph_rows(48)[0] is 14
     letter = if code is at least 97 and code is at most 122 then code - 32 else code
     choose letter:
         48 then [14, 17, 19, 21, 25, 17, 14]

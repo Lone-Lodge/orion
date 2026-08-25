@@ -1,6 +1,0 @@
-# expect: `text` was retired
-define greet(name: Text) -> number:
-    length(name)
-
-define main() -> number:
-    greet("hi")

@@ -1,0 +1,6 @@
+# expect: libm-transcendentals
+deterministic define wobble(x: float) -> float:
+    sin(x) * 2.0
+
+define main() -> number:
+    to_whole(wobble(1.0))

@@ -1,9 +1,0 @@
-use orion_lex
-use orion_parse
-
-define main():
-    src = "data Point: x: number, y: number\n"
-    tokens = self_lex(src)
-    print_line("tokens: {length(tokens)}")
-    ast = self_parse(tokens)
-    print_line("done")

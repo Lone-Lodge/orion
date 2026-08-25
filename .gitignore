@@ -1,29 +1,25 @@
-# Build artifacts — everything here is generated, never committed.
+# Build output. Everything here is generated.
 /dist/
+build/
+/target/
 out.ll
 *.o
 *.exe
-# stray emitted IR (the committed bootstrap seed lives at tools/seed/orion.ll)
-/*.ll
-
-# Debug/crash artifacts (never source). Existing tracked build outputs like
-# examples/tests/dist/*.ll are left as-is — this only stops genuine junk.
 *.pdb
 *.dmp
-build/crash.*
-
-# scratch a test writes into the runner dir
-*.tmp
-
-# host-retargeted scratch copies (the tracked .ll is the compiler output)
+# The committed bootstrap seed lives at tools/seed/orion.ll; stray IR does not.
+/*.ll
 *.host.ll
 
-# test scratch written into the tracked dist dir
-examples/tests/.*.txt
-examples/tests/dist/.*.txt
-examples/tests/.*.bat
-examples/tests/dist/.*.bat
-examples/tests/dist/.watch/
-build/autosave.txt
-build/*.map
+# Scratch the test runner writes beside itself.
+*.tmp
+# written by test_42_proc_parallel, into whatever directory it runs from
+.proc_*
+/.dbg_code.txt
+tests/suite/.*.txt
+tests/suite/.*.bat
+
+tests/suite/dist/
+
 __pycache__/
+.claude/

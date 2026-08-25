@@ -44,3 +44,31 @@ if printf '%s\n' "$out" | grep -q "name-resolved"; then
 else
     echo "FAIL: name-based resolution"; printf '%s\n' "$out"; exit 1
 fi
+
+# Second case: a project with NO workspace marker anywhere above it, and no
+# path into the orion checkout. Its only dependency is the standard library by
+# name (`os = "*"`), which must come from the toolchain that is running - the
+# way a cloned repo builds against an installed orion.
+SOLO="$(mktemp -d)"
+trap 'rm -rf "$WS" "$SOLO"' EXIT
+
+mkdir -p "$SOLO/proj/src"
+cat > "$SOLO/proj/Orbit.toml" <<'EOF'
+[package]
+name = "solo"
+version = "0.0.1"
+
+[orbs]
+os = "*"
+EOF
+cat > "$SOLO/proj/src/main.or" <<'EOF'
+define main():
+    print(if length(read_file("Orbit.toml")) > 0 then "stdlib-reached" else "no")
+EOF
+
+out="$( cd "$SOLO/proj" && "$ORBIT" run src/main.or main 2>&1 )" || true
+if printf '%s\n' "$out" | grep -q "stdlib-reached"; then
+    echo "PASS: the stdlib resolves outside any workspace"
+else
+    echo "FAIL: stdlib outside a workspace"; printf '%s\n' "$out"; exit 1
+fi

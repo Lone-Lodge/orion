@@ -1,0 +1,9 @@
+# expect: the whole-number type is written `number` now
+# One spelling per thing. `int` stayed readable long after the corpus moved to
+# `number`, so old code and old docs kept compiling silently. It survives only
+# in `external define`, where it names a C type.
+define double(x: int) -> int:
+    x * 2
+
+define main() -> number:
+    double(21)

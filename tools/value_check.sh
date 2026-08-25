@@ -38,7 +38,7 @@ case "$(uname -s 2>/dev/null || echo Windows)" in
     *) ulimit -s unlimited 2>/dev/null || ulimit -s 65500 2>/dev/null || true ;;
 esac
 ORION="$ROOT/dist/orion.exe"
-TESTS="$ROOT/examples/tests/tests"
+TESTS="$ROOT/tests/suite/tests"
 WORK="$ROOT/dist/.valuecheck"
 FILTER="${1:-}"
 CLANG="${CLANG:-C:/Program Files/LLVM/bin/clang.exe}"
@@ -73,8 +73,12 @@ build() {
     "$CLANG" "$opt" "$ll" "$WORK/rt.o" $STACK -Wno-override-module -o "$exe" >"$WORK/l.log" 2>&1
 }
 
-# The expected exit code is the number after `test_` in the filename.
-expected_of() { printf '%s' "$1" | sed -E 's/^test_([0-9]+).*/\1/'; }
+# The expected exit code is the number after `test_` in the filename, taken
+# as the OS reports it: an exit code is a byte, so test_1713 exits 177.
+expected_of() {
+    n=$(printf '%s' "$1" | sed -E 's/^test_([0-9]+).*/\1/')
+    case "$n" in '' | *[!0-9]*) printf '%s' "$n" ;; *) printf '%s' "$((n % 256))" ;; esac
+}
 
 # Insert `defer print_line("")` as the first statement of main. A defer must
 # never change the value of the block it sits in -- that is the whole contract.
@@ -92,7 +96,7 @@ inject_defer() {
             print indent "defer print_line(\"__deferred__\")"
             done = 1
         }
-        /^fn main\(\) *-> *int: *$/ { seen = 1 }
+        /^define main\(\) *-> *number: *$/ { seen = 1 }
         { print }
         END { exit(done ? 0 : 1) }
     ' "$1" > "$2"
@@ -107,6 +111,15 @@ for src in "$TESTS"/*.or; do
     [ -n "$FILTER" ] && case "$name" in *"$FILTER"*) ;; *) continue ;; esac
     want="$(expected_of "$name")"
     case "$want" in ''|*[!0-9]*) continue ;; esac
+
+    # The untouched program first. Some tests need the full runtime (file_mtime,
+    # file_size) and cannot link against orion_rt.c alone; those are not this
+    # gate's business, and blaming the defer transformation for them read as a
+    # defer bug that was not there.
+    if ! build "$src" "-O0" "$WORK/t2.exe"; then
+        nobuild=$((nobuild + 1))
+        continue
+    fi
 
     # ---- transformation 1: a defer that must not change the answer ----
     if inject_defer "$src" "$WORK/deferred.or"; then
@@ -150,32 +163,28 @@ for src in "$TESTS"/*.or; do
 
     # ---- transformation 2: the optimiser must not change the answer ----
     # ---- transformation 3: nor must running it a second time ----
-    if build "$src" "-O0" "$WORK/t2.exe"; then
-        "$WORK/t2.exe" >/dev/null 2>&1; got=$?
+    "$WORK/t2.exe" >/dev/null 2>&1; got=$?
+    checks=$((checks + 1))
+    if [ "$got" != "$want" ]; then
+        printf "  %-38s -O0     want=%s got=%s\n" "$name" "$want" "$got"
+        FAILED="$FAILED $name(O0)"; fail=$((fail + 1))
+    else
+        pass=$((pass + 1))
+        "$WORK/t2.exe" >/dev/null 2>&1; again=$?
         checks=$((checks + 1))
-        if [ "$got" != "$want" ]; then
-            printf "  %-38s -O0     want=%s got=%s\n" "$name" "$want" "$got"
-            FAILED="$FAILED $name(O0)"; fail=$((fail + 1))
+        if [ "$again" != "$got" ]; then
+            printf "  %-38s rerun   first=%s second=%s\n" "$name" "$got" "$again"
+            FAILED="$FAILED $name(rerun)"; fail=$((fail + 1))
         else
             pass=$((pass + 1))
-            "$WORK/t2.exe" >/dev/null 2>&1; again=$?
-            checks=$((checks + 1))
-            if [ "$again" != "$got" ]; then
-                printf "  %-38s rerun   first=%s second=%s\n" "$name" "$got" "$again"
-                FAILED="$FAILED $name(rerun)"; fail=$((fail + 1))
-            else
-                pass=$((pass + 1))
-            fi
         fi
-    else
-        nobuild=$((nobuild + 1))
     fi
 done
 
 echo
 # Say what was not covered. A harness that hides its own gaps reads as
 # "everything passed" when it means "everything I looked at passed".
-[ "$skip" -gt 0 ] && echo "  $skip file(s) have no multi-line \`fn main() -> int:\` - not defer-checked"
+[ "$skip" -gt 0 ] && echo "  $skip file(s) have no multi-line \`define main() -> number:\` - not defer-checked"
 [ "$nobuild" -gt 0 ] && echo "  $nobuild file(s) did not build at -O0 - not value-checked"
 [ "$trapped" -gt 0 ] && echo "  $trapped program(s) trap at run time - an abort may skip its defers, not checked"
 if [ "$fail" = "0" ]; then

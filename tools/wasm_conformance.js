@@ -8,7 +8,7 @@
 // Args: <root> [comma,separated,filter substrings]
 const fs = require('fs'), cp = require('child_process'), path = require('path');
 const ROOT = process.argv[2] || '.';
-const TESTS = path.join(ROOT, 'examples/tests/tests');
+const TESTS = path.join(ROOT, 'tests/suite/tests');
 const ORION = path.join(ROOT, 'dist/orion.exe');
 const RUNNER = path.join(__dirname, 'wasm_run.js');
 const TMP = path.join(ROOT, 'dist/.wasmconf');
@@ -73,6 +73,14 @@ if (cats.UNSUPPORTED.length && filter) {
 // must be no MISMATCH (wrong answer) or FAIL (compile/link crash). Expected
 // runtime aborts (divide-by-zero, out-of-range, require) land in TRAP and are
 // tolerated. Bump BASELINE_OK when real coverage rises.
+// 163 -> 164 on 2026-08-21: a real reaching a binding widens it.
+// 162 -> 163 on 2026-08-21: mixed whole/real if-branches.
+// 161 -> 162 on 2026-08-20: a real number into an effect.
+// 160 -> 161 on 2026-08-20: a truth says true.
+// 159 -> 160 on 2026-08-20: exponent literals.
+// 158 -> 159 on 2026-08-20: a text counts in characters.
+// 157 -> 158 on 2026-08-19: byte reads straight off a text.
+// 156 -> 157 on 2026-08-19: the effect real carrier.
 // 154 -> 156 on 2026-08-19: a LIST parameter records its element type here
 // too, so a `[float]` argument is walked eight bytes at a time rather than
 // four. That was a standing gap; `number` on a list is what walked into it.
@@ -81,11 +89,18 @@ if (cats.UNSUPPORTED.length && filter) {
 // in the number is not a baseline, it is a place for a regression to hide.
 // 142 -> 141 on 2026-08-04: test_42_general_floor gained copy/move/cwd and
 // moved OK -> UNSUPPORTED (honestly native-only). Not a lost capability.
-const BASELINE_OK = 156;
+const BASELINE_OK = 164;
 // Tests that are correct natively but rely on an idiom the wasm backend does
 // not share, each with a tracked reason. They must NOT silently count as
 // regressions, but they are listed loudly so the set cannot grow unnoticed.
-const KNOWN_GAPS = {};
+const KNOWN_GAPS = {
+  // The native backend prints the SHORTEST decimal that reads back as the same
+  // double (snprintf %.*g, precision 1..17, checked with strtod). The wasm
+  // backend has its own hand-written formatter and rounds differently. Closing
+  // it needs an f64-taking host import - wasm imports are i32-only today - so
+  // the host's own String(x), which is already the shortest form, can answer.
+  'test_43_float_text.or': 'wasm writes six decimals and trims them; native prints the SHORTEST decimal that reads back, so 0.1 + 0.2 differs. Whole numbers and simple decimals agree now',
+};
 if (!filter) {
   const isGap = (line) => Object.keys(KNOWN_GAPS).some((f) => line.startsWith(f));
   const unexpected = [...cats.MISMATCH, ...cats.FAIL].filter((x) => !isGap(x));

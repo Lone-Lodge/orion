@@ -3,11 +3,7 @@
 #   - C externs (orion_cli.c): sys_run, fs ops, exit, eprint.
 #   - orion-self builtins re-exposed: read_file=file_read, arg=argv, ...
 #   - run_command(cmd, [args]) joins to one line and calls sys_run.
-#
-# With this orb, orbit_main.or compiles under orion-self with zero changes
-# to its call sites - the last piece before a native, lodge-orion-free orbit.
 
-use text
 
 external define sys_run(cmd: text) -> int
 external define mkdir_all(path: text) -> int

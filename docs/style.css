@@ -1,53 +1,49 @@
-/* Orion Field Guide — one stylesheet, no build step, no dependencies.
+/* Orion Field Guide - one stylesheet, no build step, no dependencies.
  *
- * Warm neutrals on paper, terracotta for links. The palette used to be cool
- * greys with a blue link, which is the web's default and reads as such.
+ * The palette is dots': near-white paper on a soft grey card, obsidian dark
+ * without the purple, and gold as the one accent. Same colours as the
+ * workshop, so a person moving between them is looking at one thing.
  *
- * The accent is where accessibility and taste actually collide. A bright
- * terracotta (#d97757) is 4.0:1 on this paper -- fine for AA, nowhere near the
- * 7:1 that AAA wants for body-size text. So light mode uses the same hue taken
- * down to a deep rust, and dark mode the same hue lifted to a warm peach. Same
- * colour, opposite ends, both legible.
+ * Gold is where taste and legibility collide. dots' #8a6d3b is 4.6:1 on its
+ * own paper - fine for an app's chrome, nowhere near the 7:1 AAA wants for
+ * body-size text. So light mode takes the same hue down to a deep gold and
+ * dark mode keeps dots' own lighter one, which already clears it. dots'
+ * hairline rule and its dim grey get the same treatment: a document that is
+ * read is not an app's chrome.
  *
- * Target is WCAG 2.2 Level AAA: 7:1 for text, 3:1 for borders, in both themes.
- * These are not eyeballed and not on trust either -- tools/docs_check.sh reads
- * this palette and recomputes every pair, so a colour that drifts below its
- * threshold fails the build:
+ * Nothing here is eyeballed. tools/docs_check.sh reads this palette and
+ * recomputes every pair that carries meaning, so a colour that drifts below
+ * its threshold fails the build:
  *
- *   light   text #24231f on #faf9f5   14.9:1
- *           text #24231f on #f0eee6   13.5:1   (code)
- *           dim  #4a443b on #f0eee6    8.3:1   (comments)
- *           link #7d3319 on #faf9f5    8.5:1
- *           rule #847d70 on #f0eee6    3.5:1   (borders)
- *   dark    text #ebe8e1 on #232220   13.0:1
- *           text #ebe8e1 on #2c2a27   11.7:1   (code)
- *           dim  #c6c0b5 on #2c2a27    7.9:1   (comments)
- *           link #efab90 on #232220    8.3:1
- *           rule #817a6f on #2c2a27    3.4:1   (borders)
- *
- * The border is the one that needs watching. It started at 1.7:1, invisible on
- * a poor screen, and in light mode the border is the only thing separating a
- * code block from the page: the two backgrounds differ by about 1.05:1.
+ *   light   text #24292e on #fafafa   14.1:1
+ *           text #24292e on #f0f0f1   12.9:1   (code)
+ *           dim  #474c52 on #f0f0f1    7.6:1   (comments)
+ *           gold #5f4a1f on #fafafa    8.1:1   (links, keywords)
+ *           rule #80858b on #f0f0f1    3.3:1   (borders)
+ *   dark    text #dcddde on #1e1e1e   12.3:1
+ *           text #dcddde on #161616   13.3:1   (code)
+ *           dim  #a0a6ac on #161616    7.4:1   (comments)
+ *           gold #c9a26d on #1e1e1e    7.0:1
+ *           rule #6f7479 on #161616    3.8:1
  *
  * Code IS syntax-highlighted (highlight.js, the same token categories as the
- * VS Code grammar), and it still clears AAA. The trick the earlier plain design
- * missed: five hues that each clear 7:1 stay distinguishable when they are real
- * hues (rust, teal, olive, plum, brown), not five tints of one colour. The
- * token palette lives in --tok-* below and docs_check measures every one.
+ * VS Code grammar), and it still clears AAA. Five hues that each clear 7:1
+ * stay distinguishable because they are real hues - gold, teal, olive, plum,
+ * brown - not five tints of one. docs_check measures every one.
  */
 
 :root {
     color-scheme: light dark;
-    --bg: #faf9f5;
-    --fg: #24231f;
-    --code-bg: #f0eee6;
-    --dim: #4a443b;
-    --link: #7d3319;
-    --rule: #847d70;
-    --focus: #7d3319;
+    --bg: #fafafa;
+    --fg: #24292e;
+    --code-bg: #f0f0f1;
+    --dim: #474c52;
+    --link: #5f4a1f;
+    --rule: #80858b;
+    --focus: #5f4a1f;
     /* Syntax token colours. Distinct hues, each >=7:1 on --code-bg (AAA), so
      * highlighting costs the guide nothing on contrast. docs_check verifies. */
-    --tok-k: #7d3319;
+    --tok-k: #5f4a1f;
     --tok-t: #0a5348;
     --tok-s: #3f5412;
     --tok-n: #7a356e;
@@ -57,14 +53,14 @@
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: #232220;
-        --fg: #ebe8e1;
-        --code-bg: #2c2a27;
-        --dim: #c6c0b5;
-        --link: #efab90;
-        --rule: #817a6f;
-        --focus: #efab90;
-        --tok-k: #efab90;
+        --bg: #1e1e1e;
+        --fg: #dcddde;
+        --code-bg: #161616;
+        --dim: #a0a6ac;
+        --link: #c9a26d;
+        --rule: #6f7479;
+        --focus: #c9a26d;
+        --tok-k: #c9a26d;
         --tok-t: #6fd0c4;
         --tok-s: #b6cf8e;
         --tok-n: #daa6df;

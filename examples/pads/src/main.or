@@ -1,0 +1,86 @@
+# pads - vad input-orben ser, medan du tittar.
+#
+# Ett litet fönsterlöst program som skriver ut varje gång handkontrollerna
+# ändrar sig: hur många som finns, vilken sort, var spakarna står och vilka
+# knappar som är nere. Kör det, tryck på saker, se att det stämmer.
+#
+# Det är också det första man kör när ingenting fungerar, för det säger
+# skillnaden mellan "programmet läser fel" och "Windows har ingen enhet att
+# ge det". Står det noll här finns kontrollen inte för någon på maskinen -
+# inte för det här programmet, inte för ett spel, inte för Steam.
+#
+#   orbit build   och sedan   build/pads.exe
+#
+# Slutar av sig själv efter tio minuter så den inte blir kvar och tuggar.
+
+use input
+
+define name_of(b: number) -> text:
+    choose b:
+        0 then "south"
+        1 then "east"
+        2 then "west"
+        3 then "north"
+        4 then "l1"
+        5 then "r1"
+        6 then "back"
+        7 then "start"
+        8 then "up"
+        9 then "down"
+        10 then "left"
+        11 then "right"
+        12 then "l3"
+        13 then "r3"
+        _ then ""
+
+# Hundradelar, för en rad med sex decimaltal på är oläslig.
+define hundred(v: number) -> number:
+    to_whole(v * 100.0)
+
+define held_of(i: number) -> text:
+    edit out = ""
+    loop b in 0 until 14:
+        if pad_down(i, name_of(b)):
+            out = "{out}{name_of(b)} "
+    if out is "" then "-" else out
+
+define one_pad(i: number) -> text:
+    sort = pad_sort(i)
+    lx = hundred(pad_axis(i, "lx"))
+    ly = hundred(pad_axis(i, "ly"))
+    rx = hundred(pad_axis(i, "rx"))
+    ry = hundred(pad_axis(i, "ry"))
+    l2 = hundred(pad_axis(i, "l2"))
+    r2 = hundred(pad_axis(i, "r2"))
+    "  {i}: {sort}  vänster {lx},{ly}  höger {rx},{ry}  avtryckare {l2},{r2}  nere: {held_of(i)}"
+
+# Hela läget som en rad text. Ändras den har något hänt, och bara då skrivs
+# något ut - annars vore det sextio identiska rader i sekunden.
+define state_now() -> text:
+    n = pads_here()
+    if n is 0:
+        return "ingen handkontroll (av {devices_seen()} enheter maskinen erbjöd)"
+    edit out = "{n} st"
+    loop i in 0 until n:
+        out = "{out}\n{one_pad(i)}"
+    out
+
+define main():
+    print_line("pads - lyssnar. Tryck på saker. Ctrl-C för att sluta.")
+    print_line("")
+    started = monotonic_ms()
+    edit before = ""
+    edit said_at = 0 - 9999
+    loop:
+        now = monotonic_ms()
+        if now - started > 600000:
+            break
+        state = state_now()
+        # Rapporten kommer när något ändras, och annars en gång var femte
+        # sekund så man ser att programmet lever och inte har hängt sig.
+        if state is not before or now - said_at > 5000:
+            print_line("[{now - started} ms] sist: {last_used()}  {state}")
+            before = state
+            said_at = now
+        sleep_ms(16)
+    print_line("tio minuter gick. Kör igen när du vill.")

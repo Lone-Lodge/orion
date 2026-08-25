@@ -2,8 +2,6 @@
 # name what changed. Pure bookkeeping, so it is testable; the loop that
 # ACTS on a change (rerun a command, stop a stale run) lives in
 # tools/orbwatch.or.
-use os
-use text
 
 # Directories no watcher wants to look inside: build output and history.
 #   skip_dir("dist") -> true, skip_dir("src") -> false

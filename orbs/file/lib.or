@@ -17,7 +17,6 @@
 #
 # LIFETIME: prefer `with_read` / `with_write` - they own the handle and close
 # it on every exit path, including an early return from your body.
-use text
 
 external define file_open(path: text, mode: int) -> int
 external define file_read_chunk(handle: int, maxlen: int) -> text

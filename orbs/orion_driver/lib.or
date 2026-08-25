@@ -1,10 +1,3 @@
-use orion_ir
-use orion_lex
-use orion_parse
-use orion_ast_to_ir
-use orion_emit_llvm
-use orion_ast_to_wasm
-use orion_emit_wasm
 
 # Self-hosted driver: orion_self <input.or> [output.ll] [orb-root...]
 #
@@ -191,7 +184,7 @@ define drv_want_quiet() -> truth:
             want = true
     # A caller compiling in-process (the test runner) can silence the chatter
     # via this slot without touching argv.
-    if slot_has("drv:quiet") and slot_get_int("drv:quiet") is 1:
+    if slot_has("drv:quiet") and slot_get_number("drv:quiet") is 1:
         want = true
     want
 
@@ -349,15 +342,25 @@ define drv_build_export_index(roots: [text]):
     if slot_has("drv:idx"):
         return
     slot_set("drv:idx", 1)
-    # The FIRST root only. The search path also carries fallbacks and sibling
-    # projects, and indexing those made the compiler's own build import
-    # `atlas_ecs` because a name matched - two `Param` layouts in one program
-    # and a build that would not link. What the compiler imports for you is
-    # the standard library it was pointed at; anything further away you name
-    # yourself, which is a rule you can hold in your head.
-    if length(roots) > 0:
-        listing = orion_dir_subdirs(roots[0])
-        drv_index_root(roots[0], listing)
+    # EVERY root that is a directory OF orbs. The first-root-only rule read
+    # well and did nothing: a project entry at `src/main.or` makes the first
+    # root `src/orbs/`, which no project has, so the index came up empty and
+    # every one of the thousand `use` lines in the corpus was load-bearing.
+    #
+    # A root that itself holds a `lib.or` is an ORB, not a root - `orbit`
+    # passes both the orbs it resolved and their parents, and listing the
+    # inside of one orb indexes nothing but its own files.
+    #
+    # Reaching wider is safe because of what it does on a clash: two orbs
+    # exporting one name is an error that NAMES both, and `use` answers it.
+    # The old note here worried about `atlas_ecs` arriving uninvited; what
+    # stopped that was the rule that a name the program declares itself is
+    # never auto-imported, not the number of roots.
+    near_n = if slot_has("drv:near") then slot_get_number("drv:near") else length(roots)
+    loop ri in 0 until near_n:
+        root = roots[ri]
+        if file_read("{root}lib.or") is "":
+            drv_index_root(root, orion_dir_subdirs(root))
 
 # One root: the newline-joined subdirectory names, walked byte by byte. No
 # `split` - the driver has no `use text`, and adding one to reach a helper
@@ -411,7 +414,7 @@ define drv_index_orb(root: text, orb: text):
 define drv_note_export(line: text, orb: text):
     name = drv_public_name(line)
     if name is not "":
-        key = "expby:{name}"
+        key = "{drv_public_kind(line)}:{name}"
         seen = if slot_has(key) then slot_get(key) else ""
         if seen is "":
             slot_set(key, orb)
@@ -440,8 +443,8 @@ define drv_word_in(list: text, word: text) -> truth:
     hit
 
 # The one orb that exports `name`, or "" when none or more than one does.
-define drv_sole_exporter(name: text) -> text:
-    key = "expby:{name}"
+define drv_sole_exporter(name: text, index: text) -> text:
+    key = "{index}:{name}"
     if not slot_has(key):
         return ""
     listed = slot_get(key)
@@ -449,16 +452,34 @@ define drv_sole_exporter(name: text) -> text:
         return ""
     listed
 
+# `expby:` for what you CALL, `expty:` for what you name as a TYPE. Two
+# indexes and not one, because the two are looked up from different places in
+# the source and a name can honestly be both - `point` the constructor and
+# `point` the record. A call site asking the type index would import an orb
+# for a name it never calls.
+define drv_public_kind(line: text) -> text:
+    if drv_head_is(line, "public type "):
+        "expty"
+    else:
+        "expby"
+
+define drv_head_is(line: text, head: text) -> truth:
+    b = bytes_of(line)
+    h = length(head)
+    length(b) > h and text_of(bytes_part(b, 0, h)) is head
+
+# The name in `public define NAME` or `public type NAME`. Skips "public " and
+# then the keyword, so a third kind added later needs no change here.
 define drv_public_name(line: text) -> text:
     b = bytes_of(line)
     n = length(b)
     if n < 15:
         return ""
-    head = text_of(bytes_part(b, 0, 14))
-    if head is not "public define ":
+    if not (drv_head_is(line, "public define ") or drv_head_is(line, "public type ")):
         return ""
-    edit i = 14
-    edit stop = 14
+    kw = if drv_head_is(line, "public type ") then 12 else 14
+    edit i = kw
+    edit stop = kw
     loop:
         if i >= n:
             break
@@ -468,9 +489,9 @@ define drv_public_name(line: text) -> text:
             break
         i = i + 1
         stop = i
-    if stop <= 14:
+    if stop <= kw:
         return ""
-    text_of(bytes_part(b, 14, stop))
+    text_of(bytes_part(b, kw, stop))
 
 # Which orbs this source reaches for without importing them. Lexed, not
 # pattern-matched: a name in a comment or a string is not a dependency, and
@@ -479,7 +500,7 @@ define drv_public_name(line: text) -> text:
 # an orb over a name that is already answered here. Without it the compiler's
 # own bundle pulled in a pile of orbs for mentioning `split`, `trim` and
 # `ok` - names it defines itself - and its emit phase took twice as long.
-define drv_note_defines(src: text):
+define drv_note_defines(src: text, owner: text):
     b = bytes_of(src)
     n = length(b)
     edit start = 0
@@ -491,11 +512,15 @@ define drv_note_defines(src: text):
         is_nl = if at_end then false else b[i] is 10
         if at_end or is_nl:
             first = if start < i then b[start] else 0 - 1
-            # `define f(` at column 0, or `public define f(`.
-            if first is 100 or first is 112:
+            # `define f(` at column 0, or `public define f(`. Also `type T:`
+            # and `public type T:` - a program that declares its own `Point`
+            # must not have one fetched for it, and types are auto-imported
+            # now too. Without it a test that wrote `type Point:` pulled in
+            # `ori_geometry` for the word.
+            if first is 100 or first is 112 or first is 116:
                 nm = drv_declared_name(text_of(bytes_part(b, start, i)))
                 if nm is not "":
-                    slot_set("drvdef:{slot_get_int(\"drv:cnum\")}:{nm}", 1)
+                    slot_set("drvdef:{slot_get_number(\"drv:cnum\")}:{owner}:{nm}", 1)
             start = i + 1
         if at_end:
             break
@@ -508,8 +533,12 @@ define drv_declared_name(line: text) -> text:
     edit at = 0
     if n >= 14 and text_of(bytes_part(b, 0, 14)) is "public define ":
         at = 14
+    if at is 0 and n >= 12 and text_of(bytes_part(b, 0, 12)) is "public type ":
+        at = 12
     if at is 0 and n >= 7 and text_of(bytes_part(b, 0, 7)) is "define ":
         at = 7
+    if at is 0 and n >= 5 and text_of(bytes_part(b, 0, 5)) is "type ":
+        at = 5
     if at is 0:
         return ""
     edit i = at
@@ -527,9 +556,54 @@ define drv_declared_name(line: text) -> text:
         return ""
     text_of(bytes_part(b, at, stop))
 
-define drv_auto_uses(src: text, already: [text]) -> [text]:
+# The code inside a string's `{...}` holes, joined with newlines. The lexer
+# hands back one `str` token for `"{min(3, 7)}"` - the holes are parsed much
+# later - so a call written in a hole was invisible to auto-use. `m = min(3, 7)`
+# imported `num`; `"{min(3, 7)}"` said the function did not exist.
+#
+# `\{` is an escaped brace and not a hole, so a backslash skips the next byte.
+#
+# The bytes go into a LIST and become a text once. Built with `out = out + b`
+# it was quadratic, and the compiler's own bundle - a megabyte with thousands
+# of holes - stopped finishing.
+define drv_holes(src: text) -> text:
+    b = bytes_of(src)
+    n = length(b)
+    edit out = []
+    edit i = 0
+    edit depth = 0
+    edit start = 0
+    loop:
+        if i >= n:
+            break
+        c = b[i]
+        if c is 92:
+            i = i + 2
+        else:
+            if c is 123:
+                if depth is 0:
+                    start = i + 1
+                depth = depth + 1
+                i = i + 1
+            else:
+                if c is 125 and depth > 0:
+                    depth = depth - 1
+                    if depth is 0:
+                        loop hj in start until i:
+                            out = append(out, b[hj])
+                        out = append(out, 10)
+                    i = i + 1
+                else:
+                    i = i + 1
+    text_of(out)
+
+define drv_auto_uses(src: text, already: [text], owner: text) -> [text]:
     edit found = []
-    toks = self_lex(src)
+    # A hole is code the lexer never handed over as code. Lex it too, and the
+    # same ident-then-`(` rule applies to both streams.
+    edit toks = self_lex(src)
+    loop st in self_lex(drv_holes(src)):
+        toks = append(toks, st)
     n_toks = length(toks)
     # Only a name in CALL position - an ident with a `(` right after it. A
     # bare ident is usually a local: `first = xs[0]` pulled in the `list` orb
@@ -539,7 +613,21 @@ define drv_auto_uses(src: text, already: [text]) -> [text]:
         tok = toks[ti]
         nxt = if ti + 1 < n_toks then toks[ti + 1] else tok
         is_call = ti + 1 < n_toks and get(nxt, "kind") is "symbol" and get(nxt, "value") is "("
-        if get(tok, "kind") is "ident" and is_call:
+        # A TYPE is never called, so it gets its own trigger: the ident sits
+        # right after `:`, `->`, `of` or `[`. Those four are where a type name
+        # can stand and a local cannot. It reads the TYPE index, so a
+        # `{"key": value}` that lands here reaches for nothing.
+        #
+        # This was too dangerous while the index covered the whole search path:
+        # a type name is a global layout key, so one wrong guess gives two
+        # layouts of one name and a program that will not link - the compiler's
+        # own `Param` met atlas's. The index is the NEAR roots now, which is
+        # what this project declared, so the name a type resolves to is one
+        # the project already depends on.
+        prv = if ti > 0 then toks[ti - 1] else tok
+        pv = get(prv, "value")
+        is_type = ti > 0 and (not is_call) and (pv is ":" or pv is "->" or pv is "of" or pv is "[")
+        if get(tok, "kind") is "ident" and (is_call or is_type):
             name = get(tok, "value")
             # A name is looked up ONCE per compile. The compiler's own bundle
             # is 200k ident tokens over a few thousand distinct names, and
@@ -552,15 +640,31 @@ define drv_auto_uses(src: text, already: [text]) -> [text]:
             # away from every program that writes them. Say `use log` and you
             # get log's; say nothing and you get the core's.
             is_core_word = name is "some" or name is "none" or name is "ok" or name is "error"
-            cn = slot_get_int("drv:cnum")
-            seen_key = "drvseen:{cn}:{name}"
-            if (not is_core_word) and (not slot_has(seen_key)) and (not slot_has("drvdef:{cn}:{name}")):
+            cn = slot_get_number("drv:cnum")
+            # Per OWNER, not per compile. The cache is here to stop one name
+            # being resolved once per occurrence, but the caller turns each
+            # answer into a VISIBILITY record for the file it came from - so a
+            # compile-wide key let the first file that said `value_copy` see
+            # `astra_value` and left every other file being told to write the
+            # `use` the compiler had already decided on.
+            seen_key = "drvseen:{cn}:{owner}:{name}"
+            # Per OWNER, like the cache. "The bundle defines it" is not the
+            # same question as "this file can see it": `compile_error` lives in
+            # `orion_ir`, and a compile-wide guard let the parser be told to
+            # import an orb that the program had already loaded. What the guard
+            # is for is a file not reaching for an orb over a name of its OWN.
+            if (not is_core_word) and (not slot_has(seen_key)) and (not slot_has("drvdef:{cn}:{owner}:{name}")):
                 slot_set(seen_key, 1)
-                orb = drv_sole_exporter(name)
+                orb = drv_sole_exporter(name, if is_call then "expby" else "expty")
+                # Reported even when the orb is already LOADED. Loading and
+                # seeing are two things: the caller queues a load only for what
+                # is missing, but every file that reaches for a name needs the
+                # visibility record of its own, and filtering the answer away
+                # here left the second file to mention `compile_error` being
+                # told to import an orb that was already in the bundle.
                 if orb is not "":
-                    if not drv_list_has(already, orb):
-                        if not drv_list_has(found, orb):
-                            found = append(found, orb)
+                    if not drv_list_has(found, orb):
+                        found = append(found, orb)
     found
 
 # One auto-use round over everything loaded so far plus the entry. Returns the
@@ -569,18 +673,18 @@ define drv_auto_round(queue: [text], loaded_names: [text], owners: [text], sourc
     edit q = queue
     loop si in 0 until length(sources):
         owner = owners[si]
-        loop auto_dep in drv_auto_uses(sources[si], q):
+        loop auto_dep in drv_auto_uses(sources[si], q, owner):
             if auto_dep is not owner:
-                slot_set("drv:autouse:{slot_get_int(\"drv:cnum\")}:{owner}:{auto_dep}", 1)
+                slot_set("drv:autouse:{slot_get_number(\"drv:cnum\")}:{owner}:{auto_dep}", 1)
                 if not drv_list_has(loaded_names, auto_dep):
                     q = append(q, auto_dep)
-    loop auto in drv_auto_uses(entry_src, q):
+    loop auto in drv_auto_uses(entry_src, q, ""):
         if not drv_entry_is_orb(entry_path, auto):
             # Loading the source is only half of it - a name still has to be
             # VISIBLE, and visibility comes from a `use`. The driver records
             # the import it just decided on where the resolver looks. The entry
             # program's own orb name is "".
-            slot_set("drv:autouse:{slot_get_int(\"drv:cnum\")}::{auto}", 1)
+            slot_set("drv:autouse:{slot_get_number(\"drv:cnum\")}::{auto}", 1)
             if not drv_list_has(loaded_names, auto):
                 q = append(q, auto)
     q
@@ -593,8 +697,8 @@ public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> t
     # second program to call `trim` was told it did not exist. The export
     # index is the only thing that survives: it is read off disk and does
     # not change.
-    slot_set("drv:cnum", slot_get_int("drv:cnum") + 1)
-    drv_note_defines(entry_src)
+    slot_set("drv:cnum", slot_get_number("drv:cnum") + 1)
+    drv_note_defines(entry_src, "")
     edit queue = drv_uses_of(entry_src)
     # An orb never implicitly uses ITSELF - that is a cycle, and orbs/iter is
     # where `each` lives, so it is exactly the file that would hit it.
@@ -651,7 +755,7 @@ public define drv_collect(entry_src: text, roots: [text], entry_path: text) -> t
         chunks = append(chunks, "orb " + q + name + q + "\n")
         chunks = append(chunks, src)
         chunks = append(chunks, "\n")
-        drv_note_defines(src)
+        drv_note_defines(src, name)
         owners = append(owners, name)
         sources = append(sources, src)
         deps = drv_uses_of(src)
@@ -1108,16 +1212,34 @@ public define driver_main() -> number:
             print_line("orion: cannot read `{in_path}`")
             return 0 - 1
         base = drv_dirname(in_path)
-        edit roots = []
+        # Two kinds of root. NEAR is what this project declared plus the
+        # toolchain and the directories around the entry - the orbs a person
+        # would say belong to this program. FAR is `orbit`'s workspace sweep,
+        # after the `--scan` marker: there so a name-only dep resolves wherever
+        # it lives, and there is where a sibling project's `Param` sits.
+        # Both RESOLVE. Only the near ones are auto-imported.
+        edit near = []
+        edit far = []
+        edit past_scan = false
         loop ai in 3 until argc():
             extra = argv(ai)
-            if not drv_is_flag(extra):
-                roots = append(roots, "{extra}/")
-        roots = append(roots, "{base}/orbs/")
-        roots = append(roots, "{base}/../orbs/")
-        roots = append(roots, "{base}/../../orbs/")
-        roots = append(roots, "orbs/")
-        roots = append(roots, "../orbs/")
+            if extra is "--scan":
+                past_scan = true
+            else:
+                if not drv_is_flag(extra):
+                    if past_scan:
+                        far = append(far, "{extra}/")
+                    else:
+                        near = append(near, "{extra}/")
+        near = append(near, "{base}/orbs/")
+        near = append(near, "{base}/../orbs/")
+        near = append(near, "{base}/../../orbs/")
+        near = append(near, "orbs/")
+        near = append(near, "../orbs/")
+        slot_set("drv:near", length(near))
+        edit roots = near
+        loop fr in far:
+            roots = append(roots, fr)
         src = drv_collect(entry_src, roots, in_path)
         # `--trace` (orbit debug): ast_fn_to_ir prefixes every define with a
         # call-trail entry. Communicated by slot, like drv:quiet.
@@ -1184,6 +1306,10 @@ public define driver_main() -> number:
         # worth stating next to the timings rather than meeting in a crash.
         if out_path is "types" or out_path is "refs":
             return 0
+        if out_path is "slowfacts":
+            slowfacts_list()
+            print_line("")
+            return 0
         if out_path is "memfacts":
             memfacts_list()
             print_line("  region scopes: opened and closed in the same function")
@@ -1194,6 +1320,7 @@ public define driver_main() -> number:
             print_line("")
             return 0
         memfacts_report()
+        slowfacts_report()
         # An unbalanced region scope is a real defect, not a statistic, so it
         # gets said on every build - but only when there is one.
         n_unbalanced = drv_scope_check(module, 0)

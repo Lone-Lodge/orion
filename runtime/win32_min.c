@@ -43,11 +43,42 @@ static OrionEvent ev_current;
  * (GPU/DWM tail is invisible from here - this measures OUR share.) */
 static LARGE_INTEGER g_last_input_qpc;
 
+/* --- who is using this ----------------------------------------------------
+ * Four things drive a screen - a mouse, a keyboard, a finger and a pad -
+ * and a UI that does not know WHICH gets it subtly wrong: it draws a focus
+ * ring nobody asked for, or a hover under a finger that has already left.
+ *
+ * Touch is the one that hides. Windows turns it into ordinary mouse
+ * messages, so touch "works" without anyone doing anything at all; the only
+ * signal is a mark Windows puts in the message extra info, documented since
+ * Windows 7 and unchanged since.
+ *
+ * 1 mouse, 2 keys, 3 touch, 4 pad. 0 while nobody has done anything. */
+static int g_from_touch;
+static int g_last_input;
+
+static int came_from_touch(void) {
+    LPARAM x = GetMessageExtraInfo();
+    return ((x & 0xFFFFFF80) == 0xFF515700) ? 1 : 0;
+}
+
+/* Whether the last pointer message came from a finger rather than a mouse. */
+long long oi_touch(void) { return g_from_touch; }
+
+/* Which of the four spoke last. The pad half is set while it is read, over
+ * in the controller section. */
+long long oi_last_input(void) { return (long long)g_last_input; }
+
 static void ev_push(HWND who, long long kind, long long key, long long x, long long y) {
     int next = (ev_tail + 1) % EV_CAP;
     if (next == ev_head) return;       /* full: drop newest (potato-simple) */
     if (kind >= 1 && kind <= 5)
         QueryPerformanceCounter(&g_last_input_qpc);
+    /* 1-3 pointer, 4-5 and 12 keyboard, 8-10 touch. A pointer message that
+     * came from a finger is touch, not a mouse. */
+    if (kind >= 1 && kind <= 3) g_last_input = g_from_touch ? 3 : 1;
+    else if ((kind >= 4 && kind <= 5) || kind == 12) g_last_input = 2;
+    else if (kind >= 8 && kind <= 10) g_last_input = 3;
     ev_ring[ev_tail].kind = kind;
     ev_ring[ev_tail].key = key;
     ev_ring[ev_tail].x = x;
@@ -131,21 +162,68 @@ long long win_dpi(long long window_handle) {
     return d > 0 ? (long long)d : 96;
 }
 
-/* --- a game controller ---------------------------------------------------
- * XInput, loaded at run time so a machine without it still starts. One
- * pad (index 0) is what a UI needs: the stick and the d-pad move focus,
- * A presses, B goes back. The stick is reported as -1/0/1 per axis with a
- * dead zone, because a menu wants STEPS and not a velocity - holding the
- * stick over should move the focus once, and again when it is let go and
- * pushed a second time. That edge is the caller's business; this reports
- * where the pad is right now. */
+/* --- controllers ----------------------------------------------------------
+ *
+ * Windows answers about controllers in two different voices and needs both.
+ *
+ * XInput answers for Xbox-compatible pads and for nothing else: a DualSense
+ * does not exist to it. It has FOUR slots, and asking only the first is how a
+ * pad that landed on slot 1 answers nothing at all.
+ *
+ * Everything else is a HID device opened by WHO MADE IT - the way SDL does
+ * it, and the reason a DualSense works there. Windows does not always class
+ * such a pad as a game controller, so a search that asks for that class finds
+ * nothing on a machine with the pad connected and lit. The vendor is the one
+ * question a Bluetooth pad always answers, so that is what gets asked.
+ *
+ * Both roads end in the same place: a virtual pad. South, east, west and
+ * north rather than A/B/X/Y or cross/circle/square/triangle, so a program
+ * says what it MEANS and never which plastic is in the hand. That is what
+ * makes "different controllers" a sentence with no work left in it.
+ */
+
+#define PAD_MAX 4
+#define PAD_SOUTH 0
+#define PAD_EAST  1
+#define PAD_WEST  2
+#define PAD_NORTH 3
+#define PAD_L1    4
+#define PAD_R1    5
+#define PAD_BACK  6
+#define PAD_START 7
+#define PAD_UP    8
+#define PAD_DOWN  9
+#define PAD_LEFT  10
+#define PAD_RIGHT 11
+#define PAD_L3    12
+#define PAD_R3    13
+
+/* kind: 1 xbox, 2 dualsense, 3 dualshock, 4 switch, 5 something else. */
+typedef struct {
+    int kind;
+    int slot;                 /* the XInput slot, or -1 */
+    HANDLE hid;               /* the HID handle, or NULL */
+    OVERLAPPED ov;
+    unsigned char buf[64];
+    unsigned char last[64];
+    int len;
+    int reading;
+    unsigned int id;          /* vid<<16 | pid */
+    short axis[6];            /* lx ly rx ry l2 r2, -1000..1000 */
+    unsigned int down;        /* the virtual button space */
+} Pad;
+
+static Pad g_pad[PAD_MAX];
+static int g_pad_n;
+static int g_hid_seen;     /* how many HID interfaces Windows offered at all */
+
 typedef DWORD (WINAPI *XIGetStateFn)(DWORD, void *);
 static XIGetStateFn g_xi;
-static int g_xi_tried;
 
 static void pad_load(void) {
-    if (g_xi_tried) return;
-    g_xi_tried = 1;
+    static int tried;
+    if (tried) return;
+    tried = 1;
     const char *names[3] = { "xinput1_4.dll", "xinput1_3.dll", "xinput9_1_0.dll" };
     for (int i = 0; i < 3; i++) {
         HMODULE m = LoadLibraryA(names[i]);
@@ -156,81 +234,480 @@ static void pad_load(void) {
     }
 }
 
-/* Raw XINPUT_STATE is 16 bytes: packet(4), buttons(2), lt(1), rt(1),
- * lx,ly,rx,ry (2 each). Read as bytes so no XInput header is needed. */
-static int pad_read(unsigned char *out) {
+/* A thumb resting on a stick is not a push. Below the dead zone is nothing;
+ * above it the remaining travel is spread over the whole range, so the first
+ * degree past the edge is not a jump. */
+static short pad_stick(short v) {
+    int dead = 7000;
+    int a = v < 0 ? -v : v;
+    if (a <= dead) return 0;
+    int out = (a - dead) * 1000 / (32767 - dead);
+    if (out > 1000) out = 1000;
+    return (short)(v < 0 ? -out : out);
+}
+
+/* The same, for a HID pad: one byte, with 128 in the middle. */
+static short pad_stick_byte(unsigned char v) {
+    int c = (int)v - 128;
+    int dead = 12;
+    int a = c < 0 ? -c : c;
+    if (a <= dead) return 0;
+    int out = (a - dead) * 1000 / (127 - dead);
+    if (out > 1000) out = 1000;
+    return (short)(c < 0 ? -out : out);
+}
+
+/* Raw XINPUT_STATE is 16 bytes: packet(4), buttons(2), lt(1), rt(1), then
+ * lx, ly, rx, ry two bytes each. Read as bytes so no XInput header is
+ * needed anywhere. */
+static void pad_from_xinput(Pad *p, const unsigned char *st) {
+    unsigned short b = (unsigned short)(st[4] | (st[5] << 8));
+    unsigned int d = 0;
+    if (b & 0x1000) d |= 1u << PAD_SOUTH;
+    if (b & 0x2000) d |= 1u << PAD_EAST;
+    if (b & 0x4000) d |= 1u << PAD_WEST;
+    if (b & 0x8000) d |= 1u << PAD_NORTH;
+    if (b & 0x0100) d |= 1u << PAD_L1;
+    if (b & 0x0200) d |= 1u << PAD_R1;
+    if (b & 0x0020) d |= 1u << PAD_BACK;
+    if (b & 0x0010) d |= 1u << PAD_START;
+    if (b & 0x0001) d |= 1u << PAD_UP;
+    if (b & 0x0002) d |= 1u << PAD_DOWN;
+    if (b & 0x0004) d |= 1u << PAD_LEFT;
+    if (b & 0x0008) d |= 1u << PAD_RIGHT;
+    if (b & 0x0040) d |= 1u << PAD_L3;
+    if (b & 0x0080) d |= 1u << PAD_R3;
+    p->down = d;
+    p->axis[0] = pad_stick((short)(st[8]  | (st[9]  << 8)));
+    /* A stick points up; a screen points down. */
+    p->axis[1] = (short)-pad_stick((short)(st[10] | (st[11] << 8)));
+    p->axis[2] = pad_stick((short)(st[12] | (st[13] << 8)));
+    p->axis[3] = (short)-pad_stick((short)(st[14] | (st[15] << 8)));
+    p->axis[4] = (short)(st[6] * 1000 / 255);
+    p->axis[5] = (short)(st[7] * 1000 / 255);
+}
+
+/* The hat, as four directions. 0 is up and it goes clockwise; anything above
+ * 7 is centred. Every Sony pad and most others say it exactly this way. */
+static unsigned int pad_hat(int h) {
+    static const unsigned int by[8] = {
+        1u << PAD_UP,
+        (1u << PAD_UP) | (1u << PAD_RIGHT),
+        1u << PAD_RIGHT,
+        (1u << PAD_RIGHT) | (1u << PAD_DOWN),
+        1u << PAD_DOWN,
+        (1u << PAD_DOWN) | (1u << PAD_LEFT),
+        1u << PAD_LEFT,
+        (1u << PAD_LEFT) | (1u << PAD_UP),
+    };
+    return h >= 0 && h < 8 ? by[h] : 0u;
+}
+
+/* A Sony report. The same pad says itself four ways, so there are four rows
+ * here and no guessing: which byte the sticks start at, which byte the
+ * buttons are in, and where the two analogue triggers sit.
+ *
+ *   0x31, long    DualSense over Bluetooth  (a counter goes first)
+ *   0x11, long    DualShock 4 over Bluetooth
+ *   0x01, 32+     DualSense over the cable  (triggers before the buttons)
+ *   0x01, 10+     DualShock 4 over the cable, and a DualSense in the simple
+ *                 Bluetooth mode it starts in until something asks for more
+ *
+ * A guess was tried first - find the byte whose low nibble looks like a hat -
+ * and it reads the wrong byte the moment no face button is down, which is
+ * most of the time. Four rows are shorter than one clever line and they can
+ * be checked against a real report. */
+static void pad_from_sony(Pad *p, const unsigned char *r, int len) {
+    int ax, btn, trig;
+    if (r[0] == 0x31 && len >= 12)      { ax = 2; btn = 9; trig = 6; }
+    else if (r[0] == 0x11 && len >= 12) { ax = 3; btn = 7; trig = 10; }
+    else if (r[0] == 0x01 && len >= 32) { ax = 1; btn = 8; trig = 5; }
+    else if (r[0] == 0x01 && len >= 10) { ax = 1; btn = 5; trig = 8; }
+    else return;
+    if (len <= btn + 1 || len <= ax + 3) return;
+
+    p->axis[0] = pad_stick_byte(r[ax + 0]);
+    p->axis[1] = pad_stick_byte(r[ax + 1]);
+    p->axis[2] = pad_stick_byte(r[ax + 2]);
+    p->axis[3] = pad_stick_byte(r[ax + 3]);
+
+    unsigned char b0 = r[btn], b1 = r[btn + 1];
+    unsigned int d = pad_hat(b0 & 0x0F);
+    if (b0 & 0x10) d |= 1u << PAD_WEST;    /* square   */
+    if (b0 & 0x20) d |= 1u << PAD_SOUTH;   /* cross    */
+    if (b0 & 0x40) d |= 1u << PAD_EAST;    /* circle   */
+    if (b0 & 0x80) d |= 1u << PAD_NORTH;   /* triangle */
+    if (b1 & 0x01) d |= 1u << PAD_L1;
+    if (b1 & 0x02) d |= 1u << PAD_R1;
+    if (b1 & 0x10) d |= 1u << PAD_BACK;    /* share / create */
+    if (b1 & 0x20) d |= 1u << PAD_START;   /* options        */
+    if (b1 & 0x40) d |= 1u << PAD_L3;
+    if (b1 & 0x80) d |= 1u << PAD_R3;
+    p->down = d;
+
+    if (len > trig + 1) {
+        p->axis[4] = (short)(r[trig + 0] * 1000 / 255);
+        p->axis[5] = (short)(r[trig + 1] * 1000 / 255);
+    }
+}
+
+/* Who made it decides how to read it. Sony 054C, Microsoft 045E, Nintendo
+ * 057E, Logitech 046D, 8BitDo 2DC8. */
+static int pad_kind_of(unsigned short vid, unsigned short pid) {
+    if (vid == 0x054C) return (pid == 0x0CE6 || pid == 0x0DF2) ? 2 : 3;
+    if (vid == 0x045E) return 1;
+    if (vid == 0x057E) return 4;
+    return 5;
+}
+
+static int pad_is_maker(unsigned short v) {
+    return v == 0x054C || v == 0x045E || v == 0x057E || v == 0x046D || v == 0x2DC8;
+}
+
+typedef void (WINAPI *HidD_GetHidGuidFn)(GUID *);
+typedef BOOL (WINAPI *HidD_GetAttributesFn)(HANDLE, void *);
+typedef void * (WINAPI *SetupDiGetClassDevsAFn)(const GUID *, const char *, HWND, DWORD);
+typedef BOOL (WINAPI *SetupDiEnumDeviceInterfacesFn)(void *, void *, const GUID *, DWORD, void *);
+typedef BOOL (WINAPI *SetupDiGetDeviceInterfaceDetailAFn)(void *, void *, void *, DWORD, DWORD *, void *);
+typedef BOOL (WINAPI *SetupDiDestroyDeviceInfoListFn)(void *);
+
+/* Look for HID pads. A controller switched on after the program started has
+ * to be found too, so this runs again now and then rather than once. */
+static void pad_look(void) {
+    static unsigned long when;
+    static int ever;
+    unsigned long now = GetTickCount();
+    if (ever && now - when < 2000) return;
+    when = now; ever = 1;
+    g_hid_seen = 0;
+
+    HMODULE hid = LoadLibraryA("hid.dll");
+    HMODULE sud = LoadLibraryA("setupapi.dll");
+    if (!hid || !sud) return;
+    HidD_GetHidGuidFn getGuid = (HidD_GetHidGuidFn)(void *)GetProcAddress(hid, "HidD_GetHidGuid");
+    HidD_GetAttributesFn getAttrs = (HidD_GetAttributesFn)(void *)GetProcAddress(hid, "HidD_GetAttributes");
+    SetupDiGetClassDevsAFn getDevs = (SetupDiGetClassDevsAFn)(void *)GetProcAddress(sud, "SetupDiGetClassDevsA");
+    SetupDiEnumDeviceInterfacesFn enumIf = (SetupDiEnumDeviceInterfacesFn)(void *)GetProcAddress(sud, "SetupDiEnumDeviceInterfaces");
+    SetupDiGetDeviceInterfaceDetailAFn detail = (SetupDiGetDeviceInterfaceDetailAFn)(void *)GetProcAddress(sud, "SetupDiGetDeviceInterfaceDetailA");
+    SetupDiDestroyDeviceInfoListFn destroy = (SetupDiDestroyDeviceInfoListFn)(void *)GetProcAddress(sud, "SetupDiDestroyDeviceInfoList");
+    if (!getGuid || !getAttrs || !getDevs || !enumIf || !detail || !destroy) return;
+
+    GUID guid;
+    getGuid(&guid);
+    void *set = getDevs(&guid, NULL, NULL, 0x12 /* PRESENT | DEVICEINTERFACE */);
+    if (!set || set == INVALID_HANDLE_VALUE) return;
+
+    struct { DWORD cbSize; GUID g; DWORD flags; ULONG_PTR reserved; } iface;
+    for (DWORD i = 0; ; i++) {
+        memset(&iface, 0, sizeof iface);
+        iface.cbSize = sizeof iface;
+        if (!enumIf(set, NULL, &guid, i, &iface)) break;
+        DWORD need = 0;
+        detail(set, &iface, NULL, 0, &need, NULL);
+        if (need == 0 || need > 1024) continue;
+        /* cbSize of SP_DEVICE_INTERFACE_DETAIL_DATA_A is the field every
+         * sample gets wrong: it is the size of the STRUCT, not of the
+         * buffer, and it differs with the bitness. Try what x64 wants and
+         * then what x86 wants rather than believe either. */
+        char blob[1024];
+        int got_path = 0;
+        for (int cb = 0; cb < 2 && !got_path; cb++) {
+            memset(blob, 0, sizeof blob);
+            *(DWORD *)blob = cb == 0 ? 8u : 5u;
+            if (detail(set, &iface, blob, need, NULL, NULL)) got_path = 1;
+        }
+        if (!got_path) continue;
+        g_hid_seen++;
+        if (g_pad_n >= PAD_MAX) continue;
+        const char *path = blob + 4;
+
+        /* Ask with NO access at all: Windows holds a keyboard exclusively
+         * and refuses GENERIC_READ outright, so a search that opens for
+         * reading finds nothing and cannot say why. Zero access is always
+         * allowed and answers everything except what the device is saying
+         * right now. */
+        /* An XInput device ALSO shows up here as plain HID, and opening it
+         * both ways is how one controller in one hand becomes two on the
+         * screen. Windows marks those paths with "ig_" - the interface an
+         * XInput device exposes - so they are left to XInput, which
+         * understands the triggers and the rumble that this side does not.
+         * SDL skips them on the same mark for the same reason. */
+        if (strstr(path, "ig_") || strstr(path, "IG_")) continue;
+
+        HANDLE ask = CreateFileA(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                 NULL, OPEN_EXISTING, 0, NULL);
+        if (ask == INVALID_HANDLE_VALUE) continue;
+        struct { ULONG Size; USHORT Vendor; USHORT Product; USHORT Version; } attrs;
+        memset(&attrs, 0, sizeof attrs);
+        attrs.Size = sizeof attrs;
+        int mine = getAttrs(ask, &attrs) && pad_is_maker(attrs.Vendor);
+        CloseHandle(ask);
+        if (!mine) continue;
+
+        unsigned int id = ((unsigned int)attrs.Vendor << 16) | attrs.Product;
+        int have = 0;
+        for (int k = 0; k < g_pad_n; k++) if (g_pad[k].hid && g_pad[k].id == id) have = 1;
+        if (have) continue;
+
+        HANDLE r = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                               NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+        if (r == INVALID_HANDLE_VALUE) continue;   /* somebody else holds it */
+        Pad *p = &g_pad[g_pad_n++];
+        memset(p, 0, sizeof *p);
+        p->kind = pad_kind_of(attrs.Vendor, attrs.Product);
+        p->slot = -1;
+        p->hid = r;
+        p->id = id;
+        p->len = 64;
+        p->ov.hEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
+    }
+    destroy(set);
+}
+
+/* Read whatever has arrived, from both kinds, without ever waiting. Every
+ * question below calls this, and it does the work at most once a
+ * millisecond, so asking about eight buttons costs one read. */
+static void pad_pump(void) {
+    static unsigned long when;
+    unsigned long now = GetTickCount();
+    if (when == now) return;
+    when = now;
     pad_load();
-    if (!g_xi) return 0;
-    unsigned char st[16];
-    memset(st, 0, sizeof st);
-    if (g_xi(0, st) != 0) return 0;
-    memcpy(out, st, 16);
-    return 1;
+    pad_look();
+
+    if (g_xi) {
+        for (int slot = 0; slot < 4; slot++) {
+            unsigned char st[16];
+            memset(st, 0, sizeof st);
+            if (g_xi((DWORD)slot, st) != 0) continue;
+            Pad *p = NULL;
+            for (int k = 0; k < g_pad_n; k++) if (g_pad[k].slot == slot) p = &g_pad[k];
+            if (!p) {
+                if (g_pad_n >= PAD_MAX) continue;
+                p = &g_pad[g_pad_n++];
+                memset(p, 0, sizeof *p);
+                p->kind = 1;
+                p->slot = slot;
+            }
+            pad_from_xinput(p, st);
+        }
+    }
+
+    for (int k = 0; k < g_pad_n; k++) {
+        Pad *p = &g_pad[k];
+        if (!p->hid) continue;
+        DWORD got = 0;
+        if (!p->reading) {
+            ResetEvent(p->ov.hEvent);
+            if (ReadFile(p->hid, p->buf, (DWORD)p->len, &got, &p->ov)) {
+                if (got > 0) { memcpy(p->last, p->buf, got < 64 ? got : 64); p->len = (int)(got < 64 ? got : 64); }
+            } else if (GetLastError() == ERROR_IO_PENDING) {
+                p->reading = 1;
+            }
+        } else if (GetOverlappedResult(p->hid, &p->ov, &got, FALSE)) {
+            if (got > 0) { memcpy(p->last, p->buf, got < 64 ? got : 64); p->len = (int)(got < 64 ? got : 64); }
+            p->reading = 0;
+        }
+        if (p->kind == 2 || p->kind == 3) pad_from_sony(p, p->last, p->len);
+    }
+
+    /* A pad being used is the newest voice in the room. */
+    for (int k = 0; k < g_pad_n; k++) {
+        if (g_pad[k].down != 0) { g_last_input = 4; return; }
+        for (int a = 0; a < 4; a++)
+            if (g_pad[k].axis[a] != 0) { g_last_input = 4; return; }
+    }
 }
 
-static int stick_step(short v) {
-    if (v > 12000) return 1;
-    if (v < -12000) return -1;
+/* How many controllers are here right now. */
+long long oi_pad_count(void) { pad_pump(); return (long long)g_pad_n; }
+
+/* Which sort the i:th one is: 1 xbox, 2 dualsense, 3 dualshock, 4 switch,
+ * 5 something else, 0 there is no such pad. */
+long long oi_pad_kind(long long i) {
+    pad_pump();
+    return (i < 0 || i >= g_pad_n) ? 0 : (long long)g_pad[i].kind;
+}
+
+/* vid<<16|pid, so an app can name the exact device. A DualSense is
+ * 054C:0CE6. */
+long long oi_pad_id(long long i) {
+    pad_pump();
+    return (i < 0 || i >= g_pad_n) ? 0 : (long long)g_pad[i].id;
+}
+
+/* -1000..1000. 0 lx, 1 ly, 2 rx, 3 ry, 4 l2, 5 r2. */
+long long oi_pad_axis(long long i, long long which) {
+    pad_pump();
+    if (i < 0 || i >= g_pad_n || which < 0 || which >= 6) return 0;
+    return (long long)g_pad[i].axis[which];
+}
+
+/* Whether a virtual button is held: 0 south, 1 east, 2 west, 3 north, 4 l1,
+ * 5 r1, 6 back, 7 start, 8 up, 9 down, 10 left, 11 right, 12 l3, 13 r3. */
+long long oi_pad_button(long long i, long long b) {
+    pad_pump();
+    if (i < 0 || i >= g_pad_n || b < 0 || b >= 32) return 0;
+    return (g_pad[i].down >> (unsigned)b) & 1u;
+}
+
+/* One byte of the newest raw report, and how long that report was. A
+ * mapping is checked against what the device actually said rather than
+ * against a memory of it, which is the only honest way to add a pad nobody
+ * here owns. */
+long long oi_pad_byte(long long i, long long at) {
+    pad_pump();
+    if (i < 0 || i >= g_pad_n || at < 0 || at >= 64) return 0;
+    return (long long)g_pad[i].last[at];
+}
+
+/* How many HID devices Windows offered the search at all. It says the
+ * difference between the three ways this can be empty: a machine with no
+ * controller on it (a number here, none of them a pad), a controller that
+ * never reached Windows (the same), and a search that could not run at all
+ * (zero). Without it, all three look like "no controller". */
+long long oi_hid_seen(void) { pad_pump(); return (long long)g_hid_seen; }
+
+long long oi_pad_len(long long i) {
+    pad_pump();
+    return (i < 0 || i >= g_pad_n) ? 0 : (long long)g_pad[i].len;
+}
+
+/* The two questions a menu asks. Both answer what has CHANGED since the
+ * last time you asked, so ask them once a frame and not twice - the second
+ * ask in the same frame has nothing left to report.
+ *
+ * A menu wants STEPS and not a velocity: holding the stick over moves the
+ * focus once, waits, and then repeats, exactly the way a held arrow key
+ * behaves. The wait lives here because the clock does. */
+static unsigned int g_pad_was[PAD_MAX];
+static int g_step_dir[PAD_MAX][2];
+static unsigned long g_step_when[PAD_MAX][2];
+
+/* -1, 0 or 1. axis 0 is left/right, axis 1 is up/down and points DOWN the
+ * way a screen does. The d-pad and the left stick both answer, so a menu
+ * never cares which one the hand reached for. */
+long long oi_pad_step(long long i, long long axis) {
+    pad_pump();
+    if (i < 0 || i >= g_pad_n || axis < 0 || axis > 1) return 0;
+    Pad *p = &g_pad[i];
+    short v = p->axis[axis];
+    int dir;
+    if (axis == 0)
+        dir = (p->down & (1u << PAD_LEFT)) ? -1 : (p->down & (1u << PAD_RIGHT)) ? 1
+            : (v > 400 ? 1 : v < -400 ? -1 : 0);
+    else
+        dir = (p->down & (1u << PAD_UP)) ? -1 : (p->down & (1u << PAD_DOWN)) ? 1
+            : (v > 400 ? 1 : v < -400 ? -1 : 0);
+    unsigned long now = GetTickCount();
+    if (dir == 0) { g_step_dir[i][axis] = 0; return 0; }
+    if (dir != g_step_dir[i][axis]) {
+        g_step_dir[i][axis] = dir;
+        g_step_when[i][axis] = now + 380;
+        return dir;
+    }
+    if (now >= g_step_when[i][axis]) {
+        g_step_when[i][axis] = now + 90;
+        return dir;
+    }
     return 0;
 }
 
-/* -1, 0 or 1. The d-pad and the left stick both answer, so a menu does
- * not care which the hand reached for. */
-long long win_pad_x(void) {
-    unsigned char st[16];
-    if (!pad_read(st)) return 0;
-    unsigned short btn = (unsigned short)(st[4] | (st[5] << 8));
-    if (btn & 0x0004) return -1;   /* DPAD_LEFT  */
-    if (btn & 0x0008) return 1;    /* DPAD_RIGHT */
-    return stick_step((short)(st[8] | (st[9] << 8)));
+/* 1 the moment a button goes down. Remembered per button, so asking about
+ * south does not swallow the press of east. */
+long long oi_pad_pressed(long long i, long long b) {
+    pad_pump();
+    if (i < 0 || i >= g_pad_n || b < 0 || b >= 32) return 0;
+    unsigned int bit = 1u << (unsigned)b;
+    int now = (g_pad[i].down & bit) != 0;
+    int before = (g_pad_was[i] & bit) != 0;
+    if (now) g_pad_was[i] |= bit; else g_pad_was[i] &= ~bit;
+    return (now && !before) ? 1 : 0;
 }
 
-long long win_pad_y(void) {
-    unsigned char st[16];
-    if (!pad_read(st)) return 0;
-    unsigned short btn = (unsigned short)(st[4] | (st[5] << 8));
-    if (btn & 0x0001) return -1;   /* DPAD_UP   */
-    if (btn & 0x0002) return 1;    /* DPAD_DOWN */
-    /* The stick's Y points up; a screen's points down. */
-    return -stick_step((short)(st[10] | (st[11] << 8)));
+/* --- text on its way in ----------------------------------------------------
+ *
+ * Typing Japanese means typing "nihon" and picking which way to write it.
+ * Between the keys and the word there is a COMPOSITION: text that exists,
+ * belongs in the field, and is not settled yet. Windows sends it as its own
+ * messages, and an app that only listens for WM_CHAR never sees a single one
+ * of them - which is why so many games simply cannot be typed in.
+ *
+ * Everything here is one string and one number: what is being composed, and
+ * how far into it the caret sits. The app puts the string in the field and
+ * underlines that stretch; when the composition ends Windows sends the
+ * finished word as ordinary characters and the string goes empty again.
+ */
+static char g_ime_text[512];
+static int g_ime_caret;
+static int g_ime_on;
+
+/* imm32 by name, like everything else optional in this file, so no link
+ * line anywhere has to grow and a machine without it still starts. */
+typedef HIMC (WINAPI *ImmGetContextFn)(HWND);
+typedef LONG (WINAPI *ImmGetCompositionStringWFn)(HIMC, DWORD, LPVOID, DWORD);
+typedef BOOL (WINAPI *ImmReleaseContextFn)(HWND, HIMC);
+static ImmGetContextFn g_imm_get;
+static ImmGetCompositionStringWFn g_imm_str;
+static ImmReleaseContextFn g_imm_put;
+
+static int ime_load(void) {
+    static int tried;
+    if (!tried) {
+        tried = 1;
+        HMODULE m = LoadLibraryA("imm32.dll");
+        if (m) {
+            g_imm_get = (ImmGetContextFn)(void *)GetProcAddress(m, "ImmGetContext");
+            g_imm_str = (ImmGetCompositionStringWFn)(void *)GetProcAddress(m, "ImmGetCompositionStringW");
+            g_imm_put = (ImmReleaseContextFn)(void *)GetProcAddress(m, "ImmReleaseContext");
+        }
+    }
+    return g_imm_get && g_imm_str && g_imm_put;
 }
 
-/* 0 none, 1 A, 2 B, 3 X, 4 Y, 5 left shoulder, 6 right shoulder. */
-long long win_pad_press(void) {
-    unsigned char st[16];
-    if (!pad_read(st)) return 0;
-    unsigned short btn = (unsigned short)(st[4] | (st[5] << 8));
-    if (btn & 0x1000) return 1;
-    if (btn & 0x2000) return 2;
-    if (btn & 0x4000) return 3;
-    if (btn & 0x8000) return 4;
-    if (btn & 0x0100) return 5;
-    if (btn & 0x0200) return 6;
-    return 0;
+static void ime_read(HWND hwnd, LPARAM lp) {
+    if (!ime_load()) return;
+    HIMC ctx = g_imm_get(hwnd);
+    if (!ctx) return;
+    if (lp & GCS_COMPSTR) {
+        wchar_t w[256];
+        LONG bytes = g_imm_str(ctx, GCS_COMPSTR, w, (DWORD)sizeof w - 2);
+        int n = bytes > 0 ? (int)(bytes / 2) : 0;
+        if (n > 255) n = 255;
+        w[n] = 0;
+        WideCharToMultiByte(CP_UTF8, 0, w, -1, g_ime_text, (int)sizeof g_ime_text - 1, NULL, NULL);
+        /* The caret is given in CHARACTERS of the composition; the app wants
+         * bytes, because that is what every other offset here is. */
+        LONG at = g_imm_str(ctx, GCS_CURSORPOS, NULL, 0);
+        if (at < 0) at = 0;
+        if (at > n) at = (LONG)n;
+        wchar_t head[256];
+        memcpy(head, w, (size_t)at * 2);
+        head[at] = 0;
+        char utf8[512];
+        WideCharToMultiByte(CP_UTF8, 0, head, -1, utf8, (int)sizeof utf8 - 1, NULL, NULL);
+        g_ime_caret = (int)strlen(utf8);
+    }
+    g_imm_put(hwnd, ctx);
 }
 
-/* Whether a pad answered at all, so an app can say so rather than guess. */
-long long win_pad_here(void) {
-    unsigned char st[16];
-    return pad_read(st) ? 1 : 0;
+/* The runtime's own string maker, declared here as well as further down:
+ * a composition has to become a real Orion text, not a pointer into a
+ * static buffer the allocator knows nothing about. */
+extern const char *orion_text_from_c(const char *s);
+
+/* What is being composed right now, as UTF-8. Empty when nothing is. */
+const char *oi_composing(void) {
+    return orion_text_from_c(g_ime_text);
 }
 
-/* --- was that a finger? ---------------------------------------------------
- * Windows turns touch into ordinary mouse messages, so touch "works"
- * without anyone doing anything - and a UI that does not KNOW it is being
- * touched gets it subtly wrong: it lights things up under a finger that
- * has already left, and it draws a hover state nobody can see. The signal
- * is a mark Windows puts in the message's extra info, documented since
- * Windows 7 and unchanged since. */
-static int g_from_touch;
+/* How far into it the caret sits, in bytes. */
+long long oi_composing_at(void) { return (long long)g_ime_caret; }
 
-static int came_from_touch(void) {
-    LPARAM x = GetMessageExtraInfo();
-    return ((x & 0xFFFFFF80) == 0xFF515700) ? 1 : 0;
-}
-
-/* Whether the last pointer message came from a finger rather than a mouse. */
-long long win_from_touch(void) { return g_from_touch; }
+/* Whether a composition is open at all, which is not the same as it having
+ * text: it opens empty on the first key and an app should already be
+ * treating the keyboard as spoken for. */
+long long oi_composing_on(void) { return (long long)g_ime_on; }
 
 long long win_cursor(long long shape) {
     g_cursor = (int)shape;
@@ -602,6 +1079,23 @@ static LRESULT CALLBACK orion_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
         break;
     /* The wheel arrives in SCREEN coordinates and in notches of 120. Both
      * are converted here so an app never has to know either. */
+    /* The IME's three moments: it opens, it changes, it closes. Handled
+     * rather than passed on, because DefWindowProc draws its own little
+     * composition window over the top of ours. */
+    case WM_IME_STARTCOMPOSITION:
+        g_ime_on = 1;
+        g_ime_text[0] = 0;
+        g_ime_caret = 0;
+        return 0;
+    case WM_IME_COMPOSITION:
+        ime_read(hwnd, lp);
+        if (lp & GCS_RESULTSTR) return DefWindowProcW(hwnd, msg, wp, lp);
+        return 0;
+    case WM_IME_ENDCOMPOSITION:
+        g_ime_on = 0;
+        g_ime_text[0] = 0;
+        g_ime_caret = 0;
+        return 0;
     case WM_MOUSEWHEEL: {
         POINT pt = {(int)(short)LOWORD(lp), (int)(short)HIWORD(lp)};
         ScreenToClient(hwnd, &pt);

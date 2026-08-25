@@ -1,8 +1,0 @@
-# Tuple patterns in match: `(a, b) -> ...` destructures a tuple, binding each
-# field with its real type (heterogeneous: n is int, s is text).
-define describe(p: (int, text)) -> number:
-    choose p:
-        (n, s) then n + length(s)
-
-define main() -> number:
-    describe((37, "abcde"))    # 37 + 5 is 42

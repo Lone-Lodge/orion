@@ -5,7 +5,6 @@
 #
 # stdout carries the protocol, so anything this program wants to say goes to
 # stderr (see orion_stderr_line in the orb).
-use orion_lsp
 
 define main() -> number:
     lsp_serve()

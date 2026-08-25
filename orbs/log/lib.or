@@ -27,7 +27,6 @@
 # (~100B a line, dev-only, visible in the session ledger like every
 # other byte).
 
-use text
 public external define orion_console_color() -> int
 public external define orion_persist_text(s: text) -> text
 external define env_get(name: text) -> text
@@ -96,9 +95,9 @@ define ceiling_of(cat: text) -> number:
     env_ceilings()
     k = "log:lvl:" + cat
     if slot_has(k):
-        slot_get_int(k)
+        slot_get_number(k)
     else:
-        if slot_has("log:lvl:*") then slot_get_int("log:lvl:*") else 2
+        if slot_has("log:lvl:*") then slot_get_number("log:lvl:*") else 2
 
 # ---- Emit ----
 
@@ -159,18 +158,18 @@ public define log_ring_on():
     slot_set("log:ring:on", 1)
 
 define ring_active() -> truth:
-    slot_has("log:ring:on") and slot_get_int("log:ring:on") is 1
+    slot_has("log:ring:on") and slot_get_number("log:ring:on") is 1
 
 define ring_push(lvl: text, cat: text, msg: text):
     if ring_active():
-        n = if slot_has("log:ring:n") then slot_get_int("log:ring:n") else 0
+        n = if slot_has("log:ring:n") then slot_get_number("log:ring:n") else 0
         i = n - (n // 128) * 128
         slot_set("log:ring:{i}", orion_persist_text("{lvl} {cat}  {msg}"))
         slot_set("log:ring:n", n + 1)
 
 # no example: prints - an example would be noise in every gate run
 public define log_dump() uses console:
-    n = if slot_has("log:ring:n") then slot_get_int("log:ring:n") else 0
+    n = if slot_has("log:ring:n") then slot_get_number("log:ring:n") else 0
     count = if n < 128 then n else 128
     header = ldim("log tail ({count} of {n})")
     print_line("  {header}")

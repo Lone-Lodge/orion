@@ -12,7 +12,7 @@
 # State lives in global slots under "timer:{id}:..." so a timer is just a name.
 
 define ts_int(key: text) -> number:
-    if slot_has(key) then slot_get_int(key) else 0
+    if slot_has(key) then slot_get_number(key) else 0
 
 # --- countdown -------------------------------------------------------------
 

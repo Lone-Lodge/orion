@@ -19,7 +19,6 @@
 # locals, calls, return. Strings + memory ops + import tables land
 # next as the JS shell expands.
 
-use bytes
 
 # --- LEB128 encoders ---
 
@@ -564,6 +563,7 @@ public define encode_module(module: WModule) -> [number]:
     element_section = encode_element_section(module)
     code_section = encode_code_section(module)
     data_section = encode_data_section(module)
+    name_section = encode_name_section(module)
 
     # Section order per the wasm spec: type, import, func, table, memory,
     # export, element, code, data.
@@ -577,7 +577,49 @@ public define encode_module(module: WModule) -> [number]:
     loop byte_value in element_section: output = append(output, byte_value)
     loop byte_value in code_section: output = append(output, byte_value)
     loop byte_value in data_section: output = append(output, byte_value)
+    loop byte_value in name_section: output = append(output, byte_value)
     output
+
+# The name section (id 0, "name") - what every other wasm toolchain emits
+# and this one did not. Without it a browser can only say "function #355
+# failed", and finding out WHICH function that is means decoding the module
+# by hand. With it the message names the function, which is the difference
+# between a minute and an hour.
+#
+# Subsection 1 is the function names: a count, then (index, name) pairs.
+# Imports come first in the index space, so a defined function's index is
+# the import count plus where it sits in the code section.
+define encode_name_section(module: WModule) -> [number]:
+    fn_count = function_count(module)
+    if fn_count is 0:
+        return []
+    base = import_list_length(module)
+    edit names = []
+    edit written = 0
+    loop i in 0 until fn_count:
+        f = module.functions[i]
+        if length(f.name) > 0:
+            loop b in leb_u(base + i):
+                names = append(names, b)
+            loop b in encode_name(f.name):
+                names = append(names, b)
+            written = written + 1
+    if written is 0:
+        return []
+    edit sub = []
+    loop b in leb_u(written):
+        sub = append(sub, b)
+    loop b in names:
+        sub = append(sub, b)
+    edit body = []
+    loop b in encode_name("name"):
+        body = append(body, b)
+    body = append(body, 1)
+    loop b in leb_u(list_length(sub)):
+        body = append(body, b)
+    loop b in sub:
+        body = append(body, b)
+    wrap_section(0, body)
 
 # Data section (id 11) - initialises linear memory with literal bytes
 # at instantiate time. Each segment: memidx (0, the only memory), an

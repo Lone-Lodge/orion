@@ -4,7 +4,6 @@
 # elements need no annotation.
 #
 # Build: orion.exe examples/demos/iter_generic.or out.ll orbs
-use iter
 
 define main() -> number:
     words = ["hi", "world", "x", "abcd", "no"]

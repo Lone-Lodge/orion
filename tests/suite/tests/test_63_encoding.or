@@ -1,0 +1,9 @@
+# encoding: hex and base64 both directions, checked against RFC 4648 vectors
+# and round-trips. Bytes are plain [number] lists here.
+
+define main() -> number:
+    ok_hex = if hex_encode([255, 16, 0, 171]) is "ff1000ab" and hex_decode("ff10")[0] is 255 then 1 else 0
+    ok_vec = if base64_encode(bytes_of("Man")) is "TWFu" and base64_encode(bytes_of("Hi")) is "SGk=" then 1 else 0
+    ok_round = if text_of(base64_decode(base64_encode(bytes_of("hello, world!")))) is "hello, world!" then 1 else 0
+    ok_hexround = if text_of(hex_decode(hex_encode(bytes_of("AB")))) is "AB" then 1 else 0
+    ok_hex * 20 + ok_vec * 20 + ok_round * 13 + ok_hexround * 10   # 63

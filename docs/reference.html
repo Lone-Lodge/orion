@@ -48,6 +48,7 @@
 <li><a href="#app"><code>app</code></a></li>
 <li><a href="#core"><code>core</code></a></li>
 <li><a href="#glyphs"><code>glyphs</code></a></li>
+<li><a href="#input"><code>input</code></a></li>
 <li><a href="#mic"><code>mic</code></a></li>
 <li><a href="#ori_scene"><code>ori_scene</code></a></li>
 <li><a href="#overlay"><code>overlay</code></a></li>
@@ -56,6 +57,7 @@
 <li><a href="#typeface"><code>typeface</code></a></li>
 <li><a href="#whisper"><code>whisper</code></a></li>
 <li><a href="#window"><code>window</code></a></li>
+<li><a href="#words"><code>words</code></a></li>
 </ol>
 </nav>
 <main id="ref">
@@ -78,16 +80,15 @@ example upper("привет") is "ПРИВЕТ"</pre></div>
 example lower("ÅSA ÄR GLAD") is "åsa är glad"
 example lower("ΕΛΛΗΝΙΚΆ") is "ελληνικά"
 example lower("ПРИВЕТ") is "привет"</pre></div>
-<div class="fn"><code class="sig">characters(t: text) -&gt; number</code><p>How many CHARACTERS (Unicode code points) the text holds - <code>len</code> counts bytes, and "åsa" is 4 bytes but 3 characters. Counts every byte that is not a UTF-8 continuation byte (0x80-0xBF).</p><pre class="ex">example characters("åsa") is 3
-example characters("abc") is 3</pre></div>
 <div class="fn"><code class="sig">trim(t: text) -&gt; text</code><p>Remove leading and trailing ASCII whitespace (space, tab, newline, CR).   trim("  hi  ")  -&gt;  "hi"</p><pre class="ex">example trim("  hi  ") is "hi"</pre></div>
 <div class="fn"><code class="sig">join(parts: [text], sep: text) -&gt; text</code><p>Join a list of pieces with <code>sep</code> between them.   join(["a", "b", "c"], "-")  -&gt;  "a-b-c" Joined by halves, not one at a time. Adding a piece to the end of a growing text copies everything already in it, so a thousand pieces copy the whole result a thousand times - the cost grows with the SQUARE of how many there are, which is why building one big text out of many small ones was always the slow part of anything that serialises.  Pairing them up instead means each byte is copied about log2(n) times: a display list of a hundred and fifty pieces went from copying a megabyte to copying a hundred kilobytes.</p><pre class="ex">example join(["a", "b", "c"], "-") is "a-b-c"
 example join([], "-") is ""
 example join(["only"], "-") is "only"</pre></div>
 <div class="fn"><code class="sig">split(t: text, sep: text) -&gt; [text]</code><p>Split <code>t</code> on every occurrence of <code>sep</code>, returning the pieces.   split("a,b,c", ",")  -&gt;  ["a", "b", "c"] An empty <code>sep</code> yields the whole string as a single piece.</p><pre class="ex">example length(split("a,b,c", ",")) is 3</pre></div>
 <div class="fn"><code class="sig">replace(t: text, from: text, to: text) -&gt; text</code><p>Replace every occurrence of <code>from</code> with <code>to</code> - split on <code>from</code>, rejoin with <code>to</code>. An empty <code>from</code> returns <code>t</code> unchanged.   replace("a,b,c", ",", "; ")  -&gt;  "a; b; c"</p><pre class="ex">example replace("a,b", ",", "; ") is "a; b"</pre></div>
-<div class="fn"><code class="sig">index_of(t: text, sub: text) -&gt; number</code><p>First byte index of <code>sub</code> in <code>t</code>, or -1 if absent. Empty <code>sub</code> -&gt; 0.</p><pre class="ex">example index_of("hello", "ll") is 2
-example index_of("hello", "zz") is 0 - 1</pre></div>
+<div class="fn"><code class="sig">index_of(t: text, sub: text) -&gt; number</code><p>First byte index of <code>sub</code> in <code>t</code>, or -1 if absent. Empty <code>sub</code> -&gt; 0. Where <code>sub</code> starts, counted in CHARACTERS, or -1. The search itself walks BYTES - UTF-8 is self-synchronising, so a well-formed needle can only match at a character boundary - and the byte offset is converted at the end.  It reads the text where it lies. <code>bytes_of</code> would copy every byte into an eight-byte slot first, which for a megabyte of source is eight megabytes to find one word.</p><pre class="ex">example index_of("hello", "ll") is 2
+example index_of("hello", "zz") is 0 - 1
+example index_of("räksmörgås", "ö") is 5</pre></div>
 <div class="fn"><code class="sig">pad_left(t: text, width: number, pad: text) -&gt; text</code><p>Pad <code>t</code> on the left with <code>pad</code> until it is at least <code>width</code> bytes wide.</p><pre class="ex">example pad_left("7", 3, "0") is "007"</pre></div>
 <div class="fn"><code class="sig">pad_right(t: text, width: number, pad: text) -&gt; text</code><p>Pad <code>t</code> on the right with <code>pad</code> until it is at least <code>width</code> bytes wide.</p><pre class="ex">example pad_right("7", 3, "0") is "700"</pre></div>
 <div class="fn"><code class="sig">lines(t: text) -&gt; [text]</code><p>Split <code>t</code> into lines on '\n'.</p></div>
@@ -112,8 +113,9 @@ example last([9, 8]) is 8</pre></div>
 <div class="fn"><code class="sig">unique(xs: [number]) -&gt; [number]</code><p>The elements of <code>xs</code> with later duplicates removed (first occurrence kept).</p><pre class="ex">example length(unique([1, 2, 1, 3])) is 3</pre></div>
 <div class="fn"><code class="sig">take(xs: [number], n: number) -&gt; [number]</code><p>The first <code>n</code> elements (all of them if n &gt;= len, none if n &lt;= 0).</p><pre class="ex">example length(take([1, 2, 3], 2)) is 2</pre></div>
 <div class="fn"><code class="sig">drop(xs: [number], n: number) -&gt; [number]</code><p>All but the first <code>n</code> elements.</p><pre class="ex">example length(drop([1, 2, 3], 2)) is 1</pre></div>
-<div class="fn"><code class="sig">filled(count: number, value: number) -&gt; list of number</code><p>A list of <code>count</code> copies of one value - THE way to born a big buffer (a per-element push is a copy per element on backends without in-place growth; this is one allocation everywhere).</p></div>
-<div class="fn"><code class="sig">filled_number(count: number, value: number) -&gt; list of number</code></div>
+<div class="fn"><code class="sig">filled(count: number, value: number) -&gt; list of number</code><p>A list of <code>count</code> copies of one value - THE way to born a big buffer (a per-element push is a copy per element on backends without in-place growth; this is one allocation everywhere). <code>filled_number</code> stood next to this with the SAME four lines - it was the float version back when the two number words were separate. <code>number</code> picks, so one is enough.</p><pre class="ex">example length(filled(3, 0)) is 3
+example filled(3, 7)[2] is 7
+example filled(2, 1.5)[0] is 1.5</pre></div>
 <h2 id="num"><code>num</code></h2>
 <p class="orb-blurb">the small integer helpers every program reaches for.</p>
 <div class="fn"><code class="sig">abs(x: number) -&gt; number</code><p>Absolute value.</p><pre class="ex">example abs(0 - 5) is 5</pre></div>
@@ -126,10 +128,6 @@ example last([9, 8]) is 8</pre></div>
 <div class="fn"><code class="sig">ipow(base: number, exp: number) -&gt; number</code><p>Integer power (ipow): base^exp for exp &gt;= 0. Negative exp yields 0.   ipow(2, 10)  -&gt;  1024</p><pre class="ex">example ipow(2, 10) is 1024</pre></div>
 <div class="fn"><code class="sig">is_even(n: number) -&gt; truth</code><p>1 if <code>n</code> is even, else 0.</p><pre class="ex">example is_even(4)</pre></div>
 <div class="fn"><code class="sig">is_odd(n: number) -&gt; truth</code><p>1 if <code>n</code> is odd, else 0.</p><pre class="ex">example is_odd(7)</pre></div>
-<div class="fn"><code class="sig">fabs(x: float) -&gt; float</code><p>Absolute value of a float.</p><pre class="ex">example fabs(0.0 - 2.5) is 2.5</pre></div>
-<div class="fn"><code class="sig">fmin(a: float, b: float) -&gt; float</code><p>The smaller / larger of two floats.</p><pre class="ex">example fmin(1.5, 2.5) is 1.5</pre></div>
-<div class="fn"><code class="sig">fmax(a: float, b: float) -&gt; float</code><pre class="ex">example fmax(1.5, 2.5) is 2.5</pre></div>
-<div class="fn"><code class="sig">fclamp(x: float, lo: float, hi: float) -&gt; float</code><p>Constrain a float to [lo, hi].</p><pre class="ex">example fclamp(5.0, 0.0, 1.0) is 1.0</pre></div>
 <div class="fn"><code class="sig">parse_float(t: text) -&gt; float</code><p>Parse a float out of text: optional '-', integer part, optional '.fraction', optional 'e'/'E' exponent (with optional sign). Non-numeric tails stop the scan. parse_float("") is 0.0.   parse_float("3.14")    -&gt;  3.14   parse_float("-2.5e3")  -&gt;  -2500.0</p><pre class="ex">example parse_float("1.5") is 1.5</pre></div>
 <div class="fn"><code class="sig">with_decimals(x: float, decimals: number) -&gt; text</code><p><code>x</code> as text with a fixed number of decimals - the one formatting ask plain to_text cannot answer.</p><pre class="ex">example with_decimals(3.14159, 2) is "3.14"
 example with_decimals(2.5, 0) is "2"
@@ -163,24 +161,25 @@ example not has_key({"a": 1}, "z")</pre></div>
 <h2 id="json"><code>json</code></h2>
 <p class="orb-blurb">parse and build JSON.</p>
 <h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">Json = JNull | JBool(number)                 # 0 = false, anything else = true | JInt(number) | JFloat(float) | JStr(text) | JArr([Json]) | JObj([text], [Json])       # parallel keys and values</code></div>
+<div class="fn"><code class="sig">Json = JNull | JBool(truth) | JNum(number) | JStr(text) | JArr([Json]) | JObj([text], [Json])       # parallel keys and values</code></div>
 <h3 class="sub">Functions</h3>
 <div class="fn"><code class="sig">json_parse(src: text) -&gt; table</code><pre class="ex">example json_has(json_parse("\{\"k\": 1\}"), "k")</pre></div>
 <div class="fn"><code class="sig">json_obj(o: table, key: text) -&gt; table</code><pre class="ex">example json_has(json_obj(json_parse("\{\"o\": \{\"k\": 1\}\}"), "o"), "k")</pre></div>
 <div class="fn"><code class="sig">json_text(o: table, key: text) -&gt; text</code><pre class="ex">example json_text(json_parse("\{\"s\": \"hi\"\}"), "s") is "hi"</pre></div>
-<div class="fn"><code class="sig">json_int(o: table, key: text) -&gt; number</code><pre class="ex">example json_int(json_parse("\{\"n\": 7\}"), "n") is 7</pre></div>
+<div class="fn"><code class="sig">json_whole(o: table, key: text) -&gt; number</code><p>A WHOLE number out of the dynamic reader, and the name says so: a table slot is one machine word, and this side of the orb puts a whole number in it. <code>1.5</code> in the source reads back as <code>1</code> - the scanner consumes the fraction and drops it, which is what the LSP wants (ids, lines, characters are all whole) and what nothing else should rely on.  The WRITING side has no such limit: <code>jnum(1.5)</code> is a JSON number and serializes as one.</p><pre class="ex">example json_whole(json_parse("\{\"n\": 7\}"), "n") is 7
+example json_whole(json_parse("\{\"x\": 1.5\}"), "x") is 1</pre></div>
 <div class="fn"><code class="sig">json_list(o: table, key: text) -&gt; [table]</code><pre class="ex">example length(json_list(json_parse("\{\"xs\": [1, 2]\}"), "xs")) is 2</pre></div>
 <div class="fn"><code class="sig">json_has(o: table, key: text) -&gt; truth</code><pre class="ex">example json_has(json_parse("\{\"a\": 1\}"), "a")</pre></div>
 <div class="fn"><code class="sig">json_escape(s: text) -&gt; text</code><p>Escape a Text for embedding in JSON output. Single pass; the byte list is turned into text once at the end.</p><pre class="ex">example json_escape("a\"b") is "a\\\"b"</pre></div>
 <div class="fn"><code class="sig">jnull() -&gt; Json</code><pre class="ex">example json_stringify(jnull()) is "null"</pre></div>
-<div class="fn"><code class="sig">jbool(b: number) -&gt; Json</code><pre class="ex">example json_stringify(jbool(1)) is "true"</pre></div>
-<div class="fn"><code class="sig">jint(n: number) -&gt; Json</code><pre class="ex">example json_stringify(jint(0 - 5)) is "-5"</pre></div>
-<div class="fn"><code class="sig">jfloat(x: float) -&gt; Json</code><pre class="ex">example json_stringify(jfloat(1.5)) is "1.5"</pre></div>
+<div class="fn"><code class="sig">jbool(b: truth) -&gt; Json</code><pre class="ex">example json_stringify(jbool(true)) is "true"</pre></div>
+<div class="fn"><code class="sig">jnum(n: number) -&gt; Json</code><pre class="ex">example json_stringify(jnum(0 - 5)) is "-5"
+example json_stringify(jnum(1.5)) is "1.5"</pre></div>
 <div class="fn"><code class="sig">jstr(s: text) -&gt; Json</code><pre class="ex">example json_stringify(jstr("hi")) is "\"hi\""</pre></div>
 <div class="fn"><code class="sig">jarr(items: [Json]) -&gt; Json</code><pre class="ex">example json_stringify(jarr([])) is "[]"</pre></div>
 <div class="fn"><code class="sig">jobj(keys: [text], vals: [Json]) -&gt; Json</code><pre class="ex">example json_stringify(jobj([], [])) is "\{\}"</pre></div>
-<div class="fn"><code class="sig">json_stringify(j: Json) -&gt; text</code><p>Serialize a Json value to compact JSON text.</p><pre class="ex">example json_stringify(jint(42)) is "42"
-example json_stringify(jarr([jint(1), jint(2)])) is "[1,2]"</pre></div>
+<div class="fn"><code class="sig">json_stringify(j: Json) -&gt; text</code><p>Serialize a Json value to compact JSON text.</p><pre class="ex">example json_stringify(jnum(42)) is "42"
+example json_stringify(jarr([jnum(1), jnum(2)])) is "[1,2]"</pre></div>
 <h2 id="sqlite"><code>sqlite</code></h2>
 <p class="orb-blurb">a real SQL database in one file, no server.</p>
 <div class="fn"><code class="sig">db_open(path: text) -&gt; number uses files = sq_open(path)</code><p>Open (or create) the database file. A handle, or -1 - ask db_error(-1) for nothing; a failed open names its reason on the handle it tried. no example: opens a file on disk - proven by tools/sqlite_test.sh</p></div>
@@ -208,15 +207,15 @@ example utc_time(parse_utc("2026-08-04 21:30:05"), "%Y-%m-%d %H:%M:%S") is "2026
 <h2 id="http"><code>http</code></h2>
 <p class="orb-blurb">fetch and post over HTTP(S).</p>
 <h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">response = status: number | body: text</code></div>
+<div class="fn"><code class="sig">reply = status: number | body: text</code></div>
 <h3 class="sub">Functions</h3>
 <div class="fn"><code class="sig">status_from_headers(header_dump: text) -&gt; number</code><p>The status is read from curl's header dump (-D), not from stdout: the dump is a file of its own, so a stray stderr line can never corrupt it. With redirects (-L) the dump holds one block per hop - the LAST status line is the answer.</p><pre class="ex">example status_from_headers("HTTP/1.1 200 OK") is 200
 example status_from_headers("garbage") is 0</pre></div>
-<div class="fn"><code class="sig">fetch(url: text) -&gt; response uses net, files</code><p>GET <code>url</code>. <code>success(r)</code> when the request went through AND the server said 2xx. no example: needs the network - proven by examples/demos/httpd.or + manual runs</p></div>
-<div class="fn"><code class="sig">post(url: text, content_type: text, payload: text) -&gt; response uses net, files</code><p>POST <code>body</code> to <code>url</code> with the given Content-Type. no example: needs the network - proven by manual runs</p></div>
-<div class="fn"><code class="sig">success(r: response) -&gt; truth</code><p>Did the request reach a server that answered success?</p><pre class="ex">example success(response{status: 200, body: ""})
-example not success(response{status: 404, body: ""})
-example not success(response{status: 0, body: ""})</pre></div>
+<div class="fn"><code class="sig">fetch(url: text) -&gt; reply uses net, files</code><p>GET <code>url</code>. <code>success(r)</code> when the request went through AND the server said 2xx. no example: needs the network - proven by examples/demos/httpd.or + manual runs</p></div>
+<div class="fn"><code class="sig">post(url: text, content_type: text, payload: text) -&gt; reply uses net, files</code><p>POST <code>body</code> to <code>url</code> with the given Content-Type. no example: needs the network - proven by manual runs</p></div>
+<div class="fn"><code class="sig">success(r: reply) -&gt; truth</code><p>Did the request reach a server that answered success?</p><pre class="ex">example success(reply{status: 200, body: ""})
+example not success(reply{status: 404, body: ""})
+example not success(reply{status: 0, body: ""})</pre></div>
 <h2 id="net"><code>net</code></h2>
 <p class="orb-blurb">blocking TCP, client and server.</p>
 <div class="fn"><code class="sig">connect(host: text, port: number) -&gt; number uses net</code><p>--- client ---</p><pre class="ex">example not ok(connect("127.0.0.1", 1))</pre></div>
@@ -320,6 +319,8 @@ example not is_end("x")</pre></div>
 <div class="fn"><code class="sig">task_count() -&gt; number = orion_task_live_count()</code></div>
 <div class="fn"><code class="sig">is_done(id: number) -&gt; truth = orion_task_state(id) is 3</code></div>
 <div class="fn"><code class="sig">sleep_task(ms: number) -&gt; number = orion_task_sleep(ms)</code><p>Wait <code>ms</code> WITHOUT holding the scheduler. Inside a task this parks it and lets the others run; the scheduler makes one real OS sleep for the shortest pending deadline and wakes whoever is due. Outside a task it is an ordinary sleep, so the same call is right in both places.  This is the difference between concurrency and a queue: with <code>sleep_ms</code> inside a task, ten tasks each waiting 100 ms took a second, because the first one parked the whole scheduler in the OS. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
+<div class="fn"><code class="sig">every(period_ms: number, f: function) -&gt; number</code><p>Run <code>f(n)</code> every <code>period_ms</code>, n counting from 0, until <code>f</code> answers <code>false</code>. Returns the task id. no example: needs the running scheduler - proven by test_49_timers_are_tasks.or</p></div>
+<div class="fn"><code class="sig">after(delay_ms: number, f: function) -&gt; number</code><p>Run <code>f(0)</code> once, <code>delay_ms</code> from now. Returns the task id. no example: needs the running scheduler - proven by test_49_timers_are_tasks.or</p></div>
 <div class="fn"><code class="sig">ask(handler: function, arg: number) -&gt; number = orion_ms_perform(handler, arg)</code><p>Inside a task: hand control to <code>handler</code>, which may resume this point once and then keep working. Returns the handler's value, or the resumed value. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
 <div class="fn"><code class="sig">resume_with(v: number) -&gt; number = orion_ms_resume(v)</code><p>Inside such a handler: run the rest of the task with <code>v</code>, and get its result. no example: needs the running task scheduler - proven by test_42_async_interleave.or</p></div>
 <div class="fn"><code class="sig">resumable_ok() -&gt; truth = orion_ms_supported() is 1</code></div>
@@ -405,7 +406,7 @@ example assert(true, "holds") is 1</pre></div>
 <h2 id="ori_display"><code>ori_display</code></h2>
 <p class="orb-blurb">the ORI (Orion Rendering Interface) display list.</p>
 <h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">DrawCmd = DrawRect(Rect, text, int) | DrawRoundRect(Rect, text, text, int) | SetClip(Rect, int, int) | DrawShadow(Rect, text, int, int, int) | DrawText(Point, text, text, int, int) | DrawIcon(Point, text, int, text, int) | DrawPath(text, text, int) | DrawArc(Point, int, int, int, int, text, int) | DrawNine(Rect, text, int, text, text, int) | DrawSprite(Point, text, int, int) | DrawImage(Point, text, int, int, text, text, int)</code></div>
+<div class="fn"><code class="sig">DrawCmd = DrawRect(Rect, text, i64) | DrawRoundRect(Rect, text, text, i64) | SetClip(Rect, i64, i64) | DrawShadow(Rect, text, i64, i64, i64) | DrawText(Point, text, text, i64, i64) | DrawIcon(Point, text, i64, text, i64) | DrawPath(text, text, i64) | DrawArc(Point, i64, i64, i64, i64, text, i64) | DrawNine(Rect, text, i64, text, text, i64) | DrawSprite(Point, text, i64, i64) | DrawImage(Point, text, i64, i64, text, text, i64)</code></div>
 <div class="fn"><code class="sig">DisplayList: commands: [DrawCmd]</code></div>
 <h3 class="sub">Functions</h3>
 <div class="fn"><code class="sig">empty_list() -&gt; DisplayList</code><pre class="ex">example length(empty_list().commands) is 0</pre></div>
@@ -461,6 +462,7 @@ example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png
 <div class="fn"><code class="sig">window_click_through(title: text, on: truth) -&gt; truth uses console = win_set_click_through(title, if on then 1 else 0) &gt;= 0</code><p>Let the mouse fall through the window to whatever is under it: a reference board you can paint and click straight through. The keyboard still arrives, so alt-tab back and the page's own keys are the way out - without that, a window that takes no clicks could not be turned off from inside. no example: window state - proven by folio's click-through</p></div>
 <div class="fn"><code class="sig">clicks_through(title: text) -&gt; truth uses console = win_click_through_on(title) is 1</code><p>Whether it is clicking through right now - the page asks while it is on, since the way out does not go through the page. no example: window state - proven by folio's click-through</p></div>
 <div class="fn"><code class="sig">window_move(title: text, x: number, y: number) -&gt; truth uses console = win_move(title, x, y) is 0</code><p>Put the window's top-left corner at x,y in device pixels - a frameless window's bar drags with this. The browser keeps the pointer to itself and will not let us hand the drag to the OS move loop, so the page follows its own pointer and says where the window should be. no example: window state - proven by folio's own top bar</p></div>
+<div class="fn"><code class="sig">window_drag(title: text, phase: number, dx: number, dy: number) -&gt; truth uses console = win_drag(title, phase, dx, dy) is 0</code><p>Drag by deltas from where the window was when the drag began (phase 0 = begin, 1 = move). Reads the window's own rect, so it works where the page's screenX does not (hwnd-hosted extra windows).</p></div>
 <div class="fn"><code class="sig">window_size(title: text, w: number, h: number) -&gt; truth uses console = win_resize(title, w, h) is 0</code><p>Give the window a size (device pixels) and center it on its monitor. The one window verb that starts from the OUTSIDE: a browser app window opens at whatever size its profile last had, and only the OS side can correct that - an installer's first move. no example: window state - proven by the setup stub</p></div>
 <div class="fn"><code class="sig">window_ghost(title: text, rects: text) -&gt; truth uses console = win_ghost(title, rects) is 0</code><p>Ghost mode, own windows only: the page hands over the rectangles that stay INTERACTIVE ("x,y,w,h;..." in device pixels, client coords) - everything else is a hole: invisible where the page painted nothing, and clicks fall through to the work underneath. "" turns it off. False on the borrowed Edge window, where holes are impossible - the caller falls back to translucent click-through. no example: window state - proven by folio's ghost mode</p></div>
 <div class="fn"><code class="sig">window_minimize(title: text) -&gt; truth uses console = win_command(title, "min") is 0</code></div>
@@ -484,7 +486,26 @@ example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png
 <h3 class="sub">Functions</h3>
 <h2 id="glyphs"><code>glyphs</code></h2>
 <p class="orb-blurb">THE 5x7 bitmap font, one place (the one-of-each law).</p>
-<div class="fn"><code class="sig">glyph_rows(code: number) -&gt; list of number</code></div>
+<div class="fn"><code class="sig">glyph_rows(code: number) -&gt; list of number</code><pre class="ex">example length(glyph_rows(48)) is 7
+example glyph_rows(48)[0] is 14</pre></div>
+<h2 id="input"><code>input</code></h2>
+<p class="orb-blurb">what the person is doing, whatever they happen to be holding.</p>
+<div class="fn"><code class="sig">pads_here() -&gt; number</code><p>How many controllers are here right now. A pad switched on after the app started is found within a couple of seconds, so this can go up.</p></div>
+<div class="fn"><code class="sig">pad_sort(i: number) -&gt; text</code><p>What sort the i:th pad is, for the one thing the make should decide: which glyphs to draw on the buttons. "" when there is no such pad.</p></div>
+<div class="fn"><code class="sig">pad_id(i: number) -&gt; number</code><p>vid&lt;&lt;16|pid, when an app wants to name the exact device. A DualSense over Bluetooth is 5488870 (054C:0CE6).</p></div>
+<div class="fn"><code class="sig">pad_axis(i: number, which: text) -&gt; number</code><p>One axis, -1.0 to 1.0: "lx" "ly" "rx" "ry" are the sticks, "l2" "r2" the triggers (0.0 to 1.0). Y points DOWN, the way a screen does, so a stick pushed up and a finger dragged up agree.  The dead zone is already taken out: a thumb resting on a stick reads 0.0, and the first degree past the edge is a small number rather than a jump.</p></div>
+<div class="fn"><code class="sig">pad_down(i: number, button: text) -&gt; truth</code><p>Is a button held down? Names, not letters: "south" is the bottom face button on every pad - A on an Xbox, cross on a PlayStation. The rest are "east" "west" "north", "l1" "r1", "back" "start", the four directions "up" "down" "left" "right", and the stick clicks "l3" "r3".</p></div>
+<div class="fn"><code class="sig">pad_pressed(i: number, button: text) -&gt; truth</code><p>True on the frame a button goes down, and not while it is held. Remembered per button, so asking about "south" never swallows a press of "east".</p></div>
+<div class="fn"><code class="sig">pad_step_x(i: number) -&gt; number</code><p>-1, 0 or 1: one step left or right. Holding the stick over steps once, waits, and then repeats, the way a held arrow key behaves - because a menu wants steps and not a velocity. The d-pad and the left stick both answer.</p></div>
+<div class="fn"><code class="sig">pad_step_y(i: number) -&gt; number</code><p>The same up and down, positive DOWNWARD.</p></div>
+<div class="fn"><code class="sig">touching() -&gt; truth</code><p>Whether the last pointer message came from a finger rather than a mouse. Windows turns touch into ordinary mouse messages, so touch works without anyone doing anything - and a UI that does not KNOW gets it subtly wrong: it lights things up under a finger that has already left.</p></div>
+<div class="fn"><code class="sig">last_used() -&gt; text</code><p>Which of the four spoke last: "mouse", "keys", "touch", "pad", or "" while nobody has done anything yet. This is what decides whether to draw a focus ring, whether to draw hover at all, and how big to make what can be hit.</p></div>
+<div class="fn"><code class="sig">composing() -&gt; text</code><p>--- text on its way in -----------------------------------------------------  Typing Japanese means typing "nihon" and then picking which way to write it. Between the keys and the word there is a COMPOSITION: text that exists, belongs in the field, and is not settled yet. An app that only listens for characters never sees one, which is why so many games cannot be typed in at all.  Put <code>composing()</code> into the field at the caret and underline it with veil's <code>compose_from</code> / <code>compose_to</code>. When the composition ends the platform sends the finished word as ordinary characters and this goes empty again.</p></div>
+<div class="fn"><code class="sig">composing_at() -&gt; number</code><p>How far into the composition the caret sits, in bytes.</p></div>
+<div class="fn"><code class="sig">composing_now() -&gt; truth</code><p>Whether one is open at all, which is not the same as it having text: it opens empty on the first key, and from that moment the keyboard is spoken for even though there is nothing to show yet.</p></div>
+<div class="fn"><code class="sig">pad_report(i: number, at: number) -&gt; number</code><p>--- adding a make nobody here owns ----------------------------------------  The newest raw report, byte by byte, and how long it was. A mapping is checked against what the device ACTUALLY said rather than against a memory of it, which is the only honest way to add a pad that is not on the desk.</p></div>
+<div class="fn"><code class="sig">pad_report_len(i: number) -&gt; number</code></div>
+<div class="fn"><code class="sig">devices_seen() -&gt; number</code><p>How many devices the machine offered the search at all - keyboards, mice, everything. It answers the question a zero cannot: a machine with fifteen of these and no controller among them has no controller connected, while a machine that answers zero has a search that could not run. Nothing but a diagnostic, and the first thing to look at when a pad that is plainly on does nothing at all.</p></div>
 <h2 id="mic"><code>mic</code></h2>
 <p class="orb-blurb">microphone capture, the other half of the audio stack.</p>
 <div class="fn"><code class="sig">mic_open(rate: number) -&gt; truth = orion_mic_open(rate) is 1</code><p>Start capturing at <code>rate</code> samples a second, mono. false means there is no capture device - run silent rather than refusing to start. no example: needs a live capture device - proven by tools/mic_test.sh</p></div>
@@ -506,18 +527,21 @@ example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png
 <div class="fn"><code class="sig">Texture: width: number, height: number, pixels: list of number</code></div>
 <div class="fn"><code class="sig">Sprite: at: V3, wide: number, high: number, texture: Texture</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">v3(x: number, y: number, z: number) -&gt; V3</code></div>
+<div class="fn"><code class="sig">v3(x: number, y: number, z: number) -&gt; V3</code><pre class="ex">example v3(1, 2, 3).y is 2</pre></div>
 <div class="fn"><code class="sig">texture_from_bmp(blob: text) -&gt; Texture</code><p>A 24-bit BMP (the pixel-art interchange format every paint program writes) decoded to a Texture. Made for <code>embed</code>: assets stay FILES, the binary carries their bytes, this reads them at the seam.      texture: texture_from_bmp(embed "../../assets/dragon.bmp")  Handles bottom-up (positive height) and top-down (negative) rows and the 4-byte row padding. Anything that is not a 24-bit BMP is LOUD: a 1x1 magenta texture, impossible to miss on screen.</p></div>
 <h2 id="overlay"><code>overlay</code></h2>
 <p class="orb-blurb">the 2D compositor: an ori_display DisplayList drawn OVER a rendered pixel frame.</p>
-<div class="fn"><code class="sig">color_of(colour: text) -&gt; number</code><p>"#RRGGBB" (or "#RGB") to a whole color; anything else is 0.</p></div>
+<div class="fn"><code class="sig">color_of(colour: text) -&gt; number</code><p>"#RRGGBB" (or "#RGB") to a whole color; anything else is 0.</p><pre class="ex">example color_of("#ff0000") is 16711680
+example color_of("#000000") is 0
+example color_of("rod") is 0</pre></div>
 <div class="fn"><code class="sig">draw_over(pixels: list of number, width: number, height: number, commands: list of DrawCmd, scale: number, types: Typeset, texture_of: function) -&gt; list of number</code><p>The frame with the display list drawn over it. Each fill is reborn through slice so its set() writes stay in place (the promotion law): one frame-sized copy per drawn command buys O(1) pixel writes - a HUD is a handful of commands, so the copies are nothing. <code>texture_of</code> resolves an image NAME to pixels - the host owns its assets (a declared game embeds them at build time), the compositor only asks. A name it does not know answers with the 1x1 key texture and nothing is drawn.</p></div>
 <h2 id="raster"><code>raster</code></h2>
 <p class="orb-blurb">the first render block behind the ORI 3D seam (ori_scene).</p>
 <h3 class="sub">Types</h3>
 <div class="fn"><code class="sig">Crc: hi: number, lo: number</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">field_scale(field_h: number) -&gt; number</code><p>World units per field unit.</p></div>
+<div class="fn"><code class="sig">field_scale(field_h: number) -&gt; number</code><p>World units per field unit.</p><pre class="ex">example field_scale(2.0) is 1.736</pre></div>
+<div class="fn"><code class="sig">px_per_unit(height: number, field_h: number) -&gt; number</code><p>Screen pixels per field unit - the exact factor render() applies to anything on the game plane, so words land where the sketch said. The compositor scales a field-space DisplayList by the same number, so UI rects and words agree with the game to the pixel.</p></div>
 <div class="fn"><code class="sig">field_of_pixel(pixel_x: number, pixel_y: number, width: number, height: number, field_w: number, field_h: number) -&gt; Point</code><p>Where a screen pixel lands on the field. Outside the field is a real answer (negative, or past field_w/field_h) - the letterbox is a place too, and a hit test says no all by itself.</p></div>
 <div class="fn"><code class="sig">quad(a: V3, b: V3, c: V3, d: V3, color: number) -&gt; list of Tri</code><p>Two triangles from four corners, wound a-b-c / a-c-d.</p></div>
 <div class="fn"><code class="sig">add_triangles(triangles: list of Tri, more: list of Tri) -&gt; list of Tri</code></div>
@@ -546,8 +570,10 @@ example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png
 <div class="fn"><code class="sig">Typeset: body: Font, heading: Font, sizes: [number], slots: [number], stash: list of [number]</code></div>
 <h3 class="sub">Functions</h3>
 <div class="fn"><code class="sig">load_font_blob(blob: text) -&gt; Font</code><p>Parse the sfnt table directory and the head/maxp headers from an embedded blob. Returns a Font with ok=false when the blob isn't a recognizable TrueType sfnt.</p></div>
-<div class="fn"><code class="sig">cp_step(b: [number], i: number) -&gt; number</code><p>How many bytes the character starting at <code>i</code> takes up.</p></div>
-<div class="fn"><code class="sig">cp_at(b: [number], i: number) -&gt; number</code><p>The codepoint starting at <code>i</code>. Both arms of an <code>if</code> are evaluated before one is picked, so the continuation bytes are read defensively - a trailing ASCII character would otherwise index past the end.</p></div>
+<div class="fn"><code class="sig">cp_step(b: [number], i: number) -&gt; number</code><p>How many bytes the character starting at <code>i</code> takes up.</p><pre class="ex">example cp_step(bytes_of("a"), 0) is 1
+example cp_step(bytes_of("ä"), 0) is 2</pre></div>
+<div class="fn"><code class="sig">cp_at(b: [number], i: number) -&gt; number</code><p>The codepoint starting at <code>i</code>. Both arms of an <code>if</code> are evaluated before one is picked, so the continuation bytes are read defensively - a trailing ASCII character would otherwise index past the end.</p><pre class="ex">example cp_at(bytes_of("a"), 0) is 97
+example cp_at(bytes_of("ä"), 0) is 228</pre></div>
 <div class="fn"><code class="sig">glyph_id(f: Font, cp: number) -&gt; number</code></div>
 <div class="fn"><code class="sig">advance_width(f: Font, gid: number) -&gt; number</code><p>Advance width of a glyph in font units.</p></div>
 <div class="fn"><code class="sig">font_ascent(f: Font) -&gt; number</code><p>Typographic ascent in font units (hhea.ascender). The baseline sits this far below the top of the em box, so a renderer places text x[y] by putting the baseline at y + ascent*scale and drawing glyphs upward from it.</p></div>
@@ -559,11 +585,10 @@ example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png
 <div class="fn"><code class="sig">font_body() -&gt; Font</code><p>The engine's two faces, embedded with the engine itself. The .subset files are the ASCII the sketches can say (orion tools/subset_font.js, run against the full .ttf beside them) - the wasm backend pays per embedded byte, and a full family ships thousands of unsayable glyphs.</p></div>
 <div class="fn"><code class="sig">font_title() -&gt; Font</code></div>
 <div class="fn"><code class="sig">cold_typeset() -&gt; Typeset</code><p>The unwarmed set: fonts parsed, every glyph rasterized on demand. What the web shell uses - it re-instantiates per frame anyway.</p></div>
-<div class="fn"><code class="sig">px_per_unit(height: number, field_h: number) -&gt; number</code><p>Screen pixels per field unit - the exact factor render() applies to anything on the game plane, so words land where the sketch said. Public: the compositor scales a field-space DisplayList by the same number, so UI rects and words agree with the game to the pixel.</p></div>
-<div class="fn"><code class="sig">warm_typeset(book: list of Word, height: number, field_h: number) -&gt; Typeset</code><p>Parse both faces and rasterize every letter the game's word book can show, at the size this window will draw it. Call ONCE at startup, before any frame pool is active.</p></div>
+<div class="fn"><code class="sig">warm_typeset(book: list of Word, ppu: number) -&gt; Typeset</code><p>Parse both faces and rasterize every letter the game's word book can show, at the size this window will draw it. Call ONCE at startup, before any frame pool is active.</p></div>
 <div class="fn"><code class="sig">blit_line(pixels: [number], width: number, height: number, left_px: number, top_px: number, content: text, titled: truth, em_px: number, color: number, types: Typeset) -&gt; [number]</code><p>One line blitted at PIXEL coordinates: left_px is the pen start, top_px the line's top (baseline = top + ascent). The lowest rung of the ladder - draw_words and the DisplayList compositor both end here, so every letter on screen comes through one blitter.</p></div>
 <div class="fn"><code class="sig">line_width_px(content: text, titled: truth, em_px: number, types: Typeset) -&gt; number</code><p>The width of a line in pixels at em size em_px - the blitter's own advance sum, for centering without drawing.</p></div>
-<div class="fn"><code class="sig">draw_words(pixels: [number], width: number, height: number, field_w: number, field_h: number, spoken: list of Word, types: Typeset) -&gt; [number]</code><p>Draw every word over the rendered frame, letters placed on the pen line exactly as the font's metrics say. Words sit ABOVE everything - they are the HUD's voice, same as the old always-on-top labels.</p></div>
+<div class="fn"><code class="sig">draw_words(pixels: [number], width: number, height: number, field_w: number, field_h: number, spoken: list of Word, types: Typeset, ppu: number) -&gt; [number]</code><p>Draw every word over the rendered frame, letters placed on the pen line exactly as the font's metrics say. Words sit ABOVE everything - they are the HUD's voice, same as the old always-on-top labels.</p></div>
 <div class="fn"><code class="sig">load_font(path: text) -&gt; Font</code><p>Parse the sfnt table directory and the head/maxp headers. Returns a Font with ok=false when the file isn't a recognizable TrueType sfnt.</p></div>
 <div class="fn"><code class="sig">glyph_spans_cached(f: Font, gid: number, size: number) -&gt; [number]</code></div>
 <div class="fn"><code class="sig">kern_pair(f: Font, left: number, right: number) -&gt; number</code><p>How much closer (or further) the pen should sit for this pair, in font units. 0 when the font says nothing, which is the common case.</p></div>
@@ -601,6 +626,16 @@ example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png
 <div class="fn"><code class="sig">window_click_hole(window_handle: number, x: number, y: number, w: number, h: number) -&gt; number</code><p>The frame-skin pair: inside the hole the mouse belongs to the game (clicks land); outside it the bezel drags the window. And the key color becomes truly transparent - rounded corners over the desktop.</p></div>
 <div class="fn"><code class="sig">window_colorkey(window_handle: number, rgb: number) -&gt; number</code></div>
 <div class="fn"><code class="sig">window_sound_play(data: text, from: number, bytes: number, rate: number, channels: number, bits: number, left: number, right: number) -&gt; number</code><p>One-shot PCM playback, fire and forget - a small voice pool mixes. <code>data</code> carries the whole file (orion text is binary-safe); from and bytes point at the PCM inside it. left/right are 0..1000 shares - the shell's pan law and volume bus arrive as two plain numbers.</p></div>
+<h2 id="words"><code>words</code></h2>
+<p class="orb-blurb">what a program says, in the language of whoever is reading it.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Words: keys: [text], says: [text]</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">words_of(source: text) -&gt; Words</code><p>One saying per line, <code>key = what it says</code>.</p></div>
+<div class="fn"><code class="sig">say(book: Words, key: text) -&gt; text</code><p>What this key says here. A key nobody translated answers with itself, so a missing saying is visible on the screen rather than being an empty button.</p></div>
+<div class="fn"><code class="sig">say_with(book: Words, key: text, parts: [text]) -&gt; text</code><p><code>{0}</code>, <code>{1}</code> and so on, filled in with what you hand over. The order of the holes is the TRANSLATION's business - "5 files" and "filer: 5" are the same saying - which is the whole reason they are numbered and not appended.</p></div>
+<div class="fn"><code class="sig">say_of(book: Words, key: text, count: number) -&gt; text</code><p>One or many. <code>save.one</code> and <code>save.many</code>, with the number filled into {0}. Two forms, because that is what the languages this is for have; a language with more forms is a change HERE and not in every app that uses this.</p></div>
+<div class="fn"><code class="sig">missing_from(book: Words, wanted: [text]) -&gt; [text]</code><p>Is anything missing? Hand it the keys a screen uses and it says which ones this book cannot answer - a check to run before shipping a language, rather than a surprise on somebody's screen.</p></div>
 </main>
 
 </body>

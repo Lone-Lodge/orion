@@ -7,10 +7,6 @@
 #
 # Protocol: one line-delimited JSON request per connection -
 # {"code": "..."} in, {"ok": 0|1, "output": "...", "error": "..."} out.
-use net
-use json
-use text
-use os
 
 external define orion_stdin_line() -> text
 
@@ -53,7 +49,7 @@ define main() -> number uses net, console:
     output = json_text(root, "output")
     if length(output) > 0:
         print_line(trim(output))
-    if json_int(root, "ok") is 1:
+    if json_whole(root, "ok") is 1:
         return 0
     eprint(json_text(root, "error"))
     1

@@ -45,7 +45,16 @@ walk() {
     ORDER+=("$lib")
 }
 
-APP_SRC=$(ls "$APP"/src/*.or 2>/dev/null || ls "$APP"/*.or 2>/dev/null)
+# An app may be a DIRECTORY (every .or under src/) or a single FILE. One
+# app with two entry points - a native main.or beside a wasm app.or - has
+# two of every helper they share, and the bundler kept whichever it read
+# first. Naming the entry says which one this build is.
+if [ -f "$APP" ]; then
+    APP_SRC="$APP"
+    APP=$(dirname "$APP")
+else
+    APP_SRC=$(ls "$APP"/src/*.or 2>/dev/null || ls "$APP"/*.or 2>/dev/null)
+fi
 [ -n "$APP_SRC" ] || { echo "no .or sources under $APP"; exit 1; }
 for f in $APP_SRC; do
     while read -r dep; do
@@ -100,26 +109,34 @@ for f in $APP_SRC; do copy_embeds "$f"; done
             name = $0
             sub(/^(public )?define /, "", name)
             sub(/\(.*/, "", name)
-            # How many parameters it takes. Two definitions of one name
-            # with the SAME shape are almost always the same small helper
-            # written twice, and keeping the first is harmless. Different
-            # shapes are two different functions, and letting one answer the
-            # calls meant for the other is a bug that surfaces much later as
-            # a wasm module that will not validate, or a trap nobody can
-            # place. That one is refused here instead.
-            args = $0
-            sub(/^[^(]*\(/, "", args)
-            sub(/\).*/, "", args)
-            if (args == "") { n = 0 } else { t = args; gsub(/[^,]/, "", t); n = length(t) + 1 }
-            if (name in seen && seen[name] != n) {
-                print "bundle: ERROR - two different " name ": one takes " seen[name] " arguments, one takes " n ". Rename one of them." > "/dev/stderr"
+            # The whole signature, not just how many parameters. Two
+            # definitions of one name with the SAME shape are almost always
+            # the same small helper written twice, and keeping the first is
+            # harmless. Different shapes are two different functions: `from:
+            # int` and `from: number` are an i32 and an f64, and letting one
+            # answer calls meant for the other is a module that will not
+            # validate, or a number that quietly loses everything after the
+            # dot. That one is refused here instead.
+            sig = $0
+            sub(/^[^(]*\(/, "", sig)
+            sub(/:[ 	]*$/, "", sig)
+            gsub(/[ 	]+/, "", sig)
+            # Only the TYPES. Two helpers that call the same parameter `pre`
+            # and `prefix` are the same function; only what the types are
+            # decides whether one can answer for the other.
+            gsub(/[a-z_0-9]+:/, "", sig)
+            if (name in seen && seen[name] != sig) {
+                print "bundle: ERROR - two different " name ":" > "/dev/stderr"
+                print "         " seen[name] > "/dev/stderr"
+                print "         " sig > "/dev/stderr"
+                print "       Rename one of them." > "/dev/stderr"
                 bad = 1
             }
             if (name in seen) {
-                print "bundle: dropped a second " name " (the first one wins)" > "/dev/stderr"
+                if (seen[name] == sig) print "bundle: dropped a second " name " (the same shape, the first one wins)" > "/dev/stderr"
                 skip = 1; next
             }
-            seen[name] = n; skip = 0; print; next
+            seen[name] = sig; skip = 0; print; next
         }
         # Any other line that starts in column one ends the skipped body.
         /^[^ \t]/ { skip = 0 }

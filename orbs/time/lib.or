@@ -5,7 +5,6 @@
 # usual codes work: %Y-%m-%d %H:%M:%S, %A the weekday, %s the epoch, etc.
 # Timezone support is exactly what the host gives localtime - named zones
 # and offsets beyond "here" and "UTC" are a later, bigger job.
-use text
 
 external define unix_now() -> int
 external define time_format(unix_s: int, fmt: text, local: int) -> text

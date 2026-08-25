@@ -1,0 +1,33 @@
+# regex-orben: en räknare per påstående som ska hålla - 14 gröna = 14.
+
+define main() -> number:
+    edit n = 0
+    if regex_test("b.g", "en bag"):
+        n = n + 1
+    if regex_test("^hej", "hej du"):
+        n = n + 1
+    if not regex_test("^du", "hej du"):
+        n = n + 1
+    if regex_first("\\d+", "rad 42") is 4:
+        n = n + 1
+    if regex_test("a[b-d]+e", "abcde"):
+        n = n + 1
+    if not regex_test("a[^b-d]e", "abe"):
+        n = n + 1
+    if regex_test("(ab|cd)+x", "cdabx"):
+        n = n + 1
+    if regex_test("gr(ay|ey)", "grey"):
+        n = n + 1
+    if regex_test("colou?r", "color"):
+        n = n + 1
+    if regex_test("ab*c", "ac"):
+        n = n + 1
+    if regex_test("x.*z$", "xyz"):
+        n = n + 1
+    if not regex_valid("a[b"):
+        n = n + 1
+    if not regex_valid("(ab"):
+        n = n + 1
+    if regex_valid("a(b|c)*d"):
+        n = n + 1
+    n

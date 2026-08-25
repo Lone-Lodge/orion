@@ -1,0 +1,32 @@
+# A timer is a TASK, not something an update loop feeds.
+#
+# `every(200, tick)` sleeps and wakes on its own; `run_all()` is the loop, and
+# it is the only one. Two timers at different periods interleave correctly -
+# each sleeps its own amount and the scheduler wakes whichever is due.
+#
+# `every` stops when the body answers `false`. That is the whole protocol: no
+# id to hold, no handle to remember to stop, nothing global. It is also why
+# the body's answer had to become a `truth` before this was worth writing.
+
+
+define fast(n: number) -> truth:
+    slot_set("t49:fast", slot_get_number("t49:fast") + 1)
+    n < 2                       # fires at n = 0, 1, 2 - three times
+
+define slow(n: number) -> truth:
+    slot_set("t49:slow", slot_get_number("t49:slow") + 1)
+    n < 1                       # twice
+
+define once(n: number) -> number:
+    slot_set("t49:once", slot_get_number("t49:once") + 1)
+    0
+
+define main() -> number:
+    every(10, fast)
+    every(25, slow)
+    after(60, once)
+    run_all()
+    a = if slot_get_number("t49:fast") is 3 then 20 else 0
+    b = if slot_get_number("t49:slow") is 2 then 15 else 0
+    c = if slot_get_number("t49:once") is 1 then 14 else 0
+    a + b + c   # 20 + 15 + 14

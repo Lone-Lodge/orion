@@ -60,14 +60,14 @@ No orb, no compiler code, no tool changes.
 
 Games link platform backends instead of orion_cli.c: `runtime/*_min.c`,
 selected per host by `platform_c_files()` in `tools/orbit.or`. The contract
-is atlas's Lego baseplate (see `atlas/ARCHITECTURE.md`): a backend consumes a
-DisplayList and produces pixels; audio and input are their own blocks.
+is a baseplate: a backend consumes a DisplayList and produces pixels; audio
+and input are their own blocks.
 
 Today's blocks are Windows (`win32_min.c`, `gdi_min.c`, `ogpu_min.c`,
 `wasapi_min.c`). A platform lands as its own `<plat>_min.c` set; until it
 exists, orbit refuses with a message naming exactly what to add - it never
-half-links. The browser (wasm backend + veil_web) is the second working
-render platform and needs no C at all.
+half-links. The browser (the wasm backend) is the second working render platform and
+needs no C at all.
 
 ## Adding a platform, in order
 

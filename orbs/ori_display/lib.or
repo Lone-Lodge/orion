@@ -6,36 +6,26 @@
 #
 # Colours are CSS-style strings ("#1d1433", "rgba(46,125,224,0.35)") - each
 # backend parses its own. Text/icon carry a pixel size.
-# EVERY variant ends in a trailing PROVENANCE tag (its final int): the entity
+# EVERY variant ends in a trailing PROVENANCE tag (its final i64): the entity
 # (or rule) id that produced the command, 0 = untagged. This is what makes the
 # display list ADDRESSABLE - an edit-mode hit-tests a pixel, reads the tag, and
 # knows which spawn line in which script to rewrite.
 
-use ori_geometry
 
 public type DrawCmd:
-    # These payloads stay `int` ON PURPOSE. One enum gets one answer for its
-    # `number` payloads (a `choose` arm hands back a bare payload with no
-    # conversion), so a single fraction reaching any one of them widens every
-    # coordinate in the list to f64. Most of these are pixel counts, and this
-    # is a rendering seam whose behaviour is not checked by the test suite -
-    # so the word that says what they are is the one that stays.
-    # tonumber: skip
-    #
-    # These payloads stay `int` ON PURPOSE. One enum gets one answer for its
-    # `number` payloads (a `choose` arm hands back a bare payload with no
-    # conversion on the way out), so a single fraction reaching any one of
-    # them widens every coordinate in the draw list to f64. Most of these are
-    # pixel counts, and this is a rendering seam the test suite does not run.
-    # The marker above is read by tools/migrate/tonumber.py.
-    DrawRect(Rect, text, int)
+    # These payloads are `i64`, not `number`. A `choose` arm hands back a bare
+    # payload with no conversion on the way out, so one enum gets ONE answer:
+    # a single fraction anywhere would widen every coordinate in the draw list
+    # to f64. They are pixel counts and entity ids, and a sized type says that
+    # without saying whole-or-real.
+    DrawRect(Rect, text, i64)
     # Filled rounded rectangle: rect, colour, corner radius (px), src eid.
     # Backends fill it as horizontal og_rect spans with circular corner
     # insets - the chrome primitive for hover cells, chips, and cards.
     # rect, colour, corner radii "8" or "8 8 0 0" (top-left, top-right,
     # bottom-right, bottom-left), src eid. Four, because a tab is round on
     # top and square on the bottom and so is every joined button group.
-    DrawRoundRect(Rect, text, text, int)
+    DrawRoundRect(Rect, text, text, i64)
     # A soft drop shadow: rect, colour, corner radius, blur in px, src eid.
     # Same shape as a DrawRoundRect, drawn with the distance ramp spread
     # over `blur` pixels instead of one. Backends that cannot soften an
@@ -49,22 +39,22 @@ public type DrawCmd:
     # rectangle and always will be, so a list inside a rounded panel would
     # square off at the corners without it - which is the one place every
     # card and every avatar shows it.
-    SetClip(Rect, int, int)
-    DrawShadow(Rect, text, int, int, int)
-    DrawText(Point, text, text, int, int)
+    SetClip(Rect, i64, i64)
+    DrawShadow(Rect, text, i64, i64, i64)
+    DrawText(Point, text, text, i64, i64)
     # point, icon name, pixel size, src eid.
     # point, icon name, size, colour, src eid. An icon that cannot take a
     # colour is an icon that can only ever mean one thing: a file tree
     # tells you what a file IS by the colour of its mark, and every editor
     # in the world does it that way.
-    DrawIcon(Point, text, int, text, int)
+    DrawIcon(Point, text, i64, text, i64)
     # path data, colour, src eid.
-    DrawPath(text, text, int)
+    DrawPath(text, text, i64)
     # A ring, or a slice of one: centre, outer radius, how thick, and the
     # span in degrees measured from the top going clockwise. The one shape
     # a rectangle cannot approximate, and the one every cooldown sweep and
     # radial meter is made of.
-    DrawArc(Point, int, int, int, int, text, int)
+    DrawArc(Point, i64, i64, i64, i64, text, i64)
     # A pixel-art sprite: top-left Point, image path, integer scale, src
     # eid. The rect-only backends blit it as og_rect runs (see
     # atlas_sprite); no GPU texture needed.
@@ -72,14 +62,14 @@ public type DrawCmd:
     # PICTURE's own pixels, tint, blend, src eid. The corners keep their
     # size, the edges stretch along their run, the middle stretches both
     # ways. Every game frame that is not flat colour is one of these.
-    DrawNine(Rect, text, int, text, text, int)
-    DrawSprite(Point, text, int, int)
+    DrawNine(Rect, text, i64, text, text, i64)
+    DrawSprite(Point, text, i64, i64)
     # A textured image quad (the modern path): top-left Point, image path,
     # dest width, dest height, tint ("#rrggbb"/"#rrggbbaa" or a named colour;
     # ""=none), blend ("alpha" default, "add" for glow), src eid. Drawn as
     # ONE GPU-sampled quad - any size, scaled, blended. The renderer resolves
     # the tint/blend strings (same palette as DrawText/DrawRect colours).
-    DrawImage(Point, text, int, int, text, text, int)
+    DrawImage(Point, text, i64, i64, text, text, i64)
 
 public type DisplayList: commands: [DrawCmd]
 

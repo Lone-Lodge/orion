@@ -1,0 +1,9 @@
+# Spelled-out function type in a type annotation: `f: function(number) -> number`.
+# Before, only a bare `fn` could type a higher-order param; now the full
+# signature parses (and erases to the same "fn" ptr at lowering).
+define apply2(f: function(number) -> number, x: number) -> number:
+    f(f(x))
+
+define main() -> number:
+    inc = function(n): n + 1
+    apply2(inc, 3)   # 3 -> 4 -> 5 is 5

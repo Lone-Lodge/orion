@@ -1,223 +1,83 @@
 # Changelog
 
-Notable changes to Orion. The format follows
-[Keep a Changelog](https://keepachangelog.com/), and versions follow
-[Semantic Versioning](https://semver.org/).
+Notable changes to Orion. Format follows [Keep a Changelog](https://keepachangelog.com/),
+versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
 ### Added
-- **A whisper orb - and now Orion understands what it hears.** The
-  vendored whisper.cpp 1.9.2 (CPU only, 5 MB of source under
-  vendor/whisper/) behind four calls: hear_open / hear / hear_any /
-  hear_error. Audio arrives as a wav path, which is exactly what
-  mic_take_wav writes, so the two orbs hand off with nothing in between.
-  tools/whisper_build.sh compiles the library once into dist/ and caches
-  it against the vendored sources - and it builds with AVX2, which is the
-  whole ballgame: scalar ggml took 33 s on a four second clip, the SIMD
-  build takes 2.2 s. Models are not vendored (half a gigabyte), so
-  tools/whisper_test.sh skips without one and otherwise proves a real
-  Swedish sentence comes back through the orb.
-- **A mic orb - Orion can hear.** `wasapi_min.c` could make sound and never
-  take any in; now capture runs on its own client and thread into a ring
-  that keeps the last 30 seconds and drops the oldest, because a listener
-  wants what was just said. The device keeps its own rate and channels and
-  the ring downmixes to mono and decimates to whatever you asked for on the
-  way in - `mic_open(16000)` is what a speech recogniser wants. mic_level()
-  answers "is anyone talking" without touching a sample; mic_take_wav()
-  drains to mono PCM16, a FILE and not a `[int]` because marshalling a
-  minute of audio through a list is the exact shape that bit the vec
-  codegen - and orion_audio_load reads wav, so a gate can play back what it
-  recorded. It is a baseline orb, not a game seam: a mic is a platform
-  capability like the filesystem. Headless builds link the weak null
-  backend and run the whole listen path silently, so tools/mic_test.sh
-  gates the binding chain everywhere and skips only the WASAPI phase when
-  the runner has no capture device.
-- **A sqlite orb** - a real SQL database in one file, no server. db_open /
-  db_run / db_run_with (bound `?` params - the injection-safe path, proven
-  by a hostile string in the gate) / db_rows / columns / db_one / db_error /
-  db_changes / db_last_id, over the vendored sqlite 3.53.4 amalgamation
-  through the `link =` seam. tools/sqlite_test.sh proves create, insert,
-  bind, query, count, update and error reporting end to end, in CI on all
-  three platforms.
-- **Width-exact sized-integer arithmetic, natively - one semantics.**
-  `x: u8 = 200` then `x + 100` is 44 on BOTH backends now (native used to
-  answer 300): a sized binding coerces its value, the type rides the IR,
-  and every arithmetic result wraps to the peer width through the same
-  mask path the `as`-cast always used. A bare literal in arithmetic takes
-  the sized peer's type - on wasm too, which closed its standing literal
-  gap in the same stroke (conformance ratchet 141 -> 142). This was the
-  last known correctness gap between the two backends.
-- **The general-software floor.** `env(name)` reads environment variables;
-  `interrupted()` turns the first Ctrl+C into a pollable flag (the second
-  one kills as normal); `secure_bytes`/`secure_token` draw OS entropy (the
-  rand PRNG stays for games); a `time` orb tells human time (`now_unix`,
-  `local_time`/`utc_time` via strftime, `timestamp()`); an `http` orb does
-  GET/POST over TLS behind a stable `response{status, body}` interface
-  (curl as the engine today, swappable for a native client later); and
-  `link = "vendor/x.c"` in Orbit.toml links vendored C sources/objects -
-  the door that makes sqlite, native TLS and compression plain orb work.
-  Proven by test_42_general_floor, tools/link_test.sh (both in CI) and the
-  http orb's example-proven header parsing + examples/net_demo/http_fetch.
-
-### Removed
-- The `scheduler` orb and the async orb's deadline/timer-queue block
-  (sleep_until, delay, deadline_from_now, past_deadline, time_left,
-  timers_new/add_timer/next_due/count_due/wait_next). All of it was the
-  pre-task workaround; nothing used any of it once real tasks landed. The
-  scheduler orb is archived under _archive/orbs/.
-
-### Fixed
-- **A local binding now shadows a same-named const.** Const inlining used
-  to substitute num's `e` (2.718...) into any body with its own `e`, so
-  `e = e + 1` failed with "cannot reassign: int vs float". The pass now
-  skips names a fn binds itself (parameters, bindings, loop variables).
-- The LSP's diagnostic parser kept a byte offset sized for the old wide
-  dash after the message separator narrowed; the first two characters of
-  every diagnostic were eaten.
-
-### Added
-- **Debugger v1**: `orbit debug prog.or` runs with a call trail - every
-  define's entry is recorded (last 64 kept) and a crash, a `require`/index
-  trap, or a `breakpoint()` placed in the source prints them newest-first.
-  `breakpoint()` names its enclosing function and pauses on a terminal
-  (Enter continues, q quits); piped, it reports and continues, so a
-  forgotten one never hangs a gate. The instrumentation is opt-in
-  (`--trace` at the compiler level): a plain build pays nothing.
-- **A file watcher**: `orbit run tools/orbwatch.or main <dir> <command>`
-  reruns the command whenever a source file under `<dir>` changes, and a
-  change DURING a run stops the stale run and starts a fresh one (built on
-  `stop_command`). The mechanics live in the new `watch` orb (`scan_tree` /
-  `snapshot` / `first_change`) so they are test-proven. New primitives it
-  drove out: `modified_at(path)` in `os` (there was no mtime), and
-  `int_from_text` in `text` (there was no public text-to-int).
-- **Child processes the scheduler can wait on** (`os` orb):
-  `start_command` / `start_command_to_file` begin a command and return a job
-  id at once; `finished_within` parks the calling TASK until the child exits
-  or a deadline passes (the same bargain as the net orb's `readable_within`,
-  one level up); `command_result` reaps the exit code once; `stop_command`
-  kills a job that blew its deadline; `cpu_count()` sizes a worker pool.
-  Children are real OS processes, so they run in parallel while the
-  single-threaded scheduler coordinates the waiting. Proven by the test
-  runner itself: it now links and runs every test through one worker task
-  per hardware thread - the suite's ~79 s of serial compile became a
-  ~17 s total wall.
-- **Traits as explicit dictionaries.** A struct whose fields are functions is a
-  dictionary of operations, and `o.method(args)` now calls the fn-typed field
-  `method` on the struct value `o` (instead of desugaring to a UFCS global
-  `method(o, args)`). So a comparator, a printer, an `Ord` - any bundle of
-  behavior - is a plain struct value you build and pass by hand, with no
-  implicit resolution: you can always see which dictionary is passed. Builds on
-  typed function values.
-- A **WebAssembly backend**: `orion prog.or prog.wasm orbs` compiles to a
-  self-contained `.wasm` module. The host (JS) supplies capabilities via
-  `extern fn` imports; Orion owns its memory (a bump allocator in linear
-  memory). Covered: i32 and f64 (scalars, mixed structs, lists), maps, tuples,
-  sum types with pattern matching, `?`, non-capturing closures, list
-  comprehensions, `require`/`defer`, text with interpolation, `print_line`,
-  first-class functions (`call_indirect`), a `par_run` that reduces its workers
-  in order, one-shot algebraic effects (`perform`/`resume`/`handle`, compiled to
-  a handler call and a `return`), and a stubbed OS-IO sandbox. The async
-  scheduler (`spawn`/`await` with parked tasks) stays native (a browser has no
-  stack switching).
-- A **WebAssembly conformance gate** (`tools/wasm_conformance.sh`): compiles
-  every smoke test through the wasm backend, runs it in node, and compares the
-  answer to the native expectation, reporting OK / MISMATCH / UNSUPPORTED /
-  TRAP / HANG. It turned "the 12 Field Guide samples run" into a measured
-  131-of-160, now wired into CI as a regression gate (the OK count must hold and
-  there must be no unexpected wrong answer; known gaps are allowlisted). It drove
-  the backend past the old number: correct match dispatch
-  (int/text/binding/guard patterns) and text equality, the C-like vs boxed enum
-  distinction, void `if let` / `loop let`, `break` inside a match, `const`
-  inlining, environment-capturing closures, higher-order calls via
-  `call_indirect`, maps read/write/`has`, `contains`/`index_of`/`slice`, the
-  `bytes_*` family, struct spread, and a signed-LEB encoder fix. What stays
-  native: the async scheduler and real threads (no browser stack-switch or
-  thread model) and the compiler's own `slot_*` state. (i64 values are
-  supported in wasm; addressing is i32.)
-- The **Field Guide playground** (`tools/playground.js`, `docs/playground.js`):
-  a "Try Orion" editor plus a Run button on every sample, compiling to wasm and
-  running in place. All 12 Field Guide samples run in the browser; a construct
-  the wasm backend cannot lower (e.g. the parked-task scheduler) shows a clear
-  "native only" note.
-- `examples/wasm_demo/`: an Orion program compiled to wasm, animated on a canvas.
-- A **library reference page** (`docs/reference.html`, generated by
-  `tools/orb_reference.sh`): every `pub fn` and exported type in `orbs/`, taken
-  from the source so it cannot drift. `tools/docs_check.sh` regenerates it and
-  fails if the committed page is stale.
+- **`whisper` orb** - speech to text over the vendored whisper.cpp 1.9.2, four
+  calls, wav in. Takes exactly what `mic_take_wav` writes.
+- **`mic` orb** - capture on its own thread into a 30-second ring, downmixed and
+  decimated on the way in. Headless builds link a null backend and still run the
+  whole path.
+- **`sqlite` orb** - a real SQL database in one file, no server. Bound `?` params
+  are the injection-safe path, proven by a hostile string in the gate.
+- **Width-exact sized-integer arithmetic on both backends.** `x: u8 = 200` then
+  `x + 100` is 44 natively too (it used to answer 300). This was the last known
+  correctness gap between the two backends.
+- **The general-software floor** - `env`, `interrupted()`, `secure_bytes`, a
+  `time` orb, an `http` orb, and `link = "vendor/x.c"` in Orbit.toml for
+  vendored C.
+- **Debugger v1** - `orbit debug prog.or` keeps a call trail (last 64 entries)
+  and prints it newest-first on a crash, a trap, or a `breakpoint()`.
+  Instrumentation is opt-in; a plain build pays nothing.
+- **A file watcher** - `orbwatch` reruns a command on change and kills the stale
+  run. Drove out `modified_at` in `os` and `int_from_text` in `text`.
+- **Child processes the scheduler can wait on** - `start_command`,
+  `finished_within`, `command_result`, `stop_command`, `cpu_count()`. The test
+  runner uses them: the suite went from ~79 s serial to ~17 s wall.
+- **Traits as explicit dictionaries.** `o.method(args)` calls the fn-typed field
+  `method` on the struct value. No implicit resolution: you can see which
+  dictionary is passed.
+- **A WebAssembly backend** - `orion prog.or prog.wasm orbs` emits a
+  self-contained module. The host supplies capabilities through imports; Orion
+  owns its memory. The async scheduler stays native.
+- **A WebAssembly conformance gate** - every smoke test run through wasm in node
+  and compared to the native answer. Wired into CI as a regression ratchet.
+- **The Field Guide playground** - a Run button on every sample, compiled to
+  wasm in place. A construct wasm cannot lower says "native only".
+- **A library reference page** (`docs/reference.html`), generated from `orbs/`
+  so it cannot drift. `docs_check.sh` fails if the committed page is stale.
 
 ### Changed
-- A `fn(A, B) -> R` **parameter now carries its signature**. A call through it
-  with the wrong number of arguments is a compile error (instead of silently
-  ignoring extras or reading past the given ones), and each argument's shape is
-  checked against the declared parameter type with the same conservative rule as
-  a direct call (a concrete pointer kind passed where a different one is
-  declared fails; i64/generic wildcards are skipped so erased values never
-  false-positive). The checker records the signature in `ast_fn_to_ir`, stamped
-  per fn so a same-named param elsewhere never matches. The declared **return
-  type is propagated** through the call too, normalized to its storage class
-  (pointer / f64 / i64), so `f(x)` on a `fn(int) -> Text` or `fn(int) -> [int]`
-  or `fn(int) -> f64` yields that type instead of collapsing to i64 - function
-  values are now typed end to end.
-- `result` and `option` are **native generic sum types**, not struct
-  conventions: `Result<T>: Ok(T) | Err(Text)` and `Option<T>: Some(T) | None`.
-  They work across an orb boundary, carry any payload type (`Result<Text>`),
-  are read by an exhaustiveness-checked `match` or `if let`, and propagate with
-  `?`. `unwrap_or` now takes and returns `T` instead of `int`.
-  The lying `unwrap` (which handed back a zero on the error case) is **gone** -
-  Orion has no panic, so it could not be written honestly. Use `match`,
-  `if let`, `?` or `unwrap_or`.
-- Effects are documented in two tiers: one-shot (`perform` / `handle` /
-  `resume`) is the supported core and runs everywhere; multi-shot (`ask` /
-  `resume_with`) is marked **experimental** - it is the machinery async needs
-  and currently rides on Windows fibers.
-- A collecting `loop` now takes an **indented body**, under one rule that spans
-  one-liner and block: the body's trailing expression is collected (the same
-  "last value is the value" every block uses), and `yield expr` collects
-  additional values mid-body. So `loop x in xs:` then `if x > 2: yield x` is the
-  filter, a block that ends in a bare expression collects it, and computing
-  intermediates or yielding more than once per step are both fine. Collecting
-  loops nest (each owns its accumulator). The `where` filter clause is
-  **removed**; `if ...: yield` replaces it.
+- **A `fn(A, B) -> R` parameter carries its signature.** Wrong argument count is
+  a compile error, each argument's shape is checked, and the declared return
+  type propagates through the call. Function values are typed end to end.
+- **`result` and `option` are native generic sum types**, not struct
+  conventions. They cross an orb boundary, carry any payload, and propagate with
+  `?`. The lying `unwrap` is gone: Orion has no panic, so it could not be written
+  honestly.
+- **Effects come in two tiers.** One-shot (`perform` / `handle` / `resume`) is
+  the supported core. Multi-shot (`ask` / `resume_with`) is experimental and
+  rides on Windows fibers.
+- **A collecting `loop` takes an indented body.** The trailing expression is
+  collected and `yield expr` collects more mid-body. The `where` clause is gone;
+  `if ...: yield` replaces it.
 
 ### Fixed
-- A **closure call inside a short-circuit `and`/`or`** (or any branch tail)
-  generated invalid LLVM ("instruction does not dominate all uses"). A
-  `closure_call` is one IR instruction that expands into several LLVM blocks at
-  emit time, and the phi-predecessor tracking named the branch's entry block
-  instead of the closure's merge block. `if valid(x) and o.check(y)` and similar
-  now compile. Pre-existing; surfaced by trait-dictionary method calls.
+- **A local binding shadows a same-named const.** Const inlining used to
+  substitute `num`'s `e` into any body with its own `e`.
+- **A closure call inside a short-circuit `and`/`or`** generated invalid LLVM.
+  The phi-predecessor tracking named the branch's entry block instead of the
+  closure's merge block.
+- The LSP ate the first two characters of every diagnostic after the message
+  separator narrowed.
+
+### Removed
+- The `scheduler` orb and the async orb's timer-queue block. All of it was the
+  pre-task workaround; nothing used it once real tasks landed.
 
 ## [0.1.0] - 2026-07-28
 
-First public release.
+First public release. A self-hosting compiler, the `orbit` project tool, a
+standard library of orbs, a Language Server, and the Field Guide with every
+sample compiled in CI.
 
-Orion is a small, indentation-structured language that compiles through LLVM IR
-to a native binary, with no null, no exceptions, and no garbage collector:
-allocation goes through an arena whose scopes the compiler checks for balance
-before anything runs. The compiler (lexer, parser, lowering, LLVM backend, and
-driver) is written in Orion and rebuilds itself to a fixpoint; the only external
-dependency is clang.
+Green on Linux and Windows: a bare-checkout bootstrap from the committed seed,
+a 151-program suite, a negative suite, and a feature-combination matrix.
 
-### Included
-- The self-hosting compiler and the `orbit` project tool.
-- A standard library of orbs (list, text, num, json, option, result, iter, and
-  more) and a Language Server.
-- The Field Guide: the whole language on one page, with every sample compiled in
-  CI, so a documented feature that stops existing fails the build.
-
-### Verified
-- Green on Linux and Windows: a bare-checkout bootstrap from the committed seed,
-  a 151-program suite, a negative suite, a feature-combination matrix, and a
-  value gate that checks valid programs still answer correctly under changes
-  that must not affect them.
-
-### Known gaps
-- `x = push(x, v)` copies, so building a list in a loop is quadratic; use
-  `push_mut` for a hot accumulator until a uniqueness analysis makes the copy
-  elidable.
-- Resumable effects use Windows fibers; elsewhere they refuse rather than
-  pretend.
-- The macOS build paths are written but untested.
+Known gaps at the time: `push` copied, resumable effects were Windows-only, and
+the macOS paths were written but untested.
 
 [0.1.0]: https://github.com/Lone-Lodge/orion/releases/tag/v0.1.0

@@ -1,6 +1,5 @@
 # net_demo - a TCP round-trip over loopback. Server and client run on separate
 # OS threads (loop parallel); the client sends "ping", the server replies "pong".
-use net
 
 define serve(server: number) -> text:
   client = accept(server)

@@ -1,0 +1,14 @@
+# `loop let Pattern(binds) = expr:` loops while the pattern matches, binding
+# each time. Desugars to `loop: choose expr: Pattern -> body; _ -> break`.
+type Opt<T>: Some(T) | None
+
+define dec(n: number) -> Opt<number>:
+    if n > 0 then Opt.Some(n - 1) else Opt.None
+
+define main() -> number:
+    edit count = 0
+    edit cur = 6
+    loop let Some(next) = dec(cur):
+        cur = next
+        count = count + 1
+    count      # 6 -> 5 -> ... -> 0 then None: 6 iterations

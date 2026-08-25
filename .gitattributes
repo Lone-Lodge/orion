@@ -1,9 +1,16 @@
-# LF overallt - CRLF-konvertering vid checkout smittade editorn en gang
+# LF everywhere. A CRLF checkout once poisoned the editor.
 * text=auto eol=lf
 *.png binary
 *.jpg binary
 *.gif binary
 *.ico binary
+*.ttf binary
 *.exe binary
 *.dll binary
 *.wasm binary
+
+# GitHub guesses the language by counting bytes, and two things here are not
+# written in this repo: the 5 MB bootstrap seed, which the compiler emits, and
+# the vendored C. Without these lines orion reads as an LLVM project.
+tools/seed/*.ll linguist-generated
+vendor/** linguist-vendored

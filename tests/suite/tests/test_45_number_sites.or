@@ -1,0 +1,20 @@
+# `number` is one word the compiler resolves per site. Two sites never asked:
+# an alias to it froze as the f64 default, and a tuple PARAMETER did too (a
+# tuple return already asked). So `edit d: M = 5` stored a whole 5 into an f64
+# slot, and a whole 37 handed to a `(number, text)` parameter read back as
+# 1.83e-322. Both spellings, both kinds of number. 5 + 37 + 3 = 45.
+type Meters = number
+
+define first_of(p: (number, text)) -> number:
+    choose p:
+        (n, s) then n
+
+define real_first(p: (number, text)) -> number:
+    choose p:
+        (n, s) then to_whole(n * 2)
+
+define main() -> number:
+    edit d: Meters = 5
+    whole = first_of((37, "x"))
+    real = real_first((1.5, "x"))
+    d + whole + real

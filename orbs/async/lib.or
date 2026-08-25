@@ -16,7 +16,7 @@
 #
 # and inside a worker:
 #
-#     define worker(n: int) -> int:
+#     define worker(n: number) -> number:
 #         edit total = 0
 #         loop i in 0 until n:
 #             total += i
@@ -80,6 +80,52 @@ external define orion_task_sleep(ms: int) -> int
 # no example: needs the running task scheduler - proven by test_42_async_interleave.or
 public define sleep_task(ms: number) -> number = orion_task_sleep(ms)
 
+# ---- timers that are TASKS ----
+#
+# A timer here is not something an update loop feeds. It is a task that sleeps
+# and wakes on its own; `run_all()` is the loop, and it is the only one.
+#
+#     every(200, tick)          # tick(n) every 200 ms, n counting from 0
+#     after(1000, fire)         # fire(0) once, a second from now
+#     run_all()                 # the app's loop: every timer runs its own way
+#
+# `every` stops when the body answers `false`. That is the whole protocol -
+# no id to hold, no handle to remember to stop, and nothing global. A body
+# that always answers `true` runs until the program does.
+#
+#     define tick(n: number) -> truth:
+#         draw()
+#         n < 60                # sixty frames, then stop
+#
+# Two timers at different periods interleave correctly: each sleeps its own
+# amount and the scheduler wakes whichever is due.
+
+define run_every(period_ms: number, f: function) -> number:
+    edit n = 0
+    edit go = true
+    loop:
+        if not go:
+            break
+        sleep_task(period_ms)
+        go = f(n)
+        n = n + 1
+    n
+
+define run_after(delay_ms: number, f: function) -> number:
+    sleep_task(delay_ms)
+    f(0)
+
+# Run `f(n)` every `period_ms`, n counting from 0, until `f` answers `false`.
+# Returns the task id. no example: needs the running scheduler - proven by
+# test_49_timers_are_tasks.or
+public define every(period_ms: number, f: function) -> number:
+    spawn((ignored): run_every(period_ms, f), 0)
+
+# Run `f(0)` once, `delay_ms` from now. Returns the task id.
+# no example: needs the running scheduler - proven by test_49_timers_are_tasks.or
+public define after(delay_ms: number, f: function) -> number:
+    spawn((ignored): run_after(delay_ms, f), 0)
+
 # ---- delimited continuations: the handler survives the resume ---------
 #
 # `resume(v)` in a `handle` block is a longjmp: control leaves for the perform
@@ -87,11 +133,11 @@ public define sleep_task(ms: number) -> number = orion_task_sleep(ms)
 # continuation runs. Here the handler runs on its own stack (a fiber), so it
 # survives and `resume_with` RETURNS the continuation result.
 #
-#     define body(seed: int) -> int:
+#     define body(seed: number) -> number:
 #         x = ask(decide, seed)    # the handler decides what x is
 #         x * 10                   # the rest of the task: the continuation
 #
-#     define decide(seed: int) -> int:
+#     define decide(seed: number) -> number:
 #         answer = resume_with(4)  # runs the rest of the task with x = 4
 #         answer + 2               # ...and gets 40 back, so this returns 42
 #

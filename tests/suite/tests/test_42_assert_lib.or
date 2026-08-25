@@ -1,0 +1,12 @@
+# ONE assert: any condition, spoken comparisons. The old assert_true /
+# assert_eq / assert_text_eq trio collapsed into it.
+
+define main() -> number:
+    edit passes = 0
+    passes = passes + assert(true, "trivially true")
+    passes = passes + assert(42 is 42, "equal ints")
+    passes = passes + assert(2 + 2 is 4, "math")
+    passes = passes + assert("hi" is "hi", "equal texts")
+    passes = passes + assert(1 < 2 and 3 is at least 3, "words compose")
+    # 5 asserts, but exit must stay 42: 5 * 8 + 2
+    passes * 8 + 2

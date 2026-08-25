@@ -1,7 +1,0 @@
-name = "orion_codegen"
-version = "0.0.1"
-description = "Orion self-host — codegen (Orion → C)"
-
-[orbs]
-bytes = "*"
-io = "*"

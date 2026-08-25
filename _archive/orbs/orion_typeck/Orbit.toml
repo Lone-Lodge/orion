@@ -1,7 +1,0 @@
-name = "orion_typeck"
-version = "0.0.1"
-description = "Orion self-host — typeck"
-
-[orbs]
-bytes = "*"
-string = "*"

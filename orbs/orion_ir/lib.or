@@ -39,9 +39,8 @@ public define ir_type_void() -> text: "void"
 
 
 # --- Compile diagnostics ---
-# Global error counter lives in the runtime (@orion_err_count).
-# Natively the compiler's own emitted runtime defines these; under
-# lodge-orion they're registered as interpreter builtins. Drivers call
+# Global error counter lives in the runtime (@orion_err_count), defined by
+# the compiler's own emitted runtime. Drivers call
 # compile_errors() after the pipeline and refuse to write output when
 # any error was reported - no more "prints ERROR, exits 0, links a
 # miscompiled exe".
@@ -51,8 +50,8 @@ public external define orion_err_get() -> int
 
 # Join a list of Text into one Text: two passes (sum strlens, then one
 # malloc + memcpy per part). O(total bytes) - the string-builder
-# primitive that replaces O(n²) repeated-concat accumulation. Defined
-# in the emitted runtime natively; io.rs mirrors it for lodge-orion.
+# primitive that replaces O(n²) repeated-concat accumulation. Defined in
+# the emitted runtime.
 public external define orion_text_join(parts: [text]) -> text
 
 # Float literal text → IEEE-754 bits as "0x%016X" hex Text (strtod in
@@ -62,8 +61,7 @@ public external define orion_f64_literal_hex(s: text) -> text
 
 # Frame arena (orion_rt.c). Game loops: reset+on at frame start, off
 # before persistent mutation (or keep persistent state pre-sized so
-# in-place set/push_mut never allocates). Interp mirrors are no-ops -
-# lodge-orion's Rust owns memory there.
+# in-place set/push_mut never allocates).
 public external define orion_arena_init(bytes: int) -> int
 public external define orion_arena_on() -> int
 public external define orion_arena_off() -> int
@@ -82,6 +80,12 @@ public define compile_errors() -> number:
 
 public define ir_iconst(value: number) -> Inst:
     Inst{op: "iconst", type_text: "i64", value: value, lhs: 0, rhs: 0, name: "", args: []}
+
+# The same constant, carrying the type it was WRITTEN as. `true` is a 1 and
+# `1` is a 1; what differs is what the reader asked for, and that is the only
+# thing that makes `"{ok}"` able to say `true`.
+public define ir_iconst_typed(value: number, t: text) -> Inst:
+    Inst{op: "iconst", type_text: t, value: value, lhs: 0, rhs: 0, name: "", args: []}
 
 public define ir_iadd(lhs: number, rhs: number) -> Inst:
     Inst{op: "iadd", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
@@ -126,27 +130,32 @@ public define ir_ior(lhs: number, rhs: number) -> Inst:
     Inst{op: "ior", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 # Logical NOT: 0 → 1, non-zero → 0.
+# `not x` is the LOGICAL one - it answers a truth. (`~x` is the bitwise one
+# and answers a number; they are two operators and always were.)
 public define ir_inot(value_id: number) -> Inst:
-    Inst{op: "inot", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+    Inst{op: "inot", type_text: "truth", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
 # Comparison ops. Produce i64 with value 0 (false) or 1 (true).
+# A comparison answers a TRUTH, not a number. `truth` is an i64 in the machine
+# - `llvm_type_of` sends every type it does not know there - but the compiler
+# can tell the two apart now, which is what lets `"{3 > 2}"` say `true`.
 public define ir_icmp_eq(lhs: number, rhs: number) -> Inst:
-    Inst{op: "icmp_eq", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+    Inst{op: "icmp_eq", type_text: "truth", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 public define ir_icmp_ne(lhs: number, rhs: number) -> Inst:
-    Inst{op: "icmp_ne", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+    Inst{op: "icmp_ne", type_text: "truth", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 public define ir_icmp_lt(lhs: number, rhs: number) -> Inst:
-    Inst{op: "icmp_lt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+    Inst{op: "icmp_lt", type_text: "truth", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 public define ir_icmp_le(lhs: number, rhs: number) -> Inst:
-    Inst{op: "icmp_le", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+    Inst{op: "icmp_le", type_text: "truth", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 public define ir_icmp_gt(lhs: number, rhs: number) -> Inst:
-    Inst{op: "icmp_gt", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+    Inst{op: "icmp_gt", type_text: "truth", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 public define ir_icmp_ge(lhs: number, rhs: number) -> Inst:
-    Inst{op: "icmp_ge", type_text: "i64", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
+    Inst{op: "icmp_ge", type_text: "truth", value: 0, lhs: lhs, rhs: rhs, name: "", args: []}
 
 public define ir_return(value_id: number) -> Inst:
     Inst{op: "return", type_text: "void", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
@@ -236,8 +245,34 @@ public define ir_text_cmp(op_name: text, left_id: number, right_id: number) -> I
 public define ir_text_len(value_id: number) -> Inst:
     Inst{op: "text_len", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
 
+# How many CHARACTERS a text holds, not how many bytes. `length` answers this;
+# `bytes_count` answers the other one. They differ the moment a text leaves
+# ASCII, and "rasmorgas" with the right letters is ten characters and thirteen
+# bytes - a language that says Unicode and answers thirteen is not saying it.
+# A truth as the word for it. `1` and `0` are what the machine holds; `true`
+# and `false` are what the program said, and printing the machine's answer was
+# the surface leaking.
+public define ir_truth_text(value_id: number) -> Inst:
+    Inst{op: "truth_text", type_text: "text", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+
+public define ir_text_chars(value_id: number) -> Inst:
+    Inst{op: "text_chars", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+
+# The BYTE offset where character number `k` starts. `part` needs it at both
+# ends: a text is a run of characters, and cutting one in half gives a piece
+# no reader can read - `part("raksmorgas", 1, 2)` handed back half an `a`.
+public define ir_text_cpoff(value_id: number, k_id: number) -> Inst:
+    Inst{op: "text_cpoff", type_text: "i64", value: value_id, lhs: k_id, rhs: 0, name: "", args: []}
+
 # part(text, lo, hi) - substring from byte index lo (inclusive) to hi (exclusive).
 # Three SSA inputs encoded as: value=text_id, lhs=lo_id, rhs=hi_id.
+# One byte out of a TEXT, without unpacking it first. A text is already the
+# packed form - `[hash][len][u8 ...]` - so reading the i-th byte is a load,
+# where going through `bytes_of` first copies the whole thing into a list at
+# eight bytes per byte.
+public define ir_text_byte_at(text_id: number, idx_id: number) -> Inst:
+    Inst{op: "text_byte_at", type_text: "i64", value: text_id, lhs: idx_id, rhs: 0, name: "", args: []}
+
 public define ir_text_slice(text_id: number, lo_id: number, hi_id: number) -> Inst:
     Inst{op: "text_slice", type_text: "text", value: text_id, lhs: lo_id, rhs: hi_id, name: "", args: []}
 
@@ -254,8 +289,10 @@ public define ir_fmath2(libm: text, a_id: number, b_id: number) -> Inst:
     Inst{op: "fmath2", type_text: "f64", value: a_id, lhs: b_id, rhs: 0, name: libm, args: []}
 
 # contains(text, sub) - returns i64 1 if sub appears anywhere in text, else 0.
+# The predicates answer a TRUTH. `has(m, k)` printed `1`, which is the machine's
+# answer to a question the program asked in words.
 public define ir_text_contains(text_id: number, sub_id: number) -> Inst:
-    Inst{op: "text_contains", type_text: "i64", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
+    Inst{op: "text_contains", type_text: "truth", value: text_id, lhs: sub_id, rhs: 0, name: "", args: []}
 
 
 # --- File I/O (libc fopen/fread/fwrite) ---
@@ -330,8 +367,7 @@ public define ir_list_push(list_id: number, val_id: number) -> Inst:
 # In-place push - ONLY emitted for the self-rebind statement form
 # `x = append(x, v)`, where the old list value is dead after the
 # statement. Amortized O(1) vs list_push's O(n) copy. Callers holding
-# an alias to x across a self-rebind push observe the mutation - same
-# caveat as lodge-orion's Arc::get_mut fast path.
+# an alias to x across a self-rebind push observe the mutation.
 public define ir_list_push_mut(list_id: number, val_id: number) -> Inst:
     Inst{op: "list_push_mut", type_text: "list", value: list_id, lhs: val_id, rhs: 0, name: "", args: []}
 
@@ -384,7 +420,7 @@ public define ir_map_get(map_id: number, key_id: number, value_type: text) -> In
     Inst{op: "map_get", type_text: value_type, value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
 public define ir_map_has(map_id: number, key_id: number) -> Inst:
-    Inst{op: "map_has", type_text: "i64", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
+    Inst{op: "map_has", type_text: "truth", value: map_id, lhs: key_id, rhs: 0, name: "", args: []}
 
 # set(map, key, val) - mutates in place (indirect handle survives
 # growth) and re-yields the map so `m = set(m, k, v)` value-semantics
@@ -399,7 +435,7 @@ public define ir_map_remove(map_id: number, key_id: number) -> Inst:
 public define ir_list_set_val(list_id: number, idx_id: number, val_id: number, list_type: text) -> Inst:
     Inst{op: "list_set_val", type_text: list_type, value: list_id, lhs: idx_id, rhs: val_id, name: "", args: []}
 
-# slot_has(key) → 0/1; slot_get_int(key) → raw i64 (0 when unset).
+# slot_has(key) → 0/1; slot_get_number(key) → raw i64 (0 when unset).
 # The typed pair that replaces interp-only `type_of(slot_get(k))`
 # probing - works identically native and interpreted.
 public define ir_slot_has(key_id: number) -> Inst:
@@ -497,6 +533,21 @@ public define ir_phi(then_val_id: number, then_label: text, else_val_id: number,
 public define ir_param(param_index: number, param_type: text) -> Inst:
     Inst{op: "param", type_text: param_type, value: param_index, lhs: 0, rhs: 0, name: "", args: []}
 
+# A handler's REAL parameter: the slot holds the double's bits, this reads it
+# back. The function itself declares an i64 there, because the runtime casts a
+# handler by arity alone.
+# A slot holds one 64-bit word. A real number goes in as its BITS and comes
+# back out through `slot_get_real` - the same deal an effect argument makes,
+# and the reason `slot_get_int` could stop saying `int`.
+public define ir_bits_of_real(value_id: number) -> Inst:
+    Inst{op: "bits_of_real", type_text: "i64", value: value_id, lhs: 0, rhs: 0, name: "", args: []}
+
+public define ir_slot_get_real(key_id: number) -> Inst:
+    Inst{op: "slot_get_real", type_text: "f64", value: key_id, lhs: 0, rhs: 0, name: "", args: []}
+
+public define ir_param_bits(param_index: number) -> Inst:
+    Inst{op: "param_bits", type_text: "f64", value: param_index, lhs: 0, rhs: 0, name: "", args: []}
+
 
 # --- Function builders ---
 
@@ -567,6 +618,13 @@ public define ir_dump_instruction(inst: Inst, my_id: number) -> text:
 # `lhs` slot, so a second argument was evaluated and then dropped.
 public define ir_perform_int(handler_name: text, arg_ids: [number]) -> Inst:
     Inst{op: "perform_int", type_text: "i64", value: 0, lhs: 0, rhs: 0, name: handler_name, args: arg_ids}
+
+
+# The REAL carrier. An effect whose answer the analysis settled on real needs
+# one that is; routed through the int carrier, a resumed fraction came back as
+# the whole number that went in.
+public define ir_perform_real(handler_name: text, arg_ids: [number]) -> Inst:
+    Inst{op: "perform_real", type_text: "f64", value: 0, lhs: 0, rhs: 0, name: handler_name, args: arg_ids}
 
 
 public define ir_perform_text(handler_name: text, arg_ids: [number]) -> Inst:

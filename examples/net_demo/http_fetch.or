@@ -7,7 +7,6 @@
 # DNS-filter selectively (a Starbreeze machine resolves sqlite.org but
 # not example.com) - one succeeding is the proof; the other's failure
 # prints curl's own reason.
-use http
 
 define try_one(url: text, marker: text) -> truth:
     r = fetch(url)

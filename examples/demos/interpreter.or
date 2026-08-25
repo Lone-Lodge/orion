@@ -15,7 +15,6 @@
 #   term   := factor (('*' | '/') factor)*
 #   factor := number | ident | '(' expr ')' | '-' factor
 
-use text
 
 define tok_num(v: number) -> table:
     {"kind": "num", "val": v, "name": ""}

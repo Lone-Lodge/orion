@@ -140,19 +140,25 @@ public define sort_by(xs: [number], less: function) -> [number]:
 
 # Selection sort, stable, element-type agnostic - the engine both forms use.
 define sort_generic<T>(xs: [T], less: function) -> [T]:
-    edit rest = xs
+    # A mark beside each element rather than a new list without it. Rebuilding
+    # the remainder every pass allocated a list per pass AND could not grow it
+    # in place, so a selection sort - already n squared in comparisons - was
+    # doing n squared COPIES on top. Ten thousand things sorted was a hundred
+    # million element copies that nothing asked for.
+    n = length(xs)
+    edit gone = []
+    loop _g in 0 until n:
+        gone = append(gone, 0)
     edit out = []
-    loop _pass in 0 until length(xs):
-        # Pick the element that should come before all others still in `rest`.
-        edit best = 0
-        loop i in 1 until length(rest):
-            if less(rest[i], rest[best]):
+    loop _pass in 0 until n:
+        # The one that comes before all the others still here. Strictly
+        # before, so equals keep the order they came in - which is what
+        # makes this stable.
+        edit best = 0 - 1
+        loop i in 0 until n:
+            if gone[i] is 0 and (best < 0 or less(xs[i], xs[best])):
                 best = i
-        out = append(out, rest[best])
-        # Drop the chosen element, keeping the rest in order (stability).
-        edit nrest = []
-        loop i in 0 until length(rest):
-            if i is not best:
-                nrest = append(nrest, rest[i])
-        rest = nrest
+        if best >= 0:
+            gone = set(gone, best, 1)
+            out = append(out, xs[best])
     out

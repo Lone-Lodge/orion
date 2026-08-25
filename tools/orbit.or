@@ -1,11 +1,7 @@
-# orbit - Orion project tool, self-hosted. Compiled by orion.exe, linked
-# with orion_cli.c + orion_rt.c. No lodge-orion, no interpreter.
-use os
-use text
-use orion_fmt
-
-# build/run/test are pure Orion (see cli_build below): they compile with
-# orion.exe + clang and run the native exe. No Rust interpreter left.
+# orbit - the Orion project tool, written in Orion. Compiled by orion.exe and
+# linked with orion_cli.c + orion_rt.c.
+#
+# build / run / test compile with orion.exe + clang and run the native exe.
 external define orion_console_color() -> int
 external define host_self_exe() -> text
 external define host_subdirs(dir: text) -> text
@@ -250,7 +246,7 @@ define cmd_new_orb(name: text):
     mkdir_all(name + "/src")
     toml_body = "[package]\nname = \"" + name + "\"\nversion = \"0.0.1\"\n\n[orbs]\n"
     write_file(name + "/Orbit.toml", toml_body)
-    main_body = "define add(left: number, right: number) -> number = left + right\n\n# `orbit test` runs every function named test_*.\ndefine test_add():\n    require add(2, 3) == 5\n"
+    main_body = "define add(left: number, right: number) -> number = left + right\n\n# `orbit test` runs every function named test_*.\ndefine test_add():\n    require add(2, 3) is 5\n"
     write_file(name + "/src/main.or", main_body)
     print_line("created `" + name + "`")
     print_line("  " + name + "/Orbit.toml")
@@ -261,7 +257,7 @@ define cmd_new_orb(name: text):
 # ---------- add ----------
 
 # Insert `<orb_name> = "stdlib"` under the [orbs] section. If the section
-# doesn't exist we append one - matches what the old Rust impl did.
+# doesn't exist we append one.
 define insert_orb_line(existing: text, orb_name: text) -> text:
     new_line = orb_name + " = \"stdlib\"\n"
     if contains(existing, "[orbs]"):
@@ -290,7 +286,7 @@ define cmd_add():
         write_file("Orbit.toml", updated)
         print_line("added `" + orb_name + "` to Orbit.toml")
 
-# ---------- build / run / test (delegate to the Rust runtime) ----------
+# ---------- build / run / test ----------
 
 define resolve_path() -> text:
     candidate = first_param()
@@ -905,12 +901,27 @@ define nb_orb_dirs(lines: [text]) -> [text]:
             dirs = append(dirs, native_sibling)
     loop p2_index in 0 until parent_total:
         dirs = append(dirs, parents[p2_index])
+    # The toolchain's own orbs sit on the NEAR side, like they do for a bare
+    # `orbit run hello.or`. Without this a project that names `os = "*"` had
+    # to path-depend into the orion checkout before auto-use would reach
+    # `read_file` - so a repo of its own could not build against an installed
+    # toolchain. Explicit path: deps above still win; this only ADDS a dir.
+    tool_orbs = default_orbs()
+    if is_dir(tool_orbs) and not list_contains(dirs, tool_orbs):
+        dirs = append(dirs, tool_orbs)
     # Layout-free resolution: when a `.orbit` workspace root is found, add
     # every orbs dir under it so name-only deps (`atlas_app = "*"`) resolve
     # regardless of where the project or the orbs live. Explicit path: deps
     # above still win; this only ADDS search dirs.
     root = find_workspace_root()
     if length(root) > 0:
+        # `--scan` marks the boundary. Everything BEFORE it is what this
+        # project declared plus the toolchain it was pointed at; everything
+        # after is the workspace sweep that makes `name-only = "*"` deps
+        # resolve wherever they happen to live. The compiler auto-imports
+        # from the near side only - a sibling project's orb still resolves
+        # when you name it in a `use`, it just never arrives uninvited.
+        dirs = append(dirs, "--scan")
         scanned = scan_orb_dirs(root, 0, [])
         # Native backends win name clashes (a game wants orbs_native/atlas_render,
         # not the wgpu orbs/atlas_render), so add every orbs_native search dir
@@ -996,7 +1007,7 @@ define entry_path(name: text) -> text:
         "src/main.or"
     else:
         q = text_of(append([], 34))
-        src = "use atlas_project\n\nfn main() -> number:\n    project_run(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")\n"
+        src = "use atlas_project\n\ndefine main() -> number:\n    project_run(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")\n"
         mkdir_all("target")
         write_file("target/main_gen.or", src)
         "target/main_gen.or"
@@ -1127,7 +1138,7 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     print_line(c_bold(exe) + " " + c_green("ok"))
     exe
 
-# ---------- native build/run/test (replaces the old Rust interp path) ----------
+# ---------- native build / run / test ----------
 #
 # Compile `path` with orion.exe - CLI runtime only (orion_rt.c + orion_cli.c),
 # no window/gpu/audio - link, and return the exe path (or "" on failure).
@@ -1193,7 +1204,7 @@ define cli_build(path: text) -> text:
     if standalone:
         compile_args = append(compile_args, "--quiet")
     # `orbit debug` builds with the call trail (see cmd_debug).
-    if slot_has("orbit:trace") and slot_get_int("orbit:trace") is 1:
+    if slot_has("orbit:trace") and slot_get_number("orbit:trace") is 1:
         compile_args = append(compile_args, "--trace")
     if run_command(compiler, compile_args) is not 0:
         return ""
@@ -1230,7 +1241,7 @@ define cli_build(path: text) -> text:
     # `orbit package` links a shipped app without a console window. The entry
     # point stays main() - /SUBSYSTEM:WINDOWS alone would send the linker
     # looking for WinMain.
-    if slot_has("orbit:windowless") and slot_get_int("orbit:windowless") is 1 and os_kind() is 0:
+    if slot_has("orbit:windowless") and slot_get_number("orbit:windowless") is 1 and os_kind() is 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/SUBSYSTEM:WINDOWS")
         link_args = append(link_args, "-Xlinker")
@@ -1510,12 +1521,28 @@ define cmd_memfacts():
         args = append(args, dirs[i])
     exit_with(run_command(compiler, args))
 
+# orbit slowfacts - every list in THIS build that is copied on every append,
+# which is a loop that is quadratic in how much it collects. The build prints
+# the count next to its timings; this names them and says how to fix each.
+define cmd_slowfacts():
+    if not file_exists("Orbit.toml"):
+        die("orbit slowfacts: no Orbit.toml in this directory")
+    lines = nb_lines(read_file("Orbit.toml"))
+    compiler = nb_setting(lines, "compiler", default_compiler())
+    if not file_exists(compiler):
+        die("orbit slowfacts: compiler not found at `" + compiler + "`")
+    edit args = [resolve_path(), "slowfacts"]
+    dirs = nb_orb_dirs(lines)
+    loop i in 0 until length(dirs):
+        args = append(args, dirs[i])
+    exit_with(run_command(compiler, args))
+
 define cmd_facts():
     lines = nb_lines(read_file("Orbit.toml"))
     name = nb_setting(lines, "name", "game")
     filter = first_param()
     q = text_of(append([], 34))
-    src = "use atlas_project\n\nfn main() -> number:\n    project_facts(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + filter + q + ")\n"
+    src = "use atlas_project\n\ndefine main() -> number:\n    project_facts(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + filter + q + ")\n"
     mkdir_all("target")
     write_file("target/facts_gen.or", src)
     exe = build_native_entry("facts", "target/facts_gen.or")
@@ -1530,7 +1557,7 @@ define synth_analysis(fn_name: text, gen: text, arg: text):
     name = nb_setting(lines, "name", "game")
     q = text_of(append([], 34))
     call = if arg is "" then fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ")" else fn_name + "(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", " + q + arg + q + ")"
-    src = "use atlas_project\n\nfn main() -> number:\n    " + call + "\n"
+    src = "use atlas_project\n\ndefine main() -> number:\n    " + call + "\n"
     mkdir_all("target")
     write_file("target/" + gen + "_gen.or", src)
     exe = build_native_entry(gen, "target/" + gen + "_gen.or")
@@ -1571,7 +1598,7 @@ define cmd_try():
     ticks = nb_int(first_param(), 8000)
     seed = nb_int(second_param(), 42)
     q = text_of(append([], 34))
-    src = "use atlas_project\n\nfn main() -> number:\n    project_try(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
+    src = "use atlas_project\n\ndefine main() -> number:\n    project_try(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
     mkdir_all("target")
     write_file("target/try_gen.or", src)
     exe = build_native_entry("try", "target/try_gen.or")
@@ -1588,7 +1615,7 @@ define cmd_soak():
     ticks = nb_int(t_param, 20000)
     seed = nb_int(s_param, 42)
     q = text_of(append([], 34))
-    src = "use atlas_project\n\nfn main() -> number:\n    project_soak(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
+    src = "use atlas_project\n\ndefine main() -> number:\n    project_soak(" + q + name + ".toml" + q + ", " + q + name + ":" + q + ", {ticks}, {seed})\n"
     mkdir_all("target")
     write_file("target/soak_gen.or", src)
     exe = build_native_entry("soak", "target/soak_gen.or")
@@ -1668,6 +1695,8 @@ public define main():
                                                 else:
                                                     if command is "memfacts":
                                                         cmd_memfacts()
+                                                    else if command is "slowfacts":
+                                                        cmd_slowfacts()
                                                     else if command is "facts":
                                                         cmd_facts()
                                                     else:

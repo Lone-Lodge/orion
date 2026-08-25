@@ -1,0 +1,86 @@
+# A slow client must not hold the server.
+#
+# One task per connection, and every wait goes through `readable_within`, so
+# the task parks and the SCHEDULER waits for all the parked sockets at once.
+# The proof is the ORDER: client 1 connects first and then dawdles 60 ms
+# before finishing its request head. A one-at-a-time server answers it first
+# and makes everyone wait; here the two fast clients are answered while it
+# dawdles, so the server's own trace reads "ffw": both /fast requests
+# answered, and only then the /slow one.
+
+define handle(conn: number) -> number uses net, clock:
+    edit raw = ""
+    deadline = monotonic_ms() + 2000
+    loop:
+        left = deadline - monotonic_ms()
+        if left <= 0:
+            break
+        if readable_within(conn, left):
+            chunk = recv(conn, 512)
+            if timed_out(chunk):
+                break
+            raw = "{raw}{chunk}"
+            if contains(raw, "\r\n\r\n"):
+                break
+    send(conn, "HTTP/1.0 200 OK\r\nContent-Length: 3\r\n\r\nok\n")
+    close(conn)
+    # The trace is the SERVER's, not the clients': who got answered, in order.
+    mark = if contains(raw, "/slow") then "w" else "f"
+    slot_set("trace", "{slot_get(\"trace\")}{mark}")
+    1
+
+define acceptor(listener: number) -> number uses net:
+    edit got = 0
+    loop:
+        if got >= 3:
+            break
+        if not readable_within(listener, 2000):
+            break
+        conn = accept_within(listener, 0)
+        if ok(conn):
+            spawn(handle, conn)
+            got = got + 1
+    got
+
+define read_reply(sock: number) -> text uses net, clock:
+    deadline = monotonic_ms() + 2000
+    if readable_within(sock, deadline - monotonic_ms()) then recv(sock, 512) else ""
+
+define slow_client(id: number) -> number uses net, clock:
+    c = connect_within("127.0.0.1", 58425, 1000)
+    if not ok(c):
+        return 0
+    send(c, "GET /slow HTTP/1.0\r\n")
+    sleep_task(60)
+    send(c, "\r\n")
+    reply = read_reply(c)
+    close(c)
+    if length(reply) > 0 then 1 else 0
+
+define fast_client(id: number) -> number uses net, clock:
+    c = connect_within("127.0.0.1", 58425, 1000)
+    if not ok(c):
+        return 0
+    send(c, "GET /fast HTTP/1.0\r\n\r\n")
+    reply = read_reply(c)
+    close(c)
+    if length(reply) > 0 then 1 else 0
+
+define main() -> number uses net, console:
+    slot_set("trace", "")
+    listener = listen(58425)
+    if not ok(listener):
+        return 0
+    defer close(listener)
+    spawn(acceptor, listener)
+    t_slow = spawn(slow_client, 1)
+    t_a = spawn(fast_client, 2)
+    t_b = spawn(fast_client, 3)
+    run_all()
+    replies = await(t_slow) + await(t_a) + await(t_b)
+    trace = slot_get("trace")
+    print_line("order={trace} replies={replies}")
+    # "ffw": both fast requests were answered before the dawdler finished.
+    concurrent = if trace is "ffw" then 20 else 0
+    everyone = if replies is 3 then 20 else 0
+    concurrent + everyone + 2

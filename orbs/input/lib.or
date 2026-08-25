@@ -1,0 +1,200 @@
+# input - what the person is doing, whatever they happen to be holding.
+#
+# The window orb hands out mouse and keyboard EVENTS. This orb answers about
+# the two things a window cannot: the controllers plugged into the machine,
+# and touch. Plus the one question that decides how a UI should look right
+# now - who spoke last.
+#
+# A pad is a VIRTUAL pad. It has south, east, west and north, not A/B/X/Y and
+# not cross/circle/square/triangle, so a program says what it MEANS and never
+# which plastic is in the hand. An Xbox pad, a DualSense and a DualShock all
+# arrive here as the same fourteen buttons and six axes; adding another make
+# is a table in the runtime, not a branch in your app.
+#
+# The runtime finds them two ways because Windows has two: XInput for
+# Xbox-compatible pads across all four slots, and plain HID opened by WHO
+# MADE IT for everything else - which is how SDL does it, and the reason a
+# DualSense that Windows refuses to call a game controller still works.
+#
+# Two hosts answer the same eleven questions, so a program that reads a pad
+# in a window reads it the same way in a tab:
+#
+#     native   link = "../orion/runtime/win32_min.c -luser32"
+#     wasm     the page, out of the browser's Gamepad API
+#
+# hid.dll and setupapi.dll are loaded by name at run time, so nothing new is
+# linked and a machine without them still starts.
+
+external define oi_pad_count() -> int
+external define oi_pad_kind(i: int) -> int
+external define oi_pad_id(i: int) -> int
+external define oi_pad_axis(i: int, which: int) -> int
+external define oi_pad_button(i: int, b: int) -> int
+external define oi_pad_step(i: int, axis: int) -> int
+external define oi_pad_pressed(i: int, b: int) -> int
+external define oi_pad_byte(i: int, at: int) -> int
+external define oi_pad_len(i: int) -> int
+external define oi_hid_seen() -> int
+external define oi_touch() -> int
+external define oi_last_input() -> int
+external define oi_composing() -> text
+external define oi_composing_at() -> int
+external define oi_composing_on() -> int
+
+# How many controllers are here right now. A pad switched on after the app
+# started is found within a couple of seconds, so this can go up.
+public define pads_here() -> number:
+    oi_pad_count()
+
+# What sort the i:th pad is, for the one thing the make should decide: which
+# glyphs to draw on the buttons. "" when there is no such pad.
+public define pad_sort(i: number) -> text:
+    choose oi_pad_kind(i):
+        1 then "xbox"
+        2 then "dualsense"
+        3 then "dualshock"
+        4 then "switch"
+        5 then "pad"
+        _ then ""
+
+# vid<<16|pid, when an app wants to name the exact device. A DualSense over
+# Bluetooth is 5488870 (054C:0CE6).
+public define pad_id(i: number) -> number:
+    oi_pad_id(i)
+
+define axis_number(which: text) -> number:
+    choose which:
+        "lx" then 0
+        "ly" then 1
+        "rx" then 2
+        "ry" then 3
+        "l2" then 4
+        "r2" then 5
+        _ then 0 - 1
+
+# One axis, -1.0 to 1.0: "lx" "ly" "rx" "ry" are the sticks, "l2" "r2" the
+# triggers (0.0 to 1.0). Y points DOWN, the way a screen does, so a stick
+# pushed up and a finger dragged up agree.
+#
+# The dead zone is already taken out: a thumb resting on a stick reads 0.0,
+# and the first degree past the edge is a small number rather than a jump.
+public define pad_axis(i: number, which: text) -> number:
+    at = axis_number(which)
+    if at < 0:
+        return 0.0
+    oi_pad_axis(i, at) / 1000.0
+
+define button_number(name: text) -> number:
+    choose name:
+        "south" then 0
+        "east" then 1
+        "west" then 2
+        "north" then 3
+        "l1" then 4
+        "r1" then 5
+        "back" then 6
+        "start" then 7
+        "up" then 8
+        "down" then 9
+        "left" then 10
+        "right" then 11
+        "l3" then 12
+        "r3" then 13
+        _ then 0 - 1
+
+# Is a button held down? Names, not letters: "south" is the bottom face
+# button on every pad - A on an Xbox, cross on a PlayStation. The rest are
+# "east" "west" "north", "l1" "r1", "back" "start", the four directions
+# "up" "down" "left" "right", and the stick clicks "l3" "r3".
+public define pad_down(i: number, button: text) -> truth:
+    b = button_number(button)
+    if b < 0:
+        return false
+    oi_pad_button(i, b) is 1
+
+# --- what has changed since you last asked ---------------------------------
+#
+# These two answer about the MOMENT, not the state, so ask them once a frame
+# and not twice: the second ask in the same frame has nothing left to report.
+
+# True on the frame a button goes down, and not while it is held. Remembered
+# per button, so asking about "south" never swallows a press of "east".
+public define pad_pressed(i: number, button: text) -> truth:
+    b = button_number(button)
+    if b < 0:
+        return false
+    oi_pad_pressed(i, b) is 1
+
+# -1, 0 or 1: one step left or right. Holding the stick over steps once,
+# waits, and then repeats, the way a held arrow key behaves - because a menu
+# wants steps and not a velocity. The d-pad and the left stick both answer.
+public define pad_step_x(i: number) -> number:
+    oi_pad_step(i, 0)
+
+# The same up and down, positive DOWNWARD.
+public define pad_step_y(i: number) -> number:
+    oi_pad_step(i, 1)
+
+# --- touch, and who spoke last ---------------------------------------------
+
+# Whether the last pointer message came from a finger rather than a mouse.
+# Windows turns touch into ordinary mouse messages, so touch works without
+# anyone doing anything - and a UI that does not KNOW gets it subtly wrong:
+# it lights things up under a finger that has already left.
+public define touching() -> truth:
+    oi_touch() is 1
+
+# Which of the four spoke last: "mouse", "keys", "touch", "pad", or "" while
+# nobody has done anything yet. This is what decides whether to draw a focus
+# ring, whether to draw hover at all, and how big to make what can be hit.
+public define last_used() -> text:
+    choose oi_last_input():
+        1 then "mouse"
+        2 then "keys"
+        3 then "touch"
+        4 then "pad"
+        _ then ""
+
+# --- text on its way in -----------------------------------------------------
+#
+# Typing Japanese means typing "nihon" and then picking which way to write
+# it. Between the keys and the word there is a COMPOSITION: text that exists,
+# belongs in the field, and is not settled yet. An app that only listens for
+# characters never sees one, which is why so many games cannot be typed in at
+# all.
+#
+# Put `composing()` into the field at the caret and underline it with veil's
+# `compose_from` / `compose_to`. When the composition ends the platform sends
+# the finished word as ordinary characters and this goes empty again.
+public define composing() -> text:
+    oi_composing()
+
+# How far into the composition the caret sits, in bytes.
+public define composing_at() -> number:
+    oi_composing_at()
+
+# Whether one is open at all, which is not the same as it having text: it
+# opens empty on the first key, and from that moment the keyboard is spoken
+# for even though there is nothing to show yet.
+public define composing_now() -> truth:
+    oi_composing_on() is 1
+
+# --- adding a make nobody here owns ----------------------------------------
+#
+# The newest raw report, byte by byte, and how long it was. A mapping is
+# checked against what the device ACTUALLY said rather than against a memory
+# of it, which is the only honest way to add a pad that is not on the desk.
+public define pad_report(i: number, at: number) -> number:
+    oi_pad_byte(i, at)
+
+public define pad_report_len(i: number) -> number:
+    oi_pad_len(i)
+
+# How many devices the machine offered the search at all - keyboards, mice,
+# everything. It answers the question a zero cannot: a machine with fifteen
+# of these and no controller among them has no controller connected, while a
+# machine that answers zero has a search that could not run. Nothing but a
+# diagnostic, and the first thing to look at when a pad that is plainly on
+# does nothing at all.
+public define devices_seen() -> number:
+    oi_hid_seen()

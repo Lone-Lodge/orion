@@ -1,0 +1,10 @@
+# Type alias: `type Name = T` gives an existing type a second name. `Celsius`
+# resolves to `int` at lowering, in both a return type and a typed binding.
+type Celsius = number
+
+define make() -> Celsius:
+    5
+
+define main() -> number:
+    edit t: Celsius = make()
+    t + 7    # 12

@@ -12,9 +12,6 @@
 #
 # The command's output goes to your console. One command at a time by
 # design - this is a watcher, not a job runner.
-use os
-use text
-use watch
 
 define usage() -> number:
     eprint("orbwatch: watch a tree, rerun a command on change")

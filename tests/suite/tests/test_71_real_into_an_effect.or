@@ -1,0 +1,35 @@
+# An effect can be handed a real number now. It was the last whole-only seam
+# in the effect system: the ANSWER could be real (three carriers), the way IN
+# could not, and `perform Draw.line(1.5, 2.5)` - the canonical example - was a
+# compile error.
+#
+# The slots were always 64 bits and so is a double, so it rides as its BITS
+# and the handler reads them back. Passing it AS a double would need the
+# runtime to cast the handler by argument SHAPE and not just by arity: four
+# slots, two shapes, sixteen casts.
+#
+# What made it a silent wrong answer for one round: `perform` is a call to the
+# handler spelled differently, and the `number` pass did not know that. The
+# argument was real, the parameter had settled whole, and the bits arrived as
+# an integer near 4.6e18. The two are ONE site now.
+
+effect drawing:
+    line: function(x: number, y: number) -> number
+    label: function(x: number, s: text) -> number
+
+handle drawing.line(x: number, y: number) -> number:
+    resume(x + y)
+
+# mixed shapes in one operation: a real and a text, side by side
+handle drawing.label(x: number, s: text) -> number:
+    resume(if s is "hej" then to_whole(x * 100) else 0)
+
+define main() -> number:
+    sum = perform drawing.line(1.5, 2.25)
+    at = perform drawing.label(0.5, "hej")
+    a = if sum > 3.7 and sum < 3.8 then 40 else 0
+    b = if at is 50 then 20 else 0
+    # a whole number written at a real site is BUILT real, not handed over as
+    # a whole-number bit pattern
+    c = if perform drawing.line(2, 3) is 5.0 then 11 else 0
+    a + b + c   # 40 + 20 + 11

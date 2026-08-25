@@ -1,0 +1,31 @@
+# An `if` with one whole branch and one real one. The lowering knew how to fix
+# it - widen the whole side - and did it by re-lowering the whole `if` from the
+# state it started in, on the assumption that the half-built first attempt
+# would simply drop.
+#
+# It did not. The compiler mutates uniquely-owned values in place, so BOTH
+# attempts ended up in the function: the first one's `br` pointed at an `else`
+# label that was never emitted, and clang refused the module naming a label
+# nobody wrote.
+#
+# The widening is decided in the `number` pass now, before anything is
+# emitted, so there is nothing to undo. Found by migrating veil to `number` -
+# it needs a whole `least` and a real `v` in one `if` to show up at all.
+
+define big(n: number, s: number) -> number:
+    n * s
+
+define bounded(v: number, at_scale: number) -> number:
+    least = big(2, at_scale)
+    most = big(8, at_scale)
+    held = if v < least then least else v
+    if most > 0 and held > most then most else held
+
+define main() -> number:
+    # v below the floor: the whole branch wins and comes back real
+    a = if bounded(1.5, 3) is 6.0 then 15 else 0
+    # v between floor and ceiling: the real branch wins
+    b = if bounded(9.5, 3) > 9.4 and bounded(9.5, 3) < 9.6 then 8 else 0
+    # v above the ceiling
+    c = if bounded(99.5, 3) is 24.0 then 6 else 0
+    a + b + c   # 15 + 8 + 6

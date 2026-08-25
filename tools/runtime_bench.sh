@@ -32,7 +32,7 @@ UPDATE=0
 TMP="$ROOT/dist/.rtbench"
 mkdir -p "$TMP"
 
-# -O2, the same flags a real build uses (examples/tests/src/main.or, orbit).
+# -O2, the same flags a real build uses (tests/suite/src/main.or, orbit).
 # Anything measured at -O0 would be measuring the wrong binary.
 echo "  building examples/bench/runtime.or (-O2)"
 "$ORION" "$SRC" "$TMP/runtime.ll" "$ROOT/orbs" >/dev/null || { echo "  compile FAILED"; exit 1; }

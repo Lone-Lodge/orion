@@ -368,7 +368,6 @@ public define ir_dump_module(module: IRModule) -> text:
 
 
 
-use bytes
 
 # orion_emit_llvm - emit LLVM IR text from typed IR (orion_ir).
 #

@@ -9,10 +9,6 @@
 #
 # Reports per orb: public defines, example assertions, capability contracts,
 # and whether the orb still speaks v1 idiom ( is / is not / 0 until n).
-use os
-use text
-use iter
-use list
 
 type orbstat:
     name: text
@@ -35,13 +31,26 @@ define has_contract(line: text) -> truth:
     example not has_contract("public define f():")
     contains(line, " uses ")
 
-# ` is `, ` is not ` and `0 until n` are the retired spellings - this is the measure of
-# how much of an orb still reads like v1.
+# The RETIRED spellings, all of them a substring test can catch without
+# false-positives. `is`, `is not`, `0 until n`, `x as text`, `to_whole`,
+# `to_real`, `length`, `slot_get_number` replaced them.
+#
+# Only unambiguous ones are listed: `fn `, `mut `, `at(`, `pub ` and `map(`
+# are left out because `contains` would find them inside ordinary words and
+# prose, and a measure that cries wolf gets ignored.
+#
+# The examples below carry the old words on purpose - that is what it looks for.
 define is_old_idiom(line: text) -> truth:
     example is_old_idiom("if a == b:")
     example is_old_idiom("loop i in 0..<n:")
+    example is_old_idiom("print_line(to_text(n))")
+    example is_old_idiom("x = slot_get_int(k)")
     example not is_old_idiom("if a is b:")
-    contains(line, " == ") or contains(line, " != ") or contains(line, "..<")
+    edit old = false
+    loop w in [" == ", " != ", "..<", "to_text(", "slot_get_int(", "characters(", " as int", " as float", "to_int(", "to_float(", "println(", "bytes_from_text(", "bytes_to_text(", "bytes_length(", "bytes_slice("]:
+        if contains(line, w):
+            old = true
+    old
 
 define scan(name: text, src: text) -> orbstat:
     lines_of = lines(src)

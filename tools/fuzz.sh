@@ -22,7 +22,7 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ORION="$ROOT/dist/orion.exe"
-CORPUS="$ROOT/examples/tests/tests"
+CORPUS="$ROOT/tests/suite/tests"
 ITERS="${ITERS:-200}"
 SEED="${SEED:-1}"
 TIMEOUT="${FUZZ_TIMEOUT:-20}"

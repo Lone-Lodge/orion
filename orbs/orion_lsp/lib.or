@@ -1,13 +1,8 @@
 # orion_lsp - a Language Server for Orion, written in Orion.
 #
-# The editor used to talk to `orion-lsp.exe`, a binary built from the Rust crate
-# that was deleted when the compiler became self-hosted (`extension.js` still
-# said "cargo build --release --bin orion-lsp"). It had no source left in the
-# tree and knew a language from before `type`, `loop`, effects and the retired
-# keywords: an editor confidently underlining correct code. This replaces it
-# with something that lives in the tree, builds with everything else, and gets
-# its diagnostics from THE COMPILER rather than a second, drifting model of the
-# grammar.
+# Its diagnostics come from THE COMPILER, never from a second model of the
+# grammar: a server with its own idea of the language drifts, and an editor
+# confidently underlining correct code is worse than no editor support.
 #
 # What it serves: diagnostics (on open / change / save), document symbols
 # (outline), go-to-definition, hover, and DECLARATION-BASED completion - every
@@ -19,11 +14,6 @@
 # Protocol framing is `Content-Length: N\r\n\r\n<json>` over stdin/stdout, so
 # stdout is RESERVED for protocol traffic - logging goes to stderr.
 
-use json
-use text
-use os
-use num
-use orion_fmt
 
 external define orion_stdin_line() -> text
 external define orion_stdin_read(n: int) -> text
@@ -54,13 +44,29 @@ define lsp_read_message() -> text:
     else:
         orion_stdin_read(content_len)
 
+# Byteplatsen for kodpunkt nr cp i t. index_of/length raknar KODPUNKTER;
+# bytes_part skar BYTES - den har ar bron, sa de aldrig blandas rakt av.
+define cp_byte(t: text, cp: number) -> number:
+    b = bytes_of(t)
+    n = bytes_count(b)
+    edit i = 0
+    edit left = cp
+    loop:
+        if left <= 0 or i >= n:
+            break
+        i = i + (if b[i] >= 240 then 4 else if b[i] >= 224 then 3 else if b[i] >= 192 then 2 else 1)
+        left = left - 1
+    i
+
+# from ar ett KODPUNKTS-tal (fran index_of/length) - skarningen sker i bytes.
 define slice_from(t: text, from: number) -> text:
     b = bytes_of(t)
-    n = length(b)
-    if from >= n:
+    n = bytes_count(b)
+    i = cp_byte(t, from)
+    if i >= n:
         ""
     else:
-        text_of(bytes_part(b, from, n))
+        text_of(bytes_part(b, i, n))
 
 define lsp_send(body: text) -> number:
     n = length(body)
@@ -177,7 +183,7 @@ define diag_parse(raw: text, want_file: text) -> table:
         if sep < 0:
             {"line": 0, "col": 0, "msg": ""}
         else:
-            loc = text_of(bytes_part(bytes_of(after), 0, sep))
+            loc = text_of(bytes_part(bytes_of(after), 0, cp_byte(after, sep)))
             msg = slice_from(after, sep + 3)
             parts = split(loc, ":")
             np = length(parts)
@@ -369,11 +375,12 @@ public define word_at(uri: text, line_no: number, character: number) -> text:
     else:
         row = rows[line_no]
         b = bytes_of(row)
-        n = length(b)
-        if n is 0 or character > n:
+        n = bytes_count(b)
+        chb = cp_byte(row, character)
+        if n is 0 or chb > n:
             ""
         else:
-            edit lo = if character >= n then n - 1 else character
+            edit lo = if chb >= n then n - 1 else chb
             loop:
                 if lo <= 0:
                     break
@@ -549,8 +556,9 @@ public define receiver_before_dot(uri: text, line_no: number, character: number)
     else:
         row = rows[line_no]
         b = bytes_of(row)
-        n = length(b)
-        cut = if character > n then n else character
+        n = bytes_count(b)
+        chb = cp_byte(row, character)
+        cut = if chb > n then n else chb
         if cut < 1:
             ""
         else:
@@ -683,7 +691,11 @@ public define lsp_completion_json(uri: text, line_no: number, character: number)
                     seen = get(r2, "seen")
     # Keywords last: short, always valid, and they should not push declarations
     # out of the top of the list.
-    kws = ["define", "public", "type", "edit", "if", "then", "else", "choose", "loop", "parallel", "break", "continue", "return", "require", "ensure", "defer", "collect", "effect", "handle", "perform", "resume", "use", "external", "deterministic", "and", "or", "not", "in", "where", "is", "to", "until", "try", "given", "true", "false", "none"]
+    # The TYPES belong here too. They are what a person reaches for most and
+    # the list had none of them, so typing `num` offered nothing - while the
+    # language's whole point is that `number` is the only number word.
+    # `of` comes with them: `list of number`, `table of text`.
+    kws = ["define", "public", "type", "edit", "if", "then", "else", "choose", "loop", "parallel", "break", "continue", "return", "require", "ensure", "defer", "collect", "effect", "handle", "perform", "resume", "use", "external", "deterministic", "and", "or", "not", "in", "where", "is", "to", "until", "try", "given", "requires", "uses", "example", "of", "true", "false", "some", "none", "ok", "error", "number", "text", "truth", "table", "list", "maybe", "result"]
     loop ki in 0 until length(kws):
         kw = kws[ki]
         sep2 = if acc is "" then "" else ","
@@ -693,7 +705,7 @@ public define lsp_completion_json(uri: text, line_no: number, character: number)
 define handle(msg: text) -> number:
     root = json_parse(msg)
     method = json_text(root, "method")
-    id = json_int(root, "id")
+    id = json_whole(root, "id")
     params = json_obj(root, "params")
     td = json_obj(params, "textDocument")
     uri = json_text(td, "uri")
@@ -729,13 +741,13 @@ define handle(msg: text) -> number:
         lsp_respond(id, lsp_symbols_json(uri))
     if method is "textDocument/definition":
         pos = json_obj(params, "position")
-        lsp_respond(id, lsp_definition_json(uri, json_int(pos, "line"), json_int(pos, "character")))
+        lsp_respond(id, lsp_definition_json(uri, json_whole(pos, "line"), json_whole(pos, "character")))
     if method is "textDocument/hover":
         pos2 = json_obj(params, "position")
-        lsp_respond(id, lsp_hover_json(uri, json_int(pos2, "line"), json_int(pos2, "character")))
+        lsp_respond(id, lsp_hover_json(uri, json_whole(pos2, "line"), json_whole(pos2, "character")))
     if method is "textDocument/completion":
         pos3 = json_obj(params, "position")
-        lsp_respond(id, lsp_completion_json(uri, json_int(pos3, "line"), json_int(pos3, "character")))
+        lsp_respond(id, lsp_completion_json(uri, json_whole(pos3, "line"), json_whole(pos3, "character")))
     if method is "textDocument/formatting":
         lsp_respond(id, lsp_formatting_json(uri))
     done

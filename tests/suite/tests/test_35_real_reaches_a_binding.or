@@ -1,0 +1,44 @@
+# A binding whose slot a real number lands in later has to BE real from the
+# start. `edit width = the_game.width` and then `width = event.x` - the field
+# read is whole, the event's is real, and the slot was made to fit the first
+# one.
+#
+# The rule started narrow: rebuild a whole LITERAL as a real. That missed
+# `edit edge_row = -1`, which is a negation and not a literal, and it missed
+# every initializer that is a field read, an index, a call or a name.
+# It widens any of them now. The mark is only ever set because a real WAS
+# assigned somewhere, so the binding is a number and widening is what makes
+# the slot fit the rest.
+#
+# Found by migrating atlas0.0.1 - three rounds, each one a different shape of
+# initializer, each one the same rule not going far enough.
+
+type Box: w: number, h: number
+
+define event_x() -> number:
+    1.5
+
+define main() -> number:
+    box = Box{w: 40, h: 20}
+
+    # a FIELD read as the first value
+    edit width = box.w
+    width = event_x()
+    a = if width is 1.5 then 20 else 0
+
+    # a NEGATION as the first value
+    edit edge = 0 - 1
+    edge = 0.5
+    b = if edge is 0.5 then 9 else 0
+
+    # a CALL, and a plain name
+    edit from_call = whole_one()
+    from_call = 2.25
+    edit named = box.h
+    named = 0.75
+    c = if from_call is 2.25 and named is 0.75 then 6 else 0
+
+    a + b + c   # 20 + 9 + 6
+
+define whole_one() -> number:
+    7

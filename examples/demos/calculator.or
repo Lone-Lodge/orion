@@ -18,7 +18,6 @@
 #
 # main evaluates a handful of expressions and returns the last result.
 
-use text
 
 # A token is a map {"kind": text, "val": int}. `val` is only meaningful
 # for numbers; operators carry 0.

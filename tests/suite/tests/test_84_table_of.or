@@ -1,0 +1,45 @@
+# `table of T` - a table's VALUE type, the way `list of T` is a list's element
+# type. Without it every table was written bare, and `t[k]` had to guess: it
+# guessed `text`, so reading a number out of one handed the program a pointer
+# built from 7 and it died at that address.
+#
+# A bare `table` now REFUSES `t[k]` and says what to write. The typed readers
+# stay for a table whose values genuinely differ - the compiler's own AST.
+
+define count_up(scores: table of number) -> number:
+    edit sum = 0
+    loop name in scores:
+        sum = sum + scores[name]
+    sum
+
+# A SECOND function, because a site gets ONE answer for the whole program. A
+# real reaching `count_up` would make its parameter real everywhere, including
+# the call that passes whole numbers - which is right, and is why the two are
+# written apart when they mean different things.
+define measure(sizes: table of number) -> number:
+    edit sum = 0.0
+    loop k in sizes:
+        sum = sum + sizes[k]
+    sum
+
+define shout(names: table of text) -> text:
+    edit out = ""
+    loop k in names:
+        out = "{out}{names[k]}!"
+    out
+
+define deep(rooms: table of table) -> number:
+    edit n = 0
+    loop k in rooms:
+        n = n + length(rooms[k])
+    n
+
+define main() -> number:
+    # a literal written at a real call is BUILT real, or the slot would be
+    # read as a double over an i64 bit pattern and answer 9.2e18.
+    m = measure({"a": 1.5, "b": 2.25})
+    a = if count_up({"a": 1, "b": 2}) is 3 then 40 else 0
+    b = if m > 3.7 and m < 3.8 then 25 else 0
+    c = if shout({"x": "hej", "y": "da"}) is "hej!da!" then 12 else 0
+    d = if deep({"one": {"a": 1}, "two": {"b": 2, "c": 3}}) is 3 then 7 else 0
+    a + b + c + d   # 40 + 25 + 12 + 7

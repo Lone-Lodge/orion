@@ -2,9 +2,8 @@
 # and the language server's textDocument/formatting (the editor's format key).
 # Operations: tabs -> 4 spaces, trailing whitespace stripped, runs of blank
 # lines collapsed to one, file ends with exactly one newline. A "real"
-# formatter that rewrites expressions / re-indents blocks needs the lexer +
-# parser (step 3-4 of self-hosting).
-use text
+# formatter that rewrites expressions or re-indents blocks would need the
+# lexer and the parser.
 
 define fmt_expand_tabs(line_text: text) -> text:
     if index_of(line_text, "\t") >= 0:

@@ -1,0 +1,94 @@
+# words - what a program says, in the language of whoever is reading it.
+#
+# A program full of "Spara" cannot be read in Arabic, and a program full of
+# get_string(423) cannot be read by anyone writing it. So the source says a
+# KEY and a table says what that key sounds like here:
+#
+#     book = words_of(read_file("sv.words"))
+#     n("button", [p("text", say(book, "save"))], [])
+#
+# The file is one saying per line, `key = what it says`. Lines that are blank
+# or start with # are ignored, so a translator can leave notes.
+#
+#     save = Spara
+#     files.one = {0} fil
+#     files.many = {0} filer
+#
+# One trap, and it is orion's rather than this orb's: `{0}` in orion SOURCE is
+# interpolation and becomes the number zero. In a file read from disk it is
+# just two characters, which is where sayings belong anyway - but a saying
+# written inline in orion has to escape it as \{0\}.
+#
+# A key with no saying answers with the KEY, not with nothing. A screen with
+# `files.many` printed on a button is a screen that tells you what is missing;
+# a screen with an empty button tells you nothing at all, and that is how
+# missing translations ship.
+#
+# What is deliberately NOT here: gender, case, and the fourteen plural forms
+# some languages have. Two forms cover the languages this is for, and the day
+# one needs more, `say_of` is where it goes - not spread through every app.
+
+use text
+use bytes
+
+public type Words: keys: [text], says: [text]
+
+define trimmed(t: text) -> text:
+    trim(t)
+
+# One saying per line, `key = what it says`.
+public define words_of(source: text) -> Words:
+    edit ks = []
+    edit vs = []
+    loop line in split(source, "\n"):
+        one = trimmed(line)
+        if length(one) > 0 and not starts_with(one, "#"):
+            b = bytes_of(one)
+            n = bytes_count(b)
+            edit cut = 0 - 1
+            loop i in 0 until n:
+                if cut < 0 and byte_at(b, i) is 61:
+                    cut = i
+            if cut > 0:
+                ks = append(ks, trimmed(text_of(bytes_part(b, 0, cut))))
+                vs = append(vs, trimmed(text_of(bytes_part(b, cut + 1, n))))
+    Words{keys: ks, says: vs}
+
+# What this key says here. A key nobody translated answers with itself, so a
+# missing saying is visible on the screen rather than being an empty button.
+public define say(book: Words, key: text) -> text:
+    edit found = ""
+    loop i in 0 until length(book.keys):
+        if book.keys[i] is key:
+            found = book.says[i]
+    if found is "" then key else found
+
+# `{0}`, `{1}` and so on, filled in with what you hand over. The order of the
+# holes is the TRANSLATION's business - "5 files" and "filer: 5" are the same
+# saying - which is the whole reason they are numbered and not appended.
+public define say_with(book: Words, key: text, parts: [text]) -> text:
+    edit out = say(book, key)
+    loop i in 0 until length(parts):
+        out = replace(out, "\{{i}\}", parts[i])
+    out
+
+# One or many. `save.one` and `save.many`, with the number filled into {0}.
+# Two forms, because that is what the languages this is for have; a language
+# with more forms is a change HERE and not in every app that uses this.
+public define say_of(book: Words, key: text, count: number) -> text:
+    which = if count is 1 then "{key}.one" else "{key}.many"
+    say_with(book, which, ["{count}"])
+
+# Is anything missing? Hand it the keys a screen uses and it says which ones
+# this book cannot answer - a check to run before shipping a language, rather
+# than a surprise on somebody's screen.
+public define missing_from(book: Words, wanted: [text]) -> [text]:
+    edit out = []
+    loop k in wanted:
+        edit had = false
+        loop i in 0 until length(book.keys):
+            if book.keys[i] is k:
+                had = true
+        if not had:
+            out = append(out, k)
+    out

@@ -1,5 +1,0 @@
-define main() -> number:
-    edit total = 0
-    loop i in 1..=5:
-        total = total + i
-    total

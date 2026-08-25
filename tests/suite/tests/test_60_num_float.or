@@ -1,0 +1,9 @@
+# num's float layer: PI/E constants, parse_float (decimals + exponent), the
+# f* min/max/abs/clamp helpers, and the language's own math builtins.
+
+define main() -> number:
+    ok_parse = if to_whole(parse_float("3.14")) is 3 and to_whole(parse_float("-2.5e3")) is 0 - 2500 then 1 else 0
+    ok_clamp = if clamp(12.0, 0.0, 10.0) is 10.0 and abs(0.0 - 5.5) is 5.5 then 1 else 0
+    ok_builtin = if to_whole(pi) is 3 and to_whole(sqrt(16.0)) is 4 and to_whole(pow(2.0, 10.0)) is 1024 then 1 else 0
+    ok_minmax = if min(1.5, 2.5) is 1.5 and max(1.5, 2.5) is 2.5 then 1 else 0
+    ok_parse * 20 + ok_clamp * 20 + ok_builtin * 10 + ok_minmax * 10   # 60

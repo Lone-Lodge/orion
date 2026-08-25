@@ -5,10 +5,10 @@
 # reference lists them among the types, next to `text` and `table`, and a type
 # you have to import first is not one of those.
 #
-#   define find(k: int) -> maybe int:
+#   define find(k: number) -> maybe number:
 #       if k > 0 then some(k * 10) else none
 #
-#   define div(a: int, b: int) -> result int:
+#   define div(a: number, b: number) -> result number:
 #       if b is 0 then error("div by zero") else ok(a // b)
 #
 #   choose div(84, 2):

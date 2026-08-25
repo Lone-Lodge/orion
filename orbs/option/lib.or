@@ -5,7 +5,7 @@
 #
 #   use option
 #
-#   define find(k: int) -> Option<int>:
+#   define find(k: number) -> Option<number>:
 #       if k > 0 then Option.Some(k * 10) else Option.None
 #
 #   choose find(4):

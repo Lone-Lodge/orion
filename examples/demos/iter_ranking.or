@@ -3,7 +3,6 @@
 #
 # The comparison / key is a `function(...)` closure, so one `sort_by` covers
 # every ordering: ascending, descending, or by any computed key.
-use iter
 
 define main() -> number:
     scores = [40, 75, 88, 12, 95, 60]

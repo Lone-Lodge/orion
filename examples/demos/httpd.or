@@ -14,9 +14,6 @@
 # and `accept_within` are the same bargain for the other two blocking calls.
 # With plain blocking `recv`, one slow client stalls every other one; the demo
 # below proves it does not.
-use net
-use text
-use async
 
 # The first line of a request: `GET /path HTTP/1.1`.
 type request:
@@ -97,7 +94,7 @@ define handle(conn: number) -> number uses net, clock:
 # connection - at 300 clients the backlog drained slower than the clients
 # gave up.
 define acceptor(listener: number) -> number uses net:
-    want = slot_get_int("want")
+    want = slot_get_number("want")
     edit got = 0
     loop:
         if got >= want:

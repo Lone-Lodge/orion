@@ -1,14 +1,8 @@
-use bytes
 
-# orion_self_lex - Orion lexer written in Orion.
+# orion_lex - the Orion lexer, written in Orion.
 #
-# Tokenizes `.or` source text into a list of token Maps with the shape:
-#     {"kind": text, "value": text, "line": int, "col": int}
-#
-# This is step 3 of the self-hosting plan (see [[orion-pure-orion-goal]]).
-# Goal: feature-complete enough that the Rust lexer's output and this
-# lexer's output agree on real Orion source files. Once that's true,
-# step 4 (parser in Orion) can consume these tokens directly.
+# Tokenizes `.or` source text into a list of token maps with the shape:
+#     {"kind": text, "value": text, "line": number, "col": number}
 #
 # Token kinds emitted:
 #   ident      - names and keywords (keyword? lookup later)
@@ -19,9 +13,8 @@ use bytes
 #   newline    - line break (one per consecutive newline run)
 #   eof        - end-of-input marker
 #
-# `value` is always a Text - int and float tokens encode their numeric
-# value as text to keep the token type uniform. Step 4 (parser) can
-# str_to_int / str_to_float them.
+# `value` is always text - number tokens encode their value as text to keep
+# the token type uniform. The parser converts them.
 
 # --- byte-class predicates ---
 
@@ -160,8 +153,29 @@ define slx_scan_number(bytes: [number], start: number, byte_count: number, line:
                 cursor += 1
             else:
                 break
+    # An exponent: `e` or `E`, an optional sign, then at least one digit.
+    # `1e20` and `2.5e-3` are floats even without a dot. The digit is what
+    # makes it safe - without it `2e` would swallow an identifier, and a
+    # number followed by a name is not a number.
+    edit saw_exp = false
+    if cursor < byte_count:
+        e_byte = byte_at(bytes, cursor)
+        if e_byte is 101 or e_byte is 69:
+            sign_at = cursor + 1
+            has_sign = sign_at < byte_count and (byte_at(bytes, sign_at) is 43 or byte_at(bytes, sign_at) is 45)
+            digit_at = if has_sign then sign_at + 1 else sign_at
+            if digit_at < byte_count and slx_is_digit(byte_at(bytes, digit_at)):
+                saw_exp = true
+                cursor = digit_at
+                loop:
+                    if cursor >= byte_count:
+                        break
+                    if slx_is_digit(byte_at(bytes, cursor)):
+                        cursor += 1
+                    else:
+                        break
     text_value = text_of(bytes_part(bytes, start, cursor))
-    kind = if saw_dot then "float" else "int"
+    kind = if saw_dot or saw_exp then "float" else "int"
     {"token": slx_make_token(kind, text_value, line, col), "next": cursor}
 
 # Single-byte escape lookup - returns the resolved byte, or -1 to mean
@@ -257,8 +271,8 @@ define slx_scan_string(bytes: [number], start: number, byte_count: number, line:
                 buffer = append(buffer, resolved)
                 cursor += 2
             else:
-                # Brace escapes are preserved literally - `build_str` in the
-                # Rust pipeline depends on `\{` / `\}` surviving lex.
+                # Brace escapes are preserved literally: interpolation is built
+                # later, and it needs `\{` / `\}` to survive lex.
                 buffer = append(buffer, 92)
                 buffer = append(buffer, next_byte)
                 cursor += 2
@@ -304,8 +318,8 @@ define slx_scan_op(bytes: [number], start: number, byte_count: number) -> text:
 
 define slx_scan_op_short(first: number, second: number) -> text:
     # Two-char tokens - flat sequential checks, then fall through to single.
-    # (Deep nested if/else-as-expression chains trigger the native compiler's
-    # nesting bug - see [[orion_nesting_bug]].)
+    # (Flat, because deep nested if/else-as-expression chains once tripped the
+    # compiler's own nesting handling.)
     edit result = ""
     if first is 61 and second is 61:
         result = "=="
@@ -413,8 +427,8 @@ define slx_skip_comment(bytes: [number], start: number, byte_count: number) -> n
 # --- main loop ---
 
 # Push a token, but suppress a duplicate `newline` if the previous token
-# was already one - matches the Rust lexer's behaviour ("never two newlines
-# in a row, never first"). No type annotations on the params so Orion
+# was already one: never two newlines in a row, and never one first.
+# No type annotations on the params so Orion
 # treats them as Unknown (table isn't a writeable type name).
 # Mutate the token slot in place - O(1) amortised push instead of
 # the old `append(list, val)` which cloned the entire token list per

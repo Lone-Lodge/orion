@@ -1,5 +1,3 @@
-use orion_ir
-use bytes
 
 # orion_emit_llvm - the backend: typed IR (orion_ir) in, LLVM IR text out.
 #
@@ -164,6 +162,8 @@ define find_fn_return_type(module: IRModule, fn_name: text) -> text:
     # known statically, no AST entry exists for them.
     if fn_name is "__orion_resume_int":
         result = "void"
+    if fn_name is "__orion_resume_real":
+        result = "void"
     if fn_name is "__orion_perform_int":
         result = "i64"
     if fn_name is "orion_struct_field_int":
@@ -218,6 +218,19 @@ public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_va
             else:
                 result = "    {value_ref(my_id)} = add i64 0, %p{inst.value}"
 
+    if op is "bits_of_real":
+        result = "    {value_ref(my_id)} = bitcast double {value_ref(inst.value)} to i64"
+
+    if op is "slot_get_real":
+        sgr_w = "%v{my_id}.w"
+        result = "    {sgr_w} = call i64 @orion_slot_get_int(ptr {value_ref(inst.value)})\n    {value_ref(my_id)} = bitcast i64 {sgr_w} to double"
+
+    if op is "param_bits":
+        # A handler's real parameter. It arrives as a WORD (the runtime casts
+        # the handler to an all-i64 signature and only knows the arity), and
+        # this reads the double back out of it.
+        result = "    {value_ref(my_id)} = bitcast i64 %p{inst.value} to double"
+
     if op is "call":
         n_args = length(inst.args)
         edit arg_text = ""
@@ -230,14 +243,21 @@ public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_va
         # `call void` + dummy SSA. Other fns go through the normal path;
         # their return-type lookup is in find_fn_return_type which
         # defaults non-matches to i64.
-        is_void_resume = inst.name is "__orion_resume_int" or inst.name is "__orion_resume_text"
+        is_void_resume = inst.name is "__orion_resume_int" or inst.name is "__orion_resume_text" or inst.name is "__orion_resume_real"
         if is_void_resume:
-            result = "    call void @{inst.name}({arg_text})\n    {value_ref(my_id)} = add i64 0, 0"
+            # `resume` never comes back, but the block still needs a value
+            # to fall out with and the function still needs a `ret`. That
+            # placeholder has to be the function's OWN return type - a
+            # handler answering with a real got `ret double` on an i64 zero,
+            # which clang refused by name.
+            vr_ty = llvm_type_of(fn_value.return_type)
+            vr_zero = if vr_ty is "double" then "fadd double 0.0, 0.0" else "add i64 0, 0"
+            result = "    call void @{inst.name}({arg_text})\n    {value_ref(my_id)} = {vr_zero}"
         else:
             ret_ty = llvm_type_of(find_fn_return_type(module, inst.name))
             result = "    {value_ref(my_id)} = call {ret_ty} @{inst.name}({arg_text})"
 
-    if op is "perform_int" or op is "perform_text":
+    if op is "perform_int" or op is "perform_text" or op is "perform_real":
         # The handler fn goes in as a ptr constant (inst.name), then the arg
         # COUNT, then four i64 slots - every Orion value is a 64-bit word, so a
         # pointer argument is passed as its bits (ptrtoint) and unused slots are
@@ -256,12 +276,29 @@ public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_va
                     pf_tmp = "%v{my_id}.a{pfi}"
                     pf_pre = "{pf_pre}    {pf_tmp} = ptrtoint ptr {value_ref(pf_id)} to i64\n"
                     pf_slots = "{pf_slots}{pf_sep}i64 {pf_tmp}"
+                else if pf_ty is "double":
+                    # A real one rides as its BITS. The slot is 64 bits and so
+                    # is the double, so nothing is lost; the handler bitcasts
+                    # it back (see `param_bits`). Passing it as a double would
+                    # need the runtime to cast the handler per argument SHAPE
+                    # and not just per arity - sixteen casts for four slots.
+                    pf_dtmp = "%v{my_id}.d{pfi}"
+                    pf_pre = "{pf_pre}    {pf_dtmp} = bitcast double {value_ref(pf_id)} to i64\n"
+                    pf_slots = "{pf_slots}{pf_sep}i64 {pf_dtmp}"
                 else:
                     pf_slots = "{pf_slots}{pf_sep}i64 {value_ref(pf_id)}"
             else:
                 pf_slots = "{pf_slots}{pf_sep}i64 0"
-        pf_fam = if op is "perform_int" then "__orion_perform_int_n" else "__orion_perform_text_n"
-        pf_ret = if op is "perform_int" then "i64" else "ptr"
+        # Three carriers, one shape. The ARGUMENTS are 64-bit words in every
+        # case; only the answer differs.
+        edit pf_fam = "__orion_perform_int_n"
+        edit pf_ret = "i64"
+        if op is "perform_text":
+            pf_fam = "__orion_perform_text_n"
+            pf_ret = "ptr"
+        if op is "perform_real":
+            pf_fam = "__orion_perform_real_n"
+            pf_ret = "double"
         result = "{pf_pre}    {value_ref(my_id)} = call {pf_ret} @{pf_fam}(ptr @{inst.name}, i64 {pf_n}, {pf_slots})"
 
     if op is "fn_ref":
@@ -496,8 +533,25 @@ public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_va
     if op is "int_to_text":
         result = "    {value_ref(my_id)} = call ptr @orion_int_to_text(i64 {value_ref(inst.value)})"
 
+    if op is "text_byte_at":
+        # A text VALUE points at its first byte (the 16-byte header sits
+        # behind it), so the i-th byte is one getelementptr and one load.
+        tba_p = "%v{my_id}.p"
+        tba_b = "%v{my_id}.b"
+        result = "    {tba_p} = getelementptr i8, ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}\n    {tba_b} = load i8, ptr {tba_p}\n    {value_ref(my_id)} = zext i8 {tba_b} to i64"
+
     if op is "text_len":
         result = "    {value_ref(my_id)} = call i64 @orion_tlen(ptr {value_ref(inst.value)})"
+
+    if op is "text_chars":
+        result = "    {value_ref(my_id)} = call i64 @orion_tchars(ptr {value_ref(inst.value)})"
+
+    if op is "truth_text":
+        tt_c = "%v{my_id}.tc"
+        result = "    {tt_c} = icmp ne i64 {value_ref(inst.value)}, 0\n    {value_ref(my_id)} = select i1 {tt_c}, ptr getelementptr(i8, ptr @.str_true_h, i64 16), ptr getelementptr(i8, ptr @.str_false_h, i64 16)"
+
+    if op is "text_cpoff":
+        result = "    {value_ref(my_id)} = call i64 @orion_cpoff(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)})"
 
     if op is "text_slice":
         result = "    {value_ref(my_id)} = call ptr @orion_text_slice(ptr {value_ref(inst.value)}, i64 {value_ref(inst.lhs)}, i64 {value_ref(inst.rhs)})"
@@ -797,11 +851,18 @@ public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_va
             val_id = inst.args[pi * 2 + 1]
             val_inst = fn_value.instructions[val_id]
             val_ty = llvm_type_of(val_inst.type_text)
-            # Map slots are i64. ptr-typed values need ptrtoint first.
+            # Map slots are i64. A pointer is ptrtoint'd, a double stores
+            # its BITS - the same deal a list slot makes, and `map_get` bitcasts
+            # back. Without it `{"a": 1.5}` handed clang an f64 where the call
+            # wanted an i64, and the error was clang's, about a line nobody wrote.
             if val_ty is "ptr":
                 tmp = "%v{my_id}.p{pi}"
                 text = "{text}\n    {tmp} = ptrtoint ptr {value_ref(val_id)} to i64"
                 text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {tmp})"
+            else if val_ty is "double":
+                dtmp = "%v{my_id}.d{pi}"
+                text = "{text}\n    {dtmp} = bitcast double {value_ref(val_id)} to i64"
+                text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {dtmp})"
             else:
                 text = "{text}\n    call void @orion_map_set(ptr {value_ref(my_id)}, ptr {value_ref(key_id)}, i64 {value_ref(val_id)})"
         result = text
@@ -925,6 +986,10 @@ public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_va
             l3 = "    {null_name} = icmp eq i64 {int_name}, 0"
             l4 = "    {value_ref(my_id)} = select i1 {null_name}, ptr {mg_empty}, ptr {raw_name}"
             result = "{l1}\n{l2}\n{l3}\n{l4}"
+        else if ty is "double":
+            mgd = "%v{my_id}.di"
+            m1 = "    {mgd} = call i64 @{mg_fam}(ptr {value_ref(inst.value)}, {mg_kty} {value_ref(inst.lhs)})"
+            result = "{m1}\n    {value_ref(my_id)} = bitcast i64 {mgd} to double"
         else:
             result = "    {value_ref(my_id)} = call i64 @{mg_fam}(ptr {value_ref(inst.value)}, {mg_kty} {value_ref(inst.lhs)})"
 
@@ -1019,7 +1084,7 @@ public define emit_instruction(inst: Inst, my_id: number, strings: [text], fn_va
 
     # --trace: exit-hook fore VARJE ret - djupraknaren bakom stega
     # over/ut. Speglar trace_enter som ast_to_ir lagger i prologen.
-    if op is "return" and slot_get_int("drv:trace") is 1:
+    if op is "return" and slot_get_number("drv:trace") is 1:
         result = "    call i64 @orion_trace_exit()\n{result}"
 
     # An op no branch above handled would silently emit a placeholder
@@ -1048,7 +1113,7 @@ define memfact_count(kind: text):
     slot_set("emit:mf:" + kind, memfact_get(kind) + 1)
 
 define memfact_get(kind: text) -> number:
-    if slot_has("emit:mf:" + kind) then slot_get_int("emit:mf:" + kind) else 0
+    if slot_has("emit:mf:" + kind) then slot_get_number("emit:mf:" + kind) else 0
 
 define memfact_note(fn_name: text, type_text: text):
     n = memfact_get("opaque")
@@ -1169,9 +1234,8 @@ define emit_param_types(params: [Param]) -> text:
 
 public define emit_fn(fn_value: IRFn, strings: [text], module: IRModule) -> text:
     name = fn_value.name
-    # Skip emission of compile-time aliases that exist only so lodge-orion
-    # can interpret the source; orion-self dispatches their callers directly
-    # to typed runtime helpers.
+    # Skip compile-time aliases: their callers are dispatched straight to the
+    # typed runtime helpers.
     is_alias = name is "get_int" or name is "get_map" or name is "get_list"
     if is_alias:
         ""
@@ -1450,6 +1514,63 @@ define emit_runtime() -> text:
     text = "{text}declare ptr @orion_text_seal(ptr)\n"
     text = "{text}declare ptr @orion_text_from_c(ptr)\n"
     text = "{text}declare i64 @orion_text_hash(ptr)\n"
+    # How many CHARACTERS. A byte that is not a UTF-8 continuation
+    # (10xxxxxx, mask 0xC0 value 0x80) starts one, so counting them
+    # counts characters. `bytes_count` still answers the other question.
+    # The byte offset of character `k`. The loop only ever stands at the
+    # START of a character, so the lead byte says how far to step: under
+    # 0xC0 is one byte, then 0xE0, 0xF0 for two, three and four.
+    text = "{text}define i64 @orion_cpoff(ptr %s, i64 %k) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %on = call i64 @orion_tlen(ptr %s)\n"
+    text = "{text}  br label %oloop\n"
+    text = "{text}oloop:\n"
+    text = "{text}  %oi = phi i64 [ 0, %entry ], [ %oi2, %obody ]\n"
+    text = "{text}  %oc = phi i64 [ 0, %entry ], [ %oc2, %obody ]\n"
+    text = "{text}  %oend = icmp sge i64 %oi, %on\n"
+    text = "{text}  %ohit = icmp sge i64 %oc, %k\n"
+    text = "{text}  %ostop = or i1 %oend, %ohit\n"
+    text = "{text}  br i1 %ostop, label %oout, label %obody\n"
+    text = "{text}obody:\n"
+    text = "{text}  %obp = getelementptr i8, ptr %s, i64 %oi\n"
+    text = "{text}  %ob = load i8, ptr %obp\n"
+    text = "{text}  %obz = zext i8 %ob to i64\n"
+    text = "{text}  %ow2 = icmp uge i64 %obz, 192\n"
+    text = "{text}  %ow3 = icmp uge i64 %obz, 224\n"
+    text = "{text}  %ow4 = icmp uge i64 %obz, 240\n"
+    text = "{text}  %oa1 = select i1 %ow2, i64 2, i64 1\n"
+    text = "{text}  %oa2 = select i1 %ow3, i64 3, i64 %oa1\n"
+    text = "{text}  %oa3 = select i1 %ow4, i64 4, i64 %oa2\n"
+    text = "{text}  %oi2 = add i64 %oi, %oa3\n"
+    text = "{text}  %oc2 = add i64 %oc, 1\n"
+    text = "{text}  br label %oloop\n"
+    text = "{text}oout:\n"
+    text = "{text}  ret i64 %oi\n"
+    text = "{text}\}\n"
+    text = "{text}\n"
+    text = "{text}define i64 @orion_tchars(ptr %p) \{\n"
+    text = "{text}entry:\n"
+    text = "{text}  %chp = getelementptr i8, ptr %p, i64 -8\n"
+    text = "{text}  %cn = load i64, ptr %chp\n"
+    text = "{text}  br label %cloop\n"
+    text = "{text}cloop:\n"
+    text = "{text}  %ci = phi i64 [ 0, %entry ], [ %ci2, %cbody ]\n"
+    text = "{text}  %cc = phi i64 [ 0, %entry ], [ %cc2, %cbody ]\n"
+    text = "{text}  %cdone = icmp sge i64 %ci, %cn\n"
+    text = "{text}  br i1 %cdone, label %cout, label %cbody\n"
+    text = "{text}cbody:\n"
+    text = "{text}  %cbp = getelementptr i8, ptr %p, i64 %ci\n"
+    text = "{text}  %cb = load i8, ptr %cbp\n"
+    text = "{text}  %cm = and i8 %cb, -64\n"
+    text = "{text}  %ccont = icmp eq i8 %cm, -128\n"
+    text = "{text}  %cadd = select i1 %ccont, i64 0, i64 1\n"
+    text = "{text}  %cc2 = add i64 %cc, %cadd\n"
+    text = "{text}  %ci2 = add i64 %ci, 1\n"
+    text = "{text}  br label %cloop\n"
+    text = "{text}cout:\n"
+    text = "{text}  ret i64 %cc\n"
+    text = "{text}\}\n"
+    text = "{text}\n"
     text = "{text}define i64 @orion_tlen(ptr %p) \{\n"
     text = "{text}entry:\n"
     text = "{text}  %hp = getelementptr i8, ptr %p, i64 -8\n"
@@ -1514,6 +1635,8 @@ define emit_runtime() -> text:
     # the test runner / driver compiles alongside our .ll.
     text = "{text}declare i64 @__orion_perform_int(ptr, i64)\n"
     text = "{text}declare void @__orion_resume_int(i64)\n"
+    text = "{text}declare void @__orion_resume_real(double)\n"
+    text = "{text}declare double @__orion_perform_real_n(ptr, i64, i64, i64, i64, i64)\n"
     text = "{text}declare ptr @__orion_perform_text(ptr, ptr)\n"
     text = "{text}declare void @__orion_resume_text(ptr)\n"
     # N-argument perform (0..4). Every Orion value is a 64-bit word, so the
@@ -1527,6 +1650,8 @@ define emit_runtime() -> text:
     text = "{text}@.fmt_int = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n"
     text = "{text}@.fmt_float = private unnamed_addr constant [4 x i8] c\"%g\\0A\\00\"\n"
     text = "{text}@.fmt_g = private unnamed_addr constant [3 x i8] c\"%g\\00\"\n"
+    text = "{text}@.fmt_gp = private unnamed_addr constant [5 x i8] c\"%.*g\\00\"\n"
+    text = "{text}declare double @strtod(ptr, ptr)\n"
     text = "{text}@.fmt_int_raw = private unnamed_addr constant [5 x i8] c\"%lld\\00\"\n"
     text = "{text}@.msg_oob = private unnamed_addr constant [48 x i8] c\"orion: list index %lld out of range (len %lld)\\0A\\00\"\n"
     text = "{text}@.msg_divz = private unnamed_addr constant [25 x i8] c\"orion: division by zero\\0A\\00\"\n"
@@ -1751,6 +1876,13 @@ define emit_runtime() -> text:
     # length, then the bytes). A missing map key typed `text` selects this
     # instead of a null pointer, so `len` on it answers 0.
     text = "{text}@.str_empty_h = constant [3 x i64] [i64 5381, i64 0, i64 0]\n\n"
+    # `true` and `false` as texts, laid out like any other: hash, length,
+    # bytes. The hash is BAKED IN and must be - a text with a zero hash gets
+    # one computed and CACHED INTO ITS HEADER on the first comparison, and
+    # these two live in read-only memory, so the program died writing to them.
+    # (`@.str_empty_h` above carries 5381 for exactly this reason.)
+    text = "{text}@.str_true_h = constant \{ i64, i64, [5 x i8] \} \{ i64 966814151, i64 4, [5 x i8] c\"true\\00\" \}\n"
+    text = "{text}@.str_false_h = constant \{ i64, i64, [6 x i8] \} \{ i64 491283972, i64 5, [6 x i8] c\"false\\00\" \}\n\n"
     # NULL in = "" out: a missing text (unknown fn result, absent map
     # field) evacuates to empty instead of strlen(NULL) crashing.
     text = "{text}define ptr @orion_persist_text(ptr %s) \{\n"
@@ -2659,14 +2791,24 @@ define emit_runtime() -> text:
     text = "{text}  %v = call i64 @orion_map_get(ptr %map, ptr %key)\n"
     text = "{text}  ret i64 %v\n"
     text = "{text}\}\n\n"
-    # f64 → text via snprintf %g (for interpolation and to_text).
+    # f64 -> text: the SHORTEST decimal that reads back as the same double.
+    # `%g` alone is six significant digits, so 123456789.5 came out
+    # 1.23457e+08 and 1/3 came out 0.333333 - a number the program never
+    # held. Try one digit, then two, until strtod gives the bits back.
+    # f64 -> text: the shortest decimal that reads back as the same double.
+    # The loop lives in the C runtime (orion_f64_text_into) - it has to
+    # compare STRING lengths across every precision that round-trips, and
+    # ten printed as `1e+01` until it did.
+    text = "{text}declare void @orion_f64_text_into(ptr, double)\n"
+    text = "{text}\n"
     text = "{text}define ptr @orion_f64_to_text(double %v) \{\n"
     text = "{text}entry:\n"
-    text = "{text}  %buf = call ptr @orion_text_alloc(i64 31)\n"
-    text = "{text}  %_n = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %buf, i64 32, ptr @.fmt_g, double %v)\n"
+    text = "{text}  %buf = call ptr @orion_text_alloc(i64 39)\n"
+    text = "{text}  call void @orion_f64_text_into(ptr %buf, double %v)\n"
     text = "{text}  %sealed = call ptr @orion_text_seal(ptr %buf)\n"
     text = "{text}  ret ptr %sealed\n"
-    text = "{text}\}\n\n"
+    text = "{text}\}\n"
+    text = "{text}\n"
     # SIMD-style elementwise vector ops over int lists. Scalar fallback;
     # autovectorizer may lift to <N x i64> via -Os.
     text = "{text}define ptr @orion_vec_add(ptr %a, ptr %b) \{\n"
@@ -2758,7 +2900,7 @@ public define emit_module(module: IRModule) -> text:
         # resolves at link time (C shim / libc). Runtime symbols skip
         # even the declare: emit_runtime DEFINES those and LLVM rejects
         # declare+define of one name in a module. Guard-if style, not
-        # if/else - lodge-orion's dangling-else binds else to the inner if.
+        # if/else, because a dangling else binds to the inner if.
         is_extern_decl = length(fn_value.instructions) is 0
         if is_extern_decl:
             if not is_runtime_symbol(fn_value.name):

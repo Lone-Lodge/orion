@@ -1,6 +1,9 @@
 # http - fetch and post over HTTP(S).
 #
-# The INTERFACE is the commitment: request in, `response{status, body}` out.
+# The INTERFACE is the commitment: request in, `reply{status, body}` out.
+# Named `reply` and not `response` because `app` has a `response` of its own,
+# with a `mime` field, and a type name is ONE layout for the whole build - a
+# program that used both orbs did not compile and the error was about a field.
 # The engine behind it is curl as a child process (present on Windows 10+,
 # macOS and virtually every Linux), which buys TLS, redirects and proxies
 # for free. A native client (net orb + a TLS layer) can replace the engine
@@ -8,17 +11,15 @@
 #
 # Blocking by design per call - run it inside a task (see the async orb)
 # and the scheduler keeps everything else moving while curl works.
-use os
-use text
 
-type response:
+type reply:
     status: number
     body: text
 
 # The scratch file curl writes the body to. Per-call unique via the slot
 # counter, so concurrent tasks never share a file.
 define scratch_path() -> text:
-    n = if slot_has("http:n") then slot_get_int("http:n") else 0
+    n = if slot_has("http:n") then slot_get_number("http:n") else 0
     slot_set("http:n", n + 1)
     ".http_body_{n}.txt"
 
@@ -41,7 +42,7 @@ public define status_from_headers(header_dump: text) -> number:
 
 # Run curl with `args`, reading the body from `body_file`. Status 0 means
 # the request itself failed (no network, bad host, curl missing).
-define run_curl(args: [text], body_file: text) -> response:
+define run_curl(args: [text], body_file: text) -> reply:
     hdr_file = "{body_file}.hdr"
     log_file = "{body_file}.log"
     edit all_args = ["-sS", "--max-time", "60", "-L", "-o", body_file, "-D", hdr_file]
@@ -49,11 +50,11 @@ define run_curl(args: [text], body_file: text) -> response:
         all_args = append(all_args, args[i])
     job = start_command_to_file("curl", all_args, log_file)
     if job < 0:
-        return response{status: 0, body: ""}
+        return reply{status: 0, body: ""}
     if not finished_within(job, 65000):
         stopped = stop_command(job)
         reaped = command_result(job)
-        return response{status: 0, body: ""}
+        return reply{status: 0, body: ""}
     rc = command_result(job)
     status = status_from_headers(read_file(hdr_file))
     body = read_file(body_file)
@@ -64,16 +65,16 @@ define run_curl(args: [text], body_file: text) -> response:
     # A failed request answers status 0 with curl's OWN complaint as the
     # body ("could not resolve host", proxy refusals...), so the caller can
     # show WHY instead of a blank.
-    if rc is not 0 then response{status: 0, body: trim(err)} else response{status: status, body: body}
+    if rc is not 0 then reply{status: 0, body: trim(err)} else reply{status: status, body: body}
 
 # GET `url`. `success(r)` when the request went through AND the server said 2xx.
 # no example: needs the network - proven by examples/demos/httpd.or + manual runs
-public define fetch(url: text) -> response uses net, files:
+public define fetch(url: text) -> reply uses net, files:
     run_curl([url], scratch_path())
 
 # POST `body` to `url` with the given Content-Type.
 # no example: needs the network - proven by manual runs
-public define post(url: text, content_type: text, payload: text) -> response uses net, files:
+public define post(url: text, content_type: text, payload: text) -> reply uses net, files:
     body_file = scratch_path()
     payload_file = "{body_file}.out"
     wrote = write_file(payload_file, payload)
@@ -82,8 +83,8 @@ public define post(url: text, content_type: text, payload: text) -> response use
     r
 
 # Did the request reach a server that answered success?
-public define success(r: response) -> truth:
-    example success(response{status: 200, body: ""})
-    example not success(response{status: 404, body: ""})
-    example not success(response{status: 0, body: ""})
+public define success(r: reply) -> truth:
+    example success(reply{status: 200, body: ""})
+    example not success(reply{status: 404, body: ""})
+    example not success(reply{status: 0, body: ""})
     r.status >= 200 and r.status < 300

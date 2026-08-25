@@ -574,6 +574,27 @@ char *orion_text_alloc(long long len) {
 
 long long orion_tlen_c(const char *p) { return ((const long long *)p)[-1]; }
 
+/* A real number as the SHORTEST decimal that reads back as the same double.
+ *
+ * `%g` alone is six significant digits, so 123456789.5 came out 1.23457e+08.
+ * Trying precisions until one round-trips fixes that but picks the fewest
+ * DIGITS, and %g switches to exponent form when the exponent reaches the
+ * precision - so ten printed as `1e+01`, which round-trips and is not what
+ * anybody writes. Every precision that round-trips is tried and the shortest
+ * STRING wins; for ten that is `10`, for 1e20 it is `1e+20`. */
+void orion_f64_text_into(char *out, double v) {
+    char buf[40];
+    out[0] = 0;
+    for (int prec = 1; prec <= 17; prec++) {
+        snprintf(buf, sizeof buf, "%.*g", prec, v);
+        if (strtod(buf, NULL) != v) continue;
+        if (out[0] == 0 || strlen(buf) < strlen(out)) {
+            memcpy(out, buf, strlen(buf) + 1);
+        }
+    }
+    if (out[0] == 0) snprintf(out, 40, "%.17g", v);
+}
+
 /* Fix the header length after a C formatter wrote into the buffer
  * (snprintf paths do not know their length up front). */
 char *orion_text_seal(char *p) {
@@ -1201,6 +1222,45 @@ long long __orion_perform_int(long long (*handler)(long long), long long arg) {
     }
     current_k = old_k;
     return ret;
+}
+
+/* Real variants - the same setjmp dance, but the value is a double. An
+ * effect declared `-> number` that the analysis settled on real needs a
+ * carrier that is one: routed through the int one, `resume(m / 2)` came back
+ * as the integer that went in. Its own global, like the text one, so nested
+ * performs of different kinds cannot read each other's slot. Arguments stay
+ * 64-bit words; only the ANSWER is real here. */
+static double resume_real_value = 0.0;
+
+static double orion_call_handler_real_n(void *h, long long n,
+                                        long long a0, long long a1,
+                                        long long a2, long long a3) {
+    if (n <= 0) return ((double (*)(void))h)();
+    if (n == 1) return ((double (*)(long long))h)(a0);
+    if (n == 2) return ((double (*)(long long, long long))h)(a0, a1);
+    if (n == 3) return ((double (*)(long long, long long, long long))h)(a0, a1, a2);
+    return ((double (*)(long long, long long, long long, long long))h)(a0, a1, a2, a3);
+}
+
+double __orion_perform_real_n(void *handler, long long n,
+                              long long a0, long long a1,
+                              long long a2, long long a3) {
+    jmp_buf jb;
+    jmp_buf *old_k = current_k;
+    current_k = &jb;
+    double ret;
+    if (setjmp(jb) == 0) {
+        ret = orion_call_handler_real_n(handler, n, a0, a1, a2, a3);
+    } else {
+        ret = resume_real_value;
+    }
+    current_k = old_k;
+    return ret;
+}
+
+void __orion_resume_real(double value) {
+    resume_real_value = value;
+    longjmp(*current_k, 1);
 }
 
 /* Resume the current continuation with `value`. Does not return. */

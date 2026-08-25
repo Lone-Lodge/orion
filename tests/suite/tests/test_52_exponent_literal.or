@@ -1,0 +1,16 @@
+# `1e20` and `2.5e-3` are numbers. The lexer stopped at the `e`, so `1.0e20`
+# was the float `1.0` followed by an identifier `e20` - and inside an
+# interpolation hole that printed `1`, silently, for a hundred quintillion.
+#
+# The digit after the (optional) sign is what makes it safe to consume: without
+# it `2e` would swallow a name, and a number followed by a name is not a
+# number.
+
+define main() -> number:
+    a = if 1e3 is 1000.0 then 20 else 0
+    b = if 2.5e-3 > 0.0024 and 2.5e-3 < 0.0026 then 12 else 0
+    c = if 1E2 is 100.0 then 10 else 0
+    # no exponent: `e` is still a name, and `2` is still whole
+    e = 5
+    d = if 2 * e is 10 then 10 else 0
+    a + b + c + d   # 20 + 12 + 10 + 10

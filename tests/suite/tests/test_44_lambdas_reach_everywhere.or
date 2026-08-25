@@ -1,0 +1,38 @@
+# A lambda has to be LIFTED to a top-level function before the lowering sees
+# it. The lift walked calls, operators, struct fields and named arguments -
+# and nothing else. Anywhere else a lambda could sit, it stayed a lambda and
+# the lowering said `unhandled AST node kind Lambda` and emitted a zero.
+#
+# The shapes that were missing: inside an `if` (all three parts), under an
+# INDEX - `each(xs, (x): ...)[1]`, the commonest of the lot - under a field
+# read, a `?`, inside a list or tuple literal, and handed to a `perform`.
+#
+# There are TWO lists of node kinds: one that decides whether a statement
+# holds a lambda at all, and one that walks in to lift it. They have to agree.
+# `nlam_lift` grew the `if` case first and nothing changed, because the gate
+# in front of it still said there was nothing to lift.
+#
+# Three of `iter`'s own `example` lines had been failing on this: the checker
+# wraps every claim as `if <claim>: 0 else: 1`.
+
+define main() -> number:
+    xs = [1, 2, 3, 4]
+
+    # under an INDEX, inside an if-condition
+    a = if each(xs, (n): n * 2)[1] is 4 then 12 else 0
+
+    # in an if-EXPRESSION's branches
+    pick = if length(xs) > 2 then keep(xs, (n): n > 2) else keep(xs, (n): n < 0)
+    b = if length(pick) is 2 then 10 else 0
+
+    # inside a list literal
+    fns = [(n): n + 1, (n): n + 10]
+    c = if length(fns) is 2 then 12 else 0
+
+    # a tail if-expression, which is what a function's last line usually is
+    d = tail_shaped(xs)
+
+    a + b + c + d   # 12 + 10 + 12 + 10
+
+define tail_shaped(xs: list of number) -> number:
+    if length(keep(xs, (n): n > 2)) is 2 then 10 else 0

@@ -1,0 +1,12 @@
+# Writing JSON: build a typed Json value and json_stringify it. Objects are
+# checked by round-tripping through json_parse (avoids a literal brace, which
+# is an interpolation delimiter in source).
+
+define main() -> number:
+    ok_arr = if json_stringify(jarr([jnum(1), jnum(2), jnum(3)])) is "[1,2,3]" then 1 else 0
+    ok_prim = if json_stringify(jnull()) is "null" and json_stringify(jbool(true)) is "true" and json_stringify(jbool(false)) is "false" then 1 else 0
+    ok_str = if json_stringify(jstr("hi")) is "\"hi\"" then 1 else 0
+    obj = jobj(["age", "name"], [jnum(42), jstr("Jo")])
+    rp = json_parse(json_stringify(obj))
+    ok_round = if json_whole(rp, "age") is 42 and json_text(rp, "name") is "Jo" then 1 else 0
+    ok_arr * 16 + ok_prim * 16 + ok_str * 16 + ok_round * 16   # 64

@@ -1,0 +1,22 @@
+# `truth` is a type in the language and never showed. `"{3 > 2}"` printed `1` -
+# what the machine holds, not what the program said.
+#
+# It is still an i64 in the machine. What changed is that the compiler can tell
+# the two apart: a comparison, `and` / `or` / `not`, the two literals, and a
+# function declared `-> truth` all carry the type now, and the ONE place that
+# turns a value into text asks. The plumbing is transparent - the IR for 216
+# programs came out byte-identical until the printing changed.
+
+define alive(hp: number) -> truth:
+    hp > 0
+
+define main() -> number:
+    a = if "{3 > 2}" is "true" and "{1 > 2}" is "false" then 20 else 0
+    b = if "{true}" is "true" and "{false}" is "false" then 12 else 0
+    # a name that holds one, and a function that answers one
+    ok = 5 > 1
+    c = if "{ok}" is "true" and "{alive(5)}" is "true" and "{alive(0)}" is "false" then 14 else 0
+    d = if "{not true}" is "false" and "{true and false}" is "false" then 8 else 0
+    # a NUMBER is still a number: 1 is one, not true
+    e = if "{1}" is "1" and "{0}" is "0" then 4 else 0
+    a + b + c + d + e   # 20 + 12 + 14 + 8 + 4

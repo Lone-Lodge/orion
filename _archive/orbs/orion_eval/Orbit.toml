@@ -1,6 +1,0 @@
-name = "orion_eval"
-version = "0.0.1"
-description = "Orion self-host — eval"
-
-[orbs]
-bytes = "*"

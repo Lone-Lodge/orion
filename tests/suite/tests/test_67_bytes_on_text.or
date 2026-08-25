@@ -1,0 +1,26 @@
+# A text IS the packed byte form - `[hash][len][u8 ...]` - so the byte
+# operations read it where it lies. Handed a text, they used to read its
+# pointer as a list header and answer 5381 for the letter A: no error, just a
+# number from the wrong place.
+#
+# And the way around it, `bytes_of` first, copies the whole text into a list at
+# EIGHT bytes per byte. A megabyte read from disk became eight in memory.
+define main() -> number:
+    s = "ABCDE"
+
+    # straight off the text
+    a = byte_at(s, 0)               # 65
+    b = byte_at(s, 4)               # 69
+    n = bytes_count(s)              # 5
+
+    # and through a list, which must still answer the same
+    bs = bytes_of(s)
+    c = byte_at(bs, 0)              # 65
+    d = bytes_count(bs)             # 5
+
+    ok_same = if a is c and n is d then 20 else 0
+    ok_a = if a is 65 then 20 else 0
+    ok_b = if b is 69 then 20 else 0
+    ok_n = if n is 5 then 7 else 0
+
+    ok_same + ok_a + ok_b + ok_n    # 20*3 + 7
