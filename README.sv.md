@@ -60,10 +60,11 @@ Ingen projektfil, ingen utdatasökväg att namnge, ingen clang-rad att skriva.
 | `tools/runtime_bench.sh` | hur snabb koden den skickar ut är |
 
 CI kör dem på Linux, Windows och macOS, från en utcheckning utan en enda binär
-på disk. Den startas för hand från Actions-fliken, och vid varje pull request.
-Den är inte grön än: sviten hade aldrig körts någon annanstans än på
-författarens Windows-maskin, och första körningen hittade sex riktiga fel. Fem
-av dem failade här också - grindar ingen kört på månader.
+på disk, för hand från Actions-fliken och vid varje pull request. Första gången
+den kördes hittade den elva riktiga fel: Windows-API:er utan vakt i runtimen,
+MSVC-flaggor till macOS-länkaren, ett gammalt frö, och fem grindar som lärde ut
+ord språket pensionerat. Nio av elva failade på författarens egen maskin också.
+Så mycket är en grind ingen kör värd.
 
 ## WebAssembly
 

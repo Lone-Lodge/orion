@@ -59,11 +59,11 @@ No project file, no output path to name, no clang line to write.
 | `tools/runtime_bench.sh` | how fast the code it emits runs |
 
 CI runs them on Linux, Windows and macOS, from a checkout with no binary on
-disk. It is started by hand from the Actions tab, and on every pull request.
-It is not green yet: the suite had never been run anywhere but this author's
-Windows machine, and the first run found six real faults. Five of them failed
-here too - gates nobody had run in months. The remaining work is tracked by
-the run itself.
+disk, by hand from the Actions tab and on every pull request. The first time it
+ever ran it found eleven real faults: unguarded Windows APIs in the runtime,
+MSVC linker flags handed to the macOS linker, a stale seed, and five gates that
+had been teaching words the language retired. Nine of the eleven failed on the
+author's machine too. That is what a gate nobody runs is worth.
 
 ## WebAssembly
 
