@@ -56,6 +56,9 @@ jobs:
 
       # Gates that need a project of their own, not a single file: the
       # deterministic certificate across a call graph, and the orb boundary.
+      - name: png decoder
+        run: bash tools/png_test.sh
+
       - name: project gates
         run: bash tools/project_test.sh
 

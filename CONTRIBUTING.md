@@ -57,6 +57,18 @@ with no way to tell whether it works, or a diff that mixes a fix with a
 reformat. If you are unsure whether something is wanted, open an issue first
 and ask - that costs you nothing and saves you an afternoon.
 
+## When the seed will not build
+
+The committed seed is a compiler, and a commit that renames a word the
+compiler itself uses can leave it unable to build the sources that follow it.
+Two scripts exist for exactly that, and nothing calls them because you only
+reach for them when you are stuck:
+
+```sh
+bash tools/bootstrap_bridge.sh   # get past a commit that renames a builtin
+bash tools/bootstrap_walk.sh     # the seed is older than the sources
+```
+
 ## Where things live
 
 ```
