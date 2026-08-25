@@ -9,10 +9,11 @@
 
 name: pages
 
+# No path filter: a force-push has no diff GitHub can filter on, so the guide
+# silently never deployed. The job is a copy and an upload, it costs nothing.
 on:
   push:
     branches: [main]
-    paths: ['docs/**']
   workflow_dispatch:
 
 permissions:
