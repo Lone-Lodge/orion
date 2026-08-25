@@ -1224,10 +1224,21 @@ define cli_build(path: text) -> text:
     # /STACK is a Windows PE linker flag; POSIX raises the stack via ulimit
     # (Linux) or a link-time flag (macOS - main-thread stack is capped there).
     # -Wno-override-module silences the retargeted-triple note (no-op on Win).
-    # -ffunction-sections + /OPT:REF strippar OANVAND runtimekod ur exe:n
+    # -ffunction-sections + dead-strip tar OANVAND runtimekod ur exe:n
     # (mindre binarer, och farre antivirus-heuristiktraffar: en testbinar
     # bar inte langre med sig process-spawn/nat/fs den aldrig anropar).
-    edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module", "-ffunction-sections", "-fdata-sections", "-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF"]
+    # Varje lankare stavar det pa sitt satt, och /OPT stod har oskyddat: mac
+    # letade efter en fil som hette /OPT:REF och lankningen dog.
+    edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module", "-ffunction-sections", "-fdata-sections"]
+    if os_kind() is 0:
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "/OPT:REF")
+        link_args = append(link_args, "-Xlinker")
+        link_args = append(link_args, "/OPT:ICF")
+    else if os_kind() is 2:
+        link_args = append(link_args, "-Wl,-dead_strip")
+    else:
+        link_args = append(link_args, "-Wl,--gc-sections")
     if extra_link is not "":
         extras = split(extra_link, " ")
         loop x_index in 0 until length(extras):
