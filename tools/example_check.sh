@@ -73,7 +73,7 @@ EOF
         probe="$WORK/${orb}_$n.or"
         {
             echo "use $orb"
-            echo "define main() -> int:"
+            echo "define main() -> number:"
             echo "    if $expr:"
             echo "        0"
             echo "    else:"
@@ -85,11 +85,18 @@ EOF
         fi
         # -lm: the num orb's transcendentals need libm on Linux. NOT on
         # Windows - lld-link then demands an m.lib that does not exist.
-        if ! "$CLANG" "$WORK/p.ll" "$ROOT/runtime/orion_cli.c" "$ROOT/runtime/orion_rt.c" $LIBM -o "$WORK/p.exe" > /dev/null 2>&1; then
+        exe="$WORK/${orb}_$n.exe"
+        if ! "$CLANG" "$WORK/p.ll" "$ROOT/runtime/orion_cli.c" "$ROOT/runtime/orion_rt.c" $LIBM -o "$exe" > /dev/null 2>&1; then
             printf "  %-28s LINK FAILED\n" "$orb #$n"; echo FAIL >> "$WORK/fails"
             continue
         fi
-        if "$WORK/p.exe"; then
+        # Windows sometimes refuses to execute an exe for a moment after it is
+        # written (126 = cannot execute). That is not the example being false,
+        # so tell the two apart and give the file a breath before believing it.
+        chmod +x "$exe" 2>/dev/null || true
+        "$exe"; rc=$?
+        if [ "$rc" -eq 126 ]; then sleep 1; "$exe"; rc=$?; fi
+        if [ "$rc" -eq 0 ]; then
             :
         else
             printf "  %-28s FALSE: example %s\n" "$orb #$n" "$expr"
