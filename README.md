@@ -58,9 +58,12 @@ No project file, no output path to name, no clang line to write.
 | `tools/compile_bench.sh` | how fast the compiler runs |
 | `tools/runtime_bench.sh` | how fast the code it emits runs |
 
-CI runs all of them on Linux, Windows and macOS, from a checkout with no binary
-on disk. It is manual: run it from the Actions tab, because a push does not need
-a runner to repeat what these already said.
+CI runs them on Linux, Windows and macOS, from a checkout with no binary on
+disk. It is started by hand from the Actions tab, and on every pull request.
+It is not green yet: the suite had never been run anywhere but this author's
+Windows machine, and the first run found six real faults. Five of them failed
+here too - gates nobody had run in months. The remaining work is tracked by
+the run itself.
 
 ## WebAssembly
 

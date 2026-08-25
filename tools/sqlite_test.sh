@@ -35,7 +35,7 @@ use sqlite
 use os
 use text
 
-define main() -> int:
+define main() -> number:
     junk = remove_file("scores.db")
     db = db_open("scores.db")
     if db < 0:
@@ -49,11 +49,11 @@ define main() -> int:
 
     rows = db_rows(db, "SELECT name, points FROM scores ORDER BY points DESC")
     top = columns(at(rows, 0))
-    order_ok = len(rows) is 3 and at(top, 0) is "mio" and at(top, 1) is "30"
+    order_ok = length(rows) is 3 and at(top, 0) is "mio" and at(top, 1) is "30"
 
     kept = db_one(db, "SELECT count(*) FROM scores") is "3"
     injected = db_rows_with(db, "SELECT points FROM scores WHERE name = ?", [nasty])
-    bound_ok = len(injected) is 1 and at(injected, 0) is "7"
+    bound_ok = length(injected) is 1 and at(injected, 0) is "7"
 
     upd = db_run_with(db, "UPDATE scores SET points = ? WHERE name = ?", ["50", "alva"])
     sum_ok = db_one(db, "SELECT sum(points) FROM scores") is "87"
@@ -62,7 +62,7 @@ define main() -> int:
     err_ok = not bad and contains(db_error(db), "saknas")
 
     closed = db_close(db) is 0
-    print_line("rows={len(rows)} top={at(top, 0)} err={db_error(db)}")
+    print_line("rows={length(rows)} top={at(top, 0)} err={db_error(db)}")
     p1 = if inserted then 8 else 0
     p2 = if order_ok then 8 else 0
     p3 = if kept and bound_ok then 10 else 0

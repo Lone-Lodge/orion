@@ -23,7 +23,7 @@ G() { git -C "$1" -c user.email=t@t -c user.name=t "${@:2}"; }
 # --- package c: a leaf orb nobody's app names directly
 CPKG="$WORK/cpkg"; mkdir -p "$CPKG"
 cat > "$CPKG/lib.or" <<'EOF'
-public define c_base() -> int:
+public define c_base() -> number:
     example c_base() is 15
     15
 EOF
@@ -33,7 +33,7 @@ G "$CPKG" init -q -b main; G "$CPKG" add -A; G "$CPKG" commit -qm one
 APKG="$WORK/apkg"; mkdir -p "$APKG"
 cat > "$APKG/lib.or" <<'EOF'
 use cpkg
-public define a_answer() -> int:
+public define a_answer() -> number:
     example a_answer() is 20
     c_base() + 5
 EOF
@@ -47,13 +47,13 @@ G "$APKG" init -q -b main; G "$APKG" add -A; G "$APKG" commit -qm one
 # --- package b: tagged v1, then moved PAST the tag (get@v1 must not see it)
 BPKG="$WORK/bpkg"; mkdir -p "$BPKG"
 cat > "$BPKG/lib.or" <<'EOF'
-public define b_answer() -> int:
+public define b_answer() -> number:
     example b_answer() is 21
     21
 EOF
 G "$BPKG" init -q -b main; G "$BPKG" add -A; G "$BPKG" commit -qm one; G "$BPKG" tag v1
 cat > "$BPKG/lib.or" <<'EOF'
-public define b_answer() -> int:
+public define b_answer() -> number:
     example b_answer() is 99
     99
 EOF
@@ -71,7 +71,7 @@ EOF
 cat > "$APP/src/main.or" <<'EOF'
 use apkg
 use bpkg
-define main() -> int:
+define main() -> number:
     a_answer() + b_answer()
 EOF
 
@@ -89,7 +89,7 @@ grep -q '^cpkg ' Orbit.lock || fail "transitive dep missing from lock"
 # the remote moves: a_answer 20 -> 21. A locked project must NOT follow.
 cat > "$APKG/lib.or" <<'EOF'
 use cpkg
-public define a_answer() -> int:
+public define a_answer() -> number:
     example a_answer() is 21
     c_base() + 6
 EOF

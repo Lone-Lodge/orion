@@ -37,7 +37,7 @@ use whisper
 use text
 use os
 
-define main() -> int:
+define main() -> number:
     ear = hear_open(arg(1))
     if ear < 0:
         print_line("model would not load")

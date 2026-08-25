@@ -18,7 +18,7 @@ fail() { echo "setup_test: FAIL - $1"; exit 1; }
 cat > "$WORK/probe.or" <<'EOF'
 use os
 use text
-define main() -> int:
+define main() -> number:
     mode = if arg_count() > 1 then arg(1) else ""
     if mode is "stitch":
         stitch_setup(arg(2), arg(3), replace(arg(4), ";", "\n"), arg(5), arg(6))

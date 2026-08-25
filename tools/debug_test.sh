@@ -18,15 +18,15 @@ rm -rf "$WORK"; mkdir -p "$WORK"
 fail() { echo "debug_test: FAIL - $1"; exit 1; }
 
 cat > "$WORK/prog.or" <<'EOF'
-define inner(n: int) -> int:
+define inner(n: number) -> number:
     breakpoint()
     xs = [1, 2, 3]
     at(xs, n)
 
-define middle(n: int) -> int:
+define middle(n: number) -> number:
     inner(n + 2)
 
-define main() -> int:
+define main() -> number:
     a = middle(0)
     b = middle(5)
     a + b

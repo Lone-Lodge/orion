@@ -25,7 +25,7 @@ os = "path:$(np "$ROOT")/orbs/os"
 EOF
 cat > "$WORK/src/main.or" <<'EOF'
 external define vendored_answer(n: int) -> int
-define main() -> int:
+define main() -> number:
     vendored_answer(7)
 EOF
 

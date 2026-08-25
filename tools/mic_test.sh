@@ -23,7 +23,7 @@ fail() { echo "mic_test: FAIL - $1"; exit 1; }
 cat > "$WORK/probe.or" <<'EOF'
 use mic
 
-define main() -> int:
+define main() -> number:
     if not mic_open(16000):
         print_line("frames=-1 wrote=-1 (no capture device)")
         return 7
