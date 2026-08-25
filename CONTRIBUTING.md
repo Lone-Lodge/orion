@@ -39,6 +39,18 @@ language moved out from under it, and nothing said a word.
 - **No retired spellings.** `tools/orbstat.or` reports them; the corpus is at
   37 orbs of 37 clean and should stay there.
 
+## Sending a change
+
+You cannot push here, and that is the point: fork the repository, branch, and
+open a pull request. CI runs the gates on every one, on Linux and Windows, so
+a change is proven before anyone reads it.
+
+What gets merged: one thing at a time, small enough to read in a sitting, with
+the gate that proves it. What does not: a rewrite nobody asked for, a change
+with no way to tell whether it works, or a diff that mixes a fix with a
+reformat. If you are unsure whether something is wanted, open an issue first
+and ask - that costs you nothing and saves you an afternoon.
+
 ## Where things live
 
 ```

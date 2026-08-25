@@ -12,7 +12,7 @@
   style.textContent = `
     .pg { margin: 1.2em 0; }
     .pg-bar { display:flex; align-items:center; gap:.8em; margin:0 0 .4em; }
-    .pg-run { background:var(--link); color:var(--bg); border:0; border-radius:4px;
+    .pg-run { background:var(--link); color:var(--bg); border:0; border-radius:var(--r-small);
               padding:.25em .9em; font:inherit; font-weight:600; font-size:.9em;
               cursor:pointer; }
     .pg-run:disabled { opacity:.5; cursor:default; }
@@ -20,21 +20,21 @@
     .pg-status { font-size:.82em; color:var(--dim); font-family:ui-monospace,monospace; }
     .pg code[contenteditable] { outline:none; display:block; white-space:pre; }
     .pg code[contenteditable]:focus { box-shadow: inset 0 0 0 2px var(--rule); }
-    .pg-out { margin:.4em 0 0; padding:.7em 1em; border:1px solid var(--rule);
-              border-radius:4px; background:var(--code-bg); color:var(--fg);
+    .pg-out { margin:.4em 0 0; padding:.8em 1.1em; border:1px solid var(--hairline);
+              border-radius:var(--r-card); background:var(--code-bg); color:var(--fg);
               font-family:ui-monospace,SFMono-Regular,monospace; font-size:.86em;
               line-height:1.5; white-space:pre-wrap; overflow:auto; }
     .pg-out .exit { color:var(--dim); }
     .pg-out.err { color:#c0392b; }
     @media (prefers-color-scheme: dark) { .pg-out.err { color:#ff8b7d; } }
     .pg-top { max-width:42rem; margin:1.5rem auto 2.5rem; padding:1.1em 1.2em;
-              box-sizing:border-box; border:1px solid var(--rule);
-              border-radius:8px; background:var(--code-bg); }
+              box-sizing:border-box; border:1px solid var(--hairline);
+              border-radius:var(--r-surface); background:var(--code-bg); }
     .pg-top h2 { margin:0 0 .1em; font-size:1.05em; }
     .pg-top p { margin:0 0 .7em; font-size:.9em; color:var(--dim); }
     .pg-top textarea { width:100%; box-sizing:border-box; min-height:16em; resize:vertical;
-              background:var(--bg); color:var(--fg); border:1px solid var(--rule);
-              border-radius:4px; padding:.7em .9em; font-family:ui-monospace,monospace;
+              background:var(--bg); color:var(--fg); border:1px solid var(--hairline);
+              border-radius:var(--r-card); padding:.7em .9em; font-family:ui-monospace,monospace;
               font-size:.88em; line-height:1.55; tab-size:4; outline:none; }
     .pg-top textarea:focus { box-shadow: inset 0 0 0 1px var(--focus); }
   `;
