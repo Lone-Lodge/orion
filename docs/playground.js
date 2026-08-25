@@ -12,9 +12,13 @@
   style.textContent = `
     .pg { margin: 1.2em 0; }
     .pg-bar { display:flex; align-items:center; gap:.8em; margin:0 0 .4em; }
-    .pg-run { background:var(--link); color:var(--bg); border:0; border-radius:var(--r-small);
-              padding:.25em .9em; font:inherit; font-weight:600; font-size:.9em;
-              cursor:pointer; }
+    /* A quiet button, the way a dots control is: a surface, a hairline, and a
+       tint on hover. The gold is for the keywords in the code below it. */
+    .pg-run { background:var(--bg); color:var(--fg); border:1px solid var(--hairline);
+              border-radius:var(--r-small); padding:.3em .95em; font:inherit;
+              font-weight:600; font-size:.9em; cursor:pointer;
+              transition:background .12s ease, border-color .12s ease; }
+    .pg-run:hover:not(:disabled) { background:var(--hover); border-color:var(--link); }
     .pg-run:disabled { opacity:.5; cursor:default; }
     .pg-run:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
     .pg-status { font-size:.82em; color:var(--dim); font-family:ui-monospace,monospace; }
