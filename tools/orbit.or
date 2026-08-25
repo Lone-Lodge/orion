@@ -1237,8 +1237,12 @@ define cli_build(path: text) -> text:
         link_args = append(link_args, "/OPT:ICF")
     else if os_kind() is 2:
         link_args = append(link_args, "-Wl,-dead_strip")
+        link_args = append(link_args, "-lm")
     else:
         link_args = append(link_args, "-Wl,--gc-sections")
+        # POSIX keeps the transcendentals in libm; the Windows CRT has them
+        # already. A program that touches a real number would not link.
+        link_args = append(link_args, "-lm")
     if extra_link is not "":
         extras = split(extra_link, " ")
         loop x_index in 0 until length(extras):
