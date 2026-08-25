@@ -64,7 +64,18 @@ case "$out" in
 esac
 echo "  mic null   : contract holds, silent as designed (42)"
 
-# --- phase 2: the real WASAPI backend.
+# --- phase 2: the real WASAPI backend. WASAPI is Windows audio and wants
+# ole32; on Linux and macOS the link cannot even be attempted, and the null
+# phase above is the whole of what those platforms can say. Say it and stop
+# rather than failing on a library that was never going to be there.
+case "$(uname -s 2>/dev/null || echo Windows)" in
+    MINGW*|MSYS*|CYGWIN*|Windows*) : ;;
+    *)
+        echo "  mic wasapi : SKIP, WASAPI is Windows audio"
+        exit 0
+        ;;
+esac
+
 "$CLANG" "$WORK/probe.ll" "$ROOT/runtime/orion_cli.c" "$ROOT/runtime/orion_rt.c" \
     "$ROOT/runtime/wasapi_min.c" -lole32 \
     -o "$WORK/real.exe" > "$WORK/link2.txt" 2>&1 \
