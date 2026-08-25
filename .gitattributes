@@ -15,3 +15,6 @@
 tools/seed/*.ll linguist-generated
 vendor/** linguist-vendored
 docs/samples.json linguist-generated
+# The guide is the documentation, not the project: without this the language
+# bar counts its javascript and html as if they were the compiler.
+docs/** linguist-documentation
