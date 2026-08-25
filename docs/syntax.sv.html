@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orions syntax</title>
+<meta name="description" content="Varje ord och form i spraket, pa en sida.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#guide">Hoppa till innehallet</a>
+
+<header>
+<h1>Orions syntax</h1>
+<p class="lede">Varje ord och form i spraket, pa en sida.</p>
+<p class="lede"><a href="index.html">Faltguiden</a> ar sidan pa engelska som
+visar spraket i tolv program. Den har sidan ar uppslagsverket.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+<h2 class="toc-h" id="toc-h">Pa den har sidan</h2>
+<ol>
+<li><a href="#typer">Typer</a></li>
+<li><a href="#en-stavning-per-sak">En stavning per sak</a></li>
+<li><a href="#funktioner">Funktioner</a></li>
+<li><a href="#muterbarhet">Muterbarhet</a></li>
+<li><a href="#kontrollfl-de">Kontrollflöde</a></li>
+<li><a href="#fel">Fel</a></li>
+<li><a href="#kontrakt-effekter-determinism">Kontrakt, effekter, determinism</a></li>
+<li><a href="#builtins-ingen-use">Builtins (ingen <code>use</code>)</a></li>
+<li><a href="#data-som-databas-inte-objektgraf">Data som databas, inte objektgraf</a></li>
+<li><a href="#moduler">Moduler</a></li>
+</ol>
+</nav>
+
+<main id="guide">
+<p>Varje ord och form som språket har, på en sida. Fältguiden (<code>docs/index.html</code>) lär ut språket; den här filen är uppslagsverket.</p>
+<pre><code data-code>public define update(edit items: list of number):
+    loop i in 0 until length(items):
+        if items[i] is not 0:
+            items[i] = items[i] * 2
+
+define alive(hp: number) -&gt; truth:
+    hp &gt; 0
+
+define spawn(at: point, health = 100) -&gt; enemy:
+    example spawn(origin).hp is 100
+    enemy{position: at, hp: health}
+
+define greet_all(scores: table):
+    loop name, points in scores:
+        print_line(&quot;{name}: {points}&quot;)</code></pre>
+<h2 id="typer">1. Typer</h2>
+<table><thead><tr><th>ord</th><th>betyder</th></tr></thead><tbody><tr><td><code>number</code></td><td>tal. <code>/</code> riktig division, <code>//</code> golv. Kompilatorn väljer i64 eller f64</td></tr><tr><td><code>truth</code></td><td><code>true</code> / <code>false</code>. Skrivs ut som orden. <code>has</code>, <code>contains</code>, <code>includes</code> svarar med dem</td></tr><tr><td><code>text</code></td><td>Unicode-text. <b>Räknas i tecken</b>: <code>length</code>, <code>part</code> och <code>index_of</code> går på tecken, <code>bytes_count</code> / <code>byte_at</code> / <code>bytes_part</code> på bytes</td></tr><tr><td><code>table of T</code></td><td>nyckel-värde. <code>{&quot;name&quot;: &quot;Ada&quot;}</code>, läses <code>t[k]</code>. Bar <code>table</code> vägrar <code>t[k]</code></td></tr><tr><td><code>list of T</code></td><td><code>list of enemy</code>, <code>list of number</code>. Skrivs även <code>[T]</code></td></tr><tr><td><code>maybe T</code></td><td>ett värde eller inget: <code>some(v)</code> / <code>none</code></td></tr><tr><td><code>result T</code></td><td>lyckades eller fel: <code>ok(v)</code> / <code>error(msg)</code></td></tr></tbody></table>
+<p><code>maybe</code> och <code>result</code> bor i <code>orbs/core</code> och finns i varje program utan <code>use</code>. De tar aldrig ett namn ifrån dig: en egen enum, en egen variant eller en egen funktion vid samma namn vinner alltid. Funktionerna ÖVER dem (<code>unwrap_or</code>, <code>is_some</code>, <code>err_msg</code>) ligger kvar bakom <code>use option</code> / <code>use result</code>.</p>
+<p>En tables <b>element är dess nyckel</b>. <code>table of T</code> säger vad värdena är, precis som <code>list of T</code> säger vad elementen är. En **bar <code>table</code> vägrar <code>t[k]</code>**: den gissade <code>text</code>, så att läsa ett tal ur en gav programmet en pekare byggd av talet. <code>loop k in t:</code> ger nycklarna, <code>loop k, v in t:</code> ger båda, <code>contains(t, k)</code> frågar efter nyckeln. Från en nyckel når du värdet, från ett värde når du inte nyckeln. En table vars värden verkligen skiljer sig vägrar också, och hänvisar till <code>get_int</code> / <code>get_map</code> / <code>get_list</code>. Det är kompilatorns egen AST, inte vanlig kod.</p>
+<p>En text är tecken, inte bytes. <code>length(&quot;räksmörgås&quot;)</code> är 10, <code>bytes_count</code> är 13, och <code>part(s, index_of(s, &quot;ö&quot;), index_of(s, &quot;ö&quot;) + 1)</code> ger <code>&quot;ö&quot;</code>. Det var byte överallt förut, och då komponerade de tre inte: <code>part</code> kunde skära en bokstav mitt itu.</p>
+<p>Bytes är <code>list of number</code>. Ingen egen typ - <code>bytes_of(t)</code> ger en vanlig lista. Men **<code>byte_at</code>, <code>bytes_count</code> och <code>part</code> läser en <code>text</code> direkt**, för en text redan ÄR den packade formen. <code>bytes_of</code> behövs bara när du vill <code>loop</code>a eller <code>append</code>a - och den kopierar varje byte till en åtta byte stor plats, så en megabyte från disk blir åtta i minnet.</p>
+<p>Egna typer, allt gemener:</p>
+<pre><code data-code>type player: name: text, hp: number     # produkt
+type tile: empty, wall, loot            # val</code></pre>
+<p>Generiskt med <code>given</code>, krav med <code>requires</code>. En capability är bara en record av funktioner:</p>
+<pre><code data-code>type order given item: less: (item, item) -&gt; truth
+define largest given item requires order (items: list of item) -&gt; item:</code></pre>
+<p>Anropet skickar recorden som named argument: <code>largest(xs, order: number_order)</code>. Dictionary-passing syns i koden, ingen dold resolution.</p>
+<h2 id="en-stavning-per-sak">2. En stavning per sak</h2>
+<p>Där två stavningar fanns är den vänstra den enda som skrivs. Parsern gör samma nod av båda, så migrationen var ren omstavning - identisk IR.</p>
+<table><thead><tr><th>skrivs</th><th>inte</th></tr></thead><tbody><tr><td><code>is</code> / <code>is not</code></td><td><code>==</code> / <code>!=</code></td></tr><tr><td><code>xs[i]</code></td><td><code>at(xs, i)</code></td></tr><tr><td><code>0 until n</code></td><td><code>0..&lt;n</code></td></tr><tr><td><code>loop</code></td><td><code>for</code></td></tr><tr><td><code>edit</code></td><td><code>mut</code></td></tr><tr><td><code>define</code></td><td><code>fn</code></td></tr><tr><td><code>public</code></td><td><code>pub</code></td></tr><tr><td><code>choose</code> … <code>then</code></td><td><code>match</code> … <code>-&gt;</code></td></tr><tr><td><code>some</code> / <code>none</code> / <code>ok</code> / <code>error</code></td><td><code>Some</code> / <code>None</code> / <code>Ok</code> / <code>Err</code></td></tr><tr><td><code>maybe T</code> / <code>result T</code></td><td><code>Option&lt;T&gt;</code> / <code>Result&lt;T&gt;</code></td></tr><tr><td><code>collect</code></td><td><code>yield</code></td></tr><tr><td><code>length</code></td><td><code>len</code></td></tr><tr><td><code>truth</code> / <code>text</code> / <code>table</code></td><td><code>bool</code> / <code>Text</code> / <code>Map</code></td></tr><tr><td><code>part</code></td><td><code>slice</code></td></tr><tr><td><code>slot_get_number</code></td><td><code>slot_get_int</code></td></tr><tr><td><code>x as text</code></td><td><code>to_text(x)</code></td></tr><tr><td><code>length(t)</code> (tecken)</td><td><code>characters(t)</code></td></tr><tr><td><code>as number</code> / <code>to_whole</code> / <code>to_real</code></td><td><code>as int</code> / <code>as float</code></td></tr></tbody></table>
+<h2 id="funktioner">3. Funktioner</h2>
+<ul><li><code>define</code> definierar. <code>public</code> exponerar ur orben. Utan = privat.</li><li>Returtyp inferreras för privata, valfri på publika som kontrakt.</li><li>Named arguments och default-värden: <code>spawn(at: origin, health: 50)</code>, <code>health = 100</code>.</li><li>Anonym funktion utan keyword: <code>(n): n + k</code>. <code>each(xs, (n): n * 2)</code>.</li><li><code>x.f()</code> betyder <code>f(x)</code>.</li><li><code>uses</code> säger vad en publik funktion rör: <code>public define save(w: world) uses files:</code>. Capabilities: <code>console</code>, <code>files</code>, <code>net</code>, <code>clock</code>, <code>random</code>. Privata och <code>main</code> inferreras. Ingen klausul = ren beräkning. Kompilatorn håller det.</li><li><code>example</code> under signaturen körs av bygget: <code>example clamp(15, 0, 10) is 10</code>.</li></ul>
+<h2 id="muterbarhet">4. Muterbarhet</h2>
+<p>Allt oföränderligt som standard. <code>edit</code> markerar det som får ändras: <code>edit x = 0</code>, <code>define tick(edit world: world):</code>. Värde-semantik i språket; kompilatorn muterar unikt ägda värden in-place.</p>
+<h2 id="kontrollfl-de">5. Kontrollflöde</h2>
+<ul><li><code>if cond: … else: …</code> eller <code>if cond then a else b</code>. Allt är ett uttryck.</li><li><code>loop:</code> (oändlig, <code>break</code>), <code>loop x in xs:</code>, <code>loop i, x in xs:</code> (plats, värde). Samma två former över en <code>table</code>.</li><li><code>0 to n</code> till och med, <code>0 until n</code> fram till.</li><li><code>collect</code> samlar ur en loop, <code>where</code> filtrerar.</li><li><code>choose x:</code> med <code>pattern then body</code>-armar.</li><li>Kedjor av <code>each</code>/<code>keep</code>/<code>collect</code> fuserar - inga mellanlistor.</li></ul>
+<h2 id="fel">6. Fel</h2>
+<p>Fel är data. Inga exceptions, inget try/catch, inga dolda hopp. <code>try risky()</code> packar upp och skickar felet uppåt. Hantera med <code>choose</code>.</p>
+<h2 id="kontrakt-effekter-determinism">7. Kontrakt, effekter, determinism</h2>
+<ul><li><code>require</code> / <code>ensure</code> - för- och eftervillkor.</li><li><code>defer expr</code> - kör vid utträde (LIFO).</li><li><code>effect</code> / <code>handle</code> / <code>perform</code> / <code>resume</code> - ersätter exceptions, async och generatorer.</li><li>Uppgifter: <code>spawn</code> / <code>await</code> / <code>yield_now</code> / <code>run_all</code>. En timer är en uppgift: <code>every(200, tick)</code>, <code>after(1000, f)</code>. Ingen update-loop matar dem.</li><li><code>deterministic</code> - ren och reproducerbar, bit-exakt: fixed-point för bråktal.</li></ul>
+<h2 id="builtins-ingen-use">8. Builtins (ingen <code>use</code>)</h2>
+<ul><li>Samlingar: <code>length</code>, <code>append</code>, <code>xs[i]</code>, <code>part</code>, <code>each</code>, <code>keep</code>, <code>combine</code>, <code>get</code>/<code>set</code>/<code>has</code>.</li><li><code>contains(x, y)</code> - text: delsträng. table: nyckeln. Lista: <code>includes(xs, v)</code> ur <code>list</code>.</li><li>Utskrift: <code>print</code>, <code>print_line</code>, interpolation <code>&quot;{uttryck}&quot;</code>.</li><li>Tal: <code>abs</code> <code>min</code> <code>max</code> <code>clamp</code> <code>floor</code> <code>ceil</code> <code>round</code> <code>sqrt</code> <code>sin</code> <code>cos</code> … <b>en</b> uppsättning. Det fanns en <code>f*</code>-familj bredvid (<code>fmin</code>, <code>fabs</code>, …) med identiska kroppar; <code>number</code> gör den överflödig.</li><li>Konvertering. **Ett <code>as</code> byter TYP, en funktion väljer REPRESENTATION:** <code>x as text</code>, <code>&quot;7&quot; as number</code>, <code>x as u8</code>. <code>to_whole(x)</code> / <code>to_real(x)</code> när du måste bestämma helt eller reellt själv. <code>int</code> och <code>float</code> går inte att skriva - kompilatorn väljer maskinen, och <code>as int</code> / <code>as float</code> / <code>to_text(x)</code> säger vad du ska skriva i stället.</li><li>Program: <code>arguments</code> (en <code>list of text</code>, ett värde - inte ett anrop).</li><li>Test: <code>assert(villkor)</code>. Etiketten är valfri.</li></ul>
+<h2 id="data-som-databas-inte-objektgraf">9. Data som databas, inte objektgraf</h2>
+<p>Program-state är platta stores av värden med id:n. Värde-semantiken gör pekargrafer omöjliga. <code>store</code>-orben: <code>insert</code> / <code>remove</code> / <code>get</code>, och <code>loop e in enemies where e.hp &lt; 10:</code> ÄR queryn. Spel kallar det ECS, affärssystem kallar det relationer.</p>
+<p><code>int</code> finns kvar på ett ställe där det är <b>rätt</b>: <code>external define</code> mot C. Där beskriver ordet en främmande ABI, och den tar en int oavsett vad Orion tycker.</p>
+<h2 id="moduler">10. Moduler</h2>
+<p><code>orb</code> = modul. En ensam <code>.or</code> kör utan projektfil.</p>
+<p>**<code>use</code> behövs sällan.** Ett namn som exakt en orb på sökvägen exporterar hämtas åt dig - kompilatorn visste redan vilket orb det var: felet sa *it is exported by <code>text</code>*. Två orbar som exporterar samma namn är fortfarande ett fel som namnger båda, och <code>use</code> är svaret på det. Det är den enda uppgift <code>use</code> har kvar.</p>
+<p>Ett anrop i ett <b>interpolationshål</b> räknas. Lexern ger en enda strängtoken för <code>&quot;{min(3, 7)}&quot;</code>, så hålets namn syntes inte förut: samma rad med och utan hål gav två olika svar på om funktionen fanns.</p>
+<p>Reglerna, i ordning: det du själv deklarerar vinner. Sedan det du själv importerat. Sist auto-import, och bara för namn i <b>anropsposition</b> - en lokal variabel som heter <code>first</code> hämtar ingenting. Kärnorden <code>some</code> / <code>none</code> / <code>ok</code> / <code>error</code> hämtar aldrig heller, annars hade <code>log.error</code> tagit <code>error(m)</code> ifrån varje program som skriver det. Funktioner OCH typer hämtas. Sökvägen har två halvor: <b>nära</b> är det projektet deklarerat plus verktygskedjan och katalogerna runt entryn, <b>fjärran</b> är <code>orbit</code>s svep över hela arbetsytan som får <code>namn = &quot;*&quot;</code> att lösa sig var det än ligger. Båda går att <code>use</code>:a; bara de nära hämtas åt dig. Gränsen behövs för att ett typnamn är en <b>global layout-nyckel</b>: utan den drog kompilatorns egen <code>Param</code> in ett systerprojekts <code>Param</code> och bygget länkade inte.</p>
+<p>Kvar för <code>use</code>: svara på <b>vilken</b> av två orbar som exporterar samma namn. astra gick från 26 rader till 1, folio från 6 till 2, orions egna orbar och verktyg från 70 till 1 - <code>use net</code> i <code>setup_stub</code>, för <code>local_port</code> finns i mer än en orb.</p>
+<p>En toppnivå-binding ÄR en konstant. <code>define main():</code> är startpunkten - ingen returtyp, fel går via <code>result</code>/effekter, inte exit-koder.</p>
+<p>---</p>
+<p>1. <b>Ytan säger hela ordet.</b> Inga förkortningar, inget CPU-tänk. Verb, inte kryptik. 2. <b>En stavning per sak.</b> Två stavningar är sämre än vilken som helst av dem ensam: läsaren måste kunna båda och kan aldrig lita på att den ena betyder något särskilt. En omdöpning är inte klar förrän korpusen är omskriven. 3. <b>Docs kan inte ljuga.</b> <code>example</code>-rader körs av bygget, fältguidens exempel kompileras av <code>docs_check</code>, referenssidan genereras ur <code>orbs/</code>. 4. <b>Tyst fel är det värsta utfallet.</b> Hellre ett kompileringsfel som säger vad man ska skriva i stället, än ett svar som råkar bli fel. 5. <b>Fel är data.</b> Inga exceptions, ingen panic, inga dolda hopp. 6. <b>Värde-semantik.</b> Inga pekargrafer, inget delas i smyg. Kompilatorn äger layouten.</p>
+<p>---</p>
+<p>Omskrivningsverktyget för en stavningsmigration: <code>tools/migrate/respell.py</code>. Det maskar varje rad i kod / sträng / kommentar innan det rör något, och interpolation räknas som kod.</p></main>
+
+<footer>
+<p>Orion ar skrivet i Orion. Kompilatorn kompilerar sig sjalv.
+<a href="https://github.com/Lone-Lodge/orion">Kallkoden pa GitHub</a>.</p>
+</footer>
+
+<script src="highlight.js"></script>
+
+</body>
+</html>

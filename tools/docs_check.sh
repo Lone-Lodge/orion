@@ -103,6 +103,12 @@ for f in "$WORK/$(echo "$PAGES" | awk '{print $1}' | sed 's/\.html//')"/*.or; do
     fi
 done
 
+# --- the swedish syntax page ---------------------------------------------
+# A .md served by Pages arrives as raw text in a browser, so the guide links a
+# page. That page is generated from the markdown; a drifted one is a lie.
+echo
+python tools/guide.py --check || fail=$((fail + 1))
+
 # --- the baked playground ---------------------------------------------------
 # docs/samples.json is what makes Run work on a static host. It is generated
 # from the very samples above, so it goes stale the moment one of them changes.

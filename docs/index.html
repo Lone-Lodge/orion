@@ -41,9 +41,9 @@ and every function it exports.</p>
 
 <p>Orion compiles to LLVM IR and then to a native binary. Indentation makes
 blocks. There is no null and there are no exceptions. Every code block below is a WHOLE program, and every one is compiled by
-<code>tools/docs_check.sh</code> &mdash; if a sample here stops working, the
+<code>tools/docs_check.sh</code> - if a sample here stops working, the
 build says so. The syntax reference, in Swedish, is
-<a href="SYNTAX.sv.md">SYNTAX.sv.md</a>.</p>
+<a href="syntax.sv.html">syntaxreferensen</a>.</p>
 
 <h2 id="hello">1. Hello</h2>
 
@@ -57,7 +57,7 @@ build says so. The syntax reference, in Swedish, is
 </code></pre>
 
 <p>A block's value is its last expression, so no <code>return</code> is needed
-&mdash; though <code>return</code> exists for leaving early. <code>main</code>
+- though <code>return</code> exists for leaving early. <code>main</code>
 returns nothing: failure travels as values and effects, not exit codes.</p>
 
 <p>No project, no config, no output path to name. <code>orbit build hello.or</code>
@@ -84,7 +84,7 @@ holds you to it. Types are inferred; write one when you want it checked, as in
 <code>edit n: number = 0</code>. The types you get for free are
 <code>number</code>, <code>truth</code>, <code>text</code> and
 <code>table</code>. A top-level binding like <code>max_players = 8</code> is a
-constant &mdash; immutability needs no extra keyword &mdash; and
+constant - immutability needs no extra keyword - and
 <code>type meters = number</code> names an existing type.</p>
 
 <p>Equality is a word: <code>x is 5</code>, <code>name is not ""</code>. Order
@@ -124,7 +124,7 @@ define main():
 <p><code>choose:</code> with no subject is a chain of conditions: the first
 true arm wins, and it is what you use instead of <code>else if</code>. An arm
 reads <code>condition then result</code>, and <code>else</code> catches the
-rest &mdash; <code>else</code> never takes a <code>then</code>, same as in the
+rest - <code>else</code> never takes a <code>then</code>, same as in the
 one-line <code>if c then a else b</code>. Everything is an expression: the
 block form <code>if c:</code> / <code>else:</code> produces a value too.</p>
 
@@ -140,8 +140,8 @@ define main():
     print_line("{total} {length(doubled)} {length(big)}")
 </code></pre>
 
-<p>Most code over a collection states the intent &mdash; <code>sum</code>,
-<code>each</code>, <code>keep</code>, <code>combine</code> &mdash; and the
+<p>Most code over a collection states the intent - <code>sum</code>,
+<code>each</code>, <code>keep</code>, <code>combine</code> - and the
 compiler owns the mechanism: chains fuse with no intermediate lists, layout
 and vectorization are its job, not yours. When you do need to walk things
 yourself, there is exactly one iteration keyword:</p>
@@ -155,8 +155,8 @@ yourself, there is exactly one iteration keyword:</p>
     print_line("{total + length(doubled) + length(big)}")
 </code></pre>
 
-<p><code>collect</code> gathers values into a list &mdash; <code>each</code>
-and <code>keep</code> are built from it &mdash; and <code>where</code>
+<p><code>collect</code> gathers values into a list - <code>each</code>
+and <code>keep</code> are built from it - and <code>where</code>
 filters the run. The ranges read the way English does:
 <code>0 until 5</code> stops before 5, <code>1 to 3</code> includes 3. A bare
 <code>loop:</code> runs until <code>break</code>.</p>
@@ -207,7 +207,7 @@ built as <code>shape.rect(6, 7)</code> and read by <code>choose</code>, which
 is checked for exhaustiveness; <code>_</code> is the catch-all pattern, and
 <code>if let circle(r) = s:</code> handles a single case without a full
 choose. <code>/</code> is real division and <code>//</code> is floor division
-&mdash; the answer never depends on inferred types.</p>
+- the answer never depends on inferred types.</p>
 
 <p>A tuple <code>(a, b)</code> is an anonymous struct, so its slots keep their
 own types and <code>(number, text)</code> is a real pair. That is how a
@@ -238,8 +238,8 @@ define main():
 <code>public define</code> is what an orb exports. Return types are inferred
 for private functions; a public one may state its contract with
 <code>-&gt; type</code>. At the call site, arguments can carry their names
-&mdash; <code>greet(name: "Bo", loud: true)</code> reads without opening the
-definition &mdash; and a parameter can hold a default. An anonymous function
+- <code>greet(name: "Bo", loud: true)</code> reads without opening the
+definition - and a parameter can hold a default. An anonymous function
 is just <code>(params): body</code>. Any function can also be called
 method-style, so <code>trim(s)</code> and <code>s.trim()</code> are the same
 call. A generic function introduces its type variable as a word:
@@ -294,8 +294,8 @@ define main():
 <code>print_line</code> is stdout, and <code>file_read</code> /
 <code>file_write</code> move whole files at a time. All built in, no import.
 IO, time and randomness are becoming <em>effects</em>: a public function that
-touches the outside world says so in its signature &mdash;
-<code>public define save(w: world) uses files:</code> &mdash; so reading the
+touches the outside world says so in its signature -
+<code>public define save(w: world) uses files:</code> - so reading the
 signature tells you what a function can do, and a test swaps the handler
 instead of mocking. Private functions and <code>main</code> are inferred.</p>
 
@@ -339,7 +339,7 @@ define main():
 <p>The effects above are <em>one-shot</em>: the handler resumes exactly once
 and synchronously. That is the supported core and it works on every platform.
 Handlers that outlive their own resume (<code>ask</code> and
-<code>resume_with</code>) are <strong>experimental</strong> &mdash; that is
+<code>resume_with</code>) are <strong>experimental</strong> - that is
 the same machinery async needs, and it runs on Windows fibers. Elsewhere
 <code>resumable_ok()</code> reports 0 and <code>ask</code> refuses rather than
 pretending.</p>
@@ -347,11 +347,11 @@ pretending.</p>
 <h2 id="next">Where to go next</h2>
 
 <ul>
-<li><a href="SYNTAX.sv.md">Syntax reference</a> (in Swedish) &mdash; every word and form, in one place.</li>
-<li><code>examples/demos/</code> &mdash; 21 runnable programs, one idea each.</li>
-<li><code>examples/tests/tests/</code> &mdash; 225 tests, one feature each, all green on Linux and Windows.</li>
-<li><a href="reference.html">Library reference</a> &mdash; every orb and the functions it exports, generated from the source.</li>
-<li><code>tools/bootstrap.sh</code> &mdash; a bare checkout to a working compiler: the seed builds it, then it builds itself to a fixpoint.</li>
+<li><a href="syntax.sv.html">Syntax reference</a> (in Swedish) - every word and form, in one place.</li>
+<li><code>examples/demos/</code> - 23 runnable programs, one idea each.</li>
+<li><code>tests/suite/tests/</code> - 228 tests, one feature each, all green on Linux and Windows.</li>
+<li><a href="reference.html">Library reference</a> - every orb and the functions it exports, generated from the source.</li>
+<li><code>tools/bootstrap.sh</code> - a bare checkout to a working compiler: the seed builds it, then it builds itself to a fixpoint.</li>
 </ul>
 
 </main>
