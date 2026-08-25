@@ -14,3 +14,4 @@
 # the vendored C. Without these lines orion reads as an LLVM project.
 tools/seed/*.ll linguist-generated
 vendor/** linguist-vendored
+docs/samples.json linguist-generated

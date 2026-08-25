@@ -1,8 +1,12 @@
 // Field Guide playground. Adds a "Try Orion" editor at the top and makes every
-// sample runnable in place. Compiles via the playground server (tools/
-// playground.js, POST /api/run -> dist/orion.exe), then instantiates the wasm
-// and runs main(), with print_line output shown inline. Styled with the Field
-// Guide's own CSS variables so it matches the page in light and dark.
+// sample runnable in place: instantiate the wasm, run main(), show print_line
+// output inline. Styled with the guide's own CSS variables, light and dark.
+//
+// Two ways to get the wasm. The samples on the page are BAKED - compiled by
+// tools/playground_bake.sh into samples.json - so Run works on a plain static
+// host with no server at all. Anything typed or edited needs a compiler, which
+// means the local server (node tools/playground.js, POST /api/run). Without it
+// the page says so instead of dying on a 404 page that is not JSON.
 (function () {
   const style = document.createElement('style');
   style.textContent = `
@@ -36,6 +40,14 @@
   `;
   document.head.appendChild(style);
 
+  // The baked samples, by their order on the page. Absent is fine: then every
+  // Run asks the server, which is what a local checkout wants anyway.
+  let baked = null;
+  const bakedReady = fetch('samples.json')
+    .then(r => (r.ok && /json/.test(r.headers.get('content-type') || '') ? r.json() : null))
+    .then(j => { baked = Array.isArray(j) ? j : null; })
+    .catch(() => {});
+
   function readText(mem, ptr) {
     const u = new Uint8Array(mem.buffer);
     const len = u[ptr] | (u[ptr + 1] << 8) | (u[ptr + 2] << 16) | (u[ptr + 3] << 24);
@@ -56,14 +68,41 @@
     return ptr;
   }
 
-  async function run(source, btn, status, out) {
+  // A server answer, or the baked one when the sample is untouched. A static
+  // host answers the POST with an HTML 404, so check the content type rather
+  // than letting JSON.parse throw a message about a `<`.
+  async function compile(source, idx, original) {
+    await bakedReady;
+    if (baked && idx != null && source === original && baked[idx]) return baked[idx].wasm
+      ? { ok: true, wasm: baked[idx].wasm }
+      : { ok: false, error: baked[idx].error };
+    let res;
+    try {
+      res = await fetch('/api/run', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source })
+      });
+    } catch (e) {
+      return { ok: false, offline: true };
+    }
+    if (!res.ok || !/json/.test(res.headers.get('content-type') || '')) return { ok: false, offline: true };
+    return res.json();
+  }
+
+  async function run(source, btn, status, out, idx, original) {
     btn.disabled = true; status.textContent = 'compiling…';
     out.style.display = 'block'; out.className = 'pg-out'; out.textContent = '';
     try {
-      const res = await fetch('/api/run', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source })
-      }).then(r => r.json());
+      const res = await compile(source, idx, original);
+      if (res.offline) {
+        status.textContent = 'needs the local playground';
+        out.className = 'pg-out';
+        out.innerHTML = 'The samples on this page run as they are, because they are compiled ' +
+          'ahead of time. Compiling your own edits needs the compiler, which the browser ' +
+          'does not have: clone the repo and run <code>node tools/playground.js</code>, ' +
+          'then open the guide from there.';
+        return;
+      }
       if (!res.ok) {
         // A wasm-backend limitation reads as a calm note; a real syntax/type
         // error ("ERROR at line:col") stays red.
@@ -112,7 +151,7 @@
   }
 
   // --- the "Try Orion" editor at the top of the page ---
-  const START = `fn main() -> int:
+  const START = `define main() -> number:
     print_line("Hello from Orion, compiled to WebAssembly.")
     # 64-bit integers work out of the box
     big = 5000000000
@@ -121,8 +160,8 @@
     # use \`as\` to wrap on purpose.
     x: u8 = 200
     wrapped = 300 as u8              # 300 wraps into a byte: 44
-    print_line("u8: {x as int} and {wrapped as int}")
-    return (big / 1000000000) as int + (wrapped as int)   # 5 + 44 = 49`;
+    print_line("u8: {to_whole(x)} and {to_whole(wrapped)}")
+    return to_whole(big // 1000000000) + to_whole(wrapped)   # 5 + 44 = 49`;
 
   const top = document.createElement('section');
   top.className = 'pg-top';
@@ -139,11 +178,12 @@
   const ta = top.querySelector('textarea');
   ta.value = START;
   const topBtn = top.querySelector('.pg-run'), topStatus = top.querySelector('.pg-status'), topOut = top.querySelector('.pg-out');
-  topBtn.onclick = () => run(ta.value, topBtn, topStatus, topOut);
+  topBtn.onclick = () => run(ta.value, topBtn, topStatus, topOut, null, null);
   ta.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); topBtn.click(); } });
 
   // --- make every sample runnable in place ---
-  document.querySelectorAll('pre > code[data-or]').forEach(code => {
+  document.querySelectorAll('pre > code[data-or]').forEach((code, idx) => {
+    const original = code.textContent;
     const pre = code.parentElement;
     const box = document.createElement('div'); box.className = 'pg';
     pre.replaceWith(box);
@@ -155,6 +195,6 @@
     code.setAttribute('contenteditable', 'true');
     code.setAttribute('spellcheck', 'false');
     box.appendChild(bar); box.appendChild(pre); box.appendChild(out);
-    btn.onclick = () => run(code.textContent, btn, status, out);
+    btn.onclick = () => run(code.textContent, btn, status, out, idx, original);
   });
 })();

@@ -103,6 +103,25 @@ for f in "$WORK/$(echo "$PAGES" | awk '{print $1}' | sed 's/\.html//')"/*.or; do
     fi
 done
 
+# --- the baked playground ---------------------------------------------------
+# docs/samples.json is what makes Run work on a static host. It is generated
+# from the very samples above, so it goes stale the moment one of them changes.
+# Same promise the reference page gets: regenerate and compare.
+echo
+BAKE_TMP=$(mktemp)
+if bash "$ROOT/tools/playground_bake.sh" "$BAKE_TMP" > /dev/null 2>&1; then
+    if cmp -s "$BAKE_TMP" "$ROOT/docs/samples.json"; then
+        echo "  playground: baked samples up to date with the guide"
+    else
+        echo "  playground: FAIL - docs/samples.json is stale, run tools/playground_bake.sh"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  playground: FAIL - could not bake the samples"
+    fail=$((fail + 1))
+fi
+rm -f "$BAKE_TMP"
+
 # --- contrast -------------------------------------------------------------
 # The guide claims WCAG 2.2 AAA, and a claim nobody measures is decoration.
 # Read the palette straight out of style.css and check every pair that carries
