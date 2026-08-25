@@ -4,7 +4,7 @@ Varje ord och form som språket har, på en sida. Fältguiden
 (`docs/index.html`) lär ut språket; den här filen är uppslagsverket.
 
 
-```
+```python
 public define update(edit items: list of number):
     loop i in 0 until length(items):
         if items[i] is not 0:
@@ -56,14 +56,14 @@ varje byte till en åtta byte stor plats, så en megabyte från disk blir åtta 
 
 Egna typer, allt gemener:
 
-```
+```python
 type player: name: text, hp: number     # produkt
 type tile: empty, wall, loot            # val
 ```
 
 Generiskt med `given`, krav med `requires`. En capability är bara en record av funktioner:
 
-```
+```python
 type order given item: less: (item, item) -> truth
 define largest given item requires order (items: list of item) -> item:
 ```

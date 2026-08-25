@@ -7,7 +7,7 @@ native binary. No null, no exceptions, no garbage collector: allocation goes
 through an arena the compiler checks for balanced scopes before anything runs.
 The compiler is written in Orion and compiles itself.
 
-```
+```python
 define main() -> number:
     name = "world"
     print_line("hello {name}")

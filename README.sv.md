@@ -7,7 +7,7 @@ till en binär. Ingen null, inga undantag, ingen skräpsamlare: allokering går
 genom en arena som kompilatorn kontrollerar för balanserade scope innan något
 körs. Kompilatorn är skriven i Orion och kompilerar sig själv.
 
-```
+```python
 define main() -> number:
     name = "world"
     print_line("hello {name}")
