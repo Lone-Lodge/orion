@@ -3801,9 +3801,18 @@ long long orion_task_pump(void) {
         if (orion_tasks[i].state != 1) continue;
         orion_task_current = i;
         orion_tasks[i].state = 2;
+        /* This function sits below the #endif that closes the two scheduler
+         * implementations, so the switch has to name both. It did not, and
+         * `SwitchToFiber` is a Windows API: Linux and macOS could not build
+         * the runtime at all. Each branch is the one its own driver uses. */
+#ifdef _WIN32
         orion_trace_task(i);
         SwitchToFiber(orion_tasks[i].stack_ctx);
         orion_trace_task(-1);
+#else
+        orion_entry_idx = i;
+        swapcontext(&orion_sched_ctx, &orion_task_ctx[i]);
+#endif
         orion_task_current = -1;
         ran++;
     }
