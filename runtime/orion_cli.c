@@ -218,6 +218,26 @@ long long sys_run(const char *cmd) {
     if (WIFEXITED(rc)) return (long long)WEXITSTATUS(rc);
     return (long long)rc;
 }
+
+/* The POSIX half of sys_run_quiet. It existed only on Windows, so `os` could
+ * declare run_command_quiet and every Linux link of orbit failed on an
+ * undefined reference - the test runner is its caller, so nothing that runs
+ * on this machine ever noticed. */
+long long sys_run_quiet(const char *cmd) {
+    char buf[32768];
+    int n = snprintf(buf, sizeof(buf), "%s >/dev/null 2>&1", cmd ? cmd : "");
+    if (n < 0 || (size_t)n >= sizeof(buf)) return -1;
+    return sys_run(buf);
+}
+
+/* A ghost window is a Windows idea: the OS is asked to let clicks fall
+ * through everywhere except the named rectangles. There is no X11 or Cocoa
+ * equivalent worth faking, so this says no rather than pretending - the same
+ * answer resumable_ok() gives where fibers do not exist. */
+long long win_ghost(const char *needle, const char *rects) {
+    (void)needle; (void)rects;
+    return 1;
+}
 long long mkdir_all(const char *path) {
     char buf[4096]; strncpy(buf, path, sizeof(buf) - 1); buf[sizeof(buf) - 1] = 0;
     for (char *p = buf + 1; *p; p++) {
