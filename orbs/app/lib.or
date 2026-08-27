@@ -330,6 +330,7 @@ public external define orion_arena_on() -> int
 public external define orion_arena_reset() -> int
 public external define orion_arena_used() -> int
 public external define orion_task_live_count() -> int
+public external define orion_slot_gc() -> int
 public define run_until_interrupted(srv: number, routes: [route], static_dir: text) uses net, files, clock, console:
     # ZERO LEAKS BY CONSTRUCTION: the routes/static slots are set BEFORE
     # the arena goes on (malloc-born, safe without a copier)...
@@ -374,6 +375,9 @@ public define run_until_interrupted(srv: number, routes: [route], static_dir: te
         tasks = kvar
         if orion_task_live_count() is 0 and orion_arena_used() > 0:
             svept = orion_arena_reset()
+            # overwritten slot copies go the same quiet moment - nothing
+            # can be holding them when no connection task is alive
+            fritt = orion_slot_gc()
         # an app lives as long as its window: the page said goodbye and
         # nothing came after it, so there is nobody left to serve.
         # Headless (APP_HEADLESS=1) has no window to live by - only Ctrl+C.

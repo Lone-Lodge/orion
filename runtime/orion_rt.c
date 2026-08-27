@@ -796,6 +796,78 @@ static void oe_fatal(const char *what, const char *key) {
     fflush(stderr);
     abort();
 }
+/* ---- Deferred free of overwritten slot copies -----------------------
+ * Evacuation mallocs a private copy per slot_set; overwriting the same
+ * key used to leak the previous copy forever (measured: ~70KB per
+ * recolour in dots' hue cache - every keystroke). The old copy cannot
+ * be freed immediately (a parked task may still hold the pointer from
+ * slot_get), so it is QUEUED here and freed by orion_slot_gc(), which
+ * the server loop calls at the same proven-quiet moment it sweeps the
+ * arena (no connection task alive). Safety against aliasing (the same
+ * copy stored under two keys): gc rescans the live slot table and only
+ * frees queued blocks no slot still points at.
+ * evq = "ours": every block evacuation mallocs. Only members are ever
+ * queued or freed - program-born malloc values are never touched. */
+static void **evq_tab; static size_t evq_cap, evq_n;
+static void **pend_tab; static size_t pend_cap, pend_n;
+static size_t evq_slot(void **tab, size_t cap, const void *p) {
+    size_t h = ((size_t)(uintptr_t)p) * 2654435761u;
+    return h & (cap - 1);
+}
+static void evq_add(const void *p) {
+    if (!p) return;
+    if (evq_cap == 0 || evq_n * 10 >= evq_cap * 7) {
+        size_t ncap = evq_cap ? evq_cap * 2 : 256;
+        void **nt = (void **)calloc(ncap, sizeof(void *));
+        if (!nt) return;
+        for (size_t i = 0; i < evq_cap; i++)
+            if (evq_tab[i]) {
+                size_t j = evq_slot(nt, ncap, evq_tab[i]);
+                while (nt[j]) j = (j + 1) & (ncap - 1);
+                nt[j] = evq_tab[i];
+            }
+        free(evq_tab);
+        evq_tab = nt;
+        evq_cap = ncap;
+    }
+    size_t j = evq_slot(evq_tab, evq_cap, p);
+    while (evq_tab[j]) {
+        if (evq_tab[j] == p) return;
+        j = (j + 1) & (evq_cap - 1);
+    }
+    evq_tab[j] = (void *)p;
+    evq_n++;
+}
+static int evq_has(const void *p) {
+    if (!p || !evq_cap) return 0;
+    size_t j = evq_slot(evq_tab, evq_cap, p);
+    while (evq_tab[j]) {
+        if (evq_tab[j] == p) return 1;
+        j = (j + 1) & (evq_cap - 1);
+    }
+    return 0;
+}
+/* move a member from the set to the pending-free queue (open addressing
+ * cannot delete without tombstones, so membership just moves over) */
+static void evq_queue(const void *p) {
+    if (!p || !evq_cap) return;
+    size_t j = evq_slot(evq_tab, evq_cap, p);
+    while (evq_tab[j]) {
+        if (evq_tab[j] == p) {
+            if (pend_n == pend_cap) {
+                size_t nc = pend_cap ? pend_cap * 2 : 64;
+                void **nt = (void **)realloc(pend_tab, nc * sizeof(void *));
+                if (!nt) return;
+                pend_tab = nt;
+                pend_cap = nc;
+            }
+            pend_tab[pend_n++] = (void *)p;
+            return; /* stays in evq too - gc reconciles both */
+        }
+        j = (j + 1) & (evq_cap - 1);
+    }
+}
+
 static const char *oe_text(const char *p) {
     if (!p) return otx_empty.z;
     size_t n = strlen(p);
@@ -803,6 +875,7 @@ static const char *oe_text(const char *p) {
     ((long long *)c)[0] = 0;
     ((long long *)c)[1] = (long long)n;
     memcpy(c + 16, p, n + 1);
+    evq_add(c);
     return c + 16;
 }
 static long long *oe_list_spine(const long long *src) {
@@ -811,6 +884,7 @@ static long long *oe_list_spine(const long long *src) {
     dst[0] = len;
     dst[1] = len;
     memcpy(dst + 2, src + 2, (size_t)len * 8);
+    evq_add(dst);
     return dst;
 }
 static const char *oe_map(const char *p, const char *key) {
@@ -840,7 +914,107 @@ static const char *oe_map(const char *p, const char *key) {
     }
     return (const char *)nh;
 }
+/* The generated slot store: a single map behind @orion_slots, with
+ * C-ABI map helpers emitted next to it - reachable from here. */
+extern void *orion_slots;
+extern long long orion_map_has(void *m, const char *key);
+extern long long orion_map_get(void *m, const char *key);
+
+/* Queue the key's OLD value for deferred free, if it was one of our
+ * evacuated copies. code tells the shape: a text's malloc base sits 16
+ * bytes before the pointer, a list spine IS its base, and a list:text's
+ * elements are queued too. Maps (code 4/5) are skipped in this first
+ * step - their copies still leak on overwrite, but map-valued slots are
+ * written once, not per keystroke. */
+static void oe_queue_old(const char *key, const void *newp, long long code) {
+    if (!key || !orion_slots) return;
+    if (!orion_map_has(orion_slots, key)) return;
+    const void *old = (const void *)(uintptr_t)orion_map_get(orion_slots, key);
+    if (!old || old == newp) return;
+    if (code == 1) {
+        evq_queue((const char *)old - 16);
+        return;
+    }
+    if (code == 2 || code == 3) {
+        if (!evq_has(old)) return;
+        if (code == 3) {
+            const long long *d = (const long long *)old;
+            for (long long i = 0; i < d[1]; i++) {
+                const void *e = (const void *)(uintptr_t)d[i + 2];
+                if (e) evq_queue((const char *)e - 16);
+            }
+        }
+        evq_queue(old);
+    }
+}
+
+/* Free everything queued that NO slot still points at (aliasing guard:
+ * the same copy can be stored under two keys), and drop the freed
+ * blocks from the ownership set so a recycled address can never be
+ * mistaken for ours. Called by the server loop at its proven-quiet
+ * moment - no connection task alive, right after the arena sweep. */
+long long orion_slot_gc(void) {
+    if (!pend_n) return 0;
+    long long freed = 0;
+    long long *lv = NULL;
+    long long ln = 0;
+    if (orion_slots) {
+        const long long *h = (const long long *)orion_slots;
+        const long long *ent = (const long long *)(uintptr_t)h[0];
+        ln = h[2];
+        lv = (long long *)malloc((size_t)(ln > 0 ? ln : 1) * 8);
+        if (!lv) return 0;
+        for (long long i = 0; i < ln; i++) lv[i] = ent[i * 2 + 1];
+    }
+    for (size_t k = 0; k < pend_n; k++) {
+        const char *b = (const char *)pend_tab[k];
+        int live = 0;
+        for (long long i = 0; i < ln; i++) {
+            const char *v = (const char *)(uintptr_t)lv[i];
+            if (v == b || v == b + 16) { live = 1; break; }
+        }
+        if (live) continue;
+        /* the ownership check is the GATE: a block queued twice (same
+         * copy under two keys) is tombstoned on the first pass and
+         * skipped on the second - no double free. Out of the set BEFORE
+         * the free, so a recycled address can never pass evq_has. */
+        int mine = 0;
+        if (evq_cap) {
+            size_t j = evq_slot(evq_tab, evq_cap, b);
+            while (evq_tab[j]) {
+                if (evq_tab[j] == b) { evq_tab[j] = (void *)(uintptr_t)1; mine = 1; break; }
+                j = (j + 1) & (evq_cap - 1);
+            }
+        }
+        if (!mine) continue;
+        free((void *)b);
+        freed++;
+    }
+    /* rebuild the set without tombstones (address 1 markers) */
+    if (freed && evq_cap) {
+        void **nt = (void **)calloc(evq_cap, sizeof(void *));
+        if (nt) {
+            size_t n2 = 0;
+            for (size_t i = 0; i < evq_cap; i++) {
+                void *p = evq_tab[i];
+                if (!p || p == (void *)(uintptr_t)1) continue;
+                size_t j = evq_slot(nt, evq_cap, p);
+                while (nt[j]) j = (j + 1) & (evq_cap - 1);
+                nt[j] = p;
+                n2++;
+            }
+            free(evq_tab);
+            evq_tab = nt;
+            evq_n = n2;
+        }
+    }
+    free(lv);
+    pend_n = 0;
+    return freed;
+}
+
 const char *orion_slot_evac(const char *p, const char *key, long long code) {
+    oe_queue_old(key, p, code);
     if (!p || !oe_in_region(p)) return p;
     if (code == 1) return oe_text(p);
     if (code == 2) return (const char *)oe_list_spine((const long long *)p);

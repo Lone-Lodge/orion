@@ -1367,6 +1367,7 @@ define emit_runtime() -> text:
     text = "{text}declare i64 @orion_pool_off()\n"
     text = "{text}declare i64 @orion_pool_reset(i64)\n"
     text = "{text}declare i64 @orion_arena_reset()\n"
+    text = "{text}declare i64 @orion_slot_gc()\n"
     text = "{text}declare i64 @orion_arena_used()\n"
     text = "{text}declare i64 @orion_arena_rewind(i64)\n"
     text = "{text}declare i64 @orion_arena_high()\n"
