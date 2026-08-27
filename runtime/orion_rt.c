@@ -758,11 +758,34 @@ void orion_arena_ptr_guard(const char *p, const char *key) {
  * copy when they point into a region (text keys born there); int keys
  * never alias region addresses in practice. Map VALUES are untyped -
  * an in-region value still aborts, but now with the reason. */
+/* A region-born value can live in the bump buffer OR in an overflow
+ * chunk (ovf_push when the buffer was full) OR in a pool. The overflow
+ * chunks were invisible here: a value born in one passed the region
+ * check as "ordinary heap", the slot kept the raw pointer, and the next
+ * reset's ovf_drain freed the memory under it - a dangling cache that
+ * crashed on the first large-enough block (measured: dots' hue cache
+ * after an arena grow). Walk the chains too; evac is a slot_set-only
+ * cost and the chains are short-lived by construction. */
+static int ovf_owns(const orion_ovf *b, const void *p) {
+    for (; b; b = b->next) {
+        const unsigned char *d = (const unsigned char *)(b + 1);
+        if ((const unsigned char *)p >= d && (const unsigned char *)p < d + b->size)
+            return 1;
+    }
+    return 0;
+}
 static int oe_in_region(const void *p) {
-    return (arena_base && (const unsigned char *)p >= arena_base &&
-            (const unsigned char *)p < arena_base + arena_cap) ||
-           (frame_base && (const unsigned char *)p >= frame_base &&
-            (const unsigned char *)p < frame_base + frame_cap);
+    if (arena_base && (const unsigned char *)p >= arena_base &&
+        (const unsigned char *)p < arena_base + arena_cap) return 1;
+    if (frame_base && (const unsigned char *)p >= frame_base &&
+        (const unsigned char *)p < frame_base + frame_cap) return 1;
+    if (ovf_owns(arena_ovf, p) || ovf_owns(frame_ovf, p)) return 1;
+    for (long long i = 0; i < pool_count; i++) {
+        if (pool_base && pool_base[i] && (const unsigned char *)p >= pool_base[i] &&
+            (const unsigned char *)p < pool_base[i] + pool_cap[i]) return 1;
+        if (pool_ovf && ovf_owns(pool_ovf[i], p)) return 1;
+    }
+    return 0;
 }
 static void oe_fatal(const char *what, const char *key) {
     fprintf(stderr,

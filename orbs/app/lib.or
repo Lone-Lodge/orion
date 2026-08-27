@@ -326,10 +326,28 @@ public define app_run(title: text, port: number, w: number, h: number, routes: [
 # Cooperative and single-threaded, so handler code between IO points still
 # runs unsliced. If the task table is full we serve inline as before.
 # no example: runs a server loop - proven by folio
+public external define orion_arena_on() -> int
+public external define orion_arena_reset() -> int
+public external define orion_arena_used() -> int
+public external define orion_task_live_count() -> int
 public define run_until_interrupted(srv: number, routes: [route], static_dir: text) uses net, files, clock, console:
+    # ZERO LEAKS BY CONSTRUCTION: the routes/static slots are set BEFORE
+    # the arena goes on (malloc-born, safe without a copier)...
     slot_set("app:bye", "0")
     slot_set("app:routes", routes)
     slot_set("app:static", static_dir)
+    # ...then EVERYTHING a request allocates is born in the bump arena.
+    # Persistent state survives on its own: slot stores evacuate through
+    # their copiers, astra_run persists its trees by hand. So the moment
+    # NO connection is alive (empty task table - parked handlers count),
+    # whatever is left in the arena is garbage BY DEFINITION and one
+    # pointer rewind reclaims it. A handler cannot leak: it has no other
+    # heap to spill into. This is what made a long-lived server drip
+    # ~10MB per compile request before - malloc-mode never frees.
+    # the task-id list is born BEFORE the arena goes on (and shrinks back
+    # to the interned empty list before every sweep) so it never dangles
+    edit tasks = []
+    arena = orion_arena_on()
     loop:
         if interrupted():
             break
@@ -340,7 +358,22 @@ public define run_until_interrupted(srv: number, routes: [route], static_dir: te
             t = spawn(conn_task, conn)
             if t < 0:
                 t2 = spawn_conn(conn, routes, static_dir)
+            else:
+                tasks = append(tasks, t)
         pumped = pump()
+        # REAP finished connection tasks: fire-and-forget spawns are never
+        # awaited, so their stacks and table slots lived forever (a leak of
+        # its own) AND held the live-count above zero - the arena sweep
+        # below never fired. Awaiting a finished task releases both.
+        edit kvar = []
+        loop id in tasks:
+            if task_state(id) is 3:
+                r = await(id)
+            else:
+                kvar = append(kvar, id)
+        tasks = kvar
+        if orion_task_live_count() is 0 and orion_arena_used() > 0:
+            svept = orion_arena_reset()
         # an app lives as long as its window: the page said goodbye and
         # nothing came after it, so there is nobody left to serve.
         # Headless (APP_HEADLESS=1) has no window to live by - only Ctrl+C.
