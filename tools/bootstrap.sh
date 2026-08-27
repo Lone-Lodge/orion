@@ -35,6 +35,12 @@ echo "==> build orbit (project tool)"
 bash "$ROOT/tools/build_orbit.sh"
 
 echo "==> run tests"
-bash "$ROOT/tools/test.sh"
+# The outcome is READ. It used to be discarded, and the line below then
+# announced green whatever happened - which is how a suite that passed
+# nothing at all still ended with "tests green".
+if ! bash "$ROOT/tools/test.sh"; then
+    echo "==> bootstrap FAILED: orion.exe self-hosts, but the suite is not green" >&2
+    exit 1
+fi
 
 echo "==> bootstrap complete: orion.exe self-hosts, tests green"

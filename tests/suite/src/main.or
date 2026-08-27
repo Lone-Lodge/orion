@@ -287,12 +287,22 @@ define main() -> number:
 
     print_line("--------------------------------------------------------------------")
     print_line("")
-    all_pass = fail_count is 0
+    # Green means EVERY test passed - not merely that none reported a
+    # failure. A test that never ran reports neither, so `fail_count is 0`
+    # called a suite that did nothing a success: absence of failure read as
+    # success. That is exactly how a whole platform's worth of silence can
+    # hide behind a green line.
+    missing = total_tests - pass_count - fail_count
+    all_pass = pass_count is total_tests
     summary_color = if all_pass then c_green else c_red
     print_line("{summary_color}Pass: {pass_count} / {total_tests}{c_off}")
     if fail_count > 0:
         print_line("{c_red}Fail: {fail_count}{c_off}")
+    if missing > 0:
+        print_line("{c_red}Never ran: {missing} - emitted, but the worker pool never reported them{c_off}")
     avg_ms = total_compile_ms // total_tests
     print_line("{c_dim}Total compile: {total_compile_ms}ms   wall: {wall_ms}ms ({jobs} workers)   avg: {avg_ms}ms/test   binaries: {total_bytes}b{c_off}")
 
-    fail_count
+    # Non-zero unless every test passed - a test that never ran counts
+    # against us, so the gate above can trust the exit code.
+    total_tests - pass_count
