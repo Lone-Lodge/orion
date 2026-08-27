@@ -3120,6 +3120,18 @@ static orion_proc_slot orion_procs[ORION_MAX_PROCS];
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+
+/* SIGPIPE's default action TERMINATES the process. Any Orion program that
+ * writes to a pipe whose read end has closed - a server talking to a child
+ * that died, a language server that was never installed - would vanish
+ * mid-request with no message, no exit code you can read, nothing in the
+ * log. We want write() to return EPIPE instead, so the code can see the
+ * failure and answer for it.
+ *
+ * A constructor rather than a call in main: it covers every binary without
+ * the emitter, or anyone's main, having to know. */
+__attribute__((constructor))
+static void orion_ignore_sigpipe(void) { signal(SIGPIPE, SIG_IGN); }
 #endif
 
 /* Start `cmd`; stdout+stderr go to `outfile` when given (truncated), else they
