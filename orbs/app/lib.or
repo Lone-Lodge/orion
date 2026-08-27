@@ -11,6 +11,7 @@
 # One task per connection (the httpd pattern); static files stream in binary
 # through send_raw, so images and fonts survive. HTTP/1.0, close per request:
 # boring, debuggable, plenty for loopback.
+use os
 use file (open_read, read_chunk, close_file)
 
 type request:
@@ -372,10 +373,32 @@ define conn_task(conn: number) -> number uses net, files, clock:
 # the real thing when the WebView2 pieces are on the machine.
 # no example: opens a window - proven by folio
 public define open_window(url: text) -> number uses net:
-    a = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-    b = "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
-    exe = if file_exists(a) then a else b
-    start_command(exe, ["--app={url}"])
+    k = os_kind()
+    if k is 0:
+        a = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+        b = "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
+        exe = if file_exists(a) then a else b
+        return start_command(exe, ["--app={url}"])
+    # macOS: samma --app-lage nar en chromium finns, annars standardwebblasaren.
+    # Utan den har grenen forsokte varje Orion-app starta Edge pa en
+    # Windows-vag och sa "No such file or directory" - appen kom upp men
+    # inget fonster oppnades, pa varje maskin som inte var Windows.
+    if k is 2:
+        mc = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        me = "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
+        if file_exists(mc):
+            return start_command(mc, ["--app={url}"])
+        if file_exists(me):
+            return start_command(me, ["--app={url}"])
+        return start_command("open", [url])
+    # linux: chromium om den finns, annars skrivbordets egen oppnare
+    lc = "/usr/bin/google-chrome"
+    lm = "/usr/bin/chromium"
+    if file_exists(lc):
+        return start_command(lc, ["--app={url}"])
+    if file_exists(lm):
+        return start_command(lm, ["--app={url}"])
+    start_command("xdg-open", [url])
 
 external define own_window_open(url: text, title: text, w: int, h: int) -> int
 external define own_window_gone() -> int
