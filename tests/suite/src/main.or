@@ -153,7 +153,14 @@ define finish_one(filename: text, clang_path: text) -> number:
     slot_set("tms", slot_get_number("tms") + compile_ms)
     slot_set("tbytes", slot_get_number("tbytes") + size_bytes)
 
-    passed = built is 1 and actual is expected
+    # POSIX reports an exit status in EIGHT BITS; Windows has 32. A test
+    # whose expected value is above 255 (the name carries it) can never be
+    # observed whole here - test_1713 exits 177, which is 1713 & 255 and
+    # not a compiler disagreeing with anyone. Compare what the platform is
+    # able to say, so a real mismatch still fails and an unobservable
+    # number does not.
+    want = if host_mangle() is "w" then expected else expected - (expected // 256) * 256
+    passed = built is 1 and actual is want
     status_txt = if passed then "{c_green}PASS{c_off}" else "{c_red}FAIL{c_off}"
     if passed:
         slot_set("pass", slot_get_number("pass") + 1)

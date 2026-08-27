@@ -3652,10 +3652,15 @@ static void orion_task_release(int idx) {
 static ucontext_t orion_sched_ctx;
 static ucontext_t orion_task_ctx[ORION_MAX_TASKS];
 static char *orion_task_stack[ORION_MAX_TASKS];
-static int orion_entry_idx = -1;
 
-static void orion_task_entry(void) {
-    int idx = orion_entry_idx;
+/* The index arrives as makecontext's argument, the way CreateFiber passes it
+ * on Windows. It used to be read from a global set in spawn - but makecontext
+ * only PREPARES the context; the entry does not run until the scheduler
+ * switches into it. Spawn several tasks before running any (a worker pool
+ * does exactly that) and every one of them woke up believing it was the last
+ * index spawned. They fought over one slot, and the pool went quiet after a
+ * single round with nothing to show and nothing to report. */
+static void orion_task_entry(int idx) {
     orion_tasks[idx].result = orion_call_one(orion_tasks[idx].clos, orion_tasks[idx].arg);
     orion_tasks[idx].state = 3;
     swapcontext(&orion_task_ctx[idx], &orion_sched_ctx);
@@ -3674,8 +3679,7 @@ long long orion_task_spawn(void *clos, long long arg) {
     orion_task_ctx[idx].uc_stack.ss_sp = orion_task_stack[idx];
     orion_task_ctx[idx].uc_stack.ss_size = ORION_TASK_STACK;
     orion_task_ctx[idx].uc_link = &orion_sched_ctx;
-    orion_entry_idx = idx;
-    makecontext(&orion_task_ctx[idx], orion_task_entry, 0);
+    makecontext(&orion_task_ctx[idx], (void (*)(void))orion_task_entry, 1, idx);
     return idx;
 }
 
@@ -3712,7 +3716,6 @@ static long long orion_sched_drive(int until_idx) {
             if (orion_tasks[i].state != 1) continue;
             orion_task_current = i;
             orion_tasks[i].state = 2;
-            orion_entry_idx = i;
             swapcontext(&orion_sched_ctx, &orion_task_ctx[i]);
             orion_task_current = -1;
             ran = 1;
@@ -3722,10 +3725,25 @@ static long long orion_sched_drive(int until_idx) {
         if (!ran) {
             long long wait = orion_sched_wake_due();
             long long io = orion_sched_io_soonest();
-            if (wait <= 0 && io < 0) break;
+            long long pr = orion_sched_proc_soonest();
+            /* nothing runnable, no timers, nothing parked on: stop.
+             *
+             * `pr` used to be missing here, and with it every task parked on
+             * a CHILD PROCESS was invisible to this loop. finished_within()
+             * put the task in state 6, the scheduler asked only about timers
+             * and fds, heard nothing, and broke - abandoning every worker
+             * mid-flight. A pool of eight started eight children, went quiet,
+             * and reported nothing at all. The Windows branch had this right;
+             * this one had never been made to match. */
+            if (wait <= 0 && io < 0 && pr < 0) break;
             long long budget = wait;
             if (budget <= 0 || (io >= 0 && io < budget)) budget = io;
+            if (budget <= 0 || (pr >= 0 && pr < budget)) budget = pr;
+            /* a child process has no fd to select on - while one is
+             * watched, wake every 10 ms and ask the OS about it */
+            if (pr >= 0 && budget > 10) budget = 10;
             if (io >= 0) orion_sched_poll_io(budget); else __orion_sleep_ms(budget);
+            if (pr >= 0) orion_sched_poll_procs();
         }
     }
     return switches;
@@ -3822,7 +3840,6 @@ long long orion_task_pump(void) {
         SwitchToFiber(orion_tasks[i].stack_ctx);
         orion_trace_task(-1);
 #else
-        orion_entry_idx = i;
         swapcontext(&orion_sched_ctx, &orion_task_ctx[i]);
 #endif
         orion_task_current = -1;
