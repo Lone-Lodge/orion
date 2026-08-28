@@ -78,17 +78,20 @@ public define parse_request(raw: text) -> request:
 
 define status_line(code: number) -> text:
     choose:
-        code is 200 then "HTTP/1.0 200 OK"
-        code is 404 then "HTTP/1.0 404 Not Found"
-        else "HTTP/1.0 500 Internal Server Error"
+        code is 200 then "HTTP/1.1 200 OK"
+        code is 404 then "HTTP/1.1 404 Not Found"
+        else "HTTP/1.1 500 Internal Server Error"
 
 # no-cache överallt: appen bor på loopback och utvecklas i sekundtakt -
 # en cachad shell.js mot en ny server är ett spöke ingen ska behöva jaga.
 define head_of(r: response) -> text:
     # HTTP raknar BYTES - length(text) ar kodpunkter, och ett svar med
     # aao skulle huggas av med fel Content-Length.
+    # keep-alive: en rumstung layout gor hundratals sma anrop - en NY
+    # TCP-anslutning per fil VAR sekunderna innan Quill blev skrivbar.
+    # Langden ar alltid satt, sa samma socket kan bara fa nasta fraga.
     n = bytes_count(bytes_of(r.body))
-    "{status_line(r.status)}\r\nContent-Type: {r.mime}\r\nContent-Length: {n}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n"
+    "{status_line(r.status)}\r\nContent-Type: {r.mime}\r\nContent-Length: {n}\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n"
 
 # Content type from the filename - the handful a local app meets.
 public define mime_of(path: text) -> text:
@@ -177,73 +180,100 @@ define header_length(head: text) -> number:
             n = int_from_text(trim(kv[1]))
     n
 
-# Serve one accepted connection: read the head, then as much body as the
-# head promised (bodies are TEXT - a page sends binary as base64), dispatch,
-# answer, close.
+# Serve one accepted connection: read a request head, then as much body as
+# the head promised (bodies are TEXT - a page sends binary as base64),
+# dispatch, answer - and then WAIT FOR THE NEXT request on the same socket
+# (keep-alive). A room-heavy layout makes hundreds of small requests; one
+# TCP handshake each was seconds of pure ceremony. The browser closes the
+# socket (or says Connection: close) when it is done; an idle beat of 2 s
+# ends lingerers.
 define serve_conn(conn: number, routes: [route], static_dir: text) uses net, files, clock:
-    deadline = monotonic_ms() + 5000
-    edit raw = ""
+    edit varv = 0
     loop:
-        left = deadline - monotonic_ms()
-        if left <= 0:
-            break
-        if readable_within(conn, left):
-            chunk = recv(conn, 8192)
-            if timed_out(chunk):
+        # forsta requesten star redan och knackar (accept), foljande far
+        # en kort idle-vantan innan sockeln bedoms fardig
+        idle = if varv is 0 then 5000 else 2000
+        deadline = monotonic_ms() + idle
+        edit raw = ""
+        edit dog = false
+        # busy fran FORSTA byten: en task parkerad mitt i head-lasningen
+        # haller sin halvbyggda rad i arenan och far inte svepas - men
+        # idle-vantan pa forsta byten haller inget och raknas inte
+        edit upptagen = false
+        loop:
+            left = deadline - monotonic_ms()
+            if left <= 0:
+                dog = true
                 break
-            raw = "{raw}{chunk}"
-            if contains(raw, "\r\n\r\n"):
-                break
-    halves = split(raw, "\r\n\r\n")
-    head = halves[0]
-    edit body = if length(halves) > 1 then halves[1] else ""
-    want = header_length(head)
-    loop:
-        # want ar Content-Length i BYTES - jamfor bytes, inte kodpunkter
-        if bytes_count(bytes_of(body)) >= want:
+            if readable_within(conn, left):
+                chunk = recv(conn, 8192)
+                if timed_out(chunk) or chunk is "":
+                    dog = true
+                    break
+                if not upptagen:
+                    upptagen = true
+                    b0 = orion_busy_inc()
+                raw = "{raw}{chunk}"
+                if contains(raw, "\r\n\r\n"):
+                    break
+        if dog or not contains(raw, "\r\n\r\n"):
+            if upptagen:
+                bx = orion_busy_dec()
             break
-        left2 = deadline - monotonic_ms()
-        if left2 <= 0:
-            break
-        if readable_within(conn, left2):
-            more = recv(conn, 65536)
-            if timed_out(more):
+        halves = split(raw, "\r\n\r\n")
+        head = halves[0]
+        edit body = if length(halves) > 1 then halves[1] else ""
+        want = header_length(head)
+        loop:
+            # want ar Content-Length i BYTES - jamfor bytes, inte kodpunkter
+            if bytes_count(bytes_of(body)) >= want:
                 break
-            body = "{body}{more}"
-    first = parse_request(head)
-    req = request{method: first.method, path: first.path, query: first.query, body: body}
-    # The one path the shell answers itself: the page says goodbye when its
-    # window goes (navigator.sendBeacon on pagehide), and the loop below stops
-    # a moment later. A reload says goodbye too, so the moment is a grace
-    # period that any further request cancels - which a reload always sends.
-    if req.path is "/api/bye":
-        slot_set("app:bye", "{monotonic_ms()}")
-        gone = send(conn, head_of(json_of("\{\"bye\":true\}")))
-        gone2 = send(conn, "\{\"bye\":true\}")
-        closed_bye = close(conn)
-        return
-    slot_set("app:bye", "0")
-    # The orb's own asset: the standard bar (see app_bar above).
-    if req.path is "/orb/bar.js":
-        jsr = response{status: 200, mime: "text/javascript", body: bar_js()}
-        js1 = send(conn, head_of(jsr))
-        js2 = send_raw(conn, jsr.body)
-        js_closed = close(conn)
-        return
-    edit matched = false
-    loop r in routes:
-        if not matched and r.method is req.method and r.path is req.path:
-            matched = true
-    if matched:
-        edit resp = dispatch(req, routes)
-        # app_bar(): every routed html page gets the bar appended. Injection
-        # happens HERE, not in the page, so the page stays plain html.
-        if bar_enabled() and starts_with(resp.mime, "text/html"):
-            resp = response{status: resp.status, mime: resp.mime, body: "{resp.body}<script src=\"/orb/bar.js\"></script>"}
-        sent1 = send(conn, head_of(resp))
-        sent2 = send_raw(conn, resp.body)
-    else:
-        serve_static(conn, req, static_dir, header_val(head, "If-None-Match"))
+            left2 = deadline - monotonic_ms()
+            if left2 <= 0:
+                break
+            if readable_within(conn, left2):
+                more = recv(conn, 65536)
+                if timed_out(more):
+                    break
+                body = "{body}{more}"
+        first = parse_request(head)
+        req = request{method: first.method, path: first.path, query: first.query, body: body}
+        edit farval = false
+        # The one path the shell answers itself: the page says goodbye when
+        # its window goes (navigator.sendBeacon on pagehide), and the loop
+        # stops a moment later. A reload says goodbye too, so the moment is
+        # a grace period that any further request cancels.
+        if req.path is "/api/bye":
+            slot_set("app:bye", "{monotonic_ms()}")
+            gone = send(conn, head_of(json_of("\{\"bye\":true\}")))
+            gone2 = send(conn, "\{\"bye\":true\}")
+            farval = true
+        else:
+            slot_set("app:bye", "0")
+            # The orb's own asset: the standard bar (see app_bar above).
+            if req.path is "/orb/bar.js":
+                jsr = response{status: 200, mime: "text/javascript", body: bar_js()}
+                js1 = send(conn, head_of(jsr))
+                js2 = send_raw(conn, jsr.body)
+            else:
+                edit matched = false
+                loop r in routes:
+                    if not matched and r.method is req.method and r.path is req.path:
+                        matched = true
+                if matched:
+                    edit resp = dispatch(req, routes)
+                    # app_bar(): every routed html page gets the bar appended.
+                    # Injection happens HERE, so the page stays plain html.
+                    if bar_enabled() and starts_with(resp.mime, "text/html"):
+                        resp = response{status: resp.status, mime: resp.mime, body: "{resp.body}<script src=\"/orb/bar.js\"></script>"}
+                    sent1 = send(conn, head_of(resp))
+                    sent2 = send_raw(conn, resp.body)
+                else:
+                    serve_static(conn, req, static_dir, header_val(head, "If-None-Match"))
+        b2 = orion_busy_dec()
+        if farval or header_val(head, "Connection") is "close":
+            break
+        varv = varv + 1
     closed = close(conn)
 
 # One header's value out of the raw head, "" when absent. Browsers send
@@ -278,13 +308,13 @@ define serve_static(conn: number, req: request, static_dir: text, inm: text) use
     n = file_size(full)
     etag = "\"{modified_at(full)}-{n}\""
     if inm is etag:
-        s304 = send(conn, "HTTP/1.0 304 Not Modified\r\nETag: {etag}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n")
+        s304 = send(conn, "HTTP/1.1 304 Not Modified\r\nETag: {etag}\r\nContent-Length: 0\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n")
         return
     # app_bar(): a static html page gets the bar too, so an app needs no
     # route at all for "/" - ui/index.html serves itself, bar included.
     tag = if bar_enabled() and starts_with(mime_of(full), "text/html") then "<script src=\"/orb/bar.js\"></script>" else ""
     total = n + length(bytes_of(tag))
-    s1 = send(conn, "HTTP/1.0 200 OK\r\nContent-Type: {mime_of(full)}\r\nContent-Length: {total}\r\nETag: {etag}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n")
+    s1 = send(conn, "HTTP/1.1 200 OK\r\nContent-Type: {mime_of(full)}\r\nContent-Length: {total}\r\nETag: {etag}\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n")
     h = open_read(full)
     loop:
         chunk = read_chunk(h, 262144)
@@ -349,6 +379,10 @@ public external define orion_arena_reset() -> int
 public external define orion_arena_used() -> int
 public external define orion_task_live_count() -> int
 public external define orion_slot_gc() -> int
+public external define orion_busy_inc() -> int
+public external define orion_busy_dec() -> int
+public external define orion_busy_count() -> int
+public external define orion_task_reap_finished() -> int
 public define run_until_interrupted(srv: number, routes: [route], static_dir: text) uses net, files, clock, console:
     # ZERO LEAKS BY CONSTRUCTION: the routes/static slots are set BEFORE
     # the arena goes on (malloc-born, safe without a copier)...
@@ -363,9 +397,6 @@ public define run_until_interrupted(srv: number, routes: [route], static_dir: te
     # pointer rewind reclaims it. A handler cannot leak: it has no other
     # heap to spill into. This is what made a long-lived server drip
     # ~10MB per compile request before - malloc-mode never frees.
-    # the task-id list is born BEFORE the arena goes on (and shrinks back
-    # to the interned empty list before every sweep) so it never dangles
-    edit tasks = []
     arena = orion_arena_on()
     loop:
         if interrupted():
@@ -377,24 +408,32 @@ public define run_until_interrupted(srv: number, routes: [route], static_dir: te
             t = spawn(conn_task, conn)
             if t < 0:
                 t2 = spawn_conn(conn, routes, static_dir)
-            else:
-                tasks = append(tasks, t)
+            # DRANERA kon: en accept per varv ar max ~100 anslutningar/s,
+            # och en rumstung layout oppnar hundratals pa en gang - det
+            # VAR sekunderna innan Quill blev skrivbar. Ta allt som star
+            # och knackar innan pumpen far turen. (1 ms ar en TITT -
+            # accept_within med 0 ar den blockande accepten.)
+            loop:
+                c2 = accept_within(srv, 1)
+                if not ok(c2):
+                    break
+                t3 = spawn(conn_task, c2)
+                if t3 < 0:
+                    t4 = spawn_conn(c2, routes, static_dir)
         pumped = pump()
-        # REAP finished connection tasks: fire-and-forget spawns are never
-        # awaited, so their stacks and table slots lived forever (a leak of
-        # its own) AND held the live-count above zero - the arena sweep
-        # below never fired. Awaiting a finished task releases both.
-        edit kvar = []
-        loop id in tasks:
-            if task_state(id) is 3:
-                r = await(id)
-            else:
-                kvar = append(kvar, id)
-        tasks = kvar
-        if orion_task_live_count() is 0 and orion_arena_used() > 0:
+        # REAP finished connection tasks in the RUNTIME (no id list here:
+        # a list would live in the arena and dangle across the sweep).
+        # Fire-and-forget spawns are never awaited, so their stacks and
+        # table slots lived forever otherwise - this loop never awaits,
+        # which is the reaper's one precondition.
+        reaped = orion_task_reap_finished()
+        # tyst = INGEN request i flykt. Keep-alive-tasks som idlar mellan
+        # requests raknas inte - deras per-request-lokaler tilldelas fore
+        # lasning pa nasta varv, sa de haller inget arenaminne levande.
+        if orion_busy_count() is 0 and orion_arena_used() > 0:
             svept = orion_arena_reset()
             # overwritten slot copies go the same quiet moment - nothing
-            # can be holding them when no connection task is alive
+            # can be holding them when no request is in flight
             fritt = orion_slot_gc()
         # an app lives as long as its window: the page said goodbye and
         # nothing came after it, so there is nobody left to serve.

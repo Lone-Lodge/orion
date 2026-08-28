@@ -4052,7 +4052,30 @@ long long orion_task_state(long long id) {
     return orion_tasks[(int)id].state;
 }
 
+/* Release every finished task nobody has awaited - the serve loop's
+ * reaper for fire-and-forget connection tasks (their stacks and table
+ * slots lived forever otherwise). ONLY for a loop that never awaits:
+ * a finished task someone still intends to await would lose its
+ * result here. */
+long long orion_task_reap_finished(void) {
+    long long n = 0;
+    for (int i = 0; i < ORION_MAX_TASKS; i++)
+        if (orion_tasks[i].state == 3) { orion_task_release(i); n++; }
+    return n;
+}
+
 long long orion_task_live_count(void) { return orion_task_live; }
+
+/* Requests IN FLIGHT - the serve loop's arena sweep waits for zero.
+ * Task-live alone stopped meaning "quiet" with keep-alive: an idle
+ * connection task parks between requests holding nothing alive (its
+ * per-request locals are all assigned before read on the next turn),
+ * so it must not block the sweep. The handler brackets each request
+ * with inc/dec; cooperative scheduling makes the check race-free. */
+static long long busy_reqs = 0;
+long long orion_busy_inc(void) { return ++busy_reqs; }
+long long orion_busy_dec(void) { if (busy_reqs > 0) busy_reqs--; return busy_reqs; }
+long long orion_busy_count(void) { return busy_reqs; }
 
 /* ---- Delimited continuations: the handler survives the resume --------
  *
