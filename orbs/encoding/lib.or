@@ -100,8 +100,13 @@ public define base64_decode(s: text) -> [number]:
 external define sha256_hex(t: text) -> text
 
 # SHA-256 of `t`, as 64 hex characters. The stdlib's content hash:
-# checksums, cache keys, integrity. The examples are FIPS 180-4 vectors.
+# checksums, cache keys, integrity. The first two examples are FIPS 180-4
+# vectors. The third is BINARY: text carries its own length, so a NUL byte
+# is data like any other and must not end the hash (it did once - sha256_hex
+# read strlen instead of the text's length, so every PNG hashed as its first
+# eight bytes).
 public define sha256(t: text) -> text:
     example sha256("") is "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     example sha256("abc") is "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    example sha256(text_of([65, 0, 66])) is "76fe3925c7167317f2df68454339f5ec3650e4062178b4f2be219b105a507907"
     sha256_hex(t)

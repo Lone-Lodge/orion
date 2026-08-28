@@ -29,6 +29,8 @@
 extern const char *orion_text_from_c(const char *s);
 /* effektinspelningen (orion_rt.c): spela in/av programnivans effekter */
 extern long long orion_fx_i64(const char *tag, long long live);
+/* textens EGEN langd (orion_rt.c), inte strlen: binart innehall bar NUL */
+extern long long orion_tlen_c(const char *p);
 
 #ifdef _WIN32
 #include <windows.h>
@@ -581,7 +583,7 @@ const char *sha256_hex(const char *msg) {
     static char out[65];
     unsigned int st[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
                           0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
-    size_t len = strlen(msg);
+    size_t len = (size_t)orion_tlen_c(msg);
     size_t full = len / 64;
     for (size_t i = 0; i < full; i++) sha256_block(st, (const unsigned char *)msg + i*64);
     unsigned char tail[128];
