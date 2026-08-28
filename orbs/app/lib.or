@@ -243,12 +243,26 @@ define serve_conn(conn: number, routes: [route], static_dir: text) uses net, fil
         sent1 = send(conn, head_of(resp))
         sent2 = send_raw(conn, resp.body)
     else:
-        serve_static(conn, req, static_dir)
+        serve_static(conn, req, static_dir, header_val(head, "If-None-Match"))
     closed = close(conn)
 
+# One header's value out of the raw head, "" when absent. Browsers send
+# canonical casing; a lowercase probe catches proxies that do not.
+define header_val(head: text, name: text) -> text:
+    edit v = ""
+    loop line in lines(head):
+        kv = split(line, ":")
+        if length(kv) > 1 and (kv[0] is name or kv[0] is lower(name)):
+            v = trim(kv[1])
+    v
+
 # A static file, streamed in binary chunks so a large image never has to
-# fit one send.
-define serve_static(conn: number, req: request, static_dir: text) uses net, files:
+# fit one send. ETag = mtime-size, and If-None-Match answers 304: the
+# browser revalidates every load (no-cache keeps that promise - a new
+# server is seen at once) but unchanged bytes are never resent. A room-
+# heavy layout used to reload the whole shell per iframe; now each file
+# after the first costs one header round-trip.
+define serve_static(conn: number, req: request, static_dir: text, inm: text) uses net, files:
     rel = if req.path is "/" then "/index.html" else percent_decode(req.path)
     if req.method is not "GET" or not safe_path(rel):
         r404 = not_found()
@@ -262,11 +276,15 @@ define serve_static(conn: number, req: request, static_dir: text) uses net, file
         s2 = send(conn, r404.body)
         return
     n = file_size(full)
+    etag = "\"{modified_at(full)}-{n}\""
+    if inm is etag:
+        s304 = send(conn, "HTTP/1.0 304 Not Modified\r\nETag: {etag}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n")
+        return
     # app_bar(): a static html page gets the bar too, so an app needs no
     # route at all for "/" - ui/index.html serves itself, bar included.
     tag = if bar_enabled() and starts_with(mime_of(full), "text/html") then "<script src=\"/orb/bar.js\"></script>" else ""
     total = n + length(bytes_of(tag))
-    s1 = send(conn, "HTTP/1.0 200 OK\r\nContent-Type: {mime_of(full)}\r\nContent-Length: {total}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n")
+    s1 = send(conn, "HTTP/1.0 200 OK\r\nContent-Type: {mime_of(full)}\r\nContent-Length: {total}\r\nETag: {etag}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n")
     h = open_read(full)
     loop:
         chunk = read_chunk(h, 262144)
