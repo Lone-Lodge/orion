@@ -94,6 +94,8 @@ define head_of(r: response) -> text:
     "{status_line(r.status)}\r\nContent-Type: {r.mime}\r\nContent-Length: {n}\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n"
 
 # Content type from the filename - the handful a local app meets.
+# .wasm MASTE vara application/wasm: WebAssembly.instantiateStreaming
+# vagrar allt annat, och felet den ger talar om MIME och inte om filen.
 public define mime_of(path: text) -> text:
     example mime_of("a.png") is "image/png"
     example mime_of("a.html") is "text/html; charset=utf-8"
@@ -109,6 +111,8 @@ public define mime_of(path: text) -> text:
         ends_with(path, ".svg") then "image/svg+xml"
         ends_with(path, ".ico") then "image/x-icon"
         ends_with(path, ".woff2") then "font/woff2"
+        ends_with(path, ".ttf") then "font/ttf"
+        ends_with(path, ".wasm") then "application/wasm"
         else "application/octet-stream"
 
 # The nibble value of a hex digit byte, or -1 if it is not one.
