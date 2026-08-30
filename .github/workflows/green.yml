@@ -112,6 +112,9 @@ jobs:
       - name: type shapes unchanged
         run: bash tools/orb_shapes.sh --check
 
+      - name: float arithmetic stays unfused
+        run: bash tools/fp_determinism_test.sh
+
       - name: field guide samples compile
         run: bash tools/docs_check.sh
 
