@@ -863,10 +863,18 @@ define psr_parse_primary(tokens: [table], position: number) -> table:
                 fl_cursor = fl_cursor + 1
             if fl_cursor is fl_before:
                 break
+        # `function(n) -> text: ...` - the declared answer, same word and same
+        # place as on a define. Omitted, the answer is read off the body and is
+        # int or real, which is all it ever was.
+        edit fl_ret = {"kind": "Named", "name": ""}
+        if psr_peek_kind(tokens, fl_cursor) is "symbol" and psr_peek_value(tokens, fl_cursor) is "->":
+            fl_rt = psr_parse_type(tokens, fl_cursor + 1)
+            fl_ret = get_map(fl_rt, "node")
+            fl_cursor = get_int(fl_rt, "next")
         if psr_peek_kind(tokens, fl_cursor) is "symbol" and psr_peek_value(tokens, fl_cursor) is ":":
             fl_cursor = fl_cursor + 1
         fl_body = psr_parse_expr(tokens, fl_cursor)
-        result = {"node": {"kind": "Lambda", "params": fl_list, "param_types": fl_types, "body": get_map(fl_body, "node"), "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": get_int(fl_body, "next")}
+        result = {"node": {"kind": "Lambda", "params": fl_list, "param_types": fl_types, "ret": fl_ret, "body": get_map(fl_body, "node"), "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": get_int(fl_body, "next")}
     if is_call:
         result = psr_parse_call(tokens, position, value)
     is_true = is_ident and value is "true"
@@ -942,6 +950,7 @@ define psr_parse_primary(tokens: [table], position: number) -> table:
     edit ll_is = false
     edit ll_params = []
     edit ll_after = position
+    edit ll_ret = {"kind": "Named", "name": ""}
     if is_lparen:
         edit ll_scan = position + 1
         edit ll_ok = true
@@ -977,8 +986,23 @@ define psr_parse_primary(tokens: [table], position: number) -> table:
                 break
             if ll_scan is ll_before:
                 break
-        ll_is = ll_ok and psr_peek_kind(tokens, ll_scan) is "symbol" and psr_peek_value(tokens, ll_scan) is ")" and psr_peek_kind(tokens, ll_scan + 1) is "symbol" and psr_peek_value(tokens, ll_scan + 1) is ":"
-        ll_after = ll_scan + 2
+        # After the `)`, either the body starts (`:`) or an answer is declared
+        # first (`-> text:`). A lambda without one answers int or real, read
+        # off its body - which silently made `(): "hej"` answer a text pointer
+        # as a number. The language does not infer a function's answer
+        # anywhere else, so a lambda says it the same way a define does.
+        ll_closed = ll_ok and psr_peek_kind(tokens, ll_scan) is "symbol" and psr_peek_value(tokens, ll_scan) is ")"
+        if ll_closed:
+            if psr_peek_kind(tokens, ll_scan + 1) is "symbol" and psr_peek_value(tokens, ll_scan + 1) is "->":
+                ll_rt = psr_parse_type(tokens, ll_scan + 2)
+                ll_rt_next = get_int(ll_rt, "next")
+                if psr_peek_kind(tokens, ll_rt_next) is "symbol" and psr_peek_value(tokens, ll_rt_next) is ":":
+                    ll_is = true
+                    ll_ret = get_map(ll_rt, "node")
+                    ll_after = ll_rt_next + 1
+            else if psr_peek_kind(tokens, ll_scan + 1) is "symbol" and psr_peek_value(tokens, ll_scan + 1) is ":":
+                ll_is = true
+                ll_after = ll_scan + 2
     if ll_is:
         # Re-walk the params for real, keeping any `: type` the scan saw.
         ll_types = []
@@ -999,7 +1023,7 @@ define psr_parse_primary(tokens: [table], position: number) -> table:
             else:
                 break
         ll_body = psr_parse_expr(tokens, ll_after)
-        result = {"node": {"kind": "Lambda", "params": ll_params, "param_types": ll_tlist, "body": get_map(ll_body, "node"), "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": get_int(ll_body, "next")}
+        result = {"node": {"kind": "Lambda", "params": ll_params, "param_types": ll_tlist, "ret": ll_ret, "body": get_map(ll_body, "node"), "line": psr_peek_line(tokens, position), "col": psr_peek_col(tokens, position)}, "next": get_int(ll_body, "next")}
     if is_lparen and not ll_is:
         inner = psr_parse_expr(tokens, position + 1)
         edit inner_next = get_int(inner, "next")

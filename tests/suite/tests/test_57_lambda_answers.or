@@ -1,0 +1,30 @@
+# A lambda can declare what it answers with.
+#
+# Before this, a lifted lambda's answer was read off its body and could only
+# come out int or real. A body that made TEXT was lowered as int, so
+# `f = (): "hej"` handed a text pointer out as a number - 140698214391832 on
+# the run that found it. No error, no warning, and no way to write a lambda
+# that builds a line.
+#
+# The language does not infer a function's answer anywhere else, so a lambda
+# says it the same way a define does: `-> type` after the parameters. Both
+# lambda spellings take it, and a `function(...) -> R` parameter carries the
+# answer through to the call site.
+#
+# Omitted, the answer is still read off the body and is still int or real -
+# every lambda written before this behaves exactly as it did.
+
+define via(make: function() -> text) -> text:
+    make()
+
+define main() -> number:
+    light = via(() -> text: "abc")               # the light form, 3 chars
+    keyword = via(function() -> text: "de")      # the `function` form, 2
+    rows = 7
+    interp = via(() -> text: "{rows * 6}")       # "42", so 2 - and the hole
+                                                 # is a whole number, not a
+                                                 # double read out of an i64
+    whole = (x): x * 2                           # no answer declared: int
+    real = (x): x / 2.0                          # no answer declared: real
+    length(light) + length(keyword) + length(interp) + whole(20) + to_whole(real(20))
+    # 3 + 2 + 2 + 40 + 10 is 57

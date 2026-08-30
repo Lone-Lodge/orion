@@ -240,7 +240,9 @@ for private functions; a public one may state its contract with
 <code>-&gt; type</code>. At the call site, arguments can carry their names
 - <code>greet(name: "Bo", loud: true)</code> reads without opening the
 definition - and a parameter can hold a default. An anonymous function
-is just <code>(params): body</code>. Any function can also be called
+is just <code>(params): body</code>, and it can declare its answer the same
+way a named one does when the body is not a number:
+<code>(row) -&gt; text: "line {row}"</code>. Any function can also be called
 method-style, so <code>trim(s)</code> and <code>s.trim()</code> are the same
 call. A generic function introduces its type variable as a word:
 <code>define first given item (items: list of item) -&gt; maybe item</code>.</p>

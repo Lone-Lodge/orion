@@ -26,15 +26,22 @@
 # line: "debug" raises everything, "ecs=3" one category, and the two mix
 # ("debug,net=1"). An explicit log_set_* always wins - it is set later.
 #
-# THE COST OF A SUPPRESSED LINE IS THE MESSAGE. Orion evaluates arguments
-# before the call and has no macros, so `debug(ecs, "{expensive()}")`
-# builds its text even when the line is dropped. Measured: a thousand
-# suppressed lines called expensive() a thousand times. There is no way to
-# fix that inside a library, so it is not hidden: `log_on` is the guard for
-# a hot loop, and it is the only place the ugliness is allowed to show.
+# A SUPPRESSED LINE STILL COSTS ITS MESSAGE. Orion evaluates arguments
+# before the call, so `debug(ecs, "{expensive()}")` builds its text even
+# when the line is dropped - measured, a thousand suppressed lines called
+# expensive() a thousand times. Three ways out, in the order to reach for
+# them:
 #
-#     if log_on(ecs, 3):
-#         debug(ecs, "packed {expensive(n)} entities")
+#     debug(ecs, "packed {n} entities")            cheap message: just call it
+#     debug_lazy(ecs, () -> text: "{costly(n)}")   the message is the expense
+#     if log_on(ecs, 3): debug(ecs, "...")         the guard, when even the
+#                                                  closure is too much
+#
+# `debug_lazy` hands over a maker instead of a message and only calls it if
+# the line shows. It is not free - the closure is built either way - but it
+# is much less: 300 000 suppressed calls cost 74 ms eagerly and 12 ms
+# lazily, measured. `log_on` is the zero, and it is two lines you can
+# forget to write, which is why it is listed last.
 #
 # TWO DESTINATIONS, NOT A PLUGIN SYSTEM. The console is colored when a tty
 # is watching and plain when the output is redirected. `log_to_file` arms a
@@ -182,6 +189,14 @@ public define debug(category: Cat, msg: text) uses console, files, clock:
     if ceiling_of(category.name) >= 3:
         emit_line(3, category.name, msg)
 
+# The same line, but the message is made only if it shows. For a debug line
+# whose text costs more than a closure - a join, a scan, a format of
+# something big - which is most of the debug lines worth writing.
+# no example: prints - an example would be noise in every gate run
+public define debug_lazy(category: Cat, make: function() -> text) uses console, files, clock:
+    if ceiling_of(category.name) >= 3:
+        emit_line(3, category.name, make())
+
 define emit_line(level: number, name: text, msg: text) uses console, files, clock:
     print_line("  {level_tag(level)} {ldim(name)}  {msg}")
     plain = "{stamp()} {level_name(level)} {name}  {msg}"
@@ -251,6 +266,23 @@ define test_level_words_and_names():
     require level_num("shout") is 0 - 1
     require level_name(0) is "error"
     require level_name(3) is "debug"
+
+define test_lazy_message_is_not_made_when_dropped() uses console, files, clock:
+    quiet = cat("t_lazy")
+    log_set_level(quiet, 0)
+    slot_set("t_lazy_made", 0)
+    loop i in 0 until 50:
+        debug_lazy(quiet, () -> text: made_probe())
+    require slot_get_number("t_lazy_made") is 0
+    # And it IS made when the ceiling allows it.
+    log_set_level(quiet, 3)
+    debug_lazy(quiet, () -> text: made_probe())
+    require slot_get_number("t_lazy_made") is 1
+    log_set_level(quiet, 2)
+
+define made_probe() -> text:
+    slot_set("t_lazy_made", slot_get_number("t_lazy_made") + 1)
+    "probe"
 
 define test_ring_keeps_the_tail():
     log_ring_on()

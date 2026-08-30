@@ -100,6 +100,10 @@ const KNOWN_GAPS = {
   // it needs an f64-taking host import - wasm imports are i32-only today - so
   // the host's own String(x), which is already the shortest form, can answer.
   'test_43_float_text.or': 'wasm writes six decimals and trims them; native prints the SHORTEST decimal that reads back, so 0.1 + 0.2 differs. Whole numbers and simple decimals agree now',
+  // The wasm backend says so itself: "the wasm backend does not support
+  // `Lambda` expressions yet". Not a gap this test opened - it is the whole
+  // lambda feature, and every lambda test would sit here if one existed.
+  'test_57_lambda_answers.or': 'the wasm backend has no lambdas at all, so a test about what a lambda answers cannot run there',
 };
 if (!filter) {
   const isGap = (line) => Object.keys(KNOWN_GAPS).some((f) => line.startsWith(f));

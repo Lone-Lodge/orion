@@ -5503,10 +5503,18 @@ define nlam_capture_scan(lam_body: table, lam_params: [text]) -> [text]:
     caps
 
 
-# What a lifted lambda answers with, read off its body the way any other
-# function's answer is read.
-define num_lambda_ret(body: table) -> table:
-    if num_expr_real(body, slot_get("otir:lamfn")):
+# What a lifted lambda answers with. A DECLARED answer wins, exactly as it
+# does on a define: `(n) -> text: "row {n}"`. Without one the answer is read
+# off the body, which can only tell int from real - and a text body silently
+# handed its pointer out as a number, so a lambda that builds a line was not
+# expressible at all.
+define num_lambda_ret(lam: table) -> table:
+    if has(lam, "ret"):
+        declared = get_map(lam, "ret")
+        # A non-Named answer (`-> [text]`) has no "name" to be empty.
+        if get(declared, "kind") is not "Named" or get(declared, "name") is not "":
+            return declared
+    if num_expr_real(get_map(lam, "body"), slot_get("otir:lamfn")):
         return {"kind": "Named", "name": "float"}
     {"kind": "Named", "name": "int"}
 
@@ -5537,7 +5545,7 @@ define nlam_synth(lam: table) -> table:
     # The hoisted function inherits the LAMBDA's position: a return-type
     # complaint about `__nlambda_3` is unreadable without it, and printed
     # `at line 0:0`.
-    synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": num_lambda_ret(get(lam, "body")), "body": synth_body, "line": if has(lam, "line") then get_int(lam, "line") else 0, "col": if has(lam, "col") then get_int(lam, "col") else 0}
+    synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": num_lambda_ret(lam), "body": synth_body, "line": if has(lam, "line") then get_int(lam, "line") else 0, "col": if has(lam, "col") then get_int(lam, "col") else 0}
     edit cap_nodes = part([lam], 0, 0)
     loop cj in 0 until n_caps:
         # The capture reference at the CLOSURE-CONSTRUCTION site. Without a
@@ -7679,7 +7687,7 @@ public define ast_program_to_ir(program: table) -> IRModule:
                                 synth_stmts = append(synth_stmts, {"kind": "LetOrAssign", "name": cap_name, "value": at_call})
                             synth_stmts = append(synth_stmts, {"kind": "ExprStmt", "expr": lam_body})
                             synth_body = {"kind": "Block", "stmts": synth_stmts}
-                            synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": num_lambda_ret(get(lam, "body")), "body": synth_body, "orb": orb_lam, "line": lam_line, "col": lam_col}
+                            synth_decl = {"kind": "Fn", "name": synth_name, "params": typed_params, "ret": num_lambda_ret(lam), "body": synth_body, "orb": orb_lam, "line": lam_line, "col": lam_col}
                             synth_decls = append(synth_decls, synth_decl)
                             bind_name = get(stmt, "name")
                             binding_names = append(binding_names, bind_name)

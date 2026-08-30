@@ -49,6 +49,7 @@
 <li><a href="#core"><code>core</code></a></li>
 <li><a href="#glyphs"><code>glyphs</code></a></li>
 <li><a href="#input"><code>input</code></a></li>
+<li><a href="#math"><code>math</code></a></li>
 <li><a href="#mic"><code>mic</code></a></li>
 <li><a href="#ori_scene"><code>ori_scene</code></a></li>
 <li><a href="#overlay"><code>overlay</code></a></li>
@@ -341,8 +342,9 @@ example hex_encode([]) is ""</pre></div>
 <div class="fn"><code class="sig">base64_encode(data: [number]) -&gt; text</code><p>bytes -&gt; base64 text (standard alphabet, '=' padded).</p><pre class="ex">example base64_encode([77, 97, 110]) is "TWFu"
 example base64_encode([]) is ""</pre></div>
 <div class="fn"><code class="sig">base64_decode(s: text) -&gt; [number]</code><p>base64 text -&gt; bytes. Padding, newlines and stray characters are ignored.</p><pre class="ex">example base64_decode("TWFu")[0] is 77</pre></div>
-<div class="fn"><code class="sig">sha256(t: text) -&gt; text</code><p>SHA-256 of <code>t</code>, as 64 hex characters. The stdlib's content hash: checksums, cache keys, integrity. The examples are FIPS 180-4 vectors.</p><pre class="ex">example sha256("") is "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-example sha256("abc") is "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"</pre></div>
+<div class="fn"><code class="sig">sha256(t: text) -&gt; text</code><p>SHA-256 of <code>t</code>, as 64 hex characters. The stdlib's content hash: checksums, cache keys, integrity. The first two examples are FIPS 180-4 vectors. The third is BINARY: text carries its own length, so a NUL byte is data like any other and must not end the hash (it did once - sha256_hex read strlen instead of the text's length, so every PNG hashed as its first eight bytes).</p><pre class="ex">example sha256("") is "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+example sha256("abc") is "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+example sha256(text_of([65, 0, 66])) is "76fe3925c7167317f2df68454339f5ec3650e4062178b4f2be219b105a507907"</pre></div>
 <h2 id="store"><code>store</code></h2>
 <p class="orb-blurb">program state shaped like a database (manifesto P1).</p>
 <h3 class="sub">Types</h3>
@@ -394,13 +396,20 @@ example not is_some(Option.None)</pre></div>
 <div class="fn"><code class="sig">assert(cond: truth, label = "") -&gt; number</code><pre class="ex">example assert(true) is 1
 example assert(true, "holds") is 1</pre></div>
 <h2 id="log"><code>log</code></h2>
-<p class="orb-blurb">leveled, categorized console logging.</p>
+<p class="orb-blurb">leveled, categorized logging.</p>
+<h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Cat: name: text</code></div>
+<h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">cat(name: text) -&gt; Cat</code><p><code>const ecs = cat("ecs")</code> at the top of an orb, then <code>info(ecs, ...)</code>.</p><pre class="ex">example cat("ecs").name is "ecs"</pre></div>
 <div class="fn"><code class="sig">log_set_default(level: number)</code></div>
-<div class="fn"><code class="sig">log_set_level(cat: text, level: number)</code></div>
-<div class="fn"><code class="sig">error(cat: text, msg: text) uses console</code></div>
-<div class="fn"><code class="sig">warn(cat: text, msg: text) uses console</code></div>
-<div class="fn"><code class="sig">info(cat: text, msg: text) uses console</code></div>
-<div class="fn"><code class="sig">debug(cat: text, msg: text) uses console</code></div>
+<div class="fn"><code class="sig">log_set_level(category: Cat, level: number)</code></div>
+<div class="fn"><code class="sig">log_on(category: Cat, level: number) -&gt; truth</code><p>Would this line show? The guard for a hot loop, where the message itself is the expense. Everywhere else, just call debug() and let it decide.</p><pre class="ex">example log_on(cat("__ex"), 0)</pre></div>
+<div class="fn"><code class="sig">log_to_file(path: text) -&gt; truth uses files</code><p>Arm a plain, timestamped copy of every line that shows. The path is probed once here rather than at the first error, so a directory that cannot be written says so where the caller asked for it. no example: touches the filesystem - proven by test_file_writes_lines</p></div>
+<div class="fn"><code class="sig">error(category: Cat, msg: text) uses console, files, clock</code></div>
+<div class="fn"><code class="sig">warn(category: Cat, msg: text) uses console, files, clock</code></div>
+<div class="fn"><code class="sig">info(category: Cat, msg: text) uses console, files, clock</code></div>
+<div class="fn"><code class="sig">debug(category: Cat, msg: text) uses console, files, clock</code></div>
+<div class="fn"><code class="sig">debug_lazy(category: Cat, make: function() -&gt; text) uses console, files, clock</code><p>The same line, but the message is made only if it shows. For a debug line whose text costs more than a closure - a join, a scan, a format of something big - which is most of the debug lines worth writing. no example: prints - an example would be noise in every gate run</p></div>
 <div class="fn"><code class="sig">log_ring_on()</code></div>
 <div class="fn"><code class="sig">log_dump() uses console</code></div>
 <h2 id="ori_display"><code>ori_display</code></h2>
@@ -437,7 +446,7 @@ example not rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 9, y: 1})
 example parse_request("GET /x?a=1 HTTP/1.1").path is "/x"
 example parse_request("GET /x?a=1 HTTP/1.1").query is "a=1"
 example parse_request("").method is ""</pre></div>
-<div class="fn"><code class="sig">mime_of(path: text) -&gt; text</code><p>Content type from the filename - the handful a local app meets.</p><pre class="ex">example mime_of("a.png") is "image/png"
+<div class="fn"><code class="sig">mime_of(path: text) -&gt; text</code><p>Content type from the filename - the handful a local app meets. .wasm MASTE vara application/wasm: WebAssembly.instantiateStreaming vagrar allt annat, och felet den ger talar om MIME och inte om filen.</p><pre class="ex">example mime_of("a.png") is "image/png"
 example mime_of("a.html") is "text/html; charset=utf-8"</pre></div>
 <div class="fn"><code class="sig">percent_decode(s: text) -&gt; text</code><p>"%XX" byte triples back to the bytes they stand for. The browser sends every path and query value this way, so the file "Skärmbild 1.png" arrives as "Sk%C3%A4rmbild%201.png" and has to come back before it can be opened. A "%" that is not followed by two hex digits stays literal. ("+" is NOT space here: that rule belongs to query strings only - see query_of.)</p><pre class="ex">example percent_decode("a%20b") is "a b"
 example percent_decode("Sk%C3%A4rmbild") is "Skärmbild"
@@ -449,7 +458,7 @@ example not safe_path("/../secrets")</pre></div>
 <div class="fn"><code class="sig">serve(port: number) -&gt; number uses net = listen(port)</code><p>Open a listener on 127.0.0.1. Returns the socket; ask local_port(srv) for the port when 0 picked one. no example: opens a socket - proven by folio</p></div>
 <div class="fn"><code class="sig">app_start(title: text, port: number, routes: [route]) -&gt; number uses net, files, clock, console</code><p>The whole serve-and-run dance as ONE call, so main() stays wiring:      app_run("scribe", 7374, 1240, 860, routes, ui_dir)  The port is a preference, not a demand: taken when free, else any port (the browser keys a page's stored data by origin, so a stable port is what makes settings survive a restart - but a second instance still starts). Returns the exit code for main to return. The convention version: assets in ui/ (served as the site, index.html at "/"), a 1240x860 window. Name the app, pick its port, list its routes:      app_start("scribe", 7374, [on_get("/api/list", list_chapters)]) </p></div>
 <div class="fn"><code class="sig">app_run(title: text, port: number, w: number, h: number, routes: [route], static_dir: text) -&gt; number uses net, files, clock, console</code></div>
-<div class="fn"><code class="sig">run_until_interrupted(srv: number, routes: [route], static_dir: text) uses net, files, clock, console</code><p>Accept + serve until interrupted() (Ctrl+C). Every connection gets its own task: a slow handler (a compile, a long child process waited on with finished_within) parks only ITS task - fast requests keep landing. Cooperative and single-threaded, so handler code between IO points still runs unsliced. If the task table is full we serve inline as before. no example: runs a server loop - proven by folio</p></div>
+<div class="fn"><code class="sig">run_until_interrupted(srv: number, routes: [route], static_dir: text) uses net, files, clock, console</code></div>
 <div class="fn"><code class="sig">open_window(url: text) -&gt; number uses net</code><p>The OS's app window at <code>url</code>: Edge's --app mode - no address bar, no tabs, just the app. Edge is launched by its well-known install path (CreateProcess directly - routing through <code>cmd /c start</code> trips cmd's quote rules), with the 32/64-bit locations both tried. The borrowed window carries Edge's own strip, which frameless can only clip into a see-through band - open_app_window is the real thing when the WebView2 pieces are on the machine. no example: opens a window - proven by folio</p></div>
 <div class="fn"><code class="sig">open_app_window(url: text, title: text, w: number, h: number) -&gt; number uses net</code><p>OUR window with the OS webview inside - the Tauri model. No browser strip, nothing to clip: the page fills the window from its first pixel, the OS title follows document.title (so every title-needle verb below keeps working), and closing the window ends the serve loop. Where the WebView2 pieces are missing it falls back to the borrowed Edge window, so a caller needs no plan B. One own window per program. no example: opens a window - proven by folio</p></div>
 <div class="fn"><code class="sig">query_of(req: request, key: text) -&gt; text</code><p>The value of <code>key</code> in the request's query string, "" when absent. Decoded the form-urlencoded way: "+" is a space, then the %XX triples.</p><pre class="ex">example query_of(request{method: "GET", path: "/", query: "name=a.png&amp;x=1", body: ""}, "name") is "a.png"
@@ -506,6 +515,16 @@ example glyph_rows(48)[0] is 14</pre></div>
 <div class="fn"><code class="sig">pad_report(i: number, at: number) -&gt; number</code><p>--- adding a make nobody here owns ----------------------------------------  The newest raw report, byte by byte, and how long it was. A mapping is checked against what the device ACTUALLY said rather than against a memory of it, which is the only honest way to add a pad that is not on the desk.</p></div>
 <div class="fn"><code class="sig">pad_report_len(i: number) -&gt; number</code></div>
 <div class="fn"><code class="sig">devices_seen() -&gt; number</code><p>How many devices the machine offered the search at all - keyboards, mice, everything. It answers the question a zero cannot: a machine with fifteen of these and no controller among them has no controller connected, while a machine that answers zero has a search that could not run. Nothing but a diagnostic, and the first thing to look at when a pad that is plainly on does nothing at all.</p></div>
+<h2 id="math"><code>math</code></h2>
+<p class="orb-blurb">vector arithmetic on the ORI V3.</p>
+<div class="fn"><code class="sig">add(a: V3, b: V3) -&gt; V3</code><pre class="ex">example add(v3(1.0, 2.0, 3.0), v3(10.0, 20.0, 30.0)).y is 22.0</pre></div>
+<div class="fn"><code class="sig">sub(a: V3, b: V3) -&gt; V3</code><pre class="ex">example sub(v3(10.0, 20.0, 30.0), v3(1.0, 2.0, 3.0)).z is 27.0</pre></div>
+<div class="fn"><code class="sig">scale(a: V3, by: number) -&gt; V3</code><pre class="ex">example scale(v3(1.0, 2.0, 3.0), 2.0).z is 6.0</pre></div>
+<div class="fn"><code class="sig">dot(a: V3, b: V3) -&gt; number</code><pre class="ex">example dot(v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0)) is 0.0</pre></div>
+<div class="fn"><code class="sig">cross(a: V3, b: V3) -&gt; V3</code><pre class="ex">example cross(v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0)).z is 1.0</pre></div>
+<div class="fn"><code class="sig">norm(a: V3) -&gt; V3</code><p>A zero-length vector normalises to zero rather than to a division by it: a degenerate triangle has no facing, and the caller wants a colour, not a crash.</p><pre class="ex">example norm(v3(0.0, 5.0, 0.0)).y is 1.0</pre></div>
+<div class="fn"><code class="sig">rot_y(point: V3, angle: number) -&gt; V3</code><p>Turns about the world axes. Y is the one a camera and a placed instance both use; X is pitch.</p></div>
+<div class="fn"><code class="sig">rot_x(point: V3, angle: number) -&gt; V3</code></div>
 <h2 id="mic"><code>mic</code></h2>
 <p class="orb-blurb">microphone capture, the other half of the audio stack.</p>
 <div class="fn"><code class="sig">mic_open(rate: number) -&gt; truth = orion_mic_open(rate) is 1</code><p>Start capturing at <code>rate</code> samples a second, mono. false means there is no capture device - run silent rather than refusing to start. no example: needs a live capture device - proven by tools/mic_test.sh</p></div>

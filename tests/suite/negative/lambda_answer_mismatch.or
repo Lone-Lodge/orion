@@ -1,0 +1,10 @@
+# expect: is declared to return `text` but its body returns
+# A lambda may declare its answer (`() -> text: ...`), and the declaration is
+# a promise like any other. The return-type guard that already watched every
+# define watches a lifted lambda too - the point of letting a lambda say what
+# it answers is that it can then be held to it.
+define via(make: function() -> text) -> text:
+    make()
+
+define main() -> number:
+    length(via(() -> text: 5))
