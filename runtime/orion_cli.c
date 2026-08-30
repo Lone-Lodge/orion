@@ -118,6 +118,18 @@ long long mkdir_all(const char *path) {
 
 long long remove_file(const char *path) { return DeleteFileA(path) ? 0 : -1; }
 
+/* Mark a file read-only, or take the mark off. A shared working tree uses
+ * this to say "someone else is holding this one": the editor the person is
+ * actually drawing in refuses to save, instead of the refusal arriving
+ * afterwards from a tool. 0 on success, -1 if the file is not there. */
+long long file_readonly(const char *path, long long on) {
+    DWORD a = GetFileAttributesA(path);
+    if (a == INVALID_FILE_ATTRIBUTES) return -1;
+    DWORD n = on ? (a | FILE_ATTRIBUTE_READONLY) : (a & ~FILE_ATTRIBUTE_READONLY);
+    if (n == a) return 0;
+    return SetFileAttributesA(path, n) ? 0 : -1;
+}
+
 long long file_exists(const char *path) {
     DWORD a = GetFileAttributesA(path);
     return orion_fx_i64("fe", (a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY)) ? 1 : 0);
@@ -260,6 +272,15 @@ long long mkdir_all(const char *path) {
     return 0;
 }
 long long remove_file(const char *path) { return remove(path) == 0 ? 0 : -1; }
+
+/* See the Windows branch. Clearing gives the owner write back; setting takes
+ * it from everyone, so the mark survives a umask that would hand it back. */
+long long file_readonly(const char *path, long long on) {
+    struct stat rst;
+    if (stat(path, &rst) != 0) return -1;
+    mode_t m = on ? (rst.st_mode & ~(S_IWUSR | S_IWGRP | S_IWOTH)) : (rst.st_mode | S_IWUSR);
+    return chmod(path, m) == 0 ? 0 : -1;
+}
 long long file_exists(const char *path) {
     struct stat st;
     return orion_fx_i64("fe", (stat(path, &st) == 0 && S_ISREG(st.st_mode)) ? 1 : 0);

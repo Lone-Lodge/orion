@@ -16,6 +16,7 @@ external define eprint(s: text) -> int
 external define now() -> int
 external define file_size(path: text) -> int
 external define file_mtime(path: text) -> int
+external define file_readonly(path: text, on: int) -> int
 
 # Milliseconds between now() and an earlier now() - timing metric.
 # no example: wall-clock dependent - proven by tools/compile_bench.sh
@@ -34,6 +35,14 @@ public define write_file(p: text, c: text) -> number uses files:
     # no example: writes to disk - proven by test_42_file_stream.or
     file_write(p, c)
     0
+
+# Mark a file read-only, or take the mark off. -1 if the file is not there.
+#
+# A shared working tree uses this to say "someone else is holding this one":
+# the editor the person is actually drawing in refuses to save, instead of
+# the refusal arriving afterwards from a tool.
+# no example: changes a file's attributes - proven by rune's lock suite
+public define set_readonly(p: text, on: truth) -> number uses files = file_readonly(p, if on then 1 else 0)
 
 # When was `p` last written, in ms? Only comparisons and deltas are
 # meaningful (the epoch is host-specific). -1 for a missing file - a
