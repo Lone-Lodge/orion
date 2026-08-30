@@ -1,0 +1,13 @@
+# expect: is declared `text` but is given a number
+# An annotation on a local is not decoration - it is what tells the compiler an
+# element type it cannot infer, which is the only way to read a list out of a
+# list (`r: list of number = rs[i]`). Something load-bearing may not also be
+# unchecked: this compiled in silence and printed 5.
+#
+# Only LITERALS are judged. Anywhere else the value's own type may be a guess,
+# and there the annotation is the one being believed on purpose - erroring on a
+# disagreement would forbid the use that makes annotations worth having.
+define main() -> number:
+    x: text = 5
+    print_line(x)
+    0

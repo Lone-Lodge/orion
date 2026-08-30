@@ -732,6 +732,30 @@ define ast_block_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
                     litval = parse_int(get(vchk, "value"))
                     if not otir_int_fits(litval, dtcn):
                         compile_error("orion: ERROR - the literal {litval} does not fit `{dtcn}` (write `{litval} as {dtcn}` to wrap it deliberately)")
+                # An annotation that contradicts a LITERAL is a lie, and it used
+                # to be accepted in silence: `x: text = 5` compiled and printed
+                # 5. The annotation is not decoration - it is what tells the
+                # compiler an element type it cannot infer (`r: list of number =
+                # rs[i]`, the way out of F12) - so it may not also be unchecked.
+                #
+                # ONLY literals. Anywhere else the value's type may itself be a
+                # guess, and there the annotation is the one being believed on
+                # purpose; erroring on a disagreement would forbid the very use
+                # that makes annotations worth having.
+                vk = get(vchk, "kind")
+                lit_is_ptr = vk is "Str" or vk is "ListLit" or vk is "MapLit"
+                lit_is_flat = vk is "Int" or vk is "Float"
+                if lit_is_ptr or lit_is_flat:
+                    ann_ir = ast_type_to_ir_with_scope(dtchk, current_scope)
+                    ann_is_ptr = is_ptr_ir_type(ann_ir)
+                    if ann_is_ptr is not lit_is_ptr:
+                        got = if lit_is_ptr then "a text or a list" else "a number"
+                        # `number` is the word the person wrote; the pass has
+                        # already resolved it to int or float by here, and an
+                        # error that says `int` is answering a question nobody
+                        # asked.
+                        said = if dtcn is "int" or dtcn is "float" then "number" else dtcn
+                        compile_error("orion: ERROR - `{get(stmt, \"name\")}` is declared `{said}` but is given {got}")
             # If this is MutLet (fresh mut binding): alloca + store + bind as mut.
             # Else if it's LetOrAssign on an existing mut var: just store.
             # Else: regular SSA-style bind (immutable shadowing).
