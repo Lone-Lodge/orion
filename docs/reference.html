@@ -66,7 +66,7 @@
 <p class="orb-blurb">common text helpers callable via method-call syntax.</p>
 <div class="fn"><code class="sig">is_empty(t: text) -&gt; truth</code><pre class="ex">example is_empty("")
 example not is_empty("x")</pre></div>
-<div class="fn"><code class="sig">byte_count(t: text) -&gt; number</code><pre class="ex">example byte_count("åsa") is 4</pre></div>
+<div class="fn"><code class="sig">byte_count(t: text) -&gt; number</code><p>The text's own length header, not a walk. <code>bytes_count(bytes_of(t))</code> built a whole list - one i64 per byte - to count something the text already knew: 2000 calls on a 20 KB text was 94 ms and eight bytes of allocation per byte counted, against 0 ms and none.</p><pre class="ex">example byte_count("åsa") is 4</pre></div>
 <div class="fn"><code class="sig">starts_with(t: text, prefix: text) -&gt; truth</code><pre class="ex">example starts_with("hello", "he")</pre></div>
 <div class="fn"><code class="sig">ends_with(t: text, suffix: text) -&gt; truth</code><pre class="ex">example ends_with("hello", "lo")</pre></div>
 <div class="fn"><code class="sig">repeat(t: text, n: number) -&gt; text</code><p>Repeat <code>t</code> <code>n</code> times. Returns "" if n &lt;= 0.</p><pre class="ex">example repeat("ab", 3) is "ababab"</pre></div>
@@ -212,7 +212,9 @@ example utc_time(parse_utc("2026-08-04 21:30:05"), "%Y-%m-%d %H:%M:%S") is "2026
 <div class="fn"><code class="sig">status_from_headers(header_dump: text) -&gt; number</code><p>The status is read from curl's header dump (-D), not from stdout: the dump is a file of its own, so a stray stderr line can never corrupt it. With redirects (-L) the dump holds one block per hop - the LAST status line is the answer.</p><pre class="ex">example status_from_headers("HTTP/1.1 200 OK") is 200
 example status_from_headers("garbage") is 0</pre></div>
 <div class="fn"><code class="sig">fetch(url: text) -&gt; reply uses net, files</code><p>GET <code>url</code>. <code>success(r)</code> when the request went through AND the server said 2xx. no example: needs the network - proven by examples/demos/httpd.or + manual runs</p></div>
+<div class="fn"><code class="sig">fetch_with(url: text, headers: [text]) -&gt; reply uses net, files</code><p>GET <code>url</code> with extra headers. no example: needs the network - proven by rune's remote suite</p></div>
 <div class="fn"><code class="sig">post(url: text, content_type: text, payload: text) -&gt; reply uses net, files</code><p>POST <code>body</code> to <code>url</code> with the given Content-Type. no example: needs the network - proven by manual runs</p></div>
+<div class="fn"><code class="sig">post_with(url: text, content_type: text, payload: text, headers: [text]) -&gt; reply uses net, files</code><p>POST with extra headers. no example: needs the network - proven by rune's remote suite</p></div>
 <div class="fn"><code class="sig">success(r: reply) -&gt; truth</code><p>Did the request reach a server that answered success?</p><pre class="ex">example success(reply{status: 200, body: ""})
 example not success(reply{status: 404, body: ""})
 example not success(reply{status: 0, body: ""})</pre></div>
@@ -246,7 +248,8 @@ example ok(3)</pre></div>
 <div class="fn"><code class="sig">read_file(p: text) -&gt; text uses files = file_read(p)</code><p>orion-self builtins under orbit's names (file_read/argv/argc live in the compiler, not an orb - callable directly). no example: needs a file on disk - proven by test_42_file_stream.or</p></div>
 <div class="fn"><code class="sig">arg(i: number) -&gt; text = argv(i)</code></div>
 <div class="fn"><code class="sig">arg_count() -&gt; number = argc()</code></div>
-<div class="fn"><code class="sig">write_file(p: text, c: text) -&gt; number uses files</code></div>
+<div class="fn"><code class="sig">write_file(p: text, c: text) -&gt; number uses files</code><p>1 when the whole content reached the disk, 0 when it did not.  This threw the answer away and said 0 either way, so a write that failed was indistinguishable from one that worked. Nothing in the tree branched on it - which is the point: there was nothing to branch on. no example: writes to disk - proven by test_42_file_stream.or</p></div>
+<div class="fn"><code class="sig">set_readonly(p: text, on: truth) -&gt; number uses files = file_readonly(p, if on then 1 else 0)</code><p>Mark a file read-only, or take the mark off. -1 if the file is not there.  A shared working tree uses this to say "someone else is holding this one": the editor the person is actually drawing in refuses to save, instead of the refusal arriving afterwards from a tool. no example: changes a file's attributes - proven by rune's lock suite</p></div>
 <div class="fn"><code class="sig">modified_at(p: text) -&gt; number uses files = file_mtime(p)</code><p>When was <code>p</code> last written, in ms? Only comparisons and deltas are meaningful (the epoch is host-specific). -1 for a missing file - a watcher treats that as "changed". no example: depends on the filesystem - proven by tools/orbwatch.or</p></div>
 <div class="fn"><code class="sig">os_kind() -&gt; number</code><p>Public wrapper so other orbs can branch on the host without re-declaring the extern (a second <code>declare</code> in the bundle is an LLVM redefinition error). 0 = Windows, 1 = Linux, 2 = macOS.</p><pre class="ex">example os_kind() &gt;= 0</pre></div>
 <div class="fn"><code class="sig">run_command(cmd: text, args: [text]) -&gt; number = sys_run(os_join(os_quote(win_path(cmd)), args, 0))</code></div>
