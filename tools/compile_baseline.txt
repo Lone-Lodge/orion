@@ -1,6 +1,6 @@
-# compile_bench baseline: case total_ms lines insts rss_kb
+# compile_bench baseline: case total_ms lines insts rss_kb (resident, not commit)
 # best of 3 runs; regenerate with: bash tools/compile_bench.sh --update
-bundle 1731 18082 77901 4202976
-iter 16 157 549 30224
-interp 23 377 1334 36856
-csv 25 437 1578 39616
+bundle 1211 23174 99814 5724548
+iter 17 284 639 88004
+interp 19 425 1203 92616
+csv 27 976 3293 102136

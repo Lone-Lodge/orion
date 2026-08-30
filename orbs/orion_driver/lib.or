@@ -161,6 +161,7 @@ external define orion_console_color() -> int
 # Slot-stored text must outlive the transient allocation it was built in.
 external define orion_persist_text(s: text) -> text
 external define orion_os_private_kb() -> int
+external define atlas_rss_kb() -> int
 
 # `PERF` row on demand: any argument equal to `--perf`, or ORION_PERF=1 in the
 # environment via the `perf` output-path suffix. Kept opt-in so normal builds
@@ -1297,9 +1298,15 @@ public define driver_main() -> number:
             src_lines = drv_count_lines(src) + 1
             n_fns = length(module.functions)
             n_insts = drv_total_insts(module)
-            kb = orion_os_private_kb()
+            # Two numbers, because they are two things and the row used to
+            # call one of them by the other's name. `rss_kb` is what is in RAM;
+            # `commit_kb` is what the OS had to promise, and on this compiler's
+            # own corpus they are 5,6 GB and 10,0 GB - the second is what
+            # decides whether a 16 GB machine can build at all.
+            kb = atlas_rss_kb()
+            ckb = orion_os_private_kb()
             per_kloc = if src_lines > 0 then d_total * 1000 // src_lines else 0
-            print_line("PERF total_ms={d_total} lex_ms={d_lex} parse_ms={d_parse} ir_ms={d_ir} emit_ms={d_emit} bytes={src_bytes} lines={src_lines} fns={n_fns} insts={n_insts} rss_kb={kb} ms_per_kloc={per_kloc}")
+            print_line("PERF total_ms={d_total} lex_ms={d_lex} parse_ms={d_parse} ir_ms={d_ir} emit_ms={d_emit} bytes={src_bytes} lines={src_lines} fns={n_fns} insts={n_insts} rss_kb={kb} commit_kb={ckb} ms_per_kloc={per_kloc}")
         # What the build knows about its own memory safety. The slot-store
         # boundary decides evacuate-or-abort from a statically derived type
         # code, so the set of sites that CAN abort is a compile-time fact -

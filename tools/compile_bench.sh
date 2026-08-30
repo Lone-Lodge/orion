@@ -77,7 +77,7 @@ done
 
 if [ "$UPDATE" = "1" ]; then
     {
-        echo "# compile_bench baseline: case total_ms lines insts rss_kb"
+        echo "# compile_bench baseline: case total_ms lines insts rss_kb (resident, not commit)"
         echo "# best of $REPS runs; regenerate with: bash tools/compile_bench.sh --update"
         cat "$RESULTS"
     } > "$BASELINE"
