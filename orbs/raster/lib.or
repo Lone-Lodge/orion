@@ -26,7 +26,7 @@
 # V3 and the camera come from ori_scene. Calling across without saying so
 # worked while everything was linked at once, and stopped the moment an app
 # was bundled by following its `use` lines.
-use ori_scene
+use ori
 use math
 use glyphs
 

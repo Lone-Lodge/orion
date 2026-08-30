@@ -1,3 +1,0 @@
-name = "ori_geometry"
-version = "0.0.1"
-description = "ORI (Orion Rendering Interface) - 2D primitives (Point, Size, Rect). The neutral render-contract geometry, shared by every UI/render block."

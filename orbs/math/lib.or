@@ -5,11 +5,11 @@
 # renderer would have copied all eight, which is the duplicate the
 # one-of-each rule exists to prevent.
 #
-# V3 comes from ori_scene rather than living here, because moving the type
-# would move it out from under everything that already names it. Where V3
-# belongs is a Rigel question, not a reason to break ten consumers today.
+# V3 comes from `ori`, the seam vocabulary, rather than living here. That was
+# an awkward dependency while `ori` was three orbs and this one had to name the
+# 3D seam to borrow a vector; with one `ori` it is just the shared vocabulary.
 
-use ori_scene
+use ori
 
 public define add(a: V3, b: V3) -> V3:
     example add(v3(1.0, 2.0, 3.0), v3(10.0, 20.0, 30.0)).y is 22.0

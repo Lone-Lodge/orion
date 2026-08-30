@@ -9,11 +9,9 @@
 # the same crisp AA glyphs the rest of the frame speaks - and rounded
 # rects round for real. Icon, path, sprite and image commands arrive
 # when something needs them.
-use ori_display
-use ori_geometry
+use ori
 use list
 use typeface
-use ori_scene
 
 # "#RRGGBB" (or "#RGB") to a whole color; anything else is 0.
 public define color_of(colour: text) -> number:

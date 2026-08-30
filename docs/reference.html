@@ -43,15 +43,13 @@
 <li><a href="#option"><code>option</code></a></li>
 <li><a href="#assert"><code>assert</code></a></li>
 <li><a href="#log"><code>log</code></a></li>
-<li><a href="#ori_display"><code>ori_display</code></a></li>
-<li><a href="#ori_geometry"><code>ori_geometry</code></a></li>
 <li><a href="#app"><code>app</code></a></li>
 <li><a href="#core"><code>core</code></a></li>
 <li><a href="#glyphs"><code>glyphs</code></a></li>
 <li><a href="#input"><code>input</code></a></li>
 <li><a href="#math"><code>math</code></a></li>
 <li><a href="#mic"><code>mic</code></a></li>
-<li><a href="#ori_scene"><code>ori_scene</code></a></li>
+<li><a href="#ori"><code>ori</code></a></li>
 <li><a href="#overlay"><code>overlay</code></a></li>
 <li><a href="#raster"><code>raster</code></a></li>
 <li><a href="#regex"><code>regex</code></a></li>
@@ -412,23 +410,6 @@ example assert(true, "holds") is 1</pre></div>
 <div class="fn"><code class="sig">debug_lazy(category: Cat, make: function() -&gt; text) uses console, files, clock</code><p>The same line, but the message is made only if it shows. For a debug line whose text costs more than a closure - a join, a scan, a format of something big - which is most of the debug lines worth writing. no example: prints - an example would be noise in every gate run</p></div>
 <div class="fn"><code class="sig">log_ring_on()</code></div>
 <div class="fn"><code class="sig">log_dump() uses console</code></div>
-<h2 id="ori_display"><code>ori_display</code></h2>
-<p class="orb-blurb">the ORI (Orion Rendering Interface) display list.</p>
-<h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">DrawCmd = DrawRect(Rect, text, i64) | DrawRoundRect(Rect, text, text, i64) | SetClip(Rect, i64, i64) | DrawShadow(Rect, text, i64, i64, i64) | DrawText(Point, text, text, i64, i64) | DrawIcon(Point, text, i64, text, i64) | DrawPath(text, text, i64) | DrawArc(Point, i64, i64, i64, i64, text, i64) | DrawNine(Rect, text, i64, text, text, i64) | DrawSprite(Point, text, i64, i64) | DrawImage(Point, text, i64, i64, text, text, i64)</code></div>
-<div class="fn"><code class="sig">DisplayList: commands: [DrawCmd]</code></div>
-<h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">empty_list() -&gt; DisplayList</code><pre class="ex">example length(empty_list().commands) is 0</pre></div>
-<div class="fn"><code class="sig">push_cmd(list: DisplayList, cmd: DrawCmd) -&gt; DisplayList</code></div>
-<h2 id="ori_geometry"><code>ori_geometry</code></h2>
-<p class="orb-blurb">the ORI (Orion Rendering Interface) 2D primitives.</p>
-<h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">Point: x: number, y: number</code></div>
-<div class="fn"><code class="sig">Size: wide: number, high: number</code></div>
-<div class="fn"><code class="sig">Rect: x: number, y: number, wide: number, high: number</code></div>
-<h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">rect_contains(rect: Rect, point: Point) -&gt; truth</code><pre class="ex">example rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 1, y: 1})
-example not rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 9, y: 1})</pre></div>
 <h2 id="app"><code>app</code></h2>
 <p class="orb-blurb">the thin shell a local desktop-web app stands on: serve a folder and some routes on loopback, open the OS's app window at it, live until Ctrl+C.</p>
 <h3 class="sub">Types</h3>
@@ -535,9 +516,14 @@ example glyph_rows(48)[0] is 14</pre></div>
 <div class="fn"><code class="sig">mic_seconds() -&gt; number</code><p>How many seconds are waiting. Whole seconds - for a VAD you want mic_buffered() and the rate, not this. no example: reads a live device - proven by tools/mic_test.sh</p></div>
 <div class="fn"><code class="sig">mic_take_wav(path: text) -&gt; number uses files = orion_mic_take_wav(path)</code><p>Write everything captured so far to <code>path</code> as mono PCM16 wav and empty the ring. Returns frames written, 0 when nothing was heard.  A file and not a list of bytes on purpose: Orion carries binary as [int], and marshalling a minute of audio through one is slow and is the exact shape that bit the vec codegen. Everything downstream reads wav anyway, orion_audio_load included - which is what lets a test record and then play back what it recorded. no example: writes a file from a live device - proven by tools/mic_test.sh</p></div>
 <div class="fn"><code class="sig">mic_close()</code></div>
-<h2 id="ori_scene"><code>ori_scene</code></h2>
-<p class="orb-blurb">the ORI 3D seam.</p>
+<h2 id="ori"><code>ori</code></h2>
+<p class="orb-blurb">the Orion Rendering Interface.</p>
 <h3 class="sub">Types</h3>
+<div class="fn"><code class="sig">Point: x: number, y: number</code></div>
+<div class="fn"><code class="sig">Size: wide: number, high: number</code></div>
+<div class="fn"><code class="sig">Rect: x: number, y: number, wide: number, high: number</code></div>
+<div class="fn"><code class="sig">DrawCmd = DrawRect(Rect, text, i64) | DrawRoundRect(Rect, text, text, i64) | SetClip(Rect, i64, i64) | DrawShadow(Rect, text, i64, i64, i64) | DrawText(Point, text, text, i64, i64) | DrawMono(Point, text, text, i64, i64) | DrawIcon(Point, text, i64, text, i64) | DrawPath(text, text, i64) | DrawArc(Point, i64, i64, i64, i64, text, i64) | DrawNine(Rect, text, i64, text, text, i64) | DrawSprite(Point, text, i64, i64) | DrawImage(Point, text, i64, i64, text, text, i64)</code></div>
+<div class="fn"><code class="sig">DisplayList: commands: [DrawCmd]</code></div>
 <div class="fn"><code class="sig">V3: x: number, y: number, z: number</code></div>
 <div class="fn"><code class="sig">Tri: a: V3, b: V3, c: V3, color: number</code></div>
 <div class="fn"><code class="sig">Camera: eye: V3, yaw: number, pitch: number, fov: number</code></div>
@@ -546,6 +532,10 @@ example glyph_rows(48)[0] is 14</pre></div>
 <div class="fn"><code class="sig">Texture: width: number, height: number, pixels: list of number</code></div>
 <div class="fn"><code class="sig">Sprite: at: V3, wide: number, high: number, texture: Texture</code></div>
 <h3 class="sub">Functions</h3>
+<div class="fn"><code class="sig">rect_contains(rect: Rect, point: Point) -&gt; truth</code><pre class="ex">example rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 1, y: 1})
+example not rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 9, y: 1})</pre></div>
+<div class="fn"><code class="sig">empty_list() -&gt; DisplayList</code><pre class="ex">example length(empty_list().commands) is 0</pre></div>
+<div class="fn"><code class="sig">push_cmd(list: DisplayList, cmd: DrawCmd) -&gt; DisplayList</code></div>
 <div class="fn"><code class="sig">v3(x: number, y: number, z: number) -&gt; V3</code><pre class="ex">example v3(1, 2, 3).y is 2</pre></div>
 <div class="fn"><code class="sig">texture_from_bmp(blob: text) -&gt; Texture</code><p>A 24-bit BMP (the pixel-art interchange format every paint program writes) decoded to a Texture. Made for <code>embed</code>: assets stay FILES, the binary carries their bytes, this reads them at the seam.      texture: texture_from_bmp(embed "../../assets/dragon.bmp")  Handles bottom-up (positive height) and top-down (negative) rows and the 4-byte row padding. Anything that is not a 24-bit BMP is LOUD: a 1x1 magenta texture, impossible to miss on screen.</p></div>
 <h2 id="overlay"><code>overlay</code></h2>
@@ -603,6 +593,7 @@ example cp_at(bytes_of("ä"), 0) is 228</pre></div>
 <div class="fn"><code class="sig">glyph_fill_spans(f: Font, gid: number, scale: f64) -&gt; [number]</code><p>Scanline-fill one glyph into pixel spans (see polygon_fill_spans). <code>scale</code> is pixels-per-font-unit (size/unitsPerEm); the baseline sits at y=0.</p></div>
 <div class="fn"><code class="sig">font_body() -&gt; Font</code><p>The engine's two faces, embedded with the engine itself. The .subset files are the ASCII the sketches can say (orion tools/subset_font.js, run against the full .ttf beside them) - the wasm backend pays per embedded byte, and a full family ships thousands of unsayable glyphs.</p></div>
 <div class="fn"><code class="sig">font_title() -&gt; Font</code></div>
+<div class="fn"><code class="sig">font_mono() -&gt; Font</code><p>The fixed-width face. Code, and anything that has to line up in columns: what makes it code is not the colour, it is that every letter is the same width. Cascadia Mono, under the Open Font License.</p></div>
 <div class="fn"><code class="sig">cold_typeset() -&gt; Typeset</code><p>The unwarmed set: fonts parsed, every glyph rasterized on demand. What the web shell uses - it re-instantiates per frame anyway.</p></div>
 <div class="fn"><code class="sig">warm_typeset(book: list of Word, ppu: number) -&gt; Typeset</code><p>Parse both faces and rasterize every letter the game's word book can show, at the size this window will draw it. Call ONCE at startup, before any frame pool is active.</p></div>
 <div class="fn"><code class="sig">blit_line(pixels: [number], width: number, height: number, left_px: number, top_px: number, content: text, titled: truth, em_px: number, color: number, types: Typeset) -&gt; [number]</code><p>One line blitted at PIXEL coordinates: left_px is the pen start, top_px the line's top (baseline = top + ascent). The lowest rung of the ladder - draw_words and the DisplayList compositor both end here, so every letter on screen comes through one blitter.</p></div>

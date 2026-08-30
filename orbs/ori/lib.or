@@ -1,0 +1,212 @@
+# ori - the Orion Rendering Interface.
+#
+# One orb, three seams: the 2D primitives every box is measured in, the
+# display list every 2D backend consumes, and the scene frame a 3D renderer
+# turns into pixels. They were three orbs, which cost three manifests and a
+# dependency between them for a vocabulary of 211 lines - and made `math`
+# depend on the 3D SEAM just to name a V3.
+#
+# On the NATIVE path the split bought nothing: the emitter prunes to what is
+# reached, so an orb costs what you use of it, not what it contains.
+#
+# On the WASM path it is not free, and the number is measured: Veil's gallery
+# went from 8 924 to 9 078 bundled lines and from 245 to 276 kB, because
+# `bundle_app.sh` follows `use` lines rather than reachability. Veil now
+# carries the 3D seam it never touches - about 12% of that module.
+#
+# That cost is the bundler's, not the seam's, and it is worth paying for one
+# vocabulary in one place. Teaching the bundler to prune the way the native
+# emitter already does would take it back for everyone.
+#
+# A seam is a data type both sides speak. Nothing here draws anything; every
+# type in this file is a contract, and contracts are not swapped - what sits
+# behind them is.
+
+# ----- 2D primitives: what a box is measured in -----
+
+
+public type Point: x: number, y: number
+public type Size: wide: number, high: number
+public type Rect: x: number, y: number, wide: number, high: number
+
+public define rect_contains(rect: Rect, point: Point) -> truth:
+    example rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 1, y: 1})
+    example not rect_contains(Rect{x: 0, y: 0, wide: 4, high: 4}, Point{x: 9, y: 1})
+    point.x is at least rect.x and point.x is less than rect.x + rect.wide and point.y is at least rect.y and point.y is less than rect.y + rect.high
+
+# ----- The display list: the 2D seam every backend consumes -----
+
+
+
+public type DrawCmd:
+    # These payloads are `i64`, not `number`. A `choose` arm hands back a bare
+    # payload with no conversion on the way out, so one enum gets ONE answer:
+    # a single fraction anywhere would widen every coordinate in the draw list
+    # to f64. They are pixel counts and entity ids, and a sized type says that
+    # without saying whole-or-real.
+    DrawRect(Rect, text, i64)
+    # Filled rounded rectangle: rect, colour, corner radius (px), src eid.
+    # Backends fill it as horizontal og_rect spans with circular corner
+    # insets - the chrome primitive for hover cells, chips, and cards.
+    # rect, colour, corner radii "8" or "8 8 0 0" (top-left, top-right,
+    # bottom-right, bottom-left), src eid. Four, because a tab is round on
+    # top and square on the bottom and so is every joined button group.
+    DrawRoundRect(Rect, text, text, i64)
+    # A soft drop shadow: rect, colour, corner radius, blur in px, src eid.
+    # Same shape as a DrawRoundRect, drawn with the distance ramp spread
+    # over `blur` pixels instead of one. Backends that cannot soften an
+    # edge skip it - a hard block where a shadow belongs is worse than
+    # nothing.
+    # Clip everything after this to `rect`, until the next SetClip. A rect
+    # with no area clears it. A UI needs this the moment anything can be
+    # longer than the box it sits in - a list, a line of typing - because
+    # the alternative is content shoving its neighbours out of the way.
+    # rect, corner radius, src eid. The radius matters: a scissor is a
+    # rectangle and always will be, so a list inside a rounded panel would
+    # square off at the corners without it - which is the one place every
+    # card and every avatar shows it.
+    SetClip(Rect, i64, i64)
+    DrawShadow(Rect, text, i64, i64, i64)
+    DrawText(Point, text, text, i64, i64)
+    # The same, in the fixed-width face. A run of code, a column of
+    # numbers: the difference is not styling, it is WHICH FACE the run was
+    # measured in - and measure and paint have to agree or the caret sits
+    # a letter from the letter. Backends without a mono face draw it as
+    # DrawText, which looks wrong but never lies about position.
+    DrawMono(Point, text, text, i64, i64)
+    # point, icon name, pixel size, src eid.
+    # point, icon name, size, colour, src eid. An icon that cannot take a
+    # colour is an icon that can only ever mean one thing: a file tree
+    # tells you what a file IS by the colour of its mark, and every editor
+    # in the world does it that way.
+    DrawIcon(Point, text, i64, text, i64)
+    # path data, colour, src eid.
+    DrawPath(text, text, i64)
+    # A ring, or a slice of one: centre, outer radius, how thick, and the
+    # span in degrees measured from the top going clockwise. The one shape
+    # a rectangle cannot approximate, and the one every cooldown sweep and
+    # radial meter is made of.
+    DrawArc(Point, i64, i64, i64, i64, text, i64)
+    # A pixel-art sprite: top-left Point, image path, integer scale, src
+    # eid. The rect-only backends blit it as og_rect runs (see
+    # atlas_sprite); no GPU texture needed.
+    # A panel skinned from a picture: box, picture, corner size in the
+    # PICTURE's own pixels, tint, blend, src eid. The corners keep their
+    # size, the edges stretch along their run, the middle stretches both
+    # ways. Every game frame that is not flat colour is one of these.
+    DrawNine(Rect, text, i64, text, text, i64)
+    DrawSprite(Point, text, i64, i64)
+    # A textured image quad (the modern path): top-left Point, image path,
+    # dest width, dest height, tint ("#rrggbb"/"#rrggbbaa" or a named colour;
+    # ""=none), blend ("alpha" default, "add" for glow), src eid. Drawn as
+    # ONE GPU-sampled quad - any size, scaled, blended. The renderer resolves
+    # the tint/blend strings (same palette as DrawText/DrawRect colours).
+    DrawImage(Point, text, i64, i64, text, text, i64)
+
+public type DisplayList: commands: [DrawCmd]
+
+public define empty_list() -> DisplayList:
+    example length(empty_list().commands) is 0
+    DisplayList{commands: []}
+
+public define push_cmd(list: DisplayList, cmd: DrawCmd) -> DisplayList:
+    # no example: needs a DrawCmd value - proven by atlas display tests
+    DisplayList{commands: append(list.commands, cmd)}
+
+# ----- The scene frame: the 3D seam -----
+
+
+public type V3: x: number, y: number, z: number
+
+# One triangle of a mesh, in model space. color is 0xRRGGBB.
+public type Tri: a: V3, b: V3, c: V3, color: number
+
+# Where the viewer stands: eye position, yaw around Y (radians, 0 looks
+# toward -Z), pitch around X, and vertical field of view in radians.
+public type Camera: eye: V3, yaw: number, pitch: number, fov: number
+
+# One placed mesh: which mesh (an index the render block resolves),
+# where, turned how much around Y, scaled uniformly, tinted (0 keeps
+# the mesh's own triangle colors).
+public type Instance: mesh: number, at: V3, yaw: number, scale: number, tint: number
+
+public type SceneFrame: camera: Camera, instances: list of Instance
+
+# Pixels an artist made: 0xRRGGBB rows, top-down. Magenta (0xFF00FF) is
+# the transparent key - a sprite pixel that color is simply not drawn.
+public type Texture: width: number, height: number, pixels: list of number
+
+# One textured, camera-facing rectangle: center in world space, size in
+# world units (wide/high - numbers, unlike the whole-pixel width/height
+# of a Texture). The 2D asset workhorse; textured MESHES arrive with the
+# 3D render block.
+public type Sprite: at: V3, wide: number, high: number, texture: Texture
+
+public define v3(x: number, y: number, z: number) -> V3:
+    example v3(1, 2, 3).y is 2
+    V3{x: x, y: y, z: z}
+
+# A 24-bit BMP (the pixel-art interchange format every paint program
+# writes) decoded to a Texture. Made for `embed`: assets stay FILES,
+# the binary carries their bytes, this reads them at the seam.
+#
+#     texture: texture_from_bmp(embed "../../assets/dragon.bmp")
+#
+# Handles bottom-up (positive height) and top-down (negative) rows and
+# the 4-byte row padding. Anything that is not a 24-bit BMP is LOUD:
+# a 1x1 magenta texture, impossible to miss on screen.
+public define texture_from_bmp(blob: text) -> Texture:
+    bad = Texture{width: 1, height: 1, pixels: [16711935]}
+    data = bytes_of(blob)
+    if length(data) is less than 54:
+        return bad
+    if data[0] is not 66 or data[1] is not 77:
+        return bad
+    bits = data[28] + data[29] * 256
+    if bits is not 24:
+        return bad
+    pixel_start = read_u32(data, 10)
+    width = read_u32(data, 18)
+    # Negative height = top-down rows. Read the magnitude byte-wise
+    # (two's complement inverted) so it works under wasm's 32-bit words.
+    top_down = data[25] is at least 128
+    height = if top_down then (255 - data[22]) + (255 - data[23]) * 256 + (255 - data[24]) * 65536 + (255 - data[25]) * 16777216 + 1 else read_u32(data, 22)
+    row_bytes = ((width * 3 + 3) // 4) * 4
+    # Preallocated + set() in place: growing by append would copy per
+    # pixel under the wasm backend (no in-place promotion there).
+    edit pixels = filled(width * height, 0)
+    loop row in 0 until height:
+        source_row = if top_down then row else height - 1 - row
+        base = pixel_start + source_row * row_bytes
+        loop column in 0 until width:
+            blue = data[base + column * 3]
+            green = data[base + column * 3 + 1]
+            red = data[base + column * 3 + 2]
+            pixels = set(pixels, row * width + column, red * 65536 + green * 256 + blue)
+    Texture{width: width, height: height, pixels: pixels}
+
+define read_u32(data: list of number, offset: number) -> number:
+    data[offset] + data[offset + 1] * 256 + data[offset + 2] * 65536 + data[offset + 3] * 16777216
+
+# ----- Tests (`orbit test` runs these) -----
+
+define test_bmp_decodes():
+    # A 2x2 24-bit bottom-up BMP built by hand: green blue / red magenta
+    # (top-down reading), rows padded 6 -> 8 bytes.
+    edit bytes = [66, 77, 70, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0, 40, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 1, 0, 24, 0]
+    loop zero_index in 0 until 24:
+        bytes = push(bytes, 0)
+    loop pixel_byte in [0, 0, 255, 255, 0, 255, 0, 0, 0, 255, 0, 255, 0, 0, 0, 0]:
+        bytes = push(bytes, pixel_byte)
+    texture = texture_from_bmp(text_of(bytes))
+    require texture.width is 2
+    require texture.height is 2
+    require texture.pixels[0] is 65280
+    require texture.pixels[1] is 255
+    require texture.pixels[2] is 16711680
+    require texture.pixels[3] is 16711935
+
+define test_bmp_refuses_junk():
+    junk = texture_from_bmp("not a bmp at all, far too short anyway")
+    require junk.width is 1
+    require junk.pixels[0] is 16711935
