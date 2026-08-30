@@ -1,37 +1,77 @@
-# log - leveled, categorized console logging. Pure Orion, language-
-# level orb: usable by astra, atlas, games and tools alike. The only
-# runtime hooks are orion_console_color (tty probe, fallback arm in
-# the interp) and orion_persist_text (identity in the interp).
+# log - leveled, categorized logging. Declare a category once, log to the
+# console and to a file, and configure it from the environment without
+# touching code.
 #
-#   error("cubsy", "no tray slot {i}")     always visible, red
-#   warn("reload", "kept old bundle")      yellow
-#   info("project", "scripts reloaded")    default ceiling
-#   debug("ecs", "packed {n} entities")    hidden until raised
+#     use log
+#     const ecs = cat("ecs")
 #
-# Levels: error 0, warn 1, info 2, debug 3. A category shows a line
-# when line-level <= category ceiling; default ceiling is info(2).
-# Ceilings live in slots and can be flipped at RUNTIME - per category
-# or globally - by the game, the dev console, or an agent:
+#     error(ecs, "no tray slot {i}")     always visible, red
+#     warn(ecs, "kept old bundle")       yellow
+#     info(ecs, "scripts reloaded")      default ceiling
+#     debug(ecs, "packed {n} entities")  hidden until raised
 #
-#   log_set_default(3)            # everything, everywhere
-#   log_set_level("ecs", 3)       # just one subsystem
+# A CATEGORY IS A DECLARED VALUE, not a string. That is the whole reason
+# `Cat` exists: `debug(esc, ...)` against a category spelled `ecs` is an
+# unknown identifier at compile time, where the old free-string version
+# was a line that silently never appeared again.
 #
-# Styling rides the same tty-gated ANSI as the rest of the engine -
-# redirected output stays plain. Message interpolation happens at the
-# call site and lands in the frame region: a suppressed line costs
-# one transient text + a slot probe, never permanent heap.
+# Levels: error 0, warn 1, info 2, debug 3. A line shows when its level is
+# at most the category's ceiling; the default ceiling is info(2). Ceilings
+# are runtime state, so a dev console or an agent can raise one mid-frame:
 #
-# FLIGHT RECORDER: log_ring_on() keeps the last 128 lines (plain
-# text) so log_dump() can replay the recent past - wire it to a dev
-# key and the exit path next to the mem ledger. Ring copies persist
-# (~100B a line, dev-only, visible in the session ledger like every
-# other byte).
+#     log_set_default(3)          everything, everywhere
+#     log_set_level(ecs, 3)       just one subsystem
+#
+# ORION_LOG does the same without a code change, read once on the first
+# line: "debug" raises everything, "ecs=3" one category, and the two mix
+# ("debug,net=1"). An explicit log_set_* always wins - it is set later.
+#
+# THE COST OF A SUPPRESSED LINE IS THE MESSAGE. Orion evaluates arguments
+# before the call and has no macros, so `debug(ecs, "{expensive()}")`
+# builds its text even when the line is dropped. Measured: a thousand
+# suppressed lines called expensive() a thousand times. There is no way to
+# fix that inside a library, so it is not hidden: `log_on` is the guard for
+# a hot loop, and it is the only place the ugliness is allowed to show.
+#
+#     if log_on(ecs, 3):
+#         debug(ecs, "packed {expensive(n)} entities")
+#
+# TWO DESTINATIONS, NOT A PLUGIN SYSTEM. The console is colored when a tty
+# is watching and plain when the output is redirected. `log_to_file` arms a
+# second, always-plain, always-timestamped copy. A list of sink closures in
+# a global would be a registry, which this codebase does not do, and nobody
+# has yet wanted a third destination.
+#
+# THE FILE IS ALWAYS COMPLETE. Each line is appended and closed, so the
+# tail is on disk before the next line is built and a hard crash cannot eat
+# it. There is no flush to call and no handle to own, which is also the
+# simplest thing that works. It costs an open per line, so a category
+# logging every frame belongs behind `log_on` regardless.
+#
+# `log_ring_on()` keeps the last 128 lines in memory and `log_dump()`
+# prints them: the tail on a dev key, without opening the file.
+
+use file
 
 public external define orion_console_color() -> int
 public external define orion_persist_text(s: text) -> text
 external define env_get(name: text) -> text
 
-# Local styling fragments (a shared con orb is the day-two refactor).
+# ---- Categories ----
+
+# A logging category. Declared once, referred to by name after that.
+public type Cat: name: text
+
+# `const ecs = cat("ecs")` at the top of an orb, then `info(ecs, ...)`.
+public define cat(name: text) -> Cat:
+    example cat("ecs").name is "ecs"
+    Cat{name: name}
+
+# ---- Styling ----
+#
+# Local fragments; a shared `con` orb is the day-two refactor if a second
+# orb ever wants the same four colors.
+
 define lsty(code: text, s: text) -> text:
     if orion_console_color() is 1:
         e = text_of(append([], 27))
@@ -39,145 +79,198 @@ define lsty(code: text, s: text) -> text:
     else:
         s
 
-define ldim(s: text) -> text:
-    lsty("2", s)
-
-define lred(s: text) -> text:
-    lsty("31;1", s)
-
-define lyellow(s: text) -> text:
-    lsty("33", s)
-
-define lcyan(s: text) -> text:
-    lsty("36", s)
+define ldim(s: text) -> text = lsty("2", s)
+define lred(s: text) -> text = lsty("31;1", s)
+define lyellow(s: text) -> text = lsty("33", s)
+define lcyan(s: text) -> text = lsty("36", s)
 
 # ---- Ceilings ----
 
-# no example: sets global logging state - proven by the log ring test
-public define log_set_default(level: number):
-    slot_set("log:lvl:*", level)
-
-# no example: sets global logging state - proven by the log ring test
-public define log_set_level(cat: text, level: number):
-    slot_set("log:lvl:" + cat, level)
-
-# ORION_LOG styr taken UTAN kodandring: "debug" hojer allt, "ecs=3" en
-# kategori, kommaseparerat blandat ("debug,net=1"). Lases en gang, forsta
-# loggraden; log_set_* i koden vinner alltid over miljon (satts senare).
-define level_num(w: text) -> number:
-    if w is "error" or w is "0" then 0
-    else if w is "warn" or w is "1" then 1
-    else if w is "info" or w is "2" then 2
-    else if w is "debug" or w is "3" then 3
+define level_num(word: text) -> number:
+    if word is "error" or word is "0" then 0
+    else if word is "warn" or word is "1" then 1
+    else if word is "info" or word is "2" then 2
+    else if word is "debug" or word is "3" then 3
     else 0 - 1
 
 define env_ceilings():
     if not slot_has("log:env:done"):
         slot_set("log:env:done", 1)
-        v = env_get("ORION_LOG")
-        if v is not "":
-            loop part in split(v, ","):
-                p = trim(part)
-                eq = index_of(p, "=")
+        setting = env_get("ORION_LOG")
+        if setting is not "":
+            loop part in split(setting, ","):
+                clause = trim(part)
+                eq = index_of(clause, "=")
                 if eq >= 0:
-                    b = bytes_of(p)
-                    cat = text_of(bytes_part(b, 0, eq))
-                    lw = trim(text_of(bytes_part(b, eq + 1, bytes_count(b))))
-                    lv = level_num(lw)
-                    if lv >= 0 and not slot_has("log:lvl:" + cat):
-                        slot_set("log:lvl:" + cat, lv)
+                    raw = bytes_of(clause)
+                    name = text_of(bytes_part(raw, 0, eq))
+                    word = trim(text_of(bytes_part(raw, eq + 1, bytes_count(raw))))
+                    level = level_num(word)
+                    if level >= 0 and not slot_has("log:lvl:" + name):
+                        slot_set("log:lvl:" + name, level)
                 else:
-                    gl = level_num(p)
-                    if gl >= 0 and not slot_has("log:lvl:*"):
-                        slot_set("log:lvl:*", gl)
+                    level = level_num(clause)
+                    if level >= 0 and not slot_has("log:lvl:*"):
+                        slot_set("log:lvl:*", level)
 
-define ceiling_of(cat: text) -> number:
+define ceiling_of(name: text) -> number:
     env_ceilings()
-    k = "log:lvl:" + cat
-    if slot_has(k):
-        slot_get_number(k)
+    key = "log:lvl:" + name
+    if slot_has(key):
+        slot_get_number(key)
     else:
         if slot_has("log:lvl:*") then slot_get_number("log:lvl:*") else 2
+
+# no example: sets global logging state - proven by test_ceilings_and_guard
+public define log_set_default(level: number):
+    slot_set("log:lvl:*", level)
+
+# no example: sets global logging state - proven by test_ceilings_and_guard
+public define log_set_level(category: Cat, level: number):
+    slot_set("log:lvl:" + category.name, level)
+
+# Would this line show? The guard for a hot loop, where the message itself
+# is the expense. Everywhere else, just call debug() and let it decide.
+public define log_on(category: Cat, level: number) -> truth:
+    example log_on(cat("__ex"), 0)
+    ceiling_of(category.name) >= level
+
+# ---- The file ----
+
+# Arm a plain, timestamped copy of every line that shows. The path is
+# probed once here rather than at the first error, so a directory that
+# cannot be written says so where the caller asked for it.
+# no example: touches the filesystem - proven by test_file_writes_lines
+public define log_to_file(path: text) -> truth uses files:
+    handle = open_append(path)
+    if not ok(handle):
+        return false
+    close_file(handle)
+    slot_set("log:path", path)
+    true
+
+define file_armed() -> truth:
+    slot_has("log:path")
+
+# Milliseconds since the first line. An absolute wall clock says when the
+# session ran; elapsed says how far into it a thing happened, which is the
+# question a log answers.
+define stamp() -> number uses clock:
+    if not slot_has("log:t0"):
+        slot_set("log:t0", monotonic_ms())
+    monotonic_ms() - slot_get_number("log:t0")
 
 # ---- Emit ----
 
 # no example: prints - an example would be noise in every gate run
-public define error(cat: text, msg: text) uses console:
-    if ceiling_of(cat) >= 0:
-        emit_line(0, cat, msg)
+public define error(category: Cat, msg: text) uses console, files, clock:
+    if ceiling_of(category.name) >= 0:
+        emit_line(0, category.name, msg)
 
 # no example: prints - an example would be noise in every gate run
-public define warn(cat: text, msg: text) uses console:
-    if ceiling_of(cat) >= 1:
-        emit_line(1, cat, msg)
+public define warn(category: Cat, msg: text) uses console, files, clock:
+    if ceiling_of(category.name) >= 1:
+        emit_line(1, category.name, msg)
 
 # no example: prints - an example would be noise in every gate run
-public define info(cat: text, msg: text) uses console:
-    if ceiling_of(cat) >= 2:
-        emit_line(2, cat, msg)
+public define info(category: Cat, msg: text) uses console, files, clock:
+    if ceiling_of(category.name) >= 2:
+        emit_line(2, category.name, msg)
 
 # no example: prints - an example would be noise in every gate run
-public define debug(cat: text, msg: text) uses console:
-    if ceiling_of(cat) >= 3:
-        emit_line(3, cat, msg)
+public define debug(category: Cat, msg: text) uses console, files, clock:
+    if ceiling_of(category.name) >= 3:
+        emit_line(3, category.name, msg)
 
-define emit_line(level: number, cat: text, msg: text):
-    tag = level_tag(level)
-    c = ldim(cat)
-    print_line("  {tag} {c}  {msg}")
-    ring_push(level_name(level), cat, msg)
+define emit_line(level: number, name: text, msg: text) uses console, files, clock:
+    print_line("  {level_tag(level)} {ldim(name)}  {msg}")
+    plain = "{stamp()} {level_name(level)} {name}  {msg}"
+    if file_armed():
+        append_line(slot_get("log:path"), plain)
+    ring_push(plain)
 
 define level_tag(level: number) -> text:
-    if level is 0:
-        lred("error")
-    else:
-        if level is 1:
-            lyellow(" warn")
-        else:
-            if level is 2:
-                lcyan(" info")
-            else:
-                ldim("debug")
+    if level is 0 then lred("error")
+    else if level is 1 then lyellow(" warn")
+    else if level is 2 then lcyan(" info")
+    else ldim("debug")
 
 define level_name(level: number) -> text:
-    if level is 0:
-        "error"
-    else:
-        if level is 1:
-            " warn"
-        else:
-            if level is 2:
-                " info"
-            else:
-                "debug"
+    if level is 0 then "error"
+    else if level is 1 then " warn"
+    else if level is 2 then " info"
+    else "debug"
 
 # ---- Flight recorder ----
 
-# no example: sets global logging state - proven by the log ring test
+# no example: sets global logging state - proven by test_ring_keeps_the_tail
 public define log_ring_on():
     slot_set("log:ring:on", 1)
 
 define ring_active() -> truth:
     slot_has("log:ring:on") and slot_get_number("log:ring:on") is 1
 
-define ring_push(lvl: text, cat: text, msg: text):
+define ring_push(line: text):
     if ring_active():
         n = if slot_has("log:ring:n") then slot_get_number("log:ring:n") else 0
-        i = n - (n // 128) * 128
-        slot_set("log:ring:{i}", orion_persist_text("{lvl} {cat}  {msg}"))
+        slot_set("log:ring:{n - (n // 128) * 128}", orion_persist_text(line))
         slot_set("log:ring:n", n + 1)
 
 # no example: prints - an example would be noise in every gate run
 public define log_dump() uses console:
     n = if slot_has("log:ring:n") then slot_get_number("log:ring:n") else 0
     count = if n < 128 then n else 128
-    header = ldim("log tail ({count} of {n})")
-    print_line("  {header}")
-    start = n - count
-    loop j in start until n:
-        i = j - (j // 128) * 128
-        line = ring_line(i)
-        print_line("  {line}")
+    print_line("  {ldim(\"log tail ({count} of {n})\")}")
+    loop j in n - count until n:
+        print_line("  {ring_line(j - (j // 128) * 128)}")
 
 define ring_line(i: number) -> text:
     if slot_has("log:ring:{i}") then slot_get("log:ring:{i}") else ""
+
+# ----- Tests (`orbit test` runs these) -----
+
+define test_ceilings_and_guard():
+    quiet = cat("t_quiet")
+    loud = cat("t_loud")
+    # Default ceiling is info: error/warn/info show, debug does not.
+    require log_on(quiet, 2)
+    require not log_on(quiet, 3)
+    # A category's own ceiling wins over the default.
+    log_set_level(loud, 3)
+    require log_on(loud, 3)
+    require not log_on(quiet, 3)
+    # The default moves everything that has no ceiling of its own.
+    log_set_default(0)
+    require not log_on(quiet, 2)
+    require log_on(loud, 3)
+    log_set_default(2)
+
+define test_level_words_and_names():
+    require level_num("error") is 0
+    require level_num("3") is 3
+    require level_num("shout") is 0 - 1
+    require level_name(0) is "error"
+    require level_name(3) is "debug"
+
+define test_ring_keeps_the_tail():
+    log_ring_on()
+    slot_set("log:ring:n", 0)
+    loop i in 0 until 130:
+        ring_push("line {i}")
+    # 130 pushed into 128 slots: the first two are gone, the last one is home.
+    require slot_get_number("log:ring:n") is 130
+    require ring_line(129 - (129 // 128) * 128) is "line 129"
+    require ring_line(2) is "line 2"
+
+define test_file_writes_lines() uses console, files, clock:
+    path = "build/__logtest.txt"
+    remove_file(path)
+    require log_to_file(path)
+    require file_armed()
+    emit_line(0, "t_file", "probe")
+    # Readable immediately: no handle is held open, so there is nothing to
+    # flush and nothing to lose.
+    back = read_file(path)
+    require contains(back, "probe")
+    require contains(back, "t_file")
+    remove_file(path)
