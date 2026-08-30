@@ -23,6 +23,7 @@ external define file_read_chunk(handle: int, maxlen: int) -> text
 external define file_write_chunk(handle: int, data: text) -> int
 external define file_close(handle: int) -> int
 external define file_bytes(path: text) -> int
+external define file_seek(handle: int, offset: int) -> int
 
 # --- opening ---
 # -1 when the file cannot be opened (missing, locked, out of handles).
@@ -49,6 +50,14 @@ public define write_chunk(handle: number, data: text) -> number uses files = fil
 
 # no example: touches the filesystem - proven by test_42_file_stream.or
 public define close(handle: number) -> number uses files = file_close(handle)
+
+# Move the read point to `offset` bytes from the start. 0 on success.
+#
+# A store that keeps many objects in one file has to reach the middle of
+# it. Reading and discarding everything before the object is the
+# difference between a lookup and a scan.
+# no example: touches the filesystem - proven by test_42_file_stream.or
+public define seek(handle: number, offset: number) -> number uses files = file_seek(handle, offset)
 
 # Size in bytes without reading the contents. -1 if it does not exist.
 # no example: touches the filesystem - proven by test_42_file_stream.or

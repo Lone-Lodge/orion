@@ -4517,6 +4517,14 @@ long long file_open(const char *path, long long mode) {
     return -1;
 }
 
+/* Move the read point. A storage layer that keeps many objects in one file
+ * has to reach the middle of it; reading and discarding everything before
+ * is the difference between a lookup and a scan. 0 on success. */
+long long file_seek(long long h, long long offset) {
+    if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h]) return -1;
+    return fseek(orion_files[h], (long)offset, SEEK_SET) == 0 ? 0 : -1;
+}
+
 const char *file_read_chunk(long long h, long long maxlen) {
     if (h < 0 || h >= ORION_MAX_FILES || !orion_files[h]) return orion_text_empty();
     if (maxlen <= 0) maxlen = 4096;

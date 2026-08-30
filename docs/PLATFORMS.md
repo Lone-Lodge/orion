@@ -45,7 +45,8 @@ these, every orb works:
 - process: `sys_run`, `sys_run_quiet`, `capture`, `proc_start`,
   `proc_start_to_file`, `proc_wait_ready`, `proc_result`, `proc_stop`
 - filesystem: `mkdir_all`, `remove_file`, `fs_remove_tree`, `file_exists`,
-  `is_dir`, `file_size`, `file_mtime`, `file_readonly`, `orion_dir_list`,
+  `is_dir`, `file_size`, `file_mtime`, `file_readonly`, `file_seek`,
+  `orion_dir_list`,
   `orion_dir_subdirs`
 - host: `now`, `host_os`, `host_cpus`, `host_self_exe`, `exit_with`, `eprint`
 - sockets: the `tcp_*` family + `sock_wait_ready` (select/poll per platform)
