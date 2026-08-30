@@ -115,6 +115,9 @@ jobs:
       - name: float arithmetic stays unfused
         run: bash tools/fp_determinism_test.sh
 
+      - name: no library orb prints
+        run: bash tools/orb_console_test.sh
+
       - name: field guide samples compile
         run: bash tools/docs_check.sh
 

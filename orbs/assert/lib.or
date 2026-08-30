@@ -12,7 +12,11 @@
 # `assert(a is b, ...)` replaced the old assert_eq/assert_true/assert_text_eq
 # trio - one word, any condition.
 
-public define assert(cond: truth, label = "") -> number:
+# `uses console` is declared, not merely done. A failed assertion IS the test's
+# answer, so this is one of the few library-shaped orbs that may write - and the
+# clause is what makes that a stated fact rather than a habit
+# (tools/orb_console_test.sh).
+public define assert(cond: truth, label = "") -> number uses console:
     example assert(true) is 1
     example assert(true, "holds") is 1
     if cond:
