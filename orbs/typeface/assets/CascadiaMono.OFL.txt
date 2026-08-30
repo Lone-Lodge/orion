@@ -1,0 +1,8 @@
+Cascadia Mono is (c) Microsoft Corporation, released under the SIL Open
+Font License, Version 1.1. https://github.com/microsoft/cascadia-code
+
+The file beside this one is a SUBSET of Cascadia Mono, produced with
+orion/tools/subset_font.js - the glyphs a UI can say, nothing else. It is
+a Modified Version under the OFL and is not sold on its own.
+
+The full license text ships with the upstream font at the URL above.

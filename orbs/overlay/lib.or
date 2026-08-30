@@ -65,6 +65,10 @@ define drawn(pixels: list of number, width: number, height: number, command: Dra
         DrawRect(rect, colour, tag) then fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), 0)
         DrawRoundRect(rect, colour, radius, tag) then fill_round_rect(pixels, width, height, scaled(rect, scale), color_of(colour), to_whole(radius * scale + 0.5))
         DrawText(point, content, colour, size, tag) then fill_text(pixels, width, height, point, content, color_of(colour), size, scale, types)
+        # The CPU overlay carries one body face and no mono, so a mono run
+        # is drawn in the face it has. Wrong-looking, never wrong about
+        # where the letters are - it was MEASURED in mono either way.
+        DrawMono(point, content, colour, size, tag) then fill_text(pixels, width, height, point, content, color_of(colour), size, scale, types)
         DrawIcon(point, icon_name, size, icon_colour, tag) then pixels
         DrawPath(path_data, colour, tag) then pixels
         # The four the gpu work added while this dispatch stood still. They

@@ -630,6 +630,12 @@ public define font_body() -> Font:
 public define font_title() -> Font:
     load_font_blob(embed "assets/Cinzel-Regular.subset.ttf")
 
+# The fixed-width face. Code, and anything that has to line up in columns:
+# what makes it code is not the colour, it is that every letter is the same
+# width. Cascadia Mono, under the Open Font License.
+public define font_mono() -> Font:
+    load_font_blob(embed "assets/CascadiaMono-Regular.subset.ttf")
+
 # A warmed set: both faces plus the glyph-mask cache. Plain lists, no
 # tables - the wasm backend can carry them too. `sizes` holds each
 # warmed pixel size; `slots` holds, per size, 512 entries (face*256 +

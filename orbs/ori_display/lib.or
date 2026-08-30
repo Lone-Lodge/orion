@@ -42,6 +42,12 @@ public type DrawCmd:
     SetClip(Rect, i64, i64)
     DrawShadow(Rect, text, i64, i64, i64)
     DrawText(Point, text, text, i64, i64)
+    # The same, in the fixed-width face. A run of code, a column of
+    # numbers: the difference is not styling, it is WHICH FACE the run was
+    # measured in - and measure and paint have to agree or the caret sits
+    # a letter from the letter. Backends without a mono face draw it as
+    # DrawText, which looks wrong but never lies about position.
+    DrawMono(Point, text, text, i64, i64)
     # point, icon name, pixel size, src eid.
     # point, icon name, size, colour, src eid. An icon that cannot take a
     # colour is an icon that can only ever mean one thing: a file tree
