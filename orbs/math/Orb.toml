@@ -1,0 +1,3 @@
+name = "math"
+version = "0.0.1"
+description = "Vector math on the ORI V3: add, sub, scale, dot, cross, norm, and the two axis turns"

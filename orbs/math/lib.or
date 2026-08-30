@@ -1,0 +1,89 @@
+# math - vector arithmetic on the ORI V3.
+#
+# Lifted out of `raster`, where these lived as private helpers and where
+# `add` and `scale` were written by hand at every call site. A second
+# renderer would have copied all eight, which is the duplicate the
+# one-of-each rule exists to prevent.
+#
+# V3 comes from ori_scene rather than living here, because moving the type
+# would move it out from under everything that already names it. Where V3
+# belongs is a Rigel question, not a reason to break ten consumers today.
+
+use ori_scene
+
+public define add(a: V3, b: V3) -> V3:
+    example add(v3(1.0, 2.0, 3.0), v3(10.0, 20.0, 30.0)).y is 22.0
+    v3(a.x + b.x, a.y + b.y, a.z + b.z)
+
+public define sub(a: V3, b: V3) -> V3:
+    example sub(v3(10.0, 20.0, 30.0), v3(1.0, 2.0, 3.0)).z is 27.0
+    v3(a.x - b.x, a.y - b.y, a.z - b.z)
+
+public define scale(a: V3, by: number) -> V3:
+    example scale(v3(1.0, 2.0, 3.0), 2.0).z is 6.0
+    v3(a.x * by, a.y * by, a.z * by)
+
+public define dot(a: V3, b: V3) -> number:
+    example dot(v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0)) is 0.0
+    a.x * b.x + a.y * b.y + a.z * b.z
+
+public define cross(a: V3, b: V3) -> V3:
+    example cross(v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0)).z is 1.0
+    v3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
+
+# A zero-length vector normalises to zero rather than to a division by it:
+# a degenerate triangle has no facing, and the caller wants a colour, not a
+# crash.
+public define norm(a: V3) -> V3:
+    example norm(v3(0.0, 5.0, 0.0)).y is 1.0
+    length = sqrt(dot(a, a))
+    if length is less than 0.000001 then v3(0.0, 0.0, 0.0) else v3(a.x / length, a.y / length, a.z / length)
+
+# Turns about the world axes. Y is the one a camera and a placed instance
+# both use; X is pitch.
+public define rot_y(point: V3, angle: number) -> V3:
+    v3(point.x * cos(angle) + point.z * sin(angle), point.y, point.z * cos(angle) - point.x * sin(angle))
+
+public define rot_x(point: V3, angle: number) -> V3:
+    v3(point.x, point.y * cos(angle) - point.z * sin(angle), point.z * cos(angle) + point.y * sin(angle))
+
+# ----- Tests (`orbit test` runs these) -----
+
+define test_add_and_sub_are_inverses():
+    start = v3(3.0, -4.0, 5.0)
+    step = v3(1.5, 2.5, -0.5)
+    back = sub(add(start, step), step)
+    require back.x is start.x
+    require back.y is start.y
+    require back.z is start.z
+
+define test_cross_is_perpendicular_to_both():
+    a = v3(1.0, 2.0, 3.0)
+    b = v3(-2.0, 0.5, 1.0)
+    c = cross(a, b)
+    require dot(c, a) is 0.0
+    require dot(c, b) is 0.0
+
+define test_norm_gives_unit_length():
+    unit = norm(v3(3.0, 4.0, 0.0))
+    require unit.x is 0.6
+    require unit.y is 0.8
+    require dot(unit, unit) is 1.0
+
+define test_norm_of_zero_is_zero():
+    zero = norm(v3(0.0, 0.0, 0.0))
+    require zero.x is 0.0
+    require zero.y is 0.0
+    require zero.z is 0.0
+
+define test_quarter_turn_about_y_swaps_x_and_z():
+    # A quarter turn sends +x to -z, so the round trip has to come home.
+    quarter = 1.5707963267948966
+    there = rot_y(v3(1.0, 0.0, 0.0), quarter)
+    home = rot_y(there, 0.0 - quarter)
+    require home.x is 1.0
+
+define test_scale_by_zero_flattens():
+    flat = scale(v3(7.0, -3.0, 2.0), 0.0)
+    require flat.x is 0.0
+    require flat.z is 0.0
