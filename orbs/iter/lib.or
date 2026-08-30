@@ -138,27 +138,56 @@ public define sort_by(xs: [number], less: function) -> [number]:
     example sort_by([3, 1, 2], (a, b): a < b)[0] is 1
     sort_generic(xs, less)
 
-# Selection sort, stable, element-type agnostic - the engine both forms use.
-define sort_generic<T>(xs: [T], less: function) -> [T]:
-    # A mark beside each element rather than a new list without it. Rebuilding
-    # the remainder every pass allocated a list per pass AND could not grow it
-    # in place, so a selection sort - already n squared in comparisons - was
-    # doing n squared COPIES on top. Ten thousand things sorted was a hundred
-    # million element copies that nothing asked for.
-    n = length(xs)
-    edit gone = []
-    loop _g in 0 until n:
-        gone = append(gone, 0)
+# Bottom-up merge sort, stable, element-type agnostic - the engine both
+# forms use. Selection sort stood here and was n squared in comparisons:
+# ten thousand things cost a hundred million calls to `less`, and `less`
+# is a closure, so every one of them is a real call.
+#
+# ONE PASS PER FUNCTION, and that is not a style choice. `append` writes in
+# place when the list it grows is local and leaves as the return value. Build
+# the pass inline instead - `cur = out` inside the same body - and the list
+# is live under two names, so every append copies the whole thing and the
+# sort goes quadratic in COPIES. Measured: 8000 elements, four passes, 0 ms
+# as a returning helper against 500 ms inline.
+define merge_pass<T>(cur: [T], n: number, width: number, less: function) -> [T]:
     edit out = []
-    loop _pass in 0 until n:
-        # The one that comes before all the others still here. Strictly
-        # before, so equals keep the order they came in - which is what
-        # makes this stable.
-        edit best = 0 - 1
-        loop i in 0 until n:
-            if gone[i] is 0 and (best < 0 or less(xs[i], xs[best])):
-                best = i
-        if best >= 0:
-            gone = set(gone, best, 1)
-            out = append(out, xs[best])
+    edit lo = 0
+    loop:
+        if lo >= n:
+            break
+        mid = if lo + width < n then lo + width else n
+        hi = if lo + width + width < n then lo + width + width else n
+        # Merge cur[lo..mid) with cur[mid..hi). Take from the RIGHT run only
+        # when it is strictly before the left one - that is what keeps equals
+        # in the order they came in.
+        edit i = lo
+        edit j = mid
+        loop:
+            if i >= mid and j >= hi:
+                break
+            edit take_right = false
+            if i >= mid:
+                take_right = true
+            else if j < hi and less(cur[j], cur[i]):
+                take_right = true
+            if take_right:
+                out = append(out, cur[j])
+                j = j + 1
+            else:
+                out = append(out, cur[i])
+                i = i + 1
+        lo = hi
     out
+
+define sort_generic<T>(xs: [T], less: function) -> [T]:
+    n = length(xs)
+    if n < 2:
+        return xs
+    edit cur = xs
+    edit width = 1
+    loop:
+        if width >= n:
+            break
+        cur = merge_pass(cur, n, width, less)
+        width = width + width
+    cur
