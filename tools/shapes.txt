@@ -1,0 +1,45 @@
+# Every exported type and the fields it holds, derived by the compiler.
+# Regenerate with: bash tools/orb_shapes.sh
+# A diff here is a change to a shape something may already have on disk.
+TYPE app.request method:text,path:text,query:text,body:text
+TYPE app.response status:number,mime:text,body:text
+TYPE app.route method:text,path:text,handler:fn
+SUM core.Option Some,None
+SUM core.Result Ok,Err
+TYPE http.reply status:number,body:text
+TYPE iter.order_of less:fn
+SUM json.Json JNull,JBool,JNum,JStr,JArr,JObj
+TYPE log.Cat name:text
+SUM ori_display.DrawCmd DrawRect,DrawRoundRect,SetClip,DrawShadow,DrawText,DrawIcon,DrawPath,DrawArc,DrawNine,DrawSprite,DrawImage
+TYPE ori_display.DisplayList commands:[DrawCmd]
+TYPE ori_geometry.Point x:number,y:number
+TYPE ori_geometry.Rect x:number,y:number,wide:number,high:number
+TYPE ori_geometry.Size wide:number,high:number
+TYPE ori_scene.Camera eye:V3,yaw:number,pitch:number,fov:number
+TYPE ori_scene.Instance mesh:number,at:V3,yaw:number,scale:number,tint:number
+TYPE ori_scene.SceneFrame camera:Camera,instances:[Instance]
+TYPE ori_scene.Sprite at:V3,wide:number,high:number,texture:Texture
+TYPE ori_scene.Texture width:number,height:number,pixels:[number]
+TYPE ori_scene.Tri a:V3,b:V3,c:V3,color:number
+TYPE ori_scene.V3 x:number,y:number,z:number
+TYPE orion_ast_to_ir.ConvResult function:IRFn,scope:Scope,id:number
+TYPE orion_ast_to_ir.Scope names:[text],ids:[number],mut_flags:[number],loop_headers:[text],loop_ends:[text],fn_sig_names:[text],fn_sig_rets:[text],ds_names:[text],ds_specs:[text],en_names:[text],en_variants:[text]
+TYPE orion_emit_wasm.WDataSegment offset:number,bytes:[number]
+TYPE orion_emit_wasm.WFn name:text,param_count:number,body:[number],local_count:number
+TYPE orion_emit_wasm.WImport module_name:text,fn_name:text,param_count:number,result_count:number
+TYPE orion_emit_wasm.WModule imports:[WImport],functions:[WFn],data_segments:[WDataSegment]
+TYPE orion_ir.IRFn name:text,return_type:text,params:[Param],instructions:[Inst]
+TYPE orion_ir.IRModule functions:[IRFn]
+TYPE orion_ir.Inst op:text,type_text:text,value:number,lhs:number,rhs:number,name:text,args:[number]
+TYPE orion_ir.Param name:text,type_text:text
+TYPE orion_ir.PushResult function:IRFn,id:number
+TYPE raster.Crc hi:number,lo:number
+TYPE regex.ReUnit ue:number,qe:number,quant:number,ok:number
+TYPE store.sstore seq:number,cells:table<table>
+TYPE typeface.FlatGlyph px:[f64],py:[f64],ends:[number],adv:number
+TYPE typeface.Font bytes:[number],upm:number,nglyphs:number,loc_fmt:number,off_head:number,off_maxp:number,off_cmap:number,off_loca:number,off_glyf:number,off_hhea:number,off_hmtx:number,off_gpos:number,ok:truth,cache:table
+TYPE typeface.Glyph xs:[number],ys:[number],on_curve:[number],ends:[number],adv:number,ok:truth
+TYPE typeface.Typeset body:Font,heading:Font,sizes:[number],slots:[number],stash:[[number]]
+TYPE typeface.Word content:text,titled:truth,centered:truth,x:number,y:number,em:number,color:number
+TYPE window.Event kind:text,key:number,x:number,y:number
+TYPE words.Words keys:[text],says:[text]

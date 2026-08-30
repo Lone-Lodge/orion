@@ -109,6 +109,9 @@ jobs:
       - name: whisper
         run: bash tools/whisper_test.sh
 
+      - name: type shapes unchanged
+        run: bash tools/orb_shapes.sh --check
+
       - name: field guide samples compile
         run: bash tools/docs_check.sh
 
