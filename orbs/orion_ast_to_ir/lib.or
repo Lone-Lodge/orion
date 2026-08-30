@@ -4484,13 +4484,44 @@ define friendly_fn_name(n: text) -> text:
     else:
         text_of(bytes_part(b, cut, total))
 
+# The word a PERSON writes, for a message a person reads. `number` is the only
+# numeric word in the surface (ORION.md: "number is the word a person writes;
+# i64 or f64 is what the machine gets"), so an error that says `int` answers a
+# question nobody asked and names a type the language does not have.
+#
+# No message can ever compare i64 against f64 - the return guard buckets by
+# i64-vs-pointer and exempts f64 - so collapsing both to `number` cannot make
+# an error read "declared number but returns number".
+# Does this body leave through `resume`? Used to tell a handler - which cannot
+# answer, because control has gone back to the perform site - from a function
+# that simply forgot to.
+define otir_tail_resumes(node: table) -> truth:
+    k = get(node, "kind")
+    if k is "Call":
+        return get(node, "callee") is "resume"
+    if k is "ExprStmt":
+        return otir_tail_resumes(get_map(node, "expr"))
+    if k is "Block":
+        stmts = get_list(node, "stmts")
+        if length(stmts) is 0:
+            return false
+        return otir_tail_resumes(stmts[length(stmts) - 1])
+    if k is "IfBlock":
+        els = get_map(node, "else")
+        if get(els, "kind") is not "Block" and get(els, "kind") is not "IfBlock":
+            return false
+        return otir_tail_resumes(get_map(node, "then")) and otir_tail_resumes(els)
+    if k is "If":
+        return otir_tail_resumes(get_map(node, "then")) and otir_tail_resumes(get_map(node, "else"))
+    false
+
 define friendly_type(t: text) -> text:
     if t is "truth":
         "truth"
     else if t is "i64":
-        "int"
+        "number"
     else if t is "f64":
-        "float"
+        "number"
     else if t is "void" or t is "Unit":
         "nothing"
     else if is_list_type(t):
@@ -4803,6 +4834,18 @@ public define ast_fn_to_ir(ast_fn: table, initial_scope: Scope) -> IRFn:
         # called for its effect). There's no declared return to violate, so
         # exempt it - only an EXPLICIT return type is a contract to check.
         ret_undeclared = has(ret_type_node, "name") and get(ret_type_node, "name") is "Unit"
+        # A body that leaves through `resume` gives no value ON PURPOSE: resume
+        # is a longjmp to the perform site, so the handler's frame is gone and
+        # there is nothing to answer with. Every effect handler in the language
+        # ends this way, which is how the first version of the check below
+        # failed five smoke tests at once.
+        # A body that gives NO value where one was declared is the sibling of
+        # the annotation that lies: `define f() -> number:` whose body ends in
+        # a void call, a loop, or an `if` with no else fabricates a 0. Zero is
+        # a legal id, a legal position and a legal health, so the mistake is
+        # never found where it was made.
+        if (not ret_undeclared) and (rt_body is "void" or rt_body is "Unit") and (not otir_tail_resumes(body)):
+            compile_error("orion: ERROR at {otir_where(fn_at_line, fn_at_col)} - function `{friendly_fn_name(name)}` is declared to return `{friendly_type(ret_type)}` but its body gives no value")
         rt_exempt = ret_undeclared or ret_type is "fn" or ret_type is "f64" or ret_type is "Unit" or rt_body is "fn" or rt_body is "f64" or rt_body is "void" or rt_body is "Unit"
         # Bucket by STORAGE: a sized int (u8...) and i64 are the same slot.
         rt_decl_ll = if is_ptr_ir_type(ret_type) then "ptr" else "i64"

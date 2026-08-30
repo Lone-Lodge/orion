@@ -1,0 +1,16 @@
+# expect: is declared to return `number` but its body gives no value
+# A function that promises an answer and gives none used to fabricate a 0.
+#
+# Zero is a legal id, a legal position and a legal health, so the mistake was
+# never found where it was made - it was found later, somewhere else, as a
+# thing that was at the origin or had no hit points. In a language sold on
+# having no null, a silent zero IS a null wearing a number's clothes.
+#
+# The sibling case - the body answers the WRONG type - was already caught
+# (wrong_return.or). This is the one where it answers nothing: a void call, a
+# loop, or an `if` with no else as the last thing in the body.
+define f() -> number:
+    print_line("this is not an answer")
+
+define main() -> number:
+    f()

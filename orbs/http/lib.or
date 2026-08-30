@@ -83,7 +83,6 @@ define run_curl(args: [text], body_file: text) -> reply:
 # curl reads backslash escapes, so both characters that could end the
 # string early are escaped first.
 define cfg_quote(v: text) -> text:
-    example cfg_quote("a" + text_of([34]) + "b") is "a" + text_of([92, 34]) + "b"
     esc = replace(v, text_of([92]), text_of([92, 92]))
     text_of([34]) + replace(esc, text_of([34]), text_of([92, 34])) + text_of([34])
 
@@ -140,3 +139,12 @@ public define success(r: reply) -> truth:
     example not success(reply{status: 404, body: ""})
     example not success(reply{status: 0, body: ""})
     r.status >= 200 and r.status < 300
+
+# cfg_quote is private, and an `example` is extracted into a probe that only
+# says `use http` - so it could not call this and the example gate went red.
+# A private helper is proven by a test, which runs where it lives.
+define test_cfg_quote_escapes_what_would_end_the_string():
+    quote = text_of([34])
+    slash = text_of([92])
+    require cfg_quote("a" + quote + "b") is quote + "a" + slash + quote + "b" + quote
+    require cfg_quote("a" + slash + "b") is quote + "a" + slash + slash + "b" + quote

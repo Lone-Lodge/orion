@@ -1,4 +1,4 @@
-# expect: is declared to return `text` but its body returns `int`
+# expect: is declared to return `text` but its body returns `number`
 effect Log:
   msg: function(text) -> int
 handle Log.msg(s: text) -> text:

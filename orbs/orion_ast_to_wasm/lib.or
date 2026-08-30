@@ -622,6 +622,19 @@ public define compile_fn_ast(fn_node: table) -> WFn:
             f1 = emit_op(f1, op_f64_convert_i32_s())
         if declared_ret is "i" and tail_ty is "f":
             f1 = emit_op(f1, op_i32_trunc_f64_s())
+    # VAD SIGNATUREN LOVAR OCH VAD KROPPEN LAMNAR maste vara samma sak.
+    # Backenden skrev tidigare en modul dar de skilde sig at, rapporterade
+    # "ok", och webblasaren vagrade den med "expected 0 elements on the
+    # stack for fallthru, found 1" - utan funktionsnamn och utan rad. Ett
+    # kompilatorfel med namnet i ar hela skillnaden mellan en minut och en
+    # eftermiddag.
+    # BARA den ena riktningen. Den andra - "lovar ett varde, lamnar inget"
+    # - ger falsklarm: block_tail_type svarar "v" for svansar den inte
+    # kanner igen, och fyra funktioner i veil_resolver som fungerar
+    # utmarkt foll pa den. En kontroll som ropar pa riktig kod ar varre an
+    # ingen kontroll.
+    if ret_is_unit and tail_ty is not "v":
+        compile_error("orion: ERROR - `{fn_name}` says it gives nothing back, but its last line leaves a value")
     emit_end(f1)
 
 # The static type of a block's tail expression - "v" when the block
