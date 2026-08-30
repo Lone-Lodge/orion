@@ -45,6 +45,7 @@
 <li><a href="#log"><code>log</code></a></li>
 <li><a href="#app"><code>app</code></a></li>
 <li><a href="#arena"><code>arena</code></a></li>
+<li><a href="#compress"><code>compress</code></a></li>
 <li><a href="#core"><code>core</code></a></li>
 <li><a href="#glyphs"><code>glyphs</code></a></li>
 <li><a href="#input"><code>input</code></a></li>
@@ -302,6 +303,7 @@ example ok(2)</pre></div>
 <div class="fn"><code class="sig">read_chunk(handle: number, maxlen: number) -&gt; text uses files = file_read_chunk(handle, maxlen)</code><p>--- moving bytes --- Up to <code>maxlen</code> bytes. "" means end of stream. no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
 <div class="fn"><code class="sig">write_chunk(handle: number, data: text) -&gt; number uses files = file_write_chunk(handle, data)</code><p>How many bytes were written (-1 on failure). no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
 <div class="fn"><code class="sig">close(handle: number) -&gt; number uses files = file_close(handle)</code></div>
+<div class="fn"><code class="sig">seek(handle: number, offset: number) -&gt; number uses files = file_seek(handle, offset)</code><p>Move the read point to <code>offset</code> bytes from the start. 0 on success.  A store that keeps many objects in one file has to reach the middle of it. Reading and discarding everything before the object is the difference between a lookup and a scan. no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
 <div class="fn"><code class="sig">size_of(path: text) -&gt; number uses files = file_bytes(path)</code><p>Size in bytes without reading the contents. -1 if it does not exist. no example: touches the filesystem - proven by test_42_file_stream.or</p></div>
 <div class="fn"><code class="sig">is_end(chunk: text) -&gt; truth</code><p>Is this chunk the end of the stream?</p><pre class="ex">example is_end("")
 example not is_end("x")</pre></div>
@@ -400,20 +402,16 @@ example assert(true, "holds") is 1</pre></div>
 <h2 id="log"><code>log</code></h2>
 <p class="orb-blurb">leveled, categorized logging.</p>
 <h3 class="sub">Types</h3>
-<div class="fn"><code class="sig">Cat: name: text</code></div>
+<div class="fn"><code class="sig">Channel: name: text, hushable: truth</code></div>
 <h3 class="sub">Functions</h3>
-<div class="fn"><code class="sig">cat(name: text) -&gt; Cat</code><p><code>const ecs = cat("ecs")</code> at the top of an orb, then <code>info(ecs, ...)</code>.</p><pre class="ex">example cat("ecs").name is "ecs"</pre></div>
-<div class="fn"><code class="sig">log_set_default(level: number)</code></div>
-<div class="fn"><code class="sig">log_set_level(category: Cat, level: number)</code></div>
-<div class="fn"><code class="sig">log_on(category: Cat, level: number) -&gt; truth</code><p>Would this line show? The guard for a hot loop, where the message itself is the expense. Everywhere else, just call debug() and let it decide.</p><pre class="ex">example log_on(cat("__ex"), 0)</pre></div>
-<div class="fn"><code class="sig">log_to_file(path: text) -&gt; truth uses files</code><p>Arm a plain, timestamped copy of every line that shows. The path is probed once here rather than at the first error, so a directory that cannot be written says so where the caller asked for it. no example: touches the filesystem - proven by test_file_writes_lines</p></div>
-<div class="fn"><code class="sig">error(category: Cat, msg: text) uses console, files, clock</code></div>
-<div class="fn"><code class="sig">warn(category: Cat, msg: text) uses console, files, clock</code></div>
-<div class="fn"><code class="sig">info(category: Cat, msg: text) uses console, files, clock</code></div>
-<div class="fn"><code class="sig">debug(category: Cat, msg: text) uses console, files, clock</code></div>
-<div class="fn"><code class="sig">debug_lazy(category: Cat, make: function() -&gt; text) uses console, files, clock</code><p>The same line, but the message is made only if it shows. For a debug line whose text costs more than a closure - a join, a scan, a format of something big - which is most of the debug lines worth writing. no example: prints - an example would be noise in every gate run</p></div>
-<div class="fn"><code class="sig">log_ring_on()</code></div>
-<div class="fn"><code class="sig">log_dump() uses console</code></div>
+<div class="fn"><code class="sig">channel(name: text) -&gt; Channel</code><p>A report. Leveled, and ORION_LOG can quiet it.</p><pre class="ex">example channel("ecs").name is "ecs"</pre></div>
+<div class="fn"><code class="sig">always(name: text) -&gt; Channel</code><p>An answer. A tool's result, an editor's stream - the things that must not vanish because someone set an environment variable.</p><pre class="ex">example always("out").hushable is false</pre></div>
+<div class="fn"><code class="sig">log_set_level(ch: Channel, level: number) -&gt; truth</code><p>Raise or lower a channel. Answers false for a channel that cannot be hushed - setting a level on one is meaningless, and saying so beats a silent no-op. no example: sets global logging state - proven by test_ceilings</p></div>
+<div class="fn"><code class="sig">error(ch: Channel, msg: text) uses console</code></div>
+<div class="fn"><code class="sig">warn(ch: Channel, msg: text) uses console</code></div>
+<div class="fn"><code class="sig">info(ch: Channel, msg: text) uses console</code></div>
+<div class="fn"><code class="sig">debug(ch: Channel, make: function() -&gt; text) uses console</code><p>The maker runs only if the line shows. See the header for why there is no eager form. no example: prints - an example would be noise in every gate run</p></div>
+<div class="fn"><code class="sig">log_drain_to(path: text) -&gt; number uses files</code><p>Write everything kept since the last drain to <code>path</code>, and answer how many lines were written. The program layer calls this - it already holds the capability, and a level call must not need it.  A drain that comes too late says so IN THE FILE: the buffer holds 128 lines, and a hole is written as a counted line rather than as nothing. no example: touches the filesystem - proven by test_drain_writes_and_reports_loss</p></div>
 <h2 id="app"><code>app</code></h2>
 <p class="orb-blurb">the thin shell a local desktop-web app stands on: serve a folder and some routes on loopback, open the OS's app window at it, live until Ctrl+C.</p>
 <h3 class="sub">Types</h3>
@@ -481,6 +479,11 @@ example query_of(request{method: "GET", path: "/", query: "name=Sk%C3%A4rm+1.png
 <div class="fn"><code class="sig">persist_on() -&gt; number</code><p>--- crossing the line --- Everything allocated between persist_on and persist_off goes to malloc and survives a reset. The arena is PAUSED for that stretch, not swept: values born in it before the pause stay readable, which is what lets you copy one out. orion_alloc gives the arena priority, so a bare persist_on while the arena is on does nothing - the pause is the whole trick.  Stateless on purpose: persist_on says whether it paused, persist_off takes that back. An orb cannot hold a flag between calls, and a hidden one would be wrong the moment two of these nested.    was = persist_on()   ...allocate what must outlive the cycle...   persist_off(was) no example: allocation mode is process-wide state - proven by tools/region_shrink_test.sh</p></div>
 <div class="fn"><code class="sig">persist_off(was: number) -&gt; number</code></div>
 <div class="fn"><code class="sig">persisted(t: text) -&gt; text = orion_persist_text(t)</code></div>
+<h2 id="compress"><code>compress</code></h2>
+<p class="orb-blurb">LZ77 over a 64 KB window.</p>
+<div class="fn"><code class="sig">squeeze(t: text) -&gt; text</code><pre class="ex">example unsqueeze(squeeze("abcabcabcabcabcabc")) is "abcabcabcabcabcabc"
+example unsqueeze(squeeze("")) is ""</pre></div>
+<div class="fn"><code class="sig">unsqueeze(t: text) -&gt; text</code><p><code>unsqueeze</code> och inte <code>expand</code>: raster exporterar redan ett <code>expand</code>, och tva orbar med samma namn ar ett fel som forst dyker upp den dag nagon importerar bada.</p><pre class="ex">example unsqueeze(squeeze("hej hej hej hej hej")) is "hej hej hej hej hej"</pre></div>
 <h2 id="core"><code>core</code></h2>
 <p class="orb-blurb">the two types every program is allowed to assume.</p>
 <h3 class="sub">Types</h3>

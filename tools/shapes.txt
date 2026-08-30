@@ -9,7 +9,7 @@ SUM core.Result Ok,Err
 TYPE http.reply status:number,body:text
 TYPE iter.order_of less:fn
 SUM json.Json JNull,JBool,JNum,JStr,JArr,JObj
-TYPE log.Cat name:text
+TYPE log.Channel name:text,hushable:truth
 SUM ori.DrawCmd DrawRect,DrawRoundRect,SetClip,DrawShadow,DrawText,DrawMono,DrawIcon,DrawPath,DrawArc,DrawNine,DrawSprite,DrawImage
 TYPE ori.Camera eye:V3,yaw:number,pitch:number,fov:number
 TYPE ori.DisplayList commands:[DrawCmd]
