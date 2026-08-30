@@ -25,6 +25,74 @@ define default_runtime() -> text:
     if length(d) > 0 and is_dir(path_parent(d) + "/runtime") then path_parent(d) + "/runtime"
     else "../orion/runtime"
 
+# ---- the C runtime, compiled once instead of every build ----
+#
+# The same seven thousand lines of C went to clang on every single build.
+# Measured on a three-line program: 2.17 s total, of which 1.82 s was that C.
+# Compiled once into objects and linked instead, the same build is 0.44 s -
+# and the difference is paid on every build, forever, by everyone.
+#
+# Staleness is judged over the WHOLE runtime directory rather than the three
+# named .c files, because orion_rt.c includes png_min.c and orion_cli.c pulls
+# in the shader headers: watching only the named ones would keep a stale
+# object after a change to something they include.
+#
+# The objects carry -ffunction-sections/-fdata-sections, the same flags the
+# sources were given, or the linker's dead-strip (/OPT:REF, --gc-sections)
+# would have nothing to work with and every binary would grow.
+#
+# If the cache cannot be built the caller links the sources as before. A slow
+# build is a nuisance; a build that fails because a cache misbehaved is a bug
+# report from someone who did nothing wrong.
+define nb_rt_names() -> [text]:
+    ["orion_rt", "orion_cli", "net_min"]
+
+define nb_rt_newest(runtime: text) -> number:
+    edit newest = 0
+    loop f in list_dir(runtime):
+        m = modified_at(runtime + "/" + f)
+        if m > newest:
+            newest = m
+    newest
+
+# The three objects, built if missing or older than anything in runtime/.
+# Answers an empty list when they could not be made.
+define nb_rt_objects(runtime: text) -> [text]:
+    dir = path_parent(runtime) + "/dist/rtcache"
+    newest = nb_rt_newest(runtime)
+    edit fresh = true
+    loop n in nb_rt_names():
+        o = dir + "/" + n + ".o"
+        if not file_exists(o):
+            fresh = false
+        else if modified_at(o) < newest:
+            fresh = false
+    edit outs = []
+    if fresh:
+        loop n in nb_rt_names():
+            outs = append(outs, dir + "/" + n + ".o")
+        return outs
+    mkdir_all(dir)
+    edit ok_all = true
+    loop n in nb_rt_names():
+        o = dir + "/" + n + ".o"
+        args = ["-c", runtime + "/" + n + ".c", "-O2", "-ffunction-sections", "-fdata-sections", "-o", o]
+        if run_command_quiet(nb_clang(), args) is not 0:
+            ok_all = false
+    if not ok_all:
+        return []
+    loop n in nb_rt_names():
+        outs = append(outs, dir + "/" + n + ".o")
+    outs
+
+# The runtime part of a link line: the cached objects when they exist, the
+# sources when they do not.
+define nb_rt_link_inputs(runtime: text) -> [text]:
+    objs = nb_rt_objects(runtime)
+    if length(objs) is 3:
+        return objs
+    [runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c"]
+
 define default_orbs() -> text:
     d = self_dist_dir()
     if length(d) > 0 and is_dir(path_parent(d) + "/orbs") then path_parent(d) + "/orbs"
@@ -1229,7 +1297,11 @@ define cli_build(path: text) -> text:
     # bar inte langre med sig process-spawn/nat/fs den aldrig anropar).
     # Varje lankare stavar det pa sitt satt, och /OPT stod har oskyddat: mac
     # letade efter en fil som hette /OPT:REF och lankningen dog.
-    edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/orion_cli.c", runtime + "/net_min.c", "-O2", "-Wno-override-module", "-ffunction-sections", "-fdata-sections"]
+    edit link_args = [ll]
+    loop rt_in in nb_rt_link_inputs(runtime):
+        link_args = append(link_args, rt_in)
+    loop rt_flag in ["-O2", "-Wno-override-module", "-ffunction-sections", "-fdata-sections"]:
+        link_args = append(link_args, rt_flag)
     if os_kind() is 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/OPT:REF")
