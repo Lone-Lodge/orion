@@ -10,7 +10,7 @@ TYPE http.reply status:number,body:text
 TYPE iter.order_of less:fn
 SUM json.Json JNull,JBool,JNum,JStr,JArr,JObj
 TYPE log.Cat name:text
-SUM ori_display.DrawCmd DrawRect,DrawRoundRect,SetClip,DrawShadow,DrawText,DrawIcon,DrawPath,DrawArc,DrawNine,DrawSprite,DrawImage
+SUM ori_display.DrawCmd DrawRect,DrawRoundRect,SetClip,DrawShadow,DrawText,DrawMono,DrawIcon,DrawPath,DrawArc,DrawNine,DrawSprite,DrawImage
 TYPE ori_display.DisplayList commands:[DrawCmd]
 TYPE ori_geometry.Point x:number,y:number
 TYPE ori_geometry.Rect x:number,y:number,wide:number,high:number
