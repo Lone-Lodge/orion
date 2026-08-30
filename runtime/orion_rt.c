@@ -1883,14 +1883,19 @@ static const char *orion_file_read_live(const char *path) {
 __attribute__((weak)) const char *orion_file_read(const char *path) {
     return orion_fx_text("fr", orion_file_read_live, path);
 }
+/* 1 only when every byte reached the disk. fwrite's count and fclose's
+ * result were both discarded, so a full disk or a failed flush answered
+ * "written" - and a caller that stores content under the hash of what it
+ * MEANT to write then has a truncated file under a valid name. */
 __attribute__((weak)) long long orion_file_write(const char *path, const char *content) {
     orion_fx_init();
     if (orion_fx_rep) return 1; /* replay ror aldrig disken */
     FILE *fp = fopen(path, "wb");
     if (!fp) return 0;
-    fwrite(content, 1, (size_t)orion_tlen_c(content), fp);
-    fclose(fp);
-    return 1;
+    size_t want = (size_t)orion_tlen_c(content);
+    size_t put = fwrite(content, 1, want, fp);
+    int closed = fclose(fp);
+    return (put == want && closed == 0) ? 1 : 0;
 }
 
 /* Swimlanes: schemalaggaren loggar taskbyten ("~id") i sparloggen sa

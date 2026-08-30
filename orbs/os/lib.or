@@ -31,10 +31,14 @@ public define arg(i: number) -> text = argv(i)
 # no example: depends on the process command line - proven by orbit
 public define arg_count() -> number = argc()
 
+# 1 when the whole content reached the disk, 0 when it did not.
+#
+# This threw the answer away and said 0 either way, so a write that failed
+# was indistinguishable from one that worked. Nothing in the tree branched
+# on it - which is the point: there was nothing to branch on.
+# no example: writes to disk - proven by test_42_file_stream.or
 public define write_file(p: text, c: text) -> number uses files:
-    # no example: writes to disk - proven by test_42_file_stream.or
     file_write(p, c)
-    0
 
 # Mark a file read-only, or take the mark off. -1 if the file is not there.
 #
