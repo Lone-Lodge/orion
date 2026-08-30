@@ -90,7 +90,7 @@ define head_of(r: response) -> text:
     # keep-alive: en rumstung layout gor hundratals sma anrop - en NY
     # TCP-anslutning per fil VAR sekunderna innan Quill blev skrivbar.
     # Langden ar alltid satt, sa samma socket kan bara fa nasta fraga.
-    n = bytes_count(bytes_of(r.body))
+    n = bytes_count(r.body)
     "{status_line(r.status)}\r\nContent-Type: {r.mime}\r\nContent-Length: {n}\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n"
 
 # Content type from the filename - the handful a local app meets.
@@ -230,7 +230,7 @@ define serve_conn(conn: number, routes: [route], static_dir: text) uses net, fil
         want = header_length(head)
         loop:
             # want ar Content-Length i BYTES - jamfor bytes, inte kodpunkter
-            if bytes_count(bytes_of(body)) >= want:
+            if bytes_count(body) >= want:
                 break
             left2 = deadline - monotonic_ms()
             if left2 <= 0:
