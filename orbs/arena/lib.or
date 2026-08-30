@@ -78,18 +78,16 @@ public define persist_off(was: number) -> number:
 
 # A copy of `t` that is still there after the arena is swept.
 #
-# The byte list is made BEFORE persist goes on, so the intermediate - eight
-# bytes per byte - stays in the arena and is swept with it. Only the result,
-# a text the same size as the original, goes to malloc. Measured on 1 KB:
-# 9264 bytes bumped in the arena, 1 KB kept.
+# `orion_persist_text` is the runtime's own evacuation: one malloc and one
+# memcpy of the whole text, header included, straight out of whatever
+# region it was in. NULL in gives "" out. log, orion_ast_to_ir and
+# orion_driver already use it to carry a text into a slot store.
+#
+# It is NOT the persist MODE and needs none of the pausing above: it does
+# not ask where allocation is currently pointed, it allocates from malloc
+# by name. Which is why it is one copy and not the three a bytes_of round
+# trip would cost.
+public external define orion_persist_text(s: text) -> text
+
 # no example: allocation mode is process-wide state - proven by tools/region_shrink_test.sh
-public define persisted(t: text) -> text:
-    # Arenan av betyder att `t` redan ligger i malloc. Ingen reset kan ta
-    # den, sa det finns inget att ta sig ur och kopian vore ren kostnad.
-    if orion_arena_active() is 0:
-        return t
-    b = bytes_of(t)
-    was = persist_on()
-    out = text_of(b)
-    persist_off(was)
-    out
+public define persisted(t: text) -> text = orion_persist_text(t)
