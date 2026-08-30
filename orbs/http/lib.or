@@ -12,6 +12,8 @@
 # Blocking by design per call - run it inside a task (see the async orb)
 # and the scheduler keeps everything else moving while curl works.
 
+use text
+
 type reply:
     status: number
     body: text
@@ -67,19 +69,69 @@ define run_curl(args: [text], body_file: text) -> reply:
     # show WHY instead of a blank.
     if rc is not 0 then reply{status: 0, body: trim(err)} else reply{status: status, body: body}
 
+# Extra request headers, as "Name: value" lines.
+#
+# They go through a curl CONFIG FILE and not `-H` on the command line: a
+# process's arguments are readable by anyone who can list processes, and a
+# header is often the one part of a request that is a secret. The file is
+# removed as soon as curl is done with it.
+#
+# QUOTED, and that is not cosmetic. An unquoted config value stops at the
+# first separator, and ":" is one of them - so `header = Authorization:
+# Bearer x` reached curl as the header name alone and the request went out
+# without it. The server answered 401 and nothing said why. Inside quotes
+# curl reads backslash escapes, so both characters that could end the
+# string early are escaped first.
+define cfg_quote(v: text) -> text:
+    example cfg_quote("a" + text_of([34]) + "b") is "a" + text_of([92, 34]) + "b"
+    esc = replace(v, text_of([92]), text_of([92, 92]))
+    text_of([34]) + replace(esc, text_of([34]), text_of([92, 34])) + text_of([34])
+
+define write_config(path: text, headers: [text]) -> number uses files:
+    edit body = ""
+    loop h in headers:
+        body = body + "header = " + cfg_quote(h) + text_of([10])
+    write_file(path, body)
+
 # GET `url`. `success(r)` when the request went through AND the server said 2xx.
 # no example: needs the network - proven by examples/demos/httpd.or + manual runs
 public define fetch(url: text) -> reply uses net, files:
     run_curl([url], scratch_path())
 
+# GET `url` with extra headers.
+# no example: needs the network - proven by rune's remote suite
+public define fetch_with(url: text, headers: [text]) -> reply uses net, files:
+    if length(headers) is 0:
+        return fetch(url)
+    body_file = scratch_path()
+    cfg = "{body_file}.cfg"
+    wrote = write_config(cfg, headers)
+    r = run_curl(["-K", cfg, url], body_file)
+    cleanup = remove_file(cfg)
+    r
+
 # POST `body` to `url` with the given Content-Type.
 # no example: needs the network - proven by manual runs
 public define post(url: text, content_type: text, payload: text) -> reply uses net, files:
+    post_with(url, content_type, payload, [])
+
+# POST with extra headers.
+# no example: needs the network - proven by rune's remote suite
+public define post_with(url: text, content_type: text, payload: text, headers: [text]) -> reply uses net, files:
     body_file = scratch_path()
     payload_file = "{body_file}.out"
+    cfg = "{body_file}.cfg"
     wrote = write_file(payload_file, payload)
-    r = run_curl(["-X", "POST", "-H", "Content-Type: {content_type}", "--data-binary", "@{payload_file}", url], body_file)
+    edit args = ["-X", "POST", "-H", "Content-Type: {content_type}", "--data-binary", "@{payload_file}"]
+    if length(headers) > 0:
+        cw = write_config(cfg, headers)
+        args = append(args, "-K")
+        args = append(args, cfg)
+    args = append(args, url)
+    r = run_curl(args, body_file)
     cleanup = remove_file(payload_file)
+    if length(headers) > 0:
+        cc = remove_file(cfg)
     r
 
 # Did the request reach a server that answered success?
