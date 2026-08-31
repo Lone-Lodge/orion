@@ -24,10 +24,22 @@ use text
 define win() -> number = 65535
 define min_match() -> number = 4
 define max_match() -> number = 131
+# Tabellen ar lika stor som indatan behover, inte alltid 65536. Ett objekt
+# pa 2 KB fick annars en tabell trettio ganger sin egen storlek byggd at
+# sig, och en pack bygger en per objekt: 118 filer tog 656 ms mot 63 for
+# samma bytes i en strom.
 define tab_bits() -> number = 65536
 
-define hash3(b: [number], i: number) -> number:
-    ((byte_at(b, i) * 506832829) + (byte_at(b, i + 1) * 16777619) + byte_at(b, i + 2)) % tab_bits()
+define tab_for(n: number) -> number:
+    edit v = 256
+    loop:
+        if v >= n or v >= tab_bits():
+            break
+        v = v * 2
+    v
+
+define hash3(b: [number], i: number, bits: number) -> number:
+    ((byte_at(b, i) * 506832829) + (byte_at(b, i + 1) * 16777619) + byte_at(b, i + 2)) % bits
 
 # How many bytes match, from `a` and `c`, at most `cap`.
 define run_len(b: [number], a: number, c: number, n: number, cap: number) -> number:
@@ -254,9 +266,10 @@ define lz_pack(b: [number]) -> [number]:
     # For kort for att kunna innehalla en match: da byggs ingen tabell och
     # allt gar ut som literaler.
     stor = n >= min_match() + 2
+    bits = tab_for(n)
     edit tab = []
     if stor:
-        loop x in 0 until tab_bits():
+        loop x in 0 until bits:
             tab = append(tab, 0 - 1)
     # ALLT skrivs i den har slingan, och utlistan skickas aldrig till en
     # hjalpare. En parameter hade gjort listan levande under tva namn, och
@@ -269,7 +282,7 @@ define lz_pack(b: [number]) -> [number]:
         edit langd = 0
         edit cand = 0 - 1
         if stor and i + 2 < n:
-            h = hash3(b, i)
+            h = hash3(b, i, bits)
             cand = tab[h]
             tab = set(tab, h, i)
             if cand >= 0 and i - cand <= win():
@@ -301,7 +314,7 @@ define lz_pack(b: [number]) -> [number]:
             loop:
                 if q >= i + langd or q + 2 >= n:
                     break
-                tab = set(tab, hash3(b, q), q)
+                tab = set(tab, hash3(b, q, bits), q)
                 q = q + 1
             i = i + langd
             lit = i
@@ -359,6 +372,12 @@ public define squeeze(t: text) -> text:
     example unsqueeze(squeeze("abcabcabcabcabcabc")) is "abcabcabcabcabcabc"
     example unsqueeze(squeeze("")) is ""
     lz = lz_pack(bytes_of(t))
+    # Huvudet ar 260 bytes, sa en strom kortare an sa kan Huffman ALDRIG
+    # vinna pa - den kan i basta fall ta bort allt, och det racker inte.
+    # Att rakna ut den anda ar rent slaseri, och en pack gor det en gang
+    # per objekt.
+    if bytes_count(lz) < 512:
+        return text_of(bytes_concat([0], lz))
     h = hpack(lz)
     if bytes_count(h) < bytes_count(lz):
         return text_of(bytes_concat([1], h))
