@@ -143,7 +143,16 @@ define finish_one(filename: text, clang_path: text) -> number:
     link_start = now()
     edit built = 0
     if slot_get_number("ok:{filename}") is 1:
-        cj = start_command_to_file(clang_path, [link_path, "dist/orion_rt.o", "dist/orion_cli.o", "-O2", "-Wno-override-module", "-o", exe_path], "dist/.clang_{filename}.txt")
+        edit largs = [link_path, "dist/orion_rt.o", "dist/orion_cli.o", "-O2", "-Wno-override-module"]
+        # libm is a library of its own on Linux: pow, fmod, sin and cos are
+        # not in libc there. Windows and macOS carry them in the C runtime,
+        # so the miss only shows on the platform nobody here runs - five
+        # tests failed to link and the reason was one flag.
+        if host_mangle() is not "w":
+            largs = append(largs, "-lm")
+        largs = append(largs, "-o")
+        largs = append(largs, exe_path)
+        cj = start_command_to_file(clang_path, largs, "dist/.clang_{filename}.txt")
         if cj >= 0 and finished_within(cj, 120000):
             built = if command_result(cj) is 0 then 1 else 0
         else:

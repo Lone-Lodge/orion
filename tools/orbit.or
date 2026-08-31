@@ -1137,6 +1137,8 @@ define build_native_entry(variant: text, entry_override: text) -> text:
     edit link_args = [ll, runtime + "/orion_rt.c", runtime + "/net_min.c"]
     loop cf_index in 0 until length(cfiles):
         link_args = append(link_args, cfiles[cf_index])
+    if os_kind() is not 0:
+        link_args = append(link_args, "-lm")
     # The package's `link = "..."` rides here too - the same key
     # cli_build honors, so an app orb's runtime needs (say
     # runtime/orion_cli.c for serve + own_window) name themselves in
@@ -1302,6 +1304,10 @@ define cli_build(path: text) -> text:
         link_args = append(link_args, rt_in)
     loop rt_flag in ["-O2", "-Wno-override-module", "-ffunction-sections", "-fdata-sections"]:
         link_args = append(link_args, rt_flag)
+    # libm is a library of its own on Linux - pow, fmod, sin and cos are not
+    # in libc there. Windows and macOS carry them in the C runtime.
+    if os_kind() is not 0:
+        link_args = append(link_args, "-lm")
     if os_kind() is 0:
         link_args = append(link_args, "-Xlinker")
         link_args = append(link_args, "/OPT:REF")
