@@ -40,10 +40,216 @@ define run_len(b: [number], a: number, c: number, n: number, cap: number) -> num
         k = k + 1
     k
 
-public define squeeze(t: text) -> text:
-    example unsqueeze(squeeze("abcabcabcabcabcabc")) is "abcabcabcabcabcabc"
-    example unsqueeze(squeeze("")) is ""
-    b = bytes_of(t)
+# --- Huffman ovanpa LZ77 -------------------------------------------------
+# LZ77 tar bort upprepningen; literalerna kostar fortfarande en hel byte
+# styck. I text ar de kraftigt snedfordelade, och det ar precis vad en
+# entropikodning ar till for. Matt pa kallkod: 1,75x med bara LZ77.
+#
+# Ordning noll over HELA LZ77-utdatan, inte separata trad for literaler och
+# langder som DEFLATE har. Ett trad ar en tabell i huvudet i stallet for
+# tre, och skillnaden mellan dem ar mindre an skillnaden mot ingen alls.
+#
+# HUVUDET: 256 bytes kodlangd per symbol, sedan fyra bytes antal symboler,
+# sedan bitstrommen. 260 bytes ar mycket for ett litet objekt, sa den som
+# anropar far valja - `squeeze` lagger en markorbyte forst och tar Huffman
+# bara nar den vann.
+define hmax() -> number = 24
+
+# Kodlangd per symbol. Bygger tradet genom att upprepat sla ihop de tva
+# minsta - 256 symboler ger som mest 255 sammanslagningar, sa en linjar
+# sokning per varv ar snabbare an en ko att halla ordning pa.
+define code_lengths(freq: [number]) -> [number]:
+    edit nf = []
+    edit nl = []
+    edit nr = []
+    edit lev = []
+    loop i in 0 until 256:
+        nf = append(nf, freq[i])
+        nl = append(nl, 0 - 1)
+        nr = append(nr, 0 - 1)
+        lev = append(lev, 0)
+    edit aktiva = []
+    loop i in 0 until 256:
+        aktiva = append(aktiva, if freq[i] > 0 then 1 else 0)
+    edit antal = 0
+    loop i in 0 until 256:
+        if freq[i] > 0:
+            antal = antal + 1
+    edit langder = []
+    loop i in 0 until 256:
+        langder = append(langder, 0)
+    if antal is 0:
+        return langder
+    if antal is 1:
+        # En enda symbol behover anda en bit: en kod med noll bitar gar
+        # inte att lasa.
+        loop i in 0 until 256:
+            if freq[i] > 0:
+                langder = set(langder, i, 1)
+        return langder
+    edit n = 256
+    loop:
+        if antal <= 1:
+            break
+        edit a = 0 - 1
+        edit b = 0 - 1
+        loop i in 0 until n:
+            if aktiva[i] is 1:
+                if a < 0 or nf[i] < nf[a]:
+                    b = a
+                    a = i
+                else if b < 0 or nf[i] < nf[b]:
+                    b = i
+        nf = append(nf, nf[a] + nf[b])
+        nl = append(nl, a)
+        nr = append(nr, b)
+        lev = append(lev, 0)
+        aktiva = append(aktiva, 1)
+        aktiva = set(aktiva, a, 0)
+        aktiva = set(aktiva, b, 0)
+        n = n + 1
+        antal = antal - 1
+    edit rot = 0 - 1
+    loop i in 0 until n:
+        if aktiva[i] is 1:
+            rot = i
+    # Djupet ut till bladen, med en egen stack i stallet for rekursion.
+    edit stack = [rot]
+    edit djup = [0]
+    loop:
+        if length(stack) is 0:
+            break
+        nod = stack[length(stack) - 1]
+        d = djup[length(djup) - 1]
+        stack = bytes_part(stack, 0, length(stack) - 1)
+        djup = bytes_part(djup, 0, length(djup) - 1)
+        if nl[nod] < 0:
+            langder = set(langder, nod, if d is 0 then 1 else d)
+        else:
+            stack = append(stack, nl[nod])
+            djup = append(djup, d + 1)
+            stack = append(stack, nr[nod])
+            djup = append(djup, d + 1)
+    langder
+
+# Kanoniska koder ur langderna: symbolerna sorteras pa (langd, symbol) och
+# far stigande koder. Da behover bara LANGDERNA skickas med.
+define canon(langder: [number]) -> [number]:
+    edit kod = []
+    loop i in 0 until 256:
+        kod = append(kod, 0)
+    edit c = 0
+    edit l = 1
+    loop:
+        if l > hmax():
+            break
+        loop i in 0 until 256:
+            if langder[i] is l:
+                kod = set(kod, i, c)
+                c = c + 1
+        c = c * 2
+        l = l + 1
+    kod
+
+define hpack(b: [number]) -> [number]:
+    n = bytes_count(b)
+    edit freq = []
+    loop i in 0 until 256:
+        freq = append(freq, 0)
+    loop i in 0 until n:
+        freq = set(freq, byte_at(b, i), freq[byte_at(b, i)] + 1)
+    langder = code_lengths(freq)
+    kod = canon(langder)
+    edit ut = []
+    loop i in 0 until 256:
+        ut = append(ut, langder[i])
+    ut = append(ut, n // 16777216 % 256)
+    ut = append(ut, n // 65536 % 256)
+    ut = append(ut, n // 256 % 256)
+    ut = append(ut, n % 256)
+    edit acc = 0
+    edit bitar = 0
+    loop i in 0 until n:
+        sym = byte_at(b, i)
+        l = langder[sym]
+        c = kod[sym]
+        edit k = l - 1
+        loop:
+            if k < 0:
+                break
+            acc = acc * 2 + ((c // tvapotens(k)) % 2)
+            bitar = bitar + 1
+            if bitar is 8:
+                ut = append(ut, acc)
+                acc = 0
+                bitar = 0
+            k = k - 1
+    if bitar > 0:
+        loop x in 0 until 8 - bitar:
+            acc = acc * 2
+        ut = append(ut, acc)
+    ut
+
+define tvapotens(k: number) -> number:
+    edit v = 1
+    loop x in 0 until k:
+        v = v * 2
+    v
+
+define hunpack(b: [number]) -> [number]:
+    edit langder = []
+    loop i in 0 until 256:
+        langder = append(langder, byte_at(b, i))
+    n = byte_at(b, 256) * 16777216 + byte_at(b, 257) * 65536 + byte_at(b, 258) * 256 + byte_at(b, 259)
+    kod = canon(langder)
+    # Symbolerna i kanonisk ordning, och forsta koden per langd. Da blir
+    # avkodningen en jamforelse per bit i stallet for en sokning.
+    edit sorterade = []
+    edit forsta_kod = []
+    edit forsta_idx = []
+    edit antal_l = []
+    loop l in 0 until hmax() + 2:
+        forsta_kod = append(forsta_kod, 0)
+        forsta_idx = append(forsta_idx, 0)
+        antal_l = append(antal_l, 0)
+    edit l = 1
+    loop:
+        if l > hmax():
+            break
+        forsta_idx = set(forsta_idx, l, length(sorterade))
+        edit sett = 0 - 1
+        loop i in 0 until 256:
+            if langder[i] is l:
+                if sett < 0:
+                    forsta_kod = set(forsta_kod, l, kod[i])
+                    sett = i
+                sorterade = append(sorterade, i)
+                antal_l = set(antal_l, l, antal_l[l] + 1)
+        l = l + 1
+    edit ut = []
+    edit at = 260
+    edit bitpos = 0
+    edit c = 0
+    edit langd = 0
+    loop:
+        if length(ut) >= n:
+            break
+        if at >= bytes_count(b):
+            break
+        bit = (byte_at(b, at) // tvapotens(7 - bitpos)) % 2
+        bitpos = bitpos + 1
+        if bitpos is 8:
+            bitpos = 0
+            at = at + 1
+        c = c * 2 + bit
+        langd = langd + 1
+        if langd <= hmax() and antal_l[langd] > 0 and c - forsta_kod[langd] < antal_l[langd] and c >= forsta_kod[langd]:
+            ut = append(ut, sorterade[forsta_idx[langd] + c - forsta_kod[langd]])
+            c = 0
+            langd = 0
+    ut
+
+define lz_pack(b: [number]) -> [number]:
     n = bytes_count(b)
     # For kort for att kunna innehalla en match: da byggs ingen tabell och
     # allt gar ut som literaler.
@@ -108,14 +314,9 @@ public define squeeze(t: text) -> text:
         loop j in 0 until k:
             ut = append(ut, byte_at(b, at2 + j))
         at2 = at2 + k
-    text_of(ut)
+    ut
 
-# `unsqueeze` och inte `expand`: raster exporterar redan ett `expand`, och
-# tva orbar med samma namn ar ett fel som forst dyker upp den dag nagon
-# importerar bada.
-public define unsqueeze(t: text) -> text:
-    example unsqueeze(squeeze("hej hej hej hej hej")) is "hej hej hej hej hej"
-    b = bytes_of(t)
+define lz_unpack(b: [number]) -> [number]:
     n = bytes_count(b)
     edit ut = []
     edit i = 0
@@ -125,16 +326,53 @@ public define unsqueeze(t: text) -> text:
         tok = byte_at(b, i)
         if tok < 128:
             k = tok + 1
+            # En strom som INTE ar var egen far inte lasas utanfor sig
+            # sjalv. Avkodaren ar det som kor pa trasiga bytes - det ar
+            # hela poangen med fsck - sa den maste sta emot dem i stallet
+            # for att lita pa att de ar valformade.
+            if i + 1 + k > n:
+                break
             loop j in 0 until k:
                 ut = append(ut, byte_at(b, i + 1 + j))
             i = i + 1 + k
         else:
+            if i + 2 >= n:
+                break
             langd = tok - 128 + min_match()
             avst = byte_at(b, i + 1) * 256 + byte_at(b, i + 2)
             start = bytes_count(ut) - avst
+            if start < 0 or avst is 0:
+                break
             # Kopieras ETT tecken i taget med flit: en match far peka in i
             # det den sjalv skriver, och det ar sa en upprepning kodas.
             loop j in 0 until langd:
                 ut = append(ut, ut[start + j])
             i = i + 3
-    text_of(ut)
+    ut
+
+# --- utsidan -------------------------------------------------------------
+# En MARKORBYTE forst: 1 betyder att Huffman vann, 0 att LZ77-utdatan
+# ligger rakt av. Huvudet till en Huffman ar 260 bytes, sa for ett litet
+# objekt vinner den inte, och da ska den inte anvandas. Den som laser
+# behover inte veta vilket det blev.
+public define squeeze(t: text) -> text:
+    example unsqueeze(squeeze("abcabcabcabcabcabc")) is "abcabcabcabcabcabc"
+    example unsqueeze(squeeze("")) is ""
+    lz = lz_pack(bytes_of(t))
+    h = hpack(lz)
+    if bytes_count(h) < bytes_count(lz):
+        return text_of(bytes_concat([1], h))
+    text_of(bytes_concat([0], lz))
+
+# `unsqueeze` och inte `expand`: raster exporterar redan ett `expand`, och
+# tva orbar med samma namn ar ett fel som forst dyker upp den dag nagon
+# importerar bada.
+public define unsqueeze(t: text) -> text:
+    example unsqueeze(squeeze("hej hej hej hej hej")) is "hej hej hej hej hej"
+    b = bytes_of(t)
+    n = bytes_count(b)
+    if n is 0:
+        return ""
+    kropp = bytes_part(b, 1, n)
+    text_of(lz_unpack(if byte_at(b, 0) is 1 then hunpack(kropp) else kropp))
+
