@@ -242,7 +242,9 @@ for private functions; a public one may state its contract with
 definition - and a parameter can hold a default. An anonymous function
 is just <code>(params): body</code>, and it can declare its answer the same
 way a named one does when the body is not a number:
-<code>(row) -&gt; text: "line {row}"</code>. Any function can also be called
+<code>(row) -&gt; text: "line {row}"</code>. <code>here()</code> answers with
+the place it is written (<code>"world.or:87:12"</code>), worked out at compile
+time and free to call. Any function can also be called
 method-style, so <code>trim(s)</code> and <code>s.trim()</code> are the same
 call. A generic function introduces its type variable as a word:
 <code>define first given item (items: list of item) -&gt; maybe item</code>.</p>

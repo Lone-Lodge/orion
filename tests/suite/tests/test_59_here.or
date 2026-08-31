@@ -1,0 +1,30 @@
+# `here()` - the place these five characters are written.
+#
+# Not where the program is and not where it runs: the compiler already knows
+# every node's file and line (it is what every error message is built from), so
+# this lowers to a string CONSTANT. Free at run time, and the same answer on
+# every backend because nothing computes it.
+#
+# It is the missing half of a diagnostic: a channel says WHICH subsystem, and
+# this says which line of it. A file with forty places that can report the same
+# thing is unsearchable without it.
+#
+# NOT the caller's place. A default argument (`at = here()`) records where the
+# DEFAULT is written - the signature - which is measured and is the right
+# reading: those characters really are there. Wanting the caller's place is a
+# different question and needs a different word.
+
+define length_of_place() -> number:
+    p = here()
+    length(p)
+
+define main() -> number:
+    a = here()
+    b = here()
+    # Two calls on two lines are two different places.
+    same = if a is b then 1 else 0
+    # A place is text, and a real one is longer than "0:0".
+    long_enough = if length(a) > 3 then 1 else 0
+    inside = if length_of_place() > 3 then 1 else 0
+    # 0 + 1 + 1 is 2, doubled and doubled again is 8, plus 51 is 59.
+    (same + long_enough + inside) * 4 + 51

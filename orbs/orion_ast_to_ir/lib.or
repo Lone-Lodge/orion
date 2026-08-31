@@ -2251,6 +2251,11 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     is_contains = callee is "contains"
     is_file_read = callee is "file_read"
     is_file_write = callee is "file_write"
+    # `here()` - the place these five characters are WRITTEN. Not where the
+    # program is, not where it runs: the compiler already knows every node's
+    # file and line (it is what every error message is built from), so this
+    # lowers to a string CONSTANT and costs nothing at run time.
+    is_here = callee is "here"
     is_argc = callee is "argc"
     is_argv = callee is "argv"
     is_b_from_t = callee is "bytes_of"
@@ -2585,6 +2590,11 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         content_r = ast_expr_to_ir(path_r.function, path_r.scope, content_node)
         pr = ir_fn_push(content_r.function, ir_file_write(path_r.id, content_r.id))
         result = ConvResult{function: pr.function, scope: content_r.scope, id: pr.id}
+    if is_here:
+        h_line = if has(node, "line") then get_int(node, "line") else 0
+        h_col = if has(node, "col") then get_int(node, "col") else 0
+        pr_here = ir_fn_push(fn_value, ir_const_str(otir_where(h_line, h_col)))
+        result = ConvResult{function: pr_here.function, scope: scope, id: pr_here.id}
     if is_argc:
         pr = ir_fn_push(fn_value, ir_argc())
         result = ConvResult{function: pr.function, scope: scope, id: pr.id}
@@ -2724,7 +2734,7 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
         gl_elem = if is_get_text_list then "list:text" else (if is_get_int_list then "list:i64" else (if is_list_type(gl_declared) then gl_declared else "list:dyn"))
         pr = ir_fn_push(key_r.function, ir_map_get(map_r.id, key_r.id, gl_elem))
         result = ConvResult{function: pr.function, scope: key_r.scope, id: pr.id}
-    is_user_fn = (is_print_line is false) and (is_print_raw is false) and (is_to_text is false) and (is_to_float is false) and (is_to_int is false) and (is_resume is false) and (is_call_ptr is false) and (is_at is false) and (is_len is false) and (is_get is false) and (is_has is false) and (is_push is false) and (is_push_inplace is false) and (is_struct_field_int is false) and (is_struct_field_text is false) and (is_map_remove is false) and (is_set_call is false) and (is_map_keys is false) and (is_map_values is false) and (is_get_or is false) and (is_slice is false) and (is_contains is false) and (is_file_read is false) and (is_file_write is false) and (is_argc is false) and (is_argv is false) and (is_b_from_t is false) and (is_b_to_t is false) and (is_b_slice is false) and (is_b_concat is false) and (is_b_zeros is false) and (is_byte_at is false) and (is_b_length is false) and (is_slot_get is false) and (is_slot_set is false) and (is_slot_has is false) and (is_slot_get_int is false) and (is_slot_get_real is false) and (is_text_hash is false) and (is_get_int is false) and (is_get_map is false) and (is_get_list is false) and (is_get_text_list is false) and (is_get_int_list is false) and (is_vec_add is false) and (is_vec_addi is false) and (is_vec_madd is false) and (is_par_madd is false) and (is_par_run is false) and (is_breakpoint is false) and (is_vec_sub is false) and (is_vec_mul is false) and (is_vec_dot is false) and (is_time_now_ms is false) and (is_monotonic_ms is false) and (is_sleep_ms is false) and (is_fmath1 is false) and (is_fmath2 is false)
+    is_user_fn = (is_print_line is false) and (is_print_raw is false) and (is_to_text is false) and (is_to_float is false) and (is_to_int is false) and (is_resume is false) and (is_call_ptr is false) and (is_at is false) and (is_len is false) and (is_get is false) and (is_has is false) and (is_push is false) and (is_push_inplace is false) and (is_struct_field_int is false) and (is_struct_field_text is false) and (is_map_remove is false) and (is_set_call is false) and (is_map_keys is false) and (is_map_values is false) and (is_get_or is false) and (is_slice is false) and (is_contains is false) and (is_file_read is false) and (is_file_write is false) and (is_argc is false) and (is_here is false) and (is_argv is false) and (is_b_from_t is false) and (is_b_to_t is false) and (is_b_slice is false) and (is_b_concat is false) and (is_b_zeros is false) and (is_byte_at is false) and (is_b_length is false) and (is_slot_get is false) and (is_slot_set is false) and (is_slot_has is false) and (is_slot_get_int is false) and (is_slot_get_real is false) and (is_text_hash is false) and (is_get_int is false) and (is_get_map is false) and (is_get_list is false) and (is_get_text_list is false) and (is_get_int_list is false) and (is_vec_add is false) and (is_vec_addi is false) and (is_vec_madd is false) and (is_par_madd is false) and (is_par_run is false) and (is_breakpoint is false) and (is_vec_sub is false) and (is_vec_mul is false) and (is_vec_dot is false) and (is_time_now_ms is false) and (is_monotonic_ms is false) and (is_sleep_ms is false) and (is_fmath1 is false) and (is_fmath2 is false)
     if is_resume:
         # One `resume(v)` - pick the int vs text runtime call from the value's
         # type. (There is intentionally no resume_int / resume_text; one way.)

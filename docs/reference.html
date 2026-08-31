@@ -397,7 +397,7 @@ example not is_some(Option.None)</pre></div>
 <div class="fn"><code class="sig">is_none&lt;T&gt;(o: Option&lt;T&gt;) -&gt; truth</code><p>true if this is None.</p><pre class="ex">example is_none(Option.None)</pre></div>
 <h2 id="assert"><code>assert</code></h2>
 <p class="orb-blurb">ONE assertion for Orion.</p>
-<div class="fn"><code class="sig">assert(cond: truth, label = "") -&gt; number</code><pre class="ex">example assert(true) is 1
+<div class="fn"><code class="sig">assert(cond: truth, label = "") -&gt; number uses console</code><p><code>uses console</code> is declared, not merely done. A failed assertion IS the test's answer, so this is one of the few library-shaped orbs that may write - and the clause is what makes that a stated fact rather than a habit (tools/orb_console_test.sh).</p><pre class="ex">example assert(true) is 1
 example assert(true, "holds") is 1</pre></div>
 <h2 id="log"><code>log</code></h2>
 <p class="orb-blurb">leveled, categorized logging.</p>
