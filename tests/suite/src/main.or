@@ -115,6 +115,17 @@ define emit_one(src_path: text, ll_path: text, mangle: text, host_triple: text) 
 # Link one emitted test with clang and run the exe, both as child processes
 # the task can park on. Records the outcome in the shared counters and
 # prints the row. Runs INSIDE a worker task.
+# A line that only NAMES a log file is not a diagnosis. On a runner that
+# file is gone the moment the job ends, so the reason has to be in the
+# output. Five tests failed to link on Linux and the run said only
+# "output: dist/.clang_x.txt" - a filename nobody could open.
+define show_log(path: text, dim: text, off: text) uses console, files:
+    edit n = 0
+    loop line in split(read_file(path), text_of([10])):
+        if n < 12 and not is_empty(trim(line)):
+            print_line("{dim}      | {trim(line)}{off}")
+            n = n + 1
+
 define finish_one(filename: text, clang_path: text) -> number:
     esc = text_of([27])
     c_green = "{esc}[32m"
@@ -183,6 +194,7 @@ define finish_one(filename: text, clang_path: text) -> number:
             print_line(row)
             log_hint = if built is 1 then "dist/.out_{filename}.txt" else "dist/.clang_{filename}.txt"
             print_line("{c_dim}      output: {log_hint}{c_off}")
+            show_log(log_hint, c_dim, c_off)
         frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         spin = frames[done_n - (done_n // 10) * 10]
         print("{cr}  {c_cyan}{spin}{c_off} {c_dim}{done_n}/{total}{c_off}  {c_green}{pass_count} ok{c_off}  {c_red}{fail_count} fail{c_off}  {c_dim}{filename}{c_off}{esc}[K")
@@ -191,6 +203,7 @@ define finish_one(filename: text, clang_path: text) -> number:
         if not passed:
             log_hint = if built is 1 then "dist/.out_{filename}.txt" else "dist/.clang_{filename}.txt"
             print_line("{c_dim}      output: {log_hint}{c_off}")
+            show_log(log_hint, c_dim, c_off)
     0
 
 
