@@ -307,7 +307,16 @@ long long file_size(const char *path) {
 long long file_mtime(const char *path) {
     struct stat st;
     if (stat(path, &st) != 0) return orion_fx_i64("fm", -1);
-    return orion_fx_i64("fm", (long long)st.st_mtime * 1000);
+    /* st_mtime is SECONDS. This function promises milliseconds, and a
+     * caller that asks "has the file changed since I looked" gets a whole
+     * second of blindness from it: rune's stat cache missed an edit made in
+     * the same second that kept the same size, and only Linux showed it.
+     * st_mtim carries the nanoseconds; macOS spells it st_mtimespec. */
+#if defined(__APPLE__)
+    return orion_fx_i64("fm", (long long)st.st_mtimespec.tv_sec * 1000 + st.st_mtimespec.tv_nsec / 1000000);
+#else
+    return orion_fx_i64("fm", (long long)st.st_mtim.tv_sec * 1000 + st.st_mtim.tv_nsec / 1000000);
+#endif
 }
 
 #include <dirent.h>
