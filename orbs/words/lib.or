@@ -1,32 +1,12 @@
 # words - what a program says, in the language of whoever is reading it.
 #
-# A program full of "Spara" cannot be read in Arabic, and a program full of
-# get_string(423) cannot be read by anyone writing it. So the source says a
-# KEY and a table says what that key sounds like here:
+#   book = words_of(read_file("sv.words"))    one `key = saying` per line
+#   say(book, "save")                         a missing key answers with the KEY
 #
-#     book = words_of(read_file("sv.words"))
-#     n("button", [p("text", say(book, "save"))], [])
-#
-# The file is one saying per line, `key = what it says`. Lines that are blank
-# or start with # are ignored, so a translator can leave notes.
-#
-#     save = Spara
-#     files.one = {0} fil
-#     files.many = {0} filer
-#
-# One trap, and it is orion's rather than this orb's: `{0}` in orion SOURCE is
-# interpolation and becomes the number zero. In a file read from disk it is
-# just two characters, which is where sayings belong anyway - but a saying
-# written inline in orion has to escape it as \{0\}.
-#
-# A key with no saying answers with the KEY, not with nothing. A screen with
-# `files.many` printed on a button is a screen that tells you what is missing;
-# a screen with an empty button tells you nothing at all, and that is how
-# missing translations ship.
-#
-# What is deliberately NOT here: gender, case, and the fourteen plural forms
-# some languages have. Two forms cover the languages this is for, and the day
-# one needs more, `say_of` is where it goes - not spread through every app.
+# A screen showing `files.many` tells you what is missing; an empty button
+# tells you nothing, and that is how missing translations ship.
+# TRAP: `{0}` in orion SOURCE is interpolation - escape it as \{0\} inline.
+# No consumer in the workspace yet. See README.md.
 
 use text
 use bytes

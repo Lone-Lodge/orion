@@ -1,14 +1,13 @@
-# list - everyday integer-list helpers that don't need a closure.
-# (For map / filter / reduce and friends, see the `iter` orb.)
+# list - everyday integer-list helpers that need no closure.
+# (For map / filter / reduce, see the `iter` orb: if it takes a function, it
+# belongs there.)
 #
-#   range(4)              ->  [0, 1, 2, 3]
-#   reversed([1, 2, 3])   ->  [3, 2, 1]
-#   includes([1, 2], 2)   ->  1
-#   find([5, 6], 6)       ->  1  (index, or -1)
-#   first([9, 8])         ->  9
-#   last([9, 8])          ->  8
+#   range(4)  reversed(xs)  includes(xs, v)  find(xs, v)  first  last  filled
+#   max_of  min_of  avg  concat  unique  take  drop
+#
+# WATCH OUT: `filled` is where ISSUES.md F12 bites. Mixing `filled(n, 0)` and
+# `filled(n, 0.0)` in one program silently corrupts both. See README.md.
 
-# [0, 1, …, n-1]. Empty for n <= 0.
 public define range(n: number) -> [number]:
     example length(range(4)) is 4
     edit out = []

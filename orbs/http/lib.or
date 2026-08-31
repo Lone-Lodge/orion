@@ -1,16 +1,11 @@
-# http - fetch and post over HTTP(S).
+# http - fetch and post over HTTP(S). Request in, `reply{status, body}` out.
 #
-# The INTERFACE is the commitment: request in, `reply{status, body}` out.
-# Named `reply` and not `response` because `app` has a `response` of its own,
-# with a `mime` field, and a type name is ONE layout for the whole build - a
-# program that used both orbs did not compile and the error was about a field.
-# The engine behind it is curl as a child process (present on Windows 10+,
-# macOS and virtually every Linux), which buys TLS, redirects and proxies
-# for free. A native client (net orb + a TLS layer) can replace the engine
-# later without a caller changing a line.
+# The interface is the commitment; the engine is curl as a child process, which
+# buys TLS, redirects and proxies for free and can be swapped later.
 #
-# Blocking by design per call - run it inside a task (see the async orb)
-# and the scheduler keeps everything else moving while curl works.
+# It is `reply` and not `response` because `app` has a `response` of its own,
+# and a type name is ONE layout for the whole build. Blocking per call - run it
+# in a task (see `async`). See README.md.
 
 use text
 

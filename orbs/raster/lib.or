@@ -1,14 +1,13 @@
-# raster - the first render block behind the ORI 3D seam (ori_scene).
-# Pure software: world-space triangles in, flat-shaded pixels out, plus a
-# BMP encoder so a frame can become a file anywhere (that is the whole
-# `orbit shot` story). No window, no GPU - a block that draws is a block
-# that can be replaced by one that draws faster.
+# raster - the first render block behind the ORI 3D seam (ori_scene). Pure
+# software: world-space triangles in, flat-shaded pixels out, plus BMP and PNG
+# so a frame can become a file anywhere. No window, no GPU.
 #
-# Pipeline: view transform (translate, yaw, pitch) -> cheap near-plane
-# cull -> perspective projection -> z-buffered edge-function fill with
-# one fixed light. Every step the simplest version that makes a correct,
-# legible picture.
-
+# Pipeline: view transform -> near-plane cull -> perspective projection ->
+# z-buffered edge-function fill with one fixed light.
+#
+# WATCH OUT: `bmp_of` builds a whole image in one call because the byte list
+# loses its element type across an orb boundary (ISSUES.md F12). The same bug
+# still breaks texel colours, and it is not fixable here. See README.md.
 
 # ----- the field: the game's own coordinate grid -----
 #

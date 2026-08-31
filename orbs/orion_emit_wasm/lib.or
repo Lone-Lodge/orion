@@ -1,24 +1,11 @@
-# orion_emit_wasm - emit a WebAssembly module (.wasm binary).
+# orion_emit_wasm - emit a WebAssembly module (.wasm binary). Pure Orion writes
+# the bytes: no external linker, no wasm-bindgen, no wasm-pack.
 #
-# Mirrors `orion_emit_pe` for the browser. Pure Orion produces a
-# bytes-on-disk .wasm whose exports a JS shell calls. No external
-# linker, no wasm-bindgen, no wasm-pack - Orion writes the bytes
-# itself, JS imports them with `WebAssembly.instantiateStreaming`.
+#   "\0asm" + version, then sections Type(1) Func(3) Memory(5) Export(7)
+#   Code(10). Spec: https://webassembly.github.io/spec/core/binary/index.html
 #
-# Spec: https://webassembly.github.io/spec/core/binary/index.html
-#
-# Layout:
-#   "\0asm" + version 1 (8 bytes magic)
-#   Type   section  (id=1)  - function signatures
-#   Func   section  (id=3)  - fn indices into Types
-#   Memory section  (id=5)  - linear memory (1 page = 64 KiB)
-#   Export section  (id=7)  - what JS can call
-#   Code   section  (id=10) - fn bodies as bytecode
-#
-# Today's coverage: int → int functions with arithmetic,
-# locals, calls, return. Strings + memory ops + import tables land
-# next as the JS shell expands.
-
+# Scope today: int-to-int functions with arithmetic, locals, calls, return.
+# See README.md.
 
 # --- LEB128 encoders ---
 

@@ -1,21 +1,10 @@
 # assert - ONE assertion for Orion.
 #
-# Doesn't abort the process (no panic by design - failure is data), but
-# prints the label and returns a sentinel so tests can detect failures.
+#   assert(x is 42)                       the condition IS the message
+#   assert(is_some(opt), "opt was None")  a label when it is not enough
 #
-# Usage:
-#   assert(x is 42)                      # the condition IS the message
-#   assert(is_some(opt), "opt was None")  # a label when the condition is not enough
-#
-# Convention: success returns 1, failure returns 0. A test fn can count
-# assertion results and return 0 if any failed. Comparisons read as words:
-# `assert(a is b, ...)` replaced the old assert_eq/assert_true/assert_text_eq
-# trio - one word, any condition.
+# Never aborts: 1 for pass, 0 for fail, because failure is data. See README.md.
 
-# `uses console` is declared, not merely done. A failed assertion IS the test's
-# answer, so this is one of the few library-shaped orbs that may write - and the
-# clause is what makes that a stated fact rather than a habit
-# (tools/orb_console_test.sh).
 public define assert(cond: truth, label = "") -> number uses console:
     example assert(true) is 1
     example assert(true, "holds") is 1

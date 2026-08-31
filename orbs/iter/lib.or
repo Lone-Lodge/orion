@@ -1,18 +1,11 @@
-# iter - functional list operations, powered by closures.
+# iter - functional list operations, powered by closures. Generic over T.
 #
-# Generic over the element type `T`: map / filter / reduce / … work on a
-# list of ANY type - `[int]`, `[text]`, `[[int]]`, structs. The closure
-# names the element type so its body can use `len` / `at` / `get`:
+#   each([1, 2, 3], (x): x * 2)             keep(xs, (x): x % 2 is 0)
+#   combine(xs, 0, (acc, x): acc + x)       each(words, function(s: text): length(s))
 #
-#   doubled = each([1, 2, 3], (x): x * 2)               # int, no annotation
-#   lengths = each(words,    function(s: text): length(s))       # text - annotate `s`
-#   evens   = keep(xs,       (x): x % 2 is 0)
-#   total   = combine(xs, 0, (acc, x): acc + x)          # sum
-#
-# `int` elements need no annotation (the default); non-int elements do.
-# Predicates return 1 (keep / true) or 0 (drop / false).
+# If it takes a function it is here; if not, it is in `list`. `int` elements
+# need no annotation, non-int ones do. See README.md.
 
-# Apply `f` to every element, collecting the results.
 public define each<T>(xs: [T], f: function) -> [number]:
     example each([1, 2, 3], (x): x * 2)[1] is 4
     edit out = []

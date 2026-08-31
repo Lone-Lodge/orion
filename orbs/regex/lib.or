@@ -1,25 +1,14 @@
-# regex - en liten regexmotor. Skriven för sök (dots grep, verktyg), inte
-# för att tävla: mönstret TOLKAS direkt under matchningen, ingen kompilering,
-# inga instruktioner. Kärnidén är en enda: "vilka slutpositioner i texten kan
-# mönsterbiten [ps..pe) nå från position ti?" - en mängd, inte en position.
-# Med mängder blir kvantifierare en stängning (upprepa tills inga nya
-# positioner), grupper en union över alternativen, och backtracking finns
-# inte som begrepp - alla vägar bärs framåt samtidigt. Totalt och ändligt:
-# positionerna är max textlängden + 1.
+# regex - a small regex engine for searching, not for competing. The pattern is
+# interpreted during the match: no compilation, no instructions.
 #
-# Stöds: bokstäver, . (allt utom radbryt), klasser [a-z0-9_] och [^...],
-# \d \w \s och \x-literaler, kvantifierare * + ?, grupper (..), alternation
-# a|b (i grupper och på toppnivå), ankare ^ och $. Motorn ser BYTE: ett
-# flerbyte-tecken (å ä ö...) matchar som literal i följd, men i en klass
-# eller mot . blir det sina enskilda bytes.
+#   regex_test("gr(ay|ey)", "50 shades of grey")   -> true
+#   regex_first("\d+", "rad 42 kol 7")            -> 4
 #
-#     regex_test("gr(ay|ey)", "50 shades of grey")  -> true
-#     regex_first("\\d+", "rad 42 kol 7")           -> 4
-#     regex_valid("a[b")                            -> false (oavslutad klass)
+# ONE IDEA: which end positions can pattern slice [ps..pe) reach from ti? A SET,
+# not a position - so a quantifier is a closure, a group is a union, and
+# backtracking does not exist. TRAP: the engine sees BYTES, so a multi-byte
+# character in a class or against `.` becomes its bytes. See README.md.
 
-# En enhet i mönstret: tecken/klass/grupp/ankare som börjar på ps.
-# ue = förbi enheten, qe = förbi ev kvantifierare, quant = kvantifierarens
-# byte (42 * / 43 + / 63 ?) eller 0, ok = 0 vid trasigt mönster.
 type ReUnit: ue: number, qe: number, quant: number, ok: number
 
 # --- mönsterskanning ---------------------------------------------------

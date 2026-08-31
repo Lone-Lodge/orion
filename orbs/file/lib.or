@@ -1,22 +1,11 @@
-# file - streaming file IO.
+# file - streaming file IO, for data bigger than memory or a line at a time.
+# (Whole-file read_file/write_file are builtins and need no import.)
 #
-# Whole-file `read_file` / `write_file` (builtins) are fine until the data is
-# bigger than memory, or you want to write a line at a time. These are the
-# missing primitives: open a handle, move bytes a chunk at a time, close it.
+#   with_read("big.log", (h): ...)      owns the handle, closes on every path
+#   chunk = read_chunk(h, 4096)         "" at end of stream, like net.recv
 #
-#   h = open_read("big.log")
-#   loop:
-#       chunk = read_chunk(h, 4096)
-#       if is_end(chunk):
-#           break
-#       process(chunk)
-#   close(h)
-#
-# A read at end-of-stream returns "" - the same convention `net.recv` uses,
-# so files and sockets are read the same way.
-#
-# LIFETIME: prefer `with_read` / `with_write` - they own the handle and close
-# it on every exit path, including an early return from your body.
+# Prefer with_read/with_write over a hand-written open/close pair: the pair
+# leaks the first time somebody adds a return in the middle. See README.md.
 
 external define file_open(path: text, mode: int) -> int
 external define file_read_chunk(handle: int, maxlen: int) -> text

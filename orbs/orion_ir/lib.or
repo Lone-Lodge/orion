@@ -1,13 +1,11 @@
-# orion_ir - typed IR for orion-self.
+# orion_ir - the typed IR for orion-self.
 #
-# Design:
-#   - SSA-form: each instruction PRODUCES exactly one value.
-#   - Other instructions REFERENCE values by ID (index into the
-#     function's instructions list).
-#   - Typed: every value has a type (i64, ptr, truth, void).
+#   SSA: each instruction produces exactly one value, and others reference it
+#   by id (an index into the function's instruction list). Every value has a
+#   type: i64, ptr, truth, void.
 #
-# Pipeline: lex → parse → AST → IR → orion_emit_llvm → .ll → clang → .exe
-
+# lex -> parse -> AST -> IR -> orion_emit_llvm -> .ll -> clang -> .exe
+# See README.md.
 
 # --- Typed data structures ---
 

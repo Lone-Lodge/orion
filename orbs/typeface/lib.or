@@ -1,24 +1,13 @@
-# typeface - real font rendering from TrueType (.ttf) files, for the
-# declared-game engine. The parser (sfnt tables, cmap, glyf outlines,
-# scanline fill) is the proven atlas_text code; what this orb adds is
-# the LABEL SPRITE: a whole line of text rasterized into one keyed
-# Texture, wrapped in a field-space Sprite. The renderer's bilinear
-# minification then scales it smoothly to any window size - the same
-# path every other sprite takes.
+# typeface - real font rendering from TrueType (.ttf) files.
 #
-# A .ttf is big-endian binary. Fonts arrive as EMBEDDED blobs (the
-# engine's assets/fonts, mirrored into a project's build/fonts by
-# game_astra.sh), so a game binary carries its letters like it carries
-# its art.
+# The parser (sfnt tables, cmap, glyf outlines, scanline fill) is the proven
+# atlas_text code. What this orb adds is the LABEL SPRITE: a whole line
+# rasterized into one keyed Texture inside a field-space Sprite, so the
+# renderer's bilinear minification scales it like any other sprite.
+#
+# Fonts arrive as EMBEDDED blobs, so a game binary carries its letters the way
+# it carries its art. See README.md.
 
-# ---- big-endian byte readers over a [int] byte array ----
-
-# A face is parsed and a letter is rasterized here. What a FIELD unit is
-# belongs to the renderer, so `px_per_unit` lives there and the two
-# functions that used to work it out are handed it instead. Without that
-# split a page that only wanted a font pulled a software 3D rasterizer in
-# behind it, and would not build at all once an app was bundled by
-# following its `use` lines.
 use num
 use list
 

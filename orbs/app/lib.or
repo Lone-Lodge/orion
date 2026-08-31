@@ -1,16 +1,14 @@
 # app - the thin shell a local desktop-web app stands on: serve a folder and
 # some routes on loopback, open the OS's app window at it, live until Ctrl+C.
-# The BLOCKS.md model: a route is a record with a function in it - the app
-# hands its behavior over as data, wiring visible at the call site.
 #
-#     routes = [route{method: "GET", path: "/api/list", handler: list_files}]
-#     srv = serve("ui", routes, 0)
-#     w = open_window("http://127.0.0.1:{local_port(srv)}/")
-#     run_until_interrupted(srv, routes, "ui")
+#   routes = [route{method: "GET", path: "/api/list", handler: list_files}]
+#   srv = serve("ui", routes, 0)
+#   run_until_interrupted(srv, routes, "ui")
 #
-# One task per connection (the httpd pattern); static files stream in binary
-# through send_raw, so images and fonts survive. HTTP/1.0, close per request:
-# boring, debuggable, plenty for loopback.
+# A route is a record with a function in it: behavior handed over as data,
+# wiring visible at the call site. One task per connection; HTTP/1.0, close per
+# request - boring, debuggable, plenty for loopback. See README.md.
+
 use os
 use file (open_read, read_chunk, close_file)
 

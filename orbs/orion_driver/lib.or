@@ -1,23 +1,12 @@
-
-# Self-hosted driver: orion_self <input.or> [output.ll] [orb-root...]
+# orion_driver - the self-hosted driver, top of the graph:
 #
-# MULTI-ORB: scans the entry file for `use NAME` lines, resolves each
-# name to an orb source (NAME/lib.or under a set of search roots),
-# recursively discovers that orb's own uses, and compiles everything
-# as one program. Replaces tools/bundle_orbs.sh - no bash, one command
-# builds a whole dependency graph.
+#   orion_self <input.or> [output.ll] [orb-root...]
 #
-# Resolution roots (first hit wins): any extra argv paths, then
-# <entry-dir>/orbs/, <entry-dir>/../orbs/, <entry-dir>/../../orbs/,
-# orbs/, ../orbs/. Unresolved names print a note and are skipped -
-# builtins (bytes/io/fs/...) live in the compiler, not in orb files.
-#
-# Declaration order doesn't matter: ast_program_to_ir collects all
-# signatures before lowering bodies, so orbs concat in discovery order
-# with the entry last. The parser already skips `use` lines.
-#
-# Fail-fast: any compile_error() during lowering/emit → no output,
-# exit non-zero.
+# It follows `use NAME` lines to NAME/lib.or under a set of search roots,
+# recursively, and compiles everything as one program - which is what replaced
+# tools/bundle_orbs.sh. Unresolved names are skipped: builtins live in the
+# compiler, not in orb files. Declaration order does not matter, because all
+# signatures are collected before any body is lowered. See README.md.
 
 define drv_dirname(path: text) -> text:
     bs = bytes_of(path)

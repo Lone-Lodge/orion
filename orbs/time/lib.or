@@ -1,10 +1,10 @@
 # time - clock time for humans: unix seconds and formatted dates.
 #
-# The runtime already has monotonic_ms/sleep_ms for MEASURING; this orb is
-# for TELLING the time. Formatting rides the C library's strftime, so the
-# usual codes work: %Y-%m-%d %H:%M:%S, %A the weekday, %s the epoch, etc.
-# Timezone support is exactly what the host gives localtime - named zones
-# and offsets beyond "here" and "UTC" are a later, bigger job.
+#   now_unix()  timestamp()  local_time(s, "%A")  utc_time(s, f)  parse_utc(t)
+#
+# For MEASURING, use the runtime's monotonic_ms/sleep_ms instead. Timezones are
+# whatever the host's localtime gives - "here" and "UTC", nothing more.
+# See README.md.
 
 external define unix_now() -> int
 external define time_format(unix_s: int, fmt: text, local: int) -> text

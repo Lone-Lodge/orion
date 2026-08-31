@@ -1,17 +1,10 @@
 # num - the small integer helpers every program reaches for.
 #
-#   abs(-3)            ->  3
-#   min(4, 9)          ->  4
-#   max(4, 9)          ->  9
-#   clamp(12, 0, 10)   ->  10
-#   sign(-5)           ->  -1
+#   abs  min  max  clamp  sign            and the same four for floats
+#   pi  e  parse_float                    what the math builtins leave out
 #
-# Floats: the language already gives you f64 arithmetic and the math builtins
-# `sqrt sin cos tan exp log log2 floor ceil round atan2 pow` directly (no import
-# needed). This orb adds what those leave out: `pi`, `e` (real consts), `abs` / `min` /
-# `max` / `clamp`, and `parse_float` (the int-only `parse` above cannot read a decimal).
+# The math builtins (sqrt sin cos ... pow) need no import at all. See README.md.
 
-# Absolute value.
 public define abs(x: number) -> number:
     example abs(0 - 5) is 5
     if x < 0 then 0 - x else x

@@ -1,9 +1,11 @@
-# os - CLI / OS primitives for self-hosted tools (orbit), under the names
-# orbit already uses. Splits into three sources:
-#   - C externs (orion_cli.c): sys_run, fs ops, exit, eprint.
-#   - orion-self builtins re-exposed: read_file=file_read, arg=argv, ...
-#   - run_command(cmd, [args]) joins to one line and calls sys_run.
-
+# os - CLI / OS primitives for self-hosted tools, under the names orbit uses.
+# Three sources: C externs (orion_cli.c), orion-self builtins re-exposed under
+# friendlier names, and run_command joining args to one sys_run line.
+#
+# TRAP: `modified_at` gives ms since 1601 on Windows, not unix seconds.
+#
+# This is the grab-bag: fifty functions over five jobs (processes, files,
+# paths, registry, installer stitching). See README.md.
 
 external define sys_run(cmd: text) -> int
 external define mkdir_all(path: text) -> int

@@ -1,19 +1,12 @@
-# json - parse and build JSON. Written for the language server, which speaks
-# JSON-RPC over a pipe, but there is nothing LSP-specific here.
+# json - parse and build JSON. Written for the language server; nothing here
+# is LSP-specific.
 #
-# Values map onto Orion's own dynamic shapes: an object is a `table`, an array is
-# a list, a string is `text`, a number and a bool are ints, null is 0. That is
-# exactly how the compiler's own AST is carried around, so nothing new is
-# needed to hold a parsed document.
+# Values are Orion's own shapes: object = table, array = list, string = text,
+# number and bool = int, null = 0. Same carrier as the compiler's own AST.
 #
-# PERFORMANCE IS PART OF THE CONTRACT: a `didChange` notification carries the
-# WHOLE document, so a 100 KB file arrives as one JSON string. Every scan here
-# is single-pass and every string is cut with one `bytes_slice`; the only
-# byte-at-a-time path is unescaping, and that runs only for strings that
-# actually contain a backslash. Building text with `result = result + one_byte`
-# would be quadratic and is deliberately avoided.
-
-# --- scanning helpers ---
+# PERFORMANCE IS PART OF THE CONTRACT: a whole document arrives as one string,
+# so every scan is single-pass and every cut is one bytes_slice. Building text
+# with `result = result + one_byte` would be quadratic. See README.md.
 
 define jsn_ws(b: [number], start: number) -> number:
     n = length(b)

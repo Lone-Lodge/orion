@@ -1,22 +1,10 @@
-# store - program state shaped like a database (manifesto P1).
+# store - program state shaped like a database: flat records, stable ids.
 #
-# Flat records with STABLE ids, not object graphs: games call it ECS,
-# business software calls it relations - same idea. Value semantics makes
-# pointer graphs impossible; this orb makes tables of entities natural:
-#
-#   w0 = store_new()
-#   w1, id = insert(w0, {"hp": 10})        # id is stable for the entity's life
-#   w2 = remove(w1, id)
-#   e  = entity(w, id)                     # {} when absent
+#   w1, id = insert(w0, {"hp": 10})
 #   hurt = loop e in items(w) where get_int(e, "hp") < 10: collect e
 #
-# `loop ... in items(w) where ...` IS the query. The storage layout (SoA,
-# archetype, whatever) is the compiler's/engine's business, never the code's.
-#
-# The store itself is a RECORD (typed fields), not a bag-of-anything table -
-# heterogeneous tables read through typed getters are a poor man's record,
-# and the language has real ones. Cells stay a `table<table>`: id-text to
-# entity record, homogeneous, so plain typed reads work.
+# The `loop ... where` IS the query; the storage layout is the compiler's
+# business, never the code's. See README.md.
 
 type sstore: seq: number, cells: table<table>
 

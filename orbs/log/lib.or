@@ -1,57 +1,16 @@
 # log - leveled, categorized logging. One system, one way in.
 #
-#     use log
 #     const ecs = channel("ecs")            a report: leveled, can be hushed
-#     const out = always("out")             an answer: ORION_LOG never reaches it
+#     const out = always("out")             an answer: ORION_LOG cannot reach it
+#     error / warn / info(ecs, "text")      eager, they nearly always show
+#     debug(ecs, () -> text: "packed {n}")  a maker: hidden until raised
 #
-#     error(ecs, "no tray slot {i}")        always visible, red
-#     warn(ecs,  "kept old bundle")         yellow
-#     info(ecs,  "scripts reloaded")        cyan, the default ceiling
-#     debug(ecs, () -> text: "packed {n}")  hidden until raised
-#
-# A CHANNEL IS A DECLARED VALUE, not a string: `debug(esc, ...)` against a
-# channel spelled `ecs` is an unknown identifier at compile time, where a free
-# string was a line that silently never appeared again.
-#
-# AND THE CHANNEL CARRIES ITS OWN POLICY. The only thing that really separates
-# a program's answer from a subsystem's report is one question - may it be
-# hushed? - so that question lives on the channel and everything else is one
-# system. `ORION_LOG=error` cannot accidentally kill a tool's output or an
-# editor's type stream, because those channels are declared `always`.
-#
-# Levels: error 0, warn 1, info 2, debug 3. A line shows when its level is at
-# most the channel's ceiling; the default is info(2). ORION_LOG sets ceilings
-# without a code change, read once on the first line: "debug" raises
-# everything, "ecs=3" one channel, and the two mix ("debug,net=1"). An explicit
-# log_set_level always wins - it writes unconditionally, the environment only
-# fills what nobody set.
-#
-# `debug` TAKES A MAKER, and there is no eager form. Orion evaluates arguments
-# before the call, so an eager debug builds its text even when the line is
-# dropped: measured, 300 000 suppressed calls cost 74 ms eagerly and 12 ms
-# lazily. The closure is not free, but it is six times less, and a second
-# spelling where one is always worse is what the one-spelling rule forbids.
-# The other three levels stay eager: they show nearly always, and a closure for
-# a line that will be written is pure cost.
-#
-# LOGGING MAY NOT COST THE DISK. The level calls declare `uses console` and
-# nothing else, so a system that declares its capabilities - simulation code,
-# where it matters most - can log without asking for the filesystem. Lines
-# accumulate in memory and the PROGRAM layer, which already holds `uses files`,
-# writes them out with `log_drain_to`.
-#
-# The buffer holds 128 lines. Drain more often than that; if you do not, the
-# drain says how many it lost rather than quietly writing a hole.
-#
-# EVERY LINE CARRIES ITS PLACE, and nobody writes it. The `at` parameter
-# defaults to `caller()`, which the compiler replaces with the file and line of
-# THE CALL - not of the signature, which is what `here()` would have given and
-# why it is a different word. It lowers to a string constant, so the place is
-# free at run time.
-#
-# A channel says which subsystem; the place says which of its forty lines. On
-# the console it is dimmed so it does not fight the message; in the kept line it
-# is plain, because that one is read afterwards and searched.
+# A channel is a DECLARED VALUE, so a typo is a compile error, and it carries
+# its own policy - may it be hushed? - which is why answers and reports are one
+# system. Levels error 0 .. debug 3, ceiling from ORION_LOG or log_set_level.
+# The calls declare `uses console` only; the program layer drains to a file.
+# `at` defaults to caller(), so every line carries its place for free.
+# See README.md.
 
 public external define orion_console_color() -> int
 public external define orion_persist_text(s: text) -> text

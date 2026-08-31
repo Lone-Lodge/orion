@@ -1,15 +1,10 @@
-# text - common text helpers callable via method-call syntax.
+# text - common text helpers, callable with method-call syntax.
 #
-# Once you `use text`, you get:
-#   msg.is_empty()
-#   msg.starts_with("hello")
-#   msg.ends_with("!")
-#   msg.byte_count()
-#   split("a,b,c", ",")   ->  ["a", "b", "c"]
-#   join(parts, ", ")     ->  "a, b, c"
+#   msg.starts_with("hello")   msg.ends_with("!")   msg.is_empty()
+#   split("a,b,c", ",")        join(parts, ", ")
 #
-# All thanks to MethodCall desugar: `msg.starts_with("x")` lowers to
-# `starts_with(msg, "x")`.
+# The dot form is MethodCall desugar: `msg.starts_with(x)` lowers to
+# `starts_with(msg, x)`. No receiver, no vtable. See README.md.
 
 public define is_empty(t: text) -> truth:
     example is_empty("")

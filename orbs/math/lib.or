@@ -1,13 +1,9 @@
 # math - vector arithmetic on the ORI V3.
 #
-# Lifted out of `raster`, where these lived as private helpers and where
-# `add` and `scale` were written by hand at every call site. A second
-# renderer would have copied all eight, which is the duplicate the
-# one-of-each rule exists to prevent.
+#   add  sub  scale  dot  cross  norm  rot_y  rot_x
 #
-# V3 comes from `ori`, the seam vocabulary, rather than living here. That was
-# an awkward dependency while `ori` was three orbs and this one had to name the
-# 3D seam to borrow a vector; with one `ori` it is just the shared vocabulary.
+# V3 comes from `ori`, the shared seam vocabulary, rather than living here.
+# See README.md.
 
 use ori
 

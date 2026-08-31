@@ -1,33 +1,11 @@
-# core - the two types every program is allowed to assume.
-#
-# `maybe T` is a value or nothing. `result T` is a value or a message. They
-# live here rather than in `orbs/option` and `orbs/result` because the syntax
-# reference lists them among the types, next to `text` and `table`, and a type
-# you have to import first is not one of those.
+# core - the two types every program may assume: `maybe T`, `result T`.
 #
 #   define find(k: number) -> maybe number:
 #       if k > 0 then some(k * 10) else none
 #
-#   define div(a: number, b: number) -> result number:
-#       if b is 0 then error("div by zero") else ok(a // b)
-#
-#   choose div(84, 2):
-#       ok(v)    then v
-#       error(m) then print_line(m)
-#
-# `some` / `none` / `ok` / `error` are the spoken names; `Some` / `None` /
-# `Ok` / `Err` are what the variants are declared as, and both read. The
-# spoken ones are resolved LAST, so a variant or a function of your own by
-# that name keeps its meaning - `file.ok(handle)` still asks whether a handle
-# is open.
-#
-# The FUNCTIONS over these types are still `use option` and `use result`.
-# Only the types are free, because only the types are what the surface calls
-# core. The two orbs share the name `unwrap_or`, so making both visible
-# everywhere would make that one name ambiguous in every program.
-#
-# The whole file is two declarations on purpose. Anything else added here is
-# added to every program in the language.
+# The FUNCTIONS over them are still `use option` / `use result`; only the types
+# are free. Two declarations on purpose: anything added here is added to every
+# program in the language. See README.md.
 
 public type Option<T>:
     Some(T)

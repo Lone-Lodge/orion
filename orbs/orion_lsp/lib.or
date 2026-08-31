@@ -1,19 +1,12 @@
 # orion_lsp - a Language Server for Orion, written in Orion.
 #
-# Its diagnostics come from THE COMPILER, never from a second model of the
-# grammar: a server with its own idea of the language drifts, and an editor
-# confidently underlining correct code is worse than no editor support.
+# Diagnostics come from THE COMPILER, never from a second model of the grammar:
+# a server with its own idea of the language drifts, and an editor confidently
+# underlining correct code is worse than none. It also serves symbols,
+# go-to-definition, hover and declaration-based completion.
 #
-# What it serves: diagnostics (on open / change / save), document symbols
-# (outline), go-to-definition, hover, and DECLARATION-BASED completion - every
-# `fn`/`type`/`effect`/`const` in the document and in the orbs it can see, plus
-# the keywords. It does not filter by what would type-check at the cursor,
-# because the compiler does not expose scope-aware types; that limit is stated in
-# the completion section rather than implied by a confident-looking list.
-#
-# Protocol framing is `Content-Length: N\r\n\r\n<json>` over stdin/stdout, so
-# stdout is RESERVED for protocol traffic - logging goes to stderr.
-
+# TRAP: framing is Content-Length over stdin/stdout, so stdout is RESERVED for
+# protocol traffic - logging goes to stderr. See README.md.
 
 external define orion_stdin_line() -> text
 external define orion_stdin_read(n: int) -> text

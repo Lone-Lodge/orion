@@ -1,31 +1,13 @@
-# async - tasks: real suspension, one stack each.
+# async - tasks: real suspension, one stack each (fibers / ucontext).
 #
-# (The deadline helpers and the timer queue that used to open this orb were
-# the pre-task workaround; nothing used them once tasks landed, so they are
-# gone. The runtime builtins monotonic_ms/sleep_ms remain for direct use.)
+#   t = spawn(worker, 10)     a closure and one int argument
+#   a = await(t)              drives the scheduler until t finishes
+#   yield_now()               inside a worker: another task gets a turn
 #
-# Every task gets its own stack (Windows fibers, ucontext elsewhere),
-# so `yield_now()` suspends and the scheduler resumes exactly where it stopped.
 # Cooperative and single-threaded on purpose: `loop parallel:` is the parallel
-# primitive, this is the concurrency one.
-#
-#     t1 = spawn(worker, 10)        # a closure + one int argument
-#     t2 = spawn(worker, 20)
-#     a = await(t1)                 # drives the scheduler until t1 finishes
-#     b = await(t2)
-#
-# and inside a worker:
-#
-#     define worker(n: number) -> number:
-#         edit total = 0
-#         loop i in 0 until n:
-#             total += i
-#             yield_now()           # another task gets a turn here
-#         total
-#
-# A task is awaited ONCE (awaiting it again gives 0 - its stack is gone).
-# Where the platform has no stack switching, spawn runs the closure right away
-# and yield_now() does nothing: a non-yielding task still gives the same answer.
+# primitive, this is the concurrency one. A task is awaited ONCE - its stack is
+# gone afterwards. No consumer in the workspace yet. See README.md.
+
 external define orion_task_spawn(f: function, arg: int) -> int
 external define orion_task_await(id: int) -> int
 external define orion_task_yield() -> int

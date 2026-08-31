@@ -1,17 +1,10 @@
 # rand - a small pseudo-random generator. NOT cryptographic.
 #
-#   rand()             ->  a non-negative int
-#   rand_range(1, 7)   ->  1..6 (hi exclusive)
-#   rand_float()       ->  0.0 .. 1.0
-#   srand(seed)        ->  fix the sequence
+#   rand()  rand_range(1, 7)  rand_float()  srand(seed)
 #
 # Deterministic by default: with no `srand` the stream is fixed, so tests stay
-# reproducible. For a run that varies, seed once at startup, e.g.
-# `srand(monotonic_ms())`. State lives in a global slot (C's srand/rand model),
-# so there is nothing to thread through your code.
-#
-# The generator is a 64-bit LCG (Knuth MMIX constants); the multiply wraps in
-# i64. Good enough for games, sampling and shuffles; do not use it for secrets.
+# reproducible. State lives in a global slot, so nothing is threaded through
+# your code. A 64-bit LCG (Knuth MMIX). See README.md.
 
 RAND_A = 6364136223846793005       # LCG multiplier
 RAND_C = 1442695040888963407       # LCG increment (both wrap in i64)

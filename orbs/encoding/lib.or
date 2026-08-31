@@ -1,16 +1,11 @@
 # encoding - hex and base64, both directions.
 #
-#   hex_encode([255, 16])     ->  "ff10"
-#   hex_decode("ff10")        ->  [255, 16]
-#   base64_encode(bytes)      ->  "..."
-#   base64_decode("...")      ->  bytes
+#   hex_encode([255, 16])  ->  "ff10"        hex_decode("ff10")
+#   base64_encode(bytes)                     base64_decode("...")
 #
-# A "bytes" value in Orion is just a `[int]` of byte values (0..255): that is
-# what `bytes_from_text` returns and what `bytes_to_text` consumes, so these
-# functions take and return plain int lists. Build one with a list literal or
-# `bytes_from_text`, read it back with `bytes_to_text`.
+# "bytes" is just a [int] of 0..255 - what bytes_from_text gives and
+# bytes_to_text takes. No separate byte type. See README.md.
 
-# The nibble value of a hex digit byte, or -1 if it is not one.
 define hex_val(c: number) -> number:
     if c >= 48 and c <= 57 then c - 48                    # '0'..'9'
     else if c >= 97 and c <= 102 then c - 97 + 10         # 'a'..'f'

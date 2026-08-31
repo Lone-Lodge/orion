@@ -1,14 +1,7 @@
-
 # orion_parse - the parser: tokens in, an AST out. Recursive descent, one pass,
-# each node tagged with a source line for later diagnostics. Stage two of the
-# pipeline: lex -> parse -> lower -> emit.
+# each node tagged with a source line for later diagnostics. Stage two of
+# lex -> parse -> lower -> emit. See README.md.
 
-# Recursion-depth guard (defined in runtime/orion_rt.c). Recursive descent
-# adds one native frame per nested paren / unary op / call / indented block;
-# tens of thousands deep overran the linked stack and crashed the compiler
-# with no diagnostic. `psr_depth_bump` returns the new depth so the caller can
-# refuse past `PSR_MAX_DEPTH`; `defer psr_depth_drop()` balances it on every
-# exit path. See psr_parse_primary / psr_parse_body_at.
 external define psr_depth_bump() -> int
 external define psr_depth_drop() -> int
 

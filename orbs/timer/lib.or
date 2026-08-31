@@ -1,15 +1,11 @@
-# timer - deterministic tick-based timers.
+# timer - deterministic tick-based timers. You feed dt_ms per frame.
 #
-# The systems-level counterpart to astra's `every`. You feed dt_ms per frame
-# (the tick delta) and the timer advances - no wall clock, no sleep, no RNG.
-# Same inputs replay to the same outputs, so it is safe inside the deterministic
-# engine core (unlike the `scheduler` orb, which is real-time and blocking).
+#   countdown   timer_start -> timer_tick -> timer_done, once
+#   cadence     timer_every fires N times per period, forever
 #
-# Two shapes:
-#   - countdown  : timer_start -> timer_tick -> completes once (timer_done)
-#   - cadence    : timer_every fires N times per period, forever (astra `every`)
-#
-# State lives in global slots under "timer:{id}:..." so a timer is just a name.
+# No wall clock, no sleep, no RNG: same inputs replay to the same outputs, so
+# it is safe inside the deterministic engine core. State lives in global slots
+# under "timer:{id}:...", so a timer is just a name. See README.md.
 
 define ts_int(key: text) -> number:
     if slot_has(key) then slot_get_number(key) else 0

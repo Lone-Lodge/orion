@@ -1,22 +1,11 @@
-
-# orion_lex - the Orion lexer, written in Orion.
+# orion_lex - the Orion lexer, written in Orion. Stage one of lex -> parse ->
+# lower -> emit.
 #
-# Tokenizes `.or` source text into a list of token maps with the shape:
-#     {"kind": text, "value": text, "line": number, "col": number}
+# Tokens are maps: {"kind", "value", "line", "col"}. Kinds: ident, int, float,
+# str, symbol, newline, eof.
 #
-# Token kinds emitted:
-#   ident      - names and keywords (keyword? lookup later)
-#   int        - integer literal
-#   float      - float literal
-#   str        - string literal (escapes resolved; \{ and \} kept raw)
-#   symbol     - operator or punctuation; `value` is the operator text
-#   newline    - line break (one per consecutive newline run)
-#   eof        - end-of-input marker
-#
-# `value` is always text - number tokens encode their value as text to keep
-# the token type uniform. The parser converts them.
-
-# --- byte-class predicates ---
+# `value` is ALWAYS text - number tokens carry their value as text to keep the
+# token type uniform, and the parser converts them. See README.md.
 
 define slx_is_space(byte: number) -> truth:
     byte is 32 or byte is 9 or byte is 13

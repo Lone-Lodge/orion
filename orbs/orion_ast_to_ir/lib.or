@@ -1,10 +1,11 @@
-
 # orion_ast_to_ir - lowering: the AST in, typed IR (orion_ir) out. The
 # compiler's largest stage. Names resolve, types are checked, and the
 # desugarings run here as ordered AST passes (const folding, defer, lambda
-# lift) before the tree is shaped into IR. Diagnostics carry a source line, and
-# a reported error stops output downstream.
-
+# lift) before the tree is shaped into IR. A reported error stops output
+# downstream rather than handing clang an unchecked module.
+#
+# WATCH OUT: `number` is resolved here, ONCE for the whole program. That is the
+# root of ISSUES.md F12, the largest open bug in the language. See README.md.
 
 # --- Symbol table ---
 # Each binding tracks name, ssa-id, and a mut flag.

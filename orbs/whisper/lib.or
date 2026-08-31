@@ -1,26 +1,12 @@
-# whisper - speech to text, offline, on the CPU.
+# whisper - speech to text, offline, on the CPU. `mic` made Orion able to hear;
+# this makes it able to understand.
 #
-# The mic orb made Orion able to hear; this makes it able to understand.
-# The engine is the vendored whisper.cpp under vendor/whisper/, built
-# once into a static library. A project that uses this orb names BOTH
-# in its Orbit.toml:
+#   ear = hear_open("ggml-small.bin")
+#   said = hear(ear, "heard.wav", "sv")
 #
-#     link = "vendor/orion_whisper.c dist/libwhisper.a"
-#
-# (build the library with `bash tools/whisper_build.sh` - it takes a
-# minute and then never runs again until the vendored source changes.)
-#
-#     ear = hear_open("ggml-small.bin")
-#     if ear >= 0:
-#         said = hear(ear, "heard.wav", "sv")
-#
-# Models are the ggml .bin files from huggingface.co/ggerganov/whisper.cpp
-# and are NOT vendored - small is half a gigabyte. tiny is enough to prove
-# a pipeline works, small is where Swedish starts being usable.
-#
-# Audio comes in as a wav path and not a buffer, which is exactly what
-# mic_take_wav writes: mono PCM16 at 16 kHz. The two orbs are built to
-# hand off to each other without anything in between.
+# A project using this names:  link = "vendor/orion_whisper.c dist/libwhisper.a"
+# (build it once with tools/whisper_build.sh). Models are NOT vendored.
+# Audio is a wav path, exactly what mic_take_wav writes. See README.md.
 
 external define wh_open(path: text) -> int
 external define wh_close(h: int) -> int

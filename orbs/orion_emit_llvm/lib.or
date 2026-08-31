@@ -1,11 +1,10 @@
-
 # orion_emit_llvm - the backend: typed IR (orion_ir) in, LLVM IR text out.
 #
-# Pipeline: orion_ir -> orion_emit_llvm -> .ll -> clang -> .exe. It always emits
-# a Windows target triple; POSIX hosts retarget the module header before clang
-# links. The last stage, so an IR op it has no lowering for is a compile error,
-# not a silently wrong module.
-
+#   orion_ir -> orion_emit_llvm -> .ll -> clang -> .exe
+#
+# Always emits a Windows target triple; POSIX hosts retarget the module header
+# before clang links. Being the last stage, an IR op it has no lowering for is
+# a compile error, not a silently wrong module. See README.md.
 
 # --- Helpers ---
 

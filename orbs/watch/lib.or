@@ -1,10 +1,10 @@
-# watch - the mechanics of a file watcher: scan a tree, fingerprint it,
-# name what changed. Pure bookkeeping, so it is testable; the loop that
-# ACTS on a change (rerun a command, stop a stale run) lives in
-# tools/orbwatch.or.
+# watch - scan a tree, fingerprint it, name what changed.
+#
+#   changed = first_change(snapshot("src"), snapshot("src"))
+#
+# Pure bookkeeping, so it is testable. The loop that ACTS on a change lives in
+# tools/orbwatch.or. See README.md.
 
-# Directories no watcher wants to look inside: build output and history.
-#   skip_dir("dist") -> true, skip_dir("src") -> false
 define skip_dir(name: text) -> truth:
     name is "dist" or name is "build" or name is "target" or name is "node_modules" or name is ".git" or name is "_archive"
 

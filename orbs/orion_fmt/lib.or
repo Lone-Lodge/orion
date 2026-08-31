@@ -1,9 +1,11 @@
-# orion_fmt - the conservative whitespace formatter, shared by `orbit fmt`
-# and the language server's textDocument/formatting (the editor's format key).
-# Operations: tabs -> 4 spaces, trailing whitespace stripped, runs of blank
-# lines collapsed to one, file ends with exactly one newline. A "real"
-# formatter that rewrites expressions or re-indents blocks would need the
-# lexer and the parser.
+# orion_fmt - the conservative whitespace formatter, shared by `orbit fmt` and
+# the language server's textDocument/formatting.
+#
+#   fmt_normalize(source)
+#
+# Tabs to 4 spaces, no trailing whitespace, one blank line at most, one final
+# newline. It never touches expressions or indentation - a formatter that did
+# would need the parser and could change what a program means. See README.md.
 
 define fmt_expand_tabs(line_text: text) -> text:
     if index_of(line_text, "\t") >= 0:

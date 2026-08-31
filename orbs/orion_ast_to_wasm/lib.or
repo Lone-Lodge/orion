@@ -1,15 +1,12 @@
-# orion_ast_to_wasm - AST → wasm codegen.
+# orion_ast_to_wasm - AST to wasm codegen, the second backend. Each Fn decl
+# becomes a WFn; bodies linearise into a stack-machine instruction sequence
+# emitted through orion_emit_wasm.
 #
-# Walks the AST produced by `orion_parse::self_parse` and emits wasm
-# bytes via the `orion_emit_wasm` builder API. Each Fn decl in the
-# AST becomes a WFn; the body's statements/expressions are linearised
-# into a stack-machine instruction sequence.
+# It shares no code with the LLVM path below the language, which is what makes
+# Rigel's determinism proof mean anything.
 #
-# Scope today: i32 arithmetic, local vars (params + bindings), if/else
-# blocks, loops, function calls. No strings (those need linear memory
-# allocation), no closures, no traits - these layers come once the
-# core arithmetic pipeline runs orion-self's own files.
-
+# Scope today: i32 arithmetic, locals, if/else, loops, calls. No strings (they
+# need linear memory), no closures, no traits. See README.md.
 
 # Compile one fn AST node to a WFn. Param-name → local-index mapping
 # is built up as we walk the body so `Ident` references resolve.

@@ -1,23 +1,12 @@
 # sqlite - a real SQL database in one file, no server.
 #
-# The engine is the vendored sqlite3 amalgamation; a project that uses this
-# orb names BOTH C files in its Orbit.toml:
+#   db = db_open("game.db")
+#   db_run_with(db, "INSERT INTO scores VALUES (?, ?)", ["mio", "42"])
+#   loop row in db_rows(db, "SELECT ..."): cells = columns(row)
 #
-#     link = "vendor/sqlite3.c vendor/orion_sqlite.c"
-#
-# (copy them from orion/vendor/, or precompile sqlite3.c to a .o once with
-# `clang -c -Os` and name the .o instead - it takes the ~30 s sqlite compile
-# out of every build.)
-#
-#     db = db_open("game.db")
-#     ok1 = db_run(db, "CREATE TABLE IF NOT EXISTS scores(name TEXT, points INTEGER)")
-#     ok2 = db_run_with(db, "INSERT INTO scores VALUES (?, ?)", ["mio", "42"])
-#     loop row in db_rows(db, "SELECT name, points FROM scores ORDER BY points DESC"):
-#         cells = columns(row)
-#
-# Parameters ALWAYS bind through `?` placeholders (never paste values into
-# the SQL text - that is how injection happens). They bind as text; the
-# column's declared type converts numbers on the way in.
+# A project using this names both C files:  link = "vendor/sqlite3.c
+# vendor/orion_sqlite.c".  Parameters ALWAYS bind through `?` - never paste
+# values into the SQL text. See README.md.
 
 external define sq_open(path: text) -> int
 external define sq_close(h: int) -> int
