@@ -2008,6 +2008,12 @@ define builtin_min_args(callee: text) -> number:
             else:
                 0 - 1
 
+# Is this default expression the `caller()` marker? Only as a DEFAULT does it
+# mean anything - written anywhere else it is an ordinary unknown function, and
+# the error says so.
+define otir_is_caller_call(n: table) -> truth:
+    get(n, "kind") is "Call" and get(n, "callee") is "caller"
+
 define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     callee = get(node, "callee")
     # The orb-local name is used ONLY where a global function is meant. A LOCAL
@@ -2027,6 +2033,9 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
     # Named-argument reorder + default fill: `f(y: 3, x: 5)` → positional
     # order via the `otir:param:<fn>:<name>` slots; any slot the call never
     # fills takes its parameter's recorded default (`otir:pdefault:<fn>:<i>`).
+    # Where the CALL is written - what `caller()` in a default answers with.
+    na_line = if has(node, "line") then get_int(node, "line") else 0
+    na_col = if has(node, "col") then get_int(node, "col") else 0
     edit na_has = 0
     loop na_i in 0 until length(args):
         if get(args[na_i], "kind") is "NamedArg":
@@ -2055,7 +2064,21 @@ define ast_call_to_ir(fn_value: IRFn, scope: Scope, node: table) -> ConvResult:
             if na_filled[na_d] is 0:
                 na_dk = "otir:pdefault:{callee_g}:{na_d}"
                 if slot_has(na_dk):
-                    na_pos = set(na_pos, na_d, slot_get(na_dk))
+                    edit na_def = slot_get(na_dk)
+                    # `caller()` as a default means the place of THE CALL, not
+                    # the place of the default. That is the whole difference
+                    # from `here()`: the characters `caller()` are written in
+                    # the signature, and answering with the signature's line -
+                    # which is what `here()` does there, measured - tells you
+                    # nothing you did not already know.
+                    #
+                    # The call node is in hand right here, so the substitution
+                    # happens where the default is filled and nowhere else. It
+                    # lowers to a string constant like `here()` does, so this
+                    # is free at run time too.
+                    if otir_is_caller_call(na_def):
+                        na_def = {"kind": "Str", "value": otir_where(na_line, na_col)}
+                    na_pos = set(na_pos, na_d, na_def)
                     na_filled = set(na_filled, na_d, 1)
         args = na_pos
     # Variant-as-callee → route through the EnumName.Variant(...) sugar

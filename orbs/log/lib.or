@@ -42,6 +42,16 @@
 #
 # The buffer holds 128 lines. Drain more often than that; if you do not, the
 # drain says how many it lost rather than quietly writing a hole.
+#
+# EVERY LINE CARRIES ITS PLACE, and nobody writes it. The `at` parameter
+# defaults to `caller()`, which the compiler replaces with the file and line of
+# THE CALL - not of the signature, which is what `here()` would have given and
+# why it is a different word. It lowers to a string constant, so the place is
+# free at run time.
+#
+# A channel says which subsystem; the place says which of its forty lines. On
+# the console it is dimmed so it does not fight the message; in the kept line it
+# is plain, because that one is read afterwards and searched.
 
 public external define orion_console_color() -> int
 public external define orion_persist_text(s: text) -> text
@@ -132,30 +142,34 @@ public define log_set_level(ch: Channel, level: number) -> truth:
 # ---- Emit ----
 
 # no example: prints - an example would be noise in every gate run
-public define error(ch: Channel, msg: text) uses console:
+public define error(ch: Channel, msg: text, at: text = caller()) uses console:
     if shows(ch, 0):
-        emit(0, ch.name, msg)
+        emit(0, ch.name, msg, at)
 
 # no example: prints - an example would be noise in every gate run
-public define warn(ch: Channel, msg: text) uses console:
+public define warn(ch: Channel, msg: text, at: text = caller()) uses console:
     if shows(ch, 1):
-        emit(1, ch.name, msg)
+        emit(1, ch.name, msg, at)
 
 # no example: prints - an example would be noise in every gate run
-public define info(ch: Channel, msg: text) uses console:
+public define info(ch: Channel, msg: text, at: text = caller()) uses console:
     if shows(ch, 2):
-        emit(2, ch.name, msg)
+        emit(2, ch.name, msg, at)
 
 # The maker runs only if the line shows. See the header for why there is no
 # eager form.
 # no example: prints - an example would be noise in every gate run
-public define debug(ch: Channel, make: function() -> text) uses console:
+public define debug(ch: Channel, make: function() -> text, at: text = caller()) uses console:
     if shows(ch, 3):
-        emit(3, ch.name, make())
+        emit(3, ch.name, make(), at)
 
-define emit(level: number, name: text, msg: text) uses console:
-    print_line("  {level_tag(level)} {ldim(name)}  {msg}")
-    keep("{level_name(level)} {name}  {msg}")
+# The place rides on every line, and nobody writes it: `at` defaults to
+# `caller()`, which the compiler replaces with the CALL's file and line. It is
+# dimmed on the console so it does not fight the message, and plain in the kept
+# line, which is the one read afterwards and searched.
+define emit(level: number, name: text, msg: text, at: text) uses console:
+    print_line("  {level_tag(level)} {ldim(name)}  {msg} {ldim(at)}")
+    keep("{level_name(level)} {name}  {msg}  {at}")
 
 define level_tag(level: number) -> text:
     if level is 0 then lred("error")

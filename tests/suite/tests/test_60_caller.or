@@ -1,0 +1,24 @@
+# `caller()` - the place of the CALL, usable only as a default.
+#
+# `here()` answers where its own characters are written, which in a default
+# argument is the SIGNATURE - measured, and correct, and useless: every line a
+# logger printed would name the logger. `caller()` is the other question, and
+# it is answered where the default is filled in, with the call node in hand.
+#
+# That is what lets a diagnostic carry its place while the call site stays
+# clean: `info(ecs, "...")` and the line still knows it came from world.or:87.
+
+define place(at: text = caller()) -> text:
+    at
+
+define main() -> number:
+    a = place()
+    b = place()
+    # Two calls on two lines are two different places...
+    differ = if a is b then 0 else 1
+    # ...and both name a real spot, not the signature's.
+    real = if length(a) > 3 then 1 else 0
+    # An explicit argument still wins over the default.
+    given = if place("given") is "given" then 1 else 0
+    # 1 + 1 + 1 is 3, times 19 is 57, plus 3 is 60.
+    (differ + real + given) * 19 + 3
