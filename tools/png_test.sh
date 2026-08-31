@@ -15,6 +15,16 @@ trap 'rm -rf "$WORK"' EXIT
 cat > "$WORK/png_test.c" <<'EOF'
 #include <stdio.h>
 extern const char *host_image_load(const char *path);
+/* orion_rt.c calls the map helpers that EMITTED Orion code defines (see
+ * oe_queue_old). This test links the runtime against plain C with no .ll
+ * beside it, so nothing defines them and the link failed - red since the
+ * commit that added the slot-copy reclaim, and unnoticed because nobody ran
+ * the gate. Stubs here and nowhere else: this test never touches a slot, and
+ * a weak default in the runtime could win over the real one in a program that
+ * does. */
+void *orion_slots = 0;
+long long orion_map_has(void *m, const char *key) { (void)m; (void)key; return 0; }
+long long orion_map_get(void *m, const char *key) { (void)m; (void)key; return 0; }
 static long long tlen(const char *p){ return ((const long long*)p)[-1]; }
 static const unsigned char PNG[] = {
 137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,4,0,0,0,2,8,6,0,0,0,127,

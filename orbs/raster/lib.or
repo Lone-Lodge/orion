@@ -322,7 +322,12 @@ public define bmp_body(pixels: list of number, width: number, height: number) ->
         if y is less than 0:
             break
         loop x in 0 until width:
-            pixel = pixels[y * width + x]
+            # `to_whole` on the read, and it is not decoration: the same pixel
+            # list reads WHOLE at one site and REAL at another in the same
+            # program (ISSUES.md F12), and a colour read as a double is a
+            # denormal - so every byte came out 0 and the image was black at
+            # the right file size. Forcing it makes the read say what it means.
+            pixel = to_whole(pixels[y * width + x])
             bytes = push(bytes, pixel % 256)
             bytes = push(bytes, (pixel // 256) % 256)
             bytes = push(bytes, (pixel // 65536) % 256)
@@ -330,6 +335,32 @@ public define bmp_body(pixels: list of number, width: number, height: number) ->
             bytes = push(bytes, 0)
         y = y - 1
     bytes
+
+# A whole BMP as text, ready for write_file. The header and the body used to be
+# two public lists a caller joined, and that boundary was where the picture
+# died: the byte list is written WHOLE inside here and was read REAL at the
+# caller's `text_of`, so every byte came back a denormal and the image was
+# black with the right file size. Measured, and it takes a copy through
+# `to_whole` to survive the crossing.
+#
+# So there is no crossing. One call, one type, and a caller that cannot get it
+# wrong: `write_file(path, bmp_of(pixels, w, h))`.
+public define bmp_of(pixels: list of number, width: number, height: number) -> text:
+    # no example: builds a whole image - proven by test_bmp_of_keeps_its_bytes
+    text_of(bmp_header(width, height)) + text_of(bmp_body(pixels, width, height))
+
+define test_bmp_of_keeps_its_bytes():
+    # A one-pixel image of a known colour. 0x141414 is 20,20,20, and BMP rows
+    # are blue-green-red, so the first pixel byte is 20 - not the 0 a lost
+    # element type produced.
+    made = bmp_of([1315860], 1, 1)
+    raw = bytes_of(made)
+    require bytes_count(raw) is 58
+    require byte_at(raw, 0) is 66
+    require byte_at(raw, 1) is 77
+    require byte_at(raw, 54) is 20
+    require byte_at(raw, 55) is 20
+    require byte_at(raw, 56) is 20
 
 # ----- PNG -----
 #
@@ -418,7 +449,12 @@ public define png_bytes(pixels: list of number, width: number, height: number) -
     loop y in 0 until height:
         raw = push(raw, 0)
         loop x in 0 until width:
-            pixel = pixels[y * width + x]
+            # `to_whole` on the read, and it is not decoration: the same pixel
+            # list reads WHOLE at one site and REAL at another in the same
+            # program (ISSUES.md F12), and a colour read as a double is a
+            # denormal - so every byte came out 0 and the image was black at
+            # the right file size. Forcing it makes the read say what it means.
+            pixel = to_whole(pixels[y * width + x])
             raw = push(raw, (pixel // 65536) % 256)
             raw = push(raw, (pixel // 256) % 256)
             raw = push(raw, pixel % 256)

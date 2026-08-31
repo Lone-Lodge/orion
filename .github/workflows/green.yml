@@ -89,6 +89,12 @@ jobs:
       - name: stdlib examples run true
         run: bash tools/example_check.sh
 
+      # And every `test_` function in every orb. `example_check` covers the
+      # one-line claims; this covers the cases an example cannot show. Thirty
+      # of them existed and none had ever run here.
+      - name: orb tests run
+        run: bash tools/orb_test.sh
+
       - name: package system
         run: bash tools/package_test.sh
 
